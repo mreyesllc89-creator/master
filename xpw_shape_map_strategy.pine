@@ -249,6 +249,8 @@ entryMode  = input.string("Area (instant)", "Enter on", options = ["Area (instan
      tooltip = "Area (instant) = the tick the LOW area (long) / HIGH area (short) turns on, intrabar in realtime. Turn = the ▲/▼ confirmation after a square. Square = the wedge itself.")
 areaOnlyNew = input.bool(true, "Area: only on activation (not while it stays on)", group = grpS,
      tooltip = "On = one entry when the area switches on. Off = re-enter any time the area is on and you are flat (e.g. after a stop).")
+areaTiming = input.string("Instant (intrabar)", "Area: trigger timing", options = ["Instant (intrabar)", "Bar close (no flicker)"], group = grpS,
+     tooltip = "Instant = first tick the area turns on, even if it switches off before the close. Bar close = only if the area is still on when the bar closes; order fills at the next bar's open.")
 showAreaBg = input.bool(true, "Shade panel while an area is active", group = grpS)
 tradeDir   = input.string("Both", "Direction", options = ["Both", "Long only", "Short only"], group = grpS)
 useTickReq = input.bool(false, "Require a matching tick within N bars", group = grpS)
@@ -276,8 +278,9 @@ botTickRecent = ta.barssince(botTick) <= tickWindow
 topTickRecent = ta.barssince(topTick) <= tickWindow
 
 // inLow/inHigh are recomputed on every realtime tick, so these fire the moment the area switches on
-areaLong  = areaOnlyNew ? (inLow  and not inLow[1])  : inLow
-areaShort = areaOnlyNew ? (inHigh and not inHigh[1]) : inHigh
+areaConf  = areaTiming == "Instant (intrabar)" or barstate.isconfirmed
+areaLong  = areaConf and (areaOnlyNew ? (inLow  and not inLow[1])  : inLow)
+areaShort = areaConf and (areaOnlyNew ? (inHigh and not inHigh[1]) : inHigh)
 
 bgcolor(showAreaBg and inLow  ? color.new(color.lime, 88) : showAreaBg and inHigh ? color.new(color.red, 88) : na, title = "Area active")
 
