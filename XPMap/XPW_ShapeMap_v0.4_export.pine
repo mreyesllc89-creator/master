@@ -1,0 +1,313 @@
+//@version=6
+// XPW Shape Map v0.4 - EXPORT BUILD for GATE B. Logic IDENTICAL to XPW Shape Map v0.4; the only
+// additions are display.data_window plots of the internal series so "Export chart data" carries
+// TradingView's own values for the diff harness (reference/diff_harness.py --tv).
+// Put it on the TradingView 1S XAUUSD chart with the same settings as the MQL5 panel, export the
+// chart data to CSV, then:  python3 diff_harness.py export.csv --tv
+indicator("XPW Shape Map v0.4 export", "XPW MAP v0.4 X", overlay = false, max_boxes_count = 500, max_labels_count = 500)
+
+// ---------------- TDI ----------------
+gT = "TDI"
+rsiLen     = input.int(14, "RSI length", minval = 2, group = gT)
+fastLen    = input.int(2,  "Fast MA (your RED line)", minval = 1, group = gT)
+slowLen    = input.int(7,  "Slow MA (your LIME line)", minval = 1, group = gT)
+invertFill = input.bool(true, "Panel colours inverted (fast>slow renders RED)", group = gT)
+extLook    = input.int(20, "Lookback for LOW/MID/HIGH area", minval = 5, group = gT)
+loFrac     = input.float(0.33, "LOW area below this fraction", minval = 0.05, maxval = 0.5, step = 0.01, group = gT)
+hiFrac     = input.float(0.67, "HIGH area above this fraction", minval = 0.5, maxval = 0.95, step = 0.01, group = gT)
+
+// ---------------- BOTTOM square ----------------
+gB = "P1a - BOTTOM square (odd RED at a low)"
+sqBotOn   = input.bool(true, "Draw bottom squares", group = gB)
+sqBotMin  = input.int(1, "Min width (bars)", minval = 1, group = gB)
+sqBotMax  = input.int(3, "Max width (bars)", minval = 1, group = gB)
+sqBotCtx  = input.int(2, "Context bars each side", minval = 1, group = gB)
+sqBotSep  = input.float(0.0, "Min separation (0 = off)", minval = 0.0, step = 0.1, group = gB)
+sqBotArea = input.bool(true, "Require LOW area", group = gB)
+
+// ---------------- TOP square ----------------
+gTp = "P1b - TOP square (odd LIME at a high)"
+sqTopOn   = input.bool(true, "Draw top squares", group = gTp)
+sqTopMin  = input.int(1, "Min width (bars)", minval = 1, group = gTp)
+sqTopMax  = input.int(2, "Max width (bars)", minval = 1, group = gTp)
+sqTopCtx  = input.int(3, "Context bars each side", minval = 1, group = gTp)
+sqTopSep  = input.float(0.0, "Min separation (0 = off)", minval = 0.0, step = 0.1, group = gTp)
+sqTopArea = input.bool(true, "Require HIGH area", group = gTp)
+
+// ---------------- Ticks ----------------
+gW = "P2 - tick as compressed cycle"
+tickOn     = input.bool(true, "Mark ticks", group = gW)
+atrLen     = input.int(14, "ATR length", minval = 1, group = gW)
+dnWickFrac = input.float(0.55, "BOTTOM tick: min wick / range", minval = 0.1, maxval = 1.0, step = 0.05, group = gW)
+dnWickAtr  = input.float(0.8,  "BOTTOM tick: min wick / ATR", minval = 0.0, step = 0.1, group = gW)
+upWickFrac = input.float(0.70, "TOP tick: min wick / range", minval = 0.1, maxval = 1.0, step = 0.05, group = gW)
+upWickAtr  = input.float(1.2,  "TOP tick: min wick / ATR", minval = 0.0, step = 0.1, group = gW)
+tickPrice  = input.bool(true, "Put tick marks on the price chart", group = gW)
+
+showTbl = input.bool(true, "Show readout table", group = "P3 - continuity")
+
+// ---------------- TDI plots ----------------
+rsiv = ta.rsi(close, rsiLen)
+fast = ta.sma(rsiv, fastLen)
+slow = ta.sma(rsiv, slowLen)
+
+stUp     = fast > slow
+isRedNow = invertFill ? stUp : not stUp
+
+cRed  = color.new(#ff3b30, 0)
+cLime = color.new(#32d74b, 0)
+
+plot(rsiv, "RSI", color = color.new(color.gray, 60))
+pF = plot(fast, "Fast", color = color.new(color.white, 40))
+pS = plot(slow, "Slow", color = color.new(color.aqua, 40))
+fill(pF, pS, color = color.new(isRedNow ? cRed : cLime, 62))
+
+// ---------------- Run tracker ----------------
+var bool  runInit  = false
+var bool  runState = false
+var int   runLen   = 0
+var int   runStart = 0
+var float runTop   = na
+var float runBot   = na
+var float runSep   = 0.0
+
+var int   prevLen   = 0
+var bool  prevState = false
+var int   prevStart = 0
+var int   prevEnd   = 0
+var float prevTop   = na
+var float prevBot   = na
+var float prevSep   = 0.0
+var int   prev2Len  = 0
+
+var int   botCount   = 0
+var int   topCount   = 0
+var int   lastBotBar = na
+var int   lastTopBar = na
+var int   lastBotW   = 0
+var int   lastTopW   = 0
+var float lastBotSep = na
+var float lastTopSep = na
+
+sep = math.abs(fast - slow)
+
+drawSquare(int l, int r, float t, float b, bool isRed, float refRng, string tag) =>
+    h      = t - b
+    padMin = math.max(refRng * 0.03, 0.10)
+    padv   = h < padMin ? (padMin - h) / 2.0 : 0.0
+    box.new(left = l, top = t + padv, right = r, bottom = b - padv,
+         border_color = isRed ? cRed : cLime, border_width = 2,
+         bgcolor = color.new(isRed ? cRed : cLime, 76), xloc = xloc.bar_index)
+    label.new(x = r, y = isRed ? b - padv : t + padv, text = tag,
+         style = isRed ? label.style_label_up : label.style_label_down,
+         color = color.new(color.black, 100),
+         textcolor = isRed ? cRed : cLime, size = size.tiny)
+
+// export-only: per-bar copies of the hit flags (stamped at the confirmation bar, prevLen or 0)
+botHitX = 0
+topHitX = 0
+
+if barstate.isconfirmed
+    curUp = stUp
+    if not runInit
+        runInit  := true
+        runState := curUp
+        runLen   := 1
+        runStart := bar_index
+        runTop   := math.max(fast, slow)
+        runBot   := math.min(fast, slow)
+        runSep   := sep
+    else if curUp != runState
+        prev2Len  := prevLen
+        prevLen   := runLen
+        prevState := runState
+        prevStart := runStart
+        prevEnd   := bar_index - 1
+        prevTop   := runTop
+        prevBot   := runBot
+        prevSep   := runSep
+        runState := curUp
+        runLen   := 1
+        runStart := bar_index
+        runTop   := math.max(fast, slow)
+        runBot   := math.min(fast, slow)
+        runSep   := sep
+    else
+        runLen := runLen + 1
+        runTop := math.max(runTop, math.max(fast, slow))
+        runBot := math.min(runBot, math.min(fast, slow))
+        runSep := math.max(runSep, sep)
+
+    lo   = ta.lowest(slow, extLook)
+    hi   = ta.highest(slow, extLook)
+    mid  = (prevTop + prevBot) / 2.0
+    frac = hi > lo ? (mid - lo) / (hi - lo) : 0.5
+    isLow  = frac <= loFrac
+    isHigh = frac >= hiFrac
+    wasRed = invertFill ? prevState : not prevState
+
+    botHit = wasRed and runLen == sqBotCtx and prevLen >= sqBotMin and prevLen <= sqBotMax and prev2Len >= sqBotCtx and (not sqBotArea or isLow) and (sqBotSep == 0.0 or prevSep >= sqBotSep)
+
+    topHit = (not wasRed) and runLen == sqTopCtx and prevLen >= sqTopMin and prevLen <= sqTopMax and prev2Len >= sqTopCtx and (not sqTopArea or isHigh) and (sqTopSep == 0.0 or prevSep >= sqTopSep)
+
+    if botHit
+        botHitX    := prevLen
+        botCount   := botCount + 1
+        lastBotBar := prevEnd
+        lastBotW   := prevLen
+        lastBotSep := prevSep
+        if sqBotOn
+            drawSquare(prevStart, prevEnd, prevTop, prevBot, true, hi - lo,
+                 str.format("BOT {0}b sep {1}", prevLen, str.tostring(prevSep, "#.##")))
+
+    if topHit
+        topHitX    := prevLen
+        topCount   := topCount + 1
+        lastTopBar := prevEnd
+        lastTopW   := prevLen
+        lastTopSep := prevSep
+        if sqTopOn
+            drawSquare(prevStart, prevEnd, prevTop, prevBot, false, hi - lo,
+                 str.format("TOP {0}b sep {1}", prevLen, str.tostring(prevSep, "#.##")))
+
+// ---------------- Ticks ----------------
+atrv = ta.atr(atrLen)
+rng  = high - low
+upW  = high - math.max(open, close)
+dnW  = math.min(open, close) - low
+
+upTick = tickOn and barstate.isconfirmed and rng > 0 and upW >= upWickFrac * rng and upW >= upWickAtr * atrv
+dnTick = tickOn and barstate.isconfirmed and rng > 0 and dnW >= dnWickFrac * rng and dnW >= dnWickAtr * atrv
+
+var int   upTickN   = 0
+var int   dnTickN   = 0
+var int   lastUpTk  = na
+var int   lastDnTk  = na
+var float lastUpAtr = na
+var float lastDnAtr = na
+
+if upTick
+    upTickN   := upTickN + 1
+    lastUpTk  := bar_index
+    lastUpAtr := upW / atrv
+    txt = str.format("^ {0} ATR", str.tostring(lastUpAtr, "#.##"))
+    if tickPrice
+        label.new(bar_index, high, txt, style = label.style_label_down,
+             color = color.new(color.black, 100), textcolor = color.new(color.orange, 0),
+             size = size.tiny, force_overlay = true)
+    else
+        label.new(bar_index, 95, txt, style = label.style_label_down,
+             color = color.new(color.black, 100), textcolor = color.new(color.orange, 0),
+             size = size.tiny)
+
+if dnTick
+    dnTickN   := dnTickN + 1
+    lastDnTk  := bar_index
+    lastDnAtr := dnW / atrv
+    txt2 = str.format("v {0} ATR", str.tostring(lastDnAtr, "#.##"))
+    if tickPrice
+        label.new(bar_index, low, txt2, style = label.style_label_up,
+             color = color.new(color.black, 100), textcolor = color.new(color.yellow, 0),
+             size = size.tiny, force_overlay = true)
+    else
+        label.new(bar_index, 5, txt2, style = label.style_label_up,
+             color = color.new(color.black, 100), textcolor = color.new(color.yellow, 0),
+             size = size.tiny)
+
+// ---------------- Continuity ----------------
+var int   mDir   = 0
+var int   mBars  = 0
+var float mStart = na
+var float mPath  = 0.0
+var int   m1Bars = 0
+var float m1Net  = na
+var float m1Path = na
+var int   m2Bars = 0
+var float m2Net  = na
+var float m2Path = na
+
+if barstate.isconfirmed
+    stp = close - close[1]
+    d   = stp > 0 ? 1 : stp < 0 ? -1 : mDir
+    if mDir == 0
+        mDir   := d
+        mBars  := 1
+        mStart := close[1]
+        mPath  := math.abs(stp)
+    else if d == mDir
+        mBars := mBars + 1
+        mPath := mPath + math.abs(stp)
+    else
+        m2Bars := m1Bars
+        m2Net  := m1Net
+        m2Path := m1Path
+        m1Bars := mBars
+        m1Net  := close[1] - mStart
+        m1Path := mPath
+        mDir   := d
+        mBars  := 1
+        mStart := close[1]
+        mPath  := math.abs(stp)
+
+eff1 = na(m1Path) or m1Path == 0 ? na : math.abs(m1Net) / m1Path
+eff2 = na(m2Path) or m2Path == 0 ? na : math.abs(m2Net) / m2Path
+vel1 = na(m1Net) or m1Bars == 0 ? na : math.abs(m1Net) / m1Bars
+vel2 = na(m2Net) or m2Bars == 0 ? na : math.abs(m2Net) / m2Bars
+
+// ---------------- Table ----------------
+f(x, p) => na(x) ? "-" : str.tostring(x, p)
+
+var table tb = table.new(position.middle_right, 2, 8, border_width = 1)
+if showTbl and barstate.islast
+    table.cell(tb, 0, 0, "XPW MAP v0.4", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 0, timeframe.period, text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 1, "state", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 1, str.format("{0} {1}b sep {2}", isRedNow ? "RED" : "LIME", runLen, f(sep, "#.##")),
+         text_color = isRedNow ? cRed : cLime, text_size = size.tiny)
+    table.cell(tb, 0, 2, "BOTTOM squares", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 2, botCount == 0 ? "none" :
+         str.format("n={0}  last {1}b sep {2}, {3} bars ago", botCount, lastBotW, f(lastBotSep, "#.##"), bar_index - lastBotBar),
+         text_color = cRed, text_size = size.tiny)
+    table.cell(tb, 0, 3, "TOP squares", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 3, topCount == 0 ? "none" :
+         str.format("n={0}  last {1}b sep {2}, {3} bars ago", topCount, lastTopW, f(lastTopSep, "#.##"), bar_index - lastTopBar),
+         text_color = cLime, text_size = size.tiny)
+    table.cell(tb, 0, 4, "BOTTOM ticks", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 4, dnTickN == 0 ? "none" :
+         str.format("n={0}  last {1} ATR, {2} bars ago", dnTickN, f(lastDnAtr, "#.##"), bar_index - lastDnTk),
+         text_color = color.new(color.yellow, 0), text_size = size.tiny)
+    table.cell(tb, 0, 5, "TOP ticks", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 5, upTickN == 0 ? "none" :
+         str.format("n={0}  last {1} ATR, {2} bars ago", upTickN, f(lastUpAtr, "#.##"), bar_index - lastUpTk),
+         text_color = color.new(color.orange, 0), text_size = size.tiny)
+    table.cell(tb, 0, 6, "move -1 / -2", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 6, m1Bars == 0 ? "-" :
+         str.format("{0}b eff {1} vel {2}  |  {3}b eff {4} vel {5}", m1Bars, f(eff1, "#.##"), f(vel1, format.mintick), m2Bars, f(eff2, "#.##"), f(vel2, format.mintick)),
+         text_color = color.white, text_size = size.tiny)
+    table.cell(tb, 0, 7, "continuity", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 7, na(eff1) or na(eff2) ? "-" :
+         (eff1 > eff2 ? "move-1 more continuous" : eff1 < eff2 ? "move-2 more continuous" : "equal"),
+         text_color = color.new(color.aqua, 0), text_size = size.tiny)
+
+// ---------------- GATE B export plots (data window only; no visual change) ----------------
+plot(rsiv,                 "rsiv",     display = display.data_window)
+plot(fast,                 "fast",     display = display.data_window)
+plot(slow,                 "slow",     display = display.data_window)
+plot(atrv,                 "atrv",     display = display.data_window)
+plot(isRedNow ? 1 : 0,     "isRedNow", display = display.data_window)
+plot(runLen,               "runLen",   display = display.data_window)
+plot(runTop,               "runTop",   display = display.data_window)
+plot(runBot,               "runBot",   display = display.data_window)
+plot(runSep,               "runSep",   display = display.data_window)
+plot(prevTop,              "prevTop",  display = display.data_window)
+plot(prevBot,              "prevBot",  display = display.data_window)
+plot(prevSep,              "prevSep",  display = display.data_window)
+plot(botHitX,              "botHit",   display = display.data_window)
+plot(topHitX,              "topHit",   display = display.data_window)
+plot(upTick ? 1 : 0,       "upTick",   display = display.data_window)
+plot(dnTick ? 1 : 0,       "dnTick",   display = display.data_window)
+plot(mBars,                "mBars",    display = display.data_window)
+plot(eff1,                 "eff1",     display = display.data_window)
+plot(eff2,                 "eff2",     display = display.data_window)
+plot(vel1,                 "vel1",     display = display.data_window)
+plot(vel2,                 "vel2",     display = display.data_window)

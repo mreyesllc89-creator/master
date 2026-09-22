@@ -1,0 +1,13 @@
+# params: atrLen=2
+# P2 ticks: atrLen=2 so ATR is hand-computable; up fires at 4 and 9, down at 5; blocks: rng==0 (3), wick/range (1), wick/ATR (2,6,7,8), ATR na (0)
+bar,open,high,low,close,exp_rsi,exp_atr,exp_state,exp_runLen,exp_botHit,exp_topHit,exp_upTick,exp_dnTick,exp_upTickAtr,exp_dnTickAtr,exp_mBars,exp_eff1,exp_eff2,exp_vel1,exp_vel2,exp_botSep,exp_botTop,exp_botBot,exp_topSep,exp_topTop,exp_topBot,exp_prevTop
+0,100,101,99,100,,na,,,,,0,0,,,,,,,,,,,,,,
+1,100,101,99,100,,2,,,,,0,0,,,,,,,,,,,,,,
+2,100,102,99.5,100,,2.25,,,,,0,0,,,,,,,,,,,,,,
+3,100,100,100,100,,1.125,,,,,0,0,,,,,,,,,,,,,,
+4,100,104,99.9,100.1,,2.6125,,,,,1,0,1.492823,,,,,,,,,,,,,
+5,100.1,100.2,96,100,,3.40625,,,,,0,1,,1.174312,,,,,,,,,,,,
+6,110,110.5,108,110.2,,6.953125,,,,,0,0,,,,,,,,,,,,,,
+7,110.2,113,110.1,110.3,,4.9265625,,,,,0,0,,,,,,,,,,,,,,
+8,110.3,110.4,110.3,110.3,,2.51328125,,,,,0,0,,,,,,,,,,,,,,
+9,110.3,118,110.3,110.4,,5.106640625,,,,,1,0,1.488258,,,,,,,,,,,,,

@@ -1,0 +1,12 @@
+# params: rsiLen=2 fastLen=1 slowLen=2 extLook=5 sqBotMin=1 sqBotMax=2 sqBotCtx=2 sqTopMin=1 sqTopMax=2 sqTopCtx=2 sqTopSep=10.0
+# P1b top SEP gate block: prevSep 6.993007 < 10.0 -> no hit at 8
+bar,open,high,low,close,exp_rsi,exp_atr,exp_state,exp_runLen,exp_botHit,exp_topHit,exp_upTick,exp_dnTick,exp_upTickAtr,exp_dnTickAtr,exp_mBars,exp_eff1,exp_eff2,exp_vel1,exp_vel2,exp_botSep,exp_botTop,exp_botBot,exp_topSep,exp_topTop,exp_topBot,exp_prevTop
+0,100,100,100,100,,,,,,0,,,,,,,,,,,,,,,,
+1,100,100,99,99,,,,,,0,,,,,,,,,,,,,,,,
+2,99,99,98,98,,,,,,0,,,,,,,,,,,,,,,,
+3,98,98,97,97,,,,,,0,,,,,,,,,,,,,,,,
+4,97,105,97,105,,,,,,0,,,,,,,,,,,,,,,,
+5,105,106,105,106,,,,,,0,,,,,,,,,,,,,,,,
+6,106,106,105.5,105.5,,,,,,0,,,,,,,,,,,,,,,,
+7,105.5,106,105.5,106,,,,,,0,,,,,,,,,,,,,,,,
+8,106,106.5,106,106.5,,,,,,0,,,,,,,,,,,,,,,,

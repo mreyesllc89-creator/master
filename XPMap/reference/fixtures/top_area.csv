@@ -1,0 +1,16 @@
+# params: rsiLen=2 fastLen=1 slowLen=2 extLook=5 sqBotMin=1 sqBotMax=2 sqBotCtx=2 sqTopMin=1 sqTopMax=2 sqTopCtx=2
+# P1b top: fires at bar 8 (prev LIME 1b at bar 6, frac 0.7915 >= 0.67); bar 12 blocked by AREA only (frac 0.1985); bar 5 blocked by width (prev LIME 4b) and prev2Len 0
+bar,open,high,low,close,exp_rsi,exp_atr,exp_state,exp_runLen,exp_botHit,exp_topHit,exp_upTick,exp_dnTick,exp_upTickAtr,exp_dnTickAtr,exp_mBars,exp_eff1,exp_eff2,exp_vel1,exp_vel2,exp_botSep,exp_botTop,exp_botBot,exp_topSep,exp_topTop,exp_topBot,exp_prevTop
+0,100,100,100,100,na,,0,1,0,0,,,,,,,,,,,,,,,,
+1,100,100,99,99,na,,0,2,0,0,,,,,,,,,,,,,,,,
+2,99,99,98,98,0,,0,3,0,0,,,,,,,,,,,,,,,,
+3,98,98,97,97,0,,0,4,0,0,,,,,,,,,,,,,,,,
+4,97,105,97,105,88.888889,,1,1,0,0,,,,,,,,,,,,,,,,
+5,105,106,105,106,90.909091,,1,2,0,0,,,,,,,,,,,,,,,,
+6,106,106,105.5,105.5,76.923077,,0,1,0,0,,,,,,,,,,,,,,,,
+7,105.5,106,105.5,106,82.352941,,1,1,0,0,,,,,,,,,,,,,,,,
+8,106,106.5,106,106.5,88,,1,2,0,1,,,,,,,,,,,,,6.993007,83.916084,76.923077,
+9,106.5,107,106.5,107,92.682927,,1,3,0,0,,,,,,,,,,,,,,,,
+10,107,107,101,101,8.941176,,0,1,0,0,,,,,,,,,,,,,,,,
+11,101,101.5,101,101.5,20.858896,,1,1,0,0,,,,,,,,,,,,,,,,
+12,101.5,102,101.5,102,37.277147,,1,2,0,0,,,,,,,,,,,,,,,,
