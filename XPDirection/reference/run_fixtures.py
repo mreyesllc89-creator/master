@@ -23,7 +23,7 @@ import vote_ref  # noqa: E402
 EA = os.path.join(HERE, "..", "FlashGold_Continuation_v2_XPDIR.mq5")
 FIXTURES = os.path.join(HERE, "fixtures", "vote_rules.csv")
 EMU = os.path.join(HERE, "emu")
-COLS = ("dir", "rule", "conflict")
+COLS = ("dir", "rule", "conflict", "p_grade", "c1_grade")
 
 
 def build_and_run_emu():
@@ -71,7 +71,9 @@ def main():
         got = vote_ref.evaluate_row(row)
         name = row["name"]
         want = {"dir": row["expect_dir"], "rule": row["expect_rule"],
-                "conflict": int(row["expect_conflict"])}
+                "conflict": int(row["expect_conflict"]),
+                "p_grade": row["expect_p_grade"],
+                "c1_grade": row["expect_c1_grade"]}
 
         for col in COLS:
             asserts += 1

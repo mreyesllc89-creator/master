@@ -1,4 +1,4 @@
-WIRED | G0 BLOCKED_NO_TESTER | G1 asserts=403 mismatches=0 | G2 pending | G3 pending | OWNER_TO_CONFIRM: S1RequiredAgainstParent=true, MaxRunLenBars=0, XPDIR_POLARITY | DECISION: yes
+WIRED | G0 BLOCKED_NO_TESTER | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true, XPDIR_POLARITY | DECISION: yes
 
 # XPW Direction Ladder v1 — report
 
@@ -19,24 +19,55 @@ ladder can still point the wrong way, because it is reading an unverified map.**
 
 ---
 
-## 0. Three things found in the files that contradict the prompt
+## 0. What the files said that the prompt did not
 
-These are stated first because two of them change what the code does, and one of
-them can invert every trade.
+These are stated first because one of them can invert every trade, and one of them was
+a live risk until the contract zip arrived and closed it.
 
-### DISCREPANCY-1 — the attached `XPW_ShapeMap_v0.4.mq5` is not the map
+### DISCREPANCY-1 — RESOLVED by the contract zip: two buffer maps existed
 
-The file attached to the prompt is 37 lines with `#property indicator_buffers 26`
-and a buffer map that places `STATE` at 20 and `RUNLEN` at 21. The map named as the
-source of truth (`XPMap/XPW_ShapeMap_v0.4.mq5` @ `579cb33`) is 1,191 lines with
-`indicator_buffers 25` and `STATE` at 22, `RUNLEN` at 23. They are different
-programs — the attachment is a sketch, not the indicator.
+The `XPW_ShapeMap_v0.4.mq5` attached to the original prompt was a 37-line sketch with
+`indicator_buffers 26` and a buffer map placing `FAST` at 24, `SLOW` at 25, `STATE` at
+20 and `RUNLEN` at 21. The map named in §0 as the source of truth
+(`XPMap/XPW_ShapeMap_v0.4.mq5` @ `579cb33`) is 1,191 lines with `indicator_buffers 25`,
+`FAST` at 1, `SLOW` at 2, `STATE` at 22, `RUNLEN` at 23. Different programs, and reading
+the sketch's indices would have had the ladder voting on `VEL2` against `SLOW`.
 
-§0 of the prompt makes the repository file the source of truth and §3.2 says to take
-buffer indices "from the file, never from this prompt". **This build reads buffer 1
-(FAST), 2 (SLOW), 22 (STATE) and 23 (RUNLEN) per the repository file.** Had the
-attachment been believed, every rung would have read `VEL2` as the state and `MBARS`
-as the run length, and the ladder would have voted on noise.
+**`XPMap_ShapeMap_v0.4.zip`, supplied 2026-09-22, settles it.** Its
+`XPMap/XPW_ShapeMap_v0.4.mq5` is **byte-identical** to the repository file at `579cb33`:
+
+```
+$ diff <(git show 579cb33:XPMap/XPW_ShapeMap_v0.4.mq5) mapzip/XPMap/XPW_ShapeMap_v0.4.mq5
+IDENTICAL
+sha256  5653130d70853b643630854ea1bb22b780028acd8d47c9198aa56b9759b52120
+```
+
+The zip's `XPW_SHAPEMAP_PORT_REPORT.md` §5 gives the same map ("25 buffers, 5 plots, 27
+Pine inputs + 3 port-only inputs"; `1 FAST`, `2 SLOW`, EMPTY_VALUE for na), and its 30
+inputs parse in exactly the declaration order this build binds positionally. **The
+contract and the build agree on every index and every parameter position.** The prompt's
+37-line attachment is a stub and nothing was taken from it.
+
+**`BLOCKED_MAP_CONTRACT_MISSING` therefore does not apply** — the contract is in hand,
+and no index was guessed.
+
+### The build checks the contract at runtime anyway
+
+Because two buffer maps were in circulation, `XPDir_ProbeBufferContract` runs once per
+rung on its first valid read. `FAST` and `SLOW` are SMAs of RSI, so a valid value sits
+inside [0, 100] — the map declares `INDICATOR_MINIMUM 0` / `INDICATOR_MAXIMUM 100`
+itself. Values outside that band mean the indicator answering `InpDirMapIndicator` does
+not have the buffer map this build was compiled against:
+
+```
+XPDIR BUF_CONTRACT rung=S1 verdict=OK fast_idx=1 slow_idx=2 fast=54.3117 slow=51.8802
+XPDIR BLOCKED_MAP_CONTRACT_MISMATCH rung=S1 fast_idx=1 slow_idx=2 fast=... slow=...
+   - these are not SMAs of RSI ... this rung is silenced.
+```
+
+A mismatching rung is silenced rather than voted on. If the host ever drops the wrong
+build of the indicator into `MQL5\Indicators`, the log says so in one line instead of
+the ladder trading on `VEL2`.
 
 ### DISCREPANCY-2 — there is no "expected interval" input to override
 
@@ -60,10 +91,10 @@ is written at line 794 and read only by the table and the init print; it gates n
 computation. The EA logs one `XPDIR NOTE rung=P` line at init saying so, so the host
 does not chase it.
 
-### OWNER_TO_CONFIRM: XPDIR_POLARITY — "green" is the map's RED fill
+### OWNER_TO_CONFIRM: XPDIR_POLARITY — the bullish cross is the one into the RED fill
 
-§3.2 defines the bullish vote as **"GREEN (fast above slow on the closed bar) → BUY"**.
-In the map, with its default `invertFill = true`:
+The cross up is taken as BUY: fast cutting **up** through slow votes BUY. In the map,
+with its default `invertFill = true`:
 
 ```mql5
 bool stUp     = (fastOk && slowOk) ? (fast > slow) : false;   // line 813
@@ -72,15 +103,15 @@ BufState[i]   = isRedNow ? 1.0 : 0.0;                         // line 1008
 ```
 
 `fast > slow` — the bullish TDI state — renders **RED** on the panel, and the LIME
-fill is `fast < slow`. So the owner's spoken "the beginning of the green line" and the
-prompt's written "GREEN (fast above slow)" cannot both be the same thing.
+fill is `fast < slow`. So a cross **up** through slow is a cross **into the RED fill**,
+and the owner's spoken "the beginning of the green line" points at the opposite one.
 
-This build implements the prompt's operational definition: **`fast > slow` votes BUY**,
-because that is the bullish TDI reading and it is what §3.2 states in parentheses. If
-the owner meant the panel's LIME fill, every trade this ladder produces is backwards.
-The one-line change if he says LIME: in `XPDir_RungVote`, swap the two returns.
-
-`XPDir_RungVote` is the only place polarity is decided, and Gate 1 covers it.
+This build takes the cross up as BUY, because that is the bullish TDI reading and it is
+what §3.2 states operationally ("fast above slow → BUY"). **If the owner meant the
+cross into the panel's LIME fill, every trade this ladder produces is backwards.** The
+one-line change if he says LIME: in `XPDir_RungVoteFromSeries`, negate `crossDirOut`
+and `stateOut` — `XPDir_Sign` is the single place polarity is decided, and Gate 1
+covers it.
 
 ### Why `STATE` is logged but never voted on
 
@@ -91,13 +122,145 @@ The one-line change if he says LIME: in `XPDir_RungVote`, swap the two returns.
   "fast ≤ slow" *or* "the bar is invalid" — indistinguishable.
 
 `BufFast`/`BufSlow` carry the map's own valid flag (`BufFast[i] = fastOk ? fast :
-EMPTY_VALUE`, line 973). The vote is read from those, and `STATE` is carried into the
-logs for cross-check. This is what §3.2's "use it if the map exposes a state buffer"
-becomes once the file is read rather than described.
+EMPTY_VALUE`, line 973). The cross is computed from those, and `STATE` is carried into
+the logs for cross-check only. This is what §3.2's "use it if the map exposes a state
+buffer" becomes once the file is read rather than described — and it is reinforced by
+§1: the map's `STATE` is a colour, and the colour is not the signal.
 
 ---
 
-## 1. The cut — what changed in the EA
+## 1. The cross is the signal
+
+Owner's correction of 2026-09-22 plus the six answers of the same day, which supersede
+the earlier paste. Direction is not the fill colour. It is the cross of the fast (white)
+line through the slow line; the colour is what the cross leaves behind. A cross has a
+moment and an age. A colour has neither.
+
+Every rung reports a cross event:
+
+| Field | Meaning |
+|---|---|
+| `crossDir` | direction of the **most recent cross since warm-up**, +1 up / −1 down, **held until the next cross**; 0 only while none has been seen |
+| `crossAge` | closed bars since that cross; **0 = it happened on the bar just closed**; −1 = none seen yet |
+| `crossSep` | `fast − slow` at the cross bar, in the map's own units |
+| `sepNow` | `fast − slow` on the bar being read |
+| `carriedSign` | the sign carried forward through ties — the state floor, never the signal |
+
+"Crossed on this bar" is `crossAge == 0`. There is no separate flag.
+
+### Equality is not a sign
+
+A bar where `fast == slow` **inherits the previous closed bar's carried sign**. A touch
+is not a cross. A touch that resumes the same side is not a cross either. Only a
+**strict flip of the carried sign** is a cross, and it is stamped on the bar where the
+new non-zero sign appears — not on the touch bar. If the very first valid bar is a tie,
+the sign is 0 and the rung does not vote until it resolves.
+
+**This deliberately differs from Pine's `ta.crossover`,** which fires on the touch bar.
+Fixtures `touch_and_resume_is_not_a_cross` and `touch_then_flip_stamps_on_new_sign` pin
+both halves.
+
+### Closed bars only
+
+`XPDir_ReadRung` copies from chart index **1**. Index 0 — the forming bar — is never in
+the array and no code path can put it there. `LastBarIsClosed=false` is passed to every
+rung so the map also stops at `rates_total-2`. An early cross read off a forming bar is
+the easiest way to fake good results and lose real money; both layers refuse.
+
+The walk is **incremental**: only bars newer than the last one seen are processed, and
+`carriedSign` / `crossDir` / `crossAge` / `crossSep` persist per rung between reads. So
+`crossAge` is an exact **bar** count across gaps, missing bars and stalls — not a
+division of timestamps. The first read of a rung walks up to 256 closed bars to
+establish the carried sign and any cross inside that reach.
+
+### The vote
+
+| Condition | Vote | Grade |
+|---|---|---|
+| `crossAge` inside `InpDirCrossMaxAgeBars` | `crossDir` | `EARLY` or `FRESH` |
+| `crossAge` older than the window, **or −1 (none seen yet)**, or ageing disabled | `carriedSign` | `STALE_STATE` |
+| map warm-up (`EMPTY_VALUE` on the read bar), stale feed, or sign still 0 | NO_VOTE | — |
+
+An **unknown age is treated as old**, not as absent: a rung that has not yet been seen
+to cross still votes its carried sign, marked `STALE_STATE`, exactly like a cross that
+has aged out. NO_VOTE is reserved for the three cases in the last row.
+
+`InpDirCrossMaxAgeBars = 3` counts the **rung's own bars**: three seconds on S1, 135
+seconds on S45. Early is fractal, like everything else here. `0` is the **pure-colour
+baseline, for comparison only** — every vote becomes the carried sign and every grade
+`STALE_STATE`, while the cross fields keep being logged. The build prints a
+`XPDIR WARN` line at init when it is set, so nobody runs the baseline by accident.
+
+### Grading
+
+| Grade | Condition |
+|---|---|
+| `EARLY` | `crossAge == 0`, or inside the window with `abs(sepNow) ≤ abs(crossSep) × InpDirEarlySepMult` — the lines have barely separated, the move has not been paid out |
+| `FRESH` | inside the window, separation already past the EARLY band |
+| `STALE_STATE` | the vote is the carried sign, not a cross in the window |
+
+`InpDirEarlySepMult = 2.0` is **EQUIVALENT-ASSUMED** and in the header line. Every
+rung's grade and cross age is written to the CSV and printed on every `DIR_STATE` line
+from this first build, with `c1_cross_sep` and `c1_sep_now` beside them, so the band can
+be chosen from data instead of guessed twice.
+
+Grades are three labels. Nothing multiplies them into a score. The only thing a grade
+decides on its own is `InpDirRequireFreshS1`.
+
+### `InpDirRequireFreshS1` — a condition on the rules, not a veto on the vote
+
+Default **false** (`OWNER_TO_CONFIRM`). When true, **any rule that needs `C1 == X` also
+needs S1's grade to be `EARLY` or `FRESH`**: that is R1, and R3 when
+`InpDirS1RequiredAgainstParent` is on. **R2 is unaffected.** No other rung's grade is
+enforced anywhere; all of them are logged.
+
+A stale S1 is **not** deleted — it still counts toward R3's child total. Fixture
+`fresh_s1_stale_still_counts_in_r3` pins that distinction, which is the difference
+between this and the cruder "zero the vote" reading.
+
+**Named consequence, implemented literally.** R2's own condition is `C1 != X`. So when
+`RequireFreshS1` is on, P and a stale C1 both pointing at X with two supporting
+children gives **NONE**: R1 is blocked by the freshness test, and R2 cannot take over
+because `C1 != X` is false. Flip C1 to dissent and the same ladder returns X on R2.
+That follows directly from "R2 unaffected", it is not an accident, and fixture
+`fresh_s1_blocks_r1_and_r2_cannot_cover` holds it in place. If the owner wants R2 to
+cover a stale-C1 R1, that is a one-word change to R2's condition — say so and it moves.
+
+### FINDING — at the defaults, the cross changes nothing a colour ladder would not do
+
+This has to be said plainly, because it decides whether the owner needs to change a
+setting today.
+
+`crossDir` is assigned the new sign at the moment of a cross, and `carriedSign` only
+ever changes at a cross. So **`crossDir` and `carriedSign` are the same value whenever
+`crossDir` is non-zero**, and when it is zero the cross branch cannot fire. The cross
+branch and the state branch therefore **return the same sign, always**. Fixtures
+`unknown_age_votes_state` and `ageing_off_all_stale` show the two branches side by side
+producing the same votes.
+
+Combined with answer 3 — unknown age votes state rather than NO_VOTE — the arithmetic
+is: **at the shipped defaults, this ladder's direction output is identical to a
+pure-colour ladder.** What the cross machinery adds at defaults is measurement: an age,
+a separation and a grade on every rung, on every decision, in a file that sorts.
+
+The one switch that makes the cross *decide* something today is
+**`InpDirRequireFreshS1 = true`**, which is off by default because it is the owner's
+call. Turn it on and a stale S1 stops carrying R1 and R3 — the ladder then trades only
+when the one-second rung has actually crossed inside its window, which is the
+"it crossed early and it's even better" case expressed as a rule. Any further weighting
+belongs in §5 as rules, which is why no scoring formula was invented here.
+
+### Why the carried sign is kept at all
+
+It is the floor. Without it, a ladder in the middle of a long trend where nothing has
+crossed recently goes blind and every rung falls to NO_VOTE. `STALE_STATE` keeps the
+rung voting while making it obvious, in the log and the CSV, that the vote is the floor
+and not a signal. The only path to `STALE_STATE` is the one where no cross sits inside
+the window — reading state where a cross was available is not reachable from here.
+
+---
+
+## 2. The cut — what changed in the EA
 
 Seven 1.03 lines were replaced. Everything else is insertion.
 
@@ -121,9 +284,9 @@ side's block, on the side that actually executed.
 
 ### The exact diff (wiring)
 
-The full machine diff is `reference/ea_1.03_to_1.05_xpdir.diff` (+765 / −7). It
+The full machine diff is `reference/ea_1.03_to_1.05_xpdir.diff` (+1087 / −7). It
 contains two further hunks that are pure insertions with no 1.03 line replaced: the
-input group at 1.03:2170 (+23) and the XPDir module at 1.03:3759 (+690, immediately
+input group at 1.03:2170 (+27) and the XPDir module at 1.03:3759 (+1006, immediately
 before `ManageVirtualPendings`). Everything else is below, verbatim.
 
 ```diff
@@ -136,7 +299,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
  #property strict
  
  #include <Trade\Trade.mqh>
-@@ -2565,6 +2588,10 @@
+@@ -2565,6 +2592,10 @@
     g_MasterVwapTerminalId = MasterVwapTerminalIdFromDataPath();
  
     if(!ValidateAndLogBrokerProfile())
@@ -147,7 +310,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
        return(INIT_FAILED);
  
     // Set the Magic Number properly using the input we just defined
-@@ -2613,6 +2640,7 @@
+@@ -2613,6 +2644,7 @@
  //+------------------------------------------------------------------+
  void OnDeinit(const int reason)
  {
@@ -155,7 +318,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     CP_Deinit();
     LA_FlushOpenPairs();
     XA_ReconcileHistory();
-@@ -3584,7 +3612,14 @@
+@@ -3584,7 +3616,14 @@
        return ENTRY_HOLD_PASS;
  
     g_LastEntryHoldFailureBar = signalBar;
@@ -171,7 +334,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     else g_VirtualSellStopPrice = 0.0;
  
     { if(!MQLInfoInteger(MQL_TESTER)) PrintFormat("PROVISIONAL COST FLOOR FlashGold_Continuation_v2 ENTRY_REJECT side=%s crossing=1 burst_speed_failed=0 burst_direction_failed=0 continuation_failed=0 friction_failed=0 one_entry_per_bar_failed=0 entry_hold_failed=1 prior60_failed=0 hold_move_points=%.1f prior60_drift_points=0.0",
-@@ -3806,15 +4531,27 @@
+@@ -3806,15 +4851,27 @@
        g_LastModTime = TimeCurrent();
     }
  
@@ -201,7 +364,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     {
        const bool cheapGatesPassed = buyHoldActive ||
                                      EntryCandidateApproved(true, tickTimeMsc,
-@@ -3854,6 +4591,8 @@
+@@ -3854,6 +4911,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualBuyStopPrice = 0;
@@ -210,7 +373,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_BUY, trade.ResultOrder());
                    double virtualSL = bid - virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -3878,10 +4617,9 @@
+@@ -3878,10 +4937,9 @@
        }
     }
  
@@ -223,7 +386,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     {
        const bool cheapGatesPassed = sellHoldActive ||
                                      EntryCandidateApproved(false, tickTimeMsc,
-@@ -3921,6 +4659,8 @@
+@@ -3921,6 +4979,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualSellStopPrice = 0;
@@ -232,7 +395,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_SELL, trade.ResultOrder());
                    double virtualSL = ask + virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -4424,6 +5164,24 @@
+@@ -4424,6 +5484,26 @@
        ObjectDelete(0, "Lbl_Pos_0");
        ObjectDelete(0, "Lbl_PosSL_0"); 
     }
@@ -243,11 +406,13 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
 +   else
 +   {
 +      const ENUM_XPDIR d = XPDir_Current();
-+      string dirTxt = StringFormat("DIR: %-4s %-2s P=%s 1:%s 5:%s 10:%s 15:%s 30:%s 45:%s",
++      string dirTxt = StringFormat("DIR: %-4s %-2s P=%s/%s 1:%s/%s 5:%s/%s 10:%s/%s 15:%s 30:%s 45:%s",
 +                                   XPDir_DirName(d),
 +                                   g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "- ",
-+                                   XPDir_VoteTag(XPDIR_IDX_PARENT),
-+                                   XPDir_VoteTag(0), XPDir_VoteTag(1), XPDir_VoteTag(2),
++                                   XPDir_VoteTag(XPDIR_IDX_PARENT), XPDir_GradeLetter(g_XPDirGrade[XPDIR_IDX_PARENT]),
++                                   XPDir_VoteTag(0), XPDir_GradeLetter(g_XPDirGrade[0]),
++                                   XPDir_VoteTag(1), XPDir_GradeLetter(g_XPDirGrade[1]),
++                                   XPDir_VoteTag(2), XPDir_GradeLetter(g_XPDirGrade[2]),
 +                                   XPDir_VoteTag(3), XPDir_VoteTag(4), XPDir_VoteTag(5));
 +      color dirClr = (d == XPDIR_BUY) ? InpDashColor2
 +                     : ((d == XPDIR_SELL) ? InpDashColor3 : clrGray);
@@ -343,7 +508,7 @@ direction has to enter before the side-specific block runs, which is exactly whe
 
 ---
 
-## 2. The ladder
+## 3. The ladder
 
 | Rung | Symbol | TF passed to `iCustom` | Presence |
 |---|---|---|---|
@@ -355,18 +520,24 @@ Every symbol name derives from `_Symbol`. There is no literal `XAUUSD-ECNc` anyw
 in the build — grep it and you get nothing. `SymbolSelect(name, true)` precedes every
 handle.
 
-Per rung, per read (last closed bar, index 1):
+Per rung, per read (a window of closed bars ending at index 1 — see §1):
 
-- **vote** — `fast > slow` ⇒ BUY, `fast < slow` ⇒ SELL, equality ⇒ NO_VOTE.
-- **runlen** — buffer 23, bars since the last colour flip (1 on the flip bar).
-- **valid** — `EMPTY_VALUE` in FAST or SLOW is the map's own flag ⇒ NO_VOTE.
+- **vote** — the cross, aged out: `crossDir` inside the window, the carried sign
+  outside it or before the first observed cross. Graded `EARLY` / `FRESH` /
+  `STALE_STATE`.
+- **valid** — `EMPTY_VALUE` in FAST or SLOW on the read bar ⇒ NO_VOTE (the map's own
+  warm-up). `EMPTY_VALUE` **deeper** in the window is skipped rather than treated as a
+  sign, so a warm-up boundary can never manufacture a cross
+  (fixture `warmup_empty_is_skipped_not_a_cross`).
 - **stale** — `TimeCurrent() − iTime(sym, tf, 1) > InpDirMaxRungStaleBars × interval`
   ⇒ NO_VOTE. Interval: the rung's declared seconds for children,
   `PeriodSeconds(InpDirParentTF)` for the parent (the map does not expose its measured
   interval in a buffer).
-- **fresh** — `InpDirMaxRunLenBars > 0 && runlen > InpDirMaxRunLenBars` ⇒ NO_VOTE.
-  Default 0 (off): the owner's "just at the beginning of the green line" is
-  EQUIVALENT-ASSUMED until he names a number.
+- **sign zero** — a rung whose first valid bar was a tie and never resolved ⇒ NO_VOTE.
+- **RUNLEN** — buffer 23 is read and logged. It is **never voted on**.
+  `InpDirMaxRunLenBars` is gone from this build: the owner's "just at the beginning of
+  the line" is carried by `InpDirCrossMaxAgeBars` and the `EARLY` grade, which measure
+  the cross, and steering by the colour-run length is the thing §1 says not to do.
 
 NO_VOTE is never counted as disagreement — it simply fails to be counted for either
 direction.
@@ -379,16 +550,21 @@ guess.
 
 **Warm-up.** RSI(14) + slow SMA(7) + extLook(20) ⇒ ~21 closed bars before a rung is
 valid: S1 ≈ 30 s, S10 ≈ 4 min, S45 ≈ 16 min. No second warm-up counter was added — the
-map's own valid flag is the warm-up. `XPDIR RUNG_READY rung=… bars=…` prints once, the
-first time a rung votes.
+map's own valid flag is the warm-up. `XPDIR RUNG_READY` prints once, the first time a
+rung votes, and carries the cross that made it vote.
+
+**Scan width.** The first read of a rung walks up to 256 closed bars to establish its
+carried sign and any cross in reach. After that only the bars newer than the last one
+seen are walked (`newBars + 2`, floor 4, cap 256), and the cross state persists between
+reads — so a stall cannot hide a cross and `crossAge` stays an exact bar count.
 
 ### Voting rules
 
 | Rule | Condition |
 |---|---|
-| R1 aligned | `C1 == X and P == X` |
-| R2 parent carries | `P == X`, `C1 != X`, and ≥ `InpDirMinChildrenWithParent` (2) of the enabled optional children `== X` |
-| R3 children overrule | `P != X` and ≥ `InpDirMinChildrenAgainstParent` (3) children `== X` counting S1 as a child; and if `InpDirS1RequiredAgainstParent` (true) then `C1 == X` too |
+| R1 aligned | `C1 == X and P == X` — and, when `InpDirRequireFreshS1`, C1 graded `EARLY`/`FRESH` |
+| R2 parent carries | `P == X`, `C1 != X`, and ≥ `InpDirMinChildrenWithParent` (2) of the enabled optional children `== X`. **Freshness never applies here.** |
+| R3 children overrule | `P != X` and ≥ `InpDirMinChildrenAgainstParent` (3) children `== X` counting S1 as a child; and if `InpDirS1RequiredAgainstParent` (true) then `C1 == X` too — with freshness on that leg when `InpDirRequireFreshS1` |
 
 Direction = X if exactly one direction passes a rule. Both ⇒ NONE +
 `XPDIR DIR_CONFLICT`. Neither ⇒ NONE. R1 and R2 are mutually exclusive by construction
@@ -422,8 +598,13 @@ itself names as able to change between S1 bars. Without that, a dead S1 feed wou
 freeze the cached direction forever, since the cache key is that feed's own bar time.
 Cost is up to seven `CopyBuffer(…, 1, 1, …)` calls per second.
 
-`XPDIR DIR_STATE` prints only when the state line or the rule changes. The Experts tab
-already carries the EA's per-tick lines; nothing was added to that flood.
+`XPDIR DIR_STATE` prints only when the change key moves. That key holds the direction,
+the rule, and every rung's vote **and grade** — but deliberately **not** the cross ages,
+because an age ticks up every bar and would put a line in the log on every bar. The
+printed line still carries the ages as of the moment of the change, which is the moment
+worth reading. A grade decaying `EARLY → FRESH → STALE_STATE` is three lines per cross
+per rung, bounded and meaningful. The Experts tab already carries the EA's per-tick
+lines; nothing was added to that flood.
 
 ### `iCustom` parameter list — 30 inputs, positional, map declaration order
 
@@ -465,7 +646,7 @@ No detector parameter is overridden. The ladder reads the map the owner validate
 
 ---
 
-## 3. New inputs
+## 4. New inputs
 
 One group, appended after `--- Master Order-Flow Telemetry Only ---`. Nothing existing
 moved.
@@ -483,31 +664,48 @@ input bool            InpDirUseS45                  = false;
 input int             InpDirMinChildrenWithParent   = 2;
 input int             InpDirMinChildrenAgainstParent= 3;
 input bool            InpDirS1RequiredAgainstParent = true;
-input int             InpDirMaxRunLenBars           = 0;     // 0 = off
 input int             InpDirMaxRungStaleBars        = 3;
 input bool            InpDirWriteCsv                = true;  // XPDir decision CSV
+//--- the cross is the signal (owner's correction 2026-09-22)
+input int             InpDirCrossMaxAgeBars         = 3;     // in that rung's OWN bars (0 = off)
+input double          InpDirEarlySepMult            = 2.0;   // EARLY band
+input bool            InpDirRequireFreshS1          = false; // S1 must vote a cross
 ```
 
+The three cross inputs are appended at the **end** of the group, so no other input in
+the group moves position. `InpDirMaxRunLenBars` is **removed** per the owner's answer 4:
+RUNLEN is logged, never voted on.
+
 Clamped in `OnInit` (one `XPDIR CLAMP` line when any clamp bites):
-`MinChildrenWithParent ≥ 1`, `MinChildrenAgainstParent ≥ 2`, `MaxRungStaleBars ≥ 1`.
+`MinChildrenWithParent ≥ 1`, `MinChildrenAgainstParent ≥ 2`, `MaxRungStaleBars ≥ 1`,
+`CrossMaxAgeBars ≥ 0`, `EarlySepMult ≥ 0`. A separate `XPDIR WARN` line fires when
+`CrossMaxAgeBars = 0`, because that is the pure-colour baseline and not a tuning.
 
 **Dashboard** — one added line, written **last** in `UpdateDashboard()` so that no
 existing label's Y coordinate moves:
 
 ```
-DIR: BUY  R2 P=BUY 1:SELL 5:BUY 10:BUY 15:- 30:- 45:-
+DIR: BUY  R2 P=BUY/E 1:SELL/F 5:BUY/E 10:BUY/S 15:- 30:- 45:-
 ```
 
-`-` = rung disabled or absent, `NV` = enabled but no vote. In `DIR_OFF` the label is
-deleted rather than drawn.
+`-` = rung disabled or absent, `NV` = enabled but no vote. The letter after the slash
+is the grade: `E` EARLY, `F` FRESH, `S` STALE_STATE. In `DIR_OFF` the label is deleted
+rather than drawn.
 
 **CSV** — `MQL5\Files\XPChart\FlashGold_Continuation_v2_XPDir_v1.csv`, header written
 once, appended with `FILE_SHARE_READ|FILE_SHARE_WRITE` (the `MasterVwapDecision`
 idiom already in 1.03):
 
 ```
-server_msc,event,mode,dir,rule,P,C1,C5,C10,C15,C30,C45,runlen1,trigger_side,exec_side,action
+server_msc,event,mode,dir,rule,P,C1,C5,C10,C15,C30,C45,runlen1,trigger_side,exec_side,action,
+P_g,C1_g,C5_g,C10_g,C15_g,C30_g,C45_g,c1_cross_dir,c1_cross_age,c1_cross_sep,c1_sep_now,c1_state
 ```
+
+The §5 columns come first and in their original order, so anything already parsing this
+file keeps working; the cross columns are appended. Each `*_g` cell is
+`GRADE@crossAge`, e.g. `EARLY@0`, `FRESH@2`, `STALE_STATE@37`, `-`. **This is the file
+that answers `InpDirEarlySepMult`** — sort by `c1_cross_sep` and `c1_sep_now` and the
+"barely separated" band stops being a guess.
 
 `event` ∈ `DIR_STATE | DECISION | HOLD_DROPPED`;
 `action` ∈ `ARMED_BUY | ARMED_SELL | ARMED_NONE | SENT | BLOCKED_NONE | BLOCKED_CONFLICT`.
@@ -517,7 +715,7 @@ identical rows a minute.
 
 ---
 
-## 4. Standing clauses
+## 5. Standing clauses
 
 **Broker-agnostic calibration.** The ladder adds no numeric constant tied to a broker.
 Digits, point, tick size, stops level, contract size and volume min/max/step are still
@@ -548,18 +746,23 @@ g_VirtualSellStopPrice` pair below it. Attach those files and the list becomes a
 finding rather than a blocker.
 
 **Zero-result contingency.** `XPDir_PrintFunnel()` is built in and prints, per rung:
-handle, enabled, bars available, the index-1 bar time, the raw STATE, the run length,
-the vote and the exact NO_VOTE reason (`disabled`, `handle_invalid`, `no_data`,
-`map_invalid`, `no_bar_time`, `stale_<n>s`, `runlen_capped`, `fast_eq_slow`, `ok`).
+handle, enabled, bars available, the index-1 bar time, the vote, the grade, `crossDir`,
+`crossAge`, `crossSep`, `sepNow`, `sign`, `ever_crossed`, the map's raw STATE, the run
+length, and the exact reason (`disabled`, `handle_invalid`, `no_data`, `map_invalid`,
+`no_bar_time`, `stale_<n>s`, `sign_zero`, `buffer_contract`, `state_no_cross_seen`,
+`state_cross_aged_out`, `cross`).
 If a Gate 2 or Gate 3 run produces zero `DIR_STATE` lines after the longest enabled
 rung's warm-up, or stays NONE for the whole run, that is a broken run: re-check symbol
 names, `SymbolSelect`, handle validity, buffer index and closed-bar index **once**, then
 call the funnel and report the still-blocked item as `BLOCKED_RUNG_HANDLE_INVALID`,
-`BLOCKED_BUFFER_INDEX` or `BLOCKED_S1_NEVER_VALID`.
+`BLOCKED_BUFFER_INDEX` or `BLOCKED_S1_NEVER_VALID`. A run where every rung shows
+`why=state_no_cross_seen` is not a broken ladder — it is a ladder whose rungs have not
+been seen to cross yet, still voting their carried signs, and the funnel says so in as
+many words. `why=buffer_contract` means the probe above fired: that one is a real stop.
 
 ---
 
-## 5. Gates
+## 6. Gates
 
 ### Gate 0 — unchanged behaviour: `BLOCKED_NO_TESTER`
 
@@ -591,12 +794,12 @@ claim rests on the diff alone.**
 
 ```
 $ cd XPDirection/reference && python3 run_fixtures.py
-extracted 72 lines of MQL5 rule core -> /tmp/xpdir_emu_*/core.cpp
+extracted 167 lines of MQL5 rule core -> /tmp/xpdir_emu_*/core.cpp
 stub lint: 0 errors 0 warnings
-fixtures=31 asserts=403 mismatches=0 emu=on
+fixtures=49 asserts=833 mismatches=0 emu=on
 ```
 
-Three independent sources must agree on all 31 fixtures, or the gate fails:
+Three independent sources must agree on all 49 fixtures, or the gate fails:
 
 1. the hand-derived expectation written into `fixtures/vote_rules.csv`;
 2. `reference/vote_ref.py`, a transliteration written from §4's text;
@@ -609,14 +812,24 @@ Three independent sources must agree on all 31 fixtures, or the gate fails:
    paraphrase — which is why the rule core was written as pure functions with no
    global read and no runtime call beyond `MathAbs` / `MathIsValidNumber`.
 
-Fixtures cover: R1/R2/R3 each passing alone; R1 winning over an also-satisfied R2; R2
-at exactly the minimum and one child short; R2 with the minimum raised to 3; R3 with
-and without `S1RequiredAgainstParent`; R3 one short; R3 with the minimum raised to 4;
-both-directions conflict **with** `S1Required` true (the §4 defect above) and with it
-false; every rung NO_VOTE; parent NO_VOTE; parent-only and S1-only degenerate ladders;
-`fast == slow`; `EMPTY_VALUE` in FAST and in SLOW; staleness at the boundary, one
-second over, on a child with a 5 s interval, on the parent, and with the window raised;
-the freshness cap off, on, at its boundary, and dropping only some rungs.
+Fixtures cover, on the rule side: R1/R2/R3 each passing alone; R1 winning over an
+also-satisfied R2; R2 at exactly the minimum and one child short; R2 with the minimum
+raised to 3; R3 with and without `S1RequiredAgainstParent`; R3 one short; R3 with the
+minimum raised to 4; both-directions conflict **with** `S1Required` true (the §4 defect
+above) and with it false; every rung NO_VOTE; parent NO_VOTE; parent-only and S1-only
+degenerate ladders; staleness at the boundary, one second over, on a child with a 5 s
+interval, on the parent, and with the window raised.
+
+On the cross side: `EARLY` at age 0 and by the separation band; `FRESH` past the band
+and at the window edge; the band widened by the multiplier; `STALE_STATE` from a cross
+past the window and from an age of −1; **the tie rules** — a touch that resumes the same
+side is not a cross, a touch that flips stamps the cross on the bar carrying the new
+non-zero sign, a tie on the read bar inherits and still votes, and a sign that never
+resolves is NO_VOTE; **persisted cross state** ageing out and staying fresh across a
+read; ageing disabled as the pure-colour baseline; `EMPTY_VALUE` on the read bar and
+deeper in the window; and all five `InpDirRequireFreshS1` cases — R1 blocked with R2
+unable to cover, R1 passing when fresh, R2 unaffected, R3's required leg blocked, and a
+stale S1 still counting toward R3's child total.
 
 ### Gate 2 — wiring, host smoke, DIR_LOCK: pending
 
@@ -626,7 +839,7 @@ Both are host runs; instructions in §6.
 
 ---
 
-## 6. Host instructions
+## 7. Host instructions
 
 **1. Engine services.** Start one `XP ChartEngine v2` service per enabled seconds
 value. With the defaults that is **S1, S5 and S10** (S15/S30/S45 are off). Parent
@@ -641,10 +854,13 @@ Custom symbols land at `Custom\XPChart\XAUUSD-ECNc_S1`, `…_S5`, `…_S10`. Con
 before attaching the EA — a stale axis means a lying ladder.
 
 **2. Compile.**
-- `XPW_ShapeMap_v0.4.mq5` → `MQL5\Indicators\XPW_ShapeMap_v0.4.mq5` (the 1,191-line
-  file from `XPMap/`, **not** the 37-line attachment). `InpDirMapIndicator` resolves
-  relative to `MQL5\Indicators`; if you put it in a subfolder, set the input to
-  `Subfolder\\XPW_ShapeMap_v0.4`.
+- `XPW_ShapeMap_v0.4.mq5` → `MQL5\Indicators\XPW_ShapeMap_v0.4.mq5`. Use the file
+  from `XPMap_ShapeMap_v0.4.zip` (sha256 `5653130d…b52120`, identical to the repository
+  file at `579cb33`) — **not** the 37-line attachment from the original prompt, which
+  has a different buffer map. `InpDirMapIndicator` resolves relative to
+  `MQL5\Indicators`; if you put it in a subfolder, set the input to
+  `Subfolder\\XPW_ShapeMap_v0.4`. The build's `BUF_CONTRACT` probe will tell you at
+  runtime if the wrong one is installed.
 - `FlashGold_Continuation_v2_XPDIR.mq5` → `MQL5\Experts\`.
 - Both must show **0 errors, 0 warnings**. This build was written without MetaEditor;
   the rule core is the only part that has been compiled (by g++, Gate 1). **Report any
@@ -666,7 +882,12 @@ Pass requires all of:
   frozen ladder, not a calm market;
 - the dashboard's armed side matches `dir` (BUY ⇒ `V-SellStop: [Inactive]`, SELL ⇒
   `V-BuyStop: [Inactive]`, NONE ⇒ both inactive);
-- no `ENTRY_CANDIDATE` line ever carries a side opposite to the current `dir`.
+- no `ENTRY_CANDIDATE` line ever carries a side opposite to the current `dir`;
+- every rung logs `XPDIR BUF_CONTRACT … verdict=OK` — a `BLOCKED_MAP_CONTRACT_MISMATCH`
+  means the wrong build of the indicator is installed, and the run is void;
+- the CSV contains rows graded `EARLY` **and** `FRESH` **and** `STALE_STATE`. If every
+  row is `STALE_STATE`, either no rung crossed in 20 minutes (check `c1_cross_age`) or
+  `InpDirCrossMaxAgeBars` was left at 0.
 
 Then **detach and re-attach** mid-run: the armed side must be unchanged afterwards and
 no handle may leak (`XPDIR DEINIT handles_released` prints on every detach;
@@ -684,11 +905,21 @@ Pass requires all of:
 - no double-fire: no two `SENT` rows within `InpModInterval` (15 s) from the same
   trigger level.
 
+**6. Answer `InpDirEarlySepMult` from the Gate 2/3 CSV, not from a guess.** Sort the
+rows by `c1_cross_sep` and `c1_sep_now`. The ratio `abs(c1_sep_now) / abs(c1_cross_sep)`
+at the moment you would call a cross "still early" is the number. 2.0 is a placeholder.
+
+**7. If you want the cross to actually decide something, set
+`InpDirRequireFreshS1 = true`.** See the FINDING in §1: at the shipped defaults the
+ladder's direction output is identical to a pure-colour ladder, and this is the switch
+that changes that. Run Gate 3 once with it off and once with it on, and compare the
+`DECISION` rows.
+
 Send back: the Experts log, the XPDir CSV, and the tester reports from Gate 0.
 
 ---
 
-## 7. Out of scope, confirmed untouched
+## 8. Out of scope, confirmed untouched
 
 Pending order types (`PHASE_3_PENDING_TYPES`). Any change to the map — none was made,
 and the two things that looked like defects are written up in §0 as discrepancies
@@ -698,9 +929,23 @@ map's 27 inputs. Reading the parent through anything other than `iCustom` on `_S
 
 ## DECISION: yes
 
-The ladder is wired, the rule logic is proved against the EA's own executed source, and
-the three remaining gates are host runs with their settings and comparison scripts
-shipped. Two answers are needed before this trades money: the polarity question
-(`XPDIR_POLARITY`) and the two `OWNER_TO_CONFIRM` defaults. And the standing caveat
-holds — **its direction is only as good as the map, and the map's Gates B and C are
-still open.**
+The ladder is wired, the cross reader is built to the owner's six answers, the rule
+logic is proved against the EA's own executed source, and the three remaining gates are
+host runs with their settings and comparison scripts shipped. The map contract is in
+hand and byte-verified, so no buffer index was guessed and the build checks the contract
+again at runtime.
+
+Four things are needed from the owner before this trades money:
+
+1. **`XPDIR_POLARITY`** — the cross up is taken as BUY, which with the map's
+   `invertFill = true` is the cross **into the RED fill**. If "the green line" meant
+   LIME, every trade is backwards. One sign in `XPDir_Sign`.
+2. **`InpDirEarlySepMult = 2.0`** — EQUIVALENT-ASSUMED. Answer it from the Gate 2/3 CSV.
+3. **`InpDirRequireFreshS1 = false`** — and the FINDING in §1 that goes with it: at the
+   shipped defaults this ladder's direction output is identical to a pure-colour
+   ladder. This is the switch that makes the cross decide something.
+4. **`InpDirS1RequiredAgainstParent = true`** — one half of the owner's two
+   contradictory statements about S1.
+
+And the standing caveat holds: **its direction is only as good as the map, and the
+map's Gates B and C are still open.**

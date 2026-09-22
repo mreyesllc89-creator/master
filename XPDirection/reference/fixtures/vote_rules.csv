@@ -1,54 +1,106 @@
 # XPDir Gate 1 fixtures - hand-derived, one case per line.
 #
-# Rung columns are P,S1,S5,S10,S15,S30,S45 and use this grammar:
-#   -                              rung absent/disabled (never a vote, and not
-#                                  counted in the optional set)
-#   nv                             rung present, NO_VOTE
-#   fast|slow|runlen|age|interval  raw map outputs for the last CLOSED bar;
-#                                  EMPTY = EMPTY_VALUE, the map's valid flag
+# THE CROSS IS THE SIGNAL. A rung votes the cross it just made; the carried
+# sign is only the floor it falls back to when no cross sits inside the window.
 #
-# Vote polarity: fast > slow is the bullish TDI state and votes BUY.
-# expect_dir/expect_rule/expect_conflict are derived by hand from prompt S4.
-name,min_with,min_against,s1_required,max_stale,max_runlen,P,S1,S5,S10,S15,S30,S45,expect_dir,expect_rule,expect_conflict
-# ---- R1 aligned: S1 and parent agree ---------------------------------------
-r1_buy_alone,2,3,1,3,0,60|50|4|300|300,60|50|3|1|1,-,-,-,-,-,BUY,R1,0
-r1_sell_alone,2,3,1,3,0,40|50|4|300|300,40|50|3|1|1,-,-,-,-,-,SELL,R1,0
-r1_wins_over_r2,2,3,1,3,0,60|50|4|300|300,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R1,0
-# ---- R2 parent carries: P == X, S1 dissents, >= min_with children ----------
-r2_buy_exact_min,2,3,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R2,0
-r2_one_child_short,2,3,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|5|5,40|50|2|10|10,-,-,-,NONE,-,0
-r2_min_three_children,3,4,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|5|5,60|50|2|10|10,60|50|2|15|15,-,-,BUY,R2,0
-r2_sell_exact_min,2,3,1,3,0,40|50|4|300|300,60|50|3|1|1,40|50|2|5|5,40|50|2|10|10,-,-,-,SELL,R2,0
+# Rung columns are P,S1,S5,S10,S15,S30,S45 and use this grammar:
+#   -    rung absent/disabled (never a vote, not counted in the optional set)
+#   nv   rung present, NO_VOTE
+#   f:s/f:s/...|age|interval|carried|crossdir|crossage|crosssep
+#        the CLOSED-bar series, newest first: index 0 is the bar that just
+#        closed and the forming bar is never in it. EMPTY = EMPTY_VALUE, the
+#        map's valid flag. age = seconds since that bar opened. The last four
+#        are the rung's PERSISTED state going in - carried sign, and the most
+#        recent cross as it stands; 'x' = first read ever (0 / 0 / -1 / 0.0).
+#
+# Equality is not a sign: a tie bar inherits the carried sign, a touch is not a
+# cross, and only a strict flip of the carried sign is one.
+# crossDir persists; "crossed on this bar" is crossAge == 0.
+# Unknown age (-1) is treated as OLD: the rung votes its carried sign,
+# STALE_STATE. NO_VOTE is only map warm-up, a stale feed, or sign still zero.
+# Polarity: fast above slow = +1 = BUY.
+name,min_with,min_against,s1_required,max_stale,cross_max_age,early_sep_mult,require_fresh_s1,P,S1,S5,S10,S15,S30,S45,expect_dir,expect_rule,expect_conflict,expect_p_grade,expect_c1_grade
+# ---- grading one cross ------------------------------------------------------
+grade_early_age0,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,EARLY
+grade_early_by_sep_band,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,53:50/52:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,EARLY
+grade_fresh_widened,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,80:50/70:50/55:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,FRESH
+grade_fresh_at_window_edge,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,80:50/70:50/60:50/55:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,FRESH
+grade_stale_cross_past_window,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,80:50/70:50/60:50/58:50/56:50/55:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,STALE_STATE
+grade_early_band_wider_mult,2,3,1,3,3,8.0,0,60:50/45:50|300|300|x|x|x|x,80:50/70:50/55:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,EARLY
+# ---- crossAge -1: unknown age is treated as OLD, and still votes -----------
+# S1 has never crossed inside anything it has seen. It votes its carried sign,
+# graded STALE_STATE - not NO_VOTE. That is the floor doing its job.
+unknown_age_votes_state,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/59:50/58:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,STALE_STATE
+unknown_age_sell_side,2,3,1,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,40:50/41:50/42:50|1|1|x|x|x|x,-,-,-,-,-,SELL,R1,0,EARLY,STALE_STATE
+# ---- equality: a tie inherits, a touch is not a cross ----------------------
+# fast touches slow and resumes the SAME side. No cross: the carried sign is
+# unchanged, crossAge stays -1, and the vote is STALE_STATE, not a flip.
+touch_and_resume_is_not_a_cross,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,55:50/50:50/55:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,STALE_STATE
+# fast touches slow and comes out the OTHER side: the cross is stamped on the
+# bar where the new non-zero sign appears, NOT on the touch bar.
+touch_then_flip_stamps_on_new_sign,2,3,0,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,45:50/50:50/55:50|1|1|x|x|x|x,-,-,-,-,-,SELL,R1,0,EARLY,EARLY
+# a tie on the newest bar inherits the carried sign and still votes
+tie_on_read_bar_inherits,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,50:50/60:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,EARLY
+# first valid bar is a tie and the sign never resolves -> NO_VOTE
+sign_still_zero_is_no_vote,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,50:50/50:50/50:50|1|1|x|x|x|x,-,-,-,-,-,NONE,-,0,EARLY,-
+# ---- crossDir persists across reads ----------------------------------------
+# Going in, the rung already carries a cross DOWN at age 2. Two more quiet
+# bars age it to 4, past the window, so it falls to STALE_STATE - still SELL.
+persisted_cross_ages_out,2,3,0,3,3,2.0,0,40:50/41:50|300|300|-1|-1|2|-5.0,45:50/46:50|1|1|-1|-1|2|-5.0,-,-,-,-,-,SELL,R1,0,STALE_STATE,STALE_STATE
+# Same persisted cross, one bar newer only: still inside the window.
+persisted_cross_still_fresh,2,3,0,3,3,2.0,0,80:50/70:50|300|300|1|1|0|5.0,20:50|1|1|-1|-1|1|-5.0,-,-,-,-,-,NONE,-,0,FRESH,FRESH
+# ---- ageing disabled: pure-colour baseline ---------------------------------
+ageing_off_all_stale,2,3,1,3,0,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,STALE_STATE,STALE_STATE
+ageing_off_sign_zero_still_nv,2,3,1,3,0,2.0,0,60:50/45:50|300|300|x|x|x|x,50:50/50:50|1|1|x|x|x|x,-,-,-,-,-,NONE,-,0,STALE_STATE,-
+# ---- InpDirRequireFreshS1: a condition on the rules that need C1 == X ------
+# R1 needs C1 == X, so a STALE_STATE S1 blocks it. R2 needs C1 != X, which is
+# false here, so it cannot take over: the direction fails. Named consequence,
+# see the report - this is the literal reading of "R2 unaffected".
+fresh_s1_blocks_r1_and_r2_cannot_cover,2,3,1,3,3,2.0,1,60:50/45:50|300|300|x|x|x|x,60:50/59:50/58:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,NONE,-,0,EARLY,STALE_STATE
+fresh_s1_r1_passes_when_fresh,2,3,1,3,3,2.0,1,60:50/45:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,EARLY
+# R2 is untouched: C1 dissents, so freshness never enters the test.
+fresh_s1_r2_unaffected,2,3,1,3,3,2.0,1,60:50/45:50|300|300|x|x|x|x,40:50/41:50/42:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R2,0,EARLY,STALE_STATE
+# R3 with S1RequiredAgainstParent: the C1 == X leg needs freshness too.
+fresh_s1_blocks_r3_when_required,2,3,1,3,3,2.0,1,40:50/55:50|300|300|x|x|x|x,60:50/59:50/58:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,NONE,-,0,EARLY,STALE_STATE
+# ...but a stale S1 still COUNTS toward R3's child total when S1 is not required.
+fresh_s1_stale_still_counts_in_r3,2,3,0,3,3,2.0,1,40:50/55:50|300|300|x|x|x|x,60:50/59:50/58:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R3,0,EARLY,STALE_STATE
+fresh_s1_off_stale_s1_carries_r1,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/59:50/58:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,STALE_STATE
+# ---- R1 aligned -------------------------------------------------------------
+r1_buy_alone,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,EARLY
+r1_sell_alone,2,3,1,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,40:50/55:50|1|1|x|x|x|x,-,-,-,-,-,SELL,R1,0,EARLY,EARLY
+r1_wins_over_r2,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R1,0,EARLY,EARLY
+# ---- R2 parent carries ------------------------------------------------------
+r2_buy_exact_min,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,40:50/55:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R2,0,EARLY,EARLY
+r2_one_child_short,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,40:50/55:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,40:50/55:50|10|10|x|x|x|x,-,-,-,NONE,-,0,EARLY,EARLY
+r2_min_three_children,3,4,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,40:50/55:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,60:50/45:50|15|15|x|x|x|x,-,-,BUY,R2,0,EARLY,EARLY
+r2_sell_exact_min,2,3,1,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,40:50/55:50|5|5|x|x|x|x,40:50/55:50|10|10|x|x|x|x,-,-,-,SELL,R2,0,EARLY,EARLY
 # ---- R3 children overrule the parent (S1 counts as a child) ----------------
-r3_buy_s1_required_met,2,3,1,3,0,40|50|4|300|300,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R3,0
-r3_blocked_s1_dissents,2,3,1,3,0,40|50|4|300|300,nv,60|50|2|5|5,60|50|2|10|10,60|50|2|15|15,-,-,NONE,-,0
-r3_passes_when_s1_not_required,2,3,0,3,0,40|50|4|300|300,nv,60|50|2|5|5,60|50|2|10|10,60|50|2|15|15,-,-,BUY,R3,0
-r3_one_short,2,3,1,3,0,40|50|4|300|300,60|50|3|1|1,60|50|2|5|5,40|50|2|10|10,-,-,-,NONE,-,0
-r3_parent_novote_children_carry,2,3,1,3,0,nv,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R3,0
-r3_min_four,2,4,1,3,0,40|50|4|300|300,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,60|50|2|15|15,-,-,BUY,R3,0
+r3_buy_s1_required_met,2,3,1,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R3,0,EARLY,EARLY
+r3_blocked_s1_dissents,2,3,1,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,nv,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,60:50/45:50|15|15|x|x|x|x,-,-,NONE,-,0,EARLY,-
+r3_passes_when_s1_not_required,2,3,0,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,nv,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,60:50/45:50|15|15|x|x|x|x,-,-,BUY,R3,0,EARLY,-
+r3_one_short,2,3,1,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,40:50/55:50|10|10|x|x|x|x,-,-,-,NONE,-,0,EARLY,EARLY
+r3_parent_novote_children_carry,2,3,1,3,3,2.0,0,nv,60:50/45:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R3,0,-,EARLY
+r3_min_four,2,4,1,3,3,2.0,0,40:50/55:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,60:50/45:50|15|15|x|x|x|x,-,-,BUY,R3,0,EARLY,EARLY
 # ---- conflict: both directions pass a rule ---------------------------------
 # P=BUY + S5,S10 BUY satisfies R2 for BUY; S1,S15,S30 SELL satisfies R3 for
 # SELL with S1 == SELL, so s1_required does NOT prevent it. The prompt's
 # parenthetical ("possible only with S1RequiredAgainstParent=false") is wrong.
-conflict_with_s1_required,2,3,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|5|5,60|50|2|10|10,40|50|2|15|15,40|50|2|30|30,-,NONE,-,1
-conflict_without_s1_required,2,3,0,3,0,60|50|4|300|300,nv,60|50|2|5|5,60|50|2|10|10,40|50|2|15|15,40|50|2|30|30,40|50|2|45|45,NONE,-,1
+conflict_with_s1_required,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,40:50/55:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,40:50/55:50|15|15|x|x|x|x,40:50/55:50|30|30|x|x|x|x,-,NONE,-,1,EARLY,EARLY
+conflict_without_s1_required,2,3,0,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,nv,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,40:50/55:50|15|15|x|x|x|x,40:50/55:50|30|30|x|x|x|x,40:50/55:50|45|45|x|x|x|x,NONE,-,1,EARLY,-
 # ---- degenerate ladders ----------------------------------------------------
-all_novote,2,3,1,3,0,nv,nv,nv,nv,-,-,-,NONE,-,0
-parent_novote_only_s1,2,3,1,3,0,nv,60|50|3|1|1,-,-,-,-,-,NONE,-,0
-parent_only_no_children,2,3,1,3,0,60|50|4|300|300,nv,-,-,-,-,-,NONE,-,0
-no_optional_children_r1_still_works,2,3,1,3,0,60|50|4|300|300,60|50|3|1|1,-,-,-,-,-,BUY,R1,0
-fast_eq_slow_is_novote,2,3,1,3,0,50|50|4|300|300,50|50|3|1|1,-,-,-,-,-,NONE,-,0
-# ---- map validity flag: EMPTY_VALUE in FAST or SLOW is NO_VOTE -------------
-s1_map_invalid,2,3,1,3,0,60|50|4|300|300,EMPTY|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R2,0
-parent_map_invalid,2,3,1,3,0,60|EMPTY|4|300|300,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R3,0
+all_novote,2,3,1,3,3,2.0,0,nv,nv,nv,nv,-,-,-,NONE,-,0,-,-
+parent_novote_only_s1,2,3,1,3,3,2.0,0,nv,60:50/45:50|1|1|x|x|x|x,-,-,-,-,-,NONE,-,0,-,EARLY
+parent_only_no_children,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,nv,-,-,-,-,-,NONE,-,0,EARLY,-
+single_bar_first_read_votes_state,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,STALE_STATE
+# ---- map validity flag: EMPTY_VALUE on the read bar is NO_VOTE -------------
+s1_map_invalid,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,EMPTY:50/45:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R2,0,EARLY,-
+parent_map_invalid,2,3,1,3,3,2.0,0,60:EMPTY/45:50|300|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R3,0,-,EARLY
+# An EMPTY bar inside the window is skipped, not treated as a sign: warm-up
+# cannot manufacture a cross, and the bars either side still carry through.
+warmup_empty_is_skipped_not_a_cross,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/59:50/EMPTY:50/58:50|1|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,STALE_STATE
 # ---- staleness: age > max_stale x interval is NO_VOTE, not disagreement ----
-s1_stale_at_boundary_votes,2,3,1,3,0,60|50|4|300|300,60|50|3|3|1,-,-,-,-,-,BUY,R1,0
-s1_stale_one_over_is_novote,2,3,1,3,0,60|50|4|300|300,60|50|3|4|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R2,0
-child_stale_not_counted,2,3,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|16|5,60|50|2|10|10,-,-,-,NONE,-,0
-parent_stale_is_novote,2,3,1,3,0,60|50|4|901|300,60|50|3|1|1,60|50|2|5|5,-,-,-,-,NONE,-,0
-stale_window_raised_to_5,2,3,1,5,0,60|50|4|300|300,60|50|3|5|1,-,-,-,-,-,BUY,R1,0
-# ---- freshness cap: runlen > max_runlen is NO_VOTE -------------------------
-runlen_cap_off_long_run_votes,2,3,0,3,0,60|50|40|300|300,60|50|30|1|1,-,-,-,-,-,BUY,R1,0
-runlen_cap_on_long_run_novote,2,3,1,3,3,60|50|40|300|300,60|50|30|1|1,-,-,-,-,-,NONE,-,0
-runlen_cap_on_at_boundary,2,3,1,3,3,60|50|3|300|300,60|50|3|1|1,-,-,-,-,-,BUY,R1,0
-runlen_cap_drops_children_only,2,3,1,3,2,60|50|1|300|300,40|50|1|1|1,60|50|9|5|5,60|50|1|10|10,-,-,-,NONE,-,0
+s1_stale_at_boundary_votes,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/45:50|3|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,EARLY
+s1_stale_one_over_is_novote,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/45:50|4|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,BUY,R2,0,EARLY,-
+child_stale_not_counted,2,3,1,3,3,2.0,0,60:50/45:50|300|300|x|x|x|x,40:50/55:50|1|1|x|x|x|x,60:50/45:50|16|5|x|x|x|x,60:50/45:50|10|10|x|x|x|x,-,-,-,NONE,-,0,EARLY,EARLY
+parent_stale_is_novote,2,3,1,3,3,2.0,0,60:50/45:50|901|300|x|x|x|x,60:50/45:50|1|1|x|x|x|x,60:50/45:50|5|5|x|x|x|x,-,-,-,-,NONE,-,0,-,EARLY
+stale_window_raised_to_5,2,3,1,5,3,2.0,0,60:50/45:50|300|300|x|x|x|x,60:50/45:50|5|1|x|x|x|x,-,-,-,-,-,BUY,R1,0,EARLY,EARLY

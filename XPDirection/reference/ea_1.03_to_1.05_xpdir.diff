@@ -9,7 +9,7 @@
  #property strict
  
  #include <Trade\Trade.mqh>
-@@ -2170,6 +2170,29 @@
+@@ -2170,6 +2170,33 @@
  input string   InpMasterGVPrefix    = "XPW_XAU_"; // Existing master GlobalVariable prefix
  input int      InpMasterMaxStaleMs  = 4000;       // Existing master age limit in milliseconds
  
@@ -32,14 +32,18 @@
 +input int             InpDirMinChildrenWithParent   = 2;
 +input int             InpDirMinChildrenAgainstParent= 3;
 +input bool            InpDirS1RequiredAgainstParent = true;
-+input int             InpDirMaxRunLenBars           = 0;     // 0 = off
 +input int             InpDirMaxRungStaleBars        = 3;
 +input bool            InpDirWriteCsv                = true;  // XPDir decision CSV
++//--- the cross is the signal (owner's correction 2026-09-22). A rung votes
++//    the cross it just made; state is the floor it falls back to, never the signal.
++input int             InpDirCrossMaxAgeBars         = 3;     // cross age window, in that rung's OWN bars (0 = off)
++input double          InpDirEarlySepMult            = 2.0;   // EARLY band: |sepNow| <= |crossSep| * mult
++input bool            InpDirRequireFreshS1          = false; // S1 must vote a cross, never STALE_STATE
 +
  //--- Global Objects
  CContinuationTrade         trade;
  CPositionInfo  posInfo;
-@@ -2565,6 +2588,10 @@
+@@ -2565,6 +2592,10 @@
     g_MasterVwapTerminalId = MasterVwapTerminalIdFromDataPath();
  
     if(!ValidateAndLogBrokerProfile())
@@ -50,7 +54,7 @@
        return(INIT_FAILED);
  
     // Set the Magic Number properly using the input we just defined
-@@ -2613,6 +2640,7 @@
+@@ -2613,6 +2644,7 @@
  //+------------------------------------------------------------------+
  void OnDeinit(const int reason)
  {
@@ -58,7 +62,7 @@
     CP_Deinit();
     LA_FlushOpenPairs();
     XA_ReconcileHistory();
-@@ -3584,7 +3612,14 @@
+@@ -3584,7 +3616,14 @@
        return ENTRY_HOLD_PASS;
  
     g_LastEntryHoldFailureBar = signalBar;
@@ -74,7 +78,7 @@
     else g_VirtualSellStopPrice = 0.0;
  
     { if(!MQLInfoInteger(MQL_TESTER)) PrintFormat("PROVISIONAL COST FLOOR FlashGold_Continuation_v2 ENTRY_REJECT side=%s crossing=1 burst_speed_failed=0 burst_direction_failed=0 continuation_failed=0 friction_failed=0 one_entry_per_bar_failed=0 entry_hold_failed=1 prior60_failed=0 hold_move_points=%.1f prior60_drift_points=0.0",
-@@ -3759,6 +3794,696 @@
+@@ -3759,6 +3798,1012 @@
  }
  
  //+------------------------------------------------------------------+
@@ -103,10 +107,28 @@
 +//|                            for cross-check only; never voted on.  |
 +//|   buffer 23 RUNLEN       : bars in the current colour run, 1 on   |
 +//|                            the flip bar.                          |
-+//| The vote is therefore read from FAST/SLOW: fast > slow is the     |
-+//| bullish TDI state and votes BUY. See the report, OWNER_TO_CONFIRM |
-+//| XPDIR_POLARITY - with invertFill = true that bullish state is the |
-+//| panel's RED fill, not its LIME fill.                              |
++//| THE CROSS IS THE SIGNAL (owner's correction, 2026-09-22).         |
++//| Direction is not the fill colour. It is the cross of the fast      |
++//| (white) line through the slow line; the colour is what the cross   |
++//| leaves behind. A cross has a moment and an age, a colour has       |
++//| neither, and the early crosses - fast cutting through while the    |
++//| fill is still the old colour - are the ones worth having. So every |
++//| rung reports a cross event: crossDir, crossAge, crossSep, sepNow,  |
++//| and state kept only as the floor the vote falls back to when no    |
++//| cross is in the window. Reading state where a cross was available  |
++//| is a defect, not a shortcut.                                       |
++//|                                                                    |
++//| Cross detection is on CLOSED bars only: a cross exists on bar i    |
++//| when sign(fast-slow) at i differs from sign(fast-slow) at i+1.     |
++//| Never on the forming bar - that is the repaint the map's           |
++//| confirmed-bars rule exists to prevent, and an early cross read     |
++//| from a forming bar is the easiest way to fake good results and     |
++//| lose real money. Bar index 1 is the newest bar this code will      |
++//| look at, on every rung, always.                                    |
++//|                                                                    |
++//| Polarity: fast crossing UP through slow votes BUY. See the report, |
++//| OWNER_TO_CONFIRM XPDIR_POLARITY - with the map's invertFill = true |
++//| that bullish cross is the one INTO the panel's RED fill.           |
 +//+------------------------------------------------------------------+
 +#define XPDIR_RUNGS        7
 +#define XPDIR_IDX_S1       0
@@ -115,6 +137,17 @@
 +#define XPDIR_BUF_SLOW     2
 +#define XPDIR_BUF_STATE   22
 +#define XPDIR_BUF_RUNLEN  23
++
++//--- vote grades. Three labels, never multiplied into a score.
++#define XPDIR_GRADE_NONE   0   // no vote
++#define XPDIR_GRADE_EARLY  1   // just crossed, lines barely separated
++#define XPDIR_GRADE_FRESH  2   // crossed inside the window, already widening
++#define XPDIR_GRADE_STALE  3   // vote came from state, not from a cross
++
++//--- how far back a rung read looks for its last cross. Bounded: past the age
++//    window the vote falls back to state anyway, so there is nothing to find.
++#define XPDIR_SCAN_MIN     4
++#define XPDIR_SCAN_MAX   256
 +
 +//--- the map's own defaults, in the map's declaration order. iCustom binds
 +//    positionally, so this list is the contract. Detector inputs are never
@@ -161,15 +194,24 @@
 +bool     g_XPDirEnabled[XPDIR_RUNGS];
 +bool     g_XPDirReadyLogged[XPDIR_RUNGS];
 +int      g_XPDirVote[XPDIR_RUNGS];        // +1 BUY, -1 SELL, 0 NO_VOTE
++int      g_XPDirGrade[XPDIR_RUNGS];       // EARLY / FRESH / STALE_STATE / NONE
++int      g_XPDirCrossDir[XPDIR_RUNGS];    // +1 crossed up, -1 crossed down, 0 none
++int      g_XPDirCrossAge[XPDIR_RUNGS];    // closed bars since that cross; 0 = last bar
++double   g_XPDirCrossSep[XPDIR_RUNGS];    // fast-slow at the cross bar, map units
++double   g_XPDirSepNow[XPDIR_RUNGS];      // fast-slow on the bar being read
++int      g_XPDirSign[XPDIR_RUNGS];        // the CARRIED sign: the state fallback
++bool     g_XPDirBufProbed[XPDIR_RUNGS];   // buffer-contract probe done for this rung
++datetime g_XPDirLastBarTime[XPDIR_RUNGS]; // newest closed bar seen, for the scan width
 +int      g_XPDirRunLen[XPDIR_RUNGS];
-+double   g_XPDirState[XPDIR_RUNGS];
++double   g_XPDirState[XPDIR_RUNGS];       // the map's STATE buffer, logged only
 +string   g_XPDirWhy[XPDIR_RUNGS];         // last NO_VOTE reason (funnel)
 +
 +//--- clamped copies
 +int      g_XPDirMinWith          = 2;
 +int      g_XPDirMinAgainst       = 3;
 +int      g_XPDirMaxStaleBars     = 3;
-+int      g_XPDirMaxRunLenBars    = 0;
++int      g_XPDirCrossMaxAge      = 3;
++double   g_XPDirEarlySepMult     = 2.0;
 +
 +//--- decision cache and state
 +bool     g_XPDirReady            = false;
@@ -196,50 +238,168 @@
 +//| Votes are +1 BUY, -1 SELL, 0 NO_VOTE. NO_VOTE is never counted as |
 +//| disagreement: it simply fails to be counted for either direction. |
 +//+------------------------------------------------------------------+
++// EMPTY_VALUE in FAST or SLOW is the map's own valid flag
++// (XPW_ShapeMap_v0.4.mq5: BufFast[i] = fastOk ? fast : EMPTY_VALUE).
++bool XPDir_CoreIsEmpty(const double v)
++{
++   return (!MathIsValidNumber(v) || MathAbs(v) >= EMPTY_VALUE);
++}
++
++int XPDir_Sign(const double v)
++{
++   if(v > 0.0) return  1;     // fast above slow -> BUY side
++   if(v < 0.0) return -1;
++   return 0;
++}
++
++// Walk the newly CLOSED bars oldest -> newest and carry the sign forward.
++//
++//   fast[]/slow[] are newest-first: index 0 is the bar that just closed, and
++//   the forming bar is never in them. The newCount newest entries are the
++//   bars not yet processed; older entries are context only.
++//
++//   Equality is not a sign. A bar where fast == slow INHERITS the previous
++//   closed bar's carried sign, so a touch is not a cross and a touch that
++//   resumes the same side is not a cross either. Only a strict flip of the
++//   carried sign is a cross, and it is stamped on the bar where the new
++//   non-zero sign appears. (This deliberately differs from Pine's
++//   ta.crossover, which treats the touch bar as the event.)
++//
++//   crossDir PERSISTS: it is the direction of the most recent cross since
++//   warm-up, held until the next one. It is 0 only while no cross has been
++//   seen at all. "Crossed on this bar" is crossAge == 0 - there is no
++//   separate flag.
++//
++// carriedSign / crossDir / crossAge / crossSep are in-out: the caller keeps
++// them per rung between reads, which is what makes crossAge exact across
++// missing bars and stalls instead of a division of timestamps.
++void XPDir_AdvanceCross(const double &fast[], const double &slow[], const int newCount,
++                        int &carriedSign, int &crossDir, int &crossAge, double &crossSep)
++{
++   for(int b = newCount - 1; b >= 0; b--)
++   {
++      if(XPDir_CoreIsEmpty(fast[b]) || XPDir_CoreIsEmpty(slow[b]))
++         continue;                       // the map has not processed this bar
++      const double sep = fast[b] - slow[b];
++      const int    s   = XPDir_Sign(sep);
++      bool crossed = false;
++      if(s != 0)
++      {
++         if(carriedSign == 0)
++            carriedSign = s;             // the first sign of all is not a cross
++         else if(s != carriedSign)
++         {
++            carriedSign = s;
++            crossDir    = s;
++            crossSep    = sep;
++            crossAge    = 0;
++            crossed     = true;
++         }
++      }
++      if(!crossed && crossAge >= 0) crossAge++;
++   }
++}
++
++// One rung's vote.
++//
++//   crossAge inside the window          -> vote = crossDir   (EARLY | FRESH)
++//   crossAge outside it, or -1, or
++//   ageing disabled                     -> vote = carriedSign (STALE_STATE)
++//   map warm-up, stale feed, sign still
++//   zero                                -> NO_VOTE
++//
++// An unknown age (-1, no cross seen yet) is treated as OLD, not as absent: the
++// rung still votes its carried sign, marked STALE_STATE, exactly like a cross
++// that has aged out. NO_VOTE is only for "the map has not produced this bar",
++// "the feed is stale" and "the sign is still zero".
++//
++// crossMaxAgeBars counts the RUNG'S OWN bars: 3 is three seconds on S1 and
++// 135 seconds on S45. "Early" is fractal, like everything else here. 0 makes
++// every vote the carried sign and every grade STALE_STATE - the pure-colour
++// baseline, for comparison only. The cross fields are still logged there.
++int XPDir_VoteFromCross(const double sepNow, const bool bar0Valid,
++                        const int carriedSign, const int crossDir,
++                        const int crossAge, const double crossSep,
++                        const long ageSeconds, const int intervalSeconds,
++                        const int maxStaleBars, const int crossMaxAgeBars,
++                        const double earlySepMult,
++                        int &gradeOut, string &whyOut)
++{
++   gradeOut = XPDIR_GRADE_NONE;
++   if(!bar0Valid)                                            { whyOut = "map_invalid"; return 0; }
++   if(ageSeconds > (long)maxStaleBars * (long)intervalSeconds){ whyOut = "stale";       return 0; }
++   if(carriedSign == 0)                                      { whyOut = "sign_zero";   return 0; }
++
++   if(crossMaxAgeBars > 0 && crossAge >= 0 && crossAge <= crossMaxAgeBars)
++   {
++      // EARLY: it just crossed, or the lines have barely separated and the
++      // move has not been paid out yet. That is the "it crossed early and
++      // it's even better" case.
++      gradeOut = (crossAge == 0 ||
++                  MathAbs(sepNow) <= MathAbs(crossSep) * earlySepMult)
++                 ? XPDIR_GRADE_EARLY : XPDIR_GRADE_FRESH;
++      whyOut = "cross";
++      return crossDir;
++   }
++
++   // state is the floor, never the signal
++   gradeOut = XPDIR_GRADE_STALE;
++   whyOut   = (crossAge < 0) ? "state_no_cross_seen" : "state_cross_aged_out";
++   return carriedSign;
++}
++
 +int XPDir_RulePassesFor(const int x,
 +                        const int parentVote,
 +                        const int s1Vote,
++                        const bool s1Fresh,
 +                        const int &optionalVotes[],
 +                        const int minWithParent,
 +                        const int minAgainstParent,
-+                        const bool s1RequiredAgainstParent)
++                        const bool s1RequiredAgainstParent,
++                        const bool requireFreshS1)
 +{
 +   int nOptional = 0;
 +   for(int i = 0; i < ArraySize(optionalVotes); i++)
 +      if(optionalVotes[i] == x) nOptional++;
 +
++   // requireFreshS1 applies to every rule that NEEDS C1 == X, and to no other.
++   // R2 is untouched by it, and no other rung's grade is ever enforced.
++   const bool s1Counts = (s1Vote == x) && (!requireFreshS1 || s1Fresh);
++
 +   if(parentVote == x)
 +   {
-+      if(s1Vote == x) return 1;                              // R1 aligned
-+      if(nOptional >= minWithParent) return 2;               // R2 parent carries
++      if(s1Counts) return 1;                                 // R1 aligned
++      if(s1Vote != x && nOptional >= minWithParent) return 2; // R2 parent carries
 +      return 0;
 +   }
 +   // P != X. A NO_VOTE parent lands here too: it cannot satisfy R1 or R2,
 +   // and the prompt states R3 as "P != X" literally (report: AMBIGUITY-R3-P-NV).
 +   const int nAgainst = nOptional + ((s1Vote == x) ? 1 : 0); // S1 counts as a child
 +   if(nAgainst >= minAgainstParent &&
-+      (!s1RequiredAgainstParent || s1Vote == x))
++      (!s1RequiredAgainstParent || s1Counts))
 +      return 3;                                              // R3 children overrule
 +   return 0;
 +}
 +
 +int XPDir_DecideFromVotes(const int parentVote,
 +                          const int s1Vote,
++                          const bool s1Fresh,
 +                          const int &optionalVotes[],
 +                          const int minWithParent,
 +                          const int minAgainstParent,
 +                          const bool s1RequiredAgainstParent,
++                          const bool requireFreshS1,
 +                          int &ruleOut,
 +                          bool &conflictOut)
 +{
 +   ruleOut = 0;
 +   conflictOut = false;
-+   const int rBuy  = XPDir_RulePassesFor(1, parentVote, s1Vote, optionalVotes,
++   const int rBuy  = XPDir_RulePassesFor(1, parentVote, s1Vote, s1Fresh, optionalVotes,
 +                                         minWithParent, minAgainstParent,
-+                                         s1RequiredAgainstParent);
-+   const int rSell = XPDir_RulePassesFor(-1, parentVote, s1Vote, optionalVotes,
++                                         s1RequiredAgainstParent, requireFreshS1);
++   const int rSell = XPDir_RulePassesFor(-1, parentVote, s1Vote, s1Fresh, optionalVotes,
 +                                         minWithParent, minAgainstParent,
-+                                         s1RequiredAgainstParent);
++                                         s1RequiredAgainstParent, requireFreshS1);
 +   if(rBuy > 0 && rSell > 0) { conflictOut = true; return 0; }
 +   if(rBuy  > 0) { ruleOut = rBuy;  return  1; }
 +   if(rSell > 0) { ruleOut = rSell; return -1; }
@@ -256,6 +416,39 @@
 +   return "NV";
 +}
 +
++string XPDir_GradeName(const int grade)
++{
++   if(grade == XPDIR_GRADE_EARLY) return "EARLY";
++   if(grade == XPDIR_GRADE_FRESH) return "FRESH";
++   if(grade == XPDIR_GRADE_STALE) return "STALE_STATE";
++   return "-";
++}
++
++string XPDir_GradeLetter(const int grade)
++{
++   if(grade == XPDIR_GRADE_EARLY) return "E";
++   if(grade == XPDIR_GRADE_FRESH) return "F";
++   if(grade == XPDIR_GRADE_STALE) return "S";
++   return "-";
++}
++
++// "BUY:EARLY@0" / "SELL:STALE_STATE@37" / "NV" / "-"
++string XPDir_RungTag(const int rungIndex)
++{
++   if(!g_XPDirEnabled[rungIndex]) return "-";
++   if(g_XPDirVote[rungIndex] == 0) return "NV";
++   return XPDir_VoteTag(rungIndex) + ":" + XPDir_GradeName(g_XPDirGrade[rungIndex]) +
++          "@" + IntegerToString(g_XPDirCrossAge[rungIndex] < 0 ? -1 : g_XPDirCrossAge[rungIndex]);
++}
++
++// the CSV's per-rung grade column: "EARLY@0", "STALE_STATE@37", "-"
++string XPDir_GradeCell(const int rungIndex)
++{
++   if(!g_XPDirEnabled[rungIndex] || g_XPDirGrade[rungIndex] == XPDIR_GRADE_NONE) return "-";
++   return XPDir_GradeName(g_XPDirGrade[rungIndex]) + "@" +
++          IntegerToString(g_XPDirCrossAge[rungIndex] < 0 ? -1 : g_XPDirCrossAge[rungIndex]);
++}
++
 +string XPDir_DirName(const ENUM_XPDIR d)
 +{
 +   if(d == XPDIR_BUY)  return "BUY";
@@ -270,11 +463,6 @@
 +   return "DIR_OFF";
 +}
 +
-+bool XPDir_IsEmptyValue(const double v)
-+{
-+   return (!MathIsValidNumber(v) || v == EMPTY_VALUE || MathAbs(v) >= EMPTY_VALUE);
-+}
-+
 +//+------------------------------------------------------------------+
 +//| CSV                                                               |
 +//+------------------------------------------------------------------+
@@ -283,9 +471,15 @@
 +{
 +   if(!InpDirWriteCsv || InpDirMode == DIR_OFF) return;
 +
++   // The section-5 columns come first and in their original order, so anything
++   // already parsing this file keeps working. The cross columns are appended:
++   // one grade@age cell per rung, plus S1's cross detail.
 +   const string header = "server_msc,event,mode,dir,rule,P,C1,C5,C10,C15,C30,C45,"
-+                         "runlen1,trigger_side,exec_side,action";
-+   const string row = StringFormat("%I64d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s",
++                         "runlen1,trigger_side,exec_side,action,"
++                         "P_g,C1_g,C5_g,C10_g,C15_g,C30_g,C45_g,"
++                         "c1_cross_dir,c1_cross_age,c1_cross_sep,c1_sep_now,c1_state";
++   const string row = StringFormat("%I64d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,"
++                                   "%s,%s,%s,%s,%s,%s,%s,%d,%d,%.6f,%.6f,%d",
 +                                   (long)TimeCurrent() * 1000 + (long)(GetTickCount64() % 1000),
 +                                   eventName, XPDir_ModeName(),
 +                                   XPDir_DirName(g_XPDirCached),
@@ -294,7 +488,13 @@
 +                                   XPDir_VoteTag(0), XPDir_VoteTag(1), XPDir_VoteTag(2),
 +                                   XPDir_VoteTag(3), XPDir_VoteTag(4), XPDir_VoteTag(5),
 +                                   g_XPDirRunLen[XPDIR_IDX_S1],
-+                                   triggerSide, execSide, action);
++                                   triggerSide, execSide, action,
++                                   XPDir_GradeCell(XPDIR_IDX_PARENT),
++                                   XPDir_GradeCell(0), XPDir_GradeCell(1), XPDir_GradeCell(2),
++                                   XPDir_GradeCell(3), XPDir_GradeCell(4), XPDir_GradeCell(5),
++                                   g_XPDirCrossDir[XPDIR_IDX_S1], g_XPDirCrossAge[XPDIR_IDX_S1],
++                                   g_XPDirCrossSep[XPDIR_IDX_S1], g_XPDirSepNow[XPDIR_IDX_S1],
++                                   g_XPDirSign[XPDIR_IDX_S1]);
 +
 +   const int h = FileOpen(XPDIR_CSV_NAME,
 +                          FILE_READ | FILE_WRITE | FILE_ANSI | FILE_SHARE_READ | FILE_SHARE_WRITE, ",");
@@ -385,6 +585,14 @@
 +      g_XPDirEnabled[r]     = false;
 +      g_XPDirReadyLogged[r] = false;
 +      g_XPDirVote[r]        = 0;
++      g_XPDirGrade[r]       = XPDIR_GRADE_NONE;
++      g_XPDirCrossDir[r]    = 0;
++      g_XPDirCrossAge[r]    = -1;
++      g_XPDirCrossSep[r]    = 0.0;
++      g_XPDirSepNow[r]      = 0.0;
++      g_XPDirSign[r]        = 0;
++      g_XPDirBufProbed[r]   = false;
++      g_XPDirLastBarTime[r] = 0;
 +      g_XPDirRunLen[r]      = 0;
 +      g_XPDirState[r]       = EMPTY_VALUE;
 +      g_XPDirWhy[r]         = "init";
@@ -401,12 +609,20 @@
 +   g_XPDirMinWith       = (InpDirMinChildrenWithParent    < 1) ? 1 : InpDirMinChildrenWithParent;
 +   g_XPDirMinAgainst    = (InpDirMinChildrenAgainstParent < 2) ? 2 : InpDirMinChildrenAgainstParent;
 +   g_XPDirMaxStaleBars  = (InpDirMaxRungStaleBars         < 1) ? 1 : InpDirMaxRungStaleBars;
-+   g_XPDirMaxRunLenBars = (InpDirMaxRunLenBars            < 0) ? 0 : InpDirMaxRunLenBars;
++   g_XPDirCrossMaxAge   = (InpDirCrossMaxAgeBars         < 0) ? 0 : InpDirCrossMaxAgeBars;
++   g_XPDirEarlySepMult  = (InpDirEarlySepMult          < 0.0) ? 0.0 : InpDirEarlySepMult;
 +   if(g_XPDirMinWith != InpDirMinChildrenWithParent ||
 +      g_XPDirMinAgainst != InpDirMinChildrenAgainstParent ||
-+      g_XPDirMaxStaleBars != InpDirMaxRungStaleBars)
-+      PrintFormat("XPDIR CLAMP min_with_parent=%d min_against_parent=%d max_stale_bars=%d",
-+                  g_XPDirMinWith, g_XPDirMinAgainst, g_XPDirMaxStaleBars);
++      g_XPDirMaxStaleBars != InpDirMaxRungStaleBars ||
++      g_XPDirCrossMaxAge != InpDirCrossMaxAgeBars ||
++      g_XPDirEarlySepMult != InpDirEarlySepMult)
++      PrintFormat("XPDIR CLAMP min_with_parent=%d min_against_parent=%d max_stale_bars=%d cross_max_age_bars=%d early_sep_mult=%.3f",
++                  g_XPDirMinWith, g_XPDirMinAgainst, g_XPDirMaxStaleBars,
++                  g_XPDirCrossMaxAge, g_XPDirEarlySepMult);
++   if(g_XPDirCrossMaxAge == 0)
++      PrintFormat("XPDIR WARN cross ageing disabled (InpDirCrossMaxAgeBars=0) - every rung "
++                  "votes its state fallback and no vote can ever grade EARLY or FRESH. "
++                  "The cross is the signal; this setting throws it away.");
 +
 +   bool useOptional[5];
 +   useOptional[0] = InpDirUseS5;
@@ -487,14 +703,16 @@
 +
 +   PrintFormat("XPDIR INIT mode=%s indicator=%s parent_tf=%s children=[S1%s%s%s%s%s] "
 +               "min_with_parent=%d min_against_parent=%d s1_required_against_parent=%d "
-+               "max_runlen_bars=%d max_stale_bars=%d csv=%d",
++               "max_stale_bars=%d cross_max_age_bars=%d early_sep_mult=%.2f "
++               "require_fresh_s1=%d csv=%d",
 +               XPDir_ModeName(), InpDirMapIndicator, EnumToString(InpDirParentTF),
 +               g_XPDirEnabled[1] ? ",S5" : "", g_XPDirEnabled[2] ? ",S10" : "",
 +               g_XPDirEnabled[3] ? ",S15" : "", g_XPDirEnabled[4] ? ",S30" : "",
 +               g_XPDirEnabled[5] ? ",S45" : "",
 +               g_XPDirMinWith, g_XPDirMinAgainst,
 +               InpDirS1RequiredAgainstParent ? 1 : 0,
-+               g_XPDirMaxRunLenBars, g_XPDirMaxStaleBars, InpDirWriteCsv ? 1 : 0);
++               g_XPDirMaxStaleBars, g_XPDirCrossMaxAge,
++               g_XPDirEarlySepMult, InpDirRequireFreshS1 ? 1 : 0, InpDirWriteCsv ? 1 : 0);
 +   g_XPDirReady = true;
 +   return true;
 +}
@@ -518,62 +736,136 @@
 +}
 +
 +//+------------------------------------------------------------------+
-+//| One rung read: last CLOSED bar (index 1)                          |
++//| Buffer-contract probe.                                            |
++//|                                                                    |
++//| The map's FAST and SLOW buffers are SMAs of RSI, so a valid value  |
++//| is inside [0, 100] - the map itself declares INDICATOR_MINIMUM 0   |
++//| and INDICATOR_MAXIMUM 100. If the configured indices were pointing |
++//| at VEL2, EFF2 or MBARS instead, the values would not sit in that   |
++//| band. This runs once per rung, on its first valid read, and says   |
++//| so out loud rather than letting the ladder vote on the wrong       |
++//| buffer. See the report, DISCREPANCY-1 (two different buffer maps   |
++//| exist for "XPW_ShapeMap_v0.4").                                    |
++//+------------------------------------------------------------------+
++bool XPDir_ProbeBufferContract(const int r, const double fast, const double slow)
++{
++   if(g_XPDirBufProbed[r]) return true;
++   const bool ok = (fast >= -0.0001 && fast <= 100.0001 &&
++                    slow >= -0.0001 && slow <= 100.0001);
++   g_XPDirBufProbed[r] = true;
++   if(ok)
++   {
++      PrintFormat("XPDIR BUF_CONTRACT rung=%s verdict=OK fast_idx=%d slow_idx=%d fast=%.4f slow=%.4f",
++                  g_XPDirTag[r], XPDIR_BUF_FAST, XPDIR_BUF_SLOW, fast, slow);
++      return true;
++   }
++   PrintFormat("XPDIR BLOCKED_MAP_CONTRACT_MISMATCH rung=%s fast_idx=%d slow_idx=%d fast=%.4f slow=%.4f "
++               "- these are not SMAs of RSI. The indicator answering '%s' does not have the "
++               "buffer map this build was compiled against. Fix XPDIR_BUF_FAST/SLOW or the "
++               "indicator, do not guess: this rung is silenced.",
++               g_XPDirTag[r], XPDIR_BUF_FAST, XPDIR_BUF_SLOW, fast, slow, InpDirMapIndicator);
++   return false;
++}
++
++string XPDir_CarriedName(const int r)
++{
++   if(g_XPDirSign[r] > 0) return "BUY";
++   if(g_XPDirSign[r] < 0) return "SELL";
++   return "-";
++}
++
++//+------------------------------------------------------------------+
++//| One rung read: a window of CLOSED bars ending at index 1.         |
++//| Index 0 of the chart - the forming bar - is never copied. Only    |
++//| the bars newer than the last one seen are walked, so the carried  |
++//| sign, crossDir and crossAge advance exactly across gaps, missing  |
++//| bars and stalls.                                                   |
 +//+------------------------------------------------------------------+
 +void XPDir_ReadRung(const int r)
 +{
-+   g_XPDirVote[r]   = 0;
-+   g_XPDirRunLen[r] = 0;
-+   g_XPDirState[r]  = EMPTY_VALUE;
++   g_XPDirVote[r]     = 0;
++   g_XPDirGrade[r]    = XPDIR_GRADE_NONE;
++   g_XPDirRunLen[r]   = 0;
++   g_XPDirState[r]    = EMPTY_VALUE;
++   // g_XPDirSign / CrossDir / CrossAge / CrossSep persist across reads.
 +
 +   if(!g_XPDirEnabled[r])                { g_XPDirWhy[r] = "disabled";       return; }
 +   if(g_XPDirHandle[r] == INVALID_HANDLE){ g_XPDirWhy[r] = "handle_invalid"; return; }
 +
 +   const ENUM_TIMEFRAMES tf = (r == XPDIR_IDX_PARENT) ? InpDirParentTF : PERIOD_M1;
 +
-+   double fastArr[], slowArr[], runArr[], stateArr[];
-+   if(CopyBuffer(g_XPDirHandle[r], XPDIR_BUF_FAST, 1, 1, fastArr) != 1 ||
-+      CopyBuffer(g_XPDirHandle[r], XPDIR_BUF_SLOW, 1, 1, slowArr) != 1)
-+   { g_XPDirWhy[r] = "no_data"; return; }
-+   if(CopyBuffer(g_XPDirHandle[r], XPDIR_BUF_RUNLEN, 1, 1, runArr) != 1) ArrayResize(runArr, 0);
-+   if(CopyBuffer(g_XPDirHandle[r], XPDIR_BUF_STATE,  1, 1, stateArr) != 1) ArrayResize(stateArr, 0);
-+
-+   const double fast = fastArr[0];
-+   const double slow = slowArr[0];
-+   if(XPDir_IsEmptyValue(fast) || XPDir_IsEmptyValue(slow))
-+   { g_XPDirWhy[r] = "map_invalid"; return; }
-+
-+   if(ArraySize(runArr) == 1 && !XPDir_IsEmptyValue(runArr[0]))
-+      g_XPDirRunLen[r] = (int)MathRound(runArr[0]);
-+   if(ArraySize(stateArr) == 1) g_XPDirState[r] = stateArr[0];
-+
-+   // staleness: the closed bar must not be older than N x the rung interval
 +   const datetime barTime = iTime(g_XPDirSymbol[r], tf, 1);
 +   if(barTime <= 0) { g_XPDirWhy[r] = "no_bar_time"; return; }
-+   const long age = (long)TimeCurrent() - (long)barTime;
-+   if(age > (long)g_XPDirMaxStaleBars * (long)g_XPDirIntervalS[r])
++
++   // how many closed bars are new since the last read
++   int newBars = 1;
++   bool firstRead = (g_XPDirLastBarTime[r] <= 0);
++   if(!firstRead && g_XPDirIntervalS[r] > 0)
 +   {
-+      g_XPDirWhy[r] = StringFormat("stale_%I64ds", age);
++      const long gone = ((long)barTime - (long)g_XPDirLastBarTime[r]) / (long)g_XPDirIntervalS[r];
++      newBars = (int)((gone <= 0) ? 0 : ((gone > XPDIR_SCAN_MAX) ? XPDIR_SCAN_MAX : gone));
++   }
++   int want = firstRead ? XPDIR_SCAN_MAX : (newBars + 2);
++   if(want < XPDIR_SCAN_MIN) want = XPDIR_SCAN_MIN;
++   if(want > XPDIR_SCAN_MAX) want = XPDIR_SCAN_MAX;
++
++   double fastArr[], slowArr[], runArr[], stateArr[];
++   ArraySetAsSeries(fastArr, true);      // [0] = the bar that just closed
++   ArraySetAsSeries(slowArr, true);
++   const int gotFast = CopyBuffer(g_XPDirHandle[r], XPDIR_BUF_FAST, 1, want, fastArr);
++   const int gotSlow = CopyBuffer(g_XPDirHandle[r], XPDIR_BUF_SLOW, 1, want, slowArr);
++   if(gotFast < 1 || gotSlow < 1) { g_XPDirWhy[r] = "no_data"; return; }
++   const int count = (gotFast < gotSlow) ? gotFast : gotSlow;
++
++   if(CopyBuffer(g_XPDirHandle[r], XPDIR_BUF_RUNLEN, 1, 1, runArr) != 1) ArrayResize(runArr, 0);
++   if(CopyBuffer(g_XPDirHandle[r], XPDIR_BUF_STATE,  1, 1, stateArr) != 1) ArrayResize(stateArr, 0);
++   if(ArraySize(runArr) == 1 && !XPDir_CoreIsEmpty(runArr[0]))
++      g_XPDirRunLen[r] = (int)MathRound(runArr[0]);   // logged, never voted on
++   if(ArraySize(stateArr) == 1) g_XPDirState[r] = stateArr[0];
++
++   const bool bar0Valid = !XPDir_CoreIsEmpty(fastArr[0]) && !XPDir_CoreIsEmpty(slowArr[0]);
++   if(bar0Valid && !XPDir_ProbeBufferContract(r, fastArr[0], slowArr[0]))
++   {
++      g_XPDirWhy[r] = "buffer_contract";
++      g_XPDirEnabled[r] = false;          // silenced: never vote on the wrong buffer
 +      return;
 +   }
 +
-+   // freshness cap: only the opening bars of a run may vote
-+   if(g_XPDirMaxRunLenBars > 0 && g_XPDirRunLen[r] > g_XPDirMaxRunLenBars)
-+   { g_XPDirWhy[r] = "runlen_capped"; return; }
++   int advance = firstRead ? count : newBars;
++   if(advance > count) advance = count;
++   if(advance > 0)
++      XPDir_AdvanceCross(fastArr, slowArr, advance,
++                         g_XPDirSign[r], g_XPDirCrossDir[r],
++                         g_XPDirCrossAge[r], g_XPDirCrossSep[r]);
++   g_XPDirLastBarTime[r] = barTime;
 +
-+   if(fast > slow)      g_XPDirVote[r] =  1;    // bullish TDI -> BUY
-+   else if(fast < slow) g_XPDirVote[r] = -1;    // bearish TDI -> SELL
-+   else                 { g_XPDirWhy[r] = "fast_eq_slow"; return; }
++   g_XPDirSepNow[r] = bar0Valid ? (fastArr[0] - slowArr[0]) : 0.0;
++   const long age = (long)TimeCurrent() - (long)barTime;
 +
-+   g_XPDirWhy[r] = "ok";
++   string why = "";
++   int grade = XPDIR_GRADE_NONE;
++   const int vote = XPDir_VoteFromCross(g_XPDirSepNow[r], bar0Valid,
++                                        g_XPDirSign[r], g_XPDirCrossDir[r],
++                                        g_XPDirCrossAge[r], g_XPDirCrossSep[r],
++                                        age, g_XPDirIntervalS[r], g_XPDirMaxStaleBars,
++                                        g_XPDirCrossMaxAge, g_XPDirEarlySepMult,
++                                        grade, why);
++   g_XPDirVote[r]  = vote;
++   g_XPDirGrade[r] = grade;
++   if(why == "stale") why = StringFormat("stale_%I64ds", age);
++   g_XPDirWhy[r] = why;
++
++   if(vote == 0) return;
++
 +   if(!g_XPDirReadyLogged[r])
 +   {
 +      g_XPDirReadyLogged[r] = true;
-+      PrintFormat("XPDIR RUNG_READY rung=%s symbol=%s bars=%d fast=%.4f slow=%.4f state=%s runlen=%d vote=%s",
-+                  g_XPDirTag[r], g_XPDirSymbol[r], Bars(g_XPDirSymbol[r], tf),
-+                  fast, slow,
-+                  XPDir_IsEmptyValue(g_XPDirState[r]) ? "-" : DoubleToString(g_XPDirState[r], 0),
-+                  g_XPDirRunLen[r], XPDir_VoteTag(r));
++      PrintFormat("XPDIR RUNG_READY rung=%s symbol=%s bars=%d scan=%d vote=%s grade=%s "
++                  "cross_dir=%d cross_age=%d cross_sep=%.6f sep_now=%.6f carried=%s runlen=%d",
++                  g_XPDirTag[r], g_XPDirSymbol[r], Bars(g_XPDirSymbol[r], tf), count,
++                  XPDir_VoteTag(r), XPDir_GradeName(grade), g_XPDirCrossDir[r],
++                  g_XPDirCrossAge[r], g_XPDirCrossSep[r], g_XPDirSepNow[r],
++                  XPDir_CarriedName(r), g_XPDirRunLen[r]);
 +   }
 +}
 +
@@ -604,14 +896,22 @@
 +      optional[n] = g_XPDirVote[r];
 +   }
 +
++   // S1 freshness does not delete S1's vote: it is a condition on the rules
++   // that NEED C1 == X (R1, and R3 when S1RequiredAgainstParent). R2 is
++   // untouched, and S1 still counts toward R3's child total either way.
++   const bool s1Fresh = (g_XPDirGrade[XPDIR_IDX_S1] == XPDIR_GRADE_EARLY ||
++                         g_XPDirGrade[XPDIR_IDX_S1] == XPDIR_GRADE_FRESH);
++
 +   int rule = 0;
 +   bool conflict = false;
 +   const int decided = XPDir_DecideFromVotes(g_XPDirVote[XPDIR_IDX_PARENT],
 +                                             g_XPDirVote[XPDIR_IDX_S1],
++                                             s1Fresh,
 +                                             optional,
 +                                             g_XPDirMinWith,
 +                                             g_XPDirMinAgainst,
 +                                             InpDirS1RequiredAgainstParent,
++                                             InpDirRequireFreshS1,
 +                                             rule, conflict);
 +
 +   g_XPDirCached         = (decided > 0) ? XPDIR_BUY : ((decided < 0) ? XPDIR_SELL : XPDIR_NONE);
@@ -621,16 +921,30 @@
 +   g_XPDirCacheSecond    = nowSec;
 +   g_XPDirCacheFilled    = true;
 +
++   // The change key holds votes and GRADES but not the cross ages: an age ticks
++   // up every bar and would print a DIR_STATE line every bar. A grade change
++   // (EARLY -> FRESH -> STALE_STATE) is the part worth a line, and the line
++   // itself carries the ages as of that moment.
++   const string key = StringFormat("%s|%s|%s|%s|%s|%s|%s|%s|%s",
++                                   XPDir_DirName(g_XPDirCached),
++                                   rule > 0 ? "R" + IntegerToString(rule) : "-",
++                                   XPDir_VoteTag(XPDIR_IDX_PARENT) + XPDir_GradeLetter(g_XPDirGrade[XPDIR_IDX_PARENT]),
++                                   XPDir_VoteTag(0) + XPDir_GradeLetter(g_XPDirGrade[0]),
++                                   XPDir_VoteTag(1) + XPDir_GradeLetter(g_XPDirGrade[1]),
++                                   XPDir_VoteTag(2) + XPDir_GradeLetter(g_XPDirGrade[2]),
++                                   XPDir_VoteTag(3) + XPDir_GradeLetter(g_XPDirGrade[3]),
++                                   XPDir_VoteTag(4) + XPDir_GradeLetter(g_XPDirGrade[4]),
++                                   XPDir_VoteTag(5) + XPDir_GradeLetter(g_XPDirGrade[5]));
 +   const string line = StringFormat("dir=%s rule=%s P=%s C1=%s C5=%s C10=%s C15=%s C30=%s C45=%s runlen1=%d",
 +                                    XPDir_DirName(g_XPDirCached),
 +                                    rule > 0 ? "R" + IntegerToString(rule) : "-",
-+                                    XPDir_VoteTag(XPDIR_IDX_PARENT),
-+                                    XPDir_VoteTag(0), XPDir_VoteTag(1), XPDir_VoteTag(2),
-+                                    XPDir_VoteTag(3), XPDir_VoteTag(4), XPDir_VoteTag(5),
++                                    XPDir_RungTag(XPDIR_IDX_PARENT),
++                                    XPDir_RungTag(0), XPDir_RungTag(1), XPDir_RungTag(2),
++                                    XPDir_RungTag(3), XPDir_RungTag(4), XPDir_RungTag(5),
 +                                    g_XPDirRunLen[XPDIR_IDX_S1]);
-+   if(line != g_XPDirLastStateLine)
++   if(key != g_XPDirLastStateLine)
 +   {
-+      g_XPDirLastStateLine = line;
++      g_XPDirLastStateLine = key;
 +      g_XPDirStateLines++;
 +      PrintFormat("XPDIR DIR_STATE %s", line);
 +      if(conflict)
@@ -653,12 +967,16 @@
 +   {
 +      const ENUM_TIMEFRAMES tf = (r == XPDIR_IDX_PARENT) ? InpDirParentTF : PERIOD_M1;
 +      PrintFormat("XPDIR FUNNEL rung=%s symbol=%s enabled=%d handle=%d bars=%d bar1_time=%s "
-+                  "state=%s runlen=%d vote=%s why=%s",
++                  "vote=%s grade=%s cross_dir=%d cross_age=%d cross_sep=%.6f sep_now=%.6f "
++                  "carried_sign=%d carried=%s map_state=%s runlen=%d why=%s",
 +                  g_XPDirTag[r], g_XPDirSymbol[r], g_XPDirEnabled[r] ? 1 : 0,
 +                  g_XPDirHandle[r], g_XPDirSymbol[r] == "" ? 0 : Bars(g_XPDirSymbol[r], tf),
 +                  TimeToString(iTime(g_XPDirSymbol[r], tf, 1), TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-+                  XPDir_IsEmptyValue(g_XPDirState[r]) ? "-" : DoubleToString(g_XPDirState[r], 0),
-+                  g_XPDirRunLen[r], XPDir_VoteTag(r), g_XPDirWhy[r]);
++                  XPDir_VoteTag(r), XPDir_GradeName(g_XPDirGrade[r]),
++                  g_XPDirCrossDir[r], g_XPDirCrossAge[r], g_XPDirCrossSep[r], g_XPDirSepNow[r],
++                  g_XPDirSign[r], XPDir_CarriedName(r),
++                  XPDir_CoreIsEmpty(g_XPDirState[r]) ? "-" : DoubleToString(g_XPDirState[r], 0),
++                  g_XPDirRunLen[r], g_XPDirWhy[r]);
 +   }
 +}
 +
@@ -760,10 +1078,12 @@
 +                              ? (g_XPDirHoldTriggerIsBuy ? "BUY" : "SELL")
 +                              : (execIsBuy ? "BUY" : "SELL");
 +   const string execSide = execIsBuy ? "BUY" : "SELL";
-+   PrintFormat("XPDIR DECISION mode=%s dir=%s rule=%s trigger_side=%s exec_side=%s action=SENT translated=%d",
++   PrintFormat("XPDIR DECISION mode=%s dir=%s rule=%s trigger_side=%s exec_side=%s action=SENT "
++               "translated=%d C1=%s P=%s",
 +               XPDir_ModeName(), XPDir_DirName(g_XPDirCached),
 +               g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "-",
-+               triggerSide, execSide, (triggerSide != execSide) ? 1 : 0);
++               triggerSide, execSide, (triggerSide != execSide) ? 1 : 0,
++               XPDir_RungTag(XPDIR_IDX_S1), XPDir_RungTag(XPDIR_IDX_PARENT));
 +   XPDir_WriteCsv("DECISION", triggerSide, execSide, "SENT");
 +}
 +
@@ -771,7 +1091,7 @@
  //| Logic: Manage Virtual Pending Orders                             |
  //+------------------------------------------------------------------+
  void ManageVirtualPendings(double ask, double bid, double spread, double point,
-@@ -3806,15 +4531,27 @@
+@@ -3806,15 +4851,27 @@
        g_LastModTime = TimeCurrent();
     }
  
@@ -801,7 +1121,7 @@
     {
        const bool cheapGatesPassed = buyHoldActive ||
                                      EntryCandidateApproved(true, tickTimeMsc,
-@@ -3854,6 +4591,8 @@
+@@ -3854,6 +4911,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualBuyStopPrice = 0;
@@ -810,7 +1130,7 @@
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_BUY, trade.ResultOrder());
                    double virtualSL = bid - virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -3878,10 +4617,9 @@
+@@ -3878,10 +4937,9 @@
        }
     }
  
@@ -823,7 +1143,7 @@
     {
        const bool cheapGatesPassed = sellHoldActive ||
                                      EntryCandidateApproved(false, tickTimeMsc,
-@@ -3921,6 +4659,8 @@
+@@ -3921,6 +4979,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualSellStopPrice = 0;
@@ -832,7 +1152,7 @@
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_SELL, trade.ResultOrder());
                    double virtualSL = ask + virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -4424,6 +5164,24 @@
+@@ -4424,6 +5484,26 @@
        ObjectDelete(0, "Lbl_Pos_0");
        ObjectDelete(0, "Lbl_PosSL_0"); 
     }
@@ -843,11 +1163,13 @@
 +   else
 +   {
 +      const ENUM_XPDIR d = XPDir_Current();
-+      string dirTxt = StringFormat("DIR: %-4s %-2s P=%s 1:%s 5:%s 10:%s 15:%s 30:%s 45:%s",
++      string dirTxt = StringFormat("DIR: %-4s %-2s P=%s/%s 1:%s/%s 5:%s/%s 10:%s/%s 15:%s 30:%s 45:%s",
 +                                   XPDir_DirName(d),
 +                                   g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "- ",
-+                                   XPDir_VoteTag(XPDIR_IDX_PARENT),
-+                                   XPDir_VoteTag(0), XPDir_VoteTag(1), XPDir_VoteTag(2),
++                                   XPDir_VoteTag(XPDIR_IDX_PARENT), XPDir_GradeLetter(g_XPDirGrade[XPDIR_IDX_PARENT]),
++                                   XPDir_VoteTag(0), XPDir_GradeLetter(g_XPDirGrade[0]),
++                                   XPDir_VoteTag(1), XPDir_GradeLetter(g_XPDirGrade[1]),
++                                   XPDir_VoteTag(2), XPDir_GradeLetter(g_XPDirGrade[2]),
 +                                   XPDir_VoteTag(3), XPDir_VoteTag(4), XPDir_VoteTag(5));
 +      color dirClr = (d == XPDIR_BUY) ? InpDashColor2
 +                     : ((d == XPDIR_SELL) ? InpDashColor3 : clrGray);
