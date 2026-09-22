@@ -2142,6 +2142,7 @@ input int      InpModInterval    = 15;       // Seconds between entry modificati
    input int      InpBurstLookbackMs      = 1000;   // Burst midpoint displacement window (ms)
    input bool     InpUseBurstGate         = false;  // Burst bundle gate (magnitude/direction/continuation)
    input ENUM_BURST_THRESHOLD_MODE InpBurstThresholdMode = BURST_THRESHOLD_FIXED;
+   input double   InpBurstThresholdFixed  = 172.0;   // Fixed burst threshold (Points); used when mode = FIXED
    input double   InpBurstPercentile      = 99.0;   // Rolling absolute-burst percentile
    input int      InpBurstWindowSamples   = 2000;   // Prior observations; current sample excluded
 
@@ -2246,7 +2247,9 @@ const double   BROKER_DISTANCE_BUFFER_POINTS = 3.0;
 
 //--- Hard pre-entry signal gates and conflict-resolution limits
 #define BURST_BUFFER_CAPACITY 20000
-const double   BURST_MIN_POINTS            = 172.0;
+// BURST_MIN_POINTS retired: the fixed-mode threshold is now the input
+// InpBurstThresholdFixed, whose default is the 172.0 this constant held.
+// One number, one place to edit - a dead constant beside a live input is a trap.
 const int      CONTINUATION_TICKS          = 5;
 
 double         internalOrderDistance = 0.0;
@@ -2564,7 +2567,7 @@ bool GetActiveBurstThreshold(double &thresholdPoints, int &sampleCount)
 {
    if(InpBurstThresholdMode == BURST_THRESHOLD_FIXED)
    {
-      thresholdPoints = BURST_MIN_POINTS;
+      thresholdPoints = InpBurstThresholdFixed;
       sampleCount = g_BurstPercentileCount;
       return true;
    }
@@ -2579,12 +2582,13 @@ int OnInit()
    if(!CP_Init()) return INIT_PARAMETERS_INCORRECT;
    if(InpBurstPercentile < 0.0 || InpBurstPercentile > 100.0 ||
       InpBurstWindowSamples < 2 || InpBurstLookbackMs <= 0 ||
-      InpEntryHoldMs < 0 || InpEntryHoldMinFavPoints < 0.0)
+      InpEntryHoldMs < 0 || InpEntryHoldMinFavPoints < 0.0 ||
+      InpBurstThresholdFixed <= 0.0)
    {
-      PrintFormat("FlashGold_Continuation_v2 INIT_ABORT invalid gate settings burst_percentile=%.4f burst_window_samples=%d burst_lookback_ms=%d entry_hold_ms=%d entry_hold_min_fav_points=%.1f",
+      PrintFormat("FlashGold_Continuation_v2 INIT_ABORT invalid gate settings burst_percentile=%.4f burst_window_samples=%d burst_lookback_ms=%d entry_hold_ms=%d entry_hold_min_fav_points=%.1f burst_threshold_fixed_points=%.1f",
                   InpBurstPercentile, InpBurstWindowSamples,
                   InpBurstLookbackMs, InpEntryHoldMs,
-                  InpEntryHoldMinFavPoints);
+                  InpEntryHoldMinFavPoints, InpBurstThresholdFixed);
       return(INIT_PARAMETERS_INCORRECT);
    }
 
@@ -2623,7 +2627,7 @@ int OnInit()
                PROVISIONAL_ROUND_TRIP_COST_POINTS,
                MAX_ENTRY_DISTANCE_POINTS,
                InpUseBurstGate ? 1 : 0,
-               BurstThresholdModeName(), BURST_MIN_POINTS,
+               BurstThresholdModeName(), InpBurstThresholdFixed,
                InpBurstPercentile, InpBurstWindowSamples,
                InpUseEntryHold ? 1 : 0, InpEntryHoldMs,
                InpEntryHoldMinFavPoints);
@@ -3511,7 +3515,7 @@ bool EntryCandidateApproved(bool isBuy, long tickTimeMsc, double midPrice, doubl
                BurstThresholdModeName(),
                burstAvailable ? 1 : 0, burstPoints,
                burstThresholdAvailable ? 1 : 0,
-               burstThresholdPoints, BURST_MIN_POINTS,
+               burstThresholdPoints, InpBurstThresholdFixed,
                InpBurstPercentile, burstThresholdSampleCount,
                InpBurstWindowSamples,
                burstSpeedPassed ? 1 : 0,

@@ -9,10 +9,19 @@
  #property strict
  
  #include <Trade\Trade.mqh>
-@@ -2170,6 +2170,33 @@
+@@ -2142,6 +2142,7 @@
+    input int      InpBurstLookbackMs      = 1000;   // Burst midpoint displacement window (ms)
+    input bool     InpUseBurstGate         = false;  // Burst bundle gate (magnitude/direction/continuation)
+    input ENUM_BURST_THRESHOLD_MODE InpBurstThresholdMode = BURST_THRESHOLD_FIXED;
++   input double   InpBurstThresholdFixed  = 172.0;   // Fixed burst threshold (Points); used when mode = FIXED
+    input double   InpBurstPercentile      = 99.0;   // Rolling absolute-burst percentile
+    input int      InpBurstWindowSamples   = 2000;   // Prior observations; current sample excluded
+ 
+@@ -2169,6 +2170,33 @@
+ input group "--- Master Order-Flow Telemetry Only ---"
  input string   InpMasterGVPrefix    = "XPW_XAU_"; // Existing master GlobalVariable prefix
  input int      InpMasterMaxStaleMs  = 4000;       // Existing master age limit in milliseconds
- 
++
 +//+------------------------------------------------------------------+
 +//| XPW Direction Ladder v1 - the EA stops choosing its own side.     |
 +//| DIR_OFF reproduces 1.03 exactly (no handles, no reads, no writes).|
@@ -39,11 +48,48 @@
 +input int             InpDirCrossMaxAgeBars         = 3;     // cross age window, in that rung's OWN bars (0 = off)
 +input double          InpDirEarlySepMult            = 2.0;   // EARLY band: |sepNow| <= |crossSep| * mult
 +input bool            InpDirRequireFreshS1          = false; // S1 must vote a cross, never STALE_STATE
-+
+ 
  //--- Global Objects
  CContinuationTrade         trade;
- CPositionInfo  posInfo;
-@@ -2565,6 +2592,10 @@
+@@ -2219,7 +2247,9 @@
+ 
+ //--- Hard pre-entry signal gates and conflict-resolution limits
+ #define BURST_BUFFER_CAPACITY 20000
+-const double   BURST_MIN_POINTS            = 172.0;
++// BURST_MIN_POINTS retired: the fixed-mode threshold is now the input
++// InpBurstThresholdFixed, whose default is the 172.0 this constant held.
++// One number, one place to edit - a dead constant beside a live input is a trap.
+ const int      CONTINUATION_TICKS          = 5;
+ 
+ double         internalOrderDistance = 0.0;
+@@ -2537,7 +2567,7 @@
+ {
+    if(InpBurstThresholdMode == BURST_THRESHOLD_FIXED)
+    {
+-      thresholdPoints = BURST_MIN_POINTS;
++      thresholdPoints = InpBurstThresholdFixed;
+       sampleCount = g_BurstPercentileCount;
+       return true;
+    }
+@@ -2552,12 +2582,13 @@
+    if(!CP_Init()) return INIT_PARAMETERS_INCORRECT;
+    if(InpBurstPercentile < 0.0 || InpBurstPercentile > 100.0 ||
+       InpBurstWindowSamples < 2 || InpBurstLookbackMs <= 0 ||
+-      InpEntryHoldMs < 0 || InpEntryHoldMinFavPoints < 0.0)
+-   {
+-      PrintFormat("FlashGold_Continuation_v2 INIT_ABORT invalid gate settings burst_percentile=%.4f burst_window_samples=%d burst_lookback_ms=%d entry_hold_ms=%d entry_hold_min_fav_points=%.1f",
++      InpEntryHoldMs < 0 || InpEntryHoldMinFavPoints < 0.0 ||
++      InpBurstThresholdFixed <= 0.0)
++   {
++      PrintFormat("FlashGold_Continuation_v2 INIT_ABORT invalid gate settings burst_percentile=%.4f burst_window_samples=%d burst_lookback_ms=%d entry_hold_ms=%d entry_hold_min_fav_points=%.1f burst_threshold_fixed_points=%.1f",
+                   InpBurstPercentile, InpBurstWindowSamples,
+                   InpBurstLookbackMs, InpEntryHoldMs,
+-                  InpEntryHoldMinFavPoints);
++                  InpEntryHoldMinFavPoints, InpBurstThresholdFixed);
+       return(INIT_PARAMETERS_INCORRECT);
+    }
+ 
+@@ -2565,6 +2596,10 @@
     g_MasterVwapTerminalId = MasterVwapTerminalIdFromDataPath();
  
     if(!ValidateAndLogBrokerProfile())
@@ -54,7 +100,16 @@
        return(INIT_FAILED);
  
     // Set the Magic Number properly using the input we just defined
-@@ -2613,6 +2644,7 @@
+@@ -2592,7 +2627,7 @@
+                PROVISIONAL_ROUND_TRIP_COST_POINTS,
+                MAX_ENTRY_DISTANCE_POINTS,
+                InpUseBurstGate ? 1 : 0,
+-               BurstThresholdModeName(), BURST_MIN_POINTS,
++               BurstThresholdModeName(), InpBurstThresholdFixed,
+                InpBurstPercentile, InpBurstWindowSamples,
+                InpUseEntryHold ? 1 : 0, InpEntryHoldMs,
+                InpEntryHoldMinFavPoints);
+@@ -2613,6 +2648,7 @@
  //+------------------------------------------------------------------+
  void OnDeinit(const int reason)
  {
@@ -62,7 +117,16 @@
     CP_Deinit();
     LA_FlushOpenPairs();
     XA_ReconcileHistory();
-@@ -3584,7 +3616,14 @@
+@@ -3479,7 +3515,7 @@
+                BurstThresholdModeName(),
+                burstAvailable ? 1 : 0, burstPoints,
+                burstThresholdAvailable ? 1 : 0,
+-               burstThresholdPoints, BURST_MIN_POINTS,
++               burstThresholdPoints, InpBurstThresholdFixed,
+                InpBurstPercentile, burstThresholdSampleCount,
+                InpBurstWindowSamples,
+                burstSpeedPassed ? 1 : 0,
+@@ -3584,7 +3620,14 @@
        return ENTRY_HOLD_PASS;
  
     g_LastEntryHoldFailureBar = signalBar;
@@ -78,7 +142,7 @@
     else g_VirtualSellStopPrice = 0.0;
  
     { if(!MQLInfoInteger(MQL_TESTER)) PrintFormat("PROVISIONAL COST FLOOR FlashGold_Continuation_v2 ENTRY_REJECT side=%s crossing=1 burst_speed_failed=0 burst_direction_failed=0 continuation_failed=0 friction_failed=0 one_entry_per_bar_failed=0 entry_hold_failed=1 prior60_failed=0 hold_move_points=%.1f prior60_drift_points=0.0",
-@@ -3759,6 +3798,1025 @@
+@@ -3759,6 +3802,1025 @@
  }
  
  //+------------------------------------------------------------------+
@@ -1104,7 +1168,7 @@
  //| Logic: Manage Virtual Pending Orders                             |
  //+------------------------------------------------------------------+
  void ManageVirtualPendings(double ask, double bid, double spread, double point,
-@@ -3806,15 +4864,27 @@
+@@ -3806,15 +4868,27 @@
        g_LastModTime = TimeCurrent();
     }
  
@@ -1134,7 +1198,7 @@
     {
        const bool cheapGatesPassed = buyHoldActive ||
                                      EntryCandidateApproved(true, tickTimeMsc,
-@@ -3854,6 +4924,8 @@
+@@ -3854,6 +4928,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualBuyStopPrice = 0;
@@ -1143,7 +1207,7 @@
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_BUY, trade.ResultOrder());
                    double virtualSL = bid - virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -3878,10 +4950,9 @@
+@@ -3878,10 +4954,9 @@
        }
     }
  
@@ -1156,7 +1220,7 @@
     {
        const bool cheapGatesPassed = sellHoldActive ||
                                      EntryCandidateApproved(false, tickTimeMsc,
-@@ -3921,6 +4992,8 @@
+@@ -3921,6 +4996,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualSellStopPrice = 0;
@@ -1165,7 +1229,7 @@
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_SELL, trade.ResultOrder());
                    double virtualSL = ask + virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -4424,6 +5497,26 @@
+@@ -4424,6 +5501,26 @@
        ObjectDelete(0, "Lbl_Pos_0");
        ObjectDelete(0, "Lbl_PosSL_0"); 
     }

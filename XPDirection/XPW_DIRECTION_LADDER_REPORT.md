@@ -1,4 +1,4 @@
-WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 6/6, executed 606 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
+WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 7/7, executed 606 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
 
 # XPW Direction Ladder v1 — report
 
@@ -272,7 +272,12 @@ the window — reading state where a cross was available is not reachable from h
 
 ## 2. The cut — what changed in the EA
 
-Seven 1.03 lines were replaced. Everything else is insertion.
+The direction ladder replaces **seven** 1.03 lines; everything else it adds is
+insertion. A second, separate change — `InpBurstThresholdFixed`, §2.4 below — replaces
+another eight. The two are audited separately by the Gate 0 pre-check so neither hides
+behind the other.
+
+The ladder's seven:
 
 ```
 -#property version   "1.03" // Added Money Management
@@ -284,17 +289,18 @@ Seven 1.03 lines were replaced. Everything else is insertion.
 -   if(sellHoldActive || (!g_EntryHoldCandidate.active && sellCrossing))
 ```
 
-Untouched, as required: every gate, the 3,000 ms hold, prior-60, the burst bundle,
+Untouched by the ladder: every gate, the 3,000 ms hold, prior-60, the burst bundle,
 friction, one-entry-per-bar, `CalculateLotSize`/`OrderCalcProfit`, the virtual SL,
 the trailing geometry, `CContinuationTrade::OrderSend` (CP), `LA_*`, `XA_*`,
-`ValidateAndLogBrokerProfile`, and the dashboard's existing geometry. No existing
-input was renamed, moved or re-defaulted. `MarkCurrentBarEntered`, ticket resolution,
+`ValidateAndLogBrokerProfile`, and the dashboard's existing geometry. **No existing
+input is renamed, removed or re-defaulted** — the build has 53 inputs to 1.03's 36, and
+every one of 1.03's is present with its original name and default. `MarkCurrentBarEntered`, ticket resolution,
 `RegisterVirtualSL`, `LA_VirtualFill` and `LogEntryRisk` still run inside their own
 side's block, on the side that actually executed.
 
 ### The exact diff (wiring)
 
-The full machine diff is `reference/ea_1.03_to_1.05_xpdir.diff` (+1100 / −7). It
+The full machine diff is `reference/ea_1.03_to_1.05_xpdir.diff` (+1112 / −15). It
 contains two further hunks that are pure insertions with no 1.03 line replaced: the
 input group at 1.03:2170 (+27) and the XPDir module at 1.03:3759 (+1019, immediately
 before `ManageVirtualPendings`). Everything else is below, verbatim.
@@ -309,7 +315,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
  #property strict
  
  #include <Trade\Trade.mqh>
-@@ -2565,6 +2592,10 @@
+@@ -2565,6 +2596,10 @@
     g_MasterVwapTerminalId = MasterVwapTerminalIdFromDataPath();
  
     if(!ValidateAndLogBrokerProfile())
@@ -320,7 +326,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
        return(INIT_FAILED);
  
     // Set the Magic Number properly using the input we just defined
-@@ -2613,6 +2644,7 @@
+@@ -2613,6 +2648,7 @@
  //+------------------------------------------------------------------+
  void OnDeinit(const int reason)
  {
@@ -328,7 +334,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     CP_Deinit();
     LA_FlushOpenPairs();
     XA_ReconcileHistory();
-@@ -3584,7 +3616,14 @@
+@@ -3584,7 +3620,14 @@
        return ENTRY_HOLD_PASS;
  
     g_LastEntryHoldFailureBar = signalBar;
@@ -344,7 +350,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     else g_VirtualSellStopPrice = 0.0;
  
     { if(!MQLInfoInteger(MQL_TESTER)) PrintFormat("PROVISIONAL COST FLOOR FlashGold_Continuation_v2 ENTRY_REJECT side=%s crossing=1 burst_speed_failed=0 burst_direction_failed=0 continuation_failed=0 friction_failed=0 one_entry_per_bar_failed=0 entry_hold_failed=1 prior60_failed=0 hold_move_points=%.1f prior60_drift_points=0.0",
-@@ -3806,15 +4864,27 @@
+@@ -3806,15 +4868,27 @@
        g_LastModTime = TimeCurrent();
     }
  
@@ -374,7 +380,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     {
        const bool cheapGatesPassed = buyHoldActive ||
                                      EntryCandidateApproved(true, tickTimeMsc,
-@@ -3854,6 +4924,8 @@
+@@ -3854,6 +4928,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualBuyStopPrice = 0;
@@ -383,7 +389,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_BUY, trade.ResultOrder());
                    double virtualSL = bid - virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -3878,10 +4950,9 @@
+@@ -3878,10 +4954,9 @@
        }
     }
  
@@ -396,7 +402,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     {
        const bool cheapGatesPassed = sellHoldActive ||
                                      EntryCandidateApproved(false, tickTimeMsc,
-@@ -3921,6 +4992,8 @@
+@@ -3921,6 +4996,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualSellStopPrice = 0;
@@ -405,7 +411,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_SELL, trade.ResultOrder());
                    double virtualSL = ask + virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -4424,6 +5497,26 @@
+@@ -4424,6 +5501,26 @@
        ObjectDelete(0, "Lbl_Pos_0");
        ObjectDelete(0, "Lbl_PosSL_0"); 
     }
@@ -432,6 +438,73 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
  }
  
  void CreateLabel(string name, int x, int y, string text, color clr)
+```
+
+**The `InpBurstThresholdFixed` diff (§2.4), separately:**
+
+```diff
+@@ -2142,6 +2142,7 @@
+    input int      InpBurstLookbackMs      = 1000;   // Burst midpoint displacement window (ms)
+    input bool     InpUseBurstGate         = false;  // Burst bundle gate (magnitude/direction/continuation)
+    input ENUM_BURST_THRESHOLD_MODE InpBurstThresholdMode = BURST_THRESHOLD_FIXED;
++   input double   InpBurstThresholdFixed  = 172.0;   // Fixed burst threshold (Points); used when mode = FIXED
+    input double   InpBurstPercentile      = 99.0;   // Rolling absolute-burst percentile
+    input int      InpBurstWindowSamples   = 2000;   // Prior observations; current sample excluded
+@@ -2219,7 +2247,9 @@
+ 
+ //--- Hard pre-entry signal gates and conflict-resolution limits
+ #define BURST_BUFFER_CAPACITY 20000
+-const double   BURST_MIN_POINTS            = 172.0;
++// BURST_MIN_POINTS retired: the fixed-mode threshold is now the input
++// InpBurstThresholdFixed, whose default is the 172.0 this constant held.
++// One number, one place to edit - a dead constant beside a live input is a trap.
+ const int      CONTINUATION_TICKS          = 5;
+ 
+ double         internalOrderDistance = 0.0;
+@@ -2537,7 +2567,7 @@
+ {
+    if(InpBurstThresholdMode == BURST_THRESHOLD_FIXED)
+    {
+-      thresholdPoints = BURST_MIN_POINTS;
++      thresholdPoints = InpBurstThresholdFixed;
+       sampleCount = g_BurstPercentileCount;
+       return true;
+    }
+@@ -2552,12 +2582,13 @@
+    if(!CP_Init()) return INIT_PARAMETERS_INCORRECT;
+    if(InpBurstPercentile < 0.0 || InpBurstPercentile > 100.0 ||
+       InpBurstWindowSamples < 2 || InpBurstLookbackMs <= 0 ||
+-      InpEntryHoldMs < 0 || InpEntryHoldMinFavPoints < 0.0)
+-   {
+-      PrintFormat("FlashGold_Continuation_v2 INIT_ABORT invalid gate settings burst_percentile=%.4f burst_window_samples=%d burst_lookback_ms=%d entry_hold_ms=%d entry_hold_min_fav_points=%.1f",
++      InpEntryHoldMs < 0 || InpEntryHoldMinFavPoints < 0.0 ||
++      InpBurstThresholdFixed <= 0.0)
++   {
++      PrintFormat("FlashGold_Continuation_v2 INIT_ABORT invalid gate settings burst_percentile=%.4f burst_window_samples=%d burst_lookback_ms=%d entry_hold_ms=%d entry_hold_min_fav_points=%.1f burst_threshold_fixed_points=%.1f",
+                   InpBurstPercentile, InpBurstWindowSamples,
+                   InpBurstLookbackMs, InpEntryHoldMs,
+-                  InpEntryHoldMinFavPoints);
++                  InpEntryHoldMinFavPoints, InpBurstThresholdFixed);
+       return(INIT_PARAMETERS_INCORRECT);
+    }
+@@ -2592,7 +2627,7 @@
+                PROVISIONAL_ROUND_TRIP_COST_POINTS,
+                MAX_ENTRY_DISTANCE_POINTS,
+                InpUseBurstGate ? 1 : 0,
+-               BurstThresholdModeName(), BURST_MIN_POINTS,
++               BurstThresholdModeName(), InpBurstThresholdFixed,
+                InpBurstPercentile, InpBurstWindowSamples,
+                InpUseEntryHold ? 1 : 0, InpEntryHoldMs,
+                InpEntryHoldMinFavPoints);
+@@ -3479,7 +3515,7 @@
+                BurstThresholdModeName(),
+                burstAvailable ? 1 : 0, burstPoints,
+                burstThresholdAvailable ? 1 : 0,
+-               burstThresholdPoints, BURST_MIN_POINTS,
++               burstThresholdPoints, InpBurstThresholdFixed,
+                InpBurstPercentile, burstThresholdSampleCount,
+                InpBurstWindowSamples,
+                burstSpeedPassed ? 1 : 0,
 ```
 
 ### DIR_LOCK
@@ -496,6 +569,68 @@ is a real fade with a 3-second confirmation window, not a continuation trade, an
 is what "the EA is good at triggering the position, not at the direction" turns into
 when the trigger is kept and the side is taken away. Gate 3 exists to count how many
 of these there are and what they do.
+
+### 2.4 `InpBurstThresholdFixed` — the fixed burst threshold becomes editable
+
+Requested 2026-09-22. **This one is a change to the EA proper, not to the ladder**, and
+it is the only such change in the build. It is called out separately for that reason.
+
+1.03 held the fixed-mode burst threshold in a compile-time constant:
+
+```mql5
+const double   BURST_MIN_POINTS            = 172.0;
+```
+
+It is now an input, sitting directly under the mode enum that selects it:
+
+```mql5
+input ENUM_BURST_THRESHOLD_MODE InpBurstThresholdMode = BURST_THRESHOLD_FIXED;
+input double   InpBurstThresholdFixed  = 172.0;   // Fixed burst threshold (Points); used when mode = FIXED
+```
+
+and `BURST_THRESHOLD_FIXED` routes to it:
+
+```mql5
+   if(InpBurstThresholdMode == BURST_THRESHOLD_FIXED)
+   {
+      thresholdPoints = InpBurstThresholdFixed;
+```
+
+**`BURST_MIN_POINTS` is retired, not left behind.** A dead 172.0 sitting beside a live
+input is how someone edits the wrong number and cannot work out why nothing changed. The
+two log sites that printed the constant (`REPORT_HEADER` at init and `ENTRY_CANDIDATE`)
+now print the input, so the log states the threshold actually in force rather than a
+number that used to be.
+
+**Same default behaviour, and that is checked rather than asserted.** The default is the
+exact value the constant held, so at defaults the same number reaches the same
+comparison by the same path. Gate 0's pre-check A7 reads the default out of the source
+and fails the build if it is not 172.0 — a deliberately mis-set default was tried and
+it caught it:
+
+```
+G0 PRE-CHECK FAIL (1)
+  InpBurstThresholdFixed defaults to 150.0, but the retired BURST_MIN_POINTS held
+  172.0 - the build no longer reproduces 1.03 at defaults
+```
+
+**One addition beyond what was asked, and why.** `OnInit` now rejects
+`InpBurstThresholdFixed <= 0.0` alongside the gate settings it already validates. An
+editable threshold of 0 would pass every magnitude test — `MathAbs(burstPoints) >= 0` is
+always true — silently disabling the magnitude leg of the burst bundle while the log
+still read `burst_gate_active=1`. A constant could not be set to 0 by accident; an input
+can. The check follows the file's existing treatment of `InpEntryHoldMinFavPoints < 0.0`
+and costs nothing at defaults. Say the word if you would rather it clamp than refuse.
+
+**Note on the Inputs dialog.** The new input sits between `InpBurstThresholdMode` and
+`InpBurstPercentile`, so those two move one row down in the dialog. Nothing depends on
+input order here — the EA is not read through `iCustom`, and `.set` preset files key by
+name — but the ladder's own group is still appended last, and no 1.03 input changed its
+name or default.
+
+**Scope note.** Both `InpUseBurstGate` (false) and `InpDirMode` (`DIR_OFF`) are off by
+default, so at defaults this input changes the number in two log lines and nothing else.
+With the burst gate switched on it is the live magnitude threshold.
 
 ### PHASE_3_PENDING_TYPES — not in this build
 
@@ -801,6 +936,8 @@ A. STATIC
   A4 hold-gate failure edit reduces to the 1.03 pair outside TRANSLATE
   A5 hoisted sellCrossing expression byte-identical to 1.03, computed once
   A6 dashboard DIR line deleted, not drawn, in DIR_OFF
+  A7 InpBurstThresholdFixed = 172.0 (the retired constant), routed from FIXED,
+     guarded at init, no dead BURST_MIN_POINTS
 B. EXECUTED
   gate0 entry-path: states=144 checks=606 failures=0
     DIR_OFF divergences from 1.03: 0 (must be 0)
@@ -811,9 +948,11 @@ G0 PRE-CHECK PASS - DIR_OFF is the 1.03 entry path.
 ```
 
 **Part A** re-derives the diff against the 1.03 file (sha256 checked first) and refuses
-any removed line outside the authorised seven; then it audits each injected entry point
-for its `DIR_OFF` guard *as the function's first statement*, not merely somewhere in the
-body.
+any removed line outside the authorised set — kept as **two separate lists**, seven for
+the direction ladder and eight for `InpBurstThresholdFixed` (§2.4), so one change cannot
+hide behind the other. It then audits each injected entry point for its `DIR_OFF` guard
+*as the function's first statement*, not merely somewhere in the body, and checks that
+the new burst input still defaults to the value the retired constant held.
 
 **Part B** lifts the entry-path wiring out of the `.mq5` between the
 `XPDIR_GATE0_CORE` markers, compiles it with g++ against a stub layer that supplies the
@@ -998,9 +1137,11 @@ Send back: the Experts log, the XPDir CSV, and the tester reports from Gate 0.
 ## 8. Out of scope, confirmed untouched
 
 Pending order types (`PHASE_3_PENDING_TYPES`). Any change to the map — none was made,
-and the two things that looked like defects are written up in §0 as discrepancies
-between the prompt and the file, not as changes. Any change to the EA's gates, hold,
-money management, trailing, CP filter or observers. Multi-symbol. Retuning any of the
+and the things that looked like defects are written up in §0 as discrepancies between
+the prompt and the file, not as changes. Any change to the EA's gates, hold, money
+management, trailing, CP filter or observers — with the single, requested exception of
+`InpBurstThresholdFixed` (§2.4), which promotes one compile-time constant in the burst
+bundle to an input without changing its value. Multi-symbol. Retuning any of the
 map's 27 inputs. Reading the parent through anything other than `iCustom` on `_Symbol`.
 
 ## DECISION: yes

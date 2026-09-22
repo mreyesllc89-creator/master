@@ -34,7 +34,12 @@ BASE_SHA = "75820278a87ee5b65d9e6c4518a1ab0936d229fed6025893c188bca2f3d87498"
 
 # The 1.03 lines this build is allowed to replace. Anything else in the diff's
 # removed set is an unauthorised edit and fails the gate.
-ALLOWED_REMOVALS = [
+#
+# Two groups, because they are two different changes with two different risks:
+# the direction ladder (inert in DIR_OFF) and the burst-threshold input (a real
+# edit to the EA, behaviour-preserving only because its default is the value
+# the retired constant held - which A7 checks rather than assumes).
+ALLOWED_REMOVALS_LADDER = [
     '#property version   "1.03" // Added Money Management',
     '   if(isBuy) g_VirtualBuyStopPrice = 0.0;',
     '   if(g_EntryHoldCandidate.active &&',
@@ -43,6 +48,21 @@ ALLOWED_REMOVALS = [
     '   const bool sellCrossing = (g_VirtualSellStopPrice > 0 && bid <= g_VirtualSellStopPrice);',
     '   if(sellHoldActive || (!g_EntryHoldCandidate.active && sellCrossing))',
 ]
+ALLOWED_REMOVALS_BURST = [
+    'const double   BURST_MIN_POINTS            = 172.0;',
+    '      thresholdPoints = BURST_MIN_POINTS;',
+    '               BurstThresholdModeName(), BURST_MIN_POINTS,',
+    '               burstThresholdPoints, BURST_MIN_POINTS,',
+    '      InpEntryHoldMs < 0 || InpEntryHoldMinFavPoints < 0.0)',
+    '      PrintFormat("FlashGold_Continuation_v2 INIT_ABORT invalid gate settings burst_percentile=%.4f burst_window_samples=%d burst_lookback_ms=%d entry_hold_ms=%d entry_hold_min_fav_points=%.1f",',
+    '                  InpEntryHoldMinFavPoints);',
+    '   {',   # re-emitted by difflib where the block above it changed
+]
+ALLOWED_REMOVALS = ALLOWED_REMOVALS_LADDER + ALLOWED_REMOVALS_BURST
+
+# The value the retired BURST_MIN_POINTS constant held. The new input's default
+# must equal it exactly, or "same default behaviour as today" is not true.
+RETIRED_BURST_CONSTANT = 172.0
 
 # Every XPDir entry point called from 1.03 code, and the guard that makes it
 # inert in DIR_OFF. The guard must be the function's FIRST statement.
@@ -79,7 +99,8 @@ def static_part(base_path, problems):
         for l in missing:
             fail(f"expected removal did not happen: {l!r}", problems)
     print(f"  A1 removed 1.03 lines: {len(removed)} "
-          f"({'all authorised' if not unexpected and not missing else 'MISMATCH'})")
+          f"({len(ALLOWED_REMOVALS_LADDER)} ladder + {len(ALLOWED_REMOVALS_BURST)} burst-input) "
+          f"{'all authorised' if not unexpected and not missing else 'MISMATCH'}")
 
     # --- A2: every injected entry point is guarded, as its first statement
     for fn, guard in GUARDS.items():
@@ -123,6 +144,25 @@ def static_part(base_path, problems):
     if 'if(InpDirMode == DIR_OFF)\n      ObjectDelete(0, "Lbl_XPDir");' not in ea:
         fail("the dashboard DIR line is not guarded by a DIR_OFF branch", problems)
     print("  A6 dashboard DIR line deleted, not drawn, in DIR_OFF")
+
+    # --- A7: the burst-threshold input preserves the retired constant's value
+    m = re.search(r"^\s*input\s+double\s+InpBurstThresholdFixed\s*=\s*([0-9.]+)\s*;",
+                  ea, re.M)
+    if not m:
+        fail("InpBurstThresholdFixed is missing or is not an input double", problems)
+    elif float(m.group(1)) != RETIRED_BURST_CONSTANT:
+        fail(f"InpBurstThresholdFixed defaults to {m.group(1)}, but the retired "
+             f"BURST_MIN_POINTS held {RETIRED_BURST_CONSTANT} - the build no longer "
+             f"reproduces 1.03 at defaults", problems)
+    if "BURST_MIN_POINTS" in re.sub(r"//[^\n]*", "", ea):
+        fail("BURST_MIN_POINTS still has a live reference; two numbers, one of them dead",
+             problems)
+    if "thresholdPoints = InpBurstThresholdFixed;" not in ea:
+        fail("BURST_THRESHOLD_FIXED does not route to InpBurstThresholdFixed", problems)
+    if "InpBurstThresholdFixed <= 0.0)" not in ea:
+        fail("OnInit does not reject a non-positive InpBurstThresholdFixed", problems)
+    print(f"  A7 InpBurstThresholdFixed = {RETIRED_BURST_CONSTANT} (the retired constant), "
+          f"routed from FIXED, guarded at init, no dead BURST_MIN_POINTS")
 
 
 def executed_part(problems):

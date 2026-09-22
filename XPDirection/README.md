@@ -13,6 +13,7 @@ diff, and the host instructions for the three open gates.
 | Path | What it is |
 |---|---|
 | `FlashGold_Continuation_v2_XPDIR.mq5` | The `1.05-XPDIR` build. `InpDirMode = DIR_OFF` (the default) is 1.03 behaviour. |
+| — | Also carries `InpBurstThresholdFixed` (default 172.0), the one change to the EA proper: the fixed burst threshold is an input instead of a constant. See report §2.4. |
 | `XPW_DIRECTION_LADDER_REPORT.md` | The report. Start here. |
 | `reference/vote_ref.py` | Independent Python transliteration of the §4 rules. |
 | `reference/run_fixtures.py` | **Gate 1 runner.** Fixture expectation vs `vote_ref.py` vs the EA's own compiled rule core. |
@@ -42,7 +43,8 @@ alone. A run with `asserts=0` is a failure, not a pass.
 - **G0** (DIR_OFF is trade-for-trade 1.03) — `BLOCKED_NO_TESTER`; the tester run is the
   host's. The **pre-check passes**: static audit 6/6, and 606 executed checks over all
   144 mode × state combinations showing DIR_OFF is the 1.03 entry path and never even
-  asks the ladder for a direction. Verified against a deliberately broken build.
+  asks the ladder for a direction, plus a check that `InpBurstThresholdFixed` still
+  defaults to the retired constant's 172.0. Verified against deliberately broken builds.
 - **G1** (vote logic, including the whole cross reader) — passing, `asserts=833 mismatches=0`.
 - **G2** (host smoke, DIR_LOCK) — pending. Host run.
 - **G3** (host smoke, DIR_TRANSLATE) — pending. Host run.
