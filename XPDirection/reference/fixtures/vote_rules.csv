@@ -1,0 +1,54 @@
+# XPDir Gate 1 fixtures - hand-derived, one case per line.
+#
+# Rung columns are P,S1,S5,S10,S15,S30,S45 and use this grammar:
+#   -                              rung absent/disabled (never a vote, and not
+#                                  counted in the optional set)
+#   nv                             rung present, NO_VOTE
+#   fast|slow|runlen|age|interval  raw map outputs for the last CLOSED bar;
+#                                  EMPTY = EMPTY_VALUE, the map's valid flag
+#
+# Vote polarity: fast > slow is the bullish TDI state and votes BUY.
+# expect_dir/expect_rule/expect_conflict are derived by hand from prompt S4.
+name,min_with,min_against,s1_required,max_stale,max_runlen,P,S1,S5,S10,S15,S30,S45,expect_dir,expect_rule,expect_conflict
+# ---- R1 aligned: S1 and parent agree ---------------------------------------
+r1_buy_alone,2,3,1,3,0,60|50|4|300|300,60|50|3|1|1,-,-,-,-,-,BUY,R1,0
+r1_sell_alone,2,3,1,3,0,40|50|4|300|300,40|50|3|1|1,-,-,-,-,-,SELL,R1,0
+r1_wins_over_r2,2,3,1,3,0,60|50|4|300|300,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R1,0
+# ---- R2 parent carries: P == X, S1 dissents, >= min_with children ----------
+r2_buy_exact_min,2,3,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R2,0
+r2_one_child_short,2,3,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|5|5,40|50|2|10|10,-,-,-,NONE,-,0
+r2_min_three_children,3,4,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|5|5,60|50|2|10|10,60|50|2|15|15,-,-,BUY,R2,0
+r2_sell_exact_min,2,3,1,3,0,40|50|4|300|300,60|50|3|1|1,40|50|2|5|5,40|50|2|10|10,-,-,-,SELL,R2,0
+# ---- R3 children overrule the parent (S1 counts as a child) ----------------
+r3_buy_s1_required_met,2,3,1,3,0,40|50|4|300|300,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R3,0
+r3_blocked_s1_dissents,2,3,1,3,0,40|50|4|300|300,nv,60|50|2|5|5,60|50|2|10|10,60|50|2|15|15,-,-,NONE,-,0
+r3_passes_when_s1_not_required,2,3,0,3,0,40|50|4|300|300,nv,60|50|2|5|5,60|50|2|10|10,60|50|2|15|15,-,-,BUY,R3,0
+r3_one_short,2,3,1,3,0,40|50|4|300|300,60|50|3|1|1,60|50|2|5|5,40|50|2|10|10,-,-,-,NONE,-,0
+r3_parent_novote_children_carry,2,3,1,3,0,nv,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R3,0
+r3_min_four,2,4,1,3,0,40|50|4|300|300,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,60|50|2|15|15,-,-,BUY,R3,0
+# ---- conflict: both directions pass a rule ---------------------------------
+# P=BUY + S5,S10 BUY satisfies R2 for BUY; S1,S15,S30 SELL satisfies R3 for
+# SELL with S1 == SELL, so s1_required does NOT prevent it. The prompt's
+# parenthetical ("possible only with S1RequiredAgainstParent=false") is wrong.
+conflict_with_s1_required,2,3,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|5|5,60|50|2|10|10,40|50|2|15|15,40|50|2|30|30,-,NONE,-,1
+conflict_without_s1_required,2,3,0,3,0,60|50|4|300|300,nv,60|50|2|5|5,60|50|2|10|10,40|50|2|15|15,40|50|2|30|30,40|50|2|45|45,NONE,-,1
+# ---- degenerate ladders ----------------------------------------------------
+all_novote,2,3,1,3,0,nv,nv,nv,nv,-,-,-,NONE,-,0
+parent_novote_only_s1,2,3,1,3,0,nv,60|50|3|1|1,-,-,-,-,-,NONE,-,0
+parent_only_no_children,2,3,1,3,0,60|50|4|300|300,nv,-,-,-,-,-,NONE,-,0
+no_optional_children_r1_still_works,2,3,1,3,0,60|50|4|300|300,60|50|3|1|1,-,-,-,-,-,BUY,R1,0
+fast_eq_slow_is_novote,2,3,1,3,0,50|50|4|300|300,50|50|3|1|1,-,-,-,-,-,NONE,-,0
+# ---- map validity flag: EMPTY_VALUE in FAST or SLOW is NO_VOTE -------------
+s1_map_invalid,2,3,1,3,0,60|50|4|300|300,EMPTY|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R2,0
+parent_map_invalid,2,3,1,3,0,60|EMPTY|4|300|300,60|50|3|1|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R3,0
+# ---- staleness: age > max_stale x interval is NO_VOTE, not disagreement ----
+s1_stale_at_boundary_votes,2,3,1,3,0,60|50|4|300|300,60|50|3|3|1,-,-,-,-,-,BUY,R1,0
+s1_stale_one_over_is_novote,2,3,1,3,0,60|50|4|300|300,60|50|3|4|1,60|50|2|5|5,60|50|2|10|10,-,-,-,BUY,R2,0
+child_stale_not_counted,2,3,1,3,0,60|50|4|300|300,40|50|3|1|1,60|50|2|16|5,60|50|2|10|10,-,-,-,NONE,-,0
+parent_stale_is_novote,2,3,1,3,0,60|50|4|901|300,60|50|3|1|1,60|50|2|5|5,-,-,-,-,NONE,-,0
+stale_window_raised_to_5,2,3,1,5,0,60|50|4|300|300,60|50|3|5|1,-,-,-,-,-,BUY,R1,0
+# ---- freshness cap: runlen > max_runlen is NO_VOTE -------------------------
+runlen_cap_off_long_run_votes,2,3,0,3,0,60|50|40|300|300,60|50|30|1|1,-,-,-,-,-,BUY,R1,0
+runlen_cap_on_long_run_novote,2,3,1,3,3,60|50|40|300|300,60|50|30|1|1,-,-,-,-,-,NONE,-,0
+runlen_cap_on_at_boundary,2,3,1,3,3,60|50|3|300|300,60|50|3|1|1,-,-,-,-,-,BUY,R1,0
+runlen_cap_drops_children_only,2,3,1,3,2,60|50|1|300|300,40|50|1|1|1,60|50|9|5|5,60|50|1|10|10,-,-,-,NONE,-,0
