@@ -117,7 +117,15 @@
     CP_Deinit();
     LA_FlushOpenPairs();
     XA_ReconcileHistory();
-@@ -3479,7 +3515,7 @@
+@@ -2627,6 +2663,7 @@
+ void OnTimer()
+ {
+    XA_Poll();
++   XPDir_FunnelHeartbeat();   // XPDIR: says why the ladder is silent, unprompted
+ }
+ 
+ bool FindTesterEntryDeal(const ulong positionId, double &entryPrice,
+@@ -3479,7 +3516,7 @@
                 BurstThresholdModeName(),
                 burstAvailable ? 1 : 0, burstPoints,
                 burstThresholdAvailable ? 1 : 0,
@@ -126,7 +134,7 @@
                 InpBurstPercentile, burstThresholdSampleCount,
                 InpBurstWindowSamples,
                 burstSpeedPassed ? 1 : 0,
-@@ -3584,7 +3620,14 @@
+@@ -3584,7 +3621,14 @@
        return ENTRY_HOLD_PASS;
  
     g_LastEntryHoldFailureBar = signalBar;
@@ -142,7 +150,7 @@
     else g_VirtualSellStopPrice = 0.0;
  
     { if(!MQLInfoInteger(MQL_TESTER)) PrintFormat("PROVISIONAL COST FLOOR FlashGold_Continuation_v2 ENTRY_REJECT side=%s crossing=1 burst_speed_failed=0 burst_direction_failed=0 continuation_failed=0 friction_failed=0 one_entry_per_bar_failed=0 entry_hold_failed=1 prior60_failed=0 hold_move_points=%.1f prior60_drift_points=0.0",
-@@ -3759,6 +3802,1025 @@
+@@ -3759,6 +3803,1118 @@
  }
  
  //+------------------------------------------------------------------+
@@ -216,6 +224,9 @@
 +//    window the vote falls back to state anyway, so there is nothing to find.
 +#define XPDIR_SCAN_MIN     4
 +#define XPDIR_SCAN_MAX   256
++
++//--- funnel heartbeat: how many dumps before it stops repeating itself
++#define XPDIR_FUNNEL_MAX_DUMPS 30
 +
 +//--- the map's own defaults, in the map's declaration order. iCustom binds
 +//    positionally, so this list is the contract. Detector inputs are never
@@ -295,6 +306,8 @@
 +int      g_XPDirLastArmed        = -2;    // -2 = never logged
 +ulong    g_XPDirEvals            = 0;
 +ulong    g_XPDirStateLines       = 0;
++datetime g_XPDirFunnelLastSec    = 0;   // funnel heartbeat (zero-result contingency)
++int      g_XPDirFunnelDumps      = 0;
 +
 +const string XPDIR_CSV_NAME = "XPChart\\FlashGold_Continuation_v2_XPDir_v1.csv";
 +
@@ -644,6 +657,49 @@
 +                  XPDIR_MAP_DumpCSV);
 +}
 +
++// When a rung symbol is missing, say what IS there instead of just what is not.
++// The usual cause is the EA sitting on a _S<n> chart: the ladder derives every
++// rung from _Symbol, so an EA on XAUUSD-ECNc_S1 goes looking for
++// XAUUSD-ECNc_S1_S1, which nothing will ever create.
++void XPDir_DiagnoseSymbols(const string wanted)
++{
++   const int p = StringFind(_Symbol, "_S");
++   if(p >= 0)
++   {
++      bool allDigits = false;
++      for(int i = p + 2; i < StringLen(_Symbol); i++)
++      {
++         const ushort ch = StringGetCharacter(_Symbol, i);
++         if(ch < '0' || ch > '9') { allDigits = false; break; }
++         allDigits = true;
++      }
++      if(allDigits)
++         PrintFormat("XPDIR HINT _Symbol=%s is itself a seconds symbol. Attach this EA to the "
++                     "PARENT (%s), not to a _S<n> chart. Custom symbols do not trade, and the "
++                     "ladder derives every rung from _Symbol.",
++                     _Symbol, StringSubstr(_Symbol, 0, p));
++   }
++
++   const string prefix = _Symbol + "_S";
++   const int total = SymbolsTotal(false);
++   string found = "";
++   int n = 0;
++   for(int i = 0; i < total; i++)
++   {
++      const string name = SymbolName(i, false);
++      if(StringFind(name, prefix) != 0) continue;
++      if(n > 0) found += ",";
++      found += name;
++      n++;
++   }
++   PrintFormat("XPDIR DIAG wanted=%s found_rung_symbols=[%s] count=%d symbols_known_to_terminal=%d",
++               wanted, found, n, total);
++   if(n == 0)
++      PrintFormat("XPDIR HINT nothing named %s* exists. Start the XP ChartEngine service for "
++                  "this parent and let it create the custom symbol before attaching the EA.",
++                  prefix);
++}
++
 +bool XPDir_Init()
 +{
 +   for(int r = 0; r < XPDIR_RUNGS; r++)
@@ -713,6 +769,7 @@
 +         {
 +            PrintFormat("XPDIR_INIT_ABORT rung=S1 reason=symbol_missing symbol=%s error=%d",
 +                        g_XPDirSymbol[r], GetLastError());
++            XPDir_DiagnoseSymbols(g_XPDirSymbol[r]);
 +            return false;
 +         }
 +         PrintFormat("XPDIR RUNG_ABSENT rung=%s reason=symbol_missing symbol=%s error=%d",
@@ -728,6 +785,10 @@
 +         {
 +            PrintFormat("XPDIR_INIT_ABORT rung=S1 reason=handle_invalid symbol=%s indicator=%s error=%d",
 +                        g_XPDirSymbol[r], InpDirMapIndicator, GetLastError());
++            PrintFormat("XPDIR HINT iCustom could not load '%s'. It resolves relative to "
++                        "MQL5\\Indicators: the compiled .ex5 must sit there, the input carries "
++                        "no .ex5 extension, and a subfolder must be part of the name "
++                        "(e.g. Subfolder\\\\XPW_ShapeMap_v0.4).", InpDirMapIndicator);
 +            return false;
 +         }
 +         PrintFormat("XPDIR RUNG_ABSENT rung=%s reason=handle_invalid symbol=%s error=%d",
@@ -758,6 +819,9 @@
 +   {
 +      PrintFormat("XPDIR_INIT_ABORT rung=P reason=handle_invalid symbol=%s tf=%s indicator=%s error=%d",
 +                  g_XPDirSymbol[p], EnumToString(InpDirParentTF), InpDirMapIndicator, GetLastError());
++      PrintFormat("XPDIR HINT iCustom could not load '%s'. It resolves relative to "
++                  "MQL5\\Indicators: the compiled .ex5 must sit there, the input carries no "
++                  ".ex5 extension, and a subfolder must be part of the name.", InpDirMapIndicator);
 +      return false;
 +   }
 +   g_XPDirEnabled[p] = true;
@@ -1031,6 +1095,12 @@
 +void XPDir_PrintFunnel()
 +{
 +   if(InpDirMode == DIR_OFF) return;
++   g_XPDirFunnelDumps++;
++   PrintFormat("XPDIR FUNNEL_DUMP #%d mode=%s ready=%d evaluations=%I64u state_lines=%I64u "
++               "dir=%s indicator=%s parent=%s",
++               g_XPDirFunnelDumps, XPDir_ModeName(), g_XPDirReady ? 1 : 0,
++               g_XPDirEvals, g_XPDirStateLines, XPDir_DirName(g_XPDirCached),
++               InpDirMapIndicator, _Symbol);
 +   for(int r = 0; r < XPDIR_RUNGS; r++)
 +   {
 +      const ENUM_TIMEFRAMES tf = (r == XPDIR_IDX_PARENT) ? InpDirParentTF : PERIOD_M1;
@@ -1046,6 +1116,37 @@
 +                  XPDir_CoreIsEmpty(g_XPDirState[r]) ? "-" : DoubleToString(g_XPDirState[r], 0),
 +                  g_XPDirRunLen[r], g_XPDirWhy[r]);
 +   }
++}
++
++// Zero-result contingency, wired rather than merely available. A ladder that
++// has produced no DIR_STATE line at all is a broken run until proven otherwise,
++// so it says why - per rung, with the reason - instead of sitting silent. It
++// stops on its own the moment the ladder starts deciding.
++void XPDir_FunnelHeartbeat()
++{
++   if(InpDirMode == DIR_OFF) return;
++   if(g_XPDirFunnelDumps >= XPDIR_FUNNEL_MAX_DUMPS)
++   {
++      if(g_XPDirFunnelDumps == XPDIR_FUNNEL_MAX_DUMPS)
++      {
++         g_XPDirFunnelDumps++;            // print this once, then go quiet
++         PrintFormat("XPDIR FUNNEL_STOP after %d dumps - still nothing to report. "
++                     "Read the last dump: it names the blocked rung and the reason.",
++                     XPDIR_FUNNEL_MAX_DUMPS);
++      }
++      return;
++   }
++
++   const datetime now = TimeCurrent();
++   // nothing decided yet -> every 30 s, starting immediately
++   // deciding, but stuck on NONE -> every 300 s
++   const int period = (g_XPDirStateLines == 0) ? 30 : 300;
++   if(g_XPDirStateLines > 0 && g_XPDirCached != XPDIR_NONE) return;
++   if(g_XPDirFunnelLastSec != 0 && (long)now - (long)g_XPDirFunnelLastSec < period) return;
++   g_XPDirFunnelLastSec = now;
++
++   XPDir_Current();                       // refresh the rungs before reporting them
++   XPDir_PrintFunnel();
 +}
 +
 +//+------------------------------------------------------------------+
@@ -1168,7 +1269,7 @@
  //| Logic: Manage Virtual Pending Orders                             |
  //+------------------------------------------------------------------+
  void ManageVirtualPendings(double ask, double bid, double spread, double point,
-@@ -3806,15 +4868,27 @@
+@@ -3806,15 +4962,27 @@
        g_LastModTime = TimeCurrent();
     }
  
@@ -1198,7 +1299,7 @@
     {
        const bool cheapGatesPassed = buyHoldActive ||
                                      EntryCandidateApproved(true, tickTimeMsc,
-@@ -3854,6 +4928,8 @@
+@@ -3854,6 +5022,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualBuyStopPrice = 0;
@@ -1207,7 +1308,7 @@
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_BUY, trade.ResultOrder());
                    double virtualSL = bid - virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -3878,10 +4954,9 @@
+@@ -3878,10 +5048,9 @@
        }
     }
  
@@ -1220,7 +1321,7 @@
     {
        const bool cheapGatesPassed = sellHoldActive ||
                                      EntryCandidateApproved(false, tickTimeMsc,
-@@ -3921,6 +4996,8 @@
+@@ -3921,6 +5090,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualSellStopPrice = 0;
@@ -1229,7 +1330,7 @@
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_SELL, trade.ResultOrder());
                    double virtualSL = ask + virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -4424,6 +5501,26 @@
+@@ -4424,6 +5595,26 @@
        ObjectDelete(0, "Lbl_Pos_0");
        ObjectDelete(0, "Lbl_PosSL_0"); 
     }

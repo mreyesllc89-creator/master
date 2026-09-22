@@ -2663,6 +2663,7 @@ void OnDeinit(const int reason)
 void OnTimer()
 {
    XA_Poll();
+   XPDir_FunnelHeartbeat();   // XPDIR: says why the ladder is silent, unprompted
 }
 
 bool FindTesterEntryDeal(const ulong positionId, double &entryPrice,
@@ -3873,6 +3874,9 @@ void LogPositionExitResult(const string reason, const ulong ticket,
 #define XPDIR_SCAN_MIN     4
 #define XPDIR_SCAN_MAX   256
 
+//--- funnel heartbeat: how many dumps before it stops repeating itself
+#define XPDIR_FUNNEL_MAX_DUMPS 30
+
 //--- the map's own defaults, in the map's declaration order. iCustom binds
 //    positionally, so this list is the contract. Detector inputs are never
 //    retuned; only the five marked OVERRIDE differ from the map's default.
@@ -3951,6 +3955,8 @@ datetime g_XPDirLastBlockedSec   = 0;
 int      g_XPDirLastArmed        = -2;    // -2 = never logged
 ulong    g_XPDirEvals            = 0;
 ulong    g_XPDirStateLines       = 0;
+datetime g_XPDirFunnelLastSec    = 0;   // funnel heartbeat (zero-result contingency)
+int      g_XPDirFunnelDumps      = 0;
 
 const string XPDIR_CSV_NAME = "XPChart\\FlashGold_Continuation_v2_XPDir_v1.csv";
 
@@ -4300,6 +4306,49 @@ int XPDir_CreateHandle(const string sym, const ENUM_TIMEFRAMES tf)
                   XPDIR_MAP_DumpCSV);
 }
 
+// When a rung symbol is missing, say what IS there instead of just what is not.
+// The usual cause is the EA sitting on a _S<n> chart: the ladder derives every
+// rung from _Symbol, so an EA on XAUUSD-ECNc_S1 goes looking for
+// XAUUSD-ECNc_S1_S1, which nothing will ever create.
+void XPDir_DiagnoseSymbols(const string wanted)
+{
+   const int p = StringFind(_Symbol, "_S");
+   if(p >= 0)
+   {
+      bool allDigits = false;
+      for(int i = p + 2; i < StringLen(_Symbol); i++)
+      {
+         const ushort ch = StringGetCharacter(_Symbol, i);
+         if(ch < '0' || ch > '9') { allDigits = false; break; }
+         allDigits = true;
+      }
+      if(allDigits)
+         PrintFormat("XPDIR HINT _Symbol=%s is itself a seconds symbol. Attach this EA to the "
+                     "PARENT (%s), not to a _S<n> chart. Custom symbols do not trade, and the "
+                     "ladder derives every rung from _Symbol.",
+                     _Symbol, StringSubstr(_Symbol, 0, p));
+   }
+
+   const string prefix = _Symbol + "_S";
+   const int total = SymbolsTotal(false);
+   string found = "";
+   int n = 0;
+   for(int i = 0; i < total; i++)
+   {
+      const string name = SymbolName(i, false);
+      if(StringFind(name, prefix) != 0) continue;
+      if(n > 0) found += ",";
+      found += name;
+      n++;
+   }
+   PrintFormat("XPDIR DIAG wanted=%s found_rung_symbols=[%s] count=%d symbols_known_to_terminal=%d",
+               wanted, found, n, total);
+   if(n == 0)
+      PrintFormat("XPDIR HINT nothing named %s* exists. Start the XP ChartEngine service for "
+                  "this parent and let it create the custom symbol before attaching the EA.",
+                  prefix);
+}
+
 bool XPDir_Init()
 {
    for(int r = 0; r < XPDIR_RUNGS; r++)
@@ -4369,6 +4418,7 @@ bool XPDir_Init()
          {
             PrintFormat("XPDIR_INIT_ABORT rung=S1 reason=symbol_missing symbol=%s error=%d",
                         g_XPDirSymbol[r], GetLastError());
+            XPDir_DiagnoseSymbols(g_XPDirSymbol[r]);
             return false;
          }
          PrintFormat("XPDIR RUNG_ABSENT rung=%s reason=symbol_missing symbol=%s error=%d",
@@ -4384,6 +4434,10 @@ bool XPDir_Init()
          {
             PrintFormat("XPDIR_INIT_ABORT rung=S1 reason=handle_invalid symbol=%s indicator=%s error=%d",
                         g_XPDirSymbol[r], InpDirMapIndicator, GetLastError());
+            PrintFormat("XPDIR HINT iCustom could not load '%s'. It resolves relative to "
+                        "MQL5\\Indicators: the compiled .ex5 must sit there, the input carries "
+                        "no .ex5 extension, and a subfolder must be part of the name "
+                        "(e.g. Subfolder\\\\XPW_ShapeMap_v0.4).", InpDirMapIndicator);
             return false;
          }
          PrintFormat("XPDIR RUNG_ABSENT rung=%s reason=handle_invalid symbol=%s error=%d",
@@ -4414,6 +4468,9 @@ bool XPDir_Init()
    {
       PrintFormat("XPDIR_INIT_ABORT rung=P reason=handle_invalid symbol=%s tf=%s indicator=%s error=%d",
                   g_XPDirSymbol[p], EnumToString(InpDirParentTF), InpDirMapIndicator, GetLastError());
+      PrintFormat("XPDIR HINT iCustom could not load '%s'. It resolves relative to "
+                  "MQL5\\Indicators: the compiled .ex5 must sit there, the input carries no "
+                  ".ex5 extension, and a subfolder must be part of the name.", InpDirMapIndicator);
       return false;
    }
    g_XPDirEnabled[p] = true;
@@ -4687,6 +4744,12 @@ ENUM_XPDIR XPDir_Current()
 void XPDir_PrintFunnel()
 {
    if(InpDirMode == DIR_OFF) return;
+   g_XPDirFunnelDumps++;
+   PrintFormat("XPDIR FUNNEL_DUMP #%d mode=%s ready=%d evaluations=%I64u state_lines=%I64u "
+               "dir=%s indicator=%s parent=%s",
+               g_XPDirFunnelDumps, XPDir_ModeName(), g_XPDirReady ? 1 : 0,
+               g_XPDirEvals, g_XPDirStateLines, XPDir_DirName(g_XPDirCached),
+               InpDirMapIndicator, _Symbol);
    for(int r = 0; r < XPDIR_RUNGS; r++)
    {
       const ENUM_TIMEFRAMES tf = (r == XPDIR_IDX_PARENT) ? InpDirParentTF : PERIOD_M1;
@@ -4702,6 +4765,37 @@ void XPDir_PrintFunnel()
                   XPDir_CoreIsEmpty(g_XPDirState[r]) ? "-" : DoubleToString(g_XPDirState[r], 0),
                   g_XPDirRunLen[r], g_XPDirWhy[r]);
    }
+}
+
+// Zero-result contingency, wired rather than merely available. A ladder that
+// has produced no DIR_STATE line at all is a broken run until proven otherwise,
+// so it says why - per rung, with the reason - instead of sitting silent. It
+// stops on its own the moment the ladder starts deciding.
+void XPDir_FunnelHeartbeat()
+{
+   if(InpDirMode == DIR_OFF) return;
+   if(g_XPDirFunnelDumps >= XPDIR_FUNNEL_MAX_DUMPS)
+   {
+      if(g_XPDirFunnelDumps == XPDIR_FUNNEL_MAX_DUMPS)
+      {
+         g_XPDirFunnelDumps++;            // print this once, then go quiet
+         PrintFormat("XPDIR FUNNEL_STOP after %d dumps - still nothing to report. "
+                     "Read the last dump: it names the blocked rung and the reason.",
+                     XPDIR_FUNNEL_MAX_DUMPS);
+      }
+      return;
+   }
+
+   const datetime now = TimeCurrent();
+   // nothing decided yet -> every 30 s, starting immediately
+   // deciding, but stuck on NONE -> every 300 s
+   const int period = (g_XPDirStateLines == 0) ? 30 : 300;
+   if(g_XPDirStateLines > 0 && g_XPDirCached != XPDIR_NONE) return;
+   if(g_XPDirFunnelLastSec != 0 && (long)now - (long)g_XPDirFunnelLastSec < period) return;
+   g_XPDirFunnelLastSec = now;
+
+   XPDir_Current();                       // refresh the rungs before reporting them
+   XPDir_PrintFunnel();
 }
 
 //+------------------------------------------------------------------+

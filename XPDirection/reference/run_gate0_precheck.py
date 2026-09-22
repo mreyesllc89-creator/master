@@ -164,6 +164,24 @@ def static_part(base_path, problems):
     print(f"  A7 InpBurstThresholdFixed = {RETIRED_BURST_CONSTANT} (the retired constant), "
           f"routed from FIXED, guarded at init, no dead BURST_MIN_POINTS")
 
+    # --- A8: no XPDir function is dead code. XPDir_PrintFunnel shipped once as
+    #     a documented instrument that nothing called - the report described a
+    #     diagnostic the build could not produce. Never again silently.
+    nocomment = re.sub(r"//[^\n]*", "", ea)
+    defined = set(re.findall(
+        r"^\s*(?:int|bool|void|double|string|datetime|ulong|ENUM_XPDIR)\s+(XPDir_\w+)\s*\(",
+        nocomment, re.M))
+    called = set(re.findall(r"\b(XPDir_\w+)\s*\(", nocomment))
+    dead = sorted(d for d in defined if d not in called)
+    for d in dead:
+        fail(f"{d} is defined but never called - a diagnostic nothing can produce "
+             f"is not a diagnostic", problems)
+    if "XPDir_FunnelHeartbeat();" not in nocomment.split("void OnTimer()")[-1][:400]:
+        fail("XPDir_FunnelHeartbeat is not called from OnTimer - the zero-result "
+             "contingency would never fire", problems)
+    print(f"  A8 XPDir functions defined: {len(defined)}, dead: {len(dead)}; "
+          f"funnel heartbeat wired to OnTimer")
+
 
 def executed_part(problems):
     work = tempfile.mkdtemp(prefix="xpdir_gate0_")

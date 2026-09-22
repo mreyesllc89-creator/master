@@ -15,6 +15,7 @@ diff, and the host instructions for the three open gates.
 | `FlashGold_Continuation_v2_XPDIR.mq5` | The `1.05-XPDIR` build. `InpDirMode = DIR_OFF` (the default) is 1.03 behaviour. |
 | — | Also carries `InpBurstThresholdFixed` (default 172.0), the one change to the EA proper: the fixed burst threshold is an input instead of a constant. See report §2.4. |
 | `XPW_DIRECTION_LADDER_REPORT.md` | The report. Start here. |
+| `TROUBLESHOOTING.md` | **Nothing detected? Start here instead.** Every failure's Experts-tab line and its fix. |
 | `reference/vote_ref.py` | Independent Python transliteration of the §4 rules. |
 | `reference/run_fixtures.py` | **Gate 1 runner.** Fixture expectation vs `vote_ref.py` vs the EA's own compiled rule core. |
 | `reference/fixtures/vote_rules.csv` | 49 hand-derived fixtures. |

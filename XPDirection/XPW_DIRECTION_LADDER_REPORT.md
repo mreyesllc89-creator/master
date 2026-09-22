@@ -1,4 +1,4 @@
-WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 7/7, executed 606 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
+WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 8/8, executed 606 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
 
 # XPW Direction Ladder v1 — report
 
@@ -890,12 +890,26 @@ matching trigger sites are the `ask >= g_VirtualBuyStopPrice` / `bid <=
 g_VirtualSellStopPrice` pair below it. Attach those files and the list becomes a
 finding rather than a blocker.
 
-**Zero-result contingency.** `XPDir_PrintFunnel()` is built in and prints, per rung:
+**Zero-result contingency — DEFECT FOUND AND FIXED 2026-09-22.** `XPDir_PrintFunnel()`
+shipped in the first build **defined but never called**: this report described a
+diagnostic the build could not produce. It is now driven by `XPDir_FunnelHeartbeat()`
+on the EA's existing one-second timer — while the ladder has produced no `DIR_STATE`
+line at all it dumps every 30 s starting immediately, then every 300 s while the
+direction is stuck on `NONE`, stopping by itself once the ladder decides and capping at
+30 dumps. Gate 0's pre-check A8 now fails the build if any `XPDir_*` function is defined
+and never called, so a dead instrument cannot ship again. The funnel prints, per rung:
 handle, enabled, bars available, the index-1 bar time, the vote, the grade, `crossDir`,
 `crossAge`, `crossSep`, `sepNow`, `sign`, `ever_crossed`, the map's raw STATE, the run
 length, and the exact reason (`disabled`, `handle_invalid`, `no_data`, `map_invalid`,
 `no_bar_time`, `stale_<n>s`, `sign_zero`, `buffer_contract`, `state_no_cross_seen`,
 `state_cross_aged_out`, `cross`).
+
+A failing rung also now says what to do about it rather than only what went wrong: a
+missing S1 symbol triggers `XPDir_DiagnoseSymbols`, which lists every `<parent>_S*`
+symbol the terminal can actually see, and detects the commonest cause outright — an EA
+attached to a `_S<n>` chart instead of the parent, which sends the ladder looking for
+`XAUUSD-ECNc_S1_S1`. An `iCustom` failure prints where the indicator has to live.
+`XPDirection/TROUBLESHOOTING.md` maps every one of these lines to its fix.
 If a Gate 2 or Gate 3 run produces zero `DIR_STATE` lines after the longest enabled
 rung's warm-up, or stays NONE for the whole run, that is a broken run: re-check symbol
 names, `SymbolSelect`, handle validity, buffer index and closed-bar index **once**, then
@@ -938,6 +952,7 @@ A. STATIC
   A6 dashboard DIR line deleted, not drawn, in DIR_OFF
   A7 InpBurstThresholdFixed = 172.0 (the retired constant), routed from FIXED,
      guarded at init, no dead BURST_MIN_POINTS
+  A8 XPDir functions defined: 32, dead: 0; funnel heartbeat wired to OnTimer
 B. EXECUTED
   gate0 entry-path: states=144 checks=606 failures=0
     DIR_OFF divergences from 1.03: 0 (must be 0)
