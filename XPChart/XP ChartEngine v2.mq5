@@ -1,13 +1,14 @@
 //+------------------------------------------------------------------+
 //|                                            XP ChartEngine v2.mq5 |
 //|  Lossless CopyTicks cursor, tick.time_msc bar anchoring, spec     |
-//|  sync, restart-safe, heartbeat.  v1 stays untouched.              |
+//|  sync, restart-safe, heartbeat.  v2.01 = union with the August    |
+//|  host variant (owner-token lock, UpdateRatesEveryTick).           |
 //+------------------------------------------------------------------+
 #property service
 #property copyright   "xpworx"
 #property link        "ghostmaster"
 #property description "XP ChartEngine v2: lossless CopyTicks cursor, tick-anchored bars, spec sync, restart-safe, heartbeat"
-#define  Version      "2.00"
+#define  Version      "2.01"
 #property version     Version
 #property strict
 
@@ -58,7 +59,8 @@ input int                  PollSleepMs          = 50;              // F1 keep 50
 input int                  CopyTicksCount       = 0;               // F1 count arg: 0 = all ticks since cursor (verify in reference); >0 = bounded
 input int                  HeartbeatSeconds     = 60;              // F12
 input string               OutputDir            = "XPChart";       // R6: under MQL5\Files
-input int                  LockStaleSeconds     = 180;             // F13 stale-lock takeover
+input int                  LockStaleSeconds     = 30;              // F13 heartbeat staleness reclaim (August variant: 30 s)
+input bool                 UpdateRatesEveryTick = false;           // August variant: false = CustomRatesUpdate only on bar close (+final flush); true = every poll
 input int                  FunnelPolls          = 20;              // verbose CopyTicks prints for the first N polls
 
 //--- resolved at start ----------------------------------------------
@@ -86,7 +88,11 @@ int      last_spread = 0;
 //--- synthetic axis (F10) ---------------------------------------------
 long     axis_base   = 0;   // chart-time origin, seconds
 long     origin_slot = 0;   // real slot index mapped to axis_base
-string   gv_axis_base = "", gv_axis_origin = "", gv_lock = "";
+string   gv_axis_base = "", gv_axis_origin = "";
+//--- F13 lock (August variant scheme: owner token + heartbeat key) -----
+string   lock_key = "", heartbeat_key = "";
+double   lock_owner = 0.0;
+bool     lock_acquired = false;
 int      map_handle = INVALID_HANDLE;
 
 //--- pending output (F8 retry buffers) --------------------------------
@@ -277,44 +283,74 @@ bool ResolveBaseSymbol()
 }
 //+------------------------------------------------------------------+
 //| F13 one instance per custom_name (GlobalVariable lock)           |
+//| Scheme kept from the August host variant: owner token in lock_key,|
+//| separate heartbeat key touched every second, reclaim after        |
+//| LockStaleSeconds, release only by the owner.                      |
 //+------------------------------------------------------------------+
-bool AcquireLock()
+bool AcquireCustomSymbolLock()
 {
-   double now = (double)(long)TimeLocal();
-   if(!GlobalVariableCheck(gv_lock))
+   lock_key      = "XPChartEngine.Lock." + custom_name;
+   heartbeat_key = lock_key + ".Heartbeat";
+   lock_owner    = (double)(long)TimeLocal() * 100000.0 + (double)(GetTickCount() % 100000);
+
+   if(!GlobalVariableCheck(lock_key))
    {
-      if(!GlobalVariableTemp(gv_lock))
+      if(GlobalVariableSet(lock_key, 0.0) == 0)
       {
-         Print("F13 GlobalVariableTemp failed err=", GetLastError(), " - falling back to a persistent variable");
-         if(GlobalVariableSet(gv_lock, 0.0) == 0)
-         {
-            Print("BLOCKED_DUPLICATE_INSTANCE: cannot create lock variable '", gv_lock, "' err=", GetLastError());
-            return false;
-         }
-      }
-      if(GlobalVariableSetOnCondition(gv_lock, now, 0.0)) return true;
-   }
-   double v = GlobalVariableGet(gv_lock);
-   if(now - v > (double)LockStaleSeconds)
-   {
-      if(GlobalVariableSetOnCondition(gv_lock, now, v))
-      {
-         Print("F13 stale lock (age ", (long)(now - v), " s) taken over: ", gv_lock);
-         return true;
+         Print("BLOCKED_DUPLICATE_INSTANCE: cannot create lock variable '", lock_key, "' err=", GetLastError());
+         return false;
       }
    }
-   Print("BLOCKED_DUPLICATE_INSTANCE: lock '", gv_lock, "' held, last heartbeat ", (long)(now - v), " s ago (stale after ", LockStaleSeconds, " s)");
-   return false;
+
+   double current_owner = GlobalVariableGet(lock_key);
+   if(current_owner != 0.0)
+   {
+      double age = -1.0;
+      if(GlobalVariableCheck(heartbeat_key))
+         age = (double)(long)TimeLocal() - GlobalVariableGet(heartbeat_key);
+      if(age < 0.0 || age > (double)LockStaleSeconds)
+      {
+         Print("F13 lock '", lock_key, "' owner=", DoubleToString(current_owner, 0), " heartbeat age=", (age < 0.0) ? "none" : DoubleToString(age, 0),
+               " s > ", LockStaleSeconds, " s - reclaiming");
+         if(!GlobalVariableSetOnCondition(lock_key, 0.0, current_owner))
+            Print("F13 reclaim lost a race (owner changed) - retrying acquisition");
+      }
+   }
+
+   ResetLastError();
+   if(!GlobalVariableSetOnCondition(lock_key, lock_owner, 0.0))
+   {
+      double hb = GlobalVariableCheck(heartbeat_key) ? (double)(long)TimeLocal() - GlobalVariableGet(heartbeat_key) : -1.0;
+      Print("BLOCKED_DUPLICATE_INSTANCE: ", custom_name, " is already being generated by another service instance (lock '", lock_key,
+            "' owner=", DoubleToString(GlobalVariableGet(lock_key), 0), " heartbeat ", DoubleToString(hb, 0), " s ago, stale after ", LockStaleSeconds, " s)");
+      return false;
+   }
+
+   lock_acquired = true;
+   if(GlobalVariableSet(heartbeat_key, (double)(long)TimeLocal()) == 0)
+      Print("F13 WARNING: heartbeat variable not set err=", GetLastError());
+   return true;
 }
-void RefreshLock()
+void TouchCustomSymbolLock()
 {
-   if(GlobalVariableSet(gv_lock, (double)(long)TimeLocal()) == 0)
-      ErrPrint("F13 lock refresh failed err=" + (string)GetLastError());
+   if(lock_acquired)
+      if(GlobalVariableSet(heartbeat_key, (double)(long)TimeLocal()) == 0)
+         ErrPrint("F13 heartbeat touch failed err=" + (string)GetLastError());
 }
-void ReleaseLock()
+void ReleaseCustomSymbolLock()
 {
-   if(!GlobalVariableDel(gv_lock))
-      Print("F13 lock release failed err=", GetLastError());
+   if(!lock_acquired)
+      return;
+   if(GlobalVariableCheck(lock_key) && GlobalVariableGet(lock_key) == lock_owner)
+   {
+      if(GlobalVariableSet(lock_key, 0.0) == 0)
+         Print("F13 lock release failed err=", GetLastError());
+      if(!GlobalVariableDel(heartbeat_key))
+         Print("F13 heartbeat delete failed err=", GetLastError());
+   }
+   else
+      Print("F13 lock '", lock_key, "' is no longer ours (owner ", DoubleToString(GlobalVariableGet(lock_key), 0), ") - left untouched");
+   lock_acquired = false;
 }
 //+------------------------------------------------------------------+
 //| custom symbol create / reuse                                     |
@@ -745,7 +781,7 @@ void ProcessTick(const MqlTick &t)
 //+------------------------------------------------------------------+
 //| F8 checked writes                                                |
 //+------------------------------------------------------------------+
-bool FlushPending()
+bool FlushPending(bool include_current)
 {
    bool ok = true;
    int nt = ArraySize(pend_ticks);
@@ -770,14 +806,15 @@ bool FlushPending()
          if(polls <= (long)FunnelPolls) Print("FUNNEL CustomTicksAdd ok=", r, "/", nt);
       }
    }
-   int nb = ArraySize(pend_rates) + (bar_active ? 1 : 0);
+   bool with_current = bar_active && include_current;
+   int nb = ArraySize(pend_rates) + (with_current ? 1 : 0);
    if(nb > 0)
    {
       MqlRates wr[];
       ArrayResize(wr, nb);
       int np = ArraySize(pend_rates);
       for(int i = 0; i < np; i++) wr[i] = pend_rates[i];
-      if(bar_active) CurrentBar(wr[nb - 1]);
+      if(with_current) CurrentBar(wr[nb - 1]);
       ResetLastError();
       int r = CustomRatesUpdate(custom_name, wr);
       int err = GetLastError();
@@ -794,7 +831,7 @@ bool FlushPending()
          rates_updates += r;
          for(int i = 0; i < np; i++)
             if(pend_slots[i] > written_slot_max) { bars_written++; written_slot_max = pend_slots[i]; }
-         if(bar_active && bar_slot > written_slot_max) { bars_written++; written_slot_max = bar_slot; }
+         if(with_current && bar_slot > written_slot_max) { bars_written++; written_slot_max = bar_slot; }
          ArrayResize(pend_rates, 0);
          ArrayResize(pend_slots, 0);
          if(polls <= (long)FunnelPolls) Print("FUNNEL CustomRatesUpdate ok=", r, " bars=", nb, " last_bar=", Ts(wr[nb - 1].time),
@@ -894,7 +931,7 @@ void OnStart()
    int poll_ms = (PollSleepMs < 10) ? 10 : PollSleepMs;
 
    Print("XP ChartEngine v", Version, " starting: BaseSymbol=", BaseSymbol, " interval_s=", interval_s, " basis=", EnumToString(PriceBasis),
-         " spread=", EnumToString(SpreadMode), " axis=", EnumToString(TimeAxis), " push_ticks=", PushTicks, " poll_ms=", poll_ms);
+         " spread=", EnumToString(SpreadMode), " axis=", EnumToString(TimeAxis), " push_ticks=", PushTicks, " update_rates_every_tick=", UpdateRatesEveryTick, " poll_ms=", poll_ms);
 
    // 1. F6 base symbol
    if(!ResolveBaseSymbol()) return;
@@ -916,15 +953,14 @@ void OnStart()
 
    // 2. F14 naming
    custom_name = actual_symbol + "_S" + (string)interval_s + CustomNameSuffix;
-   gv_lock        = "XPC2.lock." + custom_name;
    gv_axis_base   = "XPC2.axis." + custom_name;
    gv_axis_origin = "XPC2.orig." + custom_name;
 
    // 3. F13 lock
-   if(!AcquireLock()) return;
+   if(!AcquireCustomSymbolLock()) return;
 
    // 4. create / reuse + F7 spec sync (both paths)
-   if(!EnsureCustomSymbol()) { ReleaseLock(); return; }
+   if(!EnsureCustomSymbol()) { ReleaseCustomSymbolLock(); return; }
    SyncSpecs();
 
    // 5. output folder (R6)
@@ -947,7 +983,7 @@ void OnStart()
    cursor_seen = 0;
 
    // 7. F10 axis, then F9 seed
-   if(!LoadAxis(start_msc)) { ReleaseLock(); return; }
+   if(!LoadAxis(start_msc)) { ReleaseCustomSymbolLock(); return; }
    SeedFromStoredBar(start_msc / interval_ms);
 
    Print("XP ChartEngine Active: ", actual_symbol, " -> ", custom_name, " | v", Version, " | interval_s=", interval_s,
@@ -959,9 +995,16 @@ void OnStart()
 
    //--- Main loop (F1): CopyTicks cursor, every tick, in order
    MqlTick ticks[];
+   datetime last_touch = 0;
    while(!IsStopped())
    {
       polls++;
+      datetime now_local = TimeLocal();                                   // F13: heartbeat once per second (August variant)
+      if(now_local != last_touch)
+      {
+         TouchCustomSymbolLock();
+         last_touch = now_local;
+      }
       ResetLastError();
       int n = CopyTicks(actual_symbol, ticks, COPY_TICKS_ALL, (ulong)cursor_msc, (uint)((CopyTicksCount < 0) ? 0 : CopyTicksCount));   // from=cursor (inclusive left border)
       int err = GetLastError();
@@ -995,8 +1038,8 @@ void OnStart()
             processed++;
          }
          if(processed > max_ticks_per_poll) max_ticks_per_poll = processed;
-         if(processed > 0 || ArraySize(pend_ticks) > 0 || ArraySize(pend_rates) > 0)
-            FlushPending();
+         if((processed > 0 && UpdateRatesEveryTick) || ArraySize(pend_ticks) > 0 || ArraySize(pend_rates) > 0)
+            FlushPending(UpdateRatesEveryTick);                             // false: bars reach the chart on close (+ final flush), as in the August variant
       }
 
       if(consecutive_fail >= ConsecutiveFailLimit)                        // F8: never spin
@@ -1012,17 +1055,16 @@ void OnStart()
       if(now - last_hb_ms >= (ulong)HeartbeatSeconds * 1000)
       {
          Heartbeat("run");
-         RefreshLock();
          last_hb_ms = now;
       }
       Sleep(poll_ms);
    }
 
    //--- shutdown
-   if(bar_active || ArraySize(pend_rates) > 0 || ArraySize(pend_ticks) > 0) FlushPending();
+   if(bar_active || ArraySize(pend_rates) > 0 || ArraySize(pend_ticks) > 0) FlushPending(true);   // final bar flush (August variant bar_ready flush)
    Heartbeat("stop");
    if(map_handle != INVALID_HANDLE) FileClose(map_handle);
-   ReleaseLock();
+   ReleaseCustomSymbolLock();
    Print("XP ChartEngine v", Version, " stopped: ", actual_symbol, " -> ", custom_name, " ticks=", ticks_captured, " bars=", bars_written,
          " write_errors=", write_errors, " uptime_s=", (long)((GetTickCount64() - start_local_ms) / 1000));
 }

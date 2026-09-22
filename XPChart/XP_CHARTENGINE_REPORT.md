@@ -2,6 +2,8 @@ BLOCKED_NO_COMPILER | max_ticks_per_second: NOT_CAPTURED (no MT5 terminal reacha
 
 # XP_CHARTENGINE_REPORT — XP ChartEngine v2 (PLUMBING bucket) — 2026-09-22
 
+> **Superseded in part by `XP_RECONCILE_REPORT.md` (v1.1, same day):** the host census showed the deployed August copy carries a lock, FillRateBar and UpdateRatesEveryTick; v2 was re-issued as **v2.01** with the August lock scheme and that input. Sections 3 (F13), 5 (deploy) and 11 defer to the reconcile report where they differ.
+
 Prompt: XP_CHARTENGINE_UPGRADE_PROMPT v1. Thread: XP ChartEngine only (no Pine→MQL5 port work started).
 Companion: `P0_REPORT.md` (diagnosis, emitted before any edit). v1 (`XP ChartEngine.mq5`) is untouched.
 
