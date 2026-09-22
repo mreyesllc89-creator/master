@@ -167,6 +167,16 @@ public:
       out = s / (double)m_len;
       return true;
    }
+   void CopyFrom(const CXpSma &s)
+   {
+      m_len = s.m_len;
+      ArrayResize(m_val, m_len);
+      ArrayResize(m_ok, m_len);
+      ArrayCopy(m_val, s.m_val);
+      ArrayCopy(m_ok, s.m_ok);
+      m_count = s.m_count;
+      m_pos   = s.m_pos;
+   }
 };
 class CXpRma
 {
@@ -185,6 +195,13 @@ public:
       else m_valid = false;
       out = m_value;
       return m_valid;
+   }
+   void CopyFrom(const CXpRma &s)
+   {
+      m_len = s.m_len;
+      m_seed.CopyFrom(s.m_seed);
+      m_value = s.m_value;
+      m_valid = s.m_valid;
    }
 };
 class CXpRsi
@@ -213,6 +230,13 @@ public:
       if(au == 0.0) { out = 0.0;   return true; }
       out = 100.0 - 100.0 / (1.0 + au / ad);
       return true;
+   }
+   void CopyFrom(const CXpRsi &s)
+   {
+      m_up.CopyFrom(s.m_up);
+      m_dn.CopyFrom(s.m_dn);
+      m_prev = s.m_prev;
+      m_prevValid = s.m_prevValid;
    }
 };
 class CXpAtr
@@ -260,6 +284,16 @@ public:
       }
       return true;
    }
+   void CopyFrom(const CXpExtreme &s)
+   {
+      m_len = s.m_len;
+      ArrayResize(m_val, m_len);
+      ArrayResize(m_ok, m_len);
+      ArrayCopy(m_val, s.m_val);
+      ArrayCopy(m_ok, s.m_ok);
+      m_count = s.m_count;
+      m_pos   = s.m_pos;
+   }
 };
 bool XpMax(double a, bool aOk, double b, bool bOk, double &out)
 {
@@ -289,6 +323,11 @@ CXpSma     g_fast;
 CXpSma     g_slow;
 CXpExtreme g_ext;
 CXpAtr     g_atr;
+//--- preview copies for the forming bar (Pine plots the realtime bar on every tick; the copies never touch confirmed state)
+CXpRsi     g_rsiP;
+CXpSma     g_fastP;
+CXpSma     g_slowP;
+CXpExtreme g_extP;
 
 //+------------------------------------------------------------------+
 //| Pine `var` state - reset only on full recalc                      |
@@ -896,6 +935,63 @@ void ProcessBar(int i, const datetime &time[], const double &open[], const doubl
 }
 
 //+------------------------------------------------------------------+
+//| forming-bar preview (fast/slow lines, fill, table header cells)   |
+//| Recomputed from a COPY of the confirmed calculators on every tick,|
+//| as TradingView redraws the realtime bar. Consumption buffers of   |
+//| forming bars stay EMPTY_VALUE; confirmed bars are never touched   |
+//| (the only write into the last closed bar is the fill bridge).     |
+//+------------------------------------------------------------------+
+void PreviewBars(int from, int to, const double &close[], const long &tick_volume[])
+{
+   g_rsiP.CopyFrom(g_rsi);
+   g_fastP.CopyFrom(g_fast);
+   g_slowP.CopyFrom(g_slow);
+   g_extP.CopyFrom(g_ext);
+   int j = g_lastProcChartIdx;
+   int prevColour = g_lastProcColour;
+   if(j >= 0)
+   {
+      bool jOk = (BufFast[j] != EMPTY_VALUE && BufSlow[j] != EMPTY_VALUE);
+      BufFillRedA[j]  = (jOk && prevColour == 1) ? BufFast[j] : EMPTY_VALUE;
+      BufFillRedB[j]  = (jOk && prevColour == 1) ? BufSlow[j] : EMPTY_VALUE;
+      BufFillLimeA[j] = (jOk && prevColour == 0) ? BufFast[j] : EMPTY_VALUE;
+      BufFillLimeB[j] = (jOk && prevColour == 0) ? BufSlow[j] : EMPTY_VALUE;
+   }
+   int prevIdx = j;
+   for(int i = from; i <= to; i++)
+   {
+      if(SkipEmptyBars && tick_volume[i] == 0) continue;
+      double r = 0.0, fast = 0.0, slow = 0.0, loW = 0.0, hiW = 0.0;
+      bool rOk    = g_rsiP.Update(close[i], r);
+      bool fastOk = g_fastP.Update(r, rOk, fast);
+      bool slowOk = g_slowP.Update(r, rOk, slow);
+      bool both   = fastOk && slowOk;
+      bool isRed  = invertFill ? (both && fast > slow) : (both && fast < slow);
+      bool extOk  = g_extP.Update(slow, slowOk, loW, hiW);
+      double posW = 0.5;
+      if(extOk && hiW - loW > 0.0) posW = (slow - loW) / (hiW - loW);
+      BufRSI[i]  = rOk ? r : EMPTY_VALUE;
+      BufFast[i] = fastOk ? fast : EMPTY_VALUE;
+      BufSlow[i] = slowOk ? slow : EMPTY_VALUE;
+      int colour = -1;
+      if(both)
+      {
+         colour = isRed ? 1 : 0;
+         if(isRed) { BufFillRedA[i] = fast;  BufFillRedB[i] = slow; }
+         else      { BufFillLimeA[i] = fast; BufFillLimeB[i] = slow; }
+         if(prevIdx >= 0 && prevColour >= 0 && prevColour != colour && BufFast[prevIdx] != EMPTY_VALUE && BufSlow[prevIdx] != EMPTY_VALUE)
+         {
+            if(isRed) { BufFillRedA[prevIdx] = BufFast[prevIdx];  BufFillRedB[prevIdx] = BufSlow[prevIdx]; }
+            else      { BufFillLimeA[prevIdx] = BufFast[prevIdx]; BufFillLimeB[prevIdx] = BufSlow[prevIdx]; }
+         }
+      }
+      prevColour = colour;
+      prevIdx = i;
+      // the Pine table reads isRed / posW / inLow / inHigh on the realtime bar
+      g_tblIsRed = isRed; g_tblPosW = posW; g_tblInLow = (posW <= g_loFrac); g_tblInHigh = (posW >= g_hiFrac);
+   }
+}
+//+------------------------------------------------------------------+
 int OnInit()
 {
    g_rsiLen   = ClampInt(rsiLen, 2, "rsiLen");
@@ -1024,7 +1120,11 @@ int OnCalculate(const int rates_total, const int prev_calculated, const datetime
       g_lastProcIdx  = i;
       any = true;
    }
-   if(any) { UpdateTable(); DumpFlush(); ChartRedraw(); }
+   if(any) DumpFlush();
+   if(lastClosed + 1 <= rates_total - 1)
+      PreviewBars(MathMax(lastClosed + 1, 0), rates_total - 1, close, tick_volume);   // realtime bar moves with every tick
+   UpdateTable();
+   ChartRedraw();
    return rates_total;
 }
 //+------------------------------------------------------------------+

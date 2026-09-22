@@ -29,13 +29,26 @@ int main(int argc, char** argv) {
   OnInit();
   int n = 300; feed(n, false); call(n, 0);                                // history load
   std::mt19937 r2(seed + 1);
+  long previewChecks = 0, previewFails = 0, previewEmpty = 0;
+  double pvR = EMPTY_VALUE, pvF = EMPTY_VALUE, pvS = EMPTY_VALUE; int pvIdx = -1;
   while (n < N) {
+    if (pvIdx >= 0 && n + 1 <= N) {   // bar pvIdx is about to close: compare its last preview with the confirmed value
+      // (comparison happens after the next feed/call below)
+    }
     int jump = (z(r2) < 0.05) ? std::min(3, N - n) : 1;                    // rates_total jumps by more than one
     n += jump;
     feed(n, !noPartial);  call(n, g_prev);                                 // new forming bar, first tick (or closed when noPartial)
     feed(n, false); call(n, g_prev);                                        // forming bar mutated (more ticks)
     call(n, g_prev);                                                        // tick with no bar change
+    if (pvIdx >= 0 && jump == 1) {                                          // previous forming bar is now closed
+      previewChecks++;
+      if (pvR == EMPTY_VALUE && BufRSI[pvIdx] != EMPTY_VALUE) previewEmpty++;
+      else if (pvR != BufRSI[pvIdx] || pvF != BufFast[pvIdx] || pvS != BufSlow[pvIdx]) previewFails++;
+    }
+    pvIdx = n - 1; pvR = BufRSI[pvIdx]; pvF = BufFast[pvIdx]; pvS = BufSlow[pvIdx];   // preview of the complete forming bar
+    if (n > 330 && BufRSI[n - 1] == EMPTY_VALUE && BufFast[n - 1] == EMPTY_VALUE) previewEmpty++;
   }
+  std::cout << "preview: checks=" << previewChecks << " mismatches_vs_confirmed=" << previewFails << " empty_forming_bars=" << previewEmpty << std::endl;
   std::cout << "objects=" << g_objects.size() << " creates=" << g_objCreates << std::endl;
   int boxes = 0, labels = 0, tbl = 0; for (auto& kv : g_objects) { if (kv.second.type == OBJ_RECTANGLE) boxes++; else if (kv.second.type == OBJ_TEXT) labels++; else tbl++; }
   std::cout << "boxes=" << boxes << " text_labels=" << labels << " table_labels=" << tbl << std::endl;

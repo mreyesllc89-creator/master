@@ -38,6 +38,7 @@ template<class T> int ArraySize(const Arr<T>& a) { return (int)a.v.size(); }
 template<class T> int ArrayResize(Arr<T>& a, int n, int reserve = 0) { a.v.resize(n); return n; }
 template<class T, class V> int ArrayInitialize(Arr<T>& a, V val) { for (auto& x : a.v) x = (T)val; return (int)a.v.size(); }
 template<class T> bool ArrayRemove(Arr<T>& a, int start, int count) { a.v.erase(a.v.begin() + start, a.v.begin() + start + count); return true; }
+template<class T> int ArrayCopy(Arr<T>& d, const Arr<T>& s, int dst_start = 0, int src_start = 0, int count = -1) { int n = (count < 0) ? (int)s.v.size() - src_start : count; if ((int)d.v.size() < dst_start + n) d.v.resize(dst_start + n); for (int i = 0; i < n; i++) d.v[dst_start + i] = s.v[src_start + i]; return n; }
 template<class T> bool ArraySort(Arr<T>& a) { std::sort(a.v.begin(), a.v.end()); return true; }
 inline int MathMax(int a, int b) { return a > b ? a : b; }
 inline double MathMax(double a, double b) { return a > b ? a : b; }

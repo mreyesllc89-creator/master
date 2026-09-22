@@ -1,4 +1,4 @@
-PORTED | rows=70 exact=51 equivalent=12 assumed=4 different=3 omitted=0 | A pass, B skipped, C pass-emulated/live-pending | DECISION: yes — ready to run once the host compile is clean; smoke stays closed until the axis receipt arrives (BLOCKED_AXIS_RECEIPT_MISSING)
+PORTED | rows=70 exact=52 equivalent=12 assumed=4 different=2 omitted=0 | A pass, B skipped, C pass-emulated/live-pending | DECISION: yes — ready to run once the host compile is clean; smoke stays closed until the axis receipt arrives (BLOCKED_AXIS_RECEIPT_MISSING)
 
 # XPW Shape Map v0.5 — Pine → MQL5 port report (2026-09-22)
 
@@ -65,7 +65,7 @@ line quotes are in the v0.4 report §1.
 | 18 | `pS = plot(slow, "Slow", color.new(color.silver, 30))` | plot 2 DRAW_LINE `C'178,181,190'` | EQUIVALENT | Pine silver #B2B5BE exact; no alpha |
 | 19 | `isRed = invertFill ? fast > slow : fast < slow` | `isRed = invertFill ? (both && fast > slow) : (both && fast < slow)` | EXACT | NA1 |
 | 20 | `isLime = not isRed` | `IsLimeAt(k)` = stored `isRed == 0` | EXACT | NA10: lime during warm-up |
-| 21 | `fill(pF, pS, isRed ? color.new(color.red, 82) : color.new(color.lime, 82))` | two single-colour DRAW_FILLING plots keyed per bar to `isRed`, transition segment bridged in the new colour | EQUIVALENT | colour-order independent; no alpha; no fill on the forming bar |
+| 21 | `fill(pF, pS, isRed ? color.new(color.red, 82) : color.new(color.lime, 82))` | two single-colour DRAW_FILLING plots keyed per bar to `isRed`, transition segment bridged in the new colour | EQUIVALENT | colour-order independent; no alpha. The forming bar is filled and its lines move with every tick (`PreviewBars()`, rev 2) |
 | 22 | `hiW = ta.highest(slow, areaLook)`, `loW = ta.lowest(slow, areaLook)` | `CXpExtreme g_ext` | EQUIVALENT-ASSUMED | NA5 (na while the window holds na; Gate B settles) |
 | 23 | `rngW = hiW - loW` | `rngW = extOk ? hiW - loW : 0` with `extOk` | EXACT | NA2 |
 | 24 | `posW = rngW > 0 ? (slow - loW) / rngW : 0.5` | `posW = (extOk && rngW > 0) ? … : 0.5` | EXACT | NA9; slow is valid whenever the window is |
@@ -104,7 +104,7 @@ line quotes are in the v0.4 report §1.
 | 57 | `if botTurn or topTurn: if legOpen: dist = math.abs(close - legP0); bars = bar_index - legB0; eff = legPath > 0 ? dist / legPath : 0.0; leg2 := leg1; leg1 := (legDir > 0 ? "UP " : "DN ") + str.tostring(dist, "#.##") + " / " + str.tostring(bars) + "b / eff " + str.tostring(eff, "#.00")` | same; `Fmt2` = "#.##", `Fmt00` = "#.00" | EQUIVALENT-ASSUMED | number formats: assumes TradingView prints `0.5` not `.5` and `0.00` for zero, rounding half away from zero like `DoubleToString` |
 | 58 | `legOpen := true; legDir := botTurn ? 1 : -1; legP0 := close; legB0 := bar_index; legPath := 0.0` | same | EXACT | |
 | 59 | `var table t = table.new(position.middle_right, 2, 10, border_width=1, frame_width=1, frame_color=color.new(color.gray, 50))` | 10×2 `OBJ_LABEL`s + `OBJ_RECTANGLE_LABEL` frame (gray border, transparent) + `OBJ_RECTANGLE_LABEL` blue header, centred on the window height | EQUIVALENT | cell borders have no colour in the Pine (border_color na) so none are drawn |
-| 60 | `if showTable and barstate.islast` | `UpdateTable()` after each processed batch | DIFFERENT | Pine refreshes on the forming bar (`isRed`, `posW`, `inLow/inHigh` read the live bar); the port shows the last CLOSED bar (R3). Counters, gaps and legs are confirmed-bar state in both |
+| 60 | `if showTable and barstate.islast` | `UpdateTable()` on every tick; `isRed`, `posW`, `inLow/inHigh` come from the forming-bar preview, counters/gaps/legs from confirmed state | EXACT | rev 2: same bar the Pine reads |
 | 61 | `table.cell(0,0, "XPW Shape Map v0.5", white, bgcolor=color.new(color.blue, 40), tiny)`; `table.cell(1,0, isRed ? "RED" : "LIME", …)` | row 0 white on the blue header rect | EQUIVALENT | no alpha |
 | 62 | `table.cell(1,1, str.tostring(posW, "#.00") + (inLow ? " LOW" : inHigh ? " HIGH" : " MID"))` | `Fmt00(posW) + …` | EQUIVALENT-ASSUMED | "#.00" leading-zero assumption (row 57) |
 | 63 | `"BOT squares"` / `str.tostring(nBotSq)`; `"TOP squares"` / `nTopSq` | same strings | EXACT | |
@@ -117,6 +117,13 @@ line quotes are in the v0.4 report §1.
 | 70 | Pine `bar_index` and `x[k]` history | `g_barIndex` + rings keyed by it; `k > bar_index` → na (NA8) | EXACT | rings sized from the inputs in `OnInit` |
 
 ---
+
+### Rev 2 (2026-09-22): the realtime bar moves with every tick
+As in the v0.4 rev 2: `PreviewBars()` advances COPIES of the RSI, SMA and highest/lowest calculators over the forming
+bar on every tick and writes only the visual buffers (FAST, SLOW, RSI, fills) and the table's live cells (`isRed`,
+`posW`, `inLow/inHigh`). Detectors, turn marks, ticks, legs and every consumption buffer stay confirmed-bar only.
+Emulator receipt (1 500 bars, seed 7): `preview: checks=1041 mismatches_vs_confirmed=0 empty_forming_bars=0`; Gate C
+PASS, replay diff 0 unchanged. Rows 17–21 and 60 updated above.
 
 ## 3. na rules applied
 NA1 comparison with na → false (`isRed`, hold loops, crossover terms, `atrV > 0`, `rngW > 0`); NA2 arithmetic with na → na

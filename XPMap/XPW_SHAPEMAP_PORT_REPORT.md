@@ -1,4 +1,4 @@
-PORTED | rows=108 exact=83 equivalent=11 assumed=6 different=8 omitted=0 | A pass, B skipped, C pass-emulated/live-pending | DECISION: yes — ready to run once the host compile is clean; smoke stays closed until the axis receipt arrives (BLOCKED_AXIS_RECEIPT_MISSING)
+PORTED | rows=108 exact=84 equivalent=11 assumed=6 different=7 omitted=0 | A pass, B skipped, C pass-emulated/live-pending | DECISION: yes — ready to run once the host compile is clean; smoke stays closed until the axis receipt arrives (BLOCKED_AXIS_RECEIPT_MISSING)
 
 # XPW Shape Map v0.4 — Pine → MQL5 port report (2026-09-22)
 
@@ -178,7 +178,7 @@ Classes: EXACT, EQUIVALENT, EQUIVALENT-ASSUMED, DIFFERENT, OMITTED. Line numbers
 | 38 | `plot(rsiv, "RSI", color.new(color.gray, 60))` | plot 1 DRAW_LINE `C'120,123,134'` | EQUIVALENT | Pine gray #787B86 exact; 60 % transparency has no MQL5 counterpart |
 | 39 | `pF = plot(fast, "Fast", color.new(color.white, 40))` | plot 2 DRAW_LINE clrWhite | EQUIVALENT | no alpha |
 | 40 | `pS = plot(slow, "Slow", color.new(color.aqua, 40))` | plot 3 DRAW_LINE `C'0,188,212'` | EQUIVALENT | Pine aqua #00BCD4 exact; no alpha |
-| 41 | `fill(pF, pS, color.new(isRedNow ? cRed : cLime, 62))` | plots 4/5: two DRAW_FILLING plots, "Fill RED" (both colours RED) fed on bars where `isRedNow`, "Fill LIME" otherwise; at a colour change the previous bar's fast/slow is also written into the new colour so the transition segment is drawn | EQUIVALENT | by construction independent of the DRAW_FILLING "first>second" colour order (docs unreachable from the box); no alpha; the forming bar has no fill (R3) |
+| 41 | `fill(pF, pS, color.new(isRedNow ? cRed : cLime, 62))` | plots 4/5: two DRAW_FILLING plots, "Fill RED" (both colours RED) fed on bars where `isRedNow`, "Fill LIME" otherwise; at a colour change the previous bar's fast/slow is also written into the new colour so the transition segment is drawn | EQUIVALENT | by construction independent of the DRAW_FILLING "first>second" colour order (docs unreachable from the box); no alpha. The forming bar IS filled: `PreviewBars()` recomputes it on every tick (rev 2) |
 | 42 | `var bool runInit = false` … `var float runSep = 0.0` (7 vars) | globals `runInit, runState, runLen, runStart, runTop/runTopOk, runBot/runBotOk, runSep/runSepOk`, reset in `ResetAll()` | EXACT | R5 |
 | 43 | `var int prevLen = 0` … `var int prev2Len = 0` (8 vars) | `prevLen, prevState, prevStart, prevEnd, prevTop/Ok, prevBot/Ok, prevSep/Ok, prev2Len` | EXACT | R5 |
 | 44 | `var int botCount = 0` … `var float lastTopSep = na` (8 vars) | `botCount, topCount, lastBotBar, lastTopBar, lastBotW, lastTopW, lastBotSep/Ok, lastTopSep/Ok` | EXACT | R5 |
@@ -230,7 +230,7 @@ Classes: EXACT, EQUIVALENT, EQUIVALENT-ASSUMED, DIFFERENT, OMITTED. Line numbers
 | 90 | `vel2 = …` | same | EXACT | |
 | 91 | `f(x, p) => na(x) ? "-" : str.tostring(x, p)` | `FmtNa(x, ok, mintick)` | EXACT | |
 | 92 | `var table tb = table.new(position.middle_right, 2, 8, border_width=1)` | 9×2 `OBJ_LABEL`s in the sub-window, `CORNER_RIGHT_UPPER`, y centred on the window height, column 1 right-aligned and column 0 placed left of the widest column-1 string (`TextGetSize`) | EQUIVALENT | Pine's default table has no visible bg/border (border_color na), so no frame is drawn either |
-| 93 | `if showTbl and barstate.islast` | `UpdateTable()` after each processed batch when `showTbl` | DIFFERENT | Pine refreshes on the forming bar (its `isRedNow`, `sep`, `runLen` read the live bar); the port shows the values as of the last CLOSED bar (R3, confirmed bars only). Counters, "bars ago" and move rows are identical because they are confirmed-bar state in both |
+| 93 | `if showTbl and barstate.islast` | `UpdateTable()` on every tick; `isRedNow` and `sep` come from the forming-bar preview, `runLen` and the counters from confirmed state | EXACT | rev 2: same bar the Pine reads (`barstate.islast`) |
 | 94 | `table.cell(0,0, "XPW MAP v0.4", white, small)`; `table.cell(1,0, timeframe.period, white, small)` | row 0: `"XPW MAP v0.4"` / measured interval string (`"1s"`), Arial 9 | DIFFERENT | R10: measured median of `time[i]-time[i-1]` over the last 200 bars, never `Period()` |
 | 95 | `table.cell(1,1, str.format("{0} {1}b sep {2}", isRedNow ? "RED" : "LIME", runLen, f(sep,"#.##")), text_color = isRedNow ? cRed : cLime, tiny)` | `StringFormat("%s %db sep %s", …)`, colour cRed/cLime, Arial 7 | EXACT | string identical; see row 93 for the bar it reads |
 | 96 | `str.tostring(x, "#.##")` | `Fmt2()`: `DoubleToString(x, 2)` with trailing zeros and dot trimmed | EQUIVALENT-ASSUMED | assumes TradingView prints `0.5` (not `.5`) and rounds half away from zero like `DoubleToString`; only strings are affected |
@@ -252,6 +252,18 @@ and the emulated MQL5 run (Gate C-emulated), which compares the MQL5 code's own 
 every bar including warm-up.
 
 ---
+
+### Rev 2 (2026-09-22): the realtime bar moves with every tick
+Rev 1 left the forming bar empty, so the RSI/fast/slow lines and the fill froze until the bar closed (the host saw the
+lines stop one bar short). Rev 2 adds `PreviewBars()`: on every `OnCalculate`, the RSI, fast and slow calculators are
+COPIED (`CopyFrom`), the copy is advanced over the forming bar(s), and only the visual buffers (RSI, FAST, SLOW, the two
+fills) and the table's live cells (`isRedNow`, `sep`) are written for those bars. Consumption buffers of a forming bar
+stay EMPTY_VALUE, the detectors still run once per closed bar, and no confirmed value is ever touched; the one write into
+the last closed bar is the fill bridge into the preview colour (visual only, restored on every tick). This is what
+TradingView does: the realtime bar's plot updates with each tick and is fixed at close. Emulator receipt (1 500 bars,
+seed 7): `preview: checks=1041 mismatches_vs_confirmed=0 empty_forming_bars=0` — the preview on the last tick equals the
+value stamped when the bar closes, and the forming bar is never left empty; Gate C and the replay diff are unchanged
+(PASS / 0 rows). Rows 38–41 and 93 updated above.
 
 ## 4. na rules applied (each one is implemented with an explicit valid flag, never with NaN arithmetic)
 

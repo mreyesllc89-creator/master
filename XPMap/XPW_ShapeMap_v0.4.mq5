@@ -202,6 +202,16 @@ public:
       out = s / (double)m_len;
       return true;
    }
+   void CopyFrom(const CXpSma &s)
+   {
+      m_len = s.m_len;
+      ArrayResize(m_val, m_len);
+      ArrayResize(m_ok, m_len);
+      ArrayCopy(m_val, s.m_val);
+      ArrayCopy(m_ok, s.m_ok);
+      m_count = s.m_count;
+      m_pos   = s.m_pos;
+   }
 };
 // ta.rma(src, len): sum := na(sum[1]) ? ta.sma(src, len) : (src + (len-1)*sum[1]) / len
 class CXpRma
@@ -239,6 +249,13 @@ public:
       out = m_value;
       return m_valid;
    }
+   void CopyFrom(const CXpRma &s)
+   {
+      m_len = s.m_len;
+      m_seed.CopyFrom(s.m_seed);
+      m_value = s.m_value;
+      m_valid = s.m_valid;
+   }
 };
 // ta.rsi(src, len) per the Pine reference implementation (NA3 + down==0 / up==0 edge cases)
 class CXpRsi
@@ -269,6 +286,13 @@ public:
       double rs = au / ad;
       out = 100.0 - 100.0 / (1.0 + rs);
       return true;
+   }
+   void CopyFrom(const CXpRsi &s)
+   {
+      m_up.CopyFrom(s.m_up);
+      m_dn.CopyFrom(s.m_dn);
+      m_prev = s.m_prev;
+      m_prevValid = s.m_prevValid;
    }
 };
 // ta.atr(len) = ta.rma(ta.tr(true), len); TR on the first bar = high - low (NA6, NA11)
@@ -333,6 +357,16 @@ public:
       }
       return true;
    }
+   void CopyFrom(const CXpExtreme &s)
+   {
+      m_len = s.m_len;
+      ArrayResize(m_val, m_len);
+      ArrayResize(m_ok, m_len);
+      ArrayCopy(m_val, s.m_val);
+      ArrayCopy(m_ok, s.m_ok);
+      m_count = s.m_count;
+      m_pos   = s.m_pos;
+   }
 };
 // math.max / math.min with na (NA7): propagate by default (XPW_NA_MAX_PROPAGATES)
 bool XpMax(double a, bool aOk, double b, bool bOk, double &out)
@@ -370,6 +404,10 @@ CXpSma     g_fast;     // ta.sma(rsiv, fastLen)
 CXpSma     g_slow;     // ta.sma(rsiv, slowLen)
 CXpExtreme g_ext;      // ta.lowest / ta.highest(slow, extLook)
 CXpAtr     g_atr;      // ta.atr(atrLen)
+//--- preview copies for the forming bar (Pine plots the realtime bar on every tick; the copies never touch confirmed state)
+CXpRsi     g_rsiP;
+CXpSma     g_fastP;
+CXpSma     g_slowP;
 
 //+------------------------------------------------------------------+
 //| Pine `var` state (R5) - reset only on full recalc (R3)            |
@@ -1031,6 +1069,63 @@ void ProcessBar(int i, const datetime &time[], const double &open[], const doubl
 }
 
 //+------------------------------------------------------------------+
+//| forming-bar preview (visual lines, fill and the table's live cells)|
+//| Recomputed from a COPY of the confirmed calculators on every tick,|
+//| exactly as TradingView redraws the realtime bar. Consumption      |
+//| buffers of forming bars stay EMPTY_VALUE; confirmed bars are      |
+//| never touched (the only write into the last closed bar is the    |
+//| fill bridge into the preview colour, a visual buffer).            |
+//+------------------------------------------------------------------+
+void PreviewBars(int from, int to, const double &close[], const long &tick_volume[])
+{
+   g_rsiP.CopyFrom(g_rsi);
+   g_fastP.CopyFrom(g_fast);
+   g_slowP.CopyFrom(g_slow);
+   int j = g_lastProcChartIdx;
+   int prevColour = g_lastProcColour;
+   if(j >= 0)                                    // restore the last closed bar's own fill (drops a stale bridge)
+   {
+      bool jOk = (BufFast[j] != EMPTY_VALUE && BufSlow[j] != EMPTY_VALUE);
+      BufFillRedA[j]  = (jOk && prevColour == 1) ? BufFast[j] : EMPTY_VALUE;
+      BufFillRedB[j]  = (jOk && prevColour == 1) ? BufSlow[j] : EMPTY_VALUE;
+      BufFillLimeA[j] = (jOk && prevColour == 0) ? BufFast[j] : EMPTY_VALUE;
+      BufFillLimeB[j] = (jOk && prevColour == 0) ? BufSlow[j] : EMPTY_VALUE;
+   }
+   int prevIdx = j;
+   for(int i = from; i <= to; i++)
+   {
+      if(SkipEmptyBars && tick_volume[i] == 0) continue;
+      double rsiv = 0.0, fast = 0.0, slow = 0.0;
+      bool rsiOk  = g_rsiP.Update(close[i], rsiv);
+      bool fastOk = g_fastP.Update(rsiv, rsiOk, fast);
+      bool slowOk = g_slowP.Update(rsiv, rsiOk, slow);
+      bool stUp   = (fastOk && slowOk) ? (fast > slow) : false;
+      bool isRedNow = invertFill ? stUp : !stUp;
+      BufRSI[i]  = rsiOk  ? rsiv : EMPTY_VALUE;
+      BufFast[i] = fastOk ? fast : EMPTY_VALUE;
+      BufSlow[i] = slowOk ? slow : EMPTY_VALUE;
+      int colour = -1;
+      if(fastOk && slowOk)
+      {
+         colour = isRedNow ? 1 : 0;
+         if(isRedNow) { BufFillRedA[i] = fast;  BufFillRedB[i] = slow; }
+         else         { BufFillLimeA[i] = fast; BufFillLimeB[i] = slow; }
+         if(prevIdx >= 0 && prevColour >= 0 && prevColour != colour && BufFast[prevIdx] != EMPTY_VALUE && BufSlow[prevIdx] != EMPTY_VALUE)
+         {
+            if(isRedNow) { BufFillRedA[prevIdx] = BufFast[prevIdx];  BufFillRedB[prevIdx] = BufSlow[prevIdx]; }
+            else         { BufFillLimeA[prevIdx] = BufFast[prevIdx]; BufFillLimeB[prevIdx] = BufSlow[prevIdx]; }
+         }
+      }
+      prevColour = colour;
+      prevIdx = i;
+      // table row "state" reads the realtime bar in the Pine
+      g_tblSep = (fastOk && slowOk) ? MathAbs(fast - slow) : 0.0;
+      g_tblSepOk = fastOk && slowOk;
+      g_tblIsRedNow = isRedNow;
+   }
+}
+
+//+------------------------------------------------------------------+
 //| OnInit                                                            |
 //+------------------------------------------------------------------+
 int OnInit()
@@ -1180,12 +1275,11 @@ int OnCalculate(const int rates_total,
       g_lastProcIdx  = i;
       any = true;
    }
-   if(any)
-   {
-      UpdateTable();
-      DumpFlush();
-      ChartRedraw();
-   }
+   if(any) DumpFlush();
+   if(lastClosed + 1 <= rates_total - 1)
+      PreviewBars(MathMax(lastClosed + 1, 0), rates_total - 1, close, tick_volume);   // realtime bar moves with every tick
+   UpdateTable();
+   ChartRedraw();
    return rates_total;
 }
 //+------------------------------------------------------------------+
