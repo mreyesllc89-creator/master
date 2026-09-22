@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
-"""Lift the XPDIR rule core out of the EA and translate it to C++.
+"""Lift a marked XPDIR block out of the EA and translate it to C++.
 
-The core lives between the XPDIR_RULE_CORE_BEGIN / XPDIR_RULE_CORE_END markers
-in FlashGold_Continuation_v2_XPDIR.mq5. It is pure MQL5: no global read, no
-runtime call beyond MathAbs / MathIsValidNumber. This script is the same
+  usage: extract_core.py <ea.mq5> <out.cpp> [MARKER]   (default XPDIR_RULE_CORE)
+
+Blocks live between <MARKER>_BEGIN and <MARKER>_END in
+FlashGold_Continuation_v2_XPDIR.mq5:
+  XPDIR_RULE_CORE   the vote and rule evaluation - pure MQL5, no global read,
+                    no runtime call beyond MathAbs / MathIsValidNumber (Gate 1)
+  XPDIR_GATE0_CORE  the entry-path wiring, which does read globals; the Gate 0
+                    driver supplies them as stubs and drives them (Gate 0)
+This script is the same
 mechanical MQL5->C++ translation the Shape Map port uses
 (XPMap/reference/emu/mql2cpp.py), narrowed to the constructs the core uses:
 
@@ -18,14 +24,18 @@ import re, sys
 
 src = open(sys.argv[1], newline=None).read()
 
+marker = sys.argv[3] if len(sys.argv) > 3 else "XPDIR_RULE_CORE"
+
 # The grade constants are part of the core's contract, so they come along.
 defines = [l for l in src.split("\n")
            if re.match(r"\s*#define\s+XPDIR_GRADE_\w+", l)]
 if not defines:
     sys.exit("no XPDIR_GRADE_* defines found in the EA")
+if marker != "XPDIR_RULE_CORE":
+    defines = []
 
-begin = src.index("XPDIR_RULE_CORE_BEGIN")
-end = src.index("XPDIR_RULE_CORE_END")
+begin = src.index(marker + "_BEGIN")
+end = src.index(marker + "_END")
 body = src[begin:end]
 body = body[body.index("\n") + 1:]          # drop the marker line itself
 

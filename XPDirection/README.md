@@ -18,16 +18,20 @@ diff, and the host instructions for the three open gates.
 | `reference/run_fixtures.py` | **Gate 1 runner.** Fixture expectation vs `vote_ref.py` vs the EA's own compiled rule core. |
 | `reference/fixtures/vote_rules.csv` | 49 hand-derived fixtures. |
 | `reference/emu/` | Lifts `XPDIR_RULE_CORE_BEGIN…END` out of the `.mq5`, translates it to C++, compiles and runs it (the `XPMap/reference/emu/` approach). |
+| `reference/run_gate0_precheck.py` | **Gate 0 pre-check** — no terminal needed. Static guard audit + 606 executed checks that DIR_OFF is the 1.03 entry path. |
 | `reference/compare_trades.py` | **Gate 0** trade-list comparison of two MT5 tester HTML reports. |
 | `reference/gate0_tester_settings.ini` | Gate 0 tester settings (real ticks, fixed window). |
 | `reference/ea_1.03_to_1.05_xpdir.diff` | The complete machine diff, 1.03 → 1.05-XPDIR (+765 / −7). |
 
-## Reproduce Gate 1 (needs only python3 and g++)
+## Reproduce Gate 1 and the Gate 0 pre-check (needs only python3 and g++)
 
 ```bash
 cd XPDirection/reference && python3 run_fixtures.py
 # stub lint: 0 errors 0 warnings
 # fixtures=49 asserts=833 mismatches=0 emu=on
+
+python3 run_gate0_precheck.py --base /path/to/FlashGold_Continuation_v2.mq5
+# G0 PRE-CHECK PASS - DIR_OFF is the 1.03 entry path.
 ```
 
 `--no-emu` skips the compile step and runs the Python reference against the fixtures
@@ -35,8 +39,10 @@ alone. A run with `asserts=0` is a failure, not a pass.
 
 ## State of the gates
 
-- **G0** (DIR_OFF is trade-for-trade 1.03) — `BLOCKED_NO_TESTER`. Host run; settings
-  and comparison script shipped.
+- **G0** (DIR_OFF is trade-for-trade 1.03) — `BLOCKED_NO_TESTER`; the tester run is the
+  host's. The **pre-check passes**: static audit 6/6, and 606 executed checks over all
+  144 mode × state combinations showing DIR_OFF is the 1.03 entry path and never even
+  asks the ladder for a direction. Verified against a deliberately broken build.
 - **G1** (vote logic, including the whole cross reader) — passing, `asserts=833 mismatches=0`.
 - **G2** (host smoke, DIR_LOCK) — pending. Host run.
 - **G3** (host smoke, DIR_TRANSLATE) — pending. Host run.
@@ -49,20 +55,22 @@ bars, `crossSep`, `sepNow` and the carried sign, and grades its vote `EARLY` / `
 `STALE_STATE`. Ties inherit the carried sign — a touch is not a cross — and detection is
 on closed bars only. Full rules in §1 of the report.
 
+**Polarity is confirmed (owner, 2026-09-22): `fast > slow` = BUY, `fast < slow` = SELL,
+the cross is the moment, and the fill is never read.** The owner's 20:56–20:57 frames
+show the fill painting RED on a climb and GREEN on a drop — `invertFill = true`, colour
+running opposite to price. The build reads FAST (1) and SLOW (2) and never touches
+STATE (22).
+
 **Read the FINDING in §1 before tuning anything:** at the shipped defaults this ladder's
 direction output is identical to a pure-colour ladder. `InpDirRequireFreshS1 = true` is
 the switch that makes the cross decide something.
 
 ## Open questions for the owner
 
-1. **`XPDIR_POLARITY`** — the cross up is taken as BUY. In the map, with its default
-   `invertFill = true`, that is the cross **into the panel's RED fill**; the LIME fill
-   is `fast < slow`. If "the green line" meant LIME, every trade is backwards. One sign
-   in `XPDir_Sign`; nothing else moves.
-2. **`InpDirEarlySepMult = 2.0`** — EQUIVALENT-ASSUMED. Answer it from the Gate 2/3 CSV
+1. **`InpDirEarlySepMult = 2.0`** — EQUIVALENT-ASSUMED. Answer it from the Gate 2/3 CSV
    (`c1_cross_sep` vs `c1_sep_now`), not from a guess.
-3. **`InpDirRequireFreshS1 = false`** — see the FINDING above.
-4. `InpDirS1RequiredAgainstParent = true` — the owner's two statements about S1
+2. **`InpDirRequireFreshS1 = false`** — see the FINDING above.
+3. `InpDirS1RequiredAgainstParent = true` — the owner's two statements about S1
    contradict each other; this default encodes one of them.
 
 ## Map contract

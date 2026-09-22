@@ -3842,9 +3842,13 @@ void LogPositionExitResult(const string reason, const ulong ticket,
 //| lose real money. Bar index 1 is the newest bar this code will      |
 //| look at, on every rung, always.                                    |
 //|                                                                    |
-//| Polarity: fast crossing UP through slow votes BUY. See the report, |
-//| OWNER_TO_CONFIRM XPDIR_POLARITY - with the map's invertFill = true |
-//| that bullish cross is the one INTO the panel's RED fill.           |
+//| POLARITY, confirmed by the owner 2026-09-22: ignore the fill       |
+//| entirely and read the two lines. Fast (white) is the shorter        |
+//| average and moves first. fast > slow is momentum up = BUY,          |
+//| fast < slow is momentum down = SELL, and the cross is the moment.   |
+//| The owner's 20:56-20:57 frames show the fill painting RED on a      |
+//| climb and GREEN on a drop - invertFill = true, colour running       |
+//| opposite to price - which is why STATE is never read for direction. |
 //+------------------------------------------------------------------+
 #define XPDIR_RUNGS        7
 #define XPDIR_IDX_S1       0
@@ -4699,6 +4703,12 @@ void XPDir_PrintFunnel()
 //+------------------------------------------------------------------+
 //| Wiring helpers used inside ManageVirtualPendings                  |
 //+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//| XPDIR_GATE0_CORE_BEGIN                                            |
+//| The entry-path wiring. Gate 0's executed pre-check lifts this out |
+//| and runs every mode x state combination against the literal 1.03  |
+//| conditions, so "DIR_OFF is inert" is a result, not a claim.       |
+//+------------------------------------------------------------------+
 // DIR_LOCK: the ladder decides which virtual stop stays armed. Enforced on
 // every tick and not only inside the InpModInterval refresh, so a direction
 // change between refreshes cannot leave a live level on the wrong side.
@@ -4786,6 +4796,9 @@ void XPDir_ClearTriggerLevels()
    g_VirtualBuyStopPrice  = 0.0;
    g_VirtualSellStopPrice = 0.0;
 }
+//+------------------------------------------------------------------+
+//| XPDIR_GATE0_CORE_END                                              |
+//+------------------------------------------------------------------+
 
 void XPDir_LogSent(const bool execIsBuy)
 {

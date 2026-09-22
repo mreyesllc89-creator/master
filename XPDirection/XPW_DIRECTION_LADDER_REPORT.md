@@ -1,4 +1,4 @@
-WIRED | G0 BLOCKED_NO_TESTER | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true, XPDIR_POLARITY | DECISION: yes
+WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 6/6, executed 606 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
 
 # XPW Direction Ladder v1 — report
 
@@ -91,27 +91,37 @@ is written at line 794 and read only by the table and the init print; it gates n
 computation. The EA logs one `XPDIR NOTE rung=P` line at init saying so, so the host
 does not chase it.
 
-### OWNER_TO_CONFIRM: XPDIR_POLARITY — the bullish cross is the one into the RED fill
+### XPDIR_POLARITY — RESOLVED by the owner, 2026-09-22
 
-The cross up is taken as BUY: fast cutting **up** through slow votes BUY. In the map,
-with its default `invertFill = true`:
+**Ignore the fill entirely. Read the two lines.** White is fast, darker is slow. Fast
+moves first because it is the shorter average. Fast above slow is momentum up, fast
+below slow is momentum down, and the moment fast crosses slow is the signal.
 
-```mql5
-bool stUp     = (fastOk && slowOk) ? (fast > slow) : false;   // line 813
-bool isRedNow = invertFill ? stUp : !stUp;                    // line 814
-BufState[i]   = isRedNow ? 1.0 : 0.0;                         // line 1008
+```
+fast > slow  ->  BUY
+fast < slow  ->  SELL
+the cross    ->  the moment
 ```
 
-`fast > slow` — the bullish TDI state — renders **RED** on the panel, and the LIME
-fill is `fast < slow`. So a cross **up** through slow is a cross **into the RED fill**,
-and the owner's spoken "the beginning of the green line" points at the opposite one.
+That is what the build already does, and it is now confirmed rather than assumed.
+`XPDir_Sign` is the single place polarity is decided, and Gate 1 covers it.
 
-This build takes the cross up as BUY, because that is the bullish TDI reading and it is
-what §3.2 states operationally ("fast above slow → BUY"). **If the owner meant the
-cross into the panel's LIME fill, every trade this ladder produces is backwards.** The
-one-line change if he says LIME: in `XPDir_RungVoteFromSeries`, negate `crossDirOut`
-and `stateOut` — `XPDir_Sign` is the single place polarity is decided, and Gate 1
-covers it.
+**The owner's own frames are the proof, and they show the colour lying twice:**
+
+| Window | Price | Lines | Fill painted |
+|---|---|---|---|
+| 20:56 → 20:57 | climbing | fast **above** slow | **RED** |
+| 20:57 → | dropping | fast **below** slow | **GREEN** |
+
+The fill ran opposite to price both times. That is `invertFill = true` doing exactly
+what it says on the input — `isRedNow = invertFill ? stUp : !stUp` at
+`XPW_ShapeMap_v0.4.mq5:814` — and it is why a ladder that read the colour would have
+bought every top and sold every bottom in those two minutes.
+
+So the earlier question — "is the bullish state the RED fill or the LIME one?" — was
+the wrong question to answer in the first place. The colour is not a thing to be read
+correctly. It is a thing not to be read. The build reads `FAST` (buffer 1) and `SLOW`
+(buffer 2) and **never touches `STATE`** (buffer 22) for direction.
 
 ### Why `STATE` is logged but never voted on
 
@@ -284,9 +294,9 @@ side's block, on the side that actually executed.
 
 ### The exact diff (wiring)
 
-The full machine diff is `reference/ea_1.03_to_1.05_xpdir.diff` (+1087 / −7). It
+The full machine diff is `reference/ea_1.03_to_1.05_xpdir.diff` (+1100 / −7). It
 contains two further hunks that are pure insertions with no 1.03 line replaced: the
-input group at 1.03:2170 (+27) and the XPDir module at 1.03:3759 (+1006, immediately
+input group at 1.03:2170 (+27) and the XPDir module at 1.03:3759 (+1019, immediately
 before `ManageVirtualPendings`). Everything else is below, verbatim.
 
 ```diff
@@ -334,7 +344,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     else g_VirtualSellStopPrice = 0.0;
  
     { if(!MQLInfoInteger(MQL_TESTER)) PrintFormat("PROVISIONAL COST FLOOR FlashGold_Continuation_v2 ENTRY_REJECT side=%s crossing=1 burst_speed_failed=0 burst_direction_failed=0 continuation_failed=0 friction_failed=0 one_entry_per_bar_failed=0 entry_hold_failed=1 prior60_failed=0 hold_move_points=%.1f prior60_drift_points=0.0",
-@@ -3806,15 +4851,27 @@
+@@ -3806,15 +4864,27 @@
        g_LastModTime = TimeCurrent();
     }
  
@@ -364,7 +374,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     {
        const bool cheapGatesPassed = buyHoldActive ||
                                      EntryCandidateApproved(true, tickTimeMsc,
-@@ -3854,6 +4911,8 @@
+@@ -3854,6 +4924,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualBuyStopPrice = 0;
@@ -373,7 +383,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_BUY, trade.ResultOrder());
                    double virtualSL = bid - virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -3878,10 +4937,9 @@
+@@ -3878,10 +4950,9 @@
        }
     }
  
@@ -386,7 +396,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
     {
        const bool cheapGatesPassed = sellHoldActive ||
                                      EntryCandidateApproved(false, tickTimeMsc,
-@@ -3921,6 +4979,8 @@
+@@ -3921,6 +4992,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualSellStopPrice = 0;
@@ -395,7 +405,7 @@ before `ManageVirtualPendings`). Everything else is below, verbatim.
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_SELL, trade.ResultOrder());
                    double virtualSL = ask + virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -4424,6 +5484,26 @@
+@@ -4424,6 +5497,26 @@
        ObjectDelete(0, "Lbl_Pos_0");
        ObjectDelete(0, "Lbl_PosSL_0"); 
     }
@@ -764,9 +774,11 @@ many words. `why=buffer_contract` means the probe above fired: that one is a rea
 
 ## 6. Gates
 
-### Gate 0 — unchanged behaviour: `BLOCKED_NO_TESTER`
+### Gate 0 — unchanged behaviour: `BLOCKED_NO_TESTER`, pre-check `PASS`
 
-No MetaEditor and no terminal in the box, so the run belongs to the host. Shipped:
+**The Strategy Tester run cannot happen here.** There is no MetaEditor and no terminal
+in this box, and Gate 0 is a comparison of two real trade lists on real ticks. That run
+is the host's, and it is the only thing that proves the gate. Shipped for it:
 
 - `reference/gate0_tester_settings.ini` — XAUUSD-ECNc, M1, **Model=4 (every tick based
   on real ticks)**, a fixed 5-day window, everything else at build defaults. Run it
@@ -776,19 +788,71 @@ No MetaEditor and no terminal in the box, so the run belongs to the host. Shippe
   Exit 0 only on `G0 identical`. It fails the gate rather than passing it if the
   baseline has no deals, because an empty trade list proves nothing.
 
-`InpDirMode` defaults to `DIR_OFF`, and in `DIR_OFF` `XPDir_Init()` creates no handle,
-`XPDir_Current()` returns at its first line, `ApplyArmingLock` / `NoteTrigger` /
-`ClearTriggerLevels` / `LogSent` all return at theirs, and
-`XPDir_Buy/SellBlockRuns` reduce to the 1.03 condition exactly:
+**What could be established here, was.** `reference/run_gate0_precheck.py` proves the
+layer underneath the trade list: that with `InpDirMode = DIR_OFF` the build's entry
+path *is* the 1.03 entry path, branch for branch.
 
-| `g_EntryHoldCandidate.active` | 1.03 `buyHoldActive \|\| (!active && buyCrossing)` | `XPDir_BuyBlockRuns` in DIR_OFF |
-|---|---|---|
-| true, buy candidate | `true` | `buyHoldActive` = `true` |
-| true, sell candidate | `false` | `buyHoldActive` = `false` |
-| false | `buyCrossing` | `buyCrossing` |
+```
+$ cd XPDirection/reference && python3 run_gate0_precheck.py --base <1.03.mq5>
+A. STATIC
+  A1 removed 1.03 lines: 7 (all authorised)
+  A2 DIR_OFF guards on injected entry points: 5 checked
+  A3 XPDir_Init returns before any iCustom handle in DIR_OFF
+  A4 hold-gate failure edit reduces to the 1.03 pair outside TRANSLATE
+  A5 hoisted sellCrossing expression byte-identical to 1.03, computed once
+  A6 dashboard DIR line deleted, not drawn, in DIR_OFF
+B. EXECUTED
+  gate0 entry-path: states=144 checks=606 failures=0
+    DIR_OFF divergences from 1.03: 0 (must be 0)
+    DIR_LOCK states exercised: 48   DIR_TRANSLATE states exercised: 48
+    DIR_TRANSLATE fades observed (sell crossing -> buy executes): 2 (must be > 0)
 
-**This gate is what proves nothing of the EA got modified. Until the host runs it, that
-claim rests on the diff alone.**
+G0 PRE-CHECK PASS - DIR_OFF is the 1.03 entry path.
+```
+
+**Part A** re-derives the diff against the 1.03 file (sha256 checked first) and refuses
+any removed line outside the authorised seven; then it audits each injected entry point
+for its `DIR_OFF` guard *as the function's first statement*, not merely somewhere in the
+body.
+
+**Part B** lifts the entry-path wiring out of the `.mq5` between the
+`XPDIR_GATE0_CORE` markers, compiles it with g++ against a stub layer that supplies the
+globals, and runs **all 144 combinations** of mode × candidate state × candidate side ×
+buy crossing × sell crossing × ladder direction. For every `DIR_OFF` state it asserts:
+
+| Assertion | Why it matters |
+|---|---|
+| `XPDir_BuyBlockRuns` ≡ `buyHoldActive \|\| (!active && buyCrossing)` | the literal 1.03 condition |
+| `XPDir_SellBlockRuns` ≡ `sellHoldActive \|\| (!active && sellCrossing)` | same, sell side |
+| no virtual stop level is written | `ApplyArmingLock` / `ClearTriggerLevels` inert |
+| the hold candidate is never reset | `ReviewHoldCandidate` inert |
+| no CSV row is written | the observer is silent |
+| **`XPDir_Current()` is never called** | in DIR_OFF the ladder is not merely ignored, it is not asked |
+
+It also asserts the other two modes do what they claim, so a build that silently
+no-ops `DIR_LOCK` or `DIR_TRANSLATE` fails here too — including that the fade path
+really exists (a sell crossing executing a buy, 2 states).
+
+**The pre-check was verified against a deliberately broken build.** Two mutations were
+injected — `return buyCrossing` widened to `return buyCrossing || sellCrossing`, and the
+`DIR_TRANSLATE` guard removed from `XPDir_ClearTriggerLevels` — and it caught both:
+
+```
+G0 PRE-CHECK FAIL (2)
+  XPDir_ClearTriggerLevels first statement is 'g_XPDirLastArmed = g_XPDirLastArmed;',
+    expected the guard 'if(InpDirMode != DIR_TRANSLATE) return;'
+  the executed entry-path check reported failures
+      -> DIR_OFF divergences from 1.03: 6, checks failed: 60
+exit code 1
+```
+
+A check that cannot fail proves nothing, so that negative control is part of the record.
+
+**What the pre-check does not prove.** It says nothing about `OnInit` ordering against
+the broker profile, about `OnTimer`, about the observers' file handles, or about
+anything downstream of the entry decision — lot sizing, the virtual SL, the trailing.
+Those are identical by diff and by inspection, and the tester is what turns that into
+evidence. **`G0 BLOCKED_NO_TESTER` stands until the host runs it.**
 
 ### Gate 1 — vote logic: `asserts=403 mismatches=0`
 
@@ -867,10 +931,22 @@ before attaching the EA — a stale axis means a lying ladder.
   compiler diagnostic verbatim rather than fixing it locally** — a silent local fix
   breaks the diff this report rests on.
 
-**3. Gate 0 — first, before any live attach.** `reference/gate0_tester_settings.ini`,
-two runs, then `python3 compare_trades.py baseline_1.03.html candidate_1.05.html`.
-Expect `G0 identical`. If it is not identical, stop: something other than the ladder
-moved, and Gates 2 and 3 would be measuring the wrong program.
+**3. Gate 0 — first, before any live attach.** Two steps.
+
+*3a, no terminal needed, ~5 seconds:* drop the 1.03 file next to the build and run the
+pre-check, so a broken build is caught before you spend a tester run on it.
+
+```
+cd XPDirection/reference
+python3 run_gate0_precheck.py --base /path/to/FlashGold_Continuation_v2.mq5
+```
+
+Expect `G0 PRE-CHECK PASS`. It needs only python3 and g++.
+
+*3b, the gate itself:* `reference/gate0_tester_settings.ini`, two runs, then
+`python3 compare_trades.py baseline_1.03.html candidate_1.05.html`. Expect
+`G0 identical`. If it is not identical, stop: something other than the ladder moved,
+and Gates 2 and 3 would be measuring the wrong program.
 
 **4. Gate 2 — DIR_LOCK, 20 minutes.** Attach to `XAUUSD-ECNc` **M1** (the parent — the
 EA trades `_Symbol`, and custom symbols do not trade). Inputs: `InpDirMode = DIR_LOCK`,
@@ -935,16 +1011,15 @@ host runs with their settings and comparison scripts shipped. The map contract i
 hand and byte-verified, so no buffer index was guessed and the build checks the contract
 again at runtime.
 
-Four things are needed from the owner before this trades money:
+Polarity is settled: fast above slow is BUY, the cross is the moment, the fill is never
+read. Three things are still open, and none of them blocks Gate 0:
 
-1. **`XPDIR_POLARITY`** — the cross up is taken as BUY, which with the map's
-   `invertFill = true` is the cross **into the RED fill**. If "the green line" meant
-   LIME, every trade is backwards. One sign in `XPDir_Sign`.
-2. **`InpDirEarlySepMult = 2.0`** — EQUIVALENT-ASSUMED. Answer it from the Gate 2/3 CSV.
-3. **`InpDirRequireFreshS1 = false`** — and the FINDING in §1 that goes with it: at the
+1. **`InpDirEarlySepMult = 2.0`** — EQUIVALENT-ASSUMED. Answer it from the Gate 2/3 CSV
+   (`c1_cross_sep` vs `c1_sep_now`), not from a guess.
+2. **`InpDirRequireFreshS1 = false`** — and the FINDING in §1 that goes with it: at the
    shipped defaults this ladder's direction output is identical to a pure-colour
    ladder. This is the switch that makes the cross decide something.
-4. **`InpDirS1RequiredAgainstParent = true`** — one half of the owner's two
+3. **`InpDirS1RequiredAgainstParent = true`** — one half of the owner's two
    contradictory statements about S1.
 
 And the standing caveat holds: **its direction is only as good as the map, and the
