@@ -280,10 +280,11 @@ var float longTgt   = na
 var float shortStop = na
 var float shortTgt  = na
 
-// Opposite signal closes the open side (entry below reverses it when that side is allowed)
-if exitOnOpp and shortSig and strategy.position_size > 0
+// Opposite signal: strategy.entry below reverses the position when that side may trade.
+// Only send a plain close when no reversing entry will be placed (avoids doubling the order).
+if exitOnOpp and shortSig and strategy.position_size > 0 and not (inWin and allowShort)
     strategy.close("Long", comment = "opp ▼")
-if exitOnOpp and longSig and strategy.position_size < 0
+if exitOnOpp and longSig and strategy.position_size < 0 and not (inWin and allowLong)
     strategy.close("Short", comment = "opp ▲")
 
 if inWin and longSig and allowLong and strategy.position_size <= 0
