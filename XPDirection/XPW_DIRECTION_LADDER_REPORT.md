@@ -1,4 +1,4 @@
-WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 9/9, executed 606 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
+WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 10/10, executed 750 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
 
 # XPW Direction Ladder v1 — report
 
@@ -632,6 +632,51 @@ name or default.
 default, so at defaults this input changes the number in two log lines and nothing else.
 With the burst gate switched on it is the live magnitude threshold.
 
+### 2.5 `DIR_VETO` and the portable include — the ladder in another EA
+
+Requested 2026-09-22: put the filter in a different EA, where **the EA keeps its own
+trigger *and* its own direction** and the ladder only blocks trades that disagree.
+
+That is a fourth mode, and it is the simplest and safest of the four:
+
+| `InpDirMode` | host keeps | ladder does |
+|---|---|---|
+| `DIR_OFF` | everything | nothing |
+| `DIR_VETO` | trigger **and** side | blocks entries it disagrees with |
+| `DIR_LOCK` | trigger | disarms one of two virtual stop levels |
+| `DIR_TRANSLATE` | trigger | picks the side that executes |
+
+**A veto is safe exactly where §2.3 said a side swap is not.** Swapping BUY for SELL
+inside `OrderSend` leaves the caller's post-fill code registering stops on the wrong
+side of a flipped position. Refusing the send creates no position and no state, so
+there is nothing to get wrong. Same hook, opposite conclusion, for a reason.
+
+**The ladder was already separable and now it is separated.** Everything between the new
+`XPDIR_LADDER_BEGIN` / `XPDIR_LADDER_END` markers — the map reading, the cross
+detection, the rules, the decision, the CSV, the funnel and the veto — has **zero**
+references to `g_VirtualBuyStopPrice`, `g_EntryHoldCandidate`, `ResetEntryHoldCandidate`,
+`posInfo` or any order call. The only coupling was `InpMagic`, now passed in as
+`XPDir_Init(hostMagic)`.
+
+`XPDirection/include/XPW_DirectionLadder.mqh` is **generated** from the EA by
+`reference/emu/make_include.py`, not retyped, so it cannot drift from the audited build
+— and Gate 0's A10 fails if it does. `XPW_DirectionVeto.mqh` adds a `CTrade` subclass
+so a hosting EA changes one declaration.
+
+**What the veto will never block**, because blocking a close strands a live position
+with no stop management: `SLTP`, `MODIFY` and `REMOVE`; anything with `request.position`
+or `request.position_by` set; and on a netting account any order that reduces or closes
+an open position, a deliberate reversal included. The entry test matches the
+`CP_IsEntryRequest` the EA already ships, plus the netting case. It errs toward
+allowing, because the cost of a wrong allow is one trade and the cost of a wrong block
+is a stranded position.
+
+`InpDirOnNone` decides what happens when the ladder has no opinion; it defaults to
+`XPDIR_NONE_BLOCK`, because a filter that passes everything when it cannot decide is not
+a filter.
+
+Integration is four calls, documented in `XPDirection/include/README.md`.
+
 ### PHASE_3_PENDING_TYPES — not in this build
 
 Pending order placement (buy/sell stop, buy/sell limit) is out. Every entry in 1.03 is
@@ -974,11 +1019,14 @@ A. STATIC
      guarded at init, no dead BURST_MIN_POINTS
   A8 XPDir functions defined: 35, dead: 0; funnel heartbeat wired to OnTimer
   A9 XPDir CSV: 30 columns = 30 row fields, carries symbol+magic, one file per instance
+  A10 XPW_DirectionLadder.mqh matches the EA, exports the full API, and
+      references no host global
 B. EXECUTED
-  gate0 entry-path: states=144 checks=606 failures=0
+  gate0 entry-path: states=192 checks=750 failures=0
     DIR_OFF divergences from 1.03: 0 (must be 0)
     DIR_LOCK states exercised: 48   DIR_TRANSLATE states exercised: 48
     DIR_TRANSLATE fades observed (sell crossing -> buy executes): 2 (must be > 0)
+    DIR_VETO states: 30 blocked a 1.03 trade, 16 allowed one (never added one)
 
 G0 PRE-CHECK PASS - DIR_OFF is the 1.03 entry path.
 ```
@@ -992,8 +1040,15 @@ the new burst input still defaults to the value the retired constant held.
 
 **Part B** lifts the entry-path wiring out of the `.mq5` between the
 `XPDIR_GATE0_CORE` markers, compiles it with g++ against a stub layer that supplies the
-globals, and runs **all 144 combinations** of mode × candidate state × candidate side ×
-buy crossing × sell crossing × ladder direction. For every `DIR_OFF` state it asserts:
+globals, and runs **all 192 combinations** of mode × candidate state × candidate side ×
+buy crossing × sell crossing × ladder direction.
+
+**It earned its keep on `DIR_VETO`.** The first wiring put the veto *after* the
+hold-candidate shortcut, so a candidate armed while the ladder agreed kept running after
+it stopped agreeing — a 3-second hole the filter could not see through. The check failed
+16 states and named them. The veto is now evaluated before the shortcut, on every tick,
+and the property it asserts is the defining one: **a veto may only ever remove a trade
+1.03 would have taken, never add one and never move one.** For every `DIR_OFF` state it asserts:
 
 | Assertion | Why it matters |
 |---|---|

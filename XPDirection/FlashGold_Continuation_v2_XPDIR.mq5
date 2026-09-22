@@ -2176,7 +2176,17 @@ input int      InpMasterMaxStaleMs  = 4000;       // Existing master age limit i
 //| DIR_OFF reproduces 1.03 exactly (no handles, no reads, no writes).|
 //+------------------------------------------------------------------+
 enum ENUM_XPDIR      { XPDIR_NONE = 0, XPDIR_BUY = 1, XPDIR_SELL = -1 };
-enum ENUM_XPDIR_MODE { DIR_OFF = 0, DIR_LOCK = 1, DIR_TRANSLATE = 2 };
+enum ENUM_XPDIR_MODE
+{
+   DIR_OFF       = 0,   // ladder inert; the host EA is untouched
+   DIR_LOCK      = 1,   // the ladder disarms the side it does not want
+   DIR_TRANSLATE = 2,   // either trigger fires; the ladder picks the side
+   DIR_VETO      = 3    // the host keeps trigger AND side; the ladder only blocks
+};
+
+// What to do when the ladder has no opinion. Blocking is the default because a
+// filter that passes everything when it cannot decide is not a filter.
+enum ENUM_XPDIR_ON_NONE { XPDIR_NONE_BLOCK = 0, XPDIR_NONE_ALLOW = 1 };
 
 input group "--- XPW Direction Ladder ---"
 input ENUM_XPDIR_MODE InpDirMode                    = DIR_OFF;
@@ -2197,6 +2207,7 @@ input bool            InpDirWriteCsv                = true;  // XPDir decision C
 input int             InpDirCrossMaxAgeBars         = 3;     // cross age window, in that rung's OWN bars (0 = off)
 input double          InpDirEarlySepMult            = 2.0;   // EARLY band: |sepNow| <= |crossSep| * mult
 input bool            InpDirRequireFreshS1          = false; // S1 must vote a cross, never STALE_STATE
+input ENUM_XPDIR_ON_NONE InpDirOnNone               = XPDIR_NONE_BLOCK; // when the ladder has no opinion
 
 //--- Global Objects
 CContinuationTrade         trade;
@@ -2599,7 +2610,7 @@ int OnInit()
       return(INIT_FAILED);
 
    // XPDIR: the direction ladder. DIR_OFF creates no handle and reads nothing.
-   if(!XPDir_Init())
+   if(!XPDir_Init(InpMagic))
       return(INIT_FAILED);
 
    // Set the Magic Number properly using the input we just defined
@@ -3803,6 +3814,14 @@ void LogPositionExitResult(const string reason, const ulong ticket,
 }
 
 //+------------------------------------------------------------------+
+//| XPDIR_LADDER_BEGIN                                                |
+//| Everything between these markers is host-independent: it reads    |
+//| the map, decides a direction, and logs. It touches no virtual     |
+//| stop, no hold candidate, no position and no order. That is what   |
+//| makes it extractable into XPW_DirectionLadder.mqh for any EA -    |
+//| see XPDirection/include/. The wiring that follows the marker END  |
+//| is FlashGold's own and does not travel.                           |
+//+------------------------------------------------------------------+
 //| XPW Direction Ladder v1                                           |
 //|                                                                   |
 //| One decision, XPDir_Current(), fed by a fractal ladder of XPW     |
@@ -3958,6 +3977,7 @@ ulong    g_XPDirStateLines       = 0;
 datetime g_XPDirFunnelLastSec    = 0;   // funnel heartbeat (zero-result contingency)
 int      g_XPDirFunnelDumps      = 0;
 
+long     g_XPDirHostMagic        = 0;    // the host EA's magic, passed to XPDir_Init
 string   g_XPDirCsvName          = "";   // per instance: symbol + magic
 string   g_XPDirClaimGV           = "";   // duplicate-instance claim
 
@@ -4210,7 +4230,7 @@ string XPDir_InstanceTag()
    StringReplace(t, "\\", "_"); StringReplace(t, "/", "_"); StringReplace(t, ":", "_");
    StringReplace(t, "*", "_");  StringReplace(t, "?", "_"); StringReplace(t, "\"", "_");
    StringReplace(t, "<", "_");  StringReplace(t, ">", "_"); StringReplace(t, "|", "_");
-   return t + "_" + IntegerToString(InpMagic);
+   return t + "_" + IntegerToString(g_XPDirHostMagic);
 }
 
 void XPDir_ClaimInstance()
@@ -4228,7 +4248,7 @@ void XPDir_ClaimInstance()
                      "chart %I64d. Ownership is symbol+magic, so both instances claim the same "
                      "positions: both will trail them and both will close them. Give this chart "
                      "its own InpMagic before you let it trade.",
-                     _Symbol, InpMagic, other);
+                     _Symbol, g_XPDirHostMagic, other);
    }
    GlobalVariableSet(g_XPDirClaimGV, (double)me);
 }
@@ -4260,7 +4280,7 @@ void XPDir_WriteCsv(const string eventName, const string triggerSide,
    const string row = StringFormat("%I64d,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,"
                                    "%s,%s,%s,%s,%s,%s,%s,%d,%d,%.6f,%.6f,%d",
                                    (long)TimeCurrent() * 1000 + (long)(GetTickCount64() % 1000),
-                                   _Symbol, InpMagic,
+                                   _Symbol, g_XPDirHostMagic,
                                    eventName, XPDir_ModeName(),
                                    XPDir_DirName(g_XPDirCached),
                                    g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "-",
@@ -4399,8 +4419,12 @@ void XPDir_DiagnoseSymbols(const string wanted)
                   prefix);
 }
 
-bool XPDir_Init()
+// hostMagic is the EA's own magic number. The ladder uses it only to name its
+// CSV and to take the duplicate-instance claim, so any EA can host this module
+// by passing its own - nothing else here knows or cares which EA it is.
+bool XPDir_Init(const long hostMagic)
 {
+   g_XPDirHostMagic = hostMagic;
    for(int r = 0; r < XPDIR_RUNGS; r++)
    {
       g_XPDirHandle[r]      = INVALID_HANDLE;
@@ -4550,7 +4574,7 @@ bool XPDir_Init()
                g_XPDirMaxStaleBars, g_XPDirCrossMaxAge,
                g_XPDirEarlySepMult, InpDirRequireFreshS1 ? 1 : 0, InpDirWriteCsv ? 1 : 0);
    PrintFormat("XPDIR INSTANCE chart=%I64d symbol=%s magic=%d csv=%s",
-               ChartID(), _Symbol, InpMagic, g_XPDirCsvName);
+               ChartID(), _Symbol, g_XPDirHostMagic, g_XPDirCsvName);
    g_XPDirReady = true;
    return true;
 }
@@ -4859,6 +4883,116 @@ void XPDir_FunnelHeartbeat()
 //+------------------------------------------------------------------+
 //| Wiring helpers used inside ManageVirtualPendings                  |
 //+------------------------------------------------------------------+
+ulong    g_XPDirVetoAllowed       = 0;
+ulong    g_XPDirVetoBlocked       = 0;
+string   g_XPDirLastVetoKey[2]    = {"", ""};   // [0] = SELL, [1] = BUY
+
+// The veto is asked on every tick of every side, so it records a line only when
+// that side's verdict actually changes. The counters still see every call.
+void XPDir_LogVeto(const bool isBuy, const ENUM_XPDIR d, const bool allowed, const string why)
+{
+   if(allowed) g_XPDirVetoAllowed++; else g_XPDirVetoBlocked++;
+
+   const string key = StringFormat("%s|%s|%s", allowed ? "ALLOW" : "BLOCK",
+                                   XPDir_DirName(d), why);
+   const int slot = isBuy ? 1 : 0;
+   if(key == g_XPDirLastVetoKey[slot]) return;
+   g_XPDirLastVetoKey[slot] = key;
+
+   PrintFormat("XPDIR VETO side=%s dir=%s rule=%s verdict=%s why=%s allowed=%I64u blocked=%I64u",
+               isBuy ? "BUY" : "SELL", XPDir_DirName(d),
+               g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "-",
+               allowed ? "ALLOW" : "BLOCK", why,
+               g_XPDirVetoAllowed, g_XPDirVetoBlocked);
+   XPDir_WriteCsv("DECISION", isBuy ? "BUY" : "SELL",
+                  allowed ? (isBuy ? "BUY" : "SELL") : "NONE",
+                  allowed ? "ALLOWED" : (d == XPDIR_NONE ? "BLOCKED_NONE" : "BLOCKED_DISAGREE"));
+}
+
+//+------------------------------------------------------------------+
+//| The veto: the only hook a foreign EA needs                        |
+//|                                                                    |
+//| DIR_VETO leaves the host EA completely in charge - its own         |
+//| trigger, its own direction, its own sizing and exits. The ladder   |
+//| answers exactly one question, as late as possible: may this side   |
+//| go out right now? Everything else about the host is untouched.     |
+//|                                                                    |
+//| A veto is safe where a SIDE SWAP is not. Swapping BUY for SELL     |
+//| inside a send leaves the caller's post-fill code registering stops |
+//| on the wrong side of a flipped position. Refusing the send creates |
+//| no position and no state at all, so there is nothing to get wrong. |
+//+------------------------------------------------------------------+
+bool XPDir_Allows(const bool isBuy)
+{
+   if(InpDirMode == DIR_OFF) return true;        // filter off: allow everything
+   const ENUM_XPDIR d = XPDir_Current();
+   if(d == XPDIR_NONE)
+   {
+      const bool allow = (InpDirOnNone == XPDIR_NONE_ALLOW);
+      XPDir_LogVeto(isBuy, d, allow, "no_opinion");
+      return allow;
+   }
+   const bool agrees = isBuy ? (d == XPDIR_BUY) : (d == XPDIR_SELL);
+   XPDir_LogVeto(isBuy, d, agrees, agrees ? "agrees" : "disagrees");
+   return agrees;
+}
+
+// Is this request an ENTRY? A veto must never touch anything else.
+//
+// Blocking a close would trap a live position with no stop management, which
+// is far worse than any trade the filter was trying to prevent. So:
+//   - only TRADE_ACTION_DEAL and TRADE_ACTION_PENDING are ever considered;
+//     SLTP, MODIFY and REMOVE always pass;
+//   - request.position or position_by != 0 means the caller named a position
+//     to close, modify or close-by, so it passes (this matches the existing
+//     CP_IsEntryRequest test the EA already ships);
+//   - on a NETTING account an opposite-side deal reduces or closes the open
+//     position rather than opening one, so it passes too. A deliberate
+//     REVERSAL passes with it: erring toward allowing is right here, because
+//     the cost of a wrong allow is one trade and the cost of a wrong block is
+//     a stranded position.
+bool XPDir_IsEntryRequest(const MqlTradeRequest &request)
+{
+   if(request.action != TRADE_ACTION_DEAL && request.action != TRADE_ACTION_PENDING)
+      return false;
+   if(request.position != 0 || request.position_by != 0) return false;
+
+   if((ENUM_ACCOUNT_MARGIN_MODE)AccountInfoInteger(ACCOUNT_MARGIN_MODE) ==
+      ACCOUNT_MARGIN_MODE_RETAIL_NETTING)
+   {
+      const string sym = (request.symbol == "") ? _Symbol : request.symbol;
+      if(PositionSelect(sym))
+      {
+         const long ptype = PositionGetInteger(POSITION_TYPE);
+         const bool reqBuy = XPDir_RequestIsBuy(request);
+         if((ptype == POSITION_TYPE_BUY && !reqBuy) ||
+            (ptype == POSITION_TYPE_SELL && reqBuy))
+            return false;                        // reduces/closes, not an entry
+      }
+   }
+   return true;
+}
+
+bool XPDir_RequestIsBuy(const MqlTradeRequest &request)
+{
+   return (request.type == ORDER_TYPE_BUY ||
+           request.type == ORDER_TYPE_BUY_LIMIT ||
+           request.type == ORDER_TYPE_BUY_STOP ||
+           request.type == ORDER_TYPE_BUY_STOP_LIMIT);
+}
+
+// One call covering both: returns false only for an ENTRY the ladder refuses.
+bool XPDir_AllowsRequest(const MqlTradeRequest &request)
+{
+   if(InpDirMode != DIR_VETO) return true;       // veto only acts in DIR_VETO
+   if(!XPDir_IsEntryRequest(request)) return true;
+   return XPDir_Allows(XPDir_RequestIsBuy(request));
+}
+
+//+------------------------------------------------------------------+
+//| XPDIR_LADDER_END                                                  |
+//+------------------------------------------------------------------+
+
 //+------------------------------------------------------------------+
 //| XPDIR_GATE0_CORE_BEGIN                                            |
 //| The entry-path wiring. Gate 0's executed pre-check lifts this out |
@@ -4929,6 +5063,11 @@ void XPDir_ReviewHoldCandidate()
 //                        the side that executes.
 bool XPDir_BuyBlockRuns(const bool buyHoldActive, const bool buyCrossing, const bool sellCrossing)
 {
+   // DIR_VETO first, and before the hold-candidate shortcut: a candidate armed
+   // while the ladder agreed must stop dead the moment it stops agreeing,
+   // otherwise the 3 s hold is a hole the filter cannot see through. The host
+   // keeps its trigger and its side; the ladder only ever removes.
+   if(InpDirMode == DIR_VETO && !XPDir_Allows(true)) return false;
    if(g_EntryHoldCandidate.active) return buyHoldActive;
    if(InpDirMode == DIR_TRANSLATE)
       return (buyCrossing || sellCrossing) && (XPDir_Current() == XPDIR_BUY);
@@ -4937,6 +5076,7 @@ bool XPDir_BuyBlockRuns(const bool buyHoldActive, const bool buyCrossing, const 
 
 bool XPDir_SellBlockRuns(const bool sellHoldActive, const bool buyCrossing, const bool sellCrossing)
 {
+   if(InpDirMode == DIR_VETO && !XPDir_Allows(false)) return false;
    if(g_EntryHoldCandidate.active) return sellHoldActive;
    if(InpDirMode == DIR_TRANSLATE)
       return (buyCrossing || sellCrossing) && (XPDir_Current() == XPDIR_SELL);

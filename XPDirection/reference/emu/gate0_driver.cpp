@@ -30,12 +30,13 @@ static void CHECK(bool cond, const char* what, int mode, int a, int b, int c, in
 }
 
 int main() {
-  const ENUM_XPDIR_MODE modes[3] = { DIR_OFF, DIR_LOCK, DIR_TRANSLATE };
+  const ENUM_XPDIR_MODE modes[4] = { DIR_OFF, DIR_LOCK, DIR_TRANSLATE, DIR_VETO };
   const ENUM_XPDIR dirs[3] = { XPDIR_NONE, XPDIR_BUY, XPDIR_SELL };
 
   int offDiffers = 0, lockActed = 0, translateActed = 0, translateFlipped = 0;
+  int vetoBlocked = 0, vetoAllowed = 0;
 
-  for (int m = 0; m < 3; m++)
+  for (int m = 0; m < 4; m++)
   for (int active = 0; active < 2; active++)
   for (int isBuy = 0; isBuy < 2; isBuy++)
   for (int buyX = 0; buyX < 2; buyX++)
@@ -95,6 +96,21 @@ int main() {
           CHECK(g_VirtualBuyStopPrice == 0.0 && g_VirtualSellStopPrice == 0.0,
                 "DIR_LOCK NONE left a level armed", m, active, isBuy, buyX, sellX, di);
         lockActed++;
+      } else if (modes[m] == DIR_VETO) {
+        // DIR_VETO: the host keeps its trigger AND its side. The ladder may
+        // only ever REMOVE a trade, never add one and never move one.
+        const bool allowBuy  = (dirs[di] == XPDIR_BUY);
+        const bool allowSell = (dirs[di] == XPDIR_SELL);
+        CHECK(got_buy  == (ref_buy  && allowBuy),
+              "VETO buy side wrong", m, active, isBuy, buyX, sellX, di);
+        CHECK(got_sell == (ref_sell && allowSell),
+              "VETO sell side wrong", m, active, isBuy, buyX, sellX, di);
+        // the defining property: a veto is a subset of 1.03, never a superset
+        CHECK(!(got_buy && !ref_buy) && !(got_sell && !ref_sell),
+              "VETO created a trade 1.03 would not have taken",
+              m, active, isBuy, buyX, sellX, di);
+        if ((ref_buy && !got_buy) || (ref_sell && !got_sell)) vetoBlocked++;
+        if ((ref_buy && got_buy) || (ref_sell && got_sell)) vetoAllowed++;
       } else {
         // DIR_TRANSLATE: with no candidate, either crossing fires the side the
         // ladder picked - and nothing fires when the ladder says NONE.
@@ -122,12 +138,15 @@ int main() {
     }
   }
 
-  printf("gate0 entry-path: states=%d checks=%d failures=%d\n", 3 * 2 * 2 * 2 * 2 * 3, checks, failures);
+  printf("gate0 entry-path: states=%d checks=%d failures=%d\n", 4 * 2 * 2 * 2 * 2 * 3, checks, failures);
   printf("  DIR_OFF divergences from 1.03: %d (must be 0)\n", offDiffers);
   printf("  DIR_LOCK states exercised: %d   DIR_TRANSLATE states exercised: %d\n",
          lockActed, translateActed);
   printf("  DIR_TRANSLATE fades observed (sell crossing -> buy executes): %d (must be > 0)\n",
          translateFlipped);
+  printf("  DIR_VETO states: %d blocked a 1.03 trade, %d allowed one (never added one)\n",
+         vetoBlocked, vetoAllowed);
   if (translateFlipped == 0) { printf("  FAIL no fade path exercised\n"); failures++; }
+  if (vetoBlocked == 0) { printf("  FAIL veto never blocked anything\n"); failures++; }
   return failures == 0 ? 0 : 1;
 }

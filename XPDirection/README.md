@@ -17,6 +17,9 @@ diff, and the host instructions for the three open gates.
 | `XPW_DIRECTION_LADDER_REPORT.md` | The report. Start here. |
 | `TROUBLESHOOTING.md` | **Nothing detected? Start here instead.** Every failure's Experts-tab line and its fix. |
 | `BASELINE_DATA_READ.md` | What the 2026-09-22 observer CSVs say: a magic shared by two programs, 13× duplicated exit rows, and the 8.6% of entries where the EA bought *and* sold the same move. |
+| `include/XPW_DirectionLadder.mqh` | **The ladder as a portable include** — generated from the EA, drops into any other EA. |
+| `include/XPW_DirectionVeto.mqh` | `CTrade` subclass that applies the veto at `OrderSend`. |
+| `include/README.md` | **Putting the filter in another EA.** Four calls, `DIR_VETO`. |
 | `reference/vote_ref.py` | Independent Python transliteration of the §4 rules. |
 | `reference/run_fixtures.py` | **Gate 1 runner.** Fixture expectation vs `vote_ref.py` vs the EA's own compiled rule core. |
 | `reference/fixtures/vote_rules.csv` | 49 hand-derived fixtures. |

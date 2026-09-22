@@ -116,7 +116,7 @@ def static_part(base_path, problems):
     print(f"  A2 DIR_OFF guards on injected entry points: {len(GUARDS)} checked")
 
     # --- A3: XPDir_Init creates no indicator handle in DIR_OFF
-    init = re.search(r"bool XPDir_Init\(\)\n\{(.*?)\n\}\n", ea, re.S).group(1)
+    init = re.search(r"bool XPDir_Init\([^)]*\)\n\{(.*?)\n\}\n", ea, re.S).group(1)
     off_return = init.index('if(InpDirMode == DIR_OFF)')
     first_handle = init.index("XPDir_CreateHandle")
     if not off_return < first_handle:
@@ -210,6 +210,27 @@ def static_part(base_path, problems):
                  "interleave into one file", problems)
         print(f"  A9 XPDir CSV: {cols} columns = {specs} row fields, carries symbol+magic, "
               f"one file per instance")
+
+    # --- A10: the portable include is generated from this EA and must not drift
+    inc = os.path.join(HERE, "..", "include", "XPW_DirectionLadder.mqh")
+    r = subprocess.run([sys.executable, os.path.join(EMU, "make_include.py"), EA, inc, "--check"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        fail("XPW_DirectionLadder.mqh is stale - regenerate it with "
+             "reference/emu/make_include.py: " + r.stdout.strip(), problems)
+    else:
+        body = open(inc, newline=None).read()
+        for banned in ("g_VirtualBuyStopPrice", "g_EntryHoldCandidate",
+                       "ResetEntryHoldCandidate", "XPDir_BuyBlockRuns"):
+            if banned in re.sub(r"//[^\n]*", "", body):
+                fail(f"the portable include references {banned}, which is the host's, "
+                     f"not the ladder's", problems)
+        for need in ("XPDir_Init", "XPDir_Deinit", "XPDir_Current", "XPDir_Allows",
+                     "XPDir_AllowsRequest", "XPDir_FunnelHeartbeat"):
+            if f"{need}(" not in body:
+                fail(f"the portable include is missing {need}", problems)
+        print("  A10 XPW_DirectionLadder.mqh matches the EA, exports the full API, "
+              "and references no host global")
 
 
 def executed_part(problems):

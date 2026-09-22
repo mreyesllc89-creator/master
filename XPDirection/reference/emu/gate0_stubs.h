@@ -24,7 +24,9 @@ inline string operator+(const char* a, const string& b) { return string(std::str
 
 // --- the EA's enums, copied from the build ---------------------------------
 enum ENUM_XPDIR      { XPDIR_NONE = 0, XPDIR_BUY = 1, XPDIR_SELL = -1 };
-enum ENUM_XPDIR_MODE { DIR_OFF = 0, DIR_LOCK = 1, DIR_TRANSLATE = 2 };
+enum ENUM_XPDIR_MODE { DIR_OFF = 0, DIR_LOCK = 1, DIR_TRANSLATE = 2, DIR_VETO = 3 };
+enum ENUM_XPDIR_ON_NONE { XPDIR_NONE_BLOCK = 0, XPDIR_NONE_ALLOW = 1 };
+ENUM_XPDIR_ON_NONE InpDirOnNone = XPDIR_NONE_BLOCK;
 
 // --- the globals the wiring touches ----------------------------------------
 ENUM_XPDIR_MODE InpDirMode = DIR_OFF;
@@ -56,11 +58,22 @@ inline string XPDir_DirName(ENUM_XPDIR d) {
 
 // --- the direction the ladder would return, set by the driver ---------------
 ENUM_XPDIR g_stubDir = XPDIR_NONE;
+int g_stubVetoCalls = 0;
+// XPDir_Allows lives in the LADDER block, not the wiring block, so the Gate 0
+// driver stubs it with the same logic to keep the two honest.
+bool XPDir_Allows(const bool isBuy);
 int g_stubDirCalls = 0;
 ENUM_XPDIR XPDir_Current() { g_stubDirCalls++; return g_stubDir; }
 
+bool XPDir_Allows(const bool isBuy) {
+  g_stubVetoCalls++;
+  if (InpDirMode == DIR_OFF) return true;
+  if (g_stubDir == XPDIR_NONE) return InpDirOnNone == XPDIR_NONE_ALLOW;
+  return isBuy ? (g_stubDir == XPDIR_BUY) : (g_stubDir == XPDIR_SELL);
+}
+
 inline void StubReset() {
-  g_stubResetCalls = g_stubCsvCalls = g_stubPrintCalls = g_stubDirCalls = 0;
+  g_stubResetCalls = g_stubCsvCalls = g_stubPrintCalls = g_stubDirCalls = g_stubVetoCalls = 0;
   g_XPDirLastArmed = -2;
   g_XPDirLastBlockedSec = 0;
   g_XPDirHoldTriggerIsBuy = false;
