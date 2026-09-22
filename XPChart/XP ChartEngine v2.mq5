@@ -41,27 +41,27 @@ enum ENUM_XP_TIME_AXIS
 };
 
 //--- inputs ---------------------------------------------------------
-input string               BaseSymbol           = "XAUUSD";        // F14 default
-input ENUM_CUSTOM_SECONDS  Timeframe            = S1;
-input int                  ManualSeconds        = 15;
-input string               BaseSymbolOverride   = "";              // F6: "" = auto-detect (deterministic)
-input string               CustomNameSuffix     = "";              // "" = <parent>_S<n> (F14). Use when changing TimeAxis on an existing name
-input ENUM_XP_PRICE_BASIS  PriceBasis           = XP_BASIS_BID;    // F5
-input ENUM_XP_SPREAD_MODE  SpreadMode           = XP_SPREAD_MAX;   // F4 (points of the PARENT's SYMBOL_POINT)
-input ENUM_XP_TIME_AXIS    TimeAxis             = XP_AXIS_REAL;    // F10 GATE1_DEFAULT: re-pin after XP_AxisCheck receipt
-input datetime             AxisBase             = 0;               // F10 SYNTHETIC chart-time origin (0 = auto, persisted)
-input datetime             AxisOrigin           = 0;               // F10 SYNTHETIC real-time origin  (0 = auto, persisted)
-input bool                 WriteEmptyBars       = false;           // F10 flat bars for interval slots with no tick
-input int                  MaxEmptyBarsPerGap   = 600;             // cap per gap (weekend protection)
-input bool                 PushTicks            = true;            // F11 (diagnostic off-switch for the funnel)
-input int                  ConsecutiveFailLimit = 20;              // F8
-input int                  PollSleepMs          = 50;              // F1 keep 50; floor 10
-input int                  CopyTicksCount       = 0;               // F1 count arg: 0 = all ticks since cursor (verify in reference); >0 = bounded
-input int                  HeartbeatSeconds     = 60;              // F12
-input string               OutputDir            = "XPChart";       // R6: under MQL5\Files
-input int                  LockStaleSeconds     = 30;              // F13 heartbeat staleness reclaim (August variant: 30 s)
-input bool                 UpdateRatesEveryTick = false;           // August variant: false = CustomRatesUpdate only on bar close (+final flush); true = every poll
-input int                  FunnelPolls          = 20;              // verbose CopyTicks prints for the first N polls
+input string               BaseSymbol           = "XAUUSD";             // Base symbol (parent); exact name or prefix
+input ENUM_CUSTOM_SECONDS  Timeframe            = S1;                   // Interval
+input int                  ManualSeconds        = 15;                   // Manual seconds (only when Interval = Manual Input)
+input string               BaseSymbolOverride   = "";                   // Base symbol override (empty = auto-detect)
+input string               CustomNameSuffix     = "";                   // Custom symbol name suffix (empty = <parent>_S<n>)
+input ENUM_XP_PRICE_BASIS  PriceBasis           = XP_BASIS_BID;         // Price basis for bars
+input ENUM_XP_SPREAD_MODE  SpreadMode           = XP_SPREAD_MAX;        // Spread per bar (points of parent)
+input ENUM_XP_TIME_AXIS    TimeAxis             = XP_AXIS_REAL;         // Time axis (REAL until Gate 1 says otherwise)
+input datetime             AxisBase             = 0;                    // SYNTHETIC: chart-time origin (0 = auto)
+input datetime             AxisOrigin           = 0;                    // SYNTHETIC: real-time origin (0 = auto)
+input bool                 WriteEmptyBars       = false;                // Write flat bars for empty intervals
+input int                  MaxEmptyBarsPerGap   = 600;                  // Max empty bars written per gap
+input bool                 PushTicks            = true;                 // Push ticks to custom symbol (off = bars only)
+input int                  ConsecutiveFailLimit = 20;                   // Consecutive write failures before 5 s pause
+input int                  PollSleepMs          = 50;                   // Poll sleep ms (min 10)
+input int                  CopyTicksCount       = 0;                    // CopyTicks count (0 = all since cursor)
+input int                  HeartbeatSeconds     = 60;                   // Heartbeat interval seconds
+input string               OutputDir            = "XPChart";            // Output folder under MQL5\Files
+input int                  LockStaleSeconds     = 30;                   // Lock heartbeat staleness seconds
+input bool                 UpdateRatesEveryTick = false;                // Write current bar every poll (false = on close)
+input int                  FunnelPolls          = 20;                   // Verbose funnel prints for first N polls
 
 //--- resolved at start ----------------------------------------------
 string   actual_symbol = "";
