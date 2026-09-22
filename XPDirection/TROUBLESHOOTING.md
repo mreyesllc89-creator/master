@@ -73,6 +73,37 @@ than voted on.
 (sha256 `5653130d…b52120`). The 37-line file from the original prompt is a **different
 program** with a different buffer map — it puts FAST at 24 and SLOW at 25.
 
+## 4b. The dashboard says `DIR[...]: NONE` and every rung says `NV`
+
+This means the ladder **initialised fine** — it is past every failure above — and the
+rungs simply are not voting yet. The panel's second line tells you why, per rung, in
+orange:
+
+```
+DIR[TRANS]: NONE R-  P=NV 1=NV 5=NV 10=NV 15=- 30=- 45=-
+WHY: P=map_invalid S1=map_invalid S5=no_data S10=no_data
+```
+
+Look up each `why=` in the table in §5. The overwhelmingly common one right after
+attach is **`map_invalid`, which is warm-up and not a fault**: the map needs about 21
+closed bars before it produces anything, so S1 ≈ 30 s, S5 ≈ 2 min, S10 ≈ 4 min, and the
+parent needs ~21 bars of `InpDirParentTF`. Leave it running and watch the WHY line
+change.
+
+Once every enabled rung votes, that second line switches by itself to the grades:
+
+```
+DIR[TRANS]: BUY R2  P=BUY 1=SELL 5=BUY 10=BUY 15=- 30=- 45=-
+GRADE: P=E 1=S 5=E 10=F 15=- 30=- 45=-
+```
+
+**Also read the mode in the brackets.** `DIR[TRANS]` is `DIR_TRANSLATE`; `DIR[LOCK]` is
+`DIR_LOCK`. A quick cross-check: in `DIR_LOCK` with `DIR: NONE`, **both** V-stops must
+read `[Inactive]`, because the lock disarms both sides when the ladder has no opinion.
+If you see `DIR: NONE` with both V-stops still showing prices, you are in
+`DIR_TRANSLATE` — which is correct behaviour there, since both levels stay armed and the
+ladder simply never picks a side to execute.
+
 ## 5. It initialised, but no `XPDIR DIR_STATE` line ever appears
 
 The build tells you why, unprompted. Once a second the timer checks, and while the

@@ -141,9 +141,15 @@ def static_part(base_path, problems):
     print("  A5 hoisted sellCrossing expression byte-identical to 1.03, computed once")
 
     # --- A6: the dashboard line is behind a DIR_OFF branch
-    if 'if(InpDirMode == DIR_OFF)\n      ObjectDelete(0, "Lbl_XPDir");' not in ea:
-        fail("the dashboard DIR line is not guarded by a DIR_OFF branch", problems)
-    print("  A6 dashboard DIR line deleted, not drawn, in DIR_OFF")
+    dash = re.search(r"// XPDIR: one added line, last.*?\n(\s*)if\(InpDirMode == DIR_OFF\)\n"
+                     r"\s*\{\n(.*?)\n\s*\}\n\s*else", ea, re.S)
+    if not dash:
+        fail("the dashboard DIR lines are not guarded by a DIR_OFF branch", problems)
+    else:
+        for label in ('"Lbl_XPDir"', '"Lbl_XPDirWhy"'):
+            if f"ObjectDelete(0, {label});" not in dash.group(2):
+                fail(f"the DIR_OFF branch does not delete {label}", problems)
+    print("  A6 dashboard DIR lines deleted, not drawn, in DIR_OFF")
 
     # --- A7: the burst-threshold input preserves the retired constant's value
     m = re.search(r"^\s*input\s+double\s+InpBurstThresholdFixed\s*=\s*([0-9.]+)\s*;",

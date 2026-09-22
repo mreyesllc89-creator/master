@@ -5656,21 +5656,54 @@ void UpdateDashboard()
 
    // XPDIR: one added line, last, so no existing dashboard line moves.
    if(InpDirMode == DIR_OFF)
+   {
       ObjectDelete(0, "Lbl_XPDir");
+      ObjectDelete(0, "Lbl_XPDirWhy");
+   }
    else
    {
       const ENUM_XPDIR d = XPDir_Current();
-      string dirTxt = StringFormat("DIR: %-4s %-2s P=%s/%s 1:%s/%s 5:%s/%s 10:%s/%s 15:%s 30:%s 45:%s",
+      // line 1: the decision and every rung's vote. Mode is on the label so
+      // DIR_LOCK and DIR_TRANSLATE can be told apart at a glance.
+      string dirTxt = StringFormat("DIR[%s]: %s %s  P=%s 1=%s 5=%s 10=%s 15=%s 30=%s 45=%s",
+                                   InpDirMode == DIR_LOCK ? "LOCK" : "TRANS",
                                    XPDir_DirName(d),
-                                   g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "- ",
-                                   XPDir_VoteTag(XPDIR_IDX_PARENT), XPDir_GradeLetter(g_XPDirGrade[XPDIR_IDX_PARENT]),
-                                   XPDir_VoteTag(0), XPDir_GradeLetter(g_XPDirGrade[0]),
-                                   XPDir_VoteTag(1), XPDir_GradeLetter(g_XPDirGrade[1]),
-                                   XPDir_VoteTag(2), XPDir_GradeLetter(g_XPDirGrade[2]),
+                                   g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "R-",
+                                   XPDir_VoteTag(XPDIR_IDX_PARENT),
+                                   XPDir_VoteTag(0), XPDir_VoteTag(1), XPDir_VoteTag(2),
                                    XPDir_VoteTag(3), XPDir_VoteTag(4), XPDir_VoteTag(5));
       color dirClr = (d == XPDIR_BUY) ? InpDashColor2
                      : ((d == XPDIR_SELL) ? InpDashColor3 : clrGray);
       CreateLabel("Lbl_XPDir", InpDashX, y, dirTxt, dirClr);
+      y += lineHeight;
+
+      // line 2: when a rung is not voting, the panel says WHY instead of
+      // making you go and read the log. Once every rung votes it shows the
+      // grades instead, which is what matters then.
+      bool anySilent = false;
+      for(int r = 0; r < XPDIR_RUNGS; r++)
+         if(g_XPDirEnabled[r] && g_XPDirVote[r] == 0) anySilent = true;
+
+      string secondTxt = "";
+      if(anySilent)
+      {
+         secondTxt = "WHY:";
+         for(int r = 0; r < XPDIR_RUNGS; r++)
+         {
+            if(!g_XPDirEnabled[r]) continue;
+            secondTxt += " " + g_XPDirTag[r] + "=" + g_XPDirWhy[r];
+         }
+      }
+      else
+      {
+         secondTxt = StringFormat("GRADE: P=%s 1=%s 5=%s 10=%s 15=%s 30=%s 45=%s",
+                                  XPDir_GradeLetter(g_XPDirGrade[XPDIR_IDX_PARENT]),
+                                  XPDir_GradeLetter(g_XPDirGrade[0]), XPDir_GradeLetter(g_XPDirGrade[1]),
+                                  XPDir_GradeLetter(g_XPDirGrade[2]), XPDir_GradeLetter(g_XPDirGrade[3]),
+                                  XPDir_GradeLetter(g_XPDirGrade[4]), XPDir_GradeLetter(g_XPDirGrade[5]));
+      }
+      CreateLabel("Lbl_XPDirWhy", InpDashX, y, secondTxt,
+                  anySilent ? clrOrange : InpDashColor1);
       y += lineHeight;
    }
 }

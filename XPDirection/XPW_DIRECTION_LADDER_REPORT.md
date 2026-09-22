@@ -830,12 +830,25 @@ Clamped in `OnInit` (one `XPDIR CLAMP` line when any clamp bites):
 existing label's Y coordinate moves:
 
 ```
-DIR: BUY  R2 P=BUY/E 1:SELL/F 5:BUY/E 10:BUY/S 15:- 30:- 45:-
+DIR[TRANS]: BUY R2  P=BUY 1=SELL 5=BUY 10=BUY 15=- 30=- 45=-
+GRADE: P=E 1=S 5=E 10=F 15=- 30=- 45=-
 ```
 
-`-` = rung disabled or absent, `NV` = enabled but no vote. The letter after the slash
-is the grade: `E` EARLY, `F` FRESH, `S` STALE_STATE. In `DIR_OFF` the label is deleted
-rather than drawn.
+`-` = rung disabled or absent, `NV` = enabled but no vote. The bracket carries the mode,
+so `DIR_LOCK` and `DIR_TRANSLATE` are distinguishable without opening the Inputs tab.
+
+**The second line answers whichever question is live.** While any enabled rung is not
+voting it shows that rung's reason instead of its grade, in orange:
+
+```
+WHY: P=map_invalid S1=map_invalid S5=no_data S10=stale_7s
+```
+
+and it switches back to `GRADE:` by itself once every rung votes. The original spec
+asked for one added line; this is two, because a panel that says `NONE` without saying
+why sends you to the log for something the EA already knows. Both are written last in
+`UpdateDashboard()`, so no existing label's Y coordinate moves, and both are deleted
+rather than drawn in `DIR_OFF` (Gate 0 pre-check A6).
 
 **CSV** — `MQL5\Files\XPChart\FlashGold_Continuation_v2_XPDir_v1_<symbol>_<magic>.csv`,
 header written once, appended with `FILE_SHARE_READ|FILE_SHARE_WRITE` (the
