@@ -104,6 +104,76 @@ If you see `DIR: NONE` with both V-stops still showing prices, you are in
 `DIR_TRANSLATE` — which is correct behaviour there, since both levels stay armed and the
 ladder simply never picks a side to execute.
 
+## 4c. Checking the engine services actually produce what the ladder needs
+
+A green ▶ in the Services tree means the instance **started**, not that it is producing
+anything. Seven running instances can still be feeding one symbol, or the wrong parent.
+
+### The default ladder needs three, not seven
+
+`InpDirUseS15/S30/S45` all default to **false**, so out of the box the ladder reads
+**S1, S5, S10** and the parent. Extra engines cost CPU and produce symbols nothing
+reads — harmless, but do not assume a rung is enabled just because its engine runs.
+
+### Two traps specific to this engine
+
+**1. S15 and S45 are not in the `Timeframe` dropdown.** The enum offers only
+`S1, S2, S5, S10, S30` and `Manual Input`:
+
+```mql5
+enum ENUM_CUSTOM_SECONDS { S1=1, S2=2, S5=5, S10=10, S30=30, S_Custom=0 };
+```
+
+To generate `_S15` or `_S45` you must set **`Timeframe = Manual Input`** and
+**`ManualSeconds = 15`** (or `45`). Picking from the list cannot produce them, so an
+instance meant to be S15 that was left on the dropdown is quietly generating something
+else.
+
+**2. `BaseSymbol` defaults to `"XAUUSD"`, which is a *prefix*.** The engine takes every
+non-custom symbol whose name starts with it and ranks them exact > selected > most
+recent tick > name. With `XAUUSD-ECNc` present that normally resolves correctly, but if
+the broker carries more than one `XAUUSD*` variant it can pick a different parent — and
+then the engine creates `<other>_S1` while the ladder, deriving its rungs from the chart
+it is attached to, looks for `XAUUSD-ECNc_S1`. **Set `BaseSymbolOverride = XAUUSD-ECNc`
+and the ambiguity is gone.**
+
+### The four checks, in order
+
+**1. Count the heartbeat files.** Each live instance writes one, named for the symbol it
+generates:
+
+```
+MQL5\Files\XPChart\heartbeat_XAUUSD-ECNc_S1.csv
+MQL5\Files\XPChart\heartbeat_XAUUSD-ECNc_S5.csv
+MQL5\Files\XPChart\heartbeat_XAUUSD-ECNc_S10.csv
+```
+
+**One file per seconds value you expect.** Seven services and three heartbeat files
+means four instances are producing nothing. There is an `axismap_<symbol>.csv` beside
+each one.
+
+**2. Look for `BLOCKED_DUPLICATE_INSTANCE` in the Journal.** The engine takes a
+`GlobalVariableSetOnCondition` lock on `XPChartEngine.Lock.<custom_name>`, so if two
+instances target the same seconds value the second refuses and says so by name. This is
+the message you get when instances were added without editing their inputs — they all
+inherit the same defaults and fight for `_S1`.
+
+**3. Read the resolution and creation lines**, one per instance:
+
+```
+F6 base resolution for 'XAUUSD': 1 candidate(s) among 2417 symbols
+custom symbol CREATED: XAUUSD-ECNc_S1 path=Custom\XPChart origin=XAUUSD-ECNc
+```
+
+`origin=` is the parent it actually chose. If that is not `XAUUSD-ECNc`, fix
+`BaseSymbolOverride`.
+
+**4. Check Market Watch** under `Custom\XPChart`: one symbol per seconds value, each
+with a current last-bar time.
+
+If a rung's symbol is missing from that list, the ladder's `why=` for it will be
+`no_bar_time` or `map_invalid`, and no amount of waiting fixes it.
+
 ## 5. It initialised, but no `XPDIR DIR_STATE` line ever appears
 
 The build tells you why, unprompted. Once a second the timer checks, and while the
