@@ -20,6 +20,8 @@ diff, and the host instructions for the three open gates.
 | `include/XPW_DirectionLadder.mqh` | **The ladder as a portable include** — generated from the EA, drops into any other EA. |
 | `include/XPW_DirectionVeto.mqh` | `CTrade` subclass that applies the veto at `OrderSend`. |
 | `include/README.md` | **Putting the filter in another EA.** Four calls, `DIR_VETO`. |
+| `hosts/README.md` | **The three filtered EAs** — FlashGold and SpeedAlert 1.498 / 1.500 — and how each was hooked. |
+| `hosts/speedalert/apply_xpdir.py` | Re-applies the veto to any SpeedAlert package. Refuses to guess if an anchor moved. |
 | `reference/vote_ref.py` | Independent Python transliteration of the §4 rules. |
 | `reference/run_fixtures.py` | **Gate 1 runner.** Fixture expectation vs `vote_ref.py` vs the EA's own compiled rule core. |
 | `reference/fixtures/vote_rules.csv` | 49 hand-derived fixtures. |
