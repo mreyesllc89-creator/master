@@ -1,0 +1,285 @@
+//@version=6
+// XPW Shape Map v0.5 — EXPORT BUILD for GATE B. Logic IDENTICAL to XPW Shape Map v0.5; the only additions are
+// the per-bar copies botOKX/topOKX and the display.data_window plots at the end, so "Export chart data" carries
+// TradingView's own values for reference/diff_harness.py --tv.
+indicator("XPW Shape Map v0.5 export", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500)
+
+// ───────────────────────── TDI ─────────────────────────
+grpT = "TDI"
+rsiLen     = input.int(14,  "RSI length",     minval = 2, group = grpT)
+fastLen    = input.int(2,   "Fast MA length", minval = 1, group = grpT)
+slowLen    = input.int(7,   "Slow MA length", minval = 1, group = grpT)
+invertFill = input.bool(true, "My panel paints fast>slow as RED", group = grpT)
+
+r    = ta.rsi(close, rsiLen)
+fast = ta.sma(r, fastLen)
+slow = ta.sma(r, slowLen)
+
+pF = plot(fast, "Fast", color = color.new(color.gray, 30), linewidth = 1)
+pS = plot(slow, "Slow", color = color.new(color.silver, 30), linewidth = 1)
+
+isRed  = invertFill ? fast > slow : fast < slow
+isLime = not isRed
+
+fill(pF, pS, color = isRed ? color.new(color.red, 82) : color.new(color.lime, 82))
+
+// ───────────────────────── AREAS ─────────────────────────
+grpA = "Areas"
+areaLook = input.int(20,     "Area lookback", minval = 5, group = grpA)
+loFrac   = input.float(0.20, "LOW area: below this fraction",  minval = 0.0, maxval = 1.0, step = 0.01, group = grpA)
+hiFrac   = input.float(0.67, "HIGH area: above this fraction", minval = 0.0, maxval = 1.0, step = 0.01, group = grpA)
+
+hiW  = ta.highest(slow, areaLook)
+loW  = ta.lowest(slow, areaLook)
+rngW = hiW - loW
+posW = rngW > 0 ? (slow - loW) / rngW : 0.5
+inLow  = posW <= loFrac
+inHigh = posW >= hiFrac
+
+// ───────────────────── BOTTOM SQUARE ─────────────────────
+grpB = "BOTTOM square (odd RED wedge, LOW area)"
+botOn      = input.bool(true, "Enable",                   group = grpB)
+botMinW    = input.int(1,  "Min width",     minval = 1,   group = grpB)
+botMaxW    = input.int(3,  "Max width",     minval = 1,   group = grpB)
+botCtx     = input.int(2,  "Context bars",  minval = 1,   group = grpB)
+botNeedLow = input.bool(true, "Require LOW area",         group = grpB)
+botSep     = input.int(5,  "Min bars between squares", minval = 0, group = grpB)
+
+// ─────────────────────── TOP SQUARE ───────────────────────
+grpP = "TOP square (odd LIME wedge, HIGH area)"
+topOn       = input.bool(true, "Enable",                  group = grpP)
+topMinW     = input.int(1,  "Min width",    minval = 1,   group = grpP)
+topMaxW     = input.int(2,  "Max width",    minval = 1,   group = grpP)
+topCtx      = input.int(3,  "Context bars", minval = 1,   group = grpP)
+topNeedHigh = input.bool(true, "Require HIGH area",       group = grpP)
+topSep      = input.int(5,  "Min bars between squares", minval = 0, group = grpP)
+
+// ───────────────────── WEDGE DETECTOR ─────────────────────
+detect(bool wantRedWedge, int minW, int maxW, int ctx) =>
+    int  wHi  = math.max(minW, maxW)
+    bool fired = false
+    int  wOut  = 0
+    for w = minW to wHi
+        if not fired
+            bool ok = true
+            for i = 0 to ctx - 1
+                bool v = wantRedWedge ? isLime[i] : isRed[i]
+                if not v
+                    ok := false
+            if ok
+                for i = 0 to w - 1
+                    bool v = wantRedWedge ? isRed[ctx + i] : isLime[ctx + i]
+                    if not v
+                        ok := false
+            if ok
+                for i = 0 to ctx - 1
+                    bool v = wantRedWedge ? isLime[ctx + w + i] : isRed[ctx + w + i]
+                    if not v
+                        ok := false
+            if ok
+                fired := true
+                wOut  := w
+    [fired, wOut]
+
+[botRaw, botWid] = detect(true,  botMinW, botMaxW, botCtx)
+[topRaw, topWid] = detect(false, topMinW, topMaxW, topCtx)
+
+var int lastBotBar   = -10000
+var int lastTopBar   = -10000
+var int lastBotWedge = -10000
+var int lastTopWedge = -10000
+
+botOK = botOn and botRaw and barstate.isconfirmed and (not botNeedLow  or inLow[botCtx])  and (bar_index - lastBotBar >= botSep)
+topOK = topOn and topRaw and barstate.isconfirmed and (not topNeedHigh or inHigh[topCtx]) and (bar_index - lastTopBar >= topSep)
+
+var int nBotSq = 0
+var int nTopSq = 0
+
+if botOK
+    lastBotBar   := bar_index
+    lastBotWedge := bar_index - botCtx
+    nBotSq += 1
+    int lft = bar_index - botCtx - botWid + 1
+    int rgt = bar_index - botCtx
+    float hh = -1e10
+    float ll =  1e10
+    for i = 0 to botWid - 1
+        hh := math.max(hh, math.max(fast[botCtx + i], slow[botCtx + i]))
+        ll := math.min(ll, math.min(fast[botCtx + i], slow[botCtx + i]))
+    box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.red, 0), border_width = 1, bgcolor = color.new(color.red, 65))
+    label.new(rgt, ll - 2.0, "BOT " + str.tostring(botWid), style = label.style_label_up, color = color.new(color.red, 25), textcolor = color.white, size = size.tiny)
+
+if topOK
+    lastTopBar   := bar_index
+    lastTopWedge := bar_index - topCtx
+    nTopSq += 1
+    int lft = bar_index - topCtx - topWid + 1
+    int rgt = bar_index - topCtx
+    float hh = -1e10
+    float ll =  1e10
+    for i = 0 to topWid - 1
+        hh := math.max(hh, math.max(fast[topCtx + i], slow[topCtx + i]))
+        ll := math.min(ll, math.min(fast[topCtx + i], slow[topCtx + i]))
+    box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.lime, 0), border_width = 1, bgcolor = color.new(color.lime, 65))
+    label.new(rgt, hh + 2.0, "TOP " + str.tostring(topWid), style = label.style_label_down, color = color.new(color.green, 25), textcolor = color.white, size = size.tiny)
+
+// ───────────────────────── TURN MARK ─────────────────────────
+grpN = "Turn mark"
+turnOn   = input.bool(true, "Enable",                       group = grpN)
+turnMax  = input.int(12, "Max bars to wait after a square", minval = 1, group = grpN)
+turnHold = input.int(2,  "Bars the cross must hold",        minval = 1, group = grpN)
+
+var bool botArmed  = false
+var int  botArmBar = 0
+var bool topArmed  = false
+var int  topArmBar = 0
+
+if botOK
+    botArmed  := true
+    botArmBar := bar_index
+if topOK
+    topArmed  := true
+    topArmBar := bar_index
+
+if botArmed and bar_index - botArmBar > turnMax
+    botArmed := false
+if topArmed and bar_index - topArmBar > turnMax
+    topArmed := false
+
+bool holdUp = true
+bool holdDn = true
+for i = 0 to turnHold
+    if not (fast[i] > slow[i])
+        holdUp := false
+    if not (fast[i] < slow[i])
+        holdDn := false
+
+crossedUpAt = ta.crossover(fast, slow)[turnHold]
+crossedDnAt = ta.crossunder(fast, slow)[turnHold]
+
+botTurn = turnOn and barstate.isconfirmed and botArmed and crossedUpAt and holdUp
+topTurn = turnOn and barstate.isconfirmed and topArmed and crossedDnAt and holdDn
+
+var int nBotTurn   = 0
+var int nTopTurn   = 0
+var int lastBotGap = 0
+var int lastTopGap = 0
+
+if botTurn
+    botArmed := false
+    nBotTurn += 1
+    int tb = bar_index - turnHold
+    lastBotGap := tb - lastBotWedge
+    label.new(tb, math.min(fast[turnHold], slow[turnHold]) - 3.0, "▲", style = label.style_label_up, color = color.new(color.yellow, 10), textcolor = color.black, size = size.tiny)
+
+if topTurn
+    topArmed := false
+    nTopTurn += 1
+    int tb = bar_index - turnHold
+    lastTopGap := tb - lastTopWedge
+    label.new(tb, math.max(fast[turnHold], slow[turnHold]) + 3.0, "▼", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.black, size = size.tiny)
+
+// ──────────── TICKS (wick as a compressed cycle) ────────────
+grpK = "Ticks"
+tickOn       = input.bool(true, "Enable",                 group = grpK)
+atrLen       = input.int(14, "ATR length", minval = 2,    group = grpK)
+botWickRange = input.float(0.55, "BOTTOM: min lower wick / range", step = 0.05, group = grpK)
+botWickAtr   = input.float(0.8,  "BOTTOM: min lower wick / ATR",   step = 0.10, group = grpK)
+topWickRange = input.float(0.70, "TOP: min upper wick / range",    step = 0.05, group = grpK)
+topWickAtr   = input.float(1.20, "TOP: min upper wick / ATR",      step = 0.10, group = grpK)
+
+atrV   = ta.atr(atrLen)
+rngBar = high - low
+upWick = high - math.max(open, close)
+dnWick = math.min(open, close) - low
+
+botTick = tickOn and barstate.isconfirmed and rngBar > 0 and atrV > 0 and dnWick / rngBar >= botWickRange and dnWick / atrV >= botWickAtr
+topTick = tickOn and barstate.isconfirmed and rngBar > 0 and atrV > 0 and upWick / rngBar >= topWickRange and upWick / atrV >= topWickAtr
+
+var int nBotTk = 0
+var int nTopTk = 0
+
+if botTick
+    nBotTk += 1
+    label.new(bar_index, low, "BOT", style = label.style_label_up, color = color.new(color.yellow, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
+if topTick
+    nTopTk += 1
+    label.new(bar_index, high, "TOP", style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
+
+// ───────── LEGS: continuity vs distance (turn to turn) ─────────
+var bool   legOpen = false
+var int    legDir  = 0
+var float  legP0   = na
+var int    legB0   = 0
+var float  legPath = 0.0
+var string leg1    = "—"
+var string leg2    = "—"
+
+if legOpen and barstate.isconfirmed
+    legPath += math.abs(close - close[1])
+
+if botTurn or topTurn
+    if legOpen
+        float dist = math.abs(close - legP0)
+        int   bars = bar_index - legB0
+        float eff  = legPath > 0 ? dist / legPath : 0.0
+        leg2 := leg1
+        leg1 := (legDir > 0 ? "UP " : "DN ") + str.tostring(dist, "#.##") + " / " + str.tostring(bars) + "b / eff " + str.tostring(eff, "#.00")
+    legOpen := true
+    legDir  := botTurn ? 1 : -1
+    legP0   := close
+    legB0   := bar_index
+    legPath := 0.0
+
+// ───────────────────────── TABLE ─────────────────────────
+grpD = "Display"
+showTable = input.bool(true, "Show table", group = grpD)
+
+var table t = table.new(position.middle_right, 2, 10, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
+
+if showTable and barstate.islast
+    table.cell(t, 0, 0, "XPW Shape Map v0.5", text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
+    table.cell(t, 1, 0, isRed ? "RED" : "LIME", text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
+    table.cell(t, 0, 1, "Area pos",    text_size = size.tiny)
+    table.cell(t, 1, 1, str.tostring(posW, "#.00") + (inLow ? " LOW" : inHigh ? " HIGH" : " MID"), text_size = size.tiny)
+    table.cell(t, 0, 2, "BOT squares", text_size = size.tiny)
+    table.cell(t, 1, 2, str.tostring(nBotSq), text_size = size.tiny)
+    table.cell(t, 0, 3, "TOP squares", text_size = size.tiny)
+    table.cell(t, 1, 3, str.tostring(nTopSq), text_size = size.tiny)
+    table.cell(t, 0, 4, "BOT turns",   text_size = size.tiny)
+    table.cell(t, 1, 4, str.tostring(nBotTurn) + "  gap " + str.tostring(lastBotGap) + "b", text_size = size.tiny)
+    table.cell(t, 0, 5, "TOP turns",   text_size = size.tiny)
+    table.cell(t, 1, 5, str.tostring(nTopTurn) + "  gap " + str.tostring(lastTopGap) + "b", text_size = size.tiny)
+    table.cell(t, 0, 6, "BOT ticks",   text_size = size.tiny)
+    table.cell(t, 1, 6, str.tostring(nBotTk), text_size = size.tiny)
+    table.cell(t, 0, 7, "TOP ticks",   text_size = size.tiny)
+    table.cell(t, 1, 7, str.tostring(nTopTk), text_size = size.tiny)
+    table.cell(t, 0, 8, "Leg -1",      text_size = size.tiny)
+    table.cell(t, 1, 8, leg1, text_size = size.tiny)
+    table.cell(t, 0, 9, "Leg -2",      text_size = size.tiny)
+    table.cell(t, 1, 9, leg2, text_size = size.tiny)
+
+// ───────────── GATE B export plots (data window only; no visual change) ─────────────
+plot(r,                    "r",          display = display.data_window)
+plot(fast,                 "fast",       display = display.data_window)
+plot(slow,                 "slow",       display = display.data_window)
+plot(atrV,                 "atrV",       display = display.data_window)
+plot(isRed ? 1 : 0,        "isRed",      display = display.data_window)
+plot(posW,                 "posW",       display = display.data_window)
+plot(inLow ? 1 : 0,        "inLow",      display = display.data_window)
+plot(inHigh ? 1 : 0,       "inHigh",     display = display.data_window)
+plot(botRaw ? 1 : 0,       "botRaw",     display = display.data_window)
+plot(botWid,               "botWid",     display = display.data_window)
+plot(topRaw ? 1 : 0,       "topRaw",     display = display.data_window)
+plot(topWid,               "topWid",     display = display.data_window)
+plot(botOK ? botWid : 0,   "botOK",      display = display.data_window)
+plot(topOK ? topWid : 0,   "topOK",      display = display.data_window)
+plot(botArmed ? 1 : 0,     "botArmed",   display = display.data_window)
+plot(topArmed ? 1 : 0,     "topArmed",   display = display.data_window)
+plot(botTurn ? 1 : 0,      "botTurn",    display = display.data_window)
+plot(topTurn ? 1 : 0,      "topTurn",    display = display.data_window)
+plot(botTick ? 1 : 0,      "botTick",    display = display.data_window)
+plot(topTick ? 1 : 0,      "topTick",    display = display.data_window)
+plot(lastBotGap,           "lastBotGap", display = display.data_window)
+plot(lastTopGap,           "lastTopGap", display = display.data_window)
+plot(legPath,              "legPath",    display = display.data_window)
