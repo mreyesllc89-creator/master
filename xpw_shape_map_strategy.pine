@@ -3,11 +3,13 @@
 // Same map layer as the v0.5 indicator (wedge squares, turn marks, ticks, legs),
 // with orders driven by the turn mark (default) or the square itself.
 //   BOTTOM turn ▲ -> long    TOP turn ▼ -> short
-// Signals are evaluated on confirmed bars; orders fill at the next bar's open.
+// "Area (instant)" mode enters on the first tick the LOW/HIGH area turns on (live, calc_on_every_tick).
+// Map signals (square/turn) are still evaluated on confirmed bars only.
 
 strategy("XPW Shape Map v0.5 Strategy", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500,
      initial_capital = 10000, default_qty_type = strategy.percent_of_equity, default_qty_value = 10,
-     commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 1, pyramiding = 0)
+     commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 1, pyramiding = 0,
+     calc_on_every_tick = true)
 
 // ───────────────────────── TDI ─────────────────────────
 grpT = "TDI"
@@ -243,8 +245,11 @@ if botTurn or topTurn
 
 // ───────────────────────── STRATEGY ─────────────────────────
 grpS = "Strategy"
-entryMode  = input.string("Turn", "Enter on", options = ["Turn", "Square", "Square or Turn"], group = grpS,
-     tooltip = "Turn = the ▲/▼ confirmation after a square. Square = the wedge itself (earlier, less confirmed).")
+entryMode  = input.string("Area (instant)", "Enter on", options = ["Area (instant)", "Turn", "Square", "Square or Turn"], group = grpS,
+     tooltip = "Area (instant) = the tick the LOW area (long) / HIGH area (short) turns on, intrabar in realtime. Turn = the ▲/▼ confirmation after a square. Square = the wedge itself.")
+areaOnlyNew = input.bool(true, "Area: only on activation (not while it stays on)", group = grpS,
+     tooltip = "On = one entry when the area switches on. Off = re-enter any time the area is on and you are flat (e.g. after a stop).")
+showAreaBg = input.bool(true, "Shade panel while an area is active", group = grpS)
 tradeDir   = input.string("Both", "Direction", options = ["Both", "Long only", "Short only"], group = grpS)
 useTickReq = input.bool(false, "Require a matching tick within N bars", group = grpS)
 tickWindow = input.int(5, "Tick window (bars)", minval = 0, group = grpS)
@@ -270,15 +275,22 @@ allowShort = tradeDir != "Long only"
 botTickRecent = ta.barssince(botTick) <= tickWindow
 topTickRecent = ta.barssince(topTick) <= tickWindow
 
-longSig  = entryMode == "Turn" ? botTurn : entryMode == "Square" ? botOK : (botOK or botTurn)
-shortSig = entryMode == "Turn" ? topTurn : entryMode == "Square" ? topOK : (topOK or topTurn)
+// inLow/inHigh are recomputed on every realtime tick, so these fire the moment the area switches on
+areaLong  = areaOnlyNew ? (inLow  and not inLow[1])  : inLow
+areaShort = areaOnlyNew ? (inHigh and not inHigh[1]) : inHigh
+
+bgcolor(showAreaBg and inLow  ? color.new(color.lime, 88) : showAreaBg and inHigh ? color.new(color.red, 88) : na, title = "Area active")
+
+longSig  = entryMode == "Area (instant)" ? areaLong  : entryMode == "Turn" ? botTurn : entryMode == "Square" ? botOK : (botOK or botTurn)
+shortSig = entryMode == "Area (instant)" ? areaShort : entryMode == "Turn" ? topTurn : entryMode == "Square" ? topOK : (topOK or topTurn)
 longSig  := longSig  and (not useTickReq or botTickRecent)
 shortSig := shortSig and (not useTickReq or topTickRecent)
 
-var float longStop  = na
-var float longTgt   = na
-var float shortStop = na
-var float shortTgt  = na
+// varip: an intrabar entry must keep its stop/target even if the area switches off again before the bar closes
+varip float longStop  = na
+varip float longTgt   = na
+varip float shortStop = na
+varip float shortTgt  = na
 
 // Opposite signal: strategy.entry below reverses the position when that side may trade.
 // Only send a plain close when no reversing entry will be placed (avoids doubling the order).
