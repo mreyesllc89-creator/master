@@ -3958,7 +3958,8 @@ ulong    g_XPDirStateLines       = 0;
 datetime g_XPDirFunnelLastSec    = 0;   // funnel heartbeat (zero-result contingency)
 int      g_XPDirFunnelDumps      = 0;
 
-const string XPDIR_CSV_NAME = "XPChart\\FlashGold_Continuation_v2_XPDir_v1.csv";
+string   g_XPDirCsvName          = "";   // per instance: symbol + magic
+string   g_XPDirClaimGV           = "";   // duplicate-instance claim
 
 //+------------------------------------------------------------------+
 //| XPDIR_RULE_CORE_BEGIN                                             |
@@ -4194,6 +4195,54 @@ string XPDir_ModeName()
 }
 
 //+------------------------------------------------------------------+
+//| Instance identity                                                 |
+//|                                                                    |
+//| Two charts running this EA are only safe when they cannot both     |
+//| claim the same positions. Ownership is symbol + magic              |
+//| (IsOwnSelectedPosition), so two instances on the SAME symbol need  |
+//| different InpMagic or they will both trail and both close the same |
+//| position. That hazard is 1.03's, not the ladder's - but the ladder |
+//| is what you run on a second chart, so it is the ladder that warns. |
+//+------------------------------------------------------------------+
+string XPDir_InstanceTag()
+{
+   string t = _Symbol;
+   StringReplace(t, "\\", "_"); StringReplace(t, "/", "_"); StringReplace(t, ":", "_");
+   StringReplace(t, "*", "_");  StringReplace(t, "?", "_"); StringReplace(t, "\"", "_");
+   StringReplace(t, "<", "_");  StringReplace(t, ">", "_"); StringReplace(t, "|", "_");
+   return t + "_" + IntegerToString(InpMagic);
+}
+
+void XPDir_ClaimInstance()
+{
+   if(InpDirMode == DIR_OFF) return;      // DIR_OFF changes nothing, including this
+   g_XPDirClaimGV = "XPDIR_OWN_" + XPDir_InstanceTag();
+   const long me = ChartID();
+   if(GlobalVariableCheck(g_XPDirClaimGV))
+   {
+      const long other = (long)GlobalVariableGet(g_XPDirClaimGV);
+      // a chart that no longer exists returns window handle 0: a stale claim
+      // from a crash or a closed chart is not a duplicate.
+      if(other != me && ChartGetInteger(other, CHART_WINDOW_HANDLE) != 0)
+         PrintFormat("XPDIR WARN_DUPLICATE_INSTANCE symbol=%s magic=%d is ALREADY running on "
+                     "chart %I64d. Ownership is symbol+magic, so both instances claim the same "
+                     "positions: both will trail them and both will close them. Give this chart "
+                     "its own InpMagic before you let it trade.",
+                     _Symbol, InpMagic, other);
+   }
+   GlobalVariableSet(g_XPDirClaimGV, (double)me);
+}
+
+void XPDir_ReleaseInstance()
+{
+   if(g_XPDirClaimGV == "") return;
+   if(GlobalVariableCheck(g_XPDirClaimGV) &&
+      (long)GlobalVariableGet(g_XPDirClaimGV) == ChartID())
+      GlobalVariableDel(g_XPDirClaimGV);
+   g_XPDirClaimGV = "";
+}
+
+//+------------------------------------------------------------------+
 //| CSV                                                               |
 //+------------------------------------------------------------------+
 void XPDir_WriteCsv(const string eventName, const string triggerSide,
@@ -4204,13 +4253,14 @@ void XPDir_WriteCsv(const string eventName, const string triggerSide,
    // The section-5 columns come first and in their original order, so anything
    // already parsing this file keeps working. The cross columns are appended:
    // one grade@age cell per rung, plus S1's cross detail.
-   const string header = "server_msc,event,mode,dir,rule,P,C1,C5,C10,C15,C30,C45,"
+   const string header = "server_msc,symbol,magic,event,mode,dir,rule,P,C1,C5,C10,C15,C30,C45,"
                          "runlen1,trigger_side,exec_side,action,"
                          "P_g,C1_g,C5_g,C10_g,C15_g,C30_g,C45_g,"
                          "c1_cross_dir,c1_cross_age,c1_cross_sep,c1_sep_now,c1_state";
-   const string row = StringFormat("%I64d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,"
+   const string row = StringFormat("%I64d,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,"
                                    "%s,%s,%s,%s,%s,%s,%s,%d,%d,%.6f,%.6f,%d",
                                    (long)TimeCurrent() * 1000 + (long)(GetTickCount64() % 1000),
+                                   _Symbol, InpMagic,
                                    eventName, XPDir_ModeName(),
                                    XPDir_DirName(g_XPDirCached),
                                    g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "-",
@@ -4226,11 +4276,11 @@ void XPDir_WriteCsv(const string eventName, const string triggerSide,
                                    g_XPDirCrossSep[XPDIR_IDX_S1], g_XPDirSepNow[XPDIR_IDX_S1],
                                    g_XPDirSign[XPDIR_IDX_S1]);
 
-   const int h = FileOpen(XPDIR_CSV_NAME,
+   const int h = FileOpen(g_XPDirCsvName,
                           FILE_READ | FILE_WRITE | FILE_ANSI | FILE_SHARE_READ | FILE_SHARE_WRITE, ",");
    if(h == INVALID_HANDLE)
    {
-      PrintFormat("XPDIR CSV_OPEN_FAILED file=%s error=%d", XPDIR_CSV_NAME, GetLastError());
+      PrintFormat("XPDIR CSV_OPEN_FAILED file=%s error=%d", g_XPDirCsvName, GetLastError());
       return;
    }
    FileSeek(h, 0, SEEK_END);
@@ -4379,6 +4429,11 @@ bool XPDir_Init()
       return true;
    }
 
+   // one CSV per instance, so a second chart is readable instead of interleaved
+   g_XPDirCsvName = "XPChart\\FlashGold_Continuation_v2_XPDir_v1_" +
+                    XPDir_InstanceTag() + ".csv";
+   XPDir_ClaimInstance();
+
    g_XPDirMinWith       = (InpDirMinChildrenWithParent    < 1) ? 1 : InpDirMinChildrenWithParent;
    g_XPDirMinAgainst    = (InpDirMinChildrenAgainstParent < 2) ? 2 : InpDirMinChildrenAgainstParent;
    g_XPDirMaxStaleBars  = (InpDirMaxRungStaleBars         < 1) ? 1 : InpDirMaxRungStaleBars;
@@ -4494,12 +4549,15 @@ bool XPDir_Init()
                InpDirS1RequiredAgainstParent ? 1 : 0,
                g_XPDirMaxStaleBars, g_XPDirCrossMaxAge,
                g_XPDirEarlySepMult, InpDirRequireFreshS1 ? 1 : 0, InpDirWriteCsv ? 1 : 0);
+   PrintFormat("XPDIR INSTANCE chart=%I64d symbol=%s magic=%d csv=%s",
+               ChartID(), _Symbol, InpMagic, g_XPDirCsvName);
    g_XPDirReady = true;
    return true;
 }
 
 void XPDir_Deinit()
 {
+   XPDir_ReleaseInstance();
    for(int r = 0; r < XPDIR_RUNGS; r++)
    {
       if(g_XPDirHandle[r] != INVALID_HANDLE)

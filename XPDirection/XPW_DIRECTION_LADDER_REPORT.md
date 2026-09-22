@@ -1,4 +1,4 @@
-WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 8/8, executed 606 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
+WIRED | G0 BLOCKED_NO_TESTER (pre-check PASS: static 9/9, executed 606 checks 0 failures) | G1 asserts=833 mismatches=0 | G2 pending | G3 pending | POLARITY CONFIRMED | OWNER_TO_CONFIRM: EarlySepMult=2.0, RequireFreshS1=false, S1RequiredAgainstParent=true | DECISION: yes
 
 # XPW Direction Ladder v1 — report
 
@@ -837,9 +837,16 @@ DIR: BUY  R2 P=BUY/E 1:SELL/F 5:BUY/E 10:BUY/S 15:- 30:- 45:-
 is the grade: `E` EARLY, `F` FRESH, `S` STALE_STATE. In `DIR_OFF` the label is deleted
 rather than drawn.
 
-**CSV** — `MQL5\Files\XPChart\FlashGold_Continuation_v2_XPDir_v1.csv`, header written
-once, appended with `FILE_SHARE_READ|FILE_SHARE_WRITE` (the `MasterVwapDecision`
-idiom already in 1.03):
+**CSV** — `MQL5\Files\XPChart\FlashGold_Continuation_v2_XPDir_v1_<symbol>_<magic>.csv`,
+header written once, appended with `FILE_SHARE_READ|FILE_SHARE_WRITE` (the
+`MasterVwapDecision` idiom already in 1.03).
+
+**DEVIATION-3.** §5 named a single fixed filename. It is per instance instead, and every
+row carries `symbol` and `magic`, because two charts writing one file with no way to
+tell the rows apart makes a second chart useless for exactly the comparison it is for
+(`DIR_LOCK` against `DIR_TRANSLATE`, or `RequireFreshS1` off against on). The naming
+follows `VirtualSLFileName()`, which 1.03 already keys by account + symbol + magic.
+Gate 0's A9 checks the header and the row format cannot drift apart:
 
 ```
 server_msc,event,mode,dir,rule,P,C1,C5,C10,C15,C30,C45,runlen1,trigger_side,exec_side,action,
@@ -952,7 +959,8 @@ A. STATIC
   A6 dashboard DIR line deleted, not drawn, in DIR_OFF
   A7 InpBurstThresholdFixed = 172.0 (the retired constant), routed from FIXED,
      guarded at init, no dead BURST_MIN_POINTS
-  A8 XPDir functions defined: 32, dead: 0; funnel heartbeat wired to OnTimer
+  A8 XPDir functions defined: 35, dead: 0; funnel heartbeat wired to OnTimer
+  A9 XPDir CSV: 30 columns = 30 row fields, carries symbol+magic, one file per instance
 B. EXECUTED
   gate0 entry-path: states=144 checks=606 failures=0
     DIR_OFF divergences from 1.03: 0 (must be 0)

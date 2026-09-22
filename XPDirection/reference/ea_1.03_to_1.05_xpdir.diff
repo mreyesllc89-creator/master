@@ -150,7 +150,7 @@
     else g_VirtualSellStopPrice = 0.0;
  
     { if(!MQLInfoInteger(MQL_TESTER)) PrintFormat("PROVISIONAL COST FLOOR FlashGold_Continuation_v2 ENTRY_REJECT side=%s crossing=1 burst_speed_failed=0 burst_direction_failed=0 continuation_failed=0 friction_failed=0 one_entry_per_bar_failed=0 entry_hold_failed=1 prior60_failed=0 hold_move_points=%.1f prior60_drift_points=0.0",
-@@ -3759,6 +3803,1118 @@
+@@ -3759,6 +3803,1176 @@
  }
  
  //+------------------------------------------------------------------+
@@ -309,7 +309,8 @@
 +datetime g_XPDirFunnelLastSec    = 0;   // funnel heartbeat (zero-result contingency)
 +int      g_XPDirFunnelDumps      = 0;
 +
-+const string XPDIR_CSV_NAME = "XPChart\\FlashGold_Continuation_v2_XPDir_v1.csv";
++string   g_XPDirCsvName          = "";   // per instance: symbol + magic
++string   g_XPDirClaimGV           = "";   // duplicate-instance claim
 +
 +//+------------------------------------------------------------------+
 +//| XPDIR_RULE_CORE_BEGIN                                             |
@@ -545,6 +546,54 @@
 +}
 +
 +//+------------------------------------------------------------------+
++//| Instance identity                                                 |
++//|                                                                    |
++//| Two charts running this EA are only safe when they cannot both     |
++//| claim the same positions. Ownership is symbol + magic              |
++//| (IsOwnSelectedPosition), so two instances on the SAME symbol need  |
++//| different InpMagic or they will both trail and both close the same |
++//| position. That hazard is 1.03's, not the ladder's - but the ladder |
++//| is what you run on a second chart, so it is the ladder that warns. |
++//+------------------------------------------------------------------+
++string XPDir_InstanceTag()
++{
++   string t = _Symbol;
++   StringReplace(t, "\\", "_"); StringReplace(t, "/", "_"); StringReplace(t, ":", "_");
++   StringReplace(t, "*", "_");  StringReplace(t, "?", "_"); StringReplace(t, "\"", "_");
++   StringReplace(t, "<", "_");  StringReplace(t, ">", "_"); StringReplace(t, "|", "_");
++   return t + "_" + IntegerToString(InpMagic);
++}
++
++void XPDir_ClaimInstance()
++{
++   if(InpDirMode == DIR_OFF) return;      // DIR_OFF changes nothing, including this
++   g_XPDirClaimGV = "XPDIR_OWN_" + XPDir_InstanceTag();
++   const long me = ChartID();
++   if(GlobalVariableCheck(g_XPDirClaimGV))
++   {
++      const long other = (long)GlobalVariableGet(g_XPDirClaimGV);
++      // a chart that no longer exists returns window handle 0: a stale claim
++      // from a crash or a closed chart is not a duplicate.
++      if(other != me && ChartGetInteger(other, CHART_WINDOW_HANDLE) != 0)
++         PrintFormat("XPDIR WARN_DUPLICATE_INSTANCE symbol=%s magic=%d is ALREADY running on "
++                     "chart %I64d. Ownership is symbol+magic, so both instances claim the same "
++                     "positions: both will trail them and both will close them. Give this chart "
++                     "its own InpMagic before you let it trade.",
++                     _Symbol, InpMagic, other);
++   }
++   GlobalVariableSet(g_XPDirClaimGV, (double)me);
++}
++
++void XPDir_ReleaseInstance()
++{
++   if(g_XPDirClaimGV == "") return;
++   if(GlobalVariableCheck(g_XPDirClaimGV) &&
++      (long)GlobalVariableGet(g_XPDirClaimGV) == ChartID())
++      GlobalVariableDel(g_XPDirClaimGV);
++   g_XPDirClaimGV = "";
++}
++
++//+------------------------------------------------------------------+
 +//| CSV                                                               |
 +//+------------------------------------------------------------------+
 +void XPDir_WriteCsv(const string eventName, const string triggerSide,
@@ -555,13 +604,14 @@
 +   // The section-5 columns come first and in their original order, so anything
 +   // already parsing this file keeps working. The cross columns are appended:
 +   // one grade@age cell per rung, plus S1's cross detail.
-+   const string header = "server_msc,event,mode,dir,rule,P,C1,C5,C10,C15,C30,C45,"
++   const string header = "server_msc,symbol,magic,event,mode,dir,rule,P,C1,C5,C10,C15,C30,C45,"
 +                         "runlen1,trigger_side,exec_side,action,"
 +                         "P_g,C1_g,C5_g,C10_g,C15_g,C30_g,C45_g,"
 +                         "c1_cross_dir,c1_cross_age,c1_cross_sep,c1_sep_now,c1_state";
-+   const string row = StringFormat("%I64d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,"
++   const string row = StringFormat("%I64d,%s,%d,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%s,%s,"
 +                                   "%s,%s,%s,%s,%s,%s,%s,%d,%d,%.6f,%.6f,%d",
 +                                   (long)TimeCurrent() * 1000 + (long)(GetTickCount64() % 1000),
++                                   _Symbol, InpMagic,
 +                                   eventName, XPDir_ModeName(),
 +                                   XPDir_DirName(g_XPDirCached),
 +                                   g_XPDirCachedRule > 0 ? "R" + IntegerToString(g_XPDirCachedRule) : "-",
@@ -577,11 +627,11 @@
 +                                   g_XPDirCrossSep[XPDIR_IDX_S1], g_XPDirSepNow[XPDIR_IDX_S1],
 +                                   g_XPDirSign[XPDIR_IDX_S1]);
 +
-+   const int h = FileOpen(XPDIR_CSV_NAME,
++   const int h = FileOpen(g_XPDirCsvName,
 +                          FILE_READ | FILE_WRITE | FILE_ANSI | FILE_SHARE_READ | FILE_SHARE_WRITE, ",");
 +   if(h == INVALID_HANDLE)
 +   {
-+      PrintFormat("XPDIR CSV_OPEN_FAILED file=%s error=%d", XPDIR_CSV_NAME, GetLastError());
++      PrintFormat("XPDIR CSV_OPEN_FAILED file=%s error=%d", g_XPDirCsvName, GetLastError());
 +      return;
 +   }
 +   FileSeek(h, 0, SEEK_END);
@@ -730,6 +780,11 @@
 +      return true;
 +   }
 +
++   // one CSV per instance, so a second chart is readable instead of interleaved
++   g_XPDirCsvName = "XPChart\\FlashGold_Continuation_v2_XPDir_v1_" +
++                    XPDir_InstanceTag() + ".csv";
++   XPDir_ClaimInstance();
++
 +   g_XPDirMinWith       = (InpDirMinChildrenWithParent    < 1) ? 1 : InpDirMinChildrenWithParent;
 +   g_XPDirMinAgainst    = (InpDirMinChildrenAgainstParent < 2) ? 2 : InpDirMinChildrenAgainstParent;
 +   g_XPDirMaxStaleBars  = (InpDirMaxRungStaleBars         < 1) ? 1 : InpDirMaxRungStaleBars;
@@ -845,12 +900,15 @@
 +               InpDirS1RequiredAgainstParent ? 1 : 0,
 +               g_XPDirMaxStaleBars, g_XPDirCrossMaxAge,
 +               g_XPDirEarlySepMult, InpDirRequireFreshS1 ? 1 : 0, InpDirWriteCsv ? 1 : 0);
++   PrintFormat("XPDIR INSTANCE chart=%I64d symbol=%s magic=%d csv=%s",
++               ChartID(), _Symbol, InpMagic, g_XPDirCsvName);
 +   g_XPDirReady = true;
 +   return true;
 +}
 +
 +void XPDir_Deinit()
 +{
++   XPDir_ReleaseInstance();
 +   for(int r = 0; r < XPDIR_RUNGS; r++)
 +   {
 +      if(g_XPDirHandle[r] != INVALID_HANDLE)
@@ -1269,7 +1327,7 @@
  //| Logic: Manage Virtual Pending Orders                             |
  //+------------------------------------------------------------------+
  void ManageVirtualPendings(double ask, double bid, double spread, double point,
-@@ -3806,15 +4962,27 @@
+@@ -3806,15 +5020,27 @@
        g_LastModTime = TimeCurrent();
     }
  
@@ -1299,7 +1357,7 @@
     {
        const bool cheapGatesPassed = buyHoldActive ||
                                      EntryCandidateApproved(true, tickTimeMsc,
-@@ -3854,6 +5022,8 @@
+@@ -3854,6 +5080,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualBuyStopPrice = 0;
@@ -1308,7 +1366,7 @@
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_BUY, trade.ResultOrder());
                    double virtualSL = bid - virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -3878,10 +5048,9 @@
+@@ -3878,10 +5106,9 @@
        }
     }
  
@@ -1321,7 +1379,7 @@
     {
        const bool cheapGatesPassed = sellHoldActive ||
                                      EntryCandidateApproved(false, tickTimeMsc,
-@@ -3921,6 +5090,8 @@
+@@ -3921,6 +5148,8 @@
                 {
                    MarkCurrentBarEntered();
                    g_VirtualSellStopPrice = 0;
@@ -1330,7 +1388,7 @@
                    ulong ticket = ResolveOwnPositionTicket(POSITION_TYPE_SELL, trade.ResultOrder());
                    double virtualSL = ask + virtualSLDist;
                    if(ticket > 0) RegisterVirtualSL(ticket, virtualSL);
-@@ -4424,6 +5595,26 @@
+@@ -4424,6 +5653,26 @@
        ObjectDelete(0, "Lbl_Pos_0");
        ObjectDelete(0, "Lbl_PosSL_0"); 
     }

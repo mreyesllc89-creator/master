@@ -105,7 +105,51 @@ per-rung tags against the rules in report §3.
 The funnel stops on its own as soon as the ladder starts deciding, and after 30 dumps
 it prints `XPDIR FUNNEL_STOP` and goes quiet rather than filling your log.
 
-## 6. Nothing at all in the Experts tab
+## 6. Running it on a second chart
+
+Supported, and the usual reason to want it is comparing two settings side by side —
+`DIR_LOCK` against `DIR_TRANSLATE`, or `InpDirRequireFreshS1` off against on. One rule
+decides whether it is safe:
+
+### Same symbol on both charts → **give the second chart its own `InpMagic`**
+
+Position ownership is `symbol == _Symbol && magic == InpMagic`. Two instances on the
+same symbol with the same magic both claim the same positions: **both will trail them
+and both will close them.** The build now says so at attach:
+
+```
+XPDIR WARN_DUPLICATE_INSTANCE symbol=XAUUSD-ECNc magic=26090555 is ALREADY running on
+chart 132496... Give this chart its own InpMagic before you let it trade.
+```
+
+Change `InpMagic` on the second chart (any distinct number, e.g. `26090556`) and the two
+separate cleanly — positions, the virtual-SL store, and the XPDir CSV all key off it.
+The warning only fires when `InpDirMode != DIR_OFF`; a chart left at `DIR_OFF` changes
+nothing at all, including this.
+
+### Different symbols on the two charts → nothing to do
+
+The symbol filter already separates them. But the second symbol needs **its own engine
+services**: a chart on `EURUSD` makes the ladder look for `EURUSD_S1`, `EURUSD_S5`, …
+If those do not exist you get the §2 message naming the missing symbol.
+
+### What is per-instance, and what is shared
+
+| | Keyed by | Safe on a second chart |
+|---|---|---|
+| Positions | symbol + magic | **only with different magic** on the same symbol |
+| Virtual-SL store | account + symbol + magic | yes |
+| XPDir CSV | symbol + magic (one file each, and every row carries both) | yes |
+| Dashboard labels | the chart itself | yes |
+| Indicator handles | symbol + timeframe + parameters | yes — MT5 shares one instance, so a second chart on the same parent costs nothing |
+| `LA_` / `XA_` / MasterVwap CSVs | **fixed filenames** | both instances append to the same files |
+
+That last row is a 1.03 property and was left alone deliberately: those are the
+observers, and rewriting their file naming would be a change to code this build promised
+not to touch. They are observational only and never gate trading. If you need them
+separated per chart, say so and it becomes its own change with its own gate.
+
+## 7. Nothing at all in the Experts tab
 
 Check, in this order:
 

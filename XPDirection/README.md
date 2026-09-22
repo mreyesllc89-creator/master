@@ -68,6 +68,15 @@ STATE (22).
 direction output is identical to a pure-colour ladder. `InpDirRequireFreshS1 = true` is
 the switch that makes the cross decide something.
 
+## Running a second chart
+
+Supported. If both charts are on the **same symbol**, give the second one its own
+`InpMagic` — ownership is symbol+magic, and two instances sharing both will fight over
+the same positions. The build warns at attach if you forget. Different symbols need no
+change, but do need their own engine services. The XPDir CSV is one file per
+symbol+magic and every row carries both, so the two runs stay readable. Full table in
+`TROUBLESHOOTING.md` §6.
+
 ## Open questions for the owner
 
 1. **`InpDirEarlySepMult = 2.0`** — EQUIVALENT-ASSUMED. Answer it from the Gate 2/3 CSV

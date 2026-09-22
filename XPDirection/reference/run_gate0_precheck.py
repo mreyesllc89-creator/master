@@ -182,6 +182,29 @@ def static_part(base_path, problems):
     print(f"  A8 XPDir functions defined: {len(defined)}, dead: {len(dead)}; "
           f"funnel heartbeat wired to OnTimer")
 
+    # --- A9: the XPDir CSV header and its row format must not drift apart, and
+    #     a second chart must not write into the first chart's file.
+    hm = re.search(r'const string header = (".*?");\n', ea, re.S)
+    fm = re.search(r'const string row = StringFormat\((".*?"),\n', ea, re.S)
+    if not hm or not fm:
+        fail("could not find the XPDir CSV header or row format", problems)
+    else:
+        cols = len("".join(re.findall(r'"([^"]*)"', hm.group(1))).split(","))
+        specs = len(re.findall(r"%[-0-9.I64]*[dsf]",
+                               "".join(re.findall(r'"([^"]*)"', fm.group(1)))))
+        if cols != specs:
+            fail(f"XPDir CSV header has {cols} columns but the row format has {specs} "
+                 f"fields - the file would be unreadable", problems)
+        for col in ("symbol", "magic"):
+            if col not in hm.group(1):
+                fail(f"the XPDir CSV has no {col} column; rows from two charts "
+                     f"could not be told apart", problems)
+        if "XPDir_InstanceTag() + \".csv\"" not in ea:
+            fail("the XPDir CSV filename is not per-instance; two charts would "
+                 "interleave into one file", problems)
+        print(f"  A9 XPDir CSV: {cols} columns = {specs} row fields, carries symbol+magic, "
+              f"one file per instance")
+
 
 def executed_part(problems):
     work = tempfile.mkdtemp(prefix="xpdir_gate0_")
