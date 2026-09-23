@@ -1,0 +1,378 @@
+//@version=6
+// ============================================================================
+//  XPW ORIENTATION TDI  -  v2.3  -  rung map, position, direction verdict
+// ----------------------------------------------------------------------------
+//  v2.3 = v2.2 plus candle labels. The same READ HERE line and chart-rung
+//  position that sit in the table are now stamped on the price candles, so
+//  the map can be read back through history without scrolling the table.
+//  Calibration, inputs and the ladder logic are unchanged from v2.2.
+//
+//  CANDLE LABELS (v2.3)
+//    - "Candle labels" group. Content = verdict (READ HERE line), position
+//      (the chart rung's own position, with (inh) when inherited), or both.
+//    - "On change only" draws a label only when the text changes from the
+//      previous bar. Off = every bar (the last 500, Pine's label ceiling).
+//    - ENTER LONGS sits under the low. ENTER SHORTS sits over the high.
+//      Everything else sits over the high in the same colour the table uses.
+//    - The labels are force_overlay, like the table, so they land on the
+//      price chart while the TDI stays in its own pane.
+//
+//  v2.2 = v2.1 plus four logic fixes found by the 2026-09-19 history test.
+//  Calibration and inputs are unchanged. No line depends on wrap indentation.
+//
+//  FIXES IN v2.2
+//    D1. An INHERITED position no longer moves the orientation. In v2.1 a
+//        shapeless rung that inherited END FIRST LEG toggled the side a second
+//        time, so orientation alternated down the ladder (about 0.25 rungs
+//        per 1m bar were doing this on gold).
+//    D2. baseDir comes from the highest rung whose direction is actually
+//        computed. In v2.1 a month with no data returned na, na >= 0 is false,
+//        and the whole ladder read INVERTED.
+//    D3. READ HERE lands only on a rung with its OWN first or second leg.
+//        In v2.1 it landed on an inherited position ("no shape here") in
+//        10-18% of the bars where it fired.
+//    D4. The trend SMA is computed on every bar. In v2.1 it sat inside a lazy
+//        `and`, so Pine v6 could skip it on some bars and the direction
+//        drifted from its definition.
+//
+//  HISTORY TEST 2026-09-19 (XAUUSD 1m May-Sep 2026, NAS100 cold, net of cost,
+//  matched random controls, split halves): the ENTER verdict showed NO SIGNAL
+//  on the 1 minute rung; every rung above it was underpowered. Read the map
+//  for location. Do not trade the verdict column on its own.
+//
+//  WHAT IS STILL MINE AND NOT YOURS - check these first when the table
+//  disagrees with your eye:
+//    - "broken"        = price takes out the window's extreme
+//    - "area vs spike" = last 5 bars hold inside 45% of the window's range
+//    - parent bars per window = 4
+//    - the second leg needs the last price where the first leg formed. You mark
+//      that by eye. This uses the window's extreme as a stand-in.
+//    - "the divergence happened prior" is approximated by the PARENT sitting at
+//      END FIRST LEG. It is not a memory of a past divergence on this rung.
+// ============================================================================
+
+indicator("XPW Orientation TDI v2.3", shorttitle="XPW-OTDI2", overlay=false, max_labels_count=500)
+
+// ---------------------------------------------------------------- INPUTS ----
+rsiLen   = input.int(13,       "RSI length",            group="TDI core")
+fastLen  = input.int(2,        "Fast line (RSI SMA)",   group="TDI core")
+slowLen  = input.int(7,        "Signal line (RSI SMA)", group="TDI core")
+bbLen    = input.int(34,       "Base line / bands",     group="TDI core")
+bbMult   = input.float(1.6185, "Band width",            group="TDI core")
+
+scaleWin = input.bool(true, "Scale window with rung", group="Structure", tooltip="ON: each rung measures about 4 of its parent's bars. OFF: flat window on every rung, as in v1.")
+flatWin  = input.int(20, "Flat window (bars)", group="Structure", tooltip="Used on every rung when scaling is off.")
+areaLen  = input.int(5, "Area window (bars)", group="Structure", tooltip="How many bars must hold together to count as an area rather than a spike.")
+areaFrac = input.float(0.45, "Area compression max", group="Structure", tooltip="Area range / window range. At or below this = area. Above = V spike = illegible.")
+trendLen = input.int(20, "Trend window (bars)", group="Structure", tooltip="Only used by the highest rung that has a computed direction.")
+
+showTable = input.bool(true, "Show rung map", group="Display")
+tblSize   = input.string("normal", "Table text size", options=["tiny","small","normal","large","huge"], group="Display", tooltip="Makes the whole table bigger or smaller.")
+tblPos    = input.string("middle_right", "Table position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group="Display", tooltip="Where the table sits on the price chart.")
+
+showLbl   = input.bool(true, "Show candle labels", group="Candle labels", tooltip="Stamps the table's reading on the price candles.")
+lblWhat   = input.string("verdict", "Label content", options=["verdict","position","both"], group="Candle labels", tooltip="verdict = the READ HERE line. position = the chart rung's own position (the * row). both = position on top, verdict underneath.")
+lblChange = input.bool(true, "On change only", group="Candle labels", tooltip="ON: a label only when the text differs from the previous bar. OFF: a label on every bar (last 500).")
+lblSize   = input.string("small", "Label text size", options=["tiny","small","normal","large"], group="Candle labels")
+
+// PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
+//   W  4*(M/W)   = 17      30M 4*(1H/30M) =  8 -> 12
+//   D  4*(W/D)   = 28      15M 4*(30/15)  =  8 -> 12
+//   4H 4*(D/4H)  = 24       5M 4*(15/5)   = 12
+//   1H 4*(4H/1H) = 16       1M 4*(5/1)    = 20
+//   M  has no parent        seconds rungs mirror the minute ratios
+hM   = scaleWin ? 20 : flatWin
+hW   = scaleWin ? 17 : flatWin
+hD   = scaleWin ? 28 : flatWin
+h4   = scaleWin ? 24 : flatWin
+h1h  = scaleWin ? 16 : flatWin
+h30  = scaleWin ? 12 : flatWin
+h15  = scaleWin ? 12 : flatWin
+h5   = scaleWin ? 12 : flatWin
+h1   = scaleWin ? 20 : flatWin
+hs30 = scaleWin ? 12 : flatWin
+hs15 = scaleWin ? 12 : flatWin
+hs5  = scaleWin ? 12 : flatWin
+hs1  = scaleWin ? 20 : flatWin
+
+// ------------------------------------------------------------- TDI CORE ----
+tdiCore() =>
+    r     = ta.rsi(close, rsiLen)
+    fast  = ta.sma(r, fastLen)
+    slow  = ta.sma(r, slowLen)
+    basis = ta.sma(r, bbLen)
+    dev   = bbMult * ta.stdev(r, bbLen)
+    [r, fast, slow, basis, basis + dev, basis - dev]
+
+// --------------------------------------------------------- RUNG MEASURE ----
+// DIRECTION-BLIND. Shape carries no direction; the parent supplies it later.
+rungState(simple int h) =>
+    [_r, fast, _slow, basis, _up, _lo] = tdiCore()
+
+    recentLow  = ta.lowest(low,   h)
+    priorLow   = ta.lowest(low,   h)[h]
+    recentHigh = ta.highest(high, h)
+    priorHigh  = ta.highest(high, h)[h]
+    fastLowR   = ta.lowest(fast,  h)
+    fastLowP   = ta.lowest(fast,  h)[h]
+    fastHighR  = ta.highest(fast, h)
+    fastHighP  = ta.highest(fast, h)[h]
+
+    brokeLow     = recentLow  < priorLow
+    brokeHigh    = recentHigh > priorHigh
+    tdiBrokeLow  = fastLowR   < fastLowP
+    tdiBrokeHigh = fastHighR  > fastHighP
+
+    // REFUSAL: price takes out the level, the TDI does not follow.
+    refuseLow  = brokeLow  and not tdiBrokeLow   // second-leg / leg-start shape
+    refuseHigh = brokeHigh and not tdiBrokeHigh  // first-leg-end divergence shape
+
+    // AREA vs SPIKE. The legibility test. No shape, no read.
+    rngShort   = ta.highest(fast, areaLen) - ta.lowest(fast, areaLen)
+    rngLong    = ta.highest(fast, h)       - ta.lowest(fast, h)
+    compressed = rngLong > 0 and (rngShort / rngLong) <= areaFrac
+
+    // STAIRCASE: the TDI slopes WITH price. Continuation, no refusal.
+    stairUp   = brokeHigh and tdiBrokeHigh and not refuseHigh
+    stairDown = brokeLow  and tdiBrokeLow  and not refuseLow
+
+    // Own direction. Only the highest rung with a computed direction uses it.
+    // D4: the SMA is computed on every bar, not inside a lazy `and`.
+    smaC    = ta.sma(close, trendLen)
+    basisP  = basis[trendLen]
+    dirUp   = basis > basisP and close > smaC
+    dirDown = basis < basisP and close < smaC
+    dir     = dirUp ? 1.0 : dirDown ? -1.0 : 0.0
+    dirOk   = not na(basisP) and not na(smaC)
+
+    [dir, refuseLow ? 1.0 : 0.0, refuseHigh ? 1.0 : 0.0, compressed ? 1.0 : 0.0, stairUp ? 1.0 : 0.0, stairDown ? 1.0 : 0.0, dirOk ? 1.0 : 0.0]
+
+// ------------------------------------------------------------ RUNG FETCH ----
+LA = barmerge.lookahead_off
+[dM,  rlM,  rhM,  cM,  suM,  sdM,  okM ] = request.security(syminfo.tickerid, "M",   rungState(hM),   lookahead=LA)
+[dW,  rlW,  rhW,  cW,  suW,  sdW,  okW ] = request.security(syminfo.tickerid, "W",   rungState(hW),   lookahead=LA)
+[dD,  rlD,  rhD,  cD,  suD,  sdD,  okD ] = request.security(syminfo.tickerid, "D",   rungState(hD),   lookahead=LA)
+[d4,  rl4,  rh4,  c4,  su4,  sd4,  ok4 ] = request.security(syminfo.tickerid, "240", rungState(h4),   lookahead=LA)
+[d1h, rl1h, rh1h, c1h, su1h, sd1h, ok1h] = request.security(syminfo.tickerid, "60",  rungState(h1h),  lookahead=LA)
+[d30, rl30, rh30, c30, su30, sd30, ok30] = request.security(syminfo.tickerid, "30",  rungState(h30),  lookahead=LA)
+[d15, rl15, rh15, c15, su15, sd15, ok15] = request.security(syminfo.tickerid, "15",  rungState(h15),  lookahead=LA)
+[d5,  rl5,  rh5,  c5,  su5,  sd5,  ok5 ] = request.security(syminfo.tickerid, "5",   rungState(h5),   lookahead=LA)
+[d1,  rl1,  rh1,  c1,  su1,  sd1,  ok1 ] = request.security(syminfo.tickerid, "1",   rungState(h1),   lookahead=LA)
+[e30, f30, g30, i30, j30, k30, n30] = request.security(syminfo.tickerid, "30S", rungState(hs30), lookahead=LA)
+[e15, f15, g15, i15, j15, k15, n15] = request.security(syminfo.tickerid, "15S", rungState(hs15), lookahead=LA)
+[e5,  f5,  g5,  i5,  j5,  k5,  n5 ] = request.security(syminfo.tickerid, "5S",  rungState(hs5),  lookahead=LA)
+[e1,  f1,  g1,  i1,  j1,  k1,  n1 ] = request.security(syminfo.tickerid, "1S",  rungState(hs1),  lookahead=LA)
+
+// ------------------------------------------------------------- ASSEMBLY ----
+var array<string> tfName = array.from("1 Month","1 Week","1 Day","4 Hour","1 Hour","30 Min","15 Min","5 Min","1 Min","30 Sec","15 Sec","5 Sec","1 Sec")
+var array<float>  tfSec  = array.from(2592000.,604800.,86400.,14400.,3600.,1800.,900.,300.,60.,30.,15.,5.,1.)
+
+dirA = array.from(dM,  dW,  dD,  d4,  d1h,  d30,  d15,  d5,  d1,  e30, e15, e5, e1)
+rlA  = array.from(rlM, rlW, rlD, rl4, rl1h, rl30, rl15, rl5, rl1, f30, f15, f5, f1)
+rhA  = array.from(rhM, rhW, rhD, rh4, rh1h, rh30, rh15, rh5, rh1, g30, g15, g5, g1)
+cA   = array.from(cM,  cW,  cD,  c4,  c1h,  c30,  c15,  c5,  c1,  i30, i15, i5, i1)
+suA  = array.from(suM, suW, suD, su4, su1h, su30, su15, su5, su1, j30, j15, j5, j1)
+sdA  = array.from(sdM, sdW, sdD, sd4, sd1h, sd30, sd15, sd5, sd1, k30, k15, k5, k1)
+okA  = array.from(okM, okW, okD, ok4, ok1h, ok30, ok15, ok5, ok1, n30, n15, n5, n1)
+
+var array<string> posA    = array.new_string(13, "UNAVAILABLE")
+var array<string> shapeA  = array.new_string(13, "-")
+var array<float>  orientA = array.new_float(13, 1.0)
+var array<bool>   inhA    = array.new_bool(13, false)
+
+// D2. The side comes from the highest rung whose direction is computed.
+// Missing or warming-up rungs are skipped instead of inverting the ladder.
+float baseDir = na
+for i = 0 to 12
+    if na(baseDir) and array.get(okA, i) == 1
+        baseDir := array.get(dirA, i) >= 0 ? 1.0 : -1.0
+baseDir := na(baseDir) ? 1.0 : baseDir
+bool flip = false
+
+// The ladder is walked ONCE, top to bottom. Each rung's side is handed down
+// from the rung above it. `flip` is the alternating loop: a parent divergence
+// turns the ladder over; a first-leg start turns it back.
+for i = 0 to 12
+    bool   avail = not na(array.get(rlA, i))
+    float  o     = baseDir * (flip ? -1.0 : 1.0)
+    array.set(orientA, i, o)
+
+    // Direction-blind measurements, read in this rung's oriented space.
+    bool refStart = o > 0 ? array.get(rlA, i) == 1 : array.get(rhA, i) == 1
+    bool refEnd   = o > 0 ? array.get(rhA, i) == 1 : array.get(rlA, i) == 1
+    bool stair    = o > 0 ? array.get(sdA, i) == 1 : array.get(suA, i) == 1
+    bool area     = array.get(cA, i) == 1
+
+    string shape = not avail ? "-" : stair ? "staircase" : refEnd ? "refusal hi" : refStart and area ? "refusal lo" : area ? "area" : "none"
+    array.set(shapeA, i, shape)
+
+    string pp  = i == 0 ? "" : array.get(posA, i - 1)
+    bool   inh = false
+    string pos = "UNAVAILABLE"
+
+    if avail
+        if stair
+            pos := "STAIRCASE"
+        else if refEnd
+            // The divergence. End of the leg, whichever side we are reading.
+            pos := "END FIRST LEG"
+        else if refStart and area
+            // A formation. WHICH leg it starts is the parent's call.
+            // Parent on the first leg (start, middle or end) -> this is a SECOND LEG.
+            // Parent on a staircase, a second leg, or nothing -> this is a FIRST LEG.
+            pos := pp == "END FIRST LEG" or pp == "FIRST LEG" or pp == "MID FIRST LEG" ? "SECOND LEG" : "FIRST LEG"
+        else if area
+            pos := pp == "SECOND LEG" or pp == "MID SECOND LEG" ? "MID SECOND LEG" : pp == "STAIRCASE" ? "STAIRCASE" : "MID FIRST LEG"
+        else
+            // No shape of its own. It still has a location: the parent's.
+            inh := true
+            pos := i == 0 or pp == "UNAVAILABLE" or pp == "UNREADABLE" ? "UNREADABLE" : pp
+
+    array.set(posA, i, pos)
+    array.set(inhA, i, inh)
+
+    // D1. Only a rung's OWN shape hands a new side down. An inherited label
+    // is the parent's location, not a new event, so it moves nothing.
+    if pos == "END FIRST LEG" and not inh
+        flip := not flip
+    if pos == "FIRST LEG" and not inh
+        flip := false
+
+// --------------------------------------------------------- CHART ANCHOR ----
+// READ HERE starts at the rung you are actually on, never at the top.
+chartSec = timeframe.in_seconds(timeframe.period)
+int chartIdx = 12
+for i = 0 to 12
+    if array.get(tfSec, i) >= chartSec
+        chartIdx := i
+
+// D3. READ HERE only lands on a rung with its OWN first or second leg.
+int readAt = -1
+for i = chartIdx to 12
+    if readAt == -1
+        string p = array.get(posA, i)
+        if (p == "FIRST LEG" or p == "SECOND LEG") and not array.get(inhA, i)
+            readAt := i
+
+verdictOf(int i) =>
+    string p    = array.get(posA, i)
+    bool   inh  = array.get(inhA, i)
+    string side = array.get(orientA, i) > 0 ? "LONGS" : "SHORTS"
+    string v = switch
+        p == "UNAVAILABLE"   => "no data"
+        p == "UNREADABLE"    => "STAY OUT"
+        inh                  => "no shape here"
+        p == "STAIRCASE"     => "continue, no entry"
+        p == "END FIRST LEG" => "exit once, then wait"
+        p == "FIRST LEG"     => "ENTER " + side
+        p == "SECOND LEG"    => "ENTER " + side
+        => "look for " + side
+    v
+
+// One colour scale for the table rows and the candle labels.
+posColor(string p) =>
+    color c = switch
+        p == "UNAVAILABLE"   => color.new(#37474f, 30)
+        p == "SECOND LEG"    => color.new(#2e7d32, 20)
+        p == "FIRST LEG"     => color.new(#2e7d32, 20)
+        p == "END FIRST LEG" => color.new(#f9a825, 25)
+        p == "STAIRCASE"     => color.new(#1565c0, 25)
+        p == "UNREADABLE"    => color.new(#37474f, 30)
+        => color.new(#455a64, 30)
+    c
+
+// The READ HERE line. Computed on every bar so the candle labels can use it.
+string readTxt = readAt == -1 ? "nothing at or below " + array.get(tfName, chartIdx) + " - stay out" : array.get(tfName, readAt) + " - " + verdictOf(readAt)
+
+// ----------------------------------------------------------- CHART PANE ----
+[_rNow, fastNow, slowNow, basisNow, upNow, loNow] = tdiCore()
+chartOrient = array.get(orientA, chartIdx)
+inv(v) => chartOrient > 0 ? v : 100.0 - v
+
+plot(inv(fastNow),  "Fast",      color=color.new(#26c6da, 0), linewidth=2)
+plot(inv(slowNow),  "Signal",    color=color.new(#ffa726, 0), linewidth=2)
+plot(inv(basisNow), "Base line", color=color.new(#b0bec5, 0), linewidth=1)
+pu = plot(inv(chartOrient > 0 ? upNow : loNow), "Band A", color=color.new(#546e7a, 40))
+pl = plot(inv(chartOrient > 0 ? loNow : upNow), "Band B", color=color.new(#546e7a, 40))
+fill(pu, pl, color=color.new(#546e7a, 92))
+hline(50, "50", color=color.new(#78909c, 60), linestyle=hline.style_dotted)
+
+// -------------------------------------------------------- CANDLE LABELS ----
+// The table's reading, stamped on the price candles. Same text, same colours.
+//   verdict  = the READ HERE line, coloured by the READ HERE rung's position.
+//   position = the chart rung's own row (the * row), with (inh) when inherited.
+//   both     = position on top, verdict underneath.
+// ENTER LONGS hangs under the low. Everything else sits over the high.
+string chartPosRaw = array.get(posA, chartIdx)
+bool   chartAv     = chartPosRaw != "UNAVAILABLE"
+string chartPosTxt = chartPosRaw + (array.get(inhA, chartIdx) and chartAv ? " (inh)" : "")
+string readPos     = readAt == -1 ? "UNREADABLE" : array.get(posA, readAt)
+
+string lblTxt = switch lblWhat
+    "position" => chartPosTxt
+    "both"     => chartPosTxt + "\n" + readTxt
+    => readTxt
+color  lblBg  = lblWhat == "position" ? posColor(chartPosRaw) : posColor(readPos)
+
+// Short verdicts only when the READ HERE rung is entering. Everything else
+// reads as a wait, so it goes over the bar.
+bool lblLong  = readAt != -1 and array.get(orientA, readAt) > 0 and (readPos == "FIRST LEG" or readPos == "SECOND LEG")
+bool lblBelow = lblWhat == "position" ? array.get(orientA, chartIdx) > 0 : lblLong
+
+var string lastLblTxt = ""
+bool lblDraw = showLbl and (not lblChange or lblTxt != lastLblTxt)
+if lblDraw
+    lSz = switch lblSize
+        "tiny"   => size.tiny
+        "normal" => size.normal
+        "large"  => size.large
+        => size.small
+    label.new(bar_index, lblBelow ? low : high, lblTxt, xloc=xloc.bar_index, yloc=yloc.price, style=lblBelow ? label.style_label_up : label.style_label_down, color=lblBg, textcolor=color.white, size=lSz, force_overlay=true)
+lastLblTxt := lblTxt
+
+// ---------------------------------------------------------------- TABLE ----
+if showTable and barstate.islast
+    tPos = switch tblPos
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+    var table t = table.new(tPos, 5, 15, border_width=1, force_overlay=true)
+    table.clear(t, 0, 0, 4, 14)
+    sz = switch tblSize
+        "tiny"  => size.tiny
+        "small" => size.small
+        "large" => size.large
+        "huge"  => size.huge
+        => size.normal
+    hdr = color.new(#263238, 0)
+
+    table.cell(t, 0, 0, "RUNG",     text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 1, 0, "ORIENT",   text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 2, 0, "SHAPE",    text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 3, 0, "POSITION", text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 4, 0, "VERDICT",  text_color=color.white, bgcolor=hdr, text_size=sz)
+
+    for i = 0 to 12
+        string p   = array.get(posA, i)
+        bool   av  = p != "UNAVAILABLE"
+        float  o   = array.get(orientA, i)
+        bool   inh = array.get(inhA, i)
+        string orS = not av ? "-" : (o > 0 ? "upright" : "INVERTED")
+        string pS  = p + (inh and av ? " (inh)" : "")
+        color  bg  = posColor(p)
+
+        string mark = i == readAt ? "  <<" : (i == chartIdx ? "  *" : "")
+        table.cell(t, 0, i + 1, array.get(tfName, i) + mark, text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 1, i + 1, orS,                          text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 2, i + 1, array.get(shapeA, i),         text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 3, i + 1, pS,                           text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 4, i + 1, verdictOf(i),                 text_color=color.white, bgcolor=bg, text_size=sz)
+
+    table.cell(t, 0, 14, "READ HERE", text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 1, 14, readTxt,     text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.merge_cells(t, 1, 14, 4, 14)
