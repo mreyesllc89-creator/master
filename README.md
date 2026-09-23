@@ -19,22 +19,24 @@ Two scripts that share the same signal engine:
 | End of move | `END +N ticks · duration · bars · time` | same |
 | Live label while the move is open | current ticks, best ticks and when, elapsed time | same |
 
-**The entry is at the open of the candle that follows the signal bar.** The
-signal bar closes, the next candle opens, and that open is the entry: the label
-sits on that candle, the dot marks its open, and the move (ticks and timing) is
-measured from that open. The entry candle itself counts toward the move.
+**The entry mark is at the beginning (open) of the signal candle**, the candle
+where the move starts. The label sits on that candle, the dot marks its open,
+and the move (ticks and timing) is measured from that open; the signal candle
+itself counts toward the move. The mark is placed once the signal candle closes,
+because that is when the signal is known. Set *Entry point* to *Next candle open*
+to mark the open of the following candle instead (the price you could trade live).
 
 A table (top-right by default) lists the most recent entries: side, signal time,
 entry price, best / worst ticks, time to the best point, result and duration.
 Every entry is also available as an alert (`Long entry`, `Short entry`, `Any entry`);
-alerts fire at the open of the entry candle.
+alerts fire when the mark is placed.
 
 ## Any timeframe on any chart
 
 *Signal timeframe* lets you compute entries on one timeframe (for example `60`)
-and see them on any chart timeframe (for example a 5-minute chart). The entry
-candle is the first chart candle after the signal bar **closes**, and the entry
-is its open, so nothing repaints. Leave it blank to use the chart's own timeframe.
+and see them on any chart timeframe (for example a 5-minute chart). The mark
+goes to the first chart candle of the signal bar, at its open, and is placed
+once that signal bar **closes**. Leave it blank to use the chart's own timeframe.
 
 Times are shown with the *Time format* and *Timezone* inputs
 (e.g. `HH:mm`, `America/New_York`). Blank timezone = exchange timezone.
@@ -65,10 +67,13 @@ Turn on *Show money value per contract* to also print `ticks × tick value`.
 
 Same signals, same labels, but the script actually trades:
 
-- **Market order filled at the open of the entry candle.** The order is sent
-  when the signal bar closes and fills at the next candle's open: the same
-  candle and the same price the indicator marks. LONG label below the candle,
-  SHORT label above it, dot at the fill price, both showing the fill and signal time.
+- **Market order filled at the next candle's open.** The order is sent when the
+  signal bar closes and fills at the open of the following candle. The Strategy
+  Tester and the table's summary row use these real fills.
+- **Same marks as the indicator.** The LONG / SHORT label and dot sit at the
+  open of the signal candle (or of the fill candle with *Entry point* = *Next
+  candle open*), and the move in ticks and time is measured from that mark.
+  The label tooltip shows both the mark price and the real fill price.
 - **Exits.** An opposite signal reverses the position at the next open. Optional
   *Stop loss* and *Take profit* are set in **ticks** and can fill inside a candle.
   Optional *Time stop* closes after N bars. *Take long / short entries* toggles

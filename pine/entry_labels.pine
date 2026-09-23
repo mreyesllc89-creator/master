@@ -3,14 +3,15 @@
 // chart timeframe, and the move after the entry measured in ticks and time.
 //
 // What it draws
-//   * The entry is at the OPEN of the candle that follows the signal bar.
-//     A green "LONG ▲" label sits below that candle, a red "SHORT ▼" above it,
-//     and a dot marks the exact entry price (the open). The label carries the
-//     entry price, the signal time (in the timezone you choose) and the signal
-//     timeframe.
+//   * The entry is marked at the OPEN of the signal candle: the candle where
+//     the move starts. A green "LONG ▲" label sits below that candle, a red
+//     "SHORT ▼" above it, and a dot marks the exact entry price (its open).
+//     The label carries the entry price, the signal time (in the timezone you
+//     choose) and the signal timeframe. The "Entry point" input can move the
+//     mark to the open of the next candle instead.
 //   * Signals can be computed on a higher timeframe (e.g. 1H) and drawn on any
-//     chart (e.g. 5m). The entry candle is the first chart candle after the
-//     signal bar closes, so nothing repaints.
+//     chart (e.g. 5m): the mark goes to the first chart candle of the signal
+//     bar, at its open.
 //   * From that open the move is tracked: best point (MFE) and worst point
 //     (MAE) in ticks, the time it took to get there, and the final result in
 //     ticks when the move ends. A dashed line joins the entry to the best point.
@@ -23,7 +24,8 @@ indicator("Candle Entry Labels: Long/Short, Ticks & Timing",
      overlay = true,
      max_labels_count = 500,
      max_lines_count = 500,
-     max_boxes_count = 100)
+     max_boxes_count = 100,
+     max_bars_back = 5000)
 
 // ─────────────────────────── Inputs: entry signal ───────────────────────────
 grpSig = "Entry signal"
@@ -31,7 +33,10 @@ sigMode  = input.string("EMA cross", "Signal type",
      options = ["EMA cross", "Engulfing candle", "Breakout", "External"], group = grpSig,
      tooltip = "EMA cross: fast EMA crosses slow EMA.\nEngulfing: bullish / bearish engulfing candle.\nBreakout: close breaks the highest high / lowest low of the lookback.\nExternal: use the two source inputs below (a value > 0 fires the signal).")
 sigTf    = input.timeframe("", "Signal timeframe (blank = chart)", group = grpSig,
-     tooltip = "Signals are computed on this timeframe and drawn on whatever timeframe the chart is on. The entry candle is the first chart candle after the signal bar closes, so it never repaints.")
+     tooltip = "Signals are computed on this timeframe and drawn on whatever timeframe the chart is on.")
+entryAt  = input.string("Signal candle open", "Entry point",
+     options = ["Signal candle open", "Next candle open"], group = grpSig,
+     tooltip = "Signal candle open: the mark sits at the beginning (open) of the candle that gives the signal, i.e. where the move starts. It is placed once that candle closes.\nNext candle open: the mark sits at the open of the following candle (what you could actually trade live).")
 emaFast  = input.int(9,  "EMA fast", minval = 1, group = grpSig)
 emaSlow  = input.int(21, "EMA slow", minval = 2, group = grpSig)
 brkLen   = input.int(20, "Breakout lookback", minval = 2, group = grpSig)
@@ -146,17 +151,33 @@ string reqTf = useHtf ? sigTf : timeframe.period
 [hL, hS, hT] = request.security(syminfo.tickerid, reqTf, [cL[1], cS[1], cT[1]], lookahead = barmerge.lookahead_on)
 bool htfChange = timeframe.change(reqTf)
 
-// The entry candle is the candle that OPENS right after the signal bar closes:
-//   chart timeframe → the bar after the signal bar (cL[1])
-//   higher timeframe → the first chart bar of the next signal-timeframe bar
-// Both are known at that candle's open, so the entry is at its open price.
-bool longRaw  = useHtf ? (hL and htfChange) : cL[1]
-bool shortRaw = useHtf ? (hS and htfChange) : cS[1]
-int  sigTime  = useHtf ? hT : cT[1]
+bool atSig = entryAt == "Signal candle open"
+
+// Chart bar on which the current signal-timeframe bar started; at an htfChange
+// bar, prevStart is where the bar that just closed (the signal bar) started.
+var int htfStart = na
+int prevStart = htfStart
+if htfChange
+    htfStart := bar_index
+
+// When the signal fires:
+//   chart timeframe, signal candle open → on the signal bar, once it closes (mark at its open)
+//   chart timeframe, next candle open   → on the bar after the signal bar
+//   higher timeframe                    → on the first chart bar after the signal bar closes
+bool longRaw  = useHtf ? (hL and htfChange) : (atSig ? cL and barstate.isconfirmed : cL[1])
+bool shortRaw = useHtf ? (hS and htfChange) : (atSig ? cS and barstate.isconfirmed : cS[1])
+int  sigTime  = useHtf ? hT : (atSig ? cT : cT[1])
 
 bool newLong   = longRaw
 bool newShort  = shortRaw and not longRaw
-float entryPx  = open
+
+// Where the entry mark goes: entryOff bars back from the current bar, at that
+// candle's open. Non-zero only for a higher-timeframe signal marked at the
+// open of its first chart candle.
+int   entryOff = atSig and useHtf and not na(prevStart) ? math.max(bar_index - prevStart, 0) : 0
+int   entryBar = bar_index - entryOff
+float entryPx  = open[entryOff]
+int   entryT   = time[entryOff]
 
 // ─────────────────────────── Move tracking state ───────────────────────────
 type Entry
@@ -213,26 +234,42 @@ f_closeMove(Entry e, float px, int bIdx, int tNow) =>
         label.new(bIdx, px, exitTxt, xloc.bar_index, yloc.price, color.new(resDist >= 0 ? dirCol : maeCol, 20),
              label.style_label_left, textCol, size.tiny)
 
-// Extend the move with the current bar's range
-f_track(Entry e) =>
+// Extend the move with the range of the bar `i` bars back (0 = current bar)
+f_trackAt(Entry e, int i) =>
     if e.dir == 1
-        if high > e.mfe
-            e.mfe    := high
-            e.mfeBar := bar_index
-            e.mfeT   := time
-        if low < e.mae
-            e.mae    := low
-            e.maeBar := bar_index
-            e.maeT   := time
+        if high[i] > e.mfe
+            e.mfe    := high[i]
+            e.mfeBar := bar_index - i
+            e.mfeT   := time[i]
+        if low[i] < e.mae
+            e.mae    := low[i]
+            e.maeBar := bar_index - i
+            e.maeT   := time[i]
     else
-        if low < e.mfe
-            e.mfe    := low
-            e.mfeBar := bar_index
-            e.mfeT   := time
-        if high > e.mae
-            e.mae    := high
-            e.maeBar := bar_index
-            e.maeT   := time
+        if low[i] < e.mfe
+            e.mfe    := low[i]
+            e.mfeBar := bar_index - i
+            e.mfeT   := time[i]
+        if high[i] > e.mae
+            e.mae    := high[i]
+            e.maeBar := bar_index - i
+            e.maeT   := time[i]
+
+f_track(Entry e) =>
+    f_trackAt(e, 0)
+
+// Rebuild the move from its entry bar up to `lastOff` bars back (inclusive)
+f_recompute(Entry e, int lastOff) =>
+    e.mfe    := e.price
+    e.mfeBar := e.bar
+    e.mfeT   := e.t
+    e.mae    := e.price
+    e.maeBar := e.bar
+    e.maeT   := e.t
+    int first = bar_index - e.bar
+    if first >= lastOff
+        for i = first to lastOff by -1
+            f_trackAt(e, i)
 
 bool anySig  = newLong or newShort
 
@@ -241,15 +278,20 @@ bool anySig  = newLong or newShort
 if trackMove and not na(cur) and cur.isOpen and bar_index > cur.bar and not anySig
     f_track(cur)
 
-// 2) End the open move: at this bar's OPEN on a new signal, at its close on the bar limit
+// 2) End the open move: at the new entry's OPEN on a new signal, at this bar's close on the bar limit
 bool barsUp  = exitMode == "Next signal or fixed bars" and not na(cur) and cur.isOpen and bar_index - cur.bar >= maxBars
-if trackMove and not na(cur) and cur.isOpen and (anySig or barsUp) and bar_index > cur.bar
-    f_closeMove(cur, anySig ? open : close, bar_index, time)
+if trackMove and not na(cur) and cur.isOpen
+    if anySig and entryBar > cur.bar
+        if entryOff > 0
+            f_recompute(cur, entryOff + 1)   // drop the bars that now belong to the new move
+        f_closeMove(cur, entryPx, entryBar, entryT)
+    else if (barsUp or anySig) and bar_index > cur.bar
+        f_closeMove(cur, close, bar_index, time)
     if not na(liveLbl)
         label.delete(liveLbl)
         liveLbl := na
 
-// 3) New entry at this candle's open → label on the candle, start tracking
+// 3) New entry at the signal candle's open → label + dot on that candle, start tracking
 if anySig
     int    d      = newLong ? 1 : -1
     color  dirCol = d == 1 ? longCol : shortCol
@@ -263,20 +305,24 @@ if anySig
     string tip = (d == 1 ? "Long entry" : "Short entry")
          + "\nSignal: " + sigMode + (useHtf ? " on " + sigTf : "")
          + "\nSignal bar: " + f_time(sigTime)
-         + "\nEntry candle open: " + f_time(time)
+         + "\nEntry candle open: " + f_time(entryT)
          + "\nEntry price (open): " + str.tostring(entryPx, format.mintick)
          + "\nTick size: " + str.tostring(syminfo.mintick)
-    label.new(bar_index, d == 1 ? low : high, txt, xloc.bar_index, yloc.price, dirCol,
+    label.new(entryBar, d == 1 ? low[entryOff] : high[entryOff], txt, xloc.bar_index, yloc.price, dirCol,
          d == 1 ? label.style_label_up : label.style_label_down, textCol, sz, tooltip = tip)
+    if showDot
+        label.new(entryBar, entryPx, "", xloc.bar_index, yloc.price, dirCol, label.style_circle, textCol, size.tiny,
+             tooltip = "Entry @ " + str.tostring(entryPx, format.mintick) + " (candle open) " + f_time(entryT))
     if trackMove
-        cur := Entry.new(dir = d, price = entryPx, t = time, sigT = sigTime, bar = bar_index,
-             mfe = entryPx, mfeBar = bar_index, mfeT = time,
-             mae = entryPx, maeBar = bar_index, maeT = time,
+        cur := Entry.new(dir = d, price = entryPx, t = entryT, sigT = sigTime, bar = entryBar,
+             mfe = entryPx, mfeBar = entryBar, mfeT = entryT,
+             mae = entryPx, maeBar = entryBar, maeT = entryT,
              isOpen = true, exitPrice = na, exitT = na, exitBar = na)
         array.push(hist, cur)
         if array.size(hist) > 200
             array.shift(hist)
-        f_track(cur)   // the entry candle itself is part of the move (entry at its open)
+        for i = entryOff to 0 by -1   // the entry candle and everything since count toward the move
+            f_trackAt(cur, i)
 
 // 4) Live label on the open move
 if showLive and trackMove and not na(cur) and cur.isOpen
@@ -295,11 +341,9 @@ if showLive and trackMove and not na(cur) and cur.isOpen
         label.set_color(liveLbl, color.new(cur.dir == 1 ? longCol : shortCol, 30))
         label.set_style(liveLbl, cur.dir == 1 ? label.style_label_down : label.style_label_up)
 
-// ─────────────────────────── Entry dot at the candle open / alerts ───────────────────────────
-plotshape(showDot and newLong  ? entryPx : na, "Long entry (open)",  shape.circle, location.absolute, longCol,  size = size.tiny)
-plotshape(showDot and newShort ? entryPx : na, "Short entry (open)", shape.circle, location.absolute, shortCol, size = size.tiny)
-
-// Alerts fire at the open of the entry candle (use "Once per bar")
+// ─────────────────────────── Alerts ───────────────────────────
+// Fire when the mark is placed: on the signal candle's close (Signal candle open)
+// or at the next candle's open (Next candle open). Use "Once per bar".
 alertcondition(newLong,  "Long entry",  "LONG entry on {{ticker}} {{interval}} at candle open {{open}}")
 alertcondition(newShort, "Short entry", "SHORT entry on {{ticker}} {{interval}} at candle open {{open}}")
 alertcondition(newLong or newShort, "Any entry", "Entry on {{ticker}} {{interval}} at candle open {{open}}")
