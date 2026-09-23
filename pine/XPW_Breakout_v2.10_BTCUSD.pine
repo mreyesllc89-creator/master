@@ -609,13 +609,13 @@ if ShowTable and barstate.islast
     slNow     = slDistAt(close)
     costPctTP = tpRefDist > 0 ? rtCostNow / tpRefDist * 100.0 : na
     hdrTicks  = syminfo.mintick > 0 ? SlipUSD / syminfo.mintick : na
-    wr        = strategy.closedtrades > 0 ? strategy.wintrades / strategy.closedtrades * 100.0 : na
+    wr        = strategy.closedtrades > 0 ? strategy.wintrades * 100.0 / strategy.closedtrades : na
     cR        = slNow > 0 ? rtCostNow / slNow : na                      // cost in R
     rMult     = slNow > 0 ? tpRefDist / slNow : na
     beWin     = na(cR) or na(rMult) ? na : (1.0 + cR) / (rMult + 1.0) * 100.0   // breakeven win rate with costs
     commMis   = commModel > 0 ? math.abs(commPaid - commModel) / commModel : (commPaid > 0 ? 1.0 : 0.0)
     commOK    = strategy.closedtrades == 0 or commMis <= 0.10
-    per100    = bar_index > 0 ? strategy.closedtrades / bar_index * 100.0 : na
+    per100    = bar_index > 0 ? strategy.closedtrades * 100.0 / bar_index : na
     blocked   = (trendL or trendS ? "" : "trend ") + (coolOK ? "" : "cooldown ") + (dayOK ? "" : "maxday ") + (gateOK ? "" : "coil ") + (costOK ? "" : "cost ") + (retryOKL and retryOKS ? "" : "retry ") + (inSession and dowOK ? "" : "time ")
     row(0,  "XPW v2.10", ExecMode + " / " + EntryMode + (ArmLatch ? " / latch" : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
     row(1,  "Levels", lvSrc == "" ? "NONE" : lvSrc, lvSrc == "" ? color.red : color.white)
