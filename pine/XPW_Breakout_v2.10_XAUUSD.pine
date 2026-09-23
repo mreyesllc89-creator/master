@@ -1,0 +1,796 @@
+//@version=6
+//====================================================================
+// XPW_Breakout_v2.10 (XAUUSD)   (Pine v6, single file, self-contained)
+//--------------------------------------------------------------------
+// GOLD BUILD. Logic is byte-identical to the BTCUSD build; only the
+// symbol defaults differ: costs in USD per OUNCE (TV gold CFDs quote
+// 1 contract = 1 oz, 1 MT5 lot = 100 oz), ounce-based sizing, and the
+// notes. The ATR geometry (SL 3 ATR, TP 3R) carries over unchanged and
+// is NOT swept on gold data: see CALIBRATION.md, section 13.
+//--------------------------------------------------------------------
+// v2.10 delta vs v2.01 (XAUUSD). Three asks: include commission,
+// more extensive entry, entry by tick (not only by candle).
+// Calibration notes, presets and sweep results: CALIBRATION.md.
+//
+// COSTS
+//  C1  Cost model is explicit and INPUT-driven (group "2. Costs"):
+//      commission % per side, commission cash per contract per side
+//      (CFD: put HALF THE SPREAD here, plus any per-lot commission),
+//      slippage per side. rtCost = 2 x (pct + cash + slip). It feeds
+//        a) a COST GATE: never arm when rtCost > x% of the NET TP,
+//        b) TP WIDENING: TP = target + both commissions, measured from
+//           the FILL (entry slippage already sits inside the fill price
+//           and a limit exit is never slipped), so the NET result at TP
+//           equals the target you typed,
+//        c) SIZING: risk budget / (SL distance + rtCost),
+//        d) BREAKEVEN: BE stop = fill +/- (commissions + one exit slip),
+//        e) a referee TABLE: commission the tester actually charged
+//           (strategy.closedtrades.commission) vs the modelled figure,
+//           red when they disagree = header / Properties != inputs.
+//      The strategy() header still does the P&L accounting. Keep the
+//      two consistent: header commission == inputs, header slippage
+//      (ticks) == SlipUSD / syminfo.mintick. The table prints the ticks.
+//  C2  Header in USD per OUNCE (1 contract = 1 oz on TV gold CFD feeds,
+//      100 oz = 1 MT5 lot): cash commission per contract, slippage in
+//      ticks at mintick 0.01. v2.01's header ($0.006/oz commission, no
+//      spread) understated a raw gold round trip by roughly 50x.
+//
+// TICK EXECUTION
+//  T1  calc_on_every_tick=true. Input "Execution": Tick re-evaluates
+//      arming, cancelling, sizing, the cost gate and the trail on every
+//      realtime tick; BarClose gates all of that to barstate.isconfirmed
+//      (= v2.01 behaviour). Historical bars are computed once per bar
+//      in both modes, so the backtest is identical; only live differs.
+//  T2  Arm state, trail, breakeven and counters are varip so they
+//      survive the per-tick rollback (a var ratchet re-issued with
+//      strategy.exit RETREATS on the next tick: order state is not
+//      rolled back, var state is).
+//  T3  Entry LEVELS still come from CONFIRMED bars (pivot latched on
+//      close, Donchian[1], previous day) because an unconfirmed level
+//      cannot be backtested honestly. What is tick-driven is the arm /
+//      cancel decision and the resting stop or limit order, which the
+//      broker emulator fills on the tick (or intrabar) that touches it.
+//  T4  calc_on_order_fills stays OFF: on historical bars it would let
+//      the fill re-execution see the bar's final high/low/close.
+//  T5  ATR and every close-based filter (trend, compression, cost gate,
+//      the MaxDist drop) are frozen to the last CLOSED bar on interim
+//      ticks, so tick decisions use the numbers the backtest used and a
+//      resting stop is never cancelled by intrabar filter flicker.
+//  T6  Trail execution input: "Emulator" hands the trail to the broker
+//      emulator (strategy.exit trail_points / trail_offset in ticks). It
+//      ratchets on the 4-point path on historical bars and on every tick
+//      live, so history and live agree and a trail exit can happen on the
+//      same bar it was reached. "Script" is the v2.01 close-anchored
+//      ratchet (bar close on history, per tick live in Tick mode).
+//
+// ENTRY MODULE
+//  E1  Level sources (any combination; the nearest enabled level to
+//      price is used per side): Pivot (v2.01 ta.pivothigh/low),
+//      Donchian(N)[1], Previous-day high/low (non-repainting
+//      request.security, lookahead_on + [1]).
+//  E2  Trigger modes: Stop (rest a stop at the level; fills on touch),
+//      CloseConfirm (market entry after a bar CLOSES beyond the level,
+//      with a max-chase cap), Retest (limit at the broken level after
+//      a confirmed close beyond it, valid K bars).
+//  E3  Filters, each switchable: direction, chart-EMA trend, cooldown
+//      bars after an exit, max trades per day, consecutive-loss cap per level,
+//      trade days, session hours (v2.01), compression gate (v2.01),
+//      cost gate (C1). Indicator filters (ADX, ATR bands, volume, HTF
+//      bias) were deliberately NOT added: on 600-bar samples they only
+//      remove trades and cannot be calibrated.
+//  E4  Exits: SL/TP/trail geometry locked per trade at arm time and
+//      re-anchored to the real fill, ratchet trail (v2.01), optional
+//      breakeven step, optional time stop.
+//
+// DEFECT FIXES (v2.01 -> v2.10), on top of F1-F10 which are retained
+//  F11 v2.01 cancelled the resting stop on every bar whose close sat
+//      inside the buffer below the level, so a breakout could only fill
+//      if ONE bar travelled the whole buffer. Measured on the exports at
+//      buffer 1.0 ATR: 60m armed 4 of 37 breaks, 15m 10 of 54. In Tick
+//      mode it is fatal: the first tick inside the buffer cancels the
+//      stop and it can never fill. v2.10 uses the buffer to ARM only
+//      (ArmLatch). Once armed the stop rests until it fills, the level
+//      it armed on is replaced (a new level must pass the buffer again),
+//      the level is gone or too far, or the position changes. A soft
+//      gate (session, trend, cost, cooldown, day cap, loss cap,
+//      compression) only lifts the order while it is closed; the latch
+//      survives and the order returns when the gate reopens. Re-arming
+//      after a trade needs a fresh pull-back of one buffer.
+//      ArmLatch=false restores v2.01 for the acceptance test.
+//  F12 strategy.risk.max_position_size only constrains strategy.entry();
+//      v2.01 placed the straddle with strategy.order(), so the "second
+//      enforcement layer" was inert. v2.10 uses strategy.entry() (OCA
+//      kept; entries are only ever issued while flat, so its reversal
+//      semantics never engage) and the rail is live.
+//  F13 Geometry is locked per trade (SL, TP, trail trigger, trail
+//      distance, all from the arm-time ATR). Recomputing them from the
+//      live ATR after the fill makes the bracket a moving target that
+//      disagrees with the level the cost gate approved. Pct geometry is
+//      a function of the fill and is re-derived from it (v2.01 form).
+//  F14 The pre-staged bracket is expressed in TICKS FROM THE FILL
+//      (strategy.exit loss / profit), not in absolute prices anchored to
+//      the level: a gapped or slipped fill keeps the sized SL and the
+//      intended TP on the fill bar instead of an SL far wider than sized
+//      and a TP that can already sit below market.
+//
+// GEOMETRY
+//  G1  GeoMode "ATR": SL = k * ATR, TP = R * SL. One script spans
+//      15m..240m. "Pct" keeps v2.01 percent-of-price geometry. Check
+//      the table's SL row against the ATR row before trusting Pct mode:
+//      an SL that sits inside one bar's range resolves on the fill bar
+//      by the emulator's path assumption, not by the market.
+//--------------------------------------------------------------------
+// NOTES
+//  * Properties: this header already sets calc_on_every_tick. Leave
+//    "Recalculate: After order is filled" OFF. Bar magnifier ON if
+//    your plan has it (stop entry + stop exit inside one bar).
+//  * UI Properties override the header cost values once touched. On a
+//    chart that carried v2.01 (gold: slippage 30, cash 0.003) do
+//    Properties > Defaults > Reset settings, or type the values in.
+//    The table's commission row is the tripwire; it cannot check
+//    slippage ticks, only commission.
+//  * 'hour' / dayofweek use the EXCHANGE timezone of the chart symbol
+//    (broker server time on CFD feeds, usually UTC+2/+3). Gold CFDs
+//    trade Sunday evening to Friday evening with a daily maintenance
+//    break around the 00:00 server rollover; the session inputs let you
+//    skip it.
+//  * Tick mode can only be observed live or in forward test. If the
+//    live trade list diverges from the backtest, that is T1-T3 at work,
+//    not a bug: the backtest is the BarClose approximation. Realtime
+//    trades made intrabar vanish on reload (bars are re-simulated).
+//  * Limit fills (Retest mode) are never slipped by the emulator. The
+//    cost model still charges SlipUSD on them, so gate / TP / sizing
+//    stay conservative; the tester's P&L is optimistic by ~half spread.
+//  * CFD feeds on TradingView are BID. A buy stop in MT5 triggers on
+//    ASK, so longs pay ~one full spread relative to the chart trigger.
+//    Half the spread per side in CommCash is the usual compromise.
+//  * Swap / funding is not modelled by the tester. On 60m/240m a trade
+//    often spans the daily rollover; gold swaps are charged per lot per
+//    night (triple on Wednesday) and can exceed the round-trip cost.
+//  * MaxPerDay counts a trade filled on the first bar of a day on both
+//    history and live (anchor = previous bar's committed count).
+//  * v2.01 acceptance recipe (reproduces its trade list): Execution
+//    BarClose, ArmLatch off, Pivot only with BarsN 5, GeoMode Pct
+//    (SL 0.1, TP 0.25), Buffer ATR 1.0, Trail Script (trigger 1.0,
+//    distance 1.5 ATR), cost gate off, TP widening off, cost sizing
+//    off, CommPct 0, CommCash 0.003, SlipUSD 0.3 (so the referee row and
+//    the ticks row agree with the gold Properties), Risk 4, FixedQty 10,
+//    Cap 50, QtyStep 1, and Properties > Slippage 30 ticks, Commission
+//    0.003 cash per contract (Reset settings AND put the cost inputs back
+//    to 0.10 / 0.05 afterwards to return to the gold header). Residuals: v2.10
+//    snaps order prices to mintick, uses strategy.entry, locks the trail
+//    TRIGGER and DISTANCE at arm time (F13; v2.01 recomputed both from the
+//    live ATR every bar), and pre-stages the FILL-BAR bracket in ticks
+//    from the fill (F14) where v2.01 anchored it to the pivot: on the fill
+//    bar both of v2.10's legs are shifted one entry slippage (30 ticks
+//    here; gap + slippage on a gap-through fill) in the trade direction
+//    relative to v2.01's, so the SL sits that much NEARER the pivot and
+//    the TP that much FURTHER from it, and a fill-bar extreme inside
+//    either band exits in one script and not the other. From the first
+//    run after the fill both hold avg x (1 +/- pct) and agree.
+//====================================================================
+strategy("XPW Breakout v2.10 (XAUUSD)", overlay=true,
+     initial_capital=100000,
+     pyramiding=0,
+     calc_on_every_tick=true,
+     calc_on_order_fills=false,
+     process_orders_on_close=false,
+     commission_type=strategy.commission.cash_per_contract,
+     commission_value=0.10,    // USD per OZ per side = CFD raw: $0.03 commission ($6/lot RT) + $0.07 half of a ~$0.15 spread. CFD std (no commission): ~0.15 = half of a $0.30 spread. VERIFY from an MT5 statement
+     slippage=5,               // ticks per side. mintick 0.01 -> $0.05/oz pure execution slip. Must equal SlipUSD / syminfo.mintick (table prints it)
+     margin_long=0, margin_short=0,
+     max_bars_back=500)
+
+//============== INPUTS ==============//
+grpX = "1. Execution"
+ExecMode    = input.string("Tick", "Execution", options=["Tick", "BarClose"], group=grpX, tooltip="Tick: arm/cancel, sizing, cost gate and trail re-evaluated on every realtime tick. BarClose: wait for the bar to close (v2.01). Historical bars are identical in both modes.")
+systemType  = input.int(1, "Trading System (1 = enabled)", group=grpX)
+Direction   = input.string("Both", "Direction", options=["Both", "Long", "Short"], group=grpX)
+ArmLatch    = input.bool(true, "Arm latch (buffer arms only, stop then rests)", group=grpX, tooltip="Off = v2.01: the stop is cancelled on every evaluation where price is inside the buffer. Keep ON for Tick execution.")
+MaxDistAtr  = input.float(0.0, "Max level distance, ATR mult (0 = off)", minval=0.0, step=0.5, group=grpX, tooltip="Do not arm a level further than this from price (stale pivot after a fast move). Must exceed the entry buffer, otherwise nothing can arm; the table flags that.")
+
+grpC = "2. Costs (model, mirrors the header)"
+CommPct     = input.float(0.0, "Commission % per side", minval=0.0, step=0.01, group=grpC, tooltip="Exchange taker ~0.05. Must equal the header / Properties commission when its type is percent.")
+CommCash    = input.float(0.10, "Commission USD per contract (oz) per side", minval=0.0, step=0.01, group=grpC, tooltip="CFD: half the spread plus any per-lot commission, per ounce. Must equal the header when its type is cash per contract.")
+SlipUSD     = input.float(0.05, "Slippage USD per oz per side", minval=0.0, step=0.01, group=grpC, tooltip="Pure execution slip on stop / market fills. Header slippage (ticks) should equal this divided by syminfo.mintick.")
+UseCostGate = input.bool(true, "Cost gate (skip when RT cost > x% of net TP)", group=grpC)
+MaxCostPct  = input.float(20.0, "   max round-trip cost, % of net TP", minval=1.0, maxval=100.0, step=5.0, group=grpC)
+TPNetOfCost = input.bool(true, "Widen TP by both commissions (net target = input)", group=grpC)
+SizeNetOfCost = input.bool(true, "Reserve round-trip cost in risk sizing", group=grpC)
+
+grpS = "3. Sizing"
+RiskPercent = input.float(1.0, "Risk percent of equity per trade", minval=0.0, step=0.25, group=grpS)
+UseRiskSize = input.bool(true, "Risk-based sizing (off = FixedQty)", group=grpS)
+FixedQty    = input.float(10.0, "FixedQty fallback (contracts = oz, 100 = 1 lot)", minval=0.0, step=1.0, group=grpS)
+MaxQtyHard  = input.float(50.0, "HARD qty cap (contracts = oz)", minval=0.0001, step=1.0, group=grpS, tooltip="50 oz = 0.5 lot, about 2x notional at $4k gold on 100k. Also fed to strategy.risk.max_position_size. The cap binding is a misconfiguration signal, not a feature.")
+QtyStep     = input.float(1.0, "Qty step (rounds down; 1 oz = 0.01 lot)", minval=0.000001, group=grpS)
+
+grpG = "4. Geometry"
+GeoMode     = input.string("ATR", "Geometry", options=["ATR", "Pct"], group=grpG, tooltip="ATR: SL = k*ATR, TP = R*SL, locked per trade at arm time. Pct: v2.01 percent-of-price, re-derived from the fill.")
+SlAtrMult   = input.float(3.0, "SL, ATR mult (ATR mode)", minval=0.1, step=0.25, group=grpG)
+TpR         = input.float(3.0, "TP, R multiple of SL (ATR mode)", minval=0.1, step=0.25, group=grpG)
+TPasPct     = input.float(0.25, "TP as percent of entry (Pct mode)", minval=0.01, step=0.05, group=grpG)
+SLasPct     = input.float(0.1, "SL as percent of entry (Pct mode)", minval=0.01, step=0.05, group=grpG)
+AtrLen      = input.int(14, "ATR length", minval=1, group=grpG)
+
+grpL = "5. Levels"
+UsePivot    = input.bool(true, "Pivot levels (v2.01)", group=grpL)
+BarsN       = input.int(3, "   pivot bars each side", minval=1, group=grpL)
+UseDonchian = input.bool(false, "Donchian levels (prior N bars)", group=grpL)
+DonLen      = input.int(20, "   Donchian length", minval=2, group=grpL)
+UsePrevDay  = input.bool(false, "Previous-day high/low", group=grpL)
+BufMode     = input.string("ATR", "Entry buffer anchor", options=["ATR", "PctOfTP"], group=grpL)
+BufAtrMult  = input.float(0.5, "Buffer, ATR mult", minval=0.0, step=0.1, group=grpL, tooltip="Minimum distance price -> level to ARM (MT5 stop-level analogue). 2.0 starved the strategy in the BTC sweep.")
+BufPctTP    = input.float(50.0, "Buffer, percent of the Pct-mode TP (parity mode)", minval=0.0, group=grpL, tooltip="v2.01 meaning: percent of close x TPasPct, independent of GeoMode.")
+
+grpE = "6. Entry trigger"
+EntryMode   = input.string("Stop", "Trigger", options=["Stop", "CloseConfirm", "Retest"], group=grpE, tooltip="Stop: rest a stop order at the level (fills on the tick that touches it). CloseConfirm: market order after a bar closes beyond the level. Retest: limit order at the broken level after a confirmed close beyond it.")
+MaxChaseAtr = input.float(0.5, "CloseConfirm: max close beyond level, ATR mult (0 = off)", minval=0.0, step=0.1, group=grpE)
+RetestBars  = input.int(5, "Retest: bars the limit stays valid", minval=1, group=grpE)
+RetestOffAtr = input.float(0.0, "Retest: limit offset inside the level, ATR mult", minval=0.0, step=0.05, group=grpE)
+
+grpF = "7. Filters"
+TrendLen    = input.int(0, "Chart EMA trend filter, length (0 = off)", minval=0, group=grpF, tooltip="Longs only above the EMA, shorts only below. Evaluated on closed bars.")
+Cooldown    = input.int(0, "Cooldown bars after an exit (0 = off)", minval=0, group=grpF)
+MaxPerDay   = input.int(0, "Max trades per day (0 = off)", minval=0, group=grpF)
+MaxRetries  = input.int(0, "Max consecutive losses per level (0 = off)", minval=0, group=grpF, tooltip="After N consecutive losses traded at the same level (within RetryTol ATR) that level is blocked until it changes or a trade wins. N = 1 blocks the level after its first loss.")
+RetryTol    = input.float(0.25, "   same-level tolerance, ATR mult", minval=0.0, step=0.05, group=grpF)
+UseCompGate = input.bool(false, "Compression gate (arm only when coiled)", group=grpF)
+CompLen     = input.int(200, "   compression lookback", minval=20, group=grpF)
+CompPct     = input.float(30.0, "   arm below width percentile", minval=1.0, maxval=100.0, group=grpF)
+
+grpT = "8. Time"
+SHInput     = input.int(0, "Start hour (0 = off)", minval=0, maxval=23, group=grpT)
+EHInput     = input.int(0, "End hour (0 = off)", minval=0, maxval=23, group=grpT)
+DowStr      = input.string("1234567", "Trade days (1=Sun .. 7=Sat)", group=grpT)
+
+grpR = "9. Exits"
+UseTrail    = input.bool(true, "Ratchet trail", group=grpR)
+TrailExec   = input.string("Emulator", "Trail execution", options=["Emulator", "Script"], group=grpR, tooltip="Emulator: strategy.exit trail_points/trail_offset, ratchets on the intrabar path in backtests and on every tick live. Script: v2.01 close-anchored ratchet (bar close in backtests, per tick live in Tick mode).")
+TrailMode   = input.string("ATR", "Trail anchor", options=["ATR", "PctOfTP"], group=grpR)
+TrgAtrMult  = input.float(1.0, "Trail trigger, ATR mult", minval=0.0, step=0.1, group=grpR)
+TrlAtrMult  = input.float(1.5, "Trail distance, ATR mult", minval=0.1, step=0.1, group=grpR)
+TslTrgPctTP = input.float(7.0, "Trail trigger, percent of TP (parity mode)", minval=0.0, step=0.5, group=grpR)
+TslPctTP    = input.float(5.0, "Trail distance, percent of TP (parity mode)", minval=0.1, step=0.5, group=grpR)
+UseBE       = input.bool(false, "Breakeven step (stop to fill +/- costs)", group=grpR)
+BeTrigR     = input.float(1.0, "   BE trigger, R multiple of SL", minval=0.1, step=0.25, group=grpR)
+MaxBarsHeld = input.int(0, "Time stop, bars (0 = off)", minval=0, group=grpR)
+
+grpD = "10. Display"
+ShowTable   = input.bool(true, "Cost / state table", group=grpD)
+ShowLevels  = input.bool(true, "Plot levels, TP and trail", group=grpD)
+ShowEma     = input.bool(false, "Plot trend EMA", group=grpD)
+ShowTickMark = input.bool(true, "Mark realtime bars (Tick mode)", group=grpD)
+
+// Rail: emulator-level cap on top of calcQty clamp (live with strategy.entry, F12)
+strategy.risk.max_position_size(MaxQtyHard)
+
+//============== EXECUTION GATES ==============//
+tickMode   = ExecMode == "Tick"
+barClosed  = barstate.isconfirmed          // true on every historical bar, and on the last tick of a realtime bar
+evalNow    = tickMode or barClosed         // when strategy.* calls are allowed
+allowTrade = systemType == 1
+allowL     = Direction != "Short"
+allowS     = Direction != "Long"
+
+//============== CORE SERIES (every bar, unconditionally) ==============//
+atr    = ta.atr(AtrLen)
+atrRef = barClosed ? atr : atr[1]          // T5: interim ticks use the last closed bar's ATR
+atrPct = close > 0 ? atrRef / close * 100.0 : na
+
+// Pivot levels: latched on bar close only, also in Tick mode (T3)
+ph = ta.pivothigh(high, BarsN, BarsN)
+pl = ta.pivotlow(low,  BarsN, BarsN)
+var float swingH = na
+var float swingL = na
+if barClosed and not na(ph)
+    swingH := ph
+if barClosed and not na(pl)
+    swingL := pl
+
+// Donchian of the PRIOR N bars (excludes the forming bar: stable intrabar)
+donH = ta.highest(high, DonLen)[1]
+donL = ta.lowest(low,  DonLen)[1]
+
+// Previous-day high / low, documented non-repainting form (lookahead_on + [1])
+pdH = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_on)
+pdL = request.security(syminfo.tickerid, "D", low[1],  lookahead=barmerge.lookahead_on)
+
+// Nearest enabled level above / below price (arming levels)
+pickUp(float v, float cur) => not na(v) and v > close and (na(cur) or v < cur) ? v : cur
+pickDn(float v, float cur) => not na(v) and v < close and (na(cur) or v > cur) ? v : cur
+float lvlUp = na
+float lvlDn = na
+if UsePivot
+    lvlUp := pickUp(swingH, lvlUp)
+    lvlDn := pickDn(swingL, lvlDn)
+if UseDonchian
+    lvlUp := pickUp(donH, lvlUp)
+    lvlDn := pickDn(donL, lvlDn)
+if UsePrevDay
+    lvlUp := pickUp(pdH, lvlUp)
+    lvlDn := pickDn(pdL, lvlDn)
+
+// Trend filter (chart EMA; length must be simple, so the input is used as is and gated by TrendLen > 0)
+emaT    = ta.ema(close, math.max(TrendLen, 1))
+trendLr = TrendLen == 0 or close > emaT
+trendSr = TrendLen == 0 or close < emaT
+
+// Session filter with overnight wrap (v2.01 F8) + trade days
+h = hour
+inSession = true
+if SHInput != 0 and EHInput != 0 and SHInput > EHInput
+    inSession := h >= SHInput or h < EHInput
+else
+    if SHInput != 0 and h < SHInput
+        inSession := false
+    if EHInput != 0 and h >= EHInput
+        inSession := false
+dowOK = str.contains(DowStr, str.tostring(dayofweek))
+
+// Cooldown after the last exit, max trades per day
+lastExitIdx = strategy.closedtrades > 0 ? strategy.closedtrades.exit_bar_index(math.max(strategy.closedtrades - 1, 0)) : na
+coolOK   = Cooldown == 0 or na(lastExitIdx) or bar_index - lastExitIdx >= Cooldown
+tradeCnt = strategy.closedtrades + strategy.opentrades           // trades ever opened; monotone
+newDay   = timeframe.change("D")
+var int dayBase = 0
+if newDay
+    dayBase := nz(tradeCnt[1])                                     // previous bar's committed count: same on history and on every tick, so re-running it per tick is harmless
+tradesToday = tradeCnt - dayBase
+dayOK = MaxPerDay == 0 or tradesToday < MaxPerDay
+// A trade OPENED since the last evaluation (F11 "position changes"). History runs once per bar, so a fill that
+// also exits on the same bar never shows up in `flat`; live sees the position on the next tick. Both drop the
+// latch on this flag. tradeCnt is unchanged by a close (open -> closed), so it fires on entries only.
+varip int  seenCnt  = 0
+bool       newTrade = false
+if evalNow and tradeCnt != seenCnt
+    newTrade := true
+    seenCnt  := tradeCnt
+
+// Compression gate (v2.01): width of the RAW level pair of the first enabled source, independent of where close sits
+float chHi = UsePivot ? swingH : UseDonchian ? donH : UsePrevDay ? pdH : na
+float chLo = UsePivot ? swingL : UseDonchian ? donL : UsePrevDay ? pdL : na
+chWidth   = chHi - chLo
+compRatio = atrRef > 0 ? chWidth / atrRef : na
+compPR    = ta.percentrank(compRatio, CompLen)
+gateOKr   = not UseCompGate or (not na(compPR) and compPR <= CompPct)
+
+//============== GEOMETRY + COST MODEL (price units) ==============//
+// pv = account currency per 1.0 price move per contract: 1 on crypto spot and the CFD feeds this script is
+// calibrated for (1 contract = 1 oz), 100 on COMEX GC1!. USD inputs are converted to price units through it;
+// the table prints it and flags anything other than 1 because the percent-commission leg is only known
+// to be right at pv == 1.
+pv = syminfo.pointvalue
+usdToPx(float usd) => usd / pv
+slDistAt(float px) => GeoMode == "ATR" ? atrRef * SlAtrMult : px * SLasPct / 100.0
+tpDistAt(float px) => GeoMode == "ATR" ? atrRef * SlAtrMult * TpR : px * TPasPct / 100.0
+commRtAt(float px) => 2.0 * (px * CommPct / 100.0 + usdToPx(CommCash))       // both commissions, always charged (price units)
+rtCostAt(float px) => commRtAt(px) + 2.0 * usdToPx(SlipUSD)                   // full round trip: gate + sizing (conservative)
+tpEffAt(float px)  => tpDistAt(px) + (TPNetOfCost ? commRtAt(px) : 0.0)      // gross TP measured from the FILL (entry slip is inside the fill, limit exit unslipped)
+// Trail trigger / distance in price units for a given NET TP distance (v2.01 semantics)
+trailTrg(float tpDist) => TrailMode == "ATR" ? atrRef * TrgAtrMult : tpDist * TslTrgPctTP / 100.0
+trailDst(float tpDist) => TrailMode == "ATR" ? atrRef * TrlAtrMult : tpDist * TslPctTP / 100.0
+// Emulator trail legs in ticks. Only when the emulator runs the trail.
+emuTrail = UseTrail and TrailExec == "Emulator"
+toTicks(float dist) => math.max(1, math.round(dist / syminfo.mintick))
+snap(float px) => math.round_to_mintick(px)
+
+tpRefDist = tpDistAt(close)
+bufRef    = close * TPasPct / 100.0                                           // v2.01 referent for the parity buffer, independent of GeoMode
+buffer    = BufMode == "ATR" ? atrRef * BufAtrMult : bufRef * BufPctTP / 100.0
+rtCostNow = rtCostAt(close)
+costOKr   = not UseCostGate or (tpRefDist > 0 and rtCostNow <= tpRefDist * MaxCostPct / 100.0)
+maxDist   = MaxDistAtr == 0 ? na : MaxDistAtr * atrRef                       // arm window upper bound, price units
+distDead  = not na(maxDist) and maxDist <= buffer                            // window (buffer, maxDist] is empty: nothing can ever arm
+
+// T5 for the filters: close-based gates are frozen to the last CLOSED bar on interim ticks.
+// barClosed is always true on history and on the closing tick, so the backtest is unchanged.
+trendL = barClosed ? trendLr : trendLr[1]
+trendS = barClosed ? trendSr : trendSr[1]
+gateOK = barClosed ? gateOKr : gateOKr[1]
+costOK = barClosed ? costOKr : costOKr[1]
+
+//============== SIZING (risk-based, cost-aware, hard-capped, fallback) ==============//
+calcQty(float px) =>
+    slD     = slDistAt(px)
+    perUnit = slD + (SizeNetOfCost ? rtCostAt(px) : 0.0)                       // price units per contract at risk
+    raw     = UseRiskSize and perUnit > 0 ? (strategy.equity * RiskPercent / 100.0) / (perUnit * pv) : FixedQty
+    q       = na(raw) or raw <= 0 ? FixedQty : raw                             // v2.01: FixedQty covers a zero / negative risk budget
+    q      := math.min(q, MaxQtyHard)
+    q      := math.round(math.floor(q / QtyStep + 1e-9) * QtyStep, 8)          // step-count epsilon: 0.57/0.01 = 56.999.. must not lose a step
+    na(slD) or slD <= 0 ? 0.0 : q                                              // undefined geometry (ATR warm-up) is not tradeable
+
+//============== RETRY CAP PER LEVEL + COMMISSION REFEREE (per closed trade) ==============//
+// All varip: this block runs on the tick where a trade closes and must not run again on the next tick.
+// Tolerance uses atr[1] (previous bar's committed ATR): identical whether the block runs at the exit bar's close (history) or on an intrabar tick (live).
+varip float commPaid  = 0.0      // charged by the tester (header / Properties commission)
+varip float commModel = 0.0      // what the inputs say it should have been
+varip int   commSeen  = 0
+varip float lvlUsedL  = na       // level the current / last long was traded at
+varip float lvlUsedS  = na
+varip float blockLvlL = na       // level under retry block
+varip float blockLvlS = na
+varip int   blockCntL = 0
+varip int   blockCntS = 0
+if strategy.closedtrades > commSeen
+    for i = commSeen to strategy.closedtrades - 1
+        sz = strategy.closedtrades.size(i)
+        commPaid  += strategy.closedtrades.commission(i)
+        commModel += math.abs(sz) * ((strategy.closedtrades.entry_price(i) + strategy.closedtrades.exit_price(i)) * CommPct / 100.0 + 2.0 * CommCash)
+        lost = strategy.closedtrades.profit(i) < 0
+        if sz > 0
+            if not lost
+                blockCntL := 0
+            else if not na(blockLvlL) and not na(lvlUsedL) and math.abs(lvlUsedL - blockLvlL) <= RetryTol * atr[1]
+                blockCntL += 1
+            else
+                blockLvlL := lvlUsedL
+                blockCntL := 1
+        else
+            if not lost
+                blockCntS := 0
+            else if not na(blockLvlS) and not na(lvlUsedS) and math.abs(lvlUsedS - blockLvlS) <= RetryTol * atr[1]
+                blockCntS += 1
+            else
+                blockLvlS := lvlUsedS
+                blockCntS := 1
+    commSeen := strategy.closedtrades
+// Retry gate for the level actually being traded (Stop: lvlUp/lvlDn; CloseConfirm: broken level; Retest: limit price)
+retryOK(float px, float blk, int cnt) => MaxRetries == 0 or na(blk) or na(px) or cnt < MaxRetries or math.abs(px - blk) > RetryTol * atrRef
+retryOKL = retryOK(lvlUp, blockLvlL, blockCntL)
+retryOKS = retryOK(lvlDn, blockLvlS, blockCntS)
+
+//============== ENTRY MODULE ==============//
+flat = strategy.position_size == 0
+// Hard conditions: without them there is nothing to trade (latch drops, order cancelled).
+// atrRef must be defined: every SL/TP/trail/buffer helper multiplies it (ATR warm-up bars cannot trade).
+hardOK = allowTrade and flat and not na(atrRef) and atrRef > 0
+// Soft gates: while one is closed the order is lifted, the latch survives (F11)
+softOK  = inSession and dowOK and gateOK and coolOK and dayOK and costOK
+softOKL = softOK and allowL and trendL
+softOKS = softOK and allowS and trendS
+longFilt  = hardOK and softOKL
+shortFilt = hardOK and softOKS
+
+// Confirmed close beyond the level that was nearest at the previous close (CloseConfirm / Retest)
+brkPxL = lvlUp[1]
+brkPxS = lvlDn[1]
+brkL   = barClosed and not na(brkPxL) and close > brkPxL
+brkS   = barClosed and not na(brkPxS) and close < brkPxS
+
+// Arm-time geometry, locked for the bracket and re-anchored to the real fill (varip: survives tick rollback)
+varip float armSlL  = na
+varip float armTpL  = na         // gross TP distance (net + both commissions when widened)
+varip float armTpNL = na         // net TP distance (trail legs are sized from this)
+varip float armTrgL = na
+varip float armDstL = na
+varip float armSlS  = na
+varip float armTpS  = na
+varip float armTpNS = na
+varip float armTrgS = na
+varip float armDstS = na
+varip bool  armedL  = false
+varip bool  armedS  = false
+varip float armLvlL = na         // level the resting BuyStop is parked at (latch identity)
+varip float armLvlS = na
+varip float rtPxL   = na
+varip float rtPxS   = na
+varip int   rtUntilL = -1
+varip int   rtUntilS = -1
+
+// Pre-staged bracket in TICKS FROM THE FILL (F1, F14): a gapped or slipped fill keeps SL = slD and TP = tpD from the fill.
+// Once the position exists the management block re-issues the same exit id in absolute prices (same id = modify).
+stageLong(float slD, float tpD, float trgD, float dstD) =>
+    if emuTrail
+        strategy.exit("XL", from_entry="BuyStop", loss=toTicks(slD), profit=toTicks(tpD), trail_points=toTicks(trgD), trail_offset=toTicks(dstD), comment_loss="SL", comment_profit="TP", comment_trailing="Trail")
+    else
+        strategy.exit("XL", from_entry="BuyStop", loss=toTicks(slD), profit=toTicks(tpD), comment_loss="SL", comment_profit="TP")
+
+stageShort(float slD, float tpD, float trgD, float dstD) =>
+    if emuTrail
+        strategy.exit("XS", from_entry="SellStop", loss=toTicks(slD), profit=toTicks(tpD), trail_points=toTicks(trgD), trail_offset=toTicks(dstD), comment_loss="SL", comment_profit="TP", comment_trailing="Trail")
+    else
+        strategy.exit("XS", from_entry="SellStop", loss=toTicks(slD), profit=toTicks(tpD), comment_loss="SL", comment_profit="TP")
+
+// Managed bracket, absolute prices (position management)
+exitLong(float stopPx, float tpPx, float trgD, float dstD) =>
+    if emuTrail
+        strategy.exit("XL", from_entry="BuyStop", stop=snap(stopPx), limit=snap(tpPx), trail_points=toTicks(trgD), trail_offset=toTicks(dstD), comment_loss="SL/Trail", comment_profit="TP", comment_trailing="Trail")
+    else
+        strategy.exit("XL", from_entry="BuyStop", stop=snap(stopPx), limit=snap(tpPx), comment_loss="SL/Trail", comment_profit="TP")
+
+exitShort(float stopPx, float tpPx, float trgD, float dstD) =>
+    if emuTrail
+        strategy.exit("XS", from_entry="SellStop", stop=snap(stopPx), limit=snap(tpPx), trail_points=toTicks(trgD), trail_offset=toTicks(dstD), comment_loss="SL/Trail", comment_profit="TP", comment_trailing="Trail")
+    else
+        strategy.exit("XS", from_entry="SellStop", stop=snap(stopPx), limit=snap(tpPx), comment_loss="SL/Trail", comment_profit="TP")
+
+// kind: 1 = stop at px, 2 = limit at px, 0 = market. Bracket legs are distances from the fill.
+// Entry IDs stay BuyStop / SellStop for every kind (alert templates, v2.01 parity); the comment names the kind.
+// strategy.entry (not strategy.order) so strategy.risk.max_position_size is live (F12).
+placeLong(float px, float q, float slD, float tpD, float trgD, float dstD, int kind) =>
+    if kind == 1
+        strategy.entry("BuyStop", strategy.long, qty=q, stop=snap(px), oca_name="XPW", oca_type=strategy.oca.cancel, comment="L stop")
+    else if kind == 2
+        strategy.entry("BuyStop", strategy.long, qty=q, limit=snap(px), oca_name="XPW", oca_type=strategy.oca.cancel, comment="L retest")
+    else
+        strategy.entry("BuyStop", strategy.long, qty=q, oca_name="XPW", oca_type=strategy.oca.cancel, comment="L close-confirm")
+    stageLong(slD, tpD, trgD, dstD)
+
+placeShort(float px, float q, float slD, float tpD, float trgD, float dstD, int kind) =>
+    if kind == 1
+        strategy.entry("SellStop", strategy.short, qty=q, stop=snap(px), oca_name="XPW", oca_type=strategy.oca.cancel, comment="S stop")
+    else if kind == 2
+        strategy.entry("SellStop", strategy.short, qty=q, limit=snap(px), oca_name="XPW", oca_type=strategy.oca.cancel, comment="S retest")
+    else
+        strategy.entry("SellStop", strategy.short, qty=q, oca_name="XPW", oca_type=strategy.oca.cancel, comment="S close-confirm")
+    stageShort(slD, tpD, trgD, dstD)
+
+lvlChanged(float lvl, float armed) => na(armed) or math.abs(lvl - armed) > syminfo.mintick / 2.0
+
+if EntryMode == "Stop"
+    // OCA stop straddle on the nearest confirmed levels (F5); the buffer arms only (F11)
+    if evalNow
+        if newTrade
+            armedL := false                                            // a trade opened: both sides need a fresh one-buffer pull-back (F11)
+            armedS := false
+        // ---- long ----
+        tooFarL = not na(maxDist) and lvlUp - close > maxDist          // acted on at a CONFIRMED evaluation only (T5): an interim tick never cancels a latched stop
+        hardL   = hardOK and not na(lvlUp) and not distDead and not (tooFarL and barClosed)
+        if not hardL
+            armedL := false
+        else if not armedL or not ArmLatch or lvlChanged(lvlUp, armLvlL)
+            armedL  := close < lvlUp - buffer and not tooFarL         // fresh arm, v2.01 mode, or a replaced level: buffer re-checked
+            armLvlL := armedL ? lvlUp : na                             // latch identity is the ARM, not the order: survives a closed soft gate (F11)
+        placeL = armedL and softOKL and retryOKL
+        if placeL
+            qL = calcQty(lvlUp)
+            if qL > 0
+                lvlUsedL := lvlUp
+                armSlL   := slDistAt(lvlUp)
+                armTpNL  := tpDistAt(lvlUp)
+                armTpL   := tpEffAt(lvlUp)
+                armTrgL  := trailTrg(armTpNL)
+                armDstL  := trailDst(armTpNL)
+                placeLong(lvlUp, qL, armSlL, armTpL, armTrgL, armDstL, 1)
+            else
+                armedL := false
+                placeL := false
+        if not armedL
+            armLvlL := na
+        if not placeL
+            strategy.cancel("BuyStop")
+        // ---- short ----
+        tooFarS = not na(maxDist) and close - lvlDn > maxDist
+        hardS   = hardOK and not na(lvlDn) and not distDead and not (tooFarS and barClosed)
+        if not hardS
+            armedS := false
+        else if not armedS or not ArmLatch or lvlChanged(lvlDn, armLvlS)
+            armedS  := close > lvlDn + buffer and not tooFarS
+            armLvlS := armedS ? lvlDn : na
+        placeS = armedS and softOKS and retryOKS
+        if placeS
+            qS = calcQty(lvlDn)
+            if qS > 0
+                lvlUsedS := lvlDn
+                armSlS   := slDistAt(lvlDn)
+                armTpNS  := tpDistAt(lvlDn)
+                armTpS   := tpEffAt(lvlDn)
+                armTrgS  := trailTrg(armTpNS)
+                armDstS  := trailDst(armTpNS)
+                placeShort(lvlDn, qS, armSlS, armTpS, armTrgS, armDstS, 1)
+            else
+                armedS := false
+                placeS := false
+        if not armedS
+            armLvlS := na
+        if not placeS
+            strategy.cancel("SellStop")
+else
+    armedL  := false
+    armedS  := false
+    armLvlL := na
+    armLvlS := na
+
+if EntryMode == "CloseConfirm"
+    // Market entry on a confirmed close beyond the level, unless the close already ran too far (chase cap)
+    if brkL and longFilt and retryOK(brkPxL, blockLvlL, blockCntL) and (MaxChaseAtr == 0 or close - brkPxL <= MaxChaseAtr * atrRef)
+        qC = calcQty(close)
+        if qC > 0
+            lvlUsedL := brkPxL
+            armSlL   := slDistAt(close)
+            armTpNL  := tpDistAt(close)
+            armTpL   := tpEffAt(close)
+            armTrgL  := trailTrg(armTpNL)
+            armDstL  := trailDst(armTpNL)
+            placeLong(close, qC, armSlL, armTpL, armTrgL, armDstL, 0)
+    if brkS and shortFilt and retryOK(brkPxS, blockLvlS, blockCntS) and (MaxChaseAtr == 0 or brkPxS - close <= MaxChaseAtr * atrRef)
+        qC = calcQty(close)
+        if qC > 0
+            lvlUsedS := brkPxS
+            armSlS   := slDistAt(close)
+            armTpNS  := tpDistAt(close)
+            armTpS   := tpEffAt(close)
+            armTrgS  := trailTrg(armTpNS)
+            armDstS  := trailDst(armTpNS)
+            placeShort(close, qC, armSlS, armTpS, armTrgS, armDstS, 0)
+
+if EntryMode == "Retest"
+    if evalNow
+        // Invalidate the EXISTING retest first: expired (checked on the confirmed run only, so history, BarClose live
+        // and Tick live all give exactly RetestBars bars), filled (not flat, or a trade opened since the last
+        // evaluation: a same-bar round trip is flat again at the close-run), trading off, or price fell back through
+        // the level by a buffer. ORDER MATTERS: this runs BEFORE the arm below so newTrade only ever clears the setup
+        // that existed before this evaluation; a retest armed on this confirmed close must survive it (history arms
+        // at the fill bar's close-run with newTrade still true, Tick live consumed the flag on the fill tick).
+        // Under evalNow so that in BarClose mode only a CONFIRMED close can clear the varip state (T1).
+        if not na(rtPxL) and ((barClosed and bar_index > rtUntilL) or not flat or newTrade or not allowTrade or close < rtPxL - buffer)
+            rtPxL := na
+        if not na(rtPxS) and ((barClosed and bar_index > rtUntilS) or not flat or newTrade or not allowTrade or close > rtPxS + buffer)
+            rtPxS := na
+        // Then arm: a confirmed close beyond the level sets a limit at (inside) the level, live on the next RetestBars bars.
+        // Armed on HARD conditions only (F11): a soft gate closed on the break bar must not discard the setup; the
+        // placement below re-checks the soft gates and the loss cap on every evaluation and lifts the order while a gate
+        // is closed. brkL/brkS imply barClosed, which implies evalNow, so the arm fires exactly when it did before.
+        if brkL and hardOK and allowL
+            rtPxL    := brkPxL - RetestOffAtr * atrRef
+            rtUntilL := bar_index + RetestBars - 1
+        if brkS and hardOK and allowS
+            rtPxS    := brkPxS + RetestOffAtr * atrRef
+            rtUntilS := bar_index + RetestBars - 1
+        qRL = calcQty(na(rtPxL) ? close : rtPxL)
+        if not na(rtPxL) and longFilt and retryOK(rtPxL, blockLvlL, blockCntL) and qRL > 0
+            lvlUsedL := rtPxL
+            armSlL   := slDistAt(rtPxL)
+            armTpNL  := tpDistAt(rtPxL)
+            armTpL   := tpEffAt(rtPxL)
+            armTrgL  := trailTrg(armTpNL)
+            armDstL  := trailDst(armTpNL)
+            placeLong(rtPxL, qRL, armSlL, armTpL, armTrgL, armDstL, 2)
+        else
+            strategy.cancel("BuyStop")
+        qRS = calcQty(na(rtPxS) ? close : rtPxS)
+        if not na(rtPxS) and shortFilt and retryOK(rtPxS, blockLvlS, blockCntS) and qRS > 0
+            lvlUsedS := rtPxS
+            armSlS   := slDistAt(rtPxS)
+            armTpNS  := tpDistAt(rtPxS)
+            armTpS   := tpEffAt(rtPxS)
+            armTrgS  := trailTrg(armTpNS)
+            armDstS  := trailDst(armTpNS)
+            placeShort(rtPxS, qRS, armSlS, armTpS, armTrgS, armDstS, 2)
+        else
+            strategy.cancel("SellStop")
+else
+    rtPxL := na
+    rtPxS := na
+
+//============== POSITION MGMT: locked SL/TP/trail, ratchet, BE, time stop ==============//
+varip float trailL  = na
+varip float tpLockL = na
+varip float slDistL = na
+varip float trgLockL = na
+varip float dstLockL = na
+varip float trailS  = na
+varip float tpLockS = na
+varip float slDistS = na
+varip float trgLockS = na
+varip float dstLockS = na
+pctGeo = GeoMode == "Pct"
+
+if strategy.position_size > 0
+    avgL = strategy.position_avg_price
+    if na(trailL)
+        // first execution in position: re-anchor the locked bracket to the real (slipped) fill (F13).
+        // Pct geometry is a function of the fill and is re-derived from it (v2.01 form: avg x pct).
+        slDistL  := pctGeo or na(armSlL) ? slDistAt(avgL) : armSlL
+        tpNetL    = pctGeo or na(armTpNL) ? tpDistAt(avgL) : armTpNL
+        tpLockL  := avgL + (pctGeo or na(armTpL) ? tpEffAt(avgL) : armTpL)
+        trgLockL := na(armTrgL) ? trailTrg(tpNetL) : armTrgL
+        dstLockL := na(armDstL) ? trailDst(tpNetL) : armDstL
+        trailL   := avgL - slDistL
+    if evalNow
+        if UseTrail and TrailExec == "Script" and close - avgL > trgLockL
+            trailL := math.max(trailL, close - dstLockL)                     // ratchet, never retreats (F4)
+        beL = avgL + commRtAt(avgL) + usdToPx(SlipUSD)                         // breakeven NET of both commissions and the exit slip
+        if UseBE and close - avgL >= BeTrigR * slDistL and beL < close
+            trailL := math.max(trailL, beL)
+        exitLong(trailL, tpLockL, trgLockL, dstLockL)
+        if MaxBarsHeld > 0 and barClosed and bar_index - strategy.opentrades.entry_bar_index(0) >= MaxBarsHeld
+            strategy.close("BuyStop", comment="Time")
+else
+    trailL   := na
+    tpLockL  := na
+    slDistL  := na
+    trgLockL := na
+    dstLockL := na
+
+if strategy.position_size < 0
+    avgS = strategy.position_avg_price
+    if na(trailS)
+        slDistS  := pctGeo or na(armSlS) ? slDistAt(avgS) : armSlS
+        tpNetS    = pctGeo or na(armTpNS) ? tpDistAt(avgS) : armTpNS
+        tpLockS  := avgS - (pctGeo or na(armTpS) ? tpEffAt(avgS) : armTpS)
+        trgLockS := na(armTrgS) ? trailTrg(tpNetS) : armTrgS
+        dstLockS := na(armDstS) ? trailDst(tpNetS) : armDstS
+        trailS   := avgS + slDistS
+    if evalNow
+        if UseTrail and TrailExec == "Script" and avgS - close > trgLockS
+            trailS := math.min(trailS, close + dstLockS)
+        beS = avgS - commRtAt(avgS) - usdToPx(SlipUSD)
+        if UseBE and avgS - close >= BeTrigR * slDistS and beS > close
+            trailS := math.min(trailS, beS)
+        exitShort(trailS, tpLockS, trgLockS, dstLockS)
+        if MaxBarsHeld > 0 and barClosed and bar_index - strategy.opentrades.entry_bar_index(0) >= MaxBarsHeld
+            strategy.close("SellStop", comment="Time")
+else
+    trailS   := na
+    tpLockS  := na
+    slDistS  := na
+    trgLockS := na
+    dstLockS := na
+
+//============== PLOTS / DIAGNOSTICS ==============//
+varip int rtBars = 0
+if barstate.isrealtime and barstate.isnew
+    rtBars += 1
+firstRT = barstate.isrealtime and not barstate.isrealtime[1]
+
+plot(ShowLevels ? lvlUp : na, "Level Up",   color=color.new(color.teal, 0),   style=plot.style_linebr)
+plot(ShowLevels ? lvlDn : na, "Level Down", color=color.new(color.maroon, 0), style=plot.style_linebr)
+plot(ShowLevels and strategy.position_size > 0 ? trailL : ShowLevels and strategy.position_size < 0 ? trailS : na, "Stop", color=color.new(color.orange, 0), style=plot.style_linebr)
+plot(ShowLevels and strategy.position_size > 0 ? tpLockL : ShowLevels and strategy.position_size < 0 ? tpLockS : na, "TP", color=color.new(color.green, 40), style=plot.style_linebr)
+plot(ShowEma and TrendLen > 0 ? emaT : na, "Trend EMA", color=color.new(color.blue, 30))
+bgcolor(not inSession or not dowOK ? color.new(color.gray, 92) : na, title="Out of session")
+bgcolor(UseCompGate and not gateOK ? color.new(color.red, 94) : na, title="Compression gate closed")
+bgcolor(UseCostGate and not costOK ? color.new(color.yellow, 94) : na, title="Cost gate closed")
+bgcolor(ShowTickMark and tickMode and barstate.isrealtime ? color.new(color.blue, 95) : na, title="Realtime bars (Tick mode live from here)")
+
+var label rtLbl = na
+if ShowTickMark and tickMode and firstRT and na(rtLbl)
+    rtLbl := label.new(bar_index, high, "TICK MODE from here\nbars to the left: bar-close simulation", style=label.style_label_down, color=color.new(color.blue, 20), textcolor=color.white, size=size.small)
+
+var table tbl = table.new(position.top_right, 2, 20, bgcolor=color.new(color.black, 85), border_width=1, border_color=color.new(color.gray, 70))
+row(int r, string k, string v, color c) =>
+    table.cell(tbl, 0, r, k, text_color=color.new(color.silver, 0), text_size=size.small, text_halign=text.align_left)
+    table.cell(tbl, 1, r, v, text_color=c, text_size=size.small, text_halign=text.align_right)
+
+if ShowTable and barstate.islast
+    lvSrc     = (UsePivot ? "Pivot " : "") + (UseDonchian ? "Don " : "") + (UsePrevDay ? "PrevDay" : "")
+    tpNow     = tpEffAt(close)
+    slNow     = slDistAt(close)
+    costPctTP = tpRefDist > 0 ? rtCostNow / tpRefDist * 100.0 : na
+    hdrTicks  = syminfo.mintick > 0 ? usdToPx(SlipUSD) / syminfo.mintick : na
+    pvOK      = math.abs(pv - 1.0) < 1e-9
+    wr        = strategy.closedtrades > 0 ? strategy.wintrades * 100.0 / strategy.closedtrades : na
+    cR        = slNow > 0 ? rtCostNow / slNow : na                                       // cost in R
+    rMult     = slNow > 0 ? tpRefDist / slNow : na                                       // net R
+    beWin     = na(cR) or na(rMult) ? na : (1.0 + cR) / (rMult + 1.0 + (TPNetOfCost ? cR : 0.0)) * 100.0   // breakeven win rate: a win nets R when TP is widened, R - c otherwise
+    commMis   = commModel > 0 ? math.abs(commPaid - commModel) / commModel : (commPaid > 0 ? 1.0 : 0.0)
+    commOK    = strategy.closedtrades == 0 or commMis <= 0.10
+    per100    = bar_index > 0 ? strategy.closedtrades * 100.0 / bar_index : na
+    bufAtr    = atrRef > 0 ? buffer / atrRef : na
+    blocked   = ((allowL and trendL) or (allowS and trendS) ? "" : "trend ") + (coolOK ? "" : "cooldown ") + (dayOK ? "" : "maxday ") + (gateOK ? "" : "coil ") + (costOK ? "" : "cost ") + ((allowL and not retryOKL) or (allowS and not retryOKS) ? "losscap " : "") + (inSession and dowOK ? "" : "time ") + (na(atrRef) ? "atr-warmup " : "") + (distDead ? "MAXDIST<=BUFFER " : "")
+    row(0,  "XPW v2.10", ExecMode + " / " + EntryMode + (ArmLatch ? " / latch" : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
+    row(1,  "Levels", lvSrc == "" ? "NONE" : lvSrc, lvSrc == "" ? color.red : color.white)
+    row(2,  "ATR " + str.tostring(AtrLen), str.tostring(atrRef, "#.##") + "  (" + str.tostring(atrPct, "#.###") + "%)", color.white)
+    row(3,  "SL dist", str.tostring(slNow, "#.##") + "  (" + str.tostring(slNow / close * 100.0, "#.###") + "%)", color.white)
+    row(4,  "TP dist gross / net", str.tostring(tpNow, "#.##") + " / " + str.tostring(tpRefDist, "#.##"), color.white)
+    row(5,  "Entry buffer", str.tostring(buffer, "#.##") + "  (" + str.tostring(bufAtr, "#.##") + " ATR)", color.white)
+    row(6,  "Trail trigger / distance", str.tostring(trailTrg(tpRefDist), "#.##") + " / " + str.tostring(trailDst(tpRefDist), "#.##"), color.white)
+    row(7,  "RT cost / contract", str.tostring(rtCostNow, "#.##") + "  (" + str.tostring(costPctTP, "#.#") + "% of net TP)", costOK ? color.white : color.orange)
+    row(8,  "Cost gate", UseCostGate ? (costOK ? "open" : "CLOSED") : "off", costOK ? color.lime : color.orange)
+    row(9,  "Breakeven win rate", na(beWin) ? "-" : str.tostring(beWin, "#.#") + "%  (R " + str.tostring(rMult, "#.##") + ", cost " + str.tostring(cR, "#.##") + " R)", color.white)
+    row(10, "Header slippage should be", na(hdrTicks) ? "?" : str.tostring(math.round(hdrTicks)) + " ticks", color.white)
+    row(11, "Commission charged / modelled", str.tostring(commPaid, "#.##") + " / " + str.tostring(commModel, "#.##") + (commOK ? "" : "  HEADER != INPUTS"), commOK ? color.white : color.red)
+    row(12, "Qty next (L / S)", str.tostring(calcQty(na(lvlUp) ? close : lvlUp), "#.####") + " / " + str.tostring(calcQty(na(lvlDn) ? close : lvlDn), "#.####"), color.white)
+    row(13, "Filters", blocked == "" ? "all pass" : "blocked: " + blocked, distDead ? color.red : blocked == "" ? color.lime : color.orange)
+    row(14, "Armed (L / S)", (armedL ? "yes" : "no") + " / " + (armedS ? "yes" : "no"), color.white)
+    row(15, "Position", strategy.position_size > 0 ? "LONG " + str.tostring(strategy.position_size, "#.####") : strategy.position_size < 0 ? "SHORT " + str.tostring(-strategy.position_size, "#.####") : "flat", strategy.position_size != 0 ? color.yellow : color.white)
+    row(16, "Net profit", str.tostring(strategy.netprofit, "#.##"), strategy.netprofit >= 0 ? color.lime : color.red)
+    row(17, "Trades / win % / per 100 bars", str.tostring(strategy.closedtrades) + " / " + (na(wr) ? "-" : str.tostring(wr, "#.#")) + " / " + (na(per100) ? "-" : str.tostring(per100, "#.#")), color.white)
+    row(18, "Symbol", syminfo.type + "  mintick " + str.tostring(syminfo.mintick) + "  pointvalue " + str.tostring(pv) + (pvOK ? "" : " (!= 1: check sizing)") + "  realtime bars " + str.tostring(rtBars), pvOK ? color.white : color.orange)
+    row(19, "Trading", allowTrade ? "enabled" : "DISABLED (systemType)", allowTrade ? color.lime : color.red)
+
+var label warnLbl = na
+if systemType != 1 and na(warnLbl) and barstate.islast
+    warnLbl := label.new(bar_index, high, "systemType != 1 - TRADING DISABLED", style=label.style_label_down, color=color.red, textcolor=color.white)

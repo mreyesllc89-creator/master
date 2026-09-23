@@ -332,3 +332,38 @@ python3 calibration/xpw_backtest.py parity
 python3 calibration/xpw_backtest.py run --tf 60 --sl-mode atr --sl 3 --tp-r 3 --barsn 3 --buf 0.5 --trail tick --cost cfd_raw --arm latch
 python3 calibration/xpw_backtest.py geometry
 ```
+
+## 13. XAUUSD build
+
+`pine/XPW_Breakout_v2.10_XAUUSD.pine` is the same script with gold defaults.
+The logic is byte-identical (checked by stripping comments and inputs and
+diffing); only the header costs, the cost inputs, the sizing inputs and the
+notes differ.
+
+| Setting | BTCUSD build | XAUUSD build | Why |
+|---|---|---|---|
+| Contract | 1 BTC (1 MT5 lot) | 1 oz (100 oz = 1 MT5 lot) | TradingView gold CFD feeds quote per ounce |
+| Header commission | cash 9.0 per contract per side | cash 0.10 per oz per side | raw: $0.03/oz commission ($6 per lot round trip) plus half of a ~$0.15 spread; standard accounts ~0.15 (half of ~$0.30, no commission) |
+| Header slippage | 500 ticks ($5) | 5 ticks ($0.05/oz) | mintick 0.01 on both |
+| CommCash / SlipUSD inputs | 9.0 / 5.0 | 0.10 / 0.05 | mirror the header |
+| FixedQty / cap / step | 0.1 / 2.0 / 0.01 BTC | 10 / 50 / 1 oz | 0.1 lot fallback, 0.5 lot cap, 0.01 lot step |
+| Geometry | ATR: SL 3.0, TP 3R, BarsN 3, buffer 0.5 | same | ATR geometry is symbol-agnostic |
+
+Round trip at the gold defaults is $0.30 per ounce ($30 per lot), about
+0.0075% of a $4,000 price, so the cost gate will not bind on 15m and up;
+the v2.01 header ($0.006 per ounce, no spread) understated a raw round
+trip by roughly 50x. The gold spread and the per-lot commission are
+assumptions from typical raw-account pricing: verify both on an MT5
+statement and put half the real spread plus the per-ounce commission into
+CommCash.
+
+Not done for gold: no XAUUSD exports were provided, so the geometry was not
+swept. The ATR defaults carry over from the 60m BTC plateau. Before trading
+them, export 15m/60m/240m XAUUSD bars the same way and run the sweep, or at
+least check the table: the SL row should be several times the ATR row of
+the bar size you trade, and the breakeven win rate row should sit well below
+your observed win rate. Gold also differs from BTC in two ways the script
+does not model: it has a daily maintenance break and a weekend gap (use the
+session and trade-day inputs; the previous-day levels use the broker's
+server day), and its swaps are charged per lot per night with a triple
+Wednesday.

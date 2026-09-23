@@ -7,6 +7,7 @@ execution.
 | Path | What it is |
 |---|---|
 | `pine/XPW_Breakout_v2.10_BTCUSD.pine` | The strategy. Load it in the Pine editor on a BTCUSD chart. |
+| `pine/XPW_Breakout_v2.10_XAUUSD.pine` | The same strategy with gold defaults (per-ounce costs, ounce sizing). Geometry not swept on gold data; see `CALIBRATION.md` section 13. |
 | `pine/XPW_Breakout_v2.01_XAUUSD.pine` | The previous (gold) version, kept for diffing. |
 | `CALIBRATION.md` | Cost presets, per-timeframe geometry, sweep results, what changed and why. |
 | `calibration/xpw_backtest.py` | Python replica of the TradingView broker emulator used for the sweep. |
