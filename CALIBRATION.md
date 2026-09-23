@@ -15,7 +15,7 @@ positive), and the per-timeframe blocks say when even that is not available.
 
 | Ask | What v2.01 did | What v2.10 does |
 |---|---|---|
-| Include commission | Header only: 0.003 USD per oz per side and 30 ticks slippage. On BTC that is $0.61 per round trip, 35-140x below any real venue. Nothing in the logic knew about costs. | Cost inputs (commission %, commission cash per contract per side, slippage per side) drive a cost gate, TP widening so the net target equals the input, cost-aware risk sizing, a cost-aware breakeven step, and a referee table that compares the commission the tester actually charged with the modelled figure. Header re-based to BTC. |
+| Include commission | Header only: 0.003 USD per oz per side and 30 ticks slippage. On BTC that is $0.61 per round trip, 35-140x below any real venue. Nothing in the logic knew about costs. | Cost inputs (commission %, commission cash per contract per side, slippage per side) drive a cost gate, TP widening by both commissions so the net target equals the input (entry slippage already sits inside the fill price and a limit exit is never slipped), cost-aware risk sizing, a breakeven step at fill plus commissions plus one exit slip, and a referee table that compares the commission the tester actually charged with the modelled figure. Header re-based to BTC. |
 | More extensive entry | One level source (confirmed pivot), one trigger (stop straddle), a session filter and a compression gate. The stop was cancelled on every bar whose close sat inside the buffer (F11), so most breaks never had an order resting. | Three level sources (pivot, Donchian of the prior N bars, previous-day high/low; nearest enabled level is used), three triggers (resting stop, close-confirmed market entry with a chase cap, retest limit with a lifetime), an arm latch that keeps the stop resting, plus direction, chart-EMA trend, cooldown, max trades per day, retry cap per level, trade days, session, compression and cost gates. |
 | Entry by tick | Bar-close only ("Script execution = ON BAR CLOSE ONLY"). | `calc_on_every_tick=true` with an Execution input. Tick mode re-evaluates arming, cancelling, sizing, the cost gate and the trail on every live tick; state is `varip` so it survives the per-tick rollback. The trail can be handed to the broker emulator (`trail_points`/`trail_offset`), which ratchets intrabar on history and per tick live. Levels still come from confirmed bars because an unconfirmed level cannot be backtested. |
 
@@ -27,11 +27,25 @@ Defects found on the way (all fixed in v2.10, see the script header):
   cancels the stop and it can never fill.
 - F12: `strategy.risk.max_position_size` only constrains `strategy.entry()`;
   v2.01 used `strategy.order()`, so its hard cap was inert.
-- F13: ATR geometry recomputed after the fill is a moving target; SL/TP are
-  now locked per trade at arm time and re-anchored to the real fill.
+- F13: ATR geometry recomputed after the fill is a moving target; SL, TP,
+  trail trigger and trail distance are now locked per trade at arm time and
+  re-anchored to the real fill. Percent geometry is re-derived from the fill
+  (the v2.01 form).
+- F14: the pre-staged bracket is expressed in ticks from the fill
+  (`strategy.exit` loss/profit) rather than absolute prices anchored to the
+  level, so a gapped or slipped fill keeps the sized SL and the intended TP on
+  the fill bar.
 - A `var` trail ratchet re-issued with `strategy.exit` on every tick would
   retreat, because order state is not rolled back between ticks but `var`
   state is. Trail state is `varip`.
+- Two review rounds (five lenses, two independent refuters per finding)
+  found and fixed twenty further defects in the first v2.10 draft, among
+  them: the latch was not keyed to the level it armed on (a replaced level
+  re-priced the resting stop with no buffer check), a transient filter
+  closure dropped the latch, close-based filters flickered per tick, the
+  retest invalidation ran on interim ticks in BarClose mode, the retry cap
+  never applied in CloseConfirm/Retest, the compression gate measured the
+  wrong pair, and the day counter differed between history and live.
 
 ## 2. Data
 
@@ -189,7 +203,11 @@ unless noted):
 
 Shipped defaults are the 60m block: GeoMode ATR, SL 3.0 ATR, TP 3R, BarsN 3,
 buffer 0.5 ATR, trail on with Emulator execution, trigger 1.0 ATR, distance
-1.5 ATR, latch on, cost gate 20% of net TP, cfd_raw costs. Marginals over
+1.5 ATR, latch on, cost gate 20% of net TP, cfd_raw costs. One deliberate
+difference from the engine: the script locks the trail trigger and distance
+at arm time (F13), while the engine (and v2.01) followed the live ATR bar by
+bar; over the 8-17 bar holds seen here the ATR drifts little, so this is a
+second-order effect. Marginals over
 the whole latch grid (cfd_raw, measurable configurations): trail tick beats
 bar beats off; buffer 0.5 beats 1.0 beats 2.0; TP 3R is the best R; BarsN 3
 and 8 beat 5.
@@ -265,13 +283,16 @@ calibration/xpw_backtest.py parity` and `calibration/results/parity.json`.
 ## 10. v2.01 acceptance recipe
 
 To reproduce the v2.01 trade population with v2.10: Execution BarClose, Arm
-latch off, Pivot only (Donchian and previous day off), GeoMode Pct with SL
-0.1 and TP 0.25, buffer 1.0 ATR, Trail execution Script with trigger 1.0
-and distance 1.5 ATR, cost gate off, TP widening off, cost sizing off, Risk
-4, FixedQty 10, cap 50, step 1, commission and slippage as the v2.01 header.
-Entry IDs are still BuyStop/SellStop. Two residual differences: v2.10 snaps
-order prices to the symbol's mintick, and v2.10 uses `strategy.entry` so the
-position-size rail is live (it does not bind at those settings).
+latch off, Pivot only with BarsN 5 (Donchian and previous day off), GeoMode
+Pct with SL 0.1 and TP 0.25, buffer ATR 1.0, Trail execution Script with
+trigger 1.0 and distance 1.5 ATR, cost gate off, TP widening off, cost
+sizing off, Risk 4, FixedQty 10, cap 50, QtyStep 1, and Properties >
+Slippage 30 ticks, Commission 0.003 cash per contract (type them in, then
+Reset settings afterwards to return to the BTC header). Entry IDs are still
+BuyStop/SellStop. Residual differences: v2.10 snaps order prices to the
+symbol's mintick, uses `strategy.entry` so the position-size rail is live (it
+does not bind at those settings), and locks the trail distance at arm time
+where v2.01 followed the live ATR.
 
 ## 11. Not modelled, or only partly
 
