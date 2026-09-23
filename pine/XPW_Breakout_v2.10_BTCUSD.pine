@@ -323,12 +323,10 @@ dowOK = str.contains(DowStr, str.tostring(dayofweek))
 lastExitIdx = strategy.closedtrades > 0 ? strategy.closedtrades.exit_bar_index(math.max(strategy.closedtrades - 1, 0)) : na
 coolOK   = Cooldown == 0 or na(lastExitIdx) or bar_index - lastExitIdx >= Cooldown
 tradeCnt = strategy.closedtrades + strategy.opentrades           // trades ever opened; monotone
-varip int   dayKey  = -1
-varip int   dayBase = 0
-dayNow = time("D")
-if dayNow != dayKey
-    dayKey  := dayNow
-    dayBase := nz(tradeCnt[1])                                     // previous bar's committed count: same on history and on every tick
+newDay   = timeframe.change("D")
+var int dayBase = 0
+if newDay
+    dayBase := nz(tradeCnt[1])                                     // previous bar's committed count: same on history and on every tick, so re-running it per tick is harmless
 tradesToday = tradeCnt - dayBase
 dayOK = MaxPerDay == 0 or tradesToday < MaxPerDay
 // A trade OPENED since the last evaluation (F11 "position changes"). History runs once per bar, so a fill that
