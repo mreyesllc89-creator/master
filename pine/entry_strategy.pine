@@ -2,10 +2,12 @@
 // Candle Entry Strategy: trades the market as the "Candle Entry Labels"
 // indicator signals and draws the same marks.
 //
-//   * The trade is taken ON THE SIGNAL CANDLE: the market order is processed on
-//     that candle's close (orders cannot fill before the signal exists, so the
-//     fill price is the signal candle's close). The Strategy Tester shows these
-//     real fills.
+//   * The trade is taken ON THE SIGNAL CANDLE. To enter and exit at the
+//     BEGINNING of that candle, put the chart on a lower timeframe than the
+//     signal timeframe (e.g. chart 1m, signal timeframe 10m): the strategy then
+//     fills on the first chart candle of each signal candle. On the chart's own
+//     timeframe an order can only fill once the signal exists, i.e. at the
+//     signal candle's close.
 //   * The entry MARK is the same as the indicator's: at the open of the signal
 //     candle, where the move starts. LONG label below that candle, SHORT above,
 //     dot at the open. The move (best / worst point in ticks and timing) is
@@ -49,6 +51,8 @@ stopTicks  = input.int(0, "Stop loss (ticks, 0 = off)",   minval = 0, group = gr
 tpTicks    = input.int(0, "Take profit (ticks, 0 = off)", minval = 0, group = grpTrd)
 timeStop   = input.bool(false, "Time stop: close after N bars", group = grpTrd)
 maxBars    = input.int(50, "N bars", minval = 1, group = grpTrd)
+fillAtOpen = input.bool(true, "Fill at the beginning of the signal candle", group = grpTrd,
+     tooltip = "Needs the chart on a LOWER timeframe than the signal timeframe (e.g. chart 1m, signal timeframe 10m). Entries and exits then happen on the first chart candle of the signal candle. On the chart's own timeframe the fill can only be at the signal candle's close, because that is when the signal exists.\nNote: on history this uses the signal candle's final value at its first chart candle; in real time the value is still forming.")
 
 // ─────────────────────────── Inputs: labels ───────────────────────────
 grpLbl = "Entry labels"
@@ -163,14 +167,19 @@ if htfChange
     htfStart := bar_index
 
 // ─────────────────────────── Orders: on the signal candle ───────────────────────────
-// Orders are processed on the close of the bar that sends them, so the trade is
-// taken on the signal candle (chart timeframe) or on the last chart candle of
-// the signal-timeframe bar (higher timeframe).
+// Orders are processed on the close of the bar that sends them.
+//   Beginning of the signal candle (chart timeframe lower than the signal
+//   timeframe): the signal candle's value is read on its FIRST chart candle and
+//   the order fills there, i.e. at the beginning of the signal candle.
+//   Otherwise: the order fills on the signal candle's close (chart timeframe) or
+//   on the last chart candle of the signal-timeframe bar.
+bool atBegin = useHtf and fillAtOpen
 [sigL, sigS] = request.security(syminfo.tickerid, reqTf, [cL, cS])
+[begL, begS] = request.security(syminfo.tickerid, reqTf, [cL, cS], lookahead = barmerge.lookahead_on)
 int  htfCloseT  = request.security(syminfo.tickerid, reqTf, time_close, lookahead = barmerge.lookahead_on)
 bool htfLastBar = not useHtf or time_close == htfCloseT
-bool orderLong  = (useHtf ? sigL : cL) and htfLastBar
-bool orderShort = (useHtf ? sigS : cS) and htfLastBar and not orderLong
+bool orderLong  = atBegin ? (begL and htfChange) : ((useHtf ? sigL : cL) and htfLastBar)
+bool orderShort = (atBegin ? (begS and htfChange) : ((useHtf ? sigS : cS) and htfLastBar)) and not orderLong
 
 if orderLong and tradeLong
     strategy.entry("Long", strategy.long, comment = "LONG")
@@ -345,7 +354,7 @@ if openedNow
     string tip = (d == 1 ? "Long entry" : "Short entry")
          + "\nSignal: " + sigMode + (useHtf ? " on " + sigTf : "")
          + "\nSignal candle open: " + str.tostring(entryPx, format.mintick) + " " + f_time(entryT)
-         + "\nOrder fill (candle close): " + str.tostring(fillPx, format.mintick) + " " + f_time(time[fillOff])
+         + (atBegin ? "\nOrder fill (candle beginning): " : "\nOrder fill (candle close): ") + str.tostring(fillPx, format.mintick) + " " + f_time(time[fillOff])
          + "\nTick size: " + str.tostring(syminfo.mintick)
          + (stopTicks > 0 ? "\nStop: " + str.tostring(stopTicks) + " ticks" : "")
          + (tpTicks > 0 ? "\nTarget: " + str.tostring(tpTicks) + " ticks" : "")
@@ -432,5 +441,6 @@ if showTable and barstate.islast
          + " · Win rate: " + str.tostring(winPc, "#.#") + "%"
          + " · Net: " + str.tostring(strategy.netprofit, "#.##") + " " + syminfo.currency
          + (strategy.opentrades > 0 ? " · Open: " + str.tostring(strategy.openprofit, "#.##") : "")
+         + (fillAtOpen and not useHtf ? "\nTo fill at the beginning of the signal candle: set the chart to a lower timeframe than the signal timeframe" : "")
     table.cell(tbl, 0, tblRows + 1, summary, text_color = color.white, bgcolor = hdrBg, text_size = ts, text_halign = text.align_left)
     table.merge_cells(tbl, 0, tblRows + 1, cols - 1, tblRows + 1)
