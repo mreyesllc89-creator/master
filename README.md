@@ -7,12 +7,13 @@ execution.
 | Path | What it is |
 |---|---|
 | `pine/XPW_Breakout_v2.10_BTCUSD.pine` | The strategy. Load it in the Pine editor on a BTCUSD chart. |
-| `pine/XPW_Breakout_v2.10_XAUUSD.pine` | The same strategy with gold defaults (per-ounce costs, ounce sizing). Geometry not swept on gold data; see `CALIBRATION.md` section 13. |
+| `pine/XPW_Breakout_v2.10_XAUUSD.pine` | The same strategy with gold defaults (per-ounce costs, ounce sizing, SL 1.5 ATR / TP 2.5R from the gold sweep). See `CALIBRATION.md` section 13. |
 | `pine/XPW_Breakout_v2.01_XAUUSD.pine` | The previous (gold) version, kept for diffing. |
 | `CALIBRATION.md` | Cost presets, per-timeframe geometry, sweep results, what changed and why. |
 | `calibration/xpw_backtest.py` | Python replica of the TradingView broker emulator used for the sweep. |
-| `calibration/data/BTCUSD_*.csv` | The five TradingView exports (1m, 15m, 30m, 60m, 240m) the sweep ran on. |
-| `calibration/results/` | Sweep CSVs, `summary.json`, `SWEEP_NOTES.md`, `parity.json`. |
+| `calibration/data/BTCUSD_*.csv` | The five TradingView exports (1m, 15m, 30m, 60m, 240m) the BTC sweep ran on. |
+| `calibration/data/XAUUSD_*.csv` | The six OANDA gold exports (5m to 240m) the gold sweep ran on. |
+| `calibration/results/` | Sweep CSVs, `summary.json`, `SWEEP_NOTES.md`, `parity.json`; `latch/` for the v2.10 arming sweep, `xau/` for gold. |
 
 ## Quick start
 

@@ -337,33 +337,100 @@ python3 calibration/xpw_backtest.py geometry
 
 `pine/XPW_Breakout_v2.10_XAUUSD.pine` is the same script with gold defaults.
 The logic is byte-identical (checked by stripping comments and inputs and
-diffing); only the header costs, the cost inputs, the sizing inputs and the
-notes differ.
+diffing); the header costs, cost inputs, sizing inputs, geometry defaults
+and notes differ.
 
-| Setting | BTCUSD build | XAUUSD build | Why |
+### Data
+
+OANDA:XAUUSD exports made with the v2.01 build on the chart (its Swing High /
+Swing Low columns match the engine's BarsN 5 pivots 99.7 to 100%). A
+Pepperstone 10m export made with the v2.10 build was also checked: the
+engine's nearest-level pick matched its Level Up / Level Down columns 99.9%
+of the time at BarsN 3, which confirms the v2.10 level logic as it runs on
+TradingView.
+
+| File | Bars | Span | Median ATR14 | ATR % of price |
+|---|---|---|---|---|
+| `XAUUSD_5.csv` | 719 | 2.6 days | 4.32 | 0.100 |
+| `XAUUSD_10.csv` | 2161 | 22 days | 6.61 | 0.152 |
+| `XAUUSD_15.csv` | 1672 | 26 days | 8.28 | 0.190 |
+| `XAUUSD_30.csv` | 895 | 28 days | 12.01 | 0.275 |
+| `XAUUSD_60.csv` | 895 | 55 days | 17.90 | 0.409 |
+| `XAUUSD_240.csv` | 895 | 210 days | 39.19 | 0.880 |
+
+### Costs
+
+| Setting | BTCUSD build | XAUUSD build |
+|---|---|---|
+| Contract | 1 BTC (1 MT5 lot) | 1 oz (100 oz = 1 MT5 lot) |
+| Header commission | cash 9.0 per contract per side | cash 0.10 per oz per side (raw: $0.03 commission plus half of a ~$0.15 spread; standard ~0.15) |
+| Header slippage | 500 ticks ($5) | 5 ticks ($0.05 per oz) |
+| CommCash / SlipUSD inputs | 9.0 / 5.0 | 0.10 / 0.05 |
+| FixedQty / cap / step | 0.1 / 2.0 / 0.01 BTC | 10 / 50 / 1 oz |
+
+Round trip at the raw preset is $0.31 per ounce ($31 per lot): 2 to 7% of
+one ATR on 10m to 240m, so on gold the cost gate never binds and the
+geometry question is about noise, not cost. The raw and standard presets
+give the same picks. The gold spread and commission are assumptions from
+typical raw-account pricing; verify on an MT5 statement.
+
+### Sweep (latch on, gold presets, fixed 1 oz; multiply net by 100 for one lot)
+
+Grid as for BTC (SL pct/ATR bands x TP R x BarsN x buffer x trail x
+levels). Results: `calibration/results/xau/`.
+
+Shipped gold defaults: ATR mode, SL 1.5 ATR, TP 2.5R, BarsN 3, buffer 1.0,
+Emulator trail (trigger 1.0, distance 1.5 ATR). Net per ounce at those
+settings, pivot levels, raw costs:
+
+| TF | trades | net per oz (Emulator trail) | net per oz (Script trail) |
 |---|---|---|---|
-| Contract | 1 BTC (1 MT5 lot) | 1 oz (100 oz = 1 MT5 lot) | TradingView gold CFD feeds quote per ounce |
-| Header commission | cash 9.0 per contract per side | cash 0.10 per oz per side | raw: $0.03/oz commission ($6 per lot round trip) plus half of a ~$0.15 spread; standard accounts ~0.15 (half of ~$0.30, no commission) |
-| Header slippage | 500 ticks ($5) | 5 ticks ($0.05/oz) | mintick 0.01 on both |
-| CommCash / SlipUSD inputs | 9.0 / 5.0 | 0.10 / 0.05 | mirror the header |
-| FixedQty / cap / step | 0.1 / 2.0 / 0.01 BTC | 10 / 50 / 1 oz | 0.1 lot fallback, 0.5 lot cap, 0.01 lot step |
-| Geometry | ATR: SL 3.0, TP 3R, BarsN 3, buffer 0.5 | same | ATR geometry is symbol-agnostic |
+| 5m | 48 | -59 | -21 |
+| 10m | 134 | +99 | +64 |
+| 15m | 101 | +213 | +260 |
+| 30m | 54 | +194 | +275 |
+| 60m | 55 | +171 | +178 |
+| 240m | 53 | +487 | +1122 |
 
-Round trip at the gold defaults is $0.30 per ounce ($30 per lot), about
-0.0075% of a $4,000 price, so the cost gate will not bind on 15m and up;
-the v2.01 header ($0.006 per ounce, no spread) understated a raw round
-trip by roughly 50x. The gold spread and the per-lot commission are
-assumptions from typical raw-account pricing: verify both on an MT5
-statement and put half the real spread plus the per-ounce commission into
-CommCash.
+The BTC defaults (SL 3 ATR, TP 3R, buffer 0.5) are marginal on gold: negative
+on 5m and 10m at BarsN 3, and +106 to +127 per ounce on 30m and 60m. Gold
+wants a tighter stop and a less greedy target than BTC. Marginals over the
+measurable grid (10m to 240m): SL 1.5 ATR has the best positive fraction
+(86%), TP 2.5R the best mean net, BarsN 3 and 5 beat 8, buffer 1.0 edges
+0.5, and the bar-close trail beats the tick trail on mean net (128 vs 94
+per ounce) while the tick trail has the higher positive fraction (82 vs
+80%). Emulator execution is kept as the default for history-versus-live
+consistency; switch to Script if you prefer the v2.01 close-anchored
+ratchet.
 
-Not done for gold: no XAUUSD exports were provided, so the geometry was not
-swept. The ATR defaults carry over from the 60m BTC plateau. Before trading
-them, export 15m/60m/240m XAUUSD bars the same way and run the sweep, or at
-least check the table: the SL row should be several times the ATR row of
-the bar size you trade, and the breakeven win rate row should sit well below
-your observed win rate. Gold also differs from BTC in two ways the script
-does not model: it has a daily maintenance break and a weekend gap (use the
-session and trade-day inputs; the previous-day levels use the broker's
-server day), and its swaps are charged per lot per night with a triple
-Wednesday.
+Per-timeframe plateau picks (every grid neighbour positive), pivot levels,
+raw costs:
+
+| TF | pick | trades | win % | net per oz | PF | max DD per oz |
+|---|---|---|---|---|---|---|
+| 10m | Pct SL 0.5%, TP 2.5R, BarsN 8, buffer 0.5, no trail | 23 | 57 | +452 | 3.06 | 44 |
+| 15m | ATR 3.0, 2.5R, BarsN 3, buffer 2.0, no trail | 18 | 56 | +551 | 3.46 | 56 |
+| 30m | ATR 3.0, 1.5R, BarsN 3, buffer 2.0, tick trail | 35 | 69 | +389 | 6.20 | 40 |
+| 60m | ATR 3.0, 2.5R, BarsN 3, buffer 0.5, bar trail | 39 | 54 | +579 | 2.50 | 106 |
+| 240m | ATR 3.0, 1.5R, BarsN 3, buffer 1.0, bar trail | 34 | 76 | +1526 | 2.69 | 176 |
+
+These beat the shipped defaults on their own timeframe but are single cells
+with 18 to 39 trades; the shipped defaults were chosen for being positive
+everywhere rather than best anywhere. 5m is not worth trading with this
+system: 2.6 days of data, and every geometry that survives costs elsewhere
+is negative there.
+
+The v2.01 gold geometry (SL 0.1%, TP 0.25%) is not sub-noise on gold the way
+it is on BTC (SL 0.1% is 0.65 ATR on 10m), and with the latch it is mildly
+positive on 10m to 30m (PF 1.1 to 1.5 over 56 to 114 trades). On 60m and
+240m 67 to 88% of its trades resolve inside the fill bar, the same emulator
+artefact seen on BTC, so those rows do not count.
+
+Adding Donchian 20 levels raises trade counts by 30 to 60% and helps on 10m
+(79 trades, +287 per ounce at SL 1.0%, 2R, BarsN 8) and 240m (+1661 at SL
+1.5 ATR, 3R) but not elsewhere; it stays off by default.
+
+Not modelled: the daily maintenance break and weekend gap (use the session
+and trade-day inputs), and gold swaps, which are charged per lot per night
+with a triple Wednesday and can exceed the round-trip cost on a 60m or 240m
+hold.
