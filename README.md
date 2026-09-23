@@ -67,14 +67,16 @@ Turn on *Show money value per contract* to also print `ticks × tick value`.
 
 Same signals, same labels, but the script actually trades:
 
-- **Market order filled at the next candle's open.** The order is sent when the
-  signal bar closes and fills at the open of the following candle. The Strategy
-  Tester and the table's summary row use these real fills.
+- **The trade is taken on the signal candle.** Orders are processed on that
+  candle's close, so the strategy's own trade markers sit on the same candle as
+  the indicator's labels. A fill cannot happen before the signal exists, so the
+  fill price is the signal candle's close; the Strategy Tester and the table's
+  summary row use these real fills.
 - **Same marks as the indicator.** The LONG / SHORT label and dot sit at the
-  open of the signal candle (or of the fill candle with *Entry point* = *Next
-  candle open*), and the move in ticks and time is measured from that mark.
-  The label tooltip shows both the mark price and the real fill price.
-- **Exits.** An opposite signal reverses the position at the next open. Optional
+  open of the signal candle, and the move in ticks and time is measured from
+  that open, exactly as in the indicator. The label tooltip shows both the mark
+  price (open) and the real fill price (close).
+- **Exits.** An opposite signal reverses the position on its signal candle. Optional
   *Stop loss* and *Take profit* are set in **ticks** and can fill inside a candle.
   Optional *Time stop* closes after N bars. *Take long / short entries* toggles
   let you run one side only.

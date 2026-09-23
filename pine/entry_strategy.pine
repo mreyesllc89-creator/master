@@ -1,14 +1,15 @@
 //@version=6
-// Candle Entry Strategy: trades the market exactly as the "Candle Entry Labels"
-// indicator signals, with market orders, and draws the same marks.
+// Candle Entry Strategy: trades the market as the "Candle Entry Labels"
+// indicator signals and draws the same marks.
 //
-//   * The market order is sent when the signal bar closes and fills at the open
-//     of the next candle (the Strategy Tester shows these real fills).
-//   * The entry MARK sits at the open of the signal candle, where the move
-//     starts (or at the fill candle's open with "Entry point" = Next candle
-//     open). LONG label below that candle, SHORT above, dot at the entry price.
-//     The move (best / worst point in ticks and timing) is measured from the
-//     mark; the END mark uses the real exit.
+//   * The trade is taken ON THE SIGNAL CANDLE: the market order is processed on
+//     that candle's close (orders cannot fill before the signal exists, so the
+//     fill price is the signal candle's close). The Strategy Tester shows these
+//     real fills.
+//   * The entry MARK is the same as the indicator's: at the open of the signal
+//     candle, where the move starts. LONG label below that candle, SHORT above,
+//     dot at the open. The move (best / worst point in ticks and timing) is
+//     measured from that open; the END mark uses the real exit.
 //   * Exits: reverse on the opposite signal, optional stop loss / take profit
 //     in ticks (intrabar), optional time stop.
 //   * Table of recent trades plus a summary row (trades, win rate, net profit
@@ -20,7 +21,7 @@ strategy("Candle Entry Strategy: Long/Short, Ticks & Timing",
      default_qty_type = strategy.fixed,
      default_qty_value = 1,
      initial_capital = 10000,
-     process_orders_on_close = false,
+     process_orders_on_close = true,
      calc_on_every_tick = false,
      max_labels_count = 500,
      max_lines_count = 500,
@@ -34,9 +35,6 @@ sigMode  = input.string("EMA cross", "Signal type",
      tooltip = "EMA cross: fast EMA crosses slow EMA.\nEngulfing: bullish / bearish engulfing candle.\nBreakout: close breaks the highest high / lowest low of the lookback.\nExternal: use the two source inputs below (a value > 0 fires the signal).")
 sigTf    = input.timeframe("", "Signal timeframe (blank = chart)", group = grpSig,
      tooltip = "Signals are computed on this timeframe and drawn on whatever timeframe the chart is on.")
-entryAt  = input.string("Signal candle open", "Entry point",
-     options = ["Signal candle open", "Next candle open"], group = grpSig,
-     tooltip = "Signal candle open: the entry mark sits at the beginning (open) of the candle that gives the signal, i.e. where the move starts, and the move is measured from there.\nNext candle open: the mark sits at the open of the following candle, which is where the market order actually fills.\nOrders always fill at the open of the candle after the signal; the Strategy Tester always shows the real fills.")
 emaFast  = input.int(9,  "EMA fast", minval = 1, group = grpSig)
 emaSlow  = input.int(21, "EMA slow", minval = 2, group = grpSig)
 brkLen   = input.int(20, "Breakout lookback", minval = 2, group = grpSig)
@@ -157,8 +155,6 @@ string reqTf = useHtf ? sigTf : timeframe.period
 [hL, hS, hT] = request.security(syminfo.tickerid, reqTf, [cL[1], cS[1], cT[1]], lookahead = barmerge.lookahead_on)
 bool htfChange = timeframe.change(reqTf)
 
-bool atSig = entryAt == "Signal candle open"
-
 // Chart bar on which the current signal-timeframe bar started; at an htfChange
 // bar, prevStart is where the bar that just closed (the signal bar) started.
 var int htfStart = na
@@ -166,21 +162,10 @@ int prevStart = htfStart
 if htfChange
     htfStart := bar_index
 
-// The strategy's fill is at the open of the candle after the signal bar (chart
-// timeframe) or the first chart candle after the signal-timeframe bar closes.
-// On that fill bar the mark is placed entryOff bars back:
-//   Signal candle open → the signal candle (chart: 1 bar back; higher tf: its first chart bar)
-//   Next candle open   → the fill candle itself (entryOff = 0)
-int  sigTime  = useHtf ? hT : cT[1]
-int   entryOff = atSig ? (useHtf ? (na(prevStart) ? 0 : math.max(bar_index - prevStart, 0)) : 1) : 0
-int   entryBar = bar_index - entryOff
-float entryPx  = open[entryOff]
-int   entryT   = time[entryOff]
-
-// ─────────────────────────── Orders ───────────────────────────
-// A market order sent on a bar's close fills at the next bar's open. The order
-// goes out on the signal bar (chart timeframe) or on the last chart bar of the
-// signal-timeframe bar (higher timeframe).
+// ─────────────────────────── Orders: on the signal candle ───────────────────────────
+// Orders are processed on the close of the bar that sends them, so the trade is
+// taken on the signal candle (chart timeframe) or on the last chart candle of
+// the signal-timeframe bar (higher timeframe).
 [sigL, sigS] = request.security(syminfo.tickerid, reqTf, [cL, cS])
 int  htfCloseT  = request.security(syminfo.tickerid, reqTf, time_close, lookahead = barmerge.lookahead_on)
 bool htfLastBar = not useHtf or time_close == htfCloseT
@@ -203,19 +188,36 @@ if stopTicks > 0 or tpTicks > 0
     strategy.exit("Long SL/TP",  "Long",  loss = stopTicks > 0 ? stopTicks : na, profit = tpTicks > 0 ? tpTicks : na)
     strategy.exit("Short SL/TP", "Short", loss = stopTicks > 0 ? stopTicks : na, profit = tpTicks > 0 ? tpTicks : na)
 
-// Time stop (order sent at this bar's close, fills at the next open)
-if timeStop and strategy.opentrades > 0 and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= maxBars - 1
+// Time stop
+if timeStop and strategy.opentrades > 0 and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= maxBars
     strategy.close_all(comment = "Time stop")
 
-// What actually happened on this bar, taken from the strategy's fills
-int  nClosed   = strategy.closedtrades - strategy.closedtrades[1]
-int  lastIdx   = strategy.closedtrades - 1
-bool roundTrip = nClosed > 0 and strategy.closedtrades.entry_bar_index(lastIdx) == bar_index   // opened and closed on this bar
-int  oldIdx    = roundTrip ? lastIdx - 1 : lastIdx
-bool oldClosed = nClosed - (roundTrip ? 1 : 0) > 0                                              // a trade from an earlier bar closed
-bool stillOpen = strategy.opentrades > 0 and strategy.opentrades.entry_bar_index(strategy.opentrades - 1) == bar_index
-bool openedNow = stillOpen or roundTrip
-bool closedAtOpen = oldClosed and strategy.closedtrades.exit_price(oldIdx) == open and strategy.closedtrades.exit_bar_index(oldIdx) == bar_index
+// ─────────────────────────── Fills (the script sees them on the bar after they happen) ───────────────────────────
+int  nClosed  = strategy.closedtrades - strategy.closedtrades[1]
+int  lastIdx  = strategy.closedtrades - 1
+bool newestIsOpen = strategy.opentrades > 0
+int  newestEntryBar = newestIsOpen ? strategy.opentrades.entry_bar_index(strategy.opentrades - 1) :
+     strategy.closedtrades > 0 ? strategy.closedtrades.entry_bar_index(lastIdx) : na
+var int seenEntryBar = na
+bool openedNow = not na(newestEntryBar) and (na(seenEntryBar) or newestEntryBar != seenEntryBar)   // a trade we have not marked yet
+if openedNow
+    seenEntryBar := newestEntryBar
+bool  roundTrip = openedNow and not newestIsOpen                                  // opened and already closed
+int   oldIdx    = roundTrip ? lastIdx - 1 : lastIdx
+bool  oldClosed = nClosed - (roundTrip ? 1 : 0) > 0                                // a trade marked earlier closed
+int   fillOff   = openedNow ? bar_index - newestEntryBar : 0
+float fillPx    = not openedNow ? na : newestIsOpen ? strategy.opentrades.entry_price(strategy.opentrades - 1) : strategy.closedtrades.entry_price(lastIdx)
+bool  closedByRev = oldClosed and openedNow and strategy.closedtrades.exit_bar_index(oldIdx) == newestEntryBar
+     and strategy.closedtrades.exit_price(oldIdx) == fillPx
+
+// The entry mark, like the indicator: open of the signal candle. Chart timeframe →
+// the fill candle; higher timeframe → the first chart candle of that signal bar.
+int   sigStart = na(htfStart) ? bar_index : (openedNow and newestEntryBar < htfStart and not na(prevStart) ? prevStart : htfStart)
+int   entryOff = openedNow ? (useHtf ? math.max(bar_index - sigStart, 0) : fillOff) : 0
+int   entryBar = bar_index - entryOff
+float entryPx  = open[entryOff]
+int   entryT   = time[entryOff]
+int   sigTime  = entryT
 
 // ─────────────────────────── Move tracking state ───────────────────────────
 type Entry
@@ -309,29 +311,29 @@ f_recompute(Entry e, int lastOff) =>
         for k = 0 to first - lastOff
             f_trackAt(e, first - k)
 
-// 1) Update the open move with this bar's range, unless the trade was closed at
-//    this bar's open (reversal / time stop): then the move ended before this bar.
-if trackMove and not na(cur) and cur.isOpen and bar_index > cur.bar and not closedAtOpen
+// 1) Extend the open move with this bar's range (when a trade closed, the move
+//    is rebuilt below up to its real end instead)
+if trackMove and not na(cur) and cur.isOpen and bar_index > cur.bar and not oldClosed
     f_track(cur)
 
-// 2) A trade opened on an earlier bar closed on this bar → finish its move.
-//    On a reversal the old move ends at the new entry mark; otherwise at the real exit.
-if trackMove and not na(cur) and cur.isOpen and oldClosed and cur.bar < bar_index
-    if closedAtOpen and openedNow and entryBar > cur.bar
-        if entryOff > 0
-            f_recompute(cur, entryOff + 1)   // drop the bars that now belong to the new move
+// 2) A trade marked earlier closed → finish its move.
+//    On a reversal it ends at the new entry mark; otherwise at the real exit.
+if trackMove and not na(cur) and cur.isOpen and oldClosed
+    if closedByRev and entryBar > cur.bar
+        f_recompute(cur, entryOff + 1)   // only the bars before the new move
         f_closeMove(cur, entryPx, entryBar, entryT)
     else
-        f_closeMove(cur, strategy.closedtrades.exit_price(oldIdx), strategy.closedtrades.exit_bar_index(oldIdx), strategy.closedtrades.exit_time(oldIdx))
+        int xb = strategy.closedtrades.exit_bar_index(oldIdx)
+        f_recompute(cur, math.max(bar_index - xb, 0))
+        f_closeMove(cur, strategy.closedtrades.exit_price(oldIdx), xb, strategy.closedtrades.exit_time(oldIdx))
     if not na(liveLbl)
         label.delete(liveLbl)
         liveLbl := na
 
-// 3) A trade was filled at this candle's open → mark the signal candle's open, start tracking
+// 3) A new trade → mark the signal candle's open, start tracking
 if openedNow
     int    oi     = strategy.opentrades - 1
-    int    d      = stillOpen ? (strategy.opentrades.size(oi) > 0 ? 1 : -1) : (strategy.closedtrades.size(lastIdx) > 0 ? 1 : -1)
-    float  fillPx = stillOpen ? strategy.opentrades.entry_price(oi) : strategy.closedtrades.entry_price(lastIdx)
+    int    d      = newestIsOpen ? (strategy.opentrades.size(oi) > 0 ? 1 : -1) : (strategy.closedtrades.size(lastIdx) > 0 ? 1 : -1)
     color  dirCol = d == 1 ? longCol : shortCol
     string txt    = d == 1 ? "LONG ▲" : "SHORT ▼"
     if showPrice
@@ -342,9 +344,8 @@ if openedNow
         txt += " (" + sigTf + ")"
     string tip = (d == 1 ? "Long entry" : "Short entry")
          + "\nSignal: " + sigMode + (useHtf ? " on " + sigTf : "")
-         + "\nSignal bar: " + f_time(sigTime)
-         + "\nEntry mark (candle open): " + str.tostring(entryPx, format.mintick) + " " + f_time(entryT)
-         + "\nOrder fill (next open):  " + str.tostring(fillPx, format.mintick) + " " + f_time(time)
+         + "\nSignal candle open: " + str.tostring(entryPx, format.mintick) + " " + f_time(entryT)
+         + "\nOrder fill (candle close): " + str.tostring(fillPx, format.mintick) + " " + f_time(time[fillOff])
          + "\nTick size: " + str.tostring(syminfo.mintick)
          + (stopTicks > 0 ? "\nStop: " + str.tostring(stopTicks) + " ticks" : "")
          + (tpTicks > 0 ? "\nTarget: " + str.tostring(tpTicks) + " ticks" : "")
@@ -364,9 +365,11 @@ if openedNow
         for k = 0 to entryOff   // the entry candle and everything since count toward the move
             f_trackAt(cur, entryOff - k)
 
-// 3b) Opened and closed on the same candle (stop / target hit right away)
-if trackMove and roundTrip and not na(cur) and cur.isOpen and cur.bar <= bar_index and openedNow
-    f_closeMove(cur, strategy.closedtrades.exit_price(lastIdx), bar_index, strategy.closedtrades.exit_time(lastIdx))
+// 3b) Opened and already closed (stop / target hit right away)
+if trackMove and roundTrip and not na(cur) and cur.isOpen and cur.bar == entryBar
+    int xb = strategy.closedtrades.exit_bar_index(lastIdx)
+    f_recompute(cur, math.max(bar_index - xb, 0))
+    f_closeMove(cur, strategy.closedtrades.exit_price(lastIdx), xb, strategy.closedtrades.exit_time(lastIdx))
     if not na(liveLbl)
         label.delete(liveLbl)
         liveLbl := na
