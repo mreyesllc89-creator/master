@@ -1,0 +1,342 @@
+//@version=6
+// Candle Entry Strategy: trades the market exactly as the "Candle Entry Labels"
+// indicator signals, with market orders, and draws the same labels from the
+// strategy's real fills.
+//
+//   * Market order on the signal candle (filled at that candle's close, the same
+//     price the indicator prints). LONG label below the candle, SHORT above.
+//   * Exits: reverse on the opposite signal, optional stop loss / take profit in
+//     ticks, optional time stop after N bars.
+//   * Every trade is measured: best / worst point in ticks and the time it took,
+//     final result in ticks at the real exit price, live label while open.
+//   * Table of recent trades plus a summary row (trades, win rate, net profit).
+//
+strategy("Candle Entry Strategy: Long/Short, Ticks & Timing",
+     shorttitle = "Entry Strategy",
+     overlay = true,
+     default_qty_type = strategy.fixed,
+     default_qty_value = 1,
+     initial_capital = 10000,
+     process_orders_on_close = true,
+     calc_on_every_tick = false,
+     max_labels_count = 500,
+     max_lines_count = 500,
+     max_boxes_count = 100)
+
+// ─────────────────────────── Inputs: entry signal ───────────────────────────
+grpSig = "Entry signal"
+sigMode  = input.string("EMA cross", "Signal type",
+     options = ["EMA cross", "Engulfing candle", "Breakout", "External"], group = grpSig,
+     tooltip = "EMA cross: fast EMA crosses slow EMA.\nEngulfing: bullish / bearish engulfing candle.\nBreakout: close breaks the highest high / lowest low of the lookback.\nExternal: use the two source inputs below (a value > 0 fires the signal).")
+sigTf    = input.timeframe("", "Signal timeframe (blank = chart)", group = grpSig,
+     tooltip = "Signals are computed on this timeframe and drawn on whatever timeframe the chart is on. A signal is drawn on the first chart bar after the signal bar closes, so it never repaints.")
+confirmOnly = input.bool(true, "Wait for bar close before labelling", group = grpSig)
+emaFast  = input.int(9,  "EMA fast", minval = 1, group = grpSig)
+emaSlow  = input.int(21, "EMA slow", minval = 2, group = grpSig)
+brkLen   = input.int(20, "Breakout lookback", minval = 2, group = grpSig)
+extLong  = input.source(close, "External long source",  group = grpSig, tooltip = "External mode only: fires a LONG when this value turns > 0.")
+extShort = input.source(close, "External short source", group = grpSig, tooltip = "External mode only: fires a SHORT when this value turns > 0.")
+
+// ─────────────────────────── Inputs: trading ───────────────────────────
+grpTrd = "Trading"
+tradeLong  = input.bool(true, "Take long entries",  group = grpTrd)
+tradeShort = input.bool(true, "Take short entries", group = grpTrd)
+stopTicks  = input.int(0, "Stop loss (ticks, 0 = off)",   minval = 0, group = grpTrd)
+tpTicks    = input.int(0, "Take profit (ticks, 0 = off)", minval = 0, group = grpTrd)
+timeStop   = input.bool(false, "Time stop: close after N bars", group = grpTrd)
+maxBars    = input.int(50, "N bars", minval = 1, group = grpTrd)
+
+// ─────────────────────────── Inputs: labels ───────────────────────────
+grpLbl = "Entry labels"
+showPrice = input.bool(true, "Show entry price", group = grpLbl)
+showTime  = input.bool(true, "Show signal time",  group = grpLbl)
+showTf    = input.bool(true, "Show signal timeframe", group = grpLbl)
+timeFmt   = input.string("yyyy-MM-dd HH:mm", "Time format", group = grpLbl,
+     tooltip = "Java-style pattern, e.g. 'HH:mm', 'dd MMM HH:mm:ss', 'yyyy-MM-dd HH:mm'.")
+tzInput   = input.string("", "Timezone (blank = exchange)", group = grpLbl,
+     tooltip = "IANA name such as America/New_York, Europe/London, UTC. Blank uses the symbol's exchange timezone.")
+lblSize   = input.string("small", "Label size", options = ["tiny", "small", "normal", "large"], group = grpLbl)
+longCol   = input.color(#089981, "Long color",  group = grpLbl)
+shortCol  = input.color(#f23645, "Short color", group = grpLbl)
+textCol   = input.color(color.white, "Label text color", group = grpLbl)
+showShapes = input.bool(true, "Also draw small arrows (visible in the data window)", group = grpLbl)
+
+// ─────────────────────────── Inputs: move tracking ───────────────────────────
+grpMove = "Move tracking (ticks & timing)"
+trackMove = input.bool(true, "Track the move of each trade", group = grpMove)
+showMfe   = input.bool(true, "Mark best point (MFE): line + ticks + timing", group = grpMove)
+showMae   = input.bool(true, "Mark worst point (MAE)", group = grpMove)
+showExit  = input.bool(true, "Mark end of move with result in ticks", group = grpMove)
+showLive  = input.bool(true, "Live label on the open move", group = grpMove)
+showBox   = input.bool(false, "Shade entry → end of move", group = grpMove)
+showValue = input.bool(false, "Show money value per contract (tick value × ticks)", group = grpMove)
+mfeCol    = input.color(#2962ff, "Best point color", group = grpMove)
+maeCol    = input.color(#787b86, "Worst point color", group = grpMove)
+
+// ─────────────────────────── Inputs: table ───────────────────────────
+grpTbl = "Entries table"
+showTable = input.bool(true, "Show table of recent entries", group = grpTbl)
+tblRows   = input.int(10, "Rows", minval = 1, maxval = 30, group = grpTbl)
+tblPos    = input.string("top_right", "Position",
+     options = ["top_right", "top_left", "bottom_right", "bottom_left", "middle_right", "middle_left"], group = grpTbl)
+tblSize   = input.string("small", "Text size", options = ["tiny", "small", "normal"], group = grpTbl)
+
+// ─────────────────────────── Helpers ───────────────────────────
+f_size(string s) =>
+    s == "tiny" ? size.tiny : s == "small" ? size.small : s == "normal" ? size.normal : size.large
+
+f_pos(string p) =>
+    p == "top_right"    ? position.top_right    :
+     p == "top_left"     ? position.top_left     :
+     p == "bottom_right" ? position.bottom_right :
+     p == "bottom_left"  ? position.bottom_left  :
+     p == "middle_right" ? position.middle_right : position.middle_left
+
+string tz = tzInput == "" ? syminfo.timezone : tzInput
+
+f_time(int t) =>
+    str.format_time(t, timeFmt, tz)
+
+// Price distance → whole ticks
+f_ticks(float dist) =>
+    math.round(dist / syminfo.mintick)
+
+f_ticksStr(float dist) =>
+    int tk = f_ticks(dist)
+    (tk > 0 ? "+" : "") + str.tostring(tk) + " ticks"
+
+f_valueStr(float dist) =>
+    showValue ? " (" + str.tostring(f_ticks(dist) * syminfo.mintick * syminfo.pointvalue, "#.##") + " " + syminfo.currency + ")" : ""
+
+// Milliseconds → "1d 2h 3m" / "2h 3m" / "3m"
+f_dur(int ms) =>
+    float s = math.max(ms, 0) / 1000.0
+    int d = int(math.floor(s / 86400))
+    int h = int(math.floor((s - d * 86400) / 3600))
+    int m = int(math.floor((s - d * 86400 - h * 3600) / 60))
+    string out = ""
+    if d > 0
+        out += str.tostring(d) + "d "
+    if h > 0 or d > 0
+        out += str.tostring(h) + "h "
+    out += str.tostring(m) + "m"
+    out
+
+// ─────────────────────────── Signal engine ───────────────────────────
+// Returns [longSignal, shortSignal, barTime]. Called at chart resolution and
+// through request.security() at the signal timeframe.
+f_sig() =>
+    float ef = ta.ema(close, emaFast)
+    float es = ta.ema(close, emaSlow)
+    bool emaL = ta.crossover(ef, es)
+    bool emaS = ta.crossunder(ef, es)
+    bool engL = close > open and close[1] < open[1] and close >= open[1] and open <= close[1]
+    bool engS = close < open and close[1] > open[1] and close <= open[1] and open >= close[1]
+    float hh = ta.highest(high, brkLen)[1]
+    float ll = ta.lowest(low, brkLen)[1]
+    bool brkL = ta.crossover(close, hh)
+    bool brkS = ta.crossunder(close, ll)
+    bool extL = extLong > 0 and not (extLong[1] > 0)
+    bool extS = extShort > 0 and not (extShort[1] > 0)
+    bool l = sigMode == "EMA cross" ? emaL : sigMode == "Engulfing candle" ? engL : sigMode == "Breakout" ? brkL : extL
+    bool s = sigMode == "EMA cross" ? emaS : sigMode == "Engulfing candle" ? engS : sigMode == "Breakout" ? brkS : extS
+    [l, s, time]
+
+bool useHtf = sigTf != "" and sigTf != timeframe.period
+string reqTf = useHtf ? sigTf : timeframe.period
+
+[cL, cS, cT] = f_sig()
+// Previous *closed* signal-timeframe bar, fetched with lookahead so the value is
+// known at the open of the next bar of that timeframe → no repainting.
+[hL, hS, hT] = request.security(syminfo.tickerid, reqTf, [cL[1], cS[1], cT[1]], lookahead = barmerge.lookahead_on)
+bool htfChange = timeframe.change(reqTf)
+
+bool longRaw  = useHtf ? (hL and htfChange) : cL
+bool shortRaw = useHtf ? (hS and htfChange) : cS
+int  sigTime  = useHtf ? hT : cT
+
+bool confirmed = not confirmOnly or barstate.isconfirmed
+bool newLong   = longRaw and confirmed
+bool newShort  = shortRaw and not longRaw and confirmed
+
+// ─────────────────────────── Move tracking state ───────────────────────────
+type Entry
+    int   dir          // 1 = long, -1 = short
+    float price        // entry price (chart bar close)
+    int   t            // entry bar time
+    int   sigT         // signal bar time (signal timeframe)
+    int   bar          // entry bar index
+    float mfe          // best price reached
+    int   mfeBar
+    int   mfeT
+    float mae          // worst price reached
+    int   maeBar
+    int   maeT
+    bool  isOpen
+    float exitPrice
+    int   exitT
+    int   exitBar
+
+var Entry cur = na
+var array<Entry> hist = array.new<Entry>()
+var label liveLbl = na
+
+string sz = f_size(lblSize)
+
+// Draw the finished move: MFE / MAE / exit marks
+f_closeMove(Entry e, float px, int bIdx, int tNow) =>
+    e.isOpen    := false
+    e.exitPrice := px
+    e.exitT     := tNow
+    e.exitBar   := bIdx
+    float mfeDist = (e.mfe - e.price) * e.dir
+    float maeDist = (e.mae - e.price) * e.dir
+    float resDist = (px - e.price) * e.dir
+    color dirCol  = e.dir == 1 ? longCol : shortCol
+    if showBox
+        box.new(e.bar, math.max(e.price, px), bIdx, math.min(e.price, px),
+             border_color = color.new(dirCol, 60), bgcolor = color.new(resDist >= 0 ? dirCol : maeCol, 88))
+    if showMfe and e.mfeBar > e.bar
+        line.new(e.bar, e.price, e.mfeBar, e.mfe, xloc.bar_index, extend.none, color.new(mfeCol, 20), line.style_dashed, 1)
+        string mfeTxt = (e.dir == 1 ? "▲ best " : "▼ best ") + f_ticksStr(mfeDist) + f_valueStr(mfeDist)
+             + "\n" + f_dur(e.mfeT - e.t) + " · " + str.tostring(e.mfeBar - e.bar) + " bars · " + f_time(e.mfeT)
+        label.new(e.mfeBar, e.mfe, mfeTxt, xloc.bar_index, yloc.price, color.new(mfeCol, 0),
+             e.dir == 1 ? label.style_label_down : label.style_label_up, textCol, size.tiny,
+             tooltip = "Best point of the move\nPrice: " + str.tostring(e.mfe, format.mintick))
+    if showMae and e.maeBar > e.bar and maeDist < 0
+        line.new(e.bar, e.price, e.maeBar, e.mae, xloc.bar_index, extend.none, color.new(maeCol, 40), line.style_dotted, 1)
+        string maeTxt = "worst " + f_ticksStr(maeDist) + "\n" + f_dur(e.maeT - e.t) + " · " + f_time(e.maeT)
+        label.new(e.maeBar, e.mae, maeTxt, xloc.bar_index, yloc.price, color.new(maeCol, 0),
+             e.dir == 1 ? label.style_label_up : label.style_label_down, textCol, size.tiny)
+    if showExit
+        string exitTxt = "END " + f_ticksStr(resDist) + f_valueStr(resDist)
+             + "\n" + f_dur(tNow - e.t) + " · " + str.tostring(bIdx - e.bar) + " bars · " + f_time(tNow)
+        label.new(bIdx, px, exitTxt, xloc.bar_index, yloc.price, color.new(resDist >= 0 ? dirCol : maeCol, 20),
+             label.style_label_left, textCol, size.tiny)
+
+// 1) Update the open move with this bar's range
+if trackMove and not na(cur) and cur.isOpen and bar_index > cur.bar
+    if cur.dir == 1
+        if high > cur.mfe
+            cur.mfe    := high
+            cur.mfeBar := bar_index
+            cur.mfeT   := time
+        if low < cur.mae
+            cur.mae    := low
+            cur.maeBar := bar_index
+            cur.maeT   := time
+    else
+        if low < cur.mfe
+            cur.mfe    := low
+            cur.mfeBar := bar_index
+            cur.mfeT   := time
+        if high > cur.mae
+            cur.mae    := high
+            cur.maeBar := bar_index
+            cur.maeT   := time
+
+// 2) A trade closed on this bar → finish its move at the real exit price
+if trackMove and not na(cur) and cur.isOpen and closedNow
+    int ci = strategy.closedtrades - 1
+    f_closeMove(cur, strategy.closedtrades.exit_price(ci), strategy.closedtrades.exit_bar_index(ci), strategy.closedtrades.exit_time(ci))
+    if not na(liveLbl)
+        label.delete(liveLbl)
+        liveLbl := na
+
+// 3) A trade opened on this bar → label the candle, start tracking
+if openedNow
+    int    oi     = strategy.opentrades - 1
+    int    d      = strategy.opentrades.size(oi) > 0 ? 1 : -1
+    float  px     = strategy.opentrades.entry_price(oi)
+    color  dirCol = d == 1 ? longCol : shortCol
+    string txt    = d == 1 ? "LONG ▲" : "SHORT ▼"
+    if showPrice
+        txt += "\n@ " + str.tostring(px, format.mintick)
+    if showTime
+        txt += "\n" + f_time(sigTime)
+    if showTf and useHtf
+        txt += " (" + sigTf + ")"
+    string tip = (d == 1 ? "Long entry (market)" : "Short entry (market)")
+         + "\nSignal: " + sigMode + (useHtf ? " on " + sigTf : "")
+         + "\nSignal bar: " + f_time(sigTime)
+         + "\nFill bar:   " + f_time(time)
+         + "\nFill price: " + str.tostring(px, format.mintick)
+         + "\nTick size: " + str.tostring(syminfo.mintick)
+         + (stopTicks > 0 ? "\nStop: " + str.tostring(stopTicks) + " ticks" : "")
+         + (tpTicks > 0 ? "\nTarget: " + str.tostring(tpTicks) + " ticks" : "")
+    label.new(bar_index, d == 1 ? low : high, txt, xloc.bar_index, yloc.price, dirCol,
+         d == 1 ? label.style_label_up : label.style_label_down, textCol, sz, tooltip = tip)
+    if trackMove
+        cur := Entry.new(dir = d, price = px, t = time, sigT = sigTime, bar = bar_index,
+             mfe = px, mfeBar = bar_index, mfeT = time,
+             mae = px, maeBar = bar_index, maeT = time,
+             isOpen = true, exitPrice = na, exitT = na, exitBar = na)
+        array.push(hist, cur)
+        if array.size(hist) > 200
+            array.shift(hist)
+
+
+// 4) Live label on the open move
+if showLive and trackMove and not na(cur) and cur.isOpen and bar_index > cur.bar
+    float nowDist = (close - cur.price) * cur.dir
+    float bestDist = (cur.mfe - cur.price) * cur.dir
+    string liveTxt = (cur.dir == 1 ? "LONG open " : "SHORT open ") + f_ticksStr(nowDist)
+         + "\nbest " + f_ticksStr(bestDist) + " @ " + f_time(cur.mfeT)
+         + "\n" + f_dur(time - cur.t) + " · " + str.tostring(bar_index - cur.bar) + " bars"
+    if na(liveLbl)
+        liveLbl := label.new(bar_index, cur.dir == 1 ? high : low, liveTxt, xloc.bar_index, yloc.price,
+             color.new(cur.dir == 1 ? longCol : shortCol, 30),
+             cur.dir == 1 ? label.style_label_down : label.style_label_up, textCol, size.tiny)
+    else
+        label.set_xy(liveLbl, bar_index, cur.dir == 1 ? high : low)
+        label.set_text(liveLbl, liveTxt)
+        label.set_color(liveLbl, color.new(cur.dir == 1 ? longCol : shortCol, 30))
+        label.set_style(liveLbl, cur.dir == 1 ? label.style_label_down : label.style_label_up)
+
+// ─────────────────────────── Arrows for the data window ───────────────────────────
+plotshape(showShapes and openedNow and strategy.position_size > 0, "Long entry",  shape.triangleup,   location.belowbar, longCol,  size = size.tiny)
+plotshape(showShapes and openedNow and strategy.position_size < 0, "Short entry", shape.triangledown, location.abovebar, shortCol, size = size.tiny)
+
+
+// ─────────────────────────── Table of recent entries ───────────────────────────
+if showTable and barstate.islast
+    int cols = 9
+    var table tbl = table.new(f_pos(tblPos), cols, tblRows + 2, border_width = 1,
+         frame_color = color.new(color.gray, 50), border_color = color.new(color.gray, 80))
+    string ts = tblSize == "tiny" ? size.tiny : tblSize == "small" ? size.small : size.normal
+    color hdrBg = color.new(color.gray, 60)
+    table.clear(tbl, 0, 0, cols - 1, tblRows + 1)
+    string[] hdr = array.from("#", "Side", "Signal time", "Fill", "Best", "To best", "Worst", "Result", "Duration")
+    for c = 0 to cols - 1
+        table.cell(tbl, c, 0, array.get(hdr, c), text_color = color.white, bgcolor = hdrBg, text_size = ts)
+    int n = array.size(hist)
+    for i = 0 to tblRows - 1
+        int idx = n - 1 - i
+        if idx < 0
+            break
+        Entry e = array.get(hist, idx)
+        color dirCol = e.dir == 1 ? longCol : shortCol
+        float mfeDist = (e.mfe - e.price) * e.dir
+        float maeDist = (e.mae - e.price) * e.dir
+        float resDist = ((e.isOpen ? close : e.exitPrice) - e.price) * e.dir
+        int   endT    = e.isOpen ? time : e.exitT
+        int r = i + 1
+        table.cell(tbl, 0, r, str.tostring(n - idx), text_color = color.white, text_size = ts)
+        table.cell(tbl, 1, r, e.dir == 1 ? "LONG" : "SHORT", text_color = color.white, bgcolor = color.new(dirCol, 20), text_size = ts)
+        table.cell(tbl, 2, r, f_time(e.sigT), text_color = color.white, text_size = ts)
+        table.cell(tbl, 3, r, str.tostring(e.price, format.mintick), text_color = color.white, text_size = ts)
+        table.cell(tbl, 4, r, f_ticksStr(mfeDist), text_color = mfeCol, text_size = ts)
+        table.cell(tbl, 5, r, f_dur(e.mfeT - e.t), text_color = color.white, text_size = ts)
+        table.cell(tbl, 6, r, f_ticksStr(maeDist), text_color = maeCol, text_size = ts)
+        table.cell(tbl, 7, r, f_ticksStr(resDist) + (e.isOpen ? " (open)" : ""),
+             text_color = resDist >= 0 ? longCol : shortCol, text_size = ts)
+        table.cell(tbl, 8, r, f_dur(endT - e.t), text_color = color.white, text_size = ts)
+    // Summary row
+    int   nTr   = strategy.closedtrades
+    float winPc = nTr > 0 ? 100.0 * strategy.wintrades / nTr : 0.0
+    string summary = "Closed trades: " + str.tostring(nTr)
+         + " · Win rate: " + str.tostring(winPc, "#.#") + "%"
+         + " · Net: " + str.tostring(strategy.netprofit, "#.##") + " " + syminfo.currency
+         + (strategy.opentrades > 0 ? " · Open: " + str.tostring(strategy.openprofit, "#.##") : "")
+    table.cell(tbl, 0, tblRows + 1, summary, text_color = color.white, bgcolor = hdrBg, text_size = ts, text_halign = text.align_left)
+    table.merge_cells(tbl, 0, tblRows + 1, cols - 1, tblRows + 1)
