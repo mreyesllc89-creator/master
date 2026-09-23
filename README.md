@@ -19,12 +19,18 @@ Two scripts that share the same signal engine:
 | End of move | `END +N ticks · duration · bars · time` | same |
 | Live label while the move is open | current ticks, best ticks and when, elapsed time | same |
 
-**The entry mark is at the beginning (open) of the signal candle**, the candle
-where the move starts. The label sits on that candle, the dot marks its open,
-and the move (ticks and timing) is measured from that open; the signal candle
-itself counts toward the move. The mark is placed once the signal candle closes,
-because that is when the signal is known. Set *Entry point* to *Next candle open*
-to mark the open of the following candle instead (the price you could trade live).
+**The signal is read at the beginning of the candle.** It uses the candle's
+open plus the completed candles before it, nothing from the candle's close:
+the EMAs are updated with the open, a breakout is the open crossing the
+previous range, an engulfing pattern is the previous candle. So the signal is
+known the moment the candle opens, the entry is that open, and it can be traded
+live. The label sits on that candle, the dot marks its open, and the move
+(ticks and timing) is measured from that open; the candle itself counts toward
+the move.
+
+*Signal read at* = *Candle close* gives the classic close-based reading; with it,
+*Entry point* chooses whether the mark goes to the signal candle's open (placed
+once that candle closes) or to the next candle's open.
 
 A table (top-right by default) lists the most recent entries: side, signal time,
 entry price, best / worst ticks, time to the best point, result and duration.
@@ -74,10 +80,10 @@ Same signals, same labels, but the script actually trades:
   by reversal fill there too. On the chart's own timeframe a fill can only
   happen once the signal exists, i.e. at the signal candle's close. The Strategy
   Tester and the table's summary row use the real fills.
-- **Backtest note.** The "beginning of the candle" fill reads the signal
-  candle's final value at its first chart candle. That is fine for studying the
-  moves on history, but in real time the signal candle is still forming, so live
-  results will differ.
+- **Live-tradeable.** With the default *Candle beginning* reading, the signal
+  of a 10-minute candle depends only on its open and the candles before it, so
+  reading it on its first 1-minute candle is exact and matches real time. Only
+  the *Candle close* reading uses the candle's final value early (history only).
 - **Same marks as the indicator.** The LONG / SHORT label and dot sit at the
   open of the signal candle, and the move in ticks and time is measured from
   that open, exactly as in the indicator. The label tooltip shows both the mark

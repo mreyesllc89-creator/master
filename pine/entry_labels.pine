@@ -3,12 +3,15 @@
 // chart timeframe, and the move after the entry measured in ticks and time.
 //
 // What it draws
-//   * The entry is marked at the OPEN of the signal candle: the candle where
-//     the move starts. A green "LONG ▲" label sits below that candle, a red
-//     "SHORT ▼" above it, and a dot marks the exact entry price (its open).
-//     The label carries the entry price, the signal time (in the timezone you
-//     choose) and the signal timeframe. The "Entry point" input can move the
-//     mark to the open of the next candle instead.
+//   * The signal is READ AT THE BEGINNING OF THE CANDLE: it uses the candle's
+//     open and the completed candles before it, nothing from the candle's
+//     close. So the entry is at that candle's open, known the moment the candle
+//     opens, and tradeable live. ("Signal read at" can switch to the classic
+//     close-based reading.)
+//   * A green "LONG ▲" label sits below the entry candle, a red "SHORT ▼" above
+//     it, and a dot marks the exact entry price (its open). The label carries
+//     the entry price, the signal time (in the timezone you choose) and the
+//     signal timeframe.
 //   * Signals can be computed on a higher timeframe (e.g. 1H) and drawn on any
 //     chart (e.g. 5m): the mark goes to the first chart candle of the signal
 //     bar, at its open.
@@ -31,12 +34,15 @@ indicator("Candle Entry Labels: Long/Short, Ticks & Timing",
 grpSig = "Entry signal"
 sigMode  = input.string("EMA cross", "Signal type",
      options = ["EMA cross", "Engulfing candle", "Breakout", "External"], group = grpSig,
-     tooltip = "EMA cross: fast EMA crosses slow EMA.\nEngulfing: bullish / bearish engulfing candle.\nBreakout: close breaks the highest high / lowest low of the lookback.\nExternal: use the two source inputs below (a value > 0 fires the signal).")
+     tooltip = "EMA cross: fast EMA crosses slow EMA.\nEngulfing: bullish / bearish engulfing candle.\nBreakout: price breaks the highest high / lowest low of the lookback.\nExternal: use the two source inputs below (a value > 0 fires the signal).")
+sigRead  = input.string("Candle beginning (open)", "Signal read at",
+     options = ["Candle beginning (open)", "Candle close"], group = grpSig,
+     tooltip = "Candle beginning: the signal is evaluated with the candle's OPEN plus the completed candles before it (EMAs updated with the open, breakout of the open above/below the previous range, engulfing formed by the previous candle). It is known when the candle opens, so the entry is at that open and can be traded live.\nCandle close: the classic reading from the candle's close; see 'Entry point'.")
 sigTf    = input.timeframe("", "Signal timeframe (blank = chart)", group = grpSig,
      tooltip = "Signals are computed on this timeframe and drawn on whatever timeframe the chart is on.")
-entryAt  = input.string("Signal candle open", "Entry point",
+entryAt  = input.string("Signal candle open", "Entry point (Candle close reading only)",
      options = ["Signal candle open", "Next candle open"], group = grpSig,
-     tooltip = "Signal candle open: the mark sits at the beginning (open) of the candle that gives the signal, i.e. where the move starts. It is placed once that candle closes.\nNext candle open: the mark sits at the open of the following candle (what you could actually trade live).")
+     tooltip = "Only used with 'Signal read at' = Candle close.\nSignal candle open: the mark sits at the beginning (open) of the candle that gives the signal; it is placed once that candle closes.\nNext candle open: the mark sits at the open of the following candle.")
 emaFast  = input.int(9,  "EMA fast", minval = 1, group = grpSig)
 emaSlow  = input.int(21, "EMA slow", minval = 2, group = grpSig)
 brkLen   = input.int(20, "Breakout lookback", minval = 2, group = grpSig)
@@ -125,56 +131,79 @@ f_dur(int ms) =>
 // ─────────────────────────── Signal engine ───────────────────────────
 // Returns [longSignal, shortSignal, barTime]. Called at chart resolution and
 // through request.security() at the signal timeframe.
+//
+// "Candle beginning" reading uses only what is known when the candle opens:
+// its open and the completed candles before it.
 f_sig() =>
-    float ef = ta.ema(close, emaFast)
-    float es = ta.ema(close, emaSlow)
-    bool emaL = ta.crossover(ef, es)
-    bool emaS = ta.crossunder(ef, es)
-    bool engL = close > open and close[1] < open[1] and close >= open[1] and open <= close[1]
-    bool engS = close < open and close[1] > open[1] and close <= open[1] and open >= close[1]
+    bool rdOpen = sigRead == "Candle beginning (open)"
+    // EMAs on closes (complete up to the previous candle)
+    float efC = ta.ema(close, emaFast)
+    float esC = ta.ema(close, emaSlow)
+    // EMAs updated with this candle's open (known at the beginning of the candle)
+    float aF  = 2.0 / (emaFast + 1)
+    float aS  = 2.0 / (emaSlow + 1)
+    float efO = aF * open + (1 - aF) * nz(efC[1], open)
+    float esO = aS * open + (1 - aS) * nz(esC[1], open)
+    bool xUp  = ta.crossover(efC, esC)
+    bool xDn  = ta.crossunder(efC, esC)
+    bool emaL = rdOpen ? (efO > esO and efC[1] <= esC[1]) : xUp
+    bool emaS = rdOpen ? (efO < esO and efC[1] >= esC[1]) : xDn
+    // Engulfing: the previous candle when read at the open, this candle when read at the close
+    bool engLc = close > open and close[1] < open[1] and close >= open[1] and open <= close[1]
+    bool engSc = close < open and close[1] > open[1] and close <= open[1] and open >= close[1]
+    bool engL = rdOpen ? engLc[1] : engLc
+    bool engS = rdOpen ? engSc[1] : engSc
+    // Breakout: the open (or the close) breaks the previous range
     float hh = ta.highest(high, brkLen)[1]
     float ll = ta.lowest(low, brkLen)[1]
-    bool brkL = ta.crossover(close, hh)
-    bool brkS = ta.crossunder(close, ll)
+    bool bUp  = ta.crossover(close, hh)
+    bool bDn  = ta.crossunder(close, ll)
+    bool brkL = rdOpen ? (open > hh and close[1] <= hh[1]) : bUp
+    bool brkS = rdOpen ? (open < ll and close[1] >= ll[1]) : bDn
+    // External: the source turns > 0
     bool extL = extLong > 0 and not (extLong[1] > 0)
     bool extS = extShort > 0 and not (extShort[1] > 0)
     bool l = sigMode == "EMA cross" ? emaL : sigMode == "Engulfing candle" ? engL : sigMode == "Breakout" ? brkL : extL
     bool s = sigMode == "EMA cross" ? emaS : sigMode == "Engulfing candle" ? engS : sigMode == "Breakout" ? brkS : extS
     [l, s, time]
 
+bool readOpen = sigRead == "Candle beginning (open)"
 bool useHtf = sigTf != "" and sigTf != timeframe.period
 string reqTf = useHtf ? sigTf : timeframe.period
 
 [cL, cS, cT] = f_sig()
-// Previous *closed* signal-timeframe bar, fetched with lookahead so the value is
-// known at the open of the next bar of that timeframe → no repainting.
+// Previous *closed* signal-timeframe bar (close reading): known at the open of
+// the next bar of that timeframe → no repainting.
 [hL, hS, hT] = request.security(syminfo.tickerid, reqTf, [cL[1], cS[1], cT[1]], lookahead = barmerge.lookahead_on)
+// Current signal-timeframe bar (open reading): the value only depends on that
+// bar's open and earlier bars, so it is final on its first chart bar.
+[oL, oS, oT] = request.security(syminfo.tickerid, reqTf, [cL, cS, cT], lookahead = barmerge.lookahead_on)
 bool htfChange = timeframe.change(reqTf)
 
-bool atSig = entryAt == "Signal candle open"
-
 // Chart bar on which the current signal-timeframe bar started; at an htfChange
-// bar, prevStart is where the bar that just closed (the signal bar) started.
+// bar, prevStart is where the bar that just closed started.
 var int htfStart = na
 int prevStart = htfStart
 if htfChange
     htfStart := bar_index
 
 // When the signal fires:
-//   chart timeframe, signal candle open → on the signal bar, once it closes (mark at its open)
-//   chart timeframe, next candle open   → on the bar after the signal bar
-//   higher timeframe                    → on the first chart bar after the signal bar closes
-bool longRaw  = useHtf ? (hL and htfChange) : (atSig ? cL and barstate.isconfirmed : cL[1])
-bool shortRaw = useHtf ? (hS and htfChange) : (atSig ? cS and barstate.isconfirmed : cS[1])
-int  sigTime  = useHtf ? hT : (atSig ? cT : cT[1])
+bool atSig = entryAt == "Signal candle open"
+//   open reading                       → on the candle itself, at its open (higher tf: first chart candle of the bar)
+//   close reading, signal candle open  → on the signal bar, once it closes (mark at its open)
+//   close reading, next candle open    → on the bar after the signal bar
+//   close reading, higher timeframe    → on the first chart bar after the signal bar closes
+bool longRaw  = readOpen ? (useHtf ? oL and htfChange : cL) : useHtf ? (hL and htfChange) : (atSig ? cL and barstate.isconfirmed : cL[1])
+bool shortRaw = readOpen ? (useHtf ? oS and htfChange : cS) : useHtf ? (hS and htfChange) : (atSig ? cS and barstate.isconfirmed : cS[1])
+int  sigTime  = readOpen ? (useHtf ? oT : cT) : useHtf ? hT : (atSig ? cT : cT[1])
 
 bool newLong   = longRaw
 bool newShort  = shortRaw and not longRaw
 
 // Where the entry mark goes: entryOff bars back from the current bar, at that
-// candle's open. Non-zero only for a higher-timeframe signal marked at the
-// open of its first chart candle.
-int   entryOff = atSig and useHtf and not na(prevStart) ? math.max(bar_index - prevStart, 0) : 0
+// candle's open. Non-zero only for a close-read higher-timeframe signal marked
+// at the open of its first chart candle.
+int   entryOff = not readOpen and atSig and useHtf and not na(prevStart) ? math.max(bar_index - prevStart, 0) : 0
 int   entryBar = bar_index - entryOff
 float entryPx  = open[entryOff]
 int   entryT   = time[entryOff]
@@ -342,8 +371,8 @@ if showLive and trackMove and not na(cur) and cur.isOpen
         label.set_style(liveLbl, cur.dir == 1 ? label.style_label_down : label.style_label_up)
 
 // ─────────────────────────── Alerts ───────────────────────────
-// Fire when the mark is placed: on the signal candle's close (Signal candle open)
-// or at the next candle's open (Next candle open). Use "Once per bar".
+// Fire when the mark is placed: at the candle's open (Candle beginning reading).
+// Use "Once per bar".
 alertcondition(newLong,  "Long entry",  "LONG entry on {{ticker}} {{interval}} at candle open {{open}}")
 alertcondition(newShort, "Short entry", "SHORT entry on {{ticker}} {{interval}} at candle open {{open}}")
 alertcondition(newLong or newShort, "Any entry", "Entry on {{ticker}} {{interval}} at candle open {{open}}")
