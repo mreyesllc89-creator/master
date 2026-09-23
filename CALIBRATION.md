@@ -38,14 +38,20 @@ Defects found on the way (all fixed in v2.10, see the script header):
 - A `var` trail ratchet re-issued with `strategy.exit` on every tick would
   retreat, because order state is not rolled back between ticks but `var`
   state is. Trail state is `varip`.
-- Two review rounds (five lenses, two independent refuters per finding)
-  found and fixed twenty further defects in the first v2.10 draft, among
-  them: the latch was not keyed to the level it armed on (a replaced level
-  re-priced the resting stop with no buffer check), a transient filter
-  closure dropped the latch, close-based filters flickered per tick, the
-  retest invalidation ran on interim ticks in BarClose mode, the retry cap
-  never applied in CloseConfirm/Retest, the compression gate measured the
-  wrong pair, and the day counter differed between history and live.
+- Three review rounds (five to six lenses, two independent refuters per
+  finding) found and fixed twenty-nine further defects in the v2.10 drafts,
+  among them: the latch was not keyed to the level it armed on (a replaced
+  level re-priced the resting stop with no buffer check), a transient
+  filter closure dropped the latch, close-based filters flickered per
+  tick, the retest invalidation ran on interim ticks in BarClose mode, the
+  loss cap never applied in CloseConfirm/Retest, the compression gate
+  measured the wrong pair, the day counter differed between history and
+  live, a same-bar round trip left the latch armed on history but not live,
+  the latch identity was only recorded when an order was placed, and the
+  quantity step rounding lost a step on exact multiples. USD inputs are
+  converted to price units through `syminfo.pointvalue`; the table flags a
+  symbol whose pointvalue is not 1 because the script is calibrated for
+  feeds where one contract is one BTC.
 
 ## 2. Data
 
@@ -291,8 +297,13 @@ Slippage 30 ticks, Commission 0.003 cash per contract (type them in, then
 Reset settings afterwards to return to the BTC header). Entry IDs are still
 BuyStop/SellStop. Residual differences: v2.10 snaps order prices to the
 symbol's mintick, uses `strategy.entry` so the position-size rail is live (it
-does not bind at those settings), and locks the trail distance at arm time
-where v2.01 followed the live ATR.
+does not bind at those settings), locks the trail trigger and distance at
+arm time where v2.01 recomputed both from the live ATR every bar, and
+pre-stages the fill-bar bracket in ticks from the fill (F14) where v2.01
+anchored it to the pivot: on the fill bar v2.10's SL and TP sit one entry
+slippage further from the pivot, so a fill-bar extreme inside that band
+exits in one script and not the other. From the first run after the fill
+both hold the same avg-based bracket.
 
 ## 11. Not modelled, or only partly
 
