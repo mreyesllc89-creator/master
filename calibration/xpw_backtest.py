@@ -110,6 +110,27 @@ def ffill(a: np.ndarray, seed: float = np.nan) -> np.ndarray:
     return out
 
 
+def donchian_prior(high: np.ndarray, low: np.ndarray, n: int):
+    """ta.highest(high, n)[1] / ta.lowest(low, n)[1]: extremes of the PRIOR n bars, forming bar excluded."""
+    N = len(high)
+    dh = np.full(N, np.nan)
+    dl = np.full(N, np.nan)
+    for i in range(n, N):
+        dh[i] = high[i - n:i].max()
+        dl[i] = low[i - n:i].min()
+    return dh, dl
+
+
+def parse_levels(spec: str):
+    """'pivot' -> (True, 0); 'pivot+don20' -> (True, 20); 'don20' -> (False, 20)."""
+    use_pivot = "pivot" in spec
+    don = 0
+    for part in spec.split("+"):
+        if part.startswith("don"):
+            don = int(part[3:])
+    return use_pivot, don
+
+
 def percentrank(x: np.ndarray, length: int) -> np.ndarray:
     """ta.percentrank(x, length): % of the previous `length` values <= current value."""
     N = len(x)
@@ -201,6 +222,11 @@ class Config:
     comp_pct: float = 30.0
     seed_swings: bool = False    # seed swingH/L from first CSV row (parity only)
     close_at_end: bool = True
+    # v2.10 additions
+    arm_mode: str = "v201"       # 'v201': cancel the stop on every bar whose close is inside the buffer (v2.01 defect F11)
+                                 # 'latch': buffer arms only; the stop then rests until fill / level gone / not flat
+    levels: str = "pivot"        # 'pivot' | 'pivot+donN' | 'donN'  (N = Donchian length on the PRIOR N bars); nearest enabled level to close
+    max_dist_atr: float = 0.0    # latch: do not arm a level further than this many ATR from close (0 = off)
 
     def apply_preset(self):
         p = COST_PRESETS[self.cost_preset]
@@ -236,6 +262,11 @@ def run_backtest(d: TFData, cfg: Config, want_trades: bool = True):
     o, h, l, c, atr = d.open, d.high, d.low, d.close, d.atr
     N = len(o)
     sH, sL = d.swings(cfg.barsn, cfg.seed_swings)
+    use_pivot, don_len = parse_levels(cfg.levels)
+    if don_len > 0:
+        donH, donL = donchian_prior(h, l, don_len)
+    latch = cfg.arm_mode == "latch"
+    armed_long = armed_short = False
     hs = 0.5 * cfg.spread_usd
     slip = cfg.slippage_usd + hs      # adverse move on every stop/market fill
     cpct, ccash = cfg.commission_pct, cfg.commission_cash
@@ -403,23 +434,71 @@ def run_backtest(d: TFData, cfg: Config, want_trades: bool = True):
             in_pos[i] = True
             trail_series[i] = pos["stop"]
             pend_long = pend_short = None   # Pine: cancel while not flat
+            armed_long = armed_short = False
         else:
             flat = True
             can_arm = flat and in_session[i] and gate_ok[i]
-            swH, swL = sH[i], sL[i]
+            # nearest enabled level above / below close (v2.10 E1); pivot-only == v2.01 swingH/swingL
+            lvUp = lvDn = np.nan
+            cands_up = []
+            cands_dn = []
+            if use_pivot:
+                cands_up.append(sH[i])
+                cands_dn.append(sL[i])
+            if don_len > 0:
+                cands_up.append(donH[i])
+                cands_dn.append(donL[i])
+            for v in cands_up:
+                if not np.isnan(v) and v > ci and (np.isnan(lvUp) or v < lvUp):
+                    lvUp = v
+            for v in cands_dn:
+                if not np.isnan(v) and v < ci and (np.isnan(lvDn) or v > lvDn):
+                    lvDn = v
             buffer = ai * cfg.buf_atr if not np.isnan(ai) else np.nan
             pend_long = pend_short = None
-            if can_arm and not np.isnan(buffer):
-                if not np.isnan(swH) and swH > ci and ci < swH - buffer:
-                    sl_dist = swH * cfg.sl_value / 100.0 if cfg.sl_mode == "pct" else ai * cfg.sl_value
+            if not latch:
+                # v2.01: arm only while close is at least one buffer away; otherwise the stop is cancelled (F11)
+                armed_long = armed_short = False
+                if can_arm and not np.isnan(buffer):
+                    if not np.isnan(lvUp) and ci < lvUp - buffer:
+                        sl_dist = lvUp * cfg.sl_value / 100.0 if cfg.sl_mode == "pct" else ai * cfg.sl_value
+                        qty = calc_qty(cfg, equity, sl_dist)
+                        if qty > 0 and sl_dist > 0:
+                            pend_long = dict(level=lvUp, sl_dist=sl_dist, qty=qty)
+                    if not np.isnan(lvDn) and ci > lvDn + buffer:
+                        sl_dist = lvDn * cfg.sl_value / 100.0 if cfg.sl_mode == "pct" else ai * cfg.sl_value
+                        qty = calc_qty(cfg, equity, sl_dist)
+                        if qty > 0 and sl_dist > 0:
+                            pend_short = dict(level=lvDn, sl_dist=sl_dist, qty=qty)
+            else:
+                # v2.10 latch: the buffer gates ARMING only; once armed the stop rests (re-priced to the level each bar)
+                # until it fills, the level goes away / is too far, a gate closes, or the position changes.
+                can_l = can_arm and not np.isnan(lvUp) and not np.isnan(buffer) and \
+                    (cfg.max_dist_atr <= 0 or lvUp - ci <= cfg.max_dist_atr * ai)
+                if not can_l:
+                    armed_long = False
+                elif not armed_long:
+                    armed_long = ci < lvUp - buffer
+                if armed_long:
+                    sl_dist = lvUp * cfg.sl_value / 100.0 if cfg.sl_mode == "pct" else ai * cfg.sl_value
                     qty = calc_qty(cfg, equity, sl_dist)
                     if qty > 0 and sl_dist > 0:
-                        pend_long = dict(level=swH, sl_dist=sl_dist, qty=qty)
-                if not np.isnan(swL) and swL < ci and ci > swL + buffer:
-                    sl_dist = swL * cfg.sl_value / 100.0 if cfg.sl_mode == "pct" else ai * cfg.sl_value
+                        pend_long = dict(level=lvUp, sl_dist=sl_dist, qty=qty)
+                    else:
+                        armed_long = False
+                can_s = can_arm and not np.isnan(lvDn) and not np.isnan(buffer) and \
+                    (cfg.max_dist_atr <= 0 or ci - lvDn <= cfg.max_dist_atr * ai)
+                if not can_s:
+                    armed_short = False
+                elif not armed_short:
+                    armed_short = ci > lvDn + buffer
+                if armed_short:
+                    sl_dist = lvDn * cfg.sl_value / 100.0 if cfg.sl_mode == "pct" else ai * cfg.sl_value
                     qty = calc_qty(cfg, equity, sl_dist)
                     if qty > 0 and sl_dist > 0:
-                        pend_short = dict(level=swL, sl_dist=sl_dist, qty=qty)
+                        pend_short = dict(level=lvDn, sl_dist=sl_dist, qty=qty)
+                    else:
+                        armed_short = False
 
     if pos is not None and cfg.close_at_end:
         close_position(N - 1, c[-1], "end", market=True)
@@ -587,23 +666,24 @@ def _get_tf(tf: str) -> TFData:
 
 
 def _run_one(args):
-    tf, (slm, slv), tpr, bn, buf, tr, cost = args
+    tf, (slm, slv), tpr, bn, buf, tr, cost, arm, lv = args
     d = _get_tf(tf)
     cfg = Config(tf=tf, sl_mode=slm, sl_value=slv, tp_r=tpr, barsn=bn, buf_atr=buf, trail=tr,
-                 cost_preset=cost, sizing="fixed", fixed_qty=1.0).apply_preset()
+                 cost_preset=cost, sizing="fixed", fixed_qty=1.0, arm_mode=arm, levels=lv).apply_preset()
     trades, _, _ = run_backtest(d, cfg, want_trades=False)
     m = metrics(trades)
-    row = dict(tf=tf, sl_mode=slm, sl_value=slv, tp_r=tpr, barsN=bn, buf_atr=buf, trail=tr, cost_preset=cost)
+    row = dict(tf=tf, sl_mode=slm, sl_value=slv, tp_r=tpr, barsN=bn, buf_atr=buf, trail=tr, cost_preset=cost, arm_mode=arm, levels=lv)
     row.update(m)
     return row
 
 
-def sweep(tfs, jobs: int) -> dict[str, pd.DataFrame]:
+def sweep(tfs, jobs: int, arm_modes=("v201",), levels=("pivot",)) -> dict[str, pd.DataFrame]:
     import multiprocessing as mp
     os.makedirs(RESULTS_DIR, exist_ok=True)
     frames = {}
     for tf in tfs:
-        combos = list(itertools.product([tf], GRID["sl"], GRID["tp_r"], GRID["barsn"], GRID["buf_atr"], GRID["trail"], GRID["cost"]))
+        combos = list(itertools.product([tf], GRID["sl"], GRID["tp_r"], GRID["barsn"], GRID["buf_atr"], GRID["trail"], GRID["cost"],
+                                        list(arm_modes), list(levels)))
         t0 = time.time()
         if jobs > 1:
             with mp.Pool(jobs) as pool:
@@ -666,6 +746,8 @@ def _neighbors(row, df):
         i = lst.index(val)
         return [lst[j] for j in (i - 1, i + 1) if 0 <= j < len(lst)]
     base = (df.cost_preset == row.cost_preset) & (df.sl_mode == row.sl_mode)
+    if "arm_mode" in df.columns:
+        base = base & (df.arm_mode == row.arm_mode) & (df.levels == row.levels)
     masks = []
     for v in step(sl_vals, row.sl_value):
         masks.append(base & (df.sl_value == v) & (df.tp_r == row.tp_r) & (df.barsN == row.barsN) & (df.buf_atr == row.buf_atr) & (df.trail == row.trail))
@@ -736,17 +818,19 @@ def recommend(frames: dict[str, pd.DataFrame], presets=("cfd_std", "exchange"), 
 
 
 def _row_to_dict(r) -> dict:
-    keys = ["tf", "sl_mode", "sl_value", "tp_r", "barsN", "buf_atr", "trail", "cost_preset", "n_trades", "n_long", "n_short",
+    keys = ["tf", "sl_mode", "sl_value", "tp_r", "barsN", "buf_atr", "trail", "cost_preset", "arm_mode", "levels", "n_trades", "n_long", "n_short",
             "win_rate", "gross_pnl", "total_cost", "net_pnl", "cost_to_gross_ratio", "profit_factor_net", "expectancy_R",
             "max_drawdown_net", "avg_bars_held", "exit_tp", "exit_sl", "exit_trail", "exit_end", "same_bar_exit_share"]
-    return {k: _json_safe(r[k]) for k in keys}
+    return {k: _json_safe(r[k]) for k in keys if k in r.index}
 
 
 def v201_baseline(frames: dict[str, pd.DataFrame]) -> dict:
     out = {}
     for tf, df in frames.items():
         m = df[(df.sl_mode == "pct") & (df.sl_value == 0.1) & (df.tp_r == 2.5) & (df.barsN == 5) & (df.buf_atr == 1.0) & (df.trail == "bar")]
-        out[tf] = {r.cost_preset: _row_to_dict(r) for _, r in m.iterrows()}
+        if "levels" in m.columns:
+            m = m[m.levels == "pivot"]
+        out[tf] = {r.cost_preset + ("/" + r.arm_mode if "arm_mode" in m.columns else ""): _row_to_dict(r) for _, r in m.iterrows()}
     return out
 
 
@@ -776,6 +860,12 @@ def config_table(rows: list[dict], title: str) -> str:
 def write_notes(frames, geo, rec, base, par, timing: dict):
     L = []
     L.append("# XPW Breakout BTCUSD calibration sweep\n")
+    any_df = next(iter(frames.values()))
+    if "arm_mode" in any_df.columns:
+        L.append("Variant dimensions in this sweep: arm_mode = " + ", ".join(sorted(any_df.arm_mode.unique())) +
+                 "; levels = " + ", ".join(sorted(any_df.levels.unique())) +
+                 ". arm_mode 'v201' cancels the stop on every bar whose close is inside the buffer (v2.01 defect F11); "
+                 "'latch' arms once on the buffer and lets the stop rest (v2.10). 'pivot+don20' = nearest of confirmed pivot and prior-20-bar Donchian.\n")
     L.append("Engine: `calibration/xpw_backtest.py` (TradingView broker-emulator replica, no bar magnifier). "
              "Sizing fixed 1.0 BTC, initial capital 100000. Grid per TF: SL {pct 0.1/0.25/0.5/1.0, atr 1.0/1.5/2.0/3.0} x TP R {1,1.5,2,2.5,3} "
              "x BarsN {3,5,8} x buffer ATR {0.5,1,2} x trail {off, bar, tick} x cost {none, exchange, cfd_std, cfd_raw} = 4320 configs per TF.\n")
@@ -909,6 +999,9 @@ def main(argv=None):
     r.add_argument("--eh", type=int, default=0)
     r.add_argument("--gate", action="store_true")
     r.add_argument("--seed-swings", action="store_true")
+    r.add_argument("--arm", default="v201", choices=["v201", "latch"])
+    r.add_argument("--levels", default="pivot", help="pivot | pivot+don20 | don20")
+    r.add_argument("--max-dist", type=float, default=0.0)
 
     p = sub.add_parser("parity", help="v2.01 defaults vs TradingView Trail column")
     p.add_argument("--tfs", default="15,30,60,240,1")
@@ -916,17 +1009,25 @@ def main(argv=None):
     s = sub.add_parser("sweep", help="full grid sweep + summary.json + SWEEP_NOTES.md")
     s.add_argument("--tfs", default="15,30,60,240,1")
     s.add_argument("--jobs", type=int, default=max(1, os.cpu_count() or 1))
+    s.add_argument("--arm", default="v201", help="comma list of arm modes: v201,latch")
+    s.add_argument("--levels", default="pivot", help="comma list of level specs: pivot,pivot+don20,don20")
+    s.add_argument("--out", default="", help="sub-directory of results/ to write into (default: results/ itself)")
 
     g = sub.add_parser("geometry", help="print cost geometry table")
     g.add_argument("--tfs", default="1,15,30,60,240")
 
     a = ap.parse_args(argv)
 
+    global RESULTS_DIR
+    if a.cmd == "sweep" and a.out:
+        RESULTS_DIR = os.path.join(RESULTS_DIR, a.out)
+
     if a.cmd == "run":
         d = load_tf(a.tf)
         cfg = Config(tf=a.tf, sl_mode=a.sl_mode, sl_value=a.sl, tp_r=a.tp_r, barsn=a.barsn, buf_atr=a.buf, trail=a.trail,
                      trg_atr=a.trg, dst_atr=a.dst, cost_preset=a.cost, sizing=a.sizing, fixed_qty=a.qty, risk_pct=a.risk,
-                     max_qty=a.max_qty, qty_step=a.qty_step, sh=a.sh, eh=a.eh, use_gate=a.gate, seed_swings=a.seed_swings).apply_preset()
+                     max_qty=a.max_qty, qty_step=a.qty_step, sh=a.sh, eh=a.eh, use_gate=a.gate, seed_swings=a.seed_swings,
+                     arm_mode=a.arm, levels=a.levels, max_dist_atr=a.max_dist).apply_preset()
         trades, in_pos, _ = run_backtest(d, cfg)
         print(json.dumps(_json_safe(asdict(cfg))))
         print_trades(trades, d)
@@ -946,14 +1047,15 @@ def main(argv=None):
         frames = {}
         for tf in tfs:
             t0 = time.time()
-            frames.update(sweep([tf], a.jobs))
+            frames.update(sweep([tf], a.jobs, arm_modes=a.arm.split(","), levels=a.levels.split(",")))
             timing[tf] = dict(bars=len(_get_tf(tf).open), configs=len(frames[tf]), secs=time.time() - t0)
         geo = cost_geometry(tfs)
         rec = recommend(frames)
         base = v201_baseline(frames)
         par = parity(tuple(tfs), verbose=False)
         summary = dict(generated=time.strftime("%Y-%m-%d %H:%M:%S"), initial_capital=INITIAL_CAPITAL, sizing="fixed 1.0 BTC",
-                       grid=GRID, cost_presets=COST_PRESETS, timing=timing, cost_geometry=geo, recommendations=rec,
+                       grid=GRID, arm_modes=a.arm.split(","), levels=a.levels.split(","),
+                       cost_presets=COST_PRESETS, timing=timing, cost_geometry=geo, recommendations=rec,
                        v201_baseline=base, parity=par,
                        caveats=["~600 bars per TF (1m: ~10 hours) - cost/geometry sanity only, no edge proof",
                                 "broker-emulator replica without bar magnifier; intrabar order is assumed",
