@@ -1,0 +1,55 @@
+=== TF 1m: 613 bars, 2026-09-23 07:59:00+00:00 -> 2026-09-23 18:11:00+00:00 span=0 days 10:12:00
+  close: min 83616 max 86257 last 84243
+  ATR14 abs: median 44.0  mean 55.2  p10 30.7 p90 97.6
+  ATR14 %:   median 0.0518  mean 0.0650  p10 0.0357 p90 0.1153
+  bar range %: median 0.0509 mean 0.0650 p90 0.1271 max 0.4343
+  |ret| %: median 0.0283 std 0.0622
+  gap % (open vs prev close): median 0.00009 p95 0.00126 max 0.00661
+  swingH match: 100.0% of 585 rows; swingL match: 100.0% of 600 rows
+  trail non-null rows: 72
+  channel width/ATR: median 4.16, channel width %: median 0.191
+  pivot highs: 33, pivot lows: 37
+=== TF 15m: 730 bars, 2026-09-16 03:45:00+00:00 -> 2026-09-23 18:00:00+00:00 span=7 days 14:15:00
+  close: min 75390 max 87263 last 84205
+  ATR14 abs: median 195.4  mean 211.6  p10 128.0 p90 325.7
+  ATR14 %:   median 0.2387  mean 0.2597  p10 0.1611 p90 0.3977
+  bar range %: median 0.2130 mean 0.2657 p90 0.4514 max 2.2807
+  |ret| %: median 0.0946 std 0.2062
+  gap % (open vs prev close): median 0.00007 p95 0.00121 max 0.01826
+  swingH match: 100.0% of 711 rows; swingL match: 100.0% of 719 rows
+  trail non-null rows: 22
+  channel width/ATR: median 3.45, channel width %: median 0.843
+  pivot highs: 44, pivot lows: 50
+=== TF 30m: 596 bars, 2026-09-11 08:30:00+00:00 -> 2026-09-23 18:00:00+00:00 span=12 days 09:30:00
+  close: min 75390 max 87263 last 84205
+  ATR14 abs: median 278.0  mean 284.8  p10 135.6 p90 438.4
+  ATR14 %:   median 0.3511  mean 0.3560  p10 0.1762 p90 0.5334
+  bar range %: median 0.2812 mean 0.3636 p90 0.6401 max 2.8923
+  |ret| %: median 0.1144 std 0.3014
+  gap % (open vs prev close): median 0.00006 p95 0.00124 max 0.01820
+  swingH match: 100.0% of 579 rows; swingL match: 100.0% of 582 rows
+  trail non-null rows: 14
+  channel width/ATR: median 3.31, channel width %: median 1.178
+  pivot highs: 35, pivot lows: 38
+=== TF 60m: 596 bars, 2026-08-29 23:00:00+00:00 -> 2026-09-23 18:00:00+00:00 span=24 days 19:00:00
+  close: min 75439 max 87157 last 84193
+  ATR14 abs: median 400.3  mean 390.2  p10 217.7 p90 560.5
+  ATR14 %:   median 0.5065  mean 0.4917  p10 0.2762 p90 0.6842
+  bar range %: median 0.4183 mean 0.5052 p90 0.8635 max 3.1073
+  |ret| %: median 0.1552 std 0.3793
+  gap % (open vs prev close): median 0.00003 p95 0.00115 max 0.01830
+  swingH match: 100.0% of 583 rows; swingL match: 100.0% of 579 rows
+  trail non-null rows: 2
+  channel width/ATR: median 3.46, channel width %: median 1.672
+  pivot highs: 37, pivot lows: 37
+=== TF 240m: 596 bars, 2026-06-16 12:00:00+00:00 -> 2026-09-23 16:00:00+00:00 span=99 days 04:00:00
+  close: min 58289 max 86694 last 84209
+  ATR14 abs: median 735.3  mean 752.6  p10 439.3 p90 1106.1
+  ATR14 %:   median 1.0386  mean 1.0918  p10 0.6844 p90 1.5621
+  bar range %: median 0.8763 mean 1.0758 p90 1.9136 max 7.1336
+  |ret| %: median 0.3385 std 0.7905
+  gap % (open vs prev close): median 0.00006 p95 0.00133 max 0.00650
+  swingH match: 100.0% of 583 rows; swingL match: 100.0% of 577 rows
+  trail non-null rows: 4
+  channel width/ATR: median 3.97, channel width %: median 4.594
+  pivot highs: 39, pivot lows: 38

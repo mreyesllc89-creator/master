@@ -1,0 +1,195 @@
+//@version=6
+//====================================================================
+// XPW_Breakout_v2.01 (XAUUSD)   (Pine v6, single file, self-contained)
+//--------------------------------------------------------------------
+// v2.01 delta vs v2.00: gold defaults baked in (contracts = oz on TV
+// gold CFDs, 1 MT5 lot = 100 oz): TP 0.25 / SL 0.1, QtyStep 1,
+// FixedQty 10 (0.1 lot), MaxQtyHard 50 (~2x notional at $4k on 100k),
+// commission cash-per-contract, slippage 30 ticks. Geometry is
+// percent-of-price + ATR, so the logic itself is symbol-agnostic.
+//--------------------------------------------------------------------
+// Corrected rebuild of "BTC Trading Robot" v1. Defect fixes:
+//  F1  Naked position killed: SL/TP bracket is pre-staged at order
+//      time and live from the fill bar. Slpoints no longer dead code.
+//  F2  Double unit conversion removed. ALL geometry in price units.
+//      No syminfo.mintick multiplication anywhere.
+//  F3  Trail trigger uses its own input, trail distance uses its own
+//      input. The v1 dead input (5.0) is live again.
+//  F4  Trail is a ratchet: math.max/min against the prior stop. It
+//      never retreats. (Updates on bar close - Pine limit vs MT5 tick.)
+//  F5  OCA cancel on the entry straddle: a fill kills the sibling.
+//      No leftover stop acting as accidental reversal / far-band SL.
+//  F6  Confirmed pivots (ta.pivothigh/low, BarsN each side) replace
+//      the rolling Donchian that included the forming bar.
+//  F7  RiskPercent live: qty = equity * risk% / SL distance, floored
+//      to QtyStep, clamped by HARD cap, FixedQty fallback. Second
+//      enforcement layer: strategy.risk.max_position_size.
+//  F8  Session filter handles overnight wrap (SH > EH). Pendings are
+//      cancelled when out of session or when the gate closes.
+//  F9  systemType != 1 disables trading instead of producing the
+//      Tppoints = 0 degenerate instant-exit mode.
+//  F10 Costs modeled in header (commission percent, slippage ticks).
+//--------------------------------------------------------------------
+// NOTES
+//  * Enable Bar Magnifier in Properties (Premium). Stop-entry plus
+//    stop-exit inside one bar is emulator guesswork without it.
+//  * 'hour' uses the EXCHANGE timezone of the chart symbol.
+//  * At defaults (Risk 4 percent, SL 0.1 percent) computed size is
+//    about 40x notional. The HARD cap WILL bind. That is intentional.
+//    Widen SL or cut risk. Do not raise the cap casually.
+//  * ATR mode is the recommended trail/buffer anchor. PctOfTP mode is
+//    kept only for v1 parity (5 percent of a 0.2 percent TP is noise).
+//  * v1 backtests are void for comparison: F5 removes the accidental
+//    reversal, so the trade population changes completely.
+//  * Properties: Script execution = ON BAR CLOSE ONLY (turn OFF
+//    on-order-fill). Bar magnifier ON if your plan has it.
+//  * UI Properties override these header cost values once touched.
+//====================================================================
+strategy("XPW Breakout v2.01 (XAUUSD)", overlay=true,
+     initial_capital=100000,
+     pyramiding=0,
+     commission_type=strategy.commission.cash_per_contract,
+     commission_value=0.003,   // USD per oz per side = $0.60/lot RT. If VT RAW is $6/lot RT, use 0.03. VERIFY from MT5 statement.
+     slippage=30,              // ticks; raw-feed stop orders cross the spread too
+     margin_long=0, margin_short=0)
+
+//============== INPUTS ==============//
+grpT = "Trading"
+systemType  = input.int(1, "Trading System (1 = enabled)", group=grpT)
+RiskPercent = input.float(4.0, "Risk percent of equity per trade", minval=0.0, step=0.5, group=grpT)
+UseRiskSize = input.bool(true, "Risk-based sizing (off = FixedQty)", group=grpT)
+FixedQty    = input.float(10.0, "FixedQty fallback (contracts=oz)", minval=0.0, step=1.0, group=grpT)
+MaxQtyHard  = input.float(50.0, "HARD qty cap (contracts=oz)", minval=0.001, group=grpT)
+QtyStep     = input.float(1.0, "Qty step (rounds down)", minval=0.000001, group=grpT)
+SHInput     = input.int(0, "Start hour (0 = off)", minval=0, maxval=23, group=grpT)
+EHInput     = input.int(0, "End hour (0 = off)", minval=0, maxval=23, group=grpT)
+
+grpG = "Geometry"
+TPasPct     = input.float(0.25, "TP as percent of entry", minval=0.01, step=0.05, group=grpG)
+SLasPct     = input.float(0.1, "SL as percent of entry", minval=0.01, step=0.05, group=grpG)
+TrailMode   = input.string("ATR", "Trail anchor", options=["ATR", "PctOfTP"], group=grpG)
+TrgAtrMult  = input.float(1.0, "Trail trigger, ATR mult", step=0.1, group=grpG)
+TrlAtrMult  = input.float(1.5, "Trail distance, ATR mult", step=0.1, group=grpG)
+TslTrgPctTP = input.float(7.0, "Trail trigger, percent of TP (parity mode)", group=grpG)
+TslPctTP    = input.float(5.0, "Trail distance, percent of TP (parity mode)", group=grpG)
+
+grpE = "Entry"
+BarsN       = input.int(5, "Pivot bars each side", minval=1, group=grpE)
+BufMode     = input.string("ATR", "Entry buffer anchor", options=["ATR", "PctOfTP"], group=grpE)
+BufAtrMult  = input.float(1.0, "Buffer, ATR mult", step=0.1, group=grpE)
+BufPctTP    = input.float(50.0, "Buffer, percent of TP (parity mode)", group=grpE)
+AtrLen      = input.int(14, "ATR length", minval=1, group=grpE)
+UseCompGate = input.bool(false, "Compression gate (arm only when coiled)", group=grpE)
+CompLen     = input.int(200, "Compression lookback", minval=20, group=grpE)
+CompPct     = input.float(30.0, "Arm below width percentile", minval=1.0, maxval=100.0, group=grpE)
+
+// Rail: emulator-level cap on top of calcQty clamp (belt and braces)
+strategy.risk.max_position_size(MaxQtyHard)
+
+//============== CORE SERIES (computed every bar, unconditionally) ==============//
+atr = ta.atr(AtrLen)
+ph  = ta.pivothigh(high, BarsN, BarsN)
+pl  = ta.pivotlow(low,  BarsN, BarsN)
+var float swingH = na
+var float swingL = na
+if not na(ph)
+    swingH := ph
+if not na(pl)
+    swingL := pl
+
+// Session filter with overnight wrap
+h = hour
+inSession = true
+if SHInput != 0 and EHInput != 0 and SHInput > EHInput
+    inSession := h >= SHInput or h < EHInput
+else
+    if SHInput != 0 and h < SHInput
+        inSession := false
+    if EHInput != 0 and h >= EHInput
+        inSession := false
+
+// Compression gate: swing channel width relative to ATR, percentile ranked
+chWidth   = swingH - swingL
+compRatio = atr > 0 ? chWidth / atr : na
+compPR    = ta.percentrank(compRatio, CompLen)
+gateOK    = not UseCompGate or (not na(compPR) and compPR <= CompPct)
+
+// Entry buffer (price units, no mintick)
+tpRefDist = close * TPasPct / 100.0
+buffer    = BufMode == "ATR" ? atr * BufAtrMult : tpRefDist * BufPctTP / 100.0
+
+//============== SIZING (risk-based, hard-capped, fallback) ==============//
+calcQty(entryPx) =>
+    slDist = entryPx * SLasPct / 100.0
+    raw    = UseRiskSize and slDist > 0 ? (strategy.equity * RiskPercent / 100.0) / slDist : FixedQty
+    q      = na(raw) or raw <= 0 ? FixedQty : raw
+    q     := math.min(q, MaxQtyHard)
+    q     := math.floor(q / QtyStep) * QtyStep
+    q
+
+//============== ENTRIES: OCA stop straddle on confirmed pivots ==============//
+allowTrade = systemType == 1
+flat       = strategy.position_size == 0
+canArm     = flat and inSession and gateOK and allowTrade
+
+longOK  = canArm and not na(swingH) and swingH > close and close < swingH - buffer
+shortOK = canArm and not na(swingL) and swingL < close and close > swingL + buffer
+
+qL = calcQty(na(swingH) ? close : swingH)
+qS = calcQty(na(swingL) ? close : swingL)
+
+if longOK and qL > 0
+    strategy.order("BuyStop", strategy.long, qty=qL, stop=swingH, oca_name="XPW", oca_type=strategy.oca.cancel, comment="BuyStop")
+    // Pre-stage the bracket so the position is protected from the fill bar
+    strategy.exit("XL", from_entry="BuyStop", stop=swingH * (1.0 - SLasPct / 100.0), limit=swingH * (1.0 + TPasPct / 100.0), comment_loss="SL", comment_profit="TP")
+else
+    strategy.cancel("BuyStop")
+
+if shortOK and qS > 0
+    strategy.order("SellStop", strategy.short, qty=qS, stop=swingL, oca_name="XPW", oca_type=strategy.oca.cancel, comment="SellStop")
+    strategy.exit("XS", from_entry="SellStop", stop=swingL * (1.0 + SLasPct / 100.0), limit=swingL * (1.0 - TPasPct / 100.0), comment_loss="SL", comment_profit="TP")
+else
+    strategy.cancel("SellStop")
+
+//============== POSITION MGMT: ratcheted trail + fixed TP ==============//
+var float trailL = na
+var float trailS = na
+
+if strategy.position_size > 0
+    avgL    = strategy.position_avg_price
+    tpL     = avgL * (1.0 + TPasPct / 100.0)
+    sl0L    = avgL * (1.0 - SLasPct / 100.0)
+    tpDistL = tpL - avgL
+    trgL    = TrailMode == "ATR" ? atr * TrgAtrMult : tpDistL * TslTrgPctTP / 100.0
+    dstL    = TrailMode == "ATR" ? atr * TrlAtrMult : tpDistL * TslPctTP / 100.0
+    trailL := na(trailL) ? sl0L : trailL
+    if close - avgL > trgL
+        trailL := math.max(trailL, close - dstL)
+    strategy.exit("XL", from_entry="BuyStop", stop=trailL, limit=tpL, comment_loss="SL/Trail", comment_profit="TP")
+else
+    trailL := na
+
+if strategy.position_size < 0
+    avgS    = strategy.position_avg_price
+    tpS     = avgS * (1.0 - TPasPct / 100.0)
+    sl0S    = avgS * (1.0 + SLasPct / 100.0)
+    tpDistS = avgS - tpS
+    trgS    = TrailMode == "ATR" ? atr * TrgAtrMult : tpDistS * TslTrgPctTP / 100.0
+    dstS    = TrailMode == "ATR" ? atr * TrlAtrMult : tpDistS * TslPctTP / 100.0
+    trailS := na(trailS) ? sl0S : trailS
+    if avgS - close > trgS
+        trailS := math.min(trailS, close + dstS)
+    strategy.exit("XS", from_entry="SellStop", stop=trailS, limit=tpS, comment_loss="SL/Trail", comment_profit="TP")
+else
+    trailS := na
+
+//============== PLOTS / DIAGNOSTICS ==============//
+plot(swingH, "Swing High", color=color.new(color.teal, 0), style=plot.style_linebr)
+plot(swingL, "Swing Low",  color=color.new(color.maroon, 0), style=plot.style_linebr)
+plot(strategy.position_size > 0 ? trailL : strategy.position_size < 0 ? trailS : na, "Trail", color=color.new(color.orange, 0), style=plot.style_linebr)
+bgcolor(not inSession ? color.new(color.gray, 92) : na, title="Out of session")
+bgcolor(UseCompGate and not gateOK ? color.new(color.red, 94) : na, title="Gate closed")
+
+var label warnLbl = na
+if systemType != 1 and na(warnLbl) and barstate.islast
+    warnLbl := label.new(bar_index, high, "systemType != 1 - TRADING DISABLED", style=label.style_label_down, color=color.red, textcolor=color.white)
