@@ -306,8 +306,8 @@ f_recompute(Entry e, int lastOff) =>
     e.maeT   := e.t
     int first = bar_index - e.bar
     if first >= lastOff
-        for i = first to lastOff by -1
-            f_trackAt(e, i)
+        for k = 0 to first - lastOff
+            f_trackAt(e, first - k)
 
 // 1) Update the open move with this bar's range, unless the trade was closed at
 //    this bar's open (reversal / time stop): then the move ended before this bar.
@@ -361,8 +361,8 @@ if openedNow
         array.push(hist, cur)
         if array.size(hist) > 200
             array.shift(hist)
-        for i = entryOff to 0 by -1   // the entry candle and everything since count toward the move
-            f_trackAt(cur, i)
+        for k = 0 to entryOff   // the entry candle and everything since count toward the move
+            f_trackAt(cur, entryOff - k)
 
 // 3b) Opened and closed on the same candle (stop / target hit right away)
 if trackMove and roundTrip and not na(cur) and cur.isOpen and cur.bar <= bar_index and openedNow

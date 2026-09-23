@@ -268,8 +268,8 @@ f_recompute(Entry e, int lastOff) =>
     e.maeT   := e.t
     int first = bar_index - e.bar
     if first >= lastOff
-        for i = first to lastOff by -1
-            f_trackAt(e, i)
+        for k = 0 to first - lastOff
+            f_trackAt(e, first - k)
 
 bool anySig  = newLong or newShort
 
@@ -321,8 +321,8 @@ if anySig
         array.push(hist, cur)
         if array.size(hist) > 200
             array.shift(hist)
-        for i = entryOff to 0 by -1   // the entry candle and everything since count toward the move
-            f_trackAt(cur, i)
+        for k = 0 to entryOff   // the entry candle and everything since count toward the move
+            f_trackAt(cur, entryOff - k)
 
 // 4) Live label on the open move
 if showLive and trackMove and not na(cur) and cur.isOpen
