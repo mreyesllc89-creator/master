@@ -144,17 +144,21 @@
 //    BarClose, ArmLatch off, Pivot only with BarsN 5, GeoMode Pct
 //    (SL 0.1, TP 0.25), Buffer ATR 1.0, Trail Script (trigger 1.0,
 //    distance 1.5 ATR), cost gate off, TP widening off, cost sizing
-//    off, Risk 4, FixedQty 10, Cap 50, QtyStep 1, and Properties >
-//    Slippage 30 ticks, Commission 0.003 cash per contract (Reset
-//    settings afterwards to return to the BTC header). Residuals: v2.10
+//    off, CommPct 0, CommCash 0.003, SlipUSD 0.3 (so the referee row and
+//    the ticks row agree with the gold Properties), Risk 4, FixedQty 10,
+//    Cap 50, QtyStep 1, and Properties > Slippage 30 ticks, Commission
+//    0.003 cash per contract (Reset settings AND put the cost inputs back
+//    to 9 / 5 afterwards to return to the BTC header). Residuals: v2.10
 //    snaps order prices to mintick, uses strategy.entry, locks the trail
 //    TRIGGER and DISTANCE at arm time (F13; v2.01 recomputed both from the
 //    live ATR every bar), and pre-stages the FILL-BAR bracket in ticks
 //    from the fill (F14) where v2.01 anchored it to the pivot: on the fill
-//    bar v2.10's SL and TP sit one entry slippage (30 ticks here; gap +
-//    slippage on a gap-through fill) further from the pivot, so a fill-bar
-//    extreme inside that band exits in one script and not the other. From
-//    the first run after the fill both hold avg x (1 +/- pct) and agree.
+//    bar both of v2.10's legs are shifted one entry slippage (30 ticks
+//    here; gap + slippage on a gap-through fill) in the trade direction
+//    relative to v2.01's, so the SL sits that much NEARER the pivot and
+//    the TP that much FURTHER from it, and a fill-bar extreme inside
+//    either band exits in one script and not the other. From the first
+//    run after the fill both hold avg x (1 +/- pct) and agree.
 //====================================================================
 strategy("XPW Breakout v2.10 (BTCUSD)", overlay=true,
      initial_capital=100000,
@@ -605,23 +609,28 @@ if EntryMode == "CloseConfirm"
             placeShort(close, qC, armSlS, armTpS, armTrgS, armDstS, 0)
 
 if EntryMode == "Retest"
-    // A confirmed close beyond the level arms a limit at (inside) the level for RetestBars bars.
-    // Armed on HARD conditions only (F11): a soft gate closed on the break bar must not discard the setup;
-    // the placement below re-checks the soft gates and the loss cap on every evaluation and lifts the order while a gate is closed.
-    if brkL and hardOK and allowL
-        rtPxL    := brkPxL - RetestOffAtr * atrRef
-        rtUntilL := bar_index + RetestBars
-    if brkS and hardOK and allowS
-        rtPxS    := brkPxS + RetestOffAtr * atrRef
-        rtUntilS := bar_index + RetestBars
     if evalNow
-        // Invalidate: expired, filled (not flat, or a trade opened since the last evaluation: a same-bar round trip
-        // is flat again at the close-run), trading off, or price fell back through the level by a buffer.
+        // Invalidate the EXISTING retest first: expired (checked on the confirmed run only, so history, BarClose live
+        // and Tick live all give exactly RetestBars bars), filled (not flat, or a trade opened since the last
+        // evaluation: a same-bar round trip is flat again at the close-run), trading off, or price fell back through
+        // the level by a buffer. ORDER MATTERS: this runs BEFORE the arm below so newTrade only ever clears the setup
+        // that existed before this evaluation; a retest armed on this confirmed close must survive it (history arms
+        // at the fill bar's close-run with newTrade still true, Tick live consumed the flag on the fill tick).
         // Under evalNow so that in BarClose mode only a CONFIRMED close can clear the varip state (T1).
-        if not na(rtPxL) and (bar_index > rtUntilL or not flat or newTrade or not allowTrade or close < rtPxL - buffer)
+        if not na(rtPxL) and ((barClosed and bar_index > rtUntilL) or not flat or newTrade or not allowTrade or close < rtPxL - buffer)
             rtPxL := na
-        if not na(rtPxS) and (bar_index > rtUntilS or not flat or newTrade or not allowTrade or close > rtPxS + buffer)
+        if not na(rtPxS) and ((barClosed and bar_index > rtUntilS) or not flat or newTrade or not allowTrade or close > rtPxS + buffer)
             rtPxS := na
+        // Then arm: a confirmed close beyond the level sets a limit at (inside) the level, live on the next RetestBars bars.
+        // Armed on HARD conditions only (F11): a soft gate closed on the break bar must not discard the setup; the
+        // placement below re-checks the soft gates and the loss cap on every evaluation and lifts the order while a gate
+        // is closed. brkL/brkS imply barClosed, which implies evalNow, so the arm fires exactly when it did before.
+        if brkL and hardOK and allowL
+            rtPxL    := brkPxL - RetestOffAtr * atrRef
+            rtUntilL := bar_index + RetestBars - 1
+        if brkS and hardOK and allowS
+            rtPxS    := brkPxS + RetestOffAtr * atrRef
+            rtUntilS := bar_index + RetestBars - 1
         qRL = calcQty(na(rtPxL) ? close : rtPxL)
         if not na(rtPxL) and longFilt and retryOK(rtPxL, blockLvlL, blockCntL) and qRL > 0
             lvlUsedL := rtPxL
@@ -753,7 +762,7 @@ if ShowTable and barstate.islast
     commOK    = strategy.closedtrades == 0 or commMis <= 0.10
     per100    = bar_index > 0 ? strategy.closedtrades * 100.0 / bar_index : na
     bufAtr    = atrRef > 0 ? buffer / atrRef : na
-    blocked   = (trendL or trendS ? "" : "trend ") + (coolOK ? "" : "cooldown ") + (dayOK ? "" : "maxday ") + (gateOK ? "" : "coil ") + (costOK ? "" : "cost ") + (retryOKL and retryOKS ? "" : "losscap ") + (inSession and dowOK ? "" : "time ") + (na(atrRef) ? "atr-warmup " : "") + (distDead ? "MAXDIST<=BUFFER " : "")
+    blocked   = ((allowL and trendL) or (allowS and trendS) ? "" : "trend ") + (coolOK ? "" : "cooldown ") + (dayOK ? "" : "maxday ") + (gateOK ? "" : "coil ") + (costOK ? "" : "cost ") + ((allowL and not retryOKL) or (allowS and not retryOKS) ? "losscap " : "") + (inSession and dowOK ? "" : "time ") + (na(atrRef) ? "atr-warmup " : "") + (distDead ? "MAXDIST<=BUFFER " : "")
     row(0,  "XPW v2.10", ExecMode + " / " + EntryMode + (ArmLatch ? " / latch" : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
     row(1,  "Levels", lvSrc == "" ? "NONE" : lvSrc, lvSrc == "" ? color.red : color.white)
     row(2,  "ATR " + str.tostring(AtrLen), str.tostring(atrRef, "#.##") + "  (" + str.tostring(atrPct, "#.###") + "%)", color.white)

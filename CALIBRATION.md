@@ -38,8 +38,8 @@ Defects found on the way (all fixed in v2.10, see the script header):
 - A `var` trail ratchet re-issued with `strategy.exit` on every tick would
   retreat, because order state is not rolled back between ticks but `var`
   state is. Trail state is `varip`.
-- Three review rounds (five to six lenses, two independent refuters per
-  finding) found and fixed twenty-nine further defects in the v2.10 drafts,
+- Four review rounds (five to six lenses, two independent refuters per
+  finding) found and fixed thirty-four further defects in the v2.10 drafts,
   among them: the latch was not keyed to the level it armed on (a replaced
   level re-priced the resting stop with no buffer check), a transient
   filter closure dropped the latch, close-based filters flickered per
@@ -292,18 +292,21 @@ To reproduce the v2.01 trade population with v2.10: Execution BarClose, Arm
 latch off, Pivot only with BarsN 5 (Donchian and previous day off), GeoMode
 Pct with SL 0.1 and TP 0.25, buffer ATR 1.0, Trail execution Script with
 trigger 1.0 and distance 1.5 ATR, cost gate off, TP widening off, cost
-sizing off, Risk 4, FixedQty 10, cap 50, QtyStep 1, and Properties >
-Slippage 30 ticks, Commission 0.003 cash per contract (type them in, then
-Reset settings afterwards to return to the BTC header). Entry IDs are still
+sizing off, cost inputs CommPct 0 / CommCash 0.003 / SlipUSD 0.3 (so the
+referee rows agree with the gold Properties), Risk 4, FixedQty 10, cap 50,
+QtyStep 1, and Properties > Slippage 30 ticks, Commission 0.003 cash per
+contract (type them in, then Reset settings and restore the cost inputs
+afterwards to return to the BTC header). Entry IDs are still
 BuyStop/SellStop. Residual differences: v2.10 snaps order prices to the
 symbol's mintick, uses `strategy.entry` so the position-size rail is live (it
 does not bind at those settings), locks the trail trigger and distance at
 arm time where v2.01 recomputed both from the live ATR every bar, and
 pre-stages the fill-bar bracket in ticks from the fill (F14) where v2.01
-anchored it to the pivot: on the fill bar v2.10's SL and TP sit one entry
-slippage further from the pivot, so a fill-bar extreme inside that band
-exits in one script and not the other. From the first run after the fill
-both hold the same avg-based bracket.
+anchored it to the pivot: on the fill bar both legs are shifted one entry
+slippage in the trade direction, so the SL sits that much nearer the pivot
+and the TP that much further from it, and a fill-bar extreme inside either
+band exits in one script and not the other. From the first run after the
+fill both hold the same avg-based bracket.
 
 ## 11. Not modelled, or only partly
 
