@@ -159,6 +159,32 @@ bool confirmed = not confirmOnly or barstate.isconfirmed
 bool newLong   = longRaw and confirmed
 bool newShort  = shortRaw and not longRaw and confirmed
 
+// ─────────────────────────── Orders: trade as the indicator signals ───────────────────────────
+// Market orders on the signal candle. An opposite signal reverses the position.
+if newLong and tradeLong
+    strategy.entry("Long", strategy.long, comment = "LONG")
+if newShort and tradeShort
+    strategy.entry("Short", strategy.short, comment = "SHORT")
+
+// Go flat on an opposite signal we are not allowed to take
+if newShort and not tradeShort and strategy.position_size > 0
+    strategy.close("Long", comment = "Opp. signal")
+if newLong and not tradeLong and strategy.position_size < 0
+    strategy.close("Short", comment = "Opp. signal")
+
+// Stop loss / take profit, expressed in ticks
+if stopTicks > 0 or tpTicks > 0
+    strategy.exit("Long SL/TP",  "Long",  loss = stopTicks > 0 ? stopTicks : na, profit = tpTicks > 0 ? tpTicks : na)
+    strategy.exit("Short SL/TP", "Short", loss = stopTicks > 0 ? stopTicks : na, profit = tpTicks > 0 ? tpTicks : na)
+
+// Time stop
+if timeStop and strategy.opentrades > 0 and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= maxBars
+    strategy.close_all(comment = "Time stop")
+
+// What actually happened on this bar, taken from the strategy's fills
+bool closedNow = strategy.closedtrades > strategy.closedtrades[1]
+bool openedNow = strategy.opentrades > 0 and strategy.opentrades.entry_bar_index(strategy.opentrades - 1) == bar_index
+
 // ─────────────────────────── Move tracking state ───────────────────────────
 type Entry
     int   dir          // 1 = long, -1 = short
@@ -274,7 +300,6 @@ if openedNow
         array.push(hist, cur)
         if array.size(hist) > 200
             array.shift(hist)
-
 
 // 4) Live label on the open move
 if showLive and trackMove and not na(cur) and cur.isOpen and bar_index > cur.bar

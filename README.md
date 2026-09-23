@@ -1,7 +1,11 @@
 # Candle Entry Labels (TradingView / Pine Script v6)
 
-`pine/entry_labels.pine` is a TradingView indicator that labels entry candles and
-measures the move that follows, in **ticks** and **time**.
+Two scripts that share the same signal engine:
+
+| File | Type | Use it to |
+|---|---|---|
+| `pine/entry_labels.pine` | Indicator | Label entry candles and measure the move that follows, in **ticks** and **time** |
+| `pine/entry_strategy.pine` | Strategy | Trade the market with market orders exactly as the indicator signals, backtest it, and draw the same labels from the real fills |
 
 ## What you get on the chart
 
@@ -49,3 +53,22 @@ Turn on *Show money value per contract* to also print `ticks × tick value`.
 
 1. TradingView → Pine Editor → paste the contents of `pine/entry_labels.pine`.
 2. *Add to chart*. Configure in the indicator settings (gear icon).
+
+## Strategy version (`pine/entry_strategy.pine`)
+
+Same signals, same labels, but the script actually trades:
+
+- **Market order on the signal candle.** With *process orders on close* the fill
+  is that candle's close, the same price the indicator prints. LONG label below
+  the candle, SHORT label above it, both showing the fill price and signal time.
+- **Exits.** An opposite signal reverses the position. Optional *Stop loss* and
+  *Take profit* are set in **ticks**. Optional *Time stop* closes after N bars.
+  *Take long / short entries* toggles let you run one side only.
+- **Move marks from real fills.** Best / worst point in ticks and time, and the
+  `END` label uses the strategy's real exit price and exit time (stop, target,
+  time stop or reversal).
+- **Table.** Recent trades plus a summary row: closed trades, win rate, net profit.
+- Open the *Strategy Tester* tab for the full backtest report.
+
+Position size, initial capital and commission are set in the strategy's
+*Properties* tab.
