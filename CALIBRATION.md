@@ -519,10 +519,23 @@ either:
   (`UseDonchian`, `DonLen`) instead of the BarsN pivot, tested at N = 5,
   10, 20 and 50 alongside the pivot;
 - **what a latched stop does when its level is replaced**: `Recheck` (the
-  sweep's "latch": the new level must pass the buffer again) or `Follow`
-  (the sweep's "hold": the resting stop is re-priced to the new level at
-  once, no buffer re-check). Follow is the new `LvlMove` input in both
-  builds; Recheck is the default and is what every earlier section used.
+  engine's "latch" since this sweep: the new level must pass the buffer
+  again) or `Follow` (the engine's "hold": the resting stop is re-priced
+  to the new level at once, no buffer re-check). Both are now the
+  `LvlMove` input in both builds.
+
+A correction that came out of this sweep: until the "hold" mode was added,
+the engine's latch never re-checked the buffer when a level was replaced,
+so every earlier number in this report (the BTC latch sweep in section 7,
+the shipped 60m block, the gold sweep and walk-forward in section 13, the
+5m check in section 14) was measured under what is now called Follow. The
+v2.10 script, after the review fix that keyed the latch to its level, had
+been re-checking the buffer, which is Recheck. The script default is
+therefore set to Follow so that it matches what was calibrated; Recheck is
+the option. On BTC 60m the two are within 70 per BTC of each other
+(+10,004 against +9,937); on gold the shipped-default rows of section 13
+(+99, +213, +194, +171, +487 per ounce on 10m to 240m) are Follow, and
+Recheck gives +19, +216, +92, +86, +648.
 
 Full grid (SL band x TP R x BarsN x buffer x trail) for every level source
 and both policies: BTC 15m/30m/60m/240m at `vt_btc` and gold 10m to 240m
@@ -553,15 +566,18 @@ directions. It wins on BTC 15m and loses on BTC 30m/60m with the same
 level source. On gold it is slightly ahead with pivot levels on 15m and
 60m and behind with don10/don50. There is no timeframe or level source
 where it is better on both symbols. Conclusion: continually re-pricing the
-stop is not an edge in itself; it is a neutral option. Recheck stays the
-default because the walk-forward in section 13 and the acceptance recipe
-in section 10 were run with it.
+stop is not an edge in itself; it is a neutral option. Follow is the
+default because sections 7, 13 and 14 were measured with it (see the
+correction above); the acceptance recipe in section 10 runs with the latch
+off, where the policy does not apply.
 
 ### Level source: where Donchian beats the pivot
 
 Shipped geometry (BTC: ATR 3.0 / 3R / BarsN 3 / buffer 0.5 / Emulator
 trail; gold: ATR 1.5 / 2.5R / BarsN 3 / buffer 1.0 / Emulator trail),
-Recheck, whole file and then first half / second half. Trades in brackets.
+Recheck policy, whole file and then first half / second half. Trades in
+brackets. The Follow rows are in `docs/XPW_Settings_by_Timeframe.pdf` and
+in the CSVs.
 
 | TF | pivot | best Donchian | first half / second half of the best |
 |---|---|---|---|
@@ -594,12 +610,12 @@ loses in every band; don5 on BTC 240m loses 13,624).
 
 ### What to set
 
-- Defaults unchanged: pivot levels, `LvlMove` = Recheck.
+- Defaults: pivot levels, `LvlMove` = Follow (the calibrated policy).
 - To trade the timeframes above with a rolling level: `UsePivot` off,
   `UseDonchian` on, `DonLen` as in the table, geometry as shipped. BarsN
   no longer matters once the pivot is off.
-- `LvlMove` = Follow is free to try live; it changes trade count more than
-  PF. Take it on BTC 15m or 240m with don20, leave it off on BTC 30m/60m
-  and on gold don10/don50.
+- `LvlMove` = Recheck is free to try live; the policy changes trade count
+  more than PF. Recheck is ahead on BTC 30m/60m and on gold don10/don50,
+  Follow on BTC 15m/240m with don20 and on gold pivots.
 - The engine's `--levels` and `--arm` flags reproduce every cell:
   `python3 calibration/xpw_backtest.py run --tf 60 --levels don20 --arm hold --sl-mode atr --sl 3 --tp-r 3 --barsn 3 --buf 0.5 --trail tick --cost vt_btc`.

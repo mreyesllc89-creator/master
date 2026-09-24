@@ -10,6 +10,7 @@ execution.
 | `pine/XPW_Breakout_v2.10_XAUUSD.pine` | The same strategy with gold defaults (per-ounce costs, ounce sizing, SL 1.5 ATR / TP 2.5R from the gold sweep). See `CALIBRATION.md` section 13. |
 | `pine/XPW_Breakout_v2.01_XAUUSD.pine` | The previous (gold) version, kept for diffing. |
 | `CALIBRATION.md` | Cost presets, per-timeframe geometry, sweep results, what changed and why. |
+| `docs/XPW_Settings_by_Timeframe.pdf` | Every input of both builds, one sheet per timeframe, with the numbers behind each choice. |
 | `calibration/xpw_backtest.py` | Python replica of the TradingView broker emulator used for the sweep. |
 | `calibration/data/BTCUSD_*.csv` | The five TradingView exports (1m, 15m, 30m, 60m, 240m) the BTC sweep ran on. |
 | `calibration/data/XAUUSD_*.csv` | The six OANDA gold exports (5m to 240m) the gold sweep ran on. |
@@ -30,8 +31,10 @@ execution.
    `CALIBRATION.md`, and check the on-chart table: the "Header slippage
    should be" row must equal the Properties slippage.
 5. Pick the timeframe block in `CALIBRATION.md` and copy its geometry
-   inputs. Pivot levels with `LvlMove` = Recheck are the defaults; section
-   15 lists the timeframes where a rolling Donchian level did better.
+   inputs, or use `docs/XPW_Settings_by_Timeframe.pdf`, which lists every
+   input per timeframe for both builds. Pivot levels with `LvlMove` =
+   Follow are the defaults; section 15 lists the timeframes where a
+   rolling Donchian level did better.
 
 ## Reproduce the sweep
 
