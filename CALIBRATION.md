@@ -507,3 +507,99 @@ BarsN 8 is the only band with evidence, and that evidence is one week.
 MEXC's exported Swing High/Low columns match the engine's BarsN 5 pivots
 96 to 97% (the MEXC feed's highs and lows differ slightly from the
 CRYPTO index), so the engine was validated on this feed as well.
+
+## 15. Continually moved stops: Donchian levels and the Follow policy
+
+Question asked: does re-pricing the buy stop and sell stop continually,
+instead of parking them on the last confirmed pivot, raise net and profit
+factor? Two things were separated, because "moving the stop" can mean
+either:
+
+- **the level itself moves every bar**: Donchian prior-N high / low
+  (`UseDonchian`, `DonLen`) instead of the BarsN pivot, tested at N = 5,
+  10, 20 and 50 alongside the pivot;
+- **what a latched stop does when its level is replaced**: `Recheck` (the
+  sweep's "latch": the new level must pass the buffer again) or `Follow`
+  (the sweep's "hold": the resting stop is re-priced to the new level at
+  once, no buffer re-check). Follow is the new `LvlMove` input in both
+  builds; Recheck is the default and is what every earlier section used.
+
+Full grid (SL band x TP R x BarsN x buffer x trail) for every level source
+and both policies: BTC 15m/30m/60m/240m at `vt_btc` and gold 10m to 240m
+at `gold_raw`. Results in `calibration/results/don_btc/` and `don_xau/`.
+Net per BTC and per ounce, 1 unit fixed.
+
+### Follow versus Recheck: no consistent edge
+
+Paired over every grid cell (same geometry, same level source, both
+policies measurable): the share of cells where Follow beat Recheck on net,
+and the median PF difference (Follow minus Recheck).
+
+| TF | pivot | don5 | don10 | don20 | don50 |
+|---|---|---|---|---|---|
+| BTC 15m | 54% / +0.04 | 49% / +0.06 | 1% / -0.35 | 84% / +0.13 | 19% / -0.05 |
+| BTC 30m | 25% / -0.10 | 13% / -0.25 | 27% / -0.07 | 27% / -0.06 | (identical) |
+| BTC 60m | 12% / -0.12 | 84% / +0.16 | 17% / -0.23 | 9% / -0.04 | (identical) |
+| BTC 240m | 31% / -0.06 | 44% / -0.13 | 86% / +0.18 | 83% / +0.09 | 63% / +0.08 |
+| gold 10m | 64% / +0.03 | 82% / +0.11 | 49% / -0.05 | 78% / +0.04 | 4% / -0.13 |
+| gold 15m | 86% / +0.08 | 48% / -0.02 | 45% / -0.07 | 75% / +0.03 | 7% / -0.07 |
+| gold 30m | 55% / 0.00 | 55% / 0.00 | 63% / +0.02 | 51% / -0.05 | 26% / -0.05 |
+| gold 60m | 68% / +0.07 | 40% / -0.05 | 23% / -0.16 | 54% / -0.01 | 34% / -0.03 |
+| gold 240m | 45% / 0.00 | 72% / +0.02 | 34% / -0.10 | 44% / 0.00 | 3% / -0.01 |
+
+Follow adds trades (median 2 to 12 more per file, more on the short
+Donchian lengths) and its PF moves by less than 0.1 in most cells, in both
+directions. It wins on BTC 15m and loses on BTC 30m/60m with the same
+level source. On gold it is slightly ahead with pivot levels on 15m and
+60m and behind with don10/don50. There is no timeframe or level source
+where it is better on both symbols. Conclusion: continually re-pricing the
+stop is not an edge in itself; it is a neutral option. Recheck stays the
+default because the walk-forward in section 13 and the acceptance recipe
+in section 10 were run with it.
+
+### Level source: where Donchian beats the pivot
+
+Shipped geometry (BTC: ATR 3.0 / 3R / BarsN 3 / buffer 0.5 / Emulator
+trail; gold: ATR 1.5 / 2.5R / BarsN 3 / buffer 1.0 / Emulator trail),
+Recheck, whole file and then first half / second half. Trades in brackets.
+
+| TF | pivot | best Donchian | first half / second half of the best |
+|---|---|---|---|
+| BTC 15m | +1818, PF 1.34 (35) | don20 +5159, PF 2.57 (33) | +1165 / +3579 (pivot: -2007 / +3825) |
+| BTC 30m | -51, PF 0.99 (30) | don50 +7585, PF 3.90 (24) | +651 / +3979 (11 trades each half) |
+| BTC 60m | +9937, PF 2.29 (31) | don10 +7387, PF 2.00 (32) | -1794 / +8456 (pivot: +397 / +8815) |
+| BTC 240m | +1528, PF 1.10 (32) | don20 +4096, PF 1.35 (25) | +860 / +3862; Follow +885 / +5591 |
+| gold 10m | +19, PF 1.04 (101) | don10 +182, PF 1.36 (111) | +148 / +33 (pivot: +74 / -56) |
+| gold 15m | +216, PF 1.65 (81) | don10 +128, PF 1.29 (81) | pivot wins both halves: +66 / +145 |
+| gold 30m | +92, PF 1.34 (44) | don20 +109, PF 1.28 (46) | +40 / +28 (pivot: -3 / +51; pivot Follow +71 / +79) |
+| gold 60m | +86, PF 1.17 (48) | don50 +286, PF 2.49 (29) | +167 / +65 (don20: +213, PF 1.61, +174 / +49) |
+| gold 240m | +648, PF 1.59 (47) | don10 +656, PF 1.60 (48) | +446 / +163 (pivot: +283 / +365) |
+
+Robustness across the whole grid (share of measurable cells positive,
+Recheck): BTC 60m pivot 0.65 against don10 0.90 and don20 0.88, but the
+pivot keeps the higher net at the shipped geometry and is the only source
+positive in both halves there; BTC 15m don20 0.71 and don50 0.85 against
+pivot 0.65; BTC 30m don50 0.79 against pivot 0.76; BTC 240m every
+Donchian length below 0.55 and don50 0.02. Gold: pivot 0.90 on 15m and
+0.82 on 30m, the highest; don20 0.74 to 0.84 on 10m to 30m; don50 0.84 on
+60m (pivot 0.60); don5/don10 0.92 to 0.99 on 240m (pivot 0.63).
+
+Reading: the pivot is not beaten where the builds are meant to run (BTC
+60m, gold 15m to 30m), so the defaults do not change. Donchian is the
+better level source on the edges: BTC 15m and 240m with length 20, BTC 30m
+with length 50 (few trades), gold 10m with length 10 to 20, gold 60m with
+length 20 to 50, gold 240m with length 5 to 10. Long Donchian lengths on
+short timeframes and short lengths on 240m both fail (don50 on BTC 240m
+loses in every band; don5 on BTC 240m loses 13,624).
+
+### What to set
+
+- Defaults unchanged: pivot levels, `LvlMove` = Recheck.
+- To trade the timeframes above with a rolling level: `UsePivot` off,
+  `UseDonchian` on, `DonLen` as in the table, geometry as shipped. BarsN
+  no longer matters once the pivot is off.
+- `LvlMove` = Follow is free to try live; it changes trade count more than
+  PF. Take it on BTC 15m or 240m with don20, leave it off on BTC 30m/60m
+  and on gold don10/don50.
+- The engine's `--levels` and `--arm` flags reproduce every cell:
+  `python3 calibration/xpw_backtest.py run --tf 60 --levels don20 --arm hold --sl-mode atr --sl 3 --tp-r 3 --barsn 3 --buf 0.5 --trail tick --cost vt_btc`.

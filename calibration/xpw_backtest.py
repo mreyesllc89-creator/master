@@ -1019,8 +1019,8 @@ def main(argv=None):
     r.add_argument("--eh", type=int, default=0)
     r.add_argument("--gate", action="store_true")
     r.add_argument("--seed-swings", action="store_true")
-    r.add_argument("--arm", default="v201", choices=["v201", "latch"])
-    r.add_argument("--levels", default="pivot", help="pivot | pivot+don20 | don20")
+    r.add_argument("--arm", default="v201", choices=["v201", "latch", "hold"])
+    r.add_argument("--levels", default="pivot", help="pivot | pivot+don20 | don20 (any donN)")
     r.add_argument("--max-dist", type=float, default=0.0)
 
     p = sub.add_parser("parity", help="v2.01 defaults vs TradingView Trail column")
@@ -1029,8 +1029,8 @@ def main(argv=None):
     s = sub.add_parser("sweep", help="full grid sweep + summary.json + SWEEP_NOTES.md")
     s.add_argument("--tfs", default="15,30,60,240,1")
     s.add_argument("--jobs", type=int, default=max(1, os.cpu_count() or 1))
-    s.add_argument("--arm", default="v201", help="comma list of arm modes: v201,latch")
-    s.add_argument("--levels", default="pivot", help="comma list of level specs: pivot,pivot+don20,don20")
+    s.add_argument("--arm", default="v201", help="comma list of arm modes: v201,latch,hold")
+    s.add_argument("--levels", default="pivot", help="comma list of level specs: pivot,pivot+don20,don5,don10,don20,don50")
     s.add_argument("--out", default="", help="sub-directory of results/ to write into (default: results/ itself)")
     s.add_argument("--costs", default="", help="comma list of cost presets to sweep (default: the BTC grid none,exchange,cfd_std,cfd_raw)")
 

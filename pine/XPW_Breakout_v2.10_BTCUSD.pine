@@ -91,6 +91,13 @@
 //      survives and the order returns when the gate reopens. Re-arming
 //      after a trade needs a fresh pull-back of one buffer.
 //      ArmLatch=false restores v2.01 for the acceptance test.
+//      LvlMove decides what a latched stop does when its level is
+//      replaced by a new confirmed one: Recheck (default, the sweep's
+//      'latch') re-tests the buffer against the new level; Follow
+//      (the sweep's 'hold') re-prices the resting stop to the new
+//      level at once, so it moves continually with the level. The
+//      Donchian sweep (CALIBRATION.md section 15) found no consistent
+//      edge either way; Follow adds a few trades per file.
 //  F12 strategy.risk.max_position_size only constrains strategy.entry();
 //      v2.01 placed the straddle with strategy.order(), so the "second
 //      enforcement layer" was inert. v2.10 uses strategy.entry() (OCA
@@ -178,6 +185,7 @@ ExecMode    = input.string("Tick", "Execution", options=["Tick", "BarClose"], gr
 systemType  = input.int(1, "Trading System (1 = enabled)", group=grpX)
 Direction   = input.string("Both", "Direction", options=["Both", "Long", "Short"], group=grpX)
 ArmLatch    = input.bool(true, "Arm latch (buffer arms only, stop then rests)", group=grpX, tooltip="Off = v2.01: the stop is cancelled on every evaluation where price is inside the buffer. Keep ON for Tick execution.")
+LvlMove     = input.string("Recheck", "Latched stop when the level moves", options=["Recheck", "Follow"], group=grpX, tooltip="Recheck: a replaced level must pass the buffer again before the stop is re-placed (sweep default). Follow: the resting stop is re-priced to the new level immediately, so it moves continually with the pivot / Donchian level. CALIBRATION.md section 15: no consistent gain either way.")
 MaxDistAtr  = input.float(0.0, "Max level distance, ATR mult (0 = off)", minval=0.0, step=0.5, group=grpX, tooltip="Do not arm a level further than this from price (stale pivot after a fast move). Must exceed the entry buffer, otherwise nothing can arm; the table flags that.")
 
 grpC = "2. Costs (model, mirrors the header)"
@@ -530,9 +538,11 @@ if EntryMode == "Stop"
         hardL   = hardOK and not na(lvlUp) and not distDead and not (tooFarL and barClosed)
         if not hardL
             armedL := false
-        else if not armedL or not ArmLatch or lvlChanged(lvlUp, armLvlL)
+        else if not armedL or not ArmLatch or (LvlMove == "Recheck" and lvlChanged(lvlUp, armLvlL))
             armedL  := close < lvlUp - buffer and not tooFarL         // fresh arm, v2.01 mode, or a replaced level: buffer re-checked
             armLvlL := armedL ? lvlUp : na                             // latch identity is the ARM, not the order: survives a closed soft gate (F11)
+        else if lvlChanged(lvlUp, armLvlL)
+            armLvlL := lvlUp                                           // Follow: the latched stop is re-priced to the replaced level without a buffer re-check
         placeL = armedL and softOKL and retryOKL
         if placeL
             qL = calcQty(lvlUp)
@@ -556,9 +566,11 @@ if EntryMode == "Stop"
         hardS   = hardOK and not na(lvlDn) and not distDead and not (tooFarS and barClosed)
         if not hardS
             armedS := false
-        else if not armedS or not ArmLatch or lvlChanged(lvlDn, armLvlS)
+        else if not armedS or not ArmLatch or (LvlMove == "Recheck" and lvlChanged(lvlDn, armLvlS))
             armedS  := close > lvlDn + buffer and not tooFarS
             armLvlS := armedS ? lvlDn : na
+        else if lvlChanged(lvlDn, armLvlS)
+            armLvlS := lvlDn
         placeS = armedS and softOKS and retryOKS
         if placeS
             qS = calcQty(lvlDn)
@@ -761,7 +773,7 @@ if ShowTable and barstate.islast
     per100    = bar_index > 0 ? strategy.closedtrades * 100.0 / bar_index : na
     bufAtr    = atrRef > 0 ? buffer / atrRef : na
     blocked   = ((allowL and trendL) or (allowS and trendS) ? "" : "trend ") + (coolOK ? "" : "cooldown ") + (dayOK ? "" : "maxday ") + (gateOK ? "" : "coil ") + (costOK ? "" : "cost ") + ((allowL and not retryOKL) or (allowS and not retryOKS) ? "losscap " : "") + (inSession and dowOK ? "" : "time ") + (na(atrRef) ? "atr-warmup " : "") + (distDead ? "MAXDIST<=BUFFER " : "")
-    row(0,  "XPW v2.10", ExecMode + " / " + EntryMode + (ArmLatch ? " / latch" : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
+    row(0,  "XPW v2.10", ExecMode + " / " + EntryMode + (ArmLatch ? (LvlMove == "Follow" ? " / latch-follow" : " / latch") : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
     row(1,  "Levels", lvSrc == "" ? "NONE" : lvSrc, lvSrc == "" ? color.red : color.white)
     row(2,  "ATR " + str.tostring(AtrLen), str.tostring(atrRef, "#.##") + "  (" + str.tostring(atrPct, "#.###") + "%)", color.white)
     row(3,  "SL dist", str.tostring(slNow, "#.##") + "  (" + str.tostring(slNow / close * 100.0, "#.###") + "%)", color.white)

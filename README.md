@@ -14,7 +14,7 @@ execution.
 | `calibration/data/BTCUSD_*.csv` | The five TradingView exports (1m, 15m, 30m, 60m, 240m) the BTC sweep ran on. |
 | `calibration/data/XAUUSD_*.csv` | The six OANDA gold exports (5m to 240m) the gold sweep ran on. |
 | `calibration/data/BTCUSDT_*.csv` | MEXC 5m, 30s and 15s BTC exports; see `CALIBRATION.md` section 14 (5m and below: do not). |
-| `calibration/results/` | Sweep CSVs, `summary.json`, `SWEEP_NOTES.md`, `parity.json`; `latch/` for the v2.10 arming sweep, `xau/` for gold, `btc5/` for BTC 5m and sub-minute. |
+| `calibration/results/` | Sweep CSVs, `summary.json`, `SWEEP_NOTES.md`, `parity.json`; `latch/` for the v2.10 arming sweep, `xau/` for gold, `btc5/` for BTC 5m and sub-minute, `don_btc/` and `don_xau/` for the Donchian / Follow sweep (`CALIBRATION.md` section 15). |
 
 ## Quick start
 
@@ -30,7 +30,8 @@ execution.
    `CALIBRATION.md`, and check the on-chart table: the "Header slippage
    should be" row must equal the Properties slippage.
 5. Pick the timeframe block in `CALIBRATION.md` and copy its geometry
-   inputs.
+   inputs. Pivot levels with `LvlMove` = Recheck are the defaults; section
+   15 lists the timeframes where a rolling Donchian level did better.
 
 ## Reproduce the sweep
 
@@ -39,4 +40,5 @@ pip install pandas numpy
 python3 calibration/xpw_backtest.py sweep      # writes calibration/results/
 python3 calibration/xpw_backtest.py parity     # engine vs the TradingView Trail column
 python3 calibration/xpw_backtest.py run --tf 60 --sl-mode atr --sl 1.5 --tp-r 2 --cost cfd_std
+python3 calibration/xpw_backtest.py sweep --tfs 15,30,60,240 --arm latch,hold --levels pivot,don5,don10,don20,don50 --costs none,vt_btc --out don_btc   # writes calibration/results/don_btc/
 ```
