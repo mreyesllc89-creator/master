@@ -14,5 +14,6 @@ InpSLasPct=0.10
 InpAtrLen=14
 InpBarsN=3
 InpBufAtrMult=0.0
+InpLvlMove=0
 InpShowPanel=true
 InpVerbose=true

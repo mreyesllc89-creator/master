@@ -26,7 +26,7 @@
 //|   6 panel polish, tick-mode arming, alerts.                      |
 //+------------------------------------------------------------------+
 #property copyright "XPW"
-#property version   "0.12"
+#property version   "0.13"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -35,6 +35,7 @@
 //============== INPUTS ==============//
 enum ENUM_XPW_PRESET { PRESET_BTCUSD = 0, PRESET_XAUUSD = 1, PRESET_CUSTOM = 2 };
 enum ENUM_XPW_GEO    { GEO_ATR = 0, GEO_PCT = 1 };
+enum ENUM_XPW_LVLMOVE { LVL_FOLLOW = 0, LVL_RECHECK = 1 };
 
 input group "1. Symbol preset"
 input ENUM_XPW_PRESET InpPreset      = PRESET_XAUUSD;  // Preset (sets costs and lot defaults below when not Custom)
@@ -60,6 +61,7 @@ input int    InpAtrLen          = 14;    // ATR length
 input group "5. Levels"
 input int    InpBarsN           = 3;     // Pivot bars each side
 input double InpBufAtrMult      = 0.0;   // Entry buffer, ATR mult (0 = preset: BTC 0.5, XAU 1.0)
+input ENUM_XPW_LVLMOVE InpLvlMove = LVL_FOLLOW; // Latched stop when the level moves: Follow = re-price at once (calibrated), Recheck = buffer again
 
 input group "6. Display"
 input bool   InpShowPanel       = true;  // Status panel (Comment)
@@ -279,8 +281,8 @@ void OnClosedBar()
    else
    {
       bool lvlChanged = (armLvlL <= 0) || MathAbs(lvlUp - armLvlL) > _Point / 2.0;
-      if(!armedL || lvlChanged)
-         armedL = (lastClose < lvlUp - buffer);               // the buffer ARMS only (F11)
+      if(!armedL || (lvlChanged && InpLvlMove == LVL_RECHECK))
+         armedL = (lastClose < lvlUp - buffer);               // the buffer ARMS only (F11); Follow keeps the latch and re-prices below
       if(armedL && lvlUp - ask < minDist) armedL = false;    // broker stop level
       if(armedL)
       {
@@ -314,7 +316,7 @@ void OnClosedBar()
    else
    {
       bool lvlChanged = (armLvlS <= 0) || MathAbs(lvlDn - armLvlS) > _Point / 2.0;
-      if(!armedS || lvlChanged)
+      if(!armedS || (lvlChanged && InpLvlMove == LVL_RECHECK))
          armedS = (lastClose > lvlDn + buffer);
       if(armedS && bid - lvlDn < minDist) armedS = false;
       if(armedS)

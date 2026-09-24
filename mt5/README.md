@@ -5,7 +5,7 @@ a working EA that runs in the Strategy Tester before the next one lands.
 
 | Step | Content | Status |
 |---|---|---|
-| 1 | Skeleton: presets, ATR + confirmed pivots on closed bars, stop straddle with attached SL/TP, buffer-arms latch, OCA, panel | in repo (`XPW_Breakout.mq5`, v0.10) |
+| 1 | Skeleton: presets, ATR + confirmed pivots on closed bars, stop straddle with attached SL/TP, buffer-arms latch (Follow / Recheck when the level moves), OCA, panel | in repo (`XPW_Breakout.mq5`, v0.13) |
 | 2 | Cost model, TP widening, risk sizing, deal-history commission referee | next |
 | 3 | Hard/soft gates, MaxDist, loss cap per level, cooldown, day cap, session | |
 | 4 | Trail, breakeven, time stop on every tick | |
@@ -22,7 +22,7 @@ a working EA that runs in the Strategy Tester before the next one lands.
    steadiest), model **Every tick based on real ticks**, preset input set to
    the symbol. Leave lots at 0 to take the preset default (0.10).
 3. Compare the tester's trade list with the Pine build on the same symbol and
-   timeframe in Execution = BarClose, ArmLatch on, pivot levels only, trail off
+   timeframe in Execution = BarClose, ArmLatch on, level move Follow, pivot levels only, trail off
    (step 1 has no trail yet; set UseTrail off in Pine for the comparison), cost
    gate off, TP widening off, cost sizing off. Entry prices should match to the
    spread and fill quality; the bar of each entry should match exactly.
