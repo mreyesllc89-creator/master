@@ -430,6 +430,34 @@ Adding Donchian 20 levels raises trade counts by 30 to 60% and helps on 10m
 (79 trades, +287 per ounce at SL 1.0%, 2R, BarsN 8) and 240m (+1661 at SL
 1.5 ATR, 3R) but not elsewhere; it stays off by default.
 
+### Walk-forward
+
+`calibration/walkforward.py` splits each gold export in half, picks on the
+first half only, and scores on the second half (full tables in
+`calibration/results/xau/walkforward.md`). Three candidates per timeframe:
+the shipped defaults, the first-half plateau pick, and the first-half best
+cell. Out-of-sample net per ounce:
+
+| TF | shipped defaults | first-half plateau pick | first-half best cell |
+|---|---|---|---|
+| 10m | +8 | +80 | +143 |
+| 15m | +177 | -42 | +223 |
+| 30m | +79 | -13 | +22 |
+| 60m | +186 | -85 | -396 |
+| 240m | +294 | +435 | +435 |
+| positive out of sample | 5 of 5 | 2 of 5 | 4 of 5 |
+
+Reading: settings optimised on one timeframe's first half fail on its second
+half two or three times out of five, and the 60m best cell (5 in-sample
+trades, PF 11) loses 396 per ounce out of sample, which is why the report
+ships one cross-timeframe geometry instead of the per-timeframe picks. Two
+honest caveats: the shipped defaults were chosen on the full exports, so
+the second halves were not unseen by that choice (although choosing one
+geometry for five timeframes is a far weaker selection than choosing a cell
+per timeframe), and the 10m result is a coin flip at +8. On 240m the whole
+grid is only 46% positive in the second half, so the 240m number rests on
+the trend of that period more than on the geometry.
+
 Not modelled: the daily maintenance break and weekend gap (use the session
 and trade-day inputs), and gold swaps, which are charged per lot per night
 with a triple Wednesday and can exceed the round-trip cost on a 60m or 240m
