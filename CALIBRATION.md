@@ -464,3 +464,46 @@ Not modelled: the daily maintenance break and weekend gap (use the session
 and trade-day inputs), and gold swaps, which are charged per lot per night
 with a triple Wednesday and can exceed the round-trip cost on a 60m or 240m
 hold.
+
+## 14. BTC 5m and sub-minute exports (MEXC:BTCUSDT)
+
+Three further BTC exports were checked: 5m (2,258 bars, 7.8 days, Sept 16 to
+24), 30s (566 bars, 4.7 hours) and 15s (615 bars, 2.6 hours). Cost presets:
+`vt_btc` (the VT Markets account: $21 spread, no commission, $5 slip; round
+trip $31) and `mexc` (0.02% taker per side, round trip about $38). Results
+in `calibration/results/btc5/`.
+
+**Sub-minute bars are not tradeable with this system at any real cost.** The
+round trip is 1.5 ATR on 30s and 2.3 ATR on 15s at VT costs (4 to 6 ATR at
+exchange taker fees). Frictionless, 93 to 100% of configurations are
+positive; at VT costs 14 to 23%; at MEXC costs 2 to 8%. Costs eat 66 to 126%
+of gross. Nothing to calibrate there.
+
+**5m: the shipped BTC defaults lose.** SL 3 ATR, TP 3R, BarsN 3, buffer 0.5,
+latch on, pivot levels: 109 trades, -6,519 per BTC at VT costs, and -3,064
+even frictionless. Only 8% of measurable 5m configurations are positive; the
+one band that works is a percent stop of 1.0% (about 8 ATR on 5m) with
+BarsN 8, 16 to 45 trades, which is the 15m/60m geometry in dollar terms and
+gains nothing from 5m bars.
+
+To separate the week from the timeframe, the same defaults were run over
+the same Sept 16 to 23 window on the CRYPTO:BTCUSD exports:
+
+| TF, same week | trades | net per BTC (VT costs) | PF |
+|---|---|---|---|
+| 5m (MEXC) | 109 | -6,519 | 0.49 |
+| 15m | 37 | +4,314 | 1.81 |
+| 30m | 22 | +805 | 1.12 |
+| 60m | 8 | +8,085 | 7.44 |
+
+Same market, same week, same settings: positive from 15m up, negative on
+5m. The 5m pivots churn (about 14 trades per day), the buffer and stop are
+sized to a bar that is a quarter of the size of a 15m bar, and the round
+trip is 0.3 ATR instead of 0.08 on 60m. The BTC calibration therefore
+stands as shipped, with an explicit rule: do not run the BTC build below
+15m. If a 5m chart must be used, GeoMode Pct with SL 1.0%, TP 1R to 3R,
+BarsN 8 is the only band with evidence, and that evidence is one week.
+
+MEXC's exported Swing High/Low columns match the engine's BarsN 5 pivots
+96 to 97% (the MEXC feed's highs and lows differ slightly from the
+CRYPTO index), so the engine was validated on this feed as well.

@@ -13,7 +13,8 @@ execution.
 | `calibration/xpw_backtest.py` | Python replica of the TradingView broker emulator used for the sweep. |
 | `calibration/data/BTCUSD_*.csv` | The five TradingView exports (1m, 15m, 30m, 60m, 240m) the BTC sweep ran on. |
 | `calibration/data/XAUUSD_*.csv` | The six OANDA gold exports (5m to 240m) the gold sweep ran on. |
-| `calibration/results/` | Sweep CSVs, `summary.json`, `SWEEP_NOTES.md`, `parity.json`; `latch/` for the v2.10 arming sweep, `xau/` for gold. |
+| `calibration/data/BTCUSDT_*.csv` | MEXC 5m, 30s and 15s BTC exports; see `CALIBRATION.md` section 14 (5m and below: do not). |
+| `calibration/results/` | Sweep CSVs, `summary.json`, `SWEEP_NOTES.md`, `parity.json`; `latch/` for the v2.10 arming sweep, `xau/` for gold, `btc5/` for BTC 5m and sub-minute. |
 
 ## Quick start
 
