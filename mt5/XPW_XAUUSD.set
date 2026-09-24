@@ -1,0 +1,18 @@
+; XPW Breakout step 1 - XAUUSD preset (VT Markets: 2.5 pips, $0.6/lot; SL 1.5 ATR, TP 2.5R, buffer 1.0, 0.10 lots)
+InpPreset=1
+InpMagic=210002
+InpDeviation=50
+InpCommPerLotSide=0.0
+InpSpreadPrice=0.0
+InpSlipPrice=0.0
+InpLots=0.0
+InpGeoMode=0
+InpSlAtrMult=0.0
+InpTpR=0.0
+InpTPasPct=0.25
+InpSLasPct=0.10
+InpAtrLen=14
+InpBarsN=3
+InpBufAtrMult=0.0
+InpShowPanel=true
+InpVerbose=true

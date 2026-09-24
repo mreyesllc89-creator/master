@@ -27,6 +27,14 @@ a working EA that runs in the Strategy Tester before the next one lands.
    gate off, TP widening off, cost sizing off. Entry prices should match to the
    spread and fill quality; the bar of each entry should match exactly.
 
+## Preset files
+
+`XPW_BTCUSD.set` and `XPW_XAUUSD.set` hold the inputs for each symbol (preset
+enum, magic number, everything else at the preset default). Load them in the
+Strategy Tester's Inputs tab with "Load", or copy them into
+`MQL5\Presets\` so they appear in the EA's input dialog. Magic numbers are
+210001 (BTC) and 210002 (gold) so both can run on one account.
+
 ## What step 1 deliberately leaves out
 
 - No trail, breakeven or time stop: the position exits on the attached SL/TP.

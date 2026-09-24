@@ -1,0 +1,18 @@
+; XPW Breakout step 1 - BTCUSD preset (VT Markets: spread $21, no commission; SL 3 ATR, TP 3R, buffer 0.5, 0.10 lots)
+InpPreset=0
+InpMagic=210001
+InpDeviation=50
+InpCommPerLotSide=0.0
+InpSpreadPrice=0.0
+InpSlipPrice=0.0
+InpLots=0.0
+InpGeoMode=0
+InpSlAtrMult=0.0
+InpTpR=0.0
+InpTPasPct=0.25
+InpSLasPct=0.10
+InpAtrLen=14
+InpBarsN=3
+InpBufAtrMult=0.0
+InpShowPanel=true
+InpVerbose=true
