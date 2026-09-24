@@ -26,8 +26,7 @@
 //|   6 panel polish, tick-mode arming, alerts.                      |
 //+------------------------------------------------------------------+
 #property copyright "XPW"
-#property version   "0.11"
-#property strict
+#property version   "0.12"
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
@@ -136,6 +135,9 @@ int OnInit()
    if(InpGeoMode == GEO_ATR && pSlAtr < 0.5) PrintFormat("XPW WARNING: SL %.2f ATR is very tight; calibrated values are BTC 3.0 / XAU 1.5 (leave the input at 0 for the preset)", pSlAtr);
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED)) Print("XPW WARNING: trading is not allowed in the terminal (Algo Trading button)");
    if(!MQLInfoInteger(MQL_TRADE_ALLOWED)) Print("XPW WARNING: trading is not allowed for this EA (check 'Allow Algo Trading' in the EA settings)");
+   PrintFormat("XPW account: balance %.2f %s leverage 1:%d tester=%s bars loaded=%d",
+               AccountInfoDouble(ACCOUNT_BALANCE), AccountInfoString(ACCOUNT_CURRENCY), (int)AccountInfoInteger(ACCOUNT_LEVERAGE),
+               MQLInfoInteger(MQL_TESTER) ? "yes" : "no", Bars(_Symbol, _Period));
    return INIT_SUCCEEDED;
 }
 
@@ -387,7 +389,7 @@ void UpdatePanel()
                      DoubleToString(SlDistAt(lastClose),_Digits), DoubleToString(TpDistAt(lastClose),_Digits), DoubleToString(atrRef*pBufAtr,_Digits));
    s += StringFormat("Level up %s   level down %s   last close %s\n", lvlUp>0?DoubleToString(lvlUp,_Digits):"-", lvlDn>0?DoubleToString(lvlDn,_Digits):"-", DoubleToString(lastClose,_Digits));
    s += StringFormat("Armed L/S %s/%s   BuyStop %s   SellStop %s\n", armedL?"yes":"no", armedS?"yes":"no",
-                     FindPending(ORDER_TYPE_BUY_STOP)?"resting":"-", FindPending(ORDER_TYPE_SELL_STOP)?"resting":"-");
+                     FindPending(ORDER_TYPE_BUY_STOP) != 0 ? "resting" : "-", FindPending(ORDER_TYPE_SELL_STOP) != 0 ? "resting" : "-");
    s += StringFormat("Position: %s\n", pos);
    s += StringFormat("Spread now %s (model %s)   stop level %d pts   lots %.2f\n", DoubleToString(spreadNow,_Digits), DoubleToString(pSpreadPrice,_Digits),
                      (int)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL), NormLots(pLots));
