@@ -148,7 +148,7 @@
 //    the ticks row agree with the gold Properties), Risk 4, FixedQty 10,
 //    Cap 50, QtyStep 1, and Properties > Slippage 30 ticks, Commission
 //    0.003 cash per contract (Reset settings AND put the cost inputs back
-//    to 9 / 5 afterwards to return to the BTC header). Residuals: v2.10
+//    to 10.5 / 5 afterwards to return to the BTC header). Residuals: v2.10
 //    snaps order prices to mintick, uses strategy.entry, locks the trail
 //    TRIGGER and DISTANCE at arm time (F13; v2.01 recomputed both from the
 //    live ATR every bar), and pre-stages the FILL-BAR bracket in ticks
@@ -167,7 +167,7 @@ strategy("XPW Breakout v2.10 (BTCUSD)", overlay=true,
      calc_on_order_fills=false,
      process_orders_on_close=false,
      commission_type=strategy.commission.cash_per_contract,
-     commission_value=9.0,     // USD per BTC per side = CFD raw: $3 commission + $6 half of a $12 spread. CFD std: 8.5 (half of $17). Exchange: use percent 0.05
+     commission_value=10.5,    // USD per BTC per side = VT Markets MT5 BTCUSD: no commission, spread 2100 points = $21, half of it here. Exchange: use percent 0.05
      slippage=500,             // ticks per side. mintick 0.01 -> $5 pure execution slip. Must equal SlipUSD / syminfo.mintick (table prints it)
      margin_long=0, margin_short=0,
      max_bars_back=500)
@@ -182,7 +182,7 @@ MaxDistAtr  = input.float(0.0, "Max level distance, ATR mult (0 = off)", minval=
 
 grpC = "2. Costs (model, mirrors the header)"
 CommPct     = input.float(0.0, "Commission % per side", minval=0.0, step=0.01, group=grpC, tooltip="Exchange taker ~0.05. Must equal the header / Properties commission when its type is percent.")
-CommCash    = input.float(9.0, "Commission USD per contract per side", minval=0.0, step=0.5, group=grpC, tooltip="CFD: half the spread plus any per-lot commission. Must equal the header when its type is cash per contract.")
+CommCash    = input.float(10.5, "Commission USD per contract per side", minval=0.0, step=0.5, group=grpC, tooltip="CFD: half the spread plus any per-lot commission (VT Markets BTCUSD: $21 spread, no commission -> 10.5). Must equal the header when its type is cash per contract.")
 SlipUSD     = input.float(5.0, "Slippage USD per side", minval=0.0, step=0.5, group=grpC, tooltip="Pure execution slip on stop / market fills. Header slippage (ticks) should equal this divided by syminfo.mintick.")
 UseCostGate = input.bool(true, "Cost gate (skip when RT cost > x% of net TP)", group=grpC)
 MaxCostPct  = input.float(20.0, "   max round-trip cost, % of net TP", minval=1.0, maxval=100.0, step=5.0, group=grpC)

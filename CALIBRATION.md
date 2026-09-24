@@ -88,7 +88,8 @@ should be" prints the tick count for the chart symbol.
 | none | 0 | 0 | 0 | $0 | commission 0, slippage 0 | frictionless baseline |
 | exchange (perp taker) | 0.05 | 1.0 | 5.0 | ~$96 at $84k | `strategy.commission.percent`, 0.05, slippage 600 | Binance USDT-M / Bybit perp taker 0.05-0.055%; spot is 0.1% (RT ~$180). Spread $2 and slip $5 are assumptions. |
 | cfd_std (spread only) | 0 | 8.5 | 5.0 | $27 | `cash_per_contract`, 8.5, slippage 500 | VT Markets BTCUSD spread 1,696 points = $16.96 (VT cost FAQ). Pepperstone $10-15, IC Markets ~$12. |
-| cfd_raw (shipped default) | 0 | 9.0 | 5.0 | $28 | `cash_per_contract`, 9.0, slippage 500 | VT Raw ECN $3 per lot per side ($6 RT) verified for FX, assumed for BTCUSD; raw spread $12 from IC Markets. If your MT5 statement shows no crypto commission, use 6.0. |
+| cfd_raw | 0 | 9.0 | 5.0 | $28 | `cash_per_contract`, 9.0, slippage 500 | VT Raw ECN $3 per lot per side ($6 RT) verified for FX, assumed for BTCUSD; raw spread $12 from IC Markets. |
+| vt_btc (shipped default) | 0 | 10.5 | 5.0 | $31 | `cash_per_contract`, 10.5, slippage 500 | The user's VT Markets MT5 account: BTCUSD spread 2,100 points = $21, no commission shown in the specification or deal history. Within $4 of cfd_std, so the sweep results stand. |
 | v2.01 gold header | 0 | 0.003 | 0.30 | $0.61 | as shipped in v2.01 | why v2.01 numbers looked free on BTC |
 
 Tick counts assume `syminfo.mintick` = 0.01 (CRYPTO:BTCUSD and the CFD feeds
@@ -363,16 +364,17 @@ TradingView.
 | Setting | BTCUSD build | XAUUSD build |
 |---|---|---|
 | Contract | 1 BTC (1 MT5 lot) | 1 oz (100 oz = 1 MT5 lot) |
-| Header commission | cash 9.0 per contract per side | cash 0.10 per oz per side (raw: $0.03 commission plus half of a ~$0.15 spread; standard ~0.15) |
+| Header commission | cash 10.5 per contract per side (VT: $21 spread, no commission) | cash 0.13 per oz per side (VT: 2.5 pips = $0.25 spread, $0.6 per lot commission) |
 | Header slippage | 500 ticks ($5) | 5 ticks ($0.05 per oz) |
-| CommCash / SlipUSD inputs | 9.0 / 5.0 | 0.10 / 0.05 |
+| CommCash / SlipUSD inputs | 10.5 / 5.0 | 0.13 / 0.05 |
 | FixedQty / cap / step | 0.1 / 2.0 / 0.01 BTC | 10 / 50 / 1 oz |
 
-Round trip at the raw preset is $0.31 per ounce ($31 per lot): 2 to 7% of
-one ATR on 10m to 240m, so on gold the cost gate never binds and the
-geometry question is about noise, not cost. The raw and standard presets
-give the same picks. The gold spread and commission are assumptions from
-typical raw-account pricing; verify on an MT5 statement.
+Round trip at the shipped numbers is $0.36 per ounce ($36 per lot): 3 to 8%
+of one ATR on 10m to 240m, so on gold the cost gate never binds and the
+geometry question is about noise, not cost. The sweep used $0.31 (raw) and
+$0.40 (standard) presets and both give the same picks. The shipped figures
+come from the user's VT Markets MT5 account (2.5 pips spread, $0.6 per lot
+commission).
 
 ### Sweep (latch on, gold presets, fixed 1 oz; multiply net by 100 for one lot)
 
