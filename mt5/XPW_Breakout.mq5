@@ -26,7 +26,7 @@
 //|   6 panel polish, tick-mode arming, alerts.                      |
 //+------------------------------------------------------------------+
 #property copyright "XPW"
-#property version   "0.10"
+#property version   "0.11"
 #property strict
 
 #include <Trade\Trade.mqh>
@@ -127,8 +127,15 @@ int OnInit()
    atrHandle = iATR(_Symbol, _Period, InpAtrLen);
    if(atrHandle == INVALID_HANDLE) { Print("XPW: iATR failed"); return INIT_FAILED; }
    lastBarTime = 0;
-   PrintFormat("XPW step1 init: preset=%s lots=%.2f SL=%.2f ATR TP=%.2fR buffer=%.2f ATR BarsN=%d",
-               pName, pLots, pSlAtr, pTpR, pBufAtr, InpBarsN);
+   PrintFormat("XPW step1 init: preset=%s lots=%.2f SL=%.2f ATR TP=%.2fR buffer=%.2f ATR BarsN=%d geo=%s",
+               pName, pLots, pSlAtr, pTpR, pBufAtr, InpBarsN, InpGeoMode == GEO_ATR ? "ATR" : "Pct");
+   PrintFormat("XPW symbol: digits=%d point=%s contract=%.2f volmin=%.2f volstep=%.2f stoplevel=%d pts freeze=%d pts",
+               _Digits, DoubleToString(_Point,_Digits), SymbolInfoDouble(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE),
+               SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN), SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP),
+               (int)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL), (int)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL));
+   if(InpGeoMode == GEO_ATR && pSlAtr < 0.5) PrintFormat("XPW WARNING: SL %.2f ATR is very tight; calibrated values are BTC 3.0 / XAU 1.5 (leave the input at 0 for the preset)", pSlAtr);
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED)) Print("XPW WARNING: trading is not allowed in the terminal (Algo Trading button)");
+   if(!MQLInfoInteger(MQL_TRADE_ALLOWED)) Print("XPW WARNING: trading is not allowed for this EA (check 'Allow Algo Trading' in the EA settings)");
    return INIT_SUCCEEDED;
 }
 
@@ -188,9 +195,30 @@ void DeletePending(ENUM_ORDER_TYPE type, string why)
    else PrintFormat("XPW: OrderDelete %I64u failed: %d %s", t, trade.ResultRetcode(), trade.ResultRetcodeDescription());
 }
 
-// Geometry in price units (Pine slDistAt / tpDistAt), from the closed-bar ATR
-double SlDistAt(double px) { return InpGeoMode == GEO_ATR ? atrRef * pSlAtr : px * InpSLasPct / 100.0; }
-double TpDistAt(double px) { return InpGeoMode == GEO_ATR ? atrRef * pSlAtr * pTpR : px * InpTPasPct / 100.0; }
+// Broker minimum distance for stops: stop level + current spread (+1 point safety)
+double MinStopDist()
+{
+   double stops  = (double)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) * _Point;
+   double spread = SymbolInfoDouble(_Symbol, SYMBOL_ASK) - SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   return stops + spread + _Point;
+}
+
+// Geometry in price units (Pine slDistAt / tpDistAt), from the closed-bar ATR.
+// Clamped to the broker minimum so a mis-typed input cannot produce "invalid stops" on every order.
+double SlDistAt(double px)
+{
+   double d = InpGeoMode == GEO_ATR ? atrRef * pSlAtr : px * InpSLasPct / 100.0;
+   double m = MinStopDist();
+   if(d < m) { if(InpVerbose) PrintFormat("XPW: SL distance %s below broker minimum %s, clamped", DoubleToString(d,_Digits), DoubleToString(m,_Digits)); d = m; }
+   return d;
+}
+double TpDistAt(double px)
+{
+   double d = InpGeoMode == GEO_ATR ? atrRef * pSlAtr * pTpR : px * InpTPasPct / 100.0;
+   double m = MinStopDist();
+   if(d < m) { if(InpVerbose) PrintFormat("XPW: TP distance %s below broker minimum %s, clamped", DoubleToString(d,_Digits), DoubleToString(m,_Digits)); d = m; }
+   return d;
+}
 
 //+------------------------------------------------------------------+
 //| Confirmed pivots on closed bars (ta.pivothigh(high, n, n))       |
