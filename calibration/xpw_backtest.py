@@ -239,7 +239,8 @@ class Config:
     close_at_end: bool = True
     # v2.10 additions
     arm_mode: str = "v201"       # 'v201': cancel the stop on every bar whose close is inside the buffer (v2.01 defect F11)
-                                 # 'latch': buffer arms only; the stop then rests until fill / level gone / not flat
+                                 # 'latch': buffer arms only; a CHANGED level re-runs the buffer test (v2.10 Pine, review fix)
+                                 # 'hold':  buffer arms only; a changed level is re-priced without re-checking the buffer (continually moved stop)
     levels: str = "pivot"        # 'pivot' | 'pivot+donN' | 'donN'  (N = Donchian length on the PRIOR N bars); nearest enabled level to close
     max_dist_atr: float = 0.0    # latch: do not arm a level further than this many ATR from close (0 = off)
 
@@ -280,8 +281,10 @@ def run_backtest(d: TFData, cfg: Config, want_trades: bool = True):
     use_pivot, don_len = parse_levels(cfg.levels)
     if don_len > 0:
         donH, donL = donchian_prior(h, l, don_len)
-    latch = cfg.arm_mode == "latch"
+    latch = cfg.arm_mode in ("latch", "hold")
+    relatch = cfg.arm_mode == "latch"
     armed_long = armed_short = False
+    arm_lvl_long = arm_lvl_short = np.nan
     hs = 0.5 * cfg.spread_usd
     slip = cfg.slippage_usd + hs      # adverse move on every stop/market fill
     cpct, ccash = cfg.commission_pct, cfg.commission_cash
@@ -492,8 +495,9 @@ def run_backtest(d: TFData, cfg: Config, want_trades: bool = True):
                     (cfg.max_dist_atr <= 0 or lvUp - ci <= cfg.max_dist_atr * ai)
                 if not can_l:
                     armed_long = False
-                elif not armed_long:
+                elif not armed_long or (relatch and (np.isnan(arm_lvl_long) or abs(lvUp - arm_lvl_long) > 1e-9)):
                     armed_long = ci < lvUp - buffer
+                arm_lvl_long = lvUp if armed_long else np.nan
                 if armed_long:
                     sl_dist = lvUp * cfg.sl_value / 100.0 if cfg.sl_mode == "pct" else ai * cfg.sl_value
                     qty = calc_qty(cfg, equity, sl_dist)
@@ -505,8 +509,9 @@ def run_backtest(d: TFData, cfg: Config, want_trades: bool = True):
                     (cfg.max_dist_atr <= 0 or ci - lvDn <= cfg.max_dist_atr * ai)
                 if not can_s:
                     armed_short = False
-                elif not armed_short:
+                elif not armed_short or (relatch and (np.isnan(arm_lvl_short) or abs(lvDn - arm_lvl_short) > 1e-9)):
                     armed_short = ci > lvDn + buffer
+                arm_lvl_short = lvDn if armed_short else np.nan
                 if armed_short:
                     sl_dist = lvDn * cfg.sl_value / 100.0 if cfg.sl_mode == "pct" else ai * cfg.sl_value
                     qty = calc_qty(cfg, equity, sl_dist)
