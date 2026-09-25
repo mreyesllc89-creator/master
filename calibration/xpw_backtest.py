@@ -48,7 +48,7 @@ for _tf in ("5", "10", "15", "30", "60", "240"):   # OANDA:XAUUSD exports (v2.01
     TF_FILES["xau" + _tf] = os.path.join(DATA_DIR, f"XAUUSD_{_tf}.csv")
 for _tf in ("5", "15S", "30S"):                     # MEXC:BTCUSDT exports (v2.01 plots on the chart); 15S/30S are sub-minute
     TF_FILES["btc" + _tf.lower()] = os.path.join(DATA_DIR, f"BTCUSDT_{_tf}.csv")
-for _tf in ("1", "15", "30", "60", "240"):        # SPCFD:SPX cash-session CFD: 1m export, 15m+ resampled by resample_session.py
+for _tf in ("1", "15", "30", "60", "120"):        # SPCFD:SPX cash-session CFD exports (1m: 2.5 months; 15m: 5 months; 30m: 9 months; 60m: 18 months; 120m: 2.7 years)
     TF_FILES["spx" + _tf] = os.path.join(DATA_DIR, f"SPX_{_tf}.csv")
 
 INITIAL_CAPITAL = 100000.0
