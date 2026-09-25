@@ -16,6 +16,7 @@ group_trend = "Directional Trend"
 fastEmaLen = input.int(5, "Fast EMA", group=group_trend)
 slowEmaLen = input.int(13, "Slow EMA", group=group_trend)
 trendFilterLen = input.int(100, "Trend Filter EMA", group=group_trend)
+tradeDirection = input.string("Both", "Trade Direction", options=["Both", "Buy only", "Sell only"], group=group_trend, tooltip="Buy only takes long signals and ignores shorts. Sell only takes short signals and ignores longs.")
 entryMode = input.string("Stop at cross price (same candle)", "Entry Trigger", options=["Stop at cross price (same candle)", "EMA cross", "Projected cross (early)", "Fast EMA turn (early)"], group=group_trend, tooltip="Stop at cross price: at each bar close the price at which the fast EMA would cross the slow EMA on the next bar is solved from the EMA formulas, and a stop order is parked there (plus a buffer). It fills inside the candle that makes the cross, at the cross price instead of the close. EMA cross: fast EMA crosses slow EMA, entered at the close (v2). Projected cross and Fast EMA turn: close-of-bar triggers that fire 1-2 bars before the cross.")
 crossBufferAtr = input.float(0.2, "Cross Stop Buffer", minval=0.0, step=0.05, group=group_trend, tooltip="Stop-at-cross mode only, in the selected Distance Unit (see Execution And Sizing). The entry stop sits this far beyond the exact cross price so a bar has to show some follow-through before filling. 0.2 ATR gave the best balance of confirmation rate and expectancy in the calibration sample; 0 fills at the exact cross price.")
 maxArmDistAtr = input.float(2.0, "Max Distance To Arm", minval=0.01, step=0.1, group=group_trend, tooltip="Stop-at-cross mode only, in the selected Distance Unit. The stop is only parked when the cross price is within this distance of the current close, so the order is not left far from price.")
@@ -47,8 +48,9 @@ distanceUnit = input.string("ATR multiple", "Distance Unit", options=["ATR multi
 ATR_SL_MULTIPLIER = input.float(2.0, "Stop Loss Distance", minval=0.01, step=0.1, group=group_execution, tooltip="In the selected Distance Unit.")
 ATR_TP_MULTIPLIER = input.float(2.0, "Take Profit Distance", minval=0.01, step=0.1, group=group_execution, tooltip="In the selected Distance Unit.")
 USE_TRAILING_STOP = input.bool(true, "Use Trailing Stop", group=group_execution)
-trailActivationMult = input.float(0.9, "Trail Activation (x Take Profit Distance)", minval=0.05, step=0.05, group=group_execution, tooltip="Trailing stop activates once price has moved this fraction of the take-profit distance in your favor. Converted to ticks internally.")
-trailOffsetMult = input.float(0.3, "Trail Offset (x Stop Distance)", minval=0.05, step=0.05, group=group_execution, tooltip="Distance the trailing stop follows behind price, as a fraction of the stop distance. Converted to ticks internally.")
+trailUnitMode = input.string("Fraction of TP / SL", "Trailing Unit", options=["Fraction of TP / SL", "Distance Unit"], group=group_execution, tooltip="Fraction of TP / SL: activation is a fraction of the take-profit distance and offset a fraction of the stop distance (0.9 and 0.3 reproduce earlier versions). Distance Unit: activation and offset are read directly in the selected Distance Unit (ATR multiple, gold points or % of price).")
+trailActivationMult = input.float(0.9, "Trail Activation", minval=0.0, step=0.05, group=group_execution, tooltip="Profit needed before the trailing stop activates, in the Trailing Unit. Converted to ticks internally.")
+trailOffsetMult = input.float(0.3, "Trail Offset", minval=0.0, step=0.05, group=group_execution, tooltip="Distance the trailing stop follows behind price, in the Trailing Unit. Converted to ticks internally.")
 
 group_risk = "Live Safety Layer"
 timeExitMode = input.string("Close when in profit after N bars", "Time Exit", options=["Off", "Close after N bars", "Close when in profit after N bars"], group=group_risk, tooltip="Close after N bars: the v2 hard max-bars exit. Close when in profit: once N bars have passed, close at the first bar that closes in profit; until then the ATR stop, target and trail keep working. In the calibration sample the profit-aware exit raised the win rate from about 50% to about 60% and was the most consistent setting across timeframes at N=4.")
@@ -78,6 +80,22 @@ f_distance(float _value) =>
         "Gold points" => _value
         "% of price" => close * _value / 100.0
         => atr_value * _value
+
+stop_distance = f_distance(ATR_SL_MULTIPLIER)
+profit_distance = f_distance(ATR_TP_MULTIPLIER)
+cross_buffer_distance = f_distance(crossBufferAtr)
+max_arm_distance = f_distance(maxArmDistAtr)
+
+// strategy.exit() takes trail_points and trail_offset in TICKS, not price points.
+// v2 passed price distances directly, so on XAUUSD (mintick 0.01 or 0.001) the trail
+// activated after a fraction of one tick and followed price at a zero offset. The
+// backtester then filled every trade at the bar's favorable extreme, which produced
+// the 88-96% win rates in the v2 exports. Convert to ticks here.
+trail_activation_distance = trailUnitMode == "Distance Unit" ? f_distance(trailActivationMult) : profit_distance * trailActivationMult
+trail_offset_distance = trailUnitMode == "Distance Unit" ? f_distance(trailOffsetMult) : stop_distance * trailOffsetMult
+trail_activation_ticks = trail_activation_distance / syminfo.mintick
+trail_offset_ticks = trail_offset_distance / syminfo.mintick
+
 
 f_vovix_source() =>
     (ta.atr(fastVoVixLen) - ta.atr(slowVoVixLen)) / (ta.stdev(ta.atr(fastVoVixLen), devLen) + 1e-6)
@@ -169,6 +187,9 @@ f_alert_message(string _action, string _side, string _reason, float _qty, float 
      "\"max_live_spread_points\":" + f_json_num(maxLiveSpreadPoints) + "," +
      "\"trade_preset\":\"" + tradePreset + "\"," +
      "\"distance_unit\":\"" + distanceUnit + "\"," +
+     "\"trade_direction\":\"" + tradeDirection + "\"," +
+     "\"trail_activation\":" + f_json_num(trail_activation_distance) + "," +
+     "\"trail_offset\":" + f_json_num(trail_offset_distance) + "," +
      "\"bar_time\":" + str.tostring(time) +
      "}"
 
@@ -216,29 +237,19 @@ if (dailyLossHit or dailyLossCountHit) and not dailyLocked
 //==============================================================================
 // Trade Entry And Exit
 //==============================================================================
-stop_distance = f_distance(ATR_SL_MULTIPLIER)
-profit_distance = f_distance(ATR_TP_MULTIPLIER)
-cross_buffer_distance = f_distance(crossBufferAtr)
-max_arm_distance = f_distance(maxArmDistAtr)
 entry_qty = f_get_qty(stop_distance)
 stop_distance_ok = not useMaxStopDistance or stop_distance <= maxStopDistancePoints
 
-// strategy.exit() takes trail_points and trail_offset in TICKS, not price points.
-// v2 passed price distances directly, so on XAUUSD (mintick 0.01 or 0.001) the trail
-// activated after a fraction of one tick and followed price at a zero offset. The
-// backtester then filled every trade at the bar's favorable extreme, which produced
-// the 88-96% win rates in the v2 exports. Convert to ticks here.
-trail_activation_ticks = profit_distance * trailActivationMult / syminfo.mintick
-trail_offset_ticks = stop_distance * trailOffsetMult / syminfo.mintick
-
 can_enter = strategy.position_size == 0 and entry_session_active and is_weekday and not dailyLocked and not balanced_weak_entry_bar and stop_distance_ok and entry_qty > 0
 
-longCondition = bullCross and upTrend and expansion_regime and rsiLongCondition
-shortCondition = bearCross and downTrend and expansion_regime and rsiShortCondition
+allowLong = tradeDirection != "Sell only"
+allowShort = tradeDirection != "Buy only"
+longCondition = allowLong and bullCross and upTrend and expansion_regime and rsiLongCondition
+shortCondition = allowShort and bearCross and downTrend and expansion_regime and rsiShortCondition
 
 // Stop-at-cross arming: fast EMA still on the wrong side, filters pass, cross price ahead of price and within reach.
-armLong = useStopEntry and fastEma <= slowEma and upTrend and expansion_regime and rsiLongCondition and crossPrice > close and (crossPrice - close) <= max_arm_distance
-armShort = useStopEntry and fastEma >= slowEma and downTrend and expansion_regime and rsiShortCondition and crossPrice < close and (close - crossPrice) <= max_arm_distance
+armLong = allowLong and useStopEntry and fastEma <= slowEma and upTrend and expansion_regime and rsiLongCondition and crossPrice > close and (crossPrice - close) <= max_arm_distance
+armShort = allowShort and useStopEntry and fastEma >= slowEma and downTrend and expansion_regime and rsiShortCondition and crossPrice < close and (close - crossPrice) <= max_arm_distance
 longStopPrice = crossPrice + cross_buffer_distance
 shortStopPrice = crossPrice - cross_buffer_distance
 

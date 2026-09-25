@@ -185,8 +185,12 @@ Profit Distance, Cross Stop Buffer and Max Distance To Arm values are read:
 | Gold points | $2.00 per oz of price movement |
 | % of price | 2 % of the current close, about $86 at $4300 gold |
 
-The trailing stop keeps its relative definition (activation as a fraction of the take-profit
-distance, offset as a fraction of the stop distance), so it follows whichever unit is chosen.
-The defaults are sized for ATR multiples; when switching to points or percent, set the four
-values again. The calibration above was done in ATR units only; a points or percent
+The trailing stop has its own `Trailing Unit` switch: `Fraction of TP / SL` keeps the earlier
+relative definition (activation 0.9 x target distance, offset 0.3 x stop distance) and follows
+whichever Distance Unit is chosen; `Distance Unit` reads Trail Activation and Trail Offset
+directly in ATR multiples, gold points or % of price. The defaults are sized for ATR
+multiples; when switching to points or percent, set the values again.
+
+`Trade Direction` (Both, Buy only, Sell only) limits which side is taken; it applies to every
+entry trigger including the stop-at-cross order. The calibration above was done in ATR units only; a points or percent
 configuration has not been tested here.
