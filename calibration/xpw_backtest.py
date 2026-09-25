@@ -48,6 +48,8 @@ for _tf in ("5", "10", "15", "30", "60", "240"):   # OANDA:XAUUSD exports (v2.01
     TF_FILES["xau" + _tf] = os.path.join(DATA_DIR, f"XAUUSD_{_tf}.csv")
 for _tf in ("5", "15S", "30S"):                     # MEXC:BTCUSDT exports (v2.01 plots on the chart); 15S/30S are sub-minute
     TF_FILES["btc" + _tf.lower()] = os.path.join(DATA_DIR, f"BTCUSDT_{_tf}.csv")
+for _tf in ("1", "15", "30", "60", "240"):        # SPCFD:SPX cash-session CFD: 1m export, 15m+ resampled by resample_session.py
+    TF_FILES["spx" + _tf] = os.path.join(DATA_DIR, f"SPX_{_tf}.csv")
 
 INITIAL_CAPITAL = 100000.0
 
@@ -68,6 +70,9 @@ COST_PRESETS = {
     "gold_none": dict(commission_pct=0.0,   commission_cash=0.0,   spread_usd=0.0,  slippage_usd=0.0),
     # BTC on the user's VT Markets MT5 account: no commission, spread ~2100 points = $21
     "vt_btc":   dict(commission_pct=0.0,    commission_cash=0.0,   spread_usd=21.0, slippage_usd=5.0),
+    # S&P 500 CFD (SPCFD:SPX / VT Markets SPX500): spread-only, ~0.5 index points typical in cash hours, 0.1 pt slip; per 1 contract = $1/pt
+    "spx_cfd":  dict(commission_pct=0.0,    commission_cash=0.0,   spread_usd=0.5,  slippage_usd=0.1),
+    "spx_none": dict(commission_pct=0.0,    commission_cash=0.0,   spread_usd=0.0,  slippage_usd=0.0),
     # MEXC USDT perp taker 0.02% per side, ~$1 spread, $2 slip
     "mexc":     dict(commission_pct=0.0002, commission_cash=0.0,   spread_usd=1.0,  slippage_usd=2.0),
 }
