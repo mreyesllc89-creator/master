@@ -1,0 +1,301 @@
+
+====================================================================================================
+GVLiveV2_OANDA_XAUUSD_1m.csv
+  timeframe ~1m | trades 7320 | 2025-09-24 -> 2026-09-24
+  net $6,928.22 | win% 95.8 | PF 7.72 | avg/trade $0.946 | avg win $1.13 | avg loss $-3.51 | maxDD $-22.45 | commission col total $0.00
+  after $1.24/round-trip cost: net $-2,148.58 | PF 0.62 | win% 28.0 | maxDD $-2,155.52
+  long : n= 3759 net $  3165.76 PF 7.69 win% 95.6
+  short: n= 3561 net $  3762.47 PF 7.74 win% 96.1
+  exit reasons:
+    Exit Long       n= 3622 net $  3530.19 avg $  0.975 win% 99.2
+    Exit Short      n= 3447 net $  4143.04 avg $  1.202 win% 99.2
+    Max Bars Exit   n=  229 net $  -726.05 avg $ -3.171 win% 0.4
+    EOD             n=   22 net $   -18.95 avg $ -0.861 win% 9.1
+  duration (bars):
+    0    n=   34 net $    17.22 avg $  0.506 win% 70.6
+    1    n= 6688 net $  7469.16 avg $  1.117 win% 99.6
+    2    n=  239 net $   211.43 avg $  0.885 win% 92.9
+    3    n=  114 net $   -73.57 avg $ -0.645 win% 70.2
+    4    n=  245 net $  -696.01 avg $ -2.841 win% 12.7
+  entry hour (export clock):
+    04: n=  408 net $   380.60 avg $  0.933
+    05: n=  543 net $   420.67 avg $  0.775
+    06: n=  483 net $   296.62 avg $  0.614
+    07: n=  480 net $   399.63 avg $  0.833
+    08: n=  446 net $   598.51 avg $  1.342
+    09: n=  504 net $   808.46 avg $  1.604
+    10: n=  457 net $   672.67 avg $  1.472
+    11: n=  408 net $   537.40 avg $  1.317
+    12: n=  457 net $   468.13 avg $  1.024
+    13: n=  484 net $   452.93 avg $  0.936
+    14: n=  417 net $   339.00 avg $  0.813
+    15: n=  416 net $   240.10 avg $  0.577
+    16: n=  351 net $    64.85 avg $  0.185
+    18: n=  368 net $   221.63 avg $  0.602
+    19: n=  330 net $   203.90 avg $  0.618
+    20: n=  304 net $   308.49 avg $  1.015
+    21: n=  334 net $   352.09 avg $  1.054
+    22: n=  130 net $   162.53 avg $  1.250
+  entry time range: 0400 - 2229; exits range: 0401 - 2230
+  weekdays: {'Wed': 1498, 'Thu': 1586, 'Fri': 1143, 'Mon': 1494, 'Tue': 1599}
+  monthly net:
+    2025-09:+35  2025-10:+569  2025-11:+372  2025-12:+405  2026-01:+755  2026-02:+963  2026-03:+892  2026-04:+701  2026-05:+436  2026-06:+440  2026-07:+411  2026-08:+488  2026-09:+461
+  worst 5: [-18.79, -18.38, -17.51, -16.26, -12.09] best 5: [20.84, 23.53, 23.72, 24.57, 26.98]
+  top 5% of trades contribute $2,418.12 of $6,928.22
+  avg MFE $1.097 avg MAE $-0.481
+  winners whose PnL is within 10% (or $0.05) of their MFE: 7014/7016 = 100.0%  | avg win/avg MFE(winners) = 0.99
+  median winner size in gold points: 0.593
+
+====================================================================================================
+GVLiveV2_VANTAGE_XAUUSD_1D.csv
+  timeframe ~1440m | trades 52 | 2018-09-04 -> 2026-09-02
+  net $794.79 | win% 94.2 | PF 10.05 | avg/trade $15.284 | avg win $18.01 | avg loss $-29.26 | maxDD $-62.08 | commission col total $0.00
+  after $1.24/round-trip cost: net $730.31 | PF 8.97 | win% 92.3 | maxDD $-63.32
+  long : n=   36 net $   666.10 PF 32.43 win% 97.2
+  short: n=   16 net $   128.69 PF 2.93 win% 87.5
+  exit reasons:
+    Exit Long       n=   35 net $   687.29 avg $ 19.637 win% 100.0
+    Exit Short      n=   14 net $   195.28 avg $ 13.949 win% 100.0
+    Max Bars Exit   n=    3 net $   -87.78 avg $-29.260 win% 0.0
+  duration (bars):
+    1    n=   49 net $   882.57 avg $ 18.012 win% 100.0
+    4    n=    3 net $   -87.78 avg $-29.260 win% 0.0
+  entry hour (export clock):
+    00: n=   52 net $   794.79 avg $ 15.284
+  entry time range: 0000 - 0000; exits range: 0000 - 0000
+  weekdays: {'Tue': 11, 'Fri': 15, 'Wed': 15, 'Thu': 11}
+  monthly net:
+    2018-09:-5  2018-11:+9  2019-01:+2  2019-03:+10  2019-04:+1  2019-10:+44  2019-12:+7  2020-02:+7  2020-03:+27  2020-05:+7  2020-06:+11  2020-10:+3  2020-11:+49  2021-03:+3  2021-07:+9  2021-09:+5  2021-11:-52  2021-12:+6  2022-01:+12  2022-03:-21  2022-04:+23  2022-06:+31  2022-08:+13  2022-10:+4  2023-03:+11  2023-09:+2  2023-11:+12  2024-02:+16  2024-06:+20  2024-07:+6  2024-08:+14  2024-11:+6  2024-12:+5  2025-04:+69  2025-05:+29  2025-07:+23  2026-02:+163  2026-04:+80  2026-05:+89  2026-09:+45
+  worst 5: [-62.08, -21.19, -4.51, 1.08, 1.76] best 5: [49.22, 57.3, 68.93, 79.93, 118.41]
+  top 5% of trades contribute $198.34 of $794.79
+  avg MFE $17.402 avg MAE $-7.563
+  winners whose PnL is within 10% (or $0.05) of their MFE: 47/49 = 95.9%  | avg win/avg MFE(winners) = 0.98
+  median winner size in gold points: 8.560
+
+====================================================================================================
+GVLiveV2_VANTAGE_XAUUSD_1m.csv
+  timeframe ~1m | trades 5293 | 2025-09-24 -> 2026-09-24
+  net $4,585.95 | win% 87.6 | PF 3.09 | avg/trade $0.866 | avg win $1.46 | avg loss $-3.40 | maxDD $-33.48 | commission col total $0.00
+  after $1.24/round-trip cost: net $-1,977.37 | PF 0.61 | win% 33.7 | maxDD $-1,984.07
+  long : n= 2710 net $  1907.59 PF 2.67 win% 87.0
+  short: n= 2583 net $  2678.36 PF 3.55 win% 88.2
+  exit reasons:
+    Exit Long       n= 2401 net $  2770.69 avg $  1.154 win% 98.0
+    Exit Short      n= 2308 net $  3458.16 avg $  1.498 win% 98.3
+    Max Bars Exit   n=  537 net $ -1608.81 avg $ -2.996 win% 1.7
+    EOD             n=   47 net $   -34.09 avg $ -0.725 win% 12.8
+  duration (bars):
+    0    n=   15 net $     1.67 avg $  0.111 win% 33.3
+    1    n= 4012 net $  5644.20 avg $  1.407 win% 98.6
+    2    n=  434 net $   592.73 avg $  1.366 win% 96.1
+    3    n=  192 net $     9.71 avg $  0.051 win% 83.3
+    4    n=  640 net $ -1662.36 avg $ -2.597 win% 15.6
+  entry hour (export clock):
+    04: n=  402 net $   366.95 avg $  0.913
+    05: n=  515 net $   332.21 avg $  0.645
+    06: n=  464 net $   248.43 avg $  0.535
+    07: n=  429 net $   298.23 avg $  0.695
+    08: n=  388 net $   487.04 avg $  1.255
+    09: n=  435 net $   747.79 avg $  1.719
+    10: n=  395 net $   494.63 avg $  1.252
+    11: n=  307 net $   350.75 avg $  1.143
+    12: n=  342 net $   361.66 avg $  1.057
+    13: n=  353 net $   269.66 avg $  0.764
+    14: n=  274 net $   177.61 avg $  0.648
+    15: n=  246 net $   114.89 avg $  0.467
+    16: n=  174 net $    52.57 avg $  0.302
+    18: n=  156 net $    70.81 avg $  0.454
+    19: n=  139 net $    50.99 avg $  0.367
+    20: n=  119 net $    24.51 avg $  0.206
+    21: n=  108 net $   105.20 avg $  0.974
+    22: n=   47 net $    32.02 avg $  0.681
+  entry time range: 0400 - 2228; exits range: 0401 - 2232
+  weekdays: {'Wed': 1032, 'Thu': 1122, 'Fri': 960, 'Mon': 1065, 'Tue': 1114}
+  monthly net:
+    2025-09:+44  2025-10:+461  2025-11:+299  2025-12:+264  2026-01:+505  2026-02:+552  2026-03:+773  2026-04:+376  2026-05:+227  2026-06:+255  2026-07:+231  2026-08:+379  2026-09:+219
+  worst 5: [-30.35, -23.87, -23.21, -18.93, -18.91] best 5: [25.36, 26.97, 28.15, 28.16, 29.4]
+  top 5% of trades contribute $1,937.33 of $4,585.95
+  avg MFE $1.350 avg MAE $-1.045
+  winners whose PnL is within 10% (or $0.05) of their MFE: 3309/4636 = 71.4%  | avg win/avg MFE(winners) = 0.96
+  median winner size in gold points: 0.880
+
+====================================================================================================
+GVLiveV2_VANTAGE_XAUUSD_240m.csv
+  timeframe ~240m | trades 36 | 2025-11-03 -> 2026-09-22
+  net $544.90 | win% 94.4 | PF 4.89 | avg/trade $15.136 | avg win $20.15 | avg loss $-70.12 | maxDD $-119.21 | commission col total $0.00
+  after $1.24/round-trip cost: net $500.26 | PF 4.50 | win% 94.4 | maxDD $-120.45
+  long : n=   17 net $   325.38 PF inf win% 100.0
+  short: n=   19 net $   219.52 PF 2.57 win% 89.5
+  exit reasons:
+    Exit Short      n=   18 net $   240.56 avg $ 13.364 win% 94.4
+    Exit Long       n=   17 net $   325.38 avg $ 19.140 win% 100.0
+    EOD             n=    1 net $   -21.04 avg $-21.040 win% 0.0
+  duration (bars):
+    1    n=   32 net $   569.79 avg $ 17.806 win% 96.9
+    2    n=    2 net $    57.44 avg $ 28.720 win% 100.0
+    3    n=    1 net $    36.88 avg $ 36.880 win% 100.0
+    4    n=    1 net $  -119.21 avg $-119.210 win% 0.0
+  entry hour (export clock):
+    06: n=   14 net $   324.43 avg $ 23.174
+    10: n=    5 net $   -36.61 avg $ -7.322
+    14: n=    6 net $    81.20 avg $ 13.533
+    18: n=    7 net $    92.30 avg $ 13.186
+    22: n=    4 net $    83.58 avg $ 20.895
+  entry time range: 0600 - 2200; exits range: 0200 - 2200
+  weekdays: {'Mon': 11, 'Tue': 8, 'Wed': 4, 'Thu': 6, 'Fri': 7}
+  monthly net:
+    2025-11:+120  2025-12:+57  2026-01:-113  2026-02:+55  2026-03:+75  2026-04:+77  2026-05:+37  2026-06:+79  2026-07:+64  2026-08:+61  2026-09:+32
+  worst 5: [-119.21, -21.04, 4.02, 4.61, 4.84] best 5: [39.08, 41.74, 43.92, 47.19, 47.94]
+  top 5% of trades contribute $47.94 of $544.90
+  avg MFE $19.483 avg MAE $-10.882
+  winners whose PnL is within 10% (or $0.05) of their MFE: 34/34 = 100.0%  | avg win/avg MFE(winners) = 0.98
+  median winner size in gold points: 19.580
+
+====================================================================================================
+GVLiveV2_VANTAGE_XAUUSD_30m.csv
+  timeframe ~30m | trades 213 | 2025-09-30 -> 2026-09-24
+  net $1,428.66 | win% 91.1 | PF 4.28 | avg/trade $6.707 | avg win $9.61 | avg loss $-22.94 | maxDD $-103.39 | commission col total $0.00
+  after $1.24/round-trip cost: net $1,164.54 | PF 3.53 | win% 88.3 | maxDD $-109.59
+  long : n=  117 net $   775.38 PF 5.99 win% 92.3
+  short: n=   96 net $   653.28 PF 3.33 win% 89.6
+  exit reasons:
+    Exit Long       n=  109 net $   886.11 avg $  8.129 win% 99.1
+    Exit Short      n=   86 net $   933.60 avg $ 10.856 win% 100.0
+    Max Bars Exit   n=   18 net $  -391.05 avg $-21.725 win% 0.0
+  duration (bars):
+    1    n=  174 net $  1669.60 avg $  9.595 win% 100.0
+    2    n=   13 net $   153.44 avg $ 11.803 win% 100.0
+    3    n=    4 net $   -24.48 avg $ -6.120 win% 75.0
+    4    n=   22 net $  -369.90 avg $-16.814 win% 18.2
+  entry hour (export clock):
+    04: n=   12 net $    42.88 avg $  3.573
+    05: n=   12 net $    76.31 avg $  6.359
+    06: n=    5 net $    22.13 avg $  4.426
+    07: n=   12 net $    25.66 avg $  2.138
+    08: n=   16 net $   171.67 avg $ 10.729
+    09: n=   13 net $   147.38 avg $ 11.337
+    10: n=    8 net $     4.24 avg $  0.530
+    11: n=   12 net $   -70.52 avg $ -5.877
+    12: n=    9 net $    78.18 avg $  8.687
+    13: n=   11 net $   113.42 avg $ 10.311
+    14: n=   10 net $   -48.28 avg $ -4.828
+    15: n=    9 net $    29.27 avg $  3.252
+    16: n=    6 net $    98.23 avg $ 16.372
+    18: n=   13 net $    98.74 avg $  7.595
+    19: n=   13 net $    76.96 avg $  5.920
+    20: n=   20 net $   395.74 avg $ 19.787
+    21: n=   26 net $   117.49 avg $  4.519
+    22: n=    6 net $    49.16 avg $  8.193
+  entry time range: 0400 - 2200; exits range: 0430 - 2330
+  weekdays: {'Tue': 47, 'Thu': 56, 'Fri': 25, 'Wed': 45, 'Mon': 40}
+  monthly net:
+    2025-09:+10  2025-10:+52  2025-11:+110  2025-12:+110  2026-01:+308  2026-02:+219  2026-03:+109  2026-04:+124  2026-05:+92  2026-06:+100  2026-07:+102  2026-08:+44  2026-09:+49
+  worst 5: [-87.17, -44.78, -39.38, -36.12, -35.2] best 5: [36.13, 37.83, 40.05, 42.1, 188.09]
+  top 5% of trades contribute $507.29 of $1,428.66
+  avg MFE $8.980 avg MAE $-5.419
+  winners whose PnL is within 10% (or $0.05) of their MFE: 184/194 = 94.8%  | avg win/avg MFE(winners) = 0.98
+  median winner size in gold points: 6.140
+
+====================================================================================================
+GVLiveV2_VANTAGE_XAUUSD_5m.csv
+  timeframe ~5m | trades 1531 | 2025-09-24 -> 2026-09-24
+  net $3,914.49 | win% 92.2 | PF 4.70 | avg/trade $2.557 | avg win $3.52 | avg loss $-8.89 | maxDD $-71.13 | commission col total $0.00
+  after $1.24/round-trip cost: net $2,016.05 | PF 2.44 | win% 65.1 | maxDD $-74.85
+  long : n=  803 net $  1629.39 PF 3.55 win% 91.0
+  short: n=  728 net $  2285.10 PF 6.46 win% 93.5
+  exit reasons:
+    Exit Long       n=  741 net $  2063.83 avg $  2.785 win% 98.4
+    Exit Short      n=  684 net $  2603.09 avg $  3.806 win% 99.3
+    Max Bars Exit   n=   99 net $  -741.02 avg $ -7.485 win% 2.0
+    EOD             n=    7 net $   -11.41 avg $ -1.630 win% 28.6
+  duration (bars):
+    0    n=    3 net $    -2.87 avg $ -0.957 win% 33.3
+    1    n= 1274 net $  4477.35 avg $  3.514 win% 99.5
+    2    n=   85 net $   209.60 avg $  2.466 win% 96.5
+    3    n=   55 net $   -64.82 avg $ -1.179 win% 76.4
+    4    n=  114 net $  -704.77 avg $ -6.182 win% 17.5
+  entry hour (export clock):
+    04: n=   77 net $   168.67 avg $  2.191
+    05: n=  112 net $   189.83 avg $  1.695
+    06: n=  107 net $   228.19 avg $  2.133
+    07: n=   94 net $   247.96 avg $  2.638
+    08: n=  123 net $   333.94 avg $  2.715
+    09: n=  132 net $   606.23 avg $  4.593
+    10: n=   83 net $   199.00 avg $  2.398
+    11: n=   53 net $   239.92 avg $  4.527
+    12: n=   61 net $    74.65 avg $  1.224
+    13: n=  115 net $   299.31 avg $  2.603
+    14: n=   98 net $   193.30 avg $  1.972
+    15: n=   88 net $   166.81 avg $  1.896
+    16: n=   70 net $   113.19 avg $  1.617
+    18: n=   77 net $   140.91 avg $  1.830
+    19: n=   51 net $   122.66 avg $  2.405
+    20: n=   74 net $   306.48 avg $  4.142
+    21: n=   93 net $   229.69 avg $  2.470
+    22: n=   23 net $    53.75 avg $  2.337
+  entry time range: 0400 - 2225; exits range: 0405 - 2235
+  weekdays: {'Wed': 319, 'Thu': 334, 'Fri': 234, 'Mon': 334, 'Tue': 310}
+  monthly net:
+    2025-09:+34  2025-10:+348  2025-11:+204  2025-12:+284  2026-01:+307  2026-02:+457  2026-03:+432  2026-04:+532  2026-05:+299  2026-06:+360  2026-07:+168  2026-08:+216  2026-09:+273
+  worst 5: [-51.84, -45.27, -40.18, -39.12, -38.45] best 5: [36.21, 39.56, 47.57, 56.78, 82.66]
+  top 5% of trades contribute $1,375.55 of $3,914.49
+  avg MFE $3.350 avg MAE $-1.976
+  winners whose PnL is within 10% (or $0.05) of their MFE: 1196/1412 = 84.7%  | avg win/avg MFE(winners) = 0.97
+  median winner size in gold points: 2.140
+
+====================================================================================================
+GVLiveV2_VANTAGE_XAUUSD_60m.csv
+  timeframe ~60m | trades 118 | 2025-10-07 -> 2026-09-23
+  net $1,553.02 | win% 94.1 | PF 10.11 | avg/trade $13.161 | avg win $15.53 | avg loss $-24.36 | maxDD $-46.05 | commission col total $0.00
+  after $1.24/round-trip cost: net $1,406.70 | PF 8.85 | win% 94.1 | maxDD $-47.29
+  long : n=   72 net $   816.21 PF 12.98 win% 95.8
+  short: n=   46 net $   736.81 PF 8.20 win% 91.3
+  exit reasons:
+    Exit Long       n=   69 net $   884.36 avg $ 12.817 win% 100.0
+    Exit Short      n=   43 net $   800.03 avg $ 18.605 win% 97.7
+    Max Bars Exit   n=    4 net $  -106.60 avg $-26.650 win% 0.0
+    EOD             n=    2 net $   -24.77 avg $-12.385 win% 0.0
+  duration (bars):
+    1    n=  100 net $  1568.59 avg $ 15.686 win% 99.0
+    2    n=   12 net $    87.04 avg $  7.253 win% 83.3
+    3    n=    3 net $   -42.06 avg $-14.020 win% 66.7
+    4    n=    3 net $   -60.55 avg $-20.183 win% 0.0
+  entry hour (export clock):
+    04: n=    7 net $    57.24 avg $  8.177
+    05: n=    6 net $    54.91 avg $  9.152
+    06: n=    8 net $    51.89 avg $  6.486
+    07: n=    8 net $   140.51 avg $ 17.564
+    08: n=   11 net $   197.98 avg $ 17.998
+    09: n=    8 net $   122.73 avg $ 15.341
+    10: n=   11 net $   170.63 avg $ 15.512
+    11: n=    6 net $    54.27 avg $  9.045
+    12: n=    2 net $    19.55 avg $  9.775
+    13: n=    6 net $    36.11 avg $  6.018
+    14: n=    5 net $   120.85 avg $ 24.170
+    15: n=    4 net $    43.98 avg $ 10.995
+    16: n=    2 net $   -37.69 avg $-18.845
+    18: n=    7 net $    45.49 avg $  6.499
+    19: n=    9 net $   126.32 avg $ 14.036
+    20: n=    5 net $   268.32 avg $ 53.664
+    21: n=    7 net $    71.80 avg $ 10.257
+    22: n=    6 net $     8.13 avg $  1.355
+  entry time range: 0400 - 2200; exits range: 0000 - 2300
+  weekdays: {'Tue': 21, 'Thu': 22, 'Fri': 21, 'Mon': 23, 'Wed': 31}
+  monthly net:
+    2025-10:+45  2025-11:+77  2025-12:+129  2026-01:+55  2026-02:+290  2026-03:+271  2026-04:+101  2026-05:+63  2026-06:+186  2026-07:+75  2026-08:+157  2026-09:+103
+  worst 5: [-46.05, -39.12, -36.39, -17.19, -14.57] best 5: [52.75, 65.52, 66.85, 71.34, 130.15]
+  top 5% of trades contribute $386.61 of $1,553.02
+  avg MFE $14.873 avg MAE $-6.132
+  winners whose PnL is within 10% (or $0.05) of their MFE: 105/111 = 94.6%  | avg win/avg MFE(winners) = 0.98
+  median winner size in gold points: 9.700
+
+
+SUMMARY (round-trip cost $1.24)
+file                                                           tf      n       net    PF  win%     maxDD     avg  net-cost PF-cost
+GVLiveV2_OANDA_XAUUSD_1m.csv                                    1   7320      6928  7.72  95.8       -22   0.946     -2149    0.62
+GVLiveV2_VANTAGE_XAUUSD_1m.csv                                  1   5293      4586  3.09  87.6       -33   0.866     -1977    0.61
+GVLiveV2_VANTAGE_XAUUSD_5m.csv                                  5   1531      3914  4.70  92.2       -71   2.557      2016    2.44
+GVLiveV2_VANTAGE_XAUUSD_30m.csv                                30    213      1429  4.28  91.1      -103   6.707      1165    3.53
+GVLiveV2_VANTAGE_XAUUSD_60m.csv                                60    118      1553 10.11  94.1       -46  13.161      1407    8.85
+GVLiveV2_VANTAGE_XAUUSD_240m.csv                              240     36       545  4.89  94.4      -119  15.136       500    4.50
+GVLiveV2_VANTAGE_XAUUSD_1D.csv                               1440     52       795 10.05  94.2       -62  15.284       730    8.97

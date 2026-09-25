@@ -1,0 +1,7 @@
+OANDA 1m    :   62 trades overlap bar export | 1-bar winners   60 | exit within 10% of the exit bar's range from its favorable extreme:   53 ( 88.3%) | median gap $0.006 = 0.4% of bar range
+VANTAGE 1m  :   35 trades overlap bar export | 1-bar winners   27 | exit within 10% of the exit bar's range from its favorable extreme:   27 (100.0%) | median gap $0.070 = 3.3% of bar range
+VANTAGE 5m  :   44 trades overlap bar export | 1-bar winners   35 | exit within 10% of the exit bar's range from its favorable extreme:   35 (100.0%) | median gap $0.080 = 2.0% of bar range
+VANTAGE 30m :   31 trades overlap bar export | 1-bar winners   25 | exit within 10% of the exit bar's range from its favorable extreme:   25 (100.0%) | median gap $0.150 = 1.5% of bar range
+VANTAGE 60m :   40 trades overlap bar export | 1-bar winners   32 | exit within 10% of the exit bar's range from its favorable extreme:   32 (100.0%) | median gap $0.200 = 1.2% of bar range
+VANTAGE 240m:   36 trades overlap bar export | 1-bar winners   31 | exit within 10% of the exit bar's range from its favorable extreme:   31 (100.0%) | median gap $0.380 = 1.1% of bar range
+VANTAGE 1D  :   50 trades overlap bar export | 1-bar winners   48 | exit within 10% of the exit bar's range from its favorable extreme:   46 ( 95.8%) | median gap $0.280 = 1.3% of bar range

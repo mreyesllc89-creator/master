@@ -1,0 +1,247 @@
+//@version=6
+strategy("Gold VoVix DEVMA | XAUUSD/Gold 15M Live-Ready Test v2", shorttitle="GVLiveV2", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.cash_per_contract, commission_value=0.62, slippage=2, calc_on_every_tick=false, calc_on_order_fills=true, process_orders_on_close=true, pyramiding=0)
+
+//==============================================================================
+// Volatility Filter (DEVMA)
+//==============================================================================
+group_devma = "Volatility Filter (DEVMA)"
+devLen = input.int(30, "Deviation Lookback", minval=10, group=group_devma)
+fastVoVixLen = input.int(10, "Fast VoVix Length", minval=5, group=group_devma)
+slowVoVixLen = input.int(30, "Slow VoVix Length", minval=15, group=group_devma)
+
+//==============================================================================
+// Directional Trend Logic
+//==============================================================================
+group_trend = "Directional Trend"
+fastEmaLen = input.int(5, "Fast EMA", group=group_trend)
+slowEmaLen = input.int(13, "Slow EMA", group=group_trend)
+trendFilterLen = input.int(100, "Trend Filter EMA", group=group_trend)
+
+//==============================================================================
+// Momentum Filter
+//==============================================================================
+group_mom = "Momentum Filter"
+useRsiFilter = input.bool(true, "Use RSI Filter", group=group_mom)
+rsiLen = input.int(14, "RSI Length", group=group_mom)
+rsiOverbought = input.int(70, "RSI Overbought", group=group_mom)
+rsiOversold = input.int(30, "RSI Oversold", group=group_mom)
+
+//==============================================================================
+// Execution, Sizing, And Live Bridge Settings
+//==============================================================================
+group_execution = "Execution And Sizing"
+useDynamicRisk = input.bool(false, "Use Dynamic Risk %", group=group_execution, tooltip="Turn on after verifying the live broker point value and quantity step.")
+riskPercent = input.float(0.25, "Risk % Per Trade", minval=0.01, step=0.01, group=group_execution)
+tradeQty = input.float(1.0, "Fixed Trade Quantity", minval=0.0, step=0.01, group=group_execution)
+
+brokerPreset = input.string("Manual / custom", "Broker Point-Value Preset", options=["Manual / custom", "XAUUSD 1 oz per qty", "XAUUSD 10 oz per lot", "XAUUSD 100 oz per lot", "MGC micro gold futures", "GC gold futures"], group=group_execution, tooltip="Dollar value of a 1.00 gold price move for one quantity unit.")
+manualPointValue = input.float(1.0, "Manual Point Value", minval=0.01, step=0.01, group=group_execution)
+qtyStep = input.float(0.01, "Quantity Step", minval=0.0001, step=0.01, group=group_execution)
+minQty = input.float(0.01, "Minimum Quantity", minval=0.0, step=0.01, group=group_execution)
+maxQty = input.float(100.0, "Maximum Quantity", minval=0.01, step=0.01, group=group_execution)
+
+ATR_SL_MULTIPLIER = input.float(2.0, "Stop Loss ATR Multiplier", minval=0.5, step=0.1, group=group_execution)
+ATR_TP_MULTIPLIER = input.float(2.0, "Take Profit ATR Multiplier", minval=0.5, step=0.1, group=group_execution)
+USE_TRAILING_STOP = input.bool(true, "Use Trailing Stop", group=group_execution)
+
+group_risk = "Live Safety Layer"
+useMaxBarsExit = input.bool(true, "Close If Still Open After N Bars", group=group_risk)
+maxBarsInTrade = input.int(1, "Max Bars In Trade", minval=1, group=group_risk, tooltip="CSV showed trades lasting more than one bar were net negative.")
+useDailyLossLock = input.bool(true, "Use Daily Loss Lock", group=group_risk)
+maxDailyLossCurrency = input.float(150.0, "Max Daily Loss ($)", minval=0.0, step=10.0, group=group_risk)
+maxDailyLosses = input.int(3, "Max Losing Trades Per Day", minval=1, group=group_risk)
+useMaxStopDistance = input.bool(false, "Block Entries If ATR Stop Is Too Wide", group=group_risk)
+maxStopDistancePoints = input.float(8.0, "Max Stop Distance In Gold Points", minval=0.1, step=0.1, group=group_risk)
+maxLiveSpreadPoints = input.float(0.50, "Max Live Spread Points For Bridge", minval=0.0, step=0.01, group=group_risk, tooltip="Included in JSON alerts so an execution bridge can reject bad-spread orders.")
+
+group_session = "New York Session"
+tradePreset = input.string("Balanced", "Trade Preset", options=["Aggressive", "Balanced", "Conservative AM", "Custom"], group=group_session, tooltip="Balanced blocks the weak entry bars found in GVLive. Conservative AM trades the clean morning window only. Aggressive uses the full safe window.")
+entry_session = input.session("0945-1530", "Custom/Aggressive Entry Session", group=group_session, tooltip="Used by Aggressive, Balanced, and Custom presets.")
+morning_entry_session = input.session("0945-1115", "Conservative AM Entry Session", group=group_session)
+flat_session = input.session("0930-1545", "Must Be Flat Outside This NY Session", group=group_session)
+
+//==============================================================================
+// Calculations
+//==============================================================================
+atr_value = ta.atr(14)
+
+f_vovix_source() =>
+    (ta.atr(fastVoVixLen) - ta.atr(slowVoVixLen)) / (ta.stdev(ta.atr(fastVoVixLen), devLen) + 1e-6)
+
+src = f_vovix_source()
+dev = ta.stdev(src, devLen)
+fastDEVMA = ta.sma(dev, fastVoVixLen)
+slowDEVMA = ta.sma(dev, slowVoVixLen)
+expansion_regime = (fastDEVMA > slowDEVMA) or ta.rising(fastDEVMA, 2)
+
+fastEma = ta.ema(close, fastEmaLen)
+slowEma = ta.ema(close, slowEmaLen)
+trendEma = ta.ema(close, trendFilterLen)
+
+rsiVal = ta.rsi(close, rsiLen)
+rsiLongCondition = not useRsiFilter or rsiVal < rsiOverbought
+rsiShortCondition = not useRsiFilter or rsiVal > rsiOversold
+
+bullCross = ta.crossover(fastEma, slowEma)
+bearCross = ta.crossunder(fastEma, slowEma)
+upTrend = close > trendEma
+downTrend = close < trendEma
+
+custom_entry_session_active = not na(time(timeframe.period, entry_session, "America/New_York"))
+morning_entry_session_active = not na(time(timeframe.period, morning_entry_session, "America/New_York"))
+flat_session_active = not na(time(timeframe.period, flat_session, "America/New_York"))
+ny_day_of_week = dayofweek(time, "America/New_York")
+is_weekday = ny_day_of_week != dayofweek.saturday and ny_day_of_week != dayofweek.sunday
+ny_hhmm = hour(time, "America/New_York") * 100 + minute(time, "America/New_York")
+
+entry_session_active = switch tradePreset
+    "Conservative AM" => morning_entry_session_active
+    => custom_entry_session_active
+
+balanced_weak_entry_bar = tradePreset == "Balanced" and (ny_hhmm == 1245 or ny_hhmm == 1345 or ny_hhmm == 1400 or ny_hhmm == 1500)
+
+pointValue = switch brokerPreset
+    "XAUUSD 1 oz per qty" => 1.0
+    "XAUUSD 10 oz per lot" => 10.0
+    "XAUUSD 100 oz per lot" => 100.0
+    "MGC micro gold futures" => 10.0
+    "GC gold futures" => 100.0
+    => manualPointValue
+
+f_json_num(float _value) =>
+    na(_value) ? "null" : str.tostring(_value)
+
+f_alert_message(string _action, string _side, string _reason, float _qty, float _stop, float _limit) =>
+    "{" +
+     "\"strategy\":\"gold_vovix_live_test\"," +
+     "\"ticker\":\"" + syminfo.tickerid + "\"," +
+     "\"timeframe\":\"" + timeframe.period + "\"," +
+     "\"action\":\"" + _action + "\"," +
+     "\"side\":\"" + _side + "\"," +
+     "\"reason\":\"" + _reason + "\"," +
+     "\"qty\":" + f_json_num(_qty) + "," +
+     "\"price\":" + f_json_num(close) + "," +
+     "\"stop\":" + f_json_num(_stop) + "," +
+     "\"limit\":" + f_json_num(_limit) + "," +
+     "\"point_value\":" + f_json_num(pointValue) + "," +
+     "\"risk_percent\":" + f_json_num(riskPercent) + "," +
+     "\"max_live_spread_points\":" + f_json_num(maxLiveSpreadPoints) + "," +
+     "\"trade_preset\":\"" + tradePreset + "\"," +
+     "\"bar_time\":" + str.tostring(time) +
+     "}"
+
+f_round_down_to_step(_qty, _step) =>
+    _step > 0 ? math.floor(_qty / _step) * _step : _qty
+
+f_get_qty(_stop_distance) =>
+    raw_qty = useDynamicRisk and _stop_distance > 0 ? (strategy.equity * (riskPercent / 100.0)) / (_stop_distance * pointValue) : tradeQty
+    stepped_qty = f_round_down_to_step(raw_qty, qtyStep)
+    capped_qty = math.min(maxQty, stepped_qty)
+    useDynamicRisk ? (capped_qty >= minQty ? capped_qty : 0.0) : math.max(minQty, capped_qty)
+
+//==============================================================================
+// Daily Risk Lock
+//==============================================================================
+ny_day_key = year(time, "America/New_York") * 10000 + month(time, "America/New_York") * 100 + dayofmonth(time, "America/New_York")
+
+var int activeDayKey = na
+var float dayStartEquity = na
+var int dayLossCount = 0
+var int lastClosedTrades = 0
+var bool dailyLocked = false
+
+is_new_day = na(activeDayKey) or ny_day_key != activeDayKey
+if is_new_day
+    activeDayKey := ny_day_key
+    dayStartEquity := strategy.equity
+    dayLossCount := 0
+    dailyLocked := false
+
+if strategy.closedtrades > lastClosedTrades
+    last_trade_index = strategy.closedtrades - 1
+    last_trade_profit = strategy.closedtrades.profit(last_trade_index)
+    if last_trade_profit < 0
+        dayLossCount += 1
+    lastClosedTrades := strategy.closedtrades
+
+dayPnL = strategy.equity - dayStartEquity
+dailyLossHit = useDailyLossLock and maxDailyLossCurrency > 0 and dayPnL <= -maxDailyLossCurrency
+dailyLossCountHit = useDailyLossLock and dayLossCount >= maxDailyLosses
+
+if (dailyLossHit or dailyLossCountHit) and not dailyLocked
+    dailyLocked := true
+
+//==============================================================================
+// Trade Entry And Exit
+//==============================================================================
+stop_distance = atr_value * ATR_SL_MULTIPLIER
+profit_distance = atr_value * ATR_TP_MULTIPLIER
+entry_qty = f_get_qty(stop_distance)
+stop_distance_ok = not useMaxStopDistance or stop_distance <= maxStopDistancePoints
+
+can_enter = strategy.position_size == 0 and entry_session_active and is_weekday and not dailyLocked and not balanced_weak_entry_bar and stop_distance_ok and entry_qty > 0
+
+longCondition = bullCross and upTrend and expansion_regime and rsiLongCondition
+shortCondition = bearCross and downTrend and expansion_regime and rsiShortCondition
+
+if longCondition and can_enter
+    stop_loss = close - stop_distance
+    take_profit = close + profit_distance
+    strategy.entry("Long", strategy.long, qty=entry_qty, alert_message=f_alert_message("entry", "long", "signal", entry_qty, stop_loss, take_profit))
+    if USE_TRAILING_STOP
+        strategy.exit("Exit Long", "Long", stop=stop_loss, limit=take_profit, trail_points=profit_distance * 0.9, trail_offset=stop_distance * 0.3, alert_message=f_alert_message("exit", "long", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit))
+    else
+        strategy.exit("Exit Long", "Long", stop=stop_loss, limit=take_profit, alert_message=f_alert_message("exit", "long", "atr_stop_or_target", entry_qty, stop_loss, take_profit))
+
+if shortCondition and can_enter
+    stop_loss = close + stop_distance
+    take_profit = close - profit_distance
+    strategy.entry("Short", strategy.short, qty=entry_qty, alert_message=f_alert_message("entry", "short", "signal", entry_qty, stop_loss, take_profit))
+    if USE_TRAILING_STOP
+        strategy.exit("Exit Short", "Short", stop=stop_loss, limit=take_profit, trail_points=profit_distance * 0.9, trail_offset=stop_distance * 0.3, alert_message=f_alert_message("exit", "short", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit))
+    else
+        strategy.exit("Exit Short", "Short", stop=stop_loss, limit=take_profit, alert_message=f_alert_message("exit", "short", "atr_stop_or_target", entry_qty, stop_loss, take_profit))
+
+// Track bars in trade. The CSV showed that trades held beyond one bar were net negative.
+var int entryBarIndex = na
+if strategy.position_size != 0 and strategy.position_size[1] == 0
+    entryBarIndex := bar_index
+if strategy.position_size == 0
+    entryBarIndex := na
+
+barsInTrade = strategy.position_size != 0 and not na(entryBarIndex) ? bar_index - entryBarIndex : na
+maxBarsExitHit = useMaxBarsExit and strategy.position_size != 0 and not na(barsInTrade) and barsInTrade >= maxBarsInTrade
+
+if maxBarsExitHit
+    if strategy.position_size > 0
+        strategy.close("Long", comment="Max Bars Exit", alert_message=f_alert_message("close", "long", "max_bars_exit", math.abs(strategy.position_size), na, na))
+    if strategy.position_size < 0
+        strategy.close("Short", comment="Max Bars Exit", alert_message=f_alert_message("close", "short", "max_bars_exit", math.abs(strategy.position_size), na, na))
+
+if dailyLocked and strategy.position_size != 0
+    if strategy.position_size > 0
+        strategy.close("Long", comment="Daily Lock", alert_message=f_alert_message("close", "long", "daily_lock", math.abs(strategy.position_size), na, na))
+    if strategy.position_size < 0
+        strategy.close("Short", comment="Daily Lock", alert_message=f_alert_message("close", "short", "daily_lock", math.abs(strategy.position_size), na, na))
+
+if not flat_session_active and strategy.position_size != 0
+    if strategy.position_size > 0
+        strategy.close("Long", comment="EOD", alert_message=f_alert_message("close", "long", "session_flat", math.abs(strategy.position_size), na, na))
+    if strategy.position_size < 0
+        strategy.close("Short", comment="EOD", alert_message=f_alert_message("close", "short", "session_flat", math.abs(strategy.position_size), na, na))
+
+//==============================================================================
+// Plots
+//==============================================================================
+plot(fastEma, "Fast EMA", color=color.blue)
+plot(slowEma, "Slow EMA", color=color.orange)
+plot(trendEma, "Trend EMA", color=color.white, linewidth=2)
+
+plotshape(longCondition and can_enter, title="Long Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
+plotshape(shortCondition and can_enter, title="Short Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
+
+bgcolor(entry_session_active and is_weekday and not balanced_weak_entry_bar ? color.new(color.blue, 95) : na, title="Entry Session Background")
+bgcolor(balanced_weak_entry_bar ? color.new(color.orange, 88) : na, title="Balanced Block Background")
+bgcolor(dailyLocked ? color.new(color.red, 88) : na, title="Daily Lock Background")
+
+plot(useMaxBarsExit and strategy.position_size != 0 ? barsInTrade : na, "Bars In Trade", color=color.gray, display=display.data_window)
