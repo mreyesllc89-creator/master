@@ -48,7 +48,7 @@ for _tf in ("5", "10", "15", "30", "60", "240"):   # OANDA:XAUUSD exports (v2.01
     TF_FILES["xau" + _tf] = os.path.join(DATA_DIR, f"XAUUSD_{_tf}.csv")
 for _tf in ("5", "15S", "30S"):                     # MEXC:BTCUSDT exports (v2.01 plots on the chart); 15S/30S are sub-minute
     TF_FILES["btc" + _tf.lower()] = os.path.join(DATA_DIR, f"BTCUSDT_{_tf}.csv")
-for _tf in ("1", "15", "30", "60", "120", "180", "240", "1D", "1W"):   # SPCFD:SPX cash-session CFD exports (1m: 2.5 months; 15m: 5 months; 30m: 9 months; 60m: 18 months; 120m: 2.7 y; 180m: 3.6 y; 240m: 5.4 y; 1D: 10.8 y; 1W: 52 y)
+for _tf in ("1", "15", "30", "60", "120", "180", "240", "1D", "1W", "1M", "3M"):   # SPCFD:SPX cash-session CFD exports (1m: 2.5 months; 15m: 5 months; 30m: 9 months; 60m: 18 months; 120m: 2.7 y; 180m: 3.6 y; 240m: 5.4 y; 1D: 10.8 y; 1W: 52 y)
     TF_FILES["spx" + _tf] = os.path.join(DATA_DIR, f"SPX_{_tf}.csv")
 
 INITIAL_CAPITAL = 100000.0
@@ -191,7 +191,7 @@ class TFData:
 def load_tf(tf: str, atr_len: int = 14, assert_pivots: bool = True) -> TFData:
     df = pd.read_csv(TF_FILES[tf])
     t = df["time"].astype(str).tolist()
-    hour = np.array([int(s[11:13]) for s in t])  # exchange/chart-local hour as exported
+    hour = np.array([int(s[11:13]) if len(s) >= 13 and s[10] == 'T' else 0 for s in t])  # exchange/chart-local hour as exported; daily+ exports carry a date only
     o, h, l, c = (df[k].to_numpy(dtype=float) for k in ("open", "high", "low", "close"))
     d = TFData(tf=tf, time=t, hour=hour, open=o, high=h, low=l, close=c,
                csv_swingH=df["Swing High"].to_numpy(dtype=float) if "Swing High" in df else np.full(len(df), np.nan),
