@@ -109,3 +109,8 @@ take-profit hits, and a win rate nowhere near 90 percent.
 python3 analysis/analyze_trades.py 1.24   # per-file stats, optional round-trip cost
 python3 analysis/join_check.py            # exits vs exported bar extremes
 ```
+
+## Follow-up
+
+`CALIBRATION.md` covers the earlier-entry and profit-aware time-exit work done after this
+review, and `strategies/gold_vovix_devma_v2_2.pine` implements it.

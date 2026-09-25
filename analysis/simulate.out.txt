@@ -1,0 +1,104 @@
+cost per round trip: spread 0.25 pts + commission $1.24 = $1.49 per 1 oz | regime filter: plotted
+
+5m   : 2018 bars 2026-09-15 -> 2026-09-24 | max |EMA err| fast 0.0000 trend 0.0289 | plotted signals 44, of which reproduced by base rule 44 | base rule fires 94 (before session/position filters)
+15m  : 2018 bars 2026-08-25 -> 2026-09-24 | max |EMA err| fast 0.0000 trend 0.0295 | plotted signals 47, of which reproduced by base rule 46 | base rule fires 77 (before session/position filters)
+30m  : 2018 bars 2026-07-27 -> 2026-09-24 | max |EMA err| fast 0.0000 trend 0.0398 | plotted signals 32, of which reproduced by base rule 31 | base rule fires 72 (before session/position filters)
+60m  : 2018 bars 2026-05-25 -> 2026-09-24 | max |EMA err| fast 0.0000 trend 0.0085 | plotted signals 39, of which reproduced by base rule 39 | base rule fires 73 (before session/position filters)
+240m : 2018 bars 2025-06-05 -> 2026-09-24 | max |EMA err| fast 0.0000 trend 0.1154 | plotted signals 46, of which reproduced by base rule 45 | base rule fires 86 (before session/position filters)
+1D   : 2018 bars 2018-11-30 -> 2026-09-25 | max |EMA err| fast 0.0000 trend 0.0130 | plotted signals 50, of which reproduced by base rule 50 | base rule fires 87 (before session/position filters)
+
+=== Earlier-entry variants: lead vs. the base EMA 5/13 cross (same direction, within 6 bars) ===
+TF    variant             fires  lead avg   lead0/1/2/3+  no cross follows
+5m    close_x_slowEMA        78      1.98 [0, 27, 18, 12]                21
+5m    projected_cross        61      1.42 [0, 37, 10, 3]                11
+5m    fast_turn              76      1.86 [0, 32, 14, 11]                19
+5m    ema3x8                125      1.06 [34, 23, 11, 11]                46
+15m   close_x_slowEMA        78      1.73 [0, 34, 12, 10]                22
+15m   projected_cross        61      1.21  [0, 35, 7, 1]                18
+15m   fast_turn              64      1.51  [0, 28, 5, 6]                25
+15m   ema3x8                127      1.12 [34, 23, 7, 10]                53
+30m   close_x_slowEMA        79      1.98 [0, 25, 14, 11]                29
+30m   projected_cross        58      1.36  [0, 34, 7, 3]                14
+30m   fast_turn              81      1.64 [0, 32, 15, 8]                26
+30m   ema3x8                128      1.03 [28, 22, 11, 6]                61
+60m   close_x_slowEMA        68      2.06 [0, 21, 12, 16]                19
+60m   projected_cross        61      1.47  [0, 31, 7, 5]                18
+60m   fast_turn              70      1.88 [0, 24, 10, 14]                22
+60m   ema3x8                119      1.07 [30, 21, 7, 10]                51
+240m  close_x_slowEMA        68      2.04 [0, 21, 13, 15]                19
+240m  projected_cross        59      1.59 [0, 32, 10, 7]                10
+240m  fast_turn              64      1.69 [0, 32, 12, 11]                 9
+240m  ema3x8                128      1.06 [41, 19, 8, 11]                49
+1D    close_x_slowEMA        69      2.18 [0, 26, 12, 18]                13
+1D    projected_cross        56      1.65  [0, 33, 7, 9]                 7
+1D    fast_turn              70      2.07 [0, 29, 12, 17]                12
+1D    ema3x8                139      0.96 [39, 22, 10, 8]                60
+
+=== Entry variants, exits = ATR stop/target + tick-correct trail, no time exit (sessions as tested: 04:00-22:30) ===
+TF    variant               n     net$     PF   win%    avg$    maxDD  bars
+5m    base_ema5x13         40   -113.7   0.54   50.0   -2.84   -125.2  13.2
+5m    close_x_slowEMA      39   -160.1   0.38   41.0   -4.10   -170.7  11.4
+5m    projected_cross      32    -96.1   0.50   46.9   -3.00   -125.8  11.9
+5m    fast_turn            32   -102.7   0.48   43.8   -3.21   -122.8  13.0
+5m    ema3x8               52   -125.7   0.59   51.9   -2.42   -168.9  11.4
+15m   base_ema5x13         47   -100.3   0.77   46.8   -2.13   -221.4   8.1
+15m   close_x_slowEMA      46    -18.8   0.95   52.2   -0.41   -137.0   9.0
+15m   projected_cross      37     21.7   1.08   54.1    0.59    -76.3   8.5
+15m   fast_turn            33    -48.1   0.82   48.5   -1.46   -101.0   9.7
+15m   ema3x8               61    -63.4   0.88   52.5   -1.04   -265.4   8.5
+30m   base_ema5x13         43   -254.3   0.55   39.5   -5.91   -327.9   9.3
+30m   close_x_slowEMA      49   -237.3   0.61   42.9   -4.84   -289.0   7.6
+30m   projected_cross      36   -135.7   0.68   47.2   -3.77   -181.5   7.5
+30m   fast_turn            39   -103.6   0.76   46.2   -2.66   -177.8   8.3
+30m   ema3x8               70    -98.6   0.87   51.4   -1.41   -285.5   7.8
+60m   base_ema5x13         48    -93.5   0.86   47.9   -1.95   -233.7   4.6
+60m   close_x_slowEMA      47   -287.3   0.61   44.7   -6.11   -332.1   5.7
+60m   projected_cross      40   -265.4   0.60   42.5   -6.63   -351.0   5.3
+60m   fast_turn            39   -238.8   0.60   46.2   -6.12   -314.4   5.7
+60m   ema3x8               76   -447.3   0.62   40.8   -5.89   -555.0   5.9
+240m  base_ema5x13         51   -413.4   0.81   52.9   -8.11   -956.5  10.8
+240m  close_x_slowEMA      43    133.0   1.09   55.8    3.09   -638.8  12.9
+240m  projected_cross      31     -3.3   1.00   54.8   -0.11   -725.2  14.8
+240m  fast_turn            34    239.8   1.20   61.8    7.05   -733.7  12.7
+240m  ema3x8               68   -124.2   0.95   55.9   -1.83  -1062.7  11.1
+1D    base_ema5x13         49    630.7   1.44   65.3   12.87   -533.6  13.6
+1D    close_x_slowEMA      43   -149.2   0.89   58.1   -3.47   -680.8  13.2
+1D    projected_cross      33   -341.7   0.73   54.5  -10.35   -577.8  14.3
+1D    fast_turn            34   -342.8   0.71   50.0  -10.08   -464.7  13.1
+1D    ema3x8               69    -42.2   0.98   58.0   -0.61   -890.3  11.8
+
+=== Time-exit sweep, entry = base_ema5x13.  'hard N' closes after N bars; 'profit N' closes at the first profitable close once N bars have passed ===
+TF          off     hard1     hard2     hard3     hard4     hard6     hard8     prof0     prof1     prof2     prof3     prof4     prof6     prof8
+5m      -114/0.5   -115/0.3   -112/0.4   -111/0.4   -124/0.5    -89/0.6   -124/0.5   -100/0.4   -100/0.4   -126/0.4   -112/0.5   -100/0.5   -109/0.5   -117/0.5
+15m     -100/0.8    -37/0.8     16/1.1    -48/0.8    -18/0.9    -12/1.0    -50/0.8    -22/0.9    -22/0.9      9/1.0     -2/1.0     11/1.0     19/1.1    -25/0.9
+30m     -254/0.5   -143/0.4   -211/0.4   -199/0.5   -214/0.5   -277/0.4   -278/0.5   -152/0.5   -152/0.5   -222/0.5   -246/0.5   -264/0.5   -281/0.5   -287/0.5
+60m      -93/0.9    -56/0.9    -52/0.9    -34/0.9     70/1.1    -42/0.9    -73/0.9   -137/0.7   -137/0.7   -157/0.7   -149/0.8    -52/0.9    -45/0.9    -39/0.9
+240m    -413/0.8   -613/0.4   -419/0.7    -46/1.0   -234/0.8   -446/0.8   -147/0.9   -728/0.5   -728/0.5   -284/0.8     11/1.0    -31/1.0   -630/0.7   -468/0.8
+1D       631/1.4   -122/0.9   -176/0.8   -374/0.7   -429/0.7   -150/0.9   -229/0.9     41/1.0     41/1.0   -363/0.7   -310/0.8   -230/0.8    -62/1.0    -84/0.9
+sum       -344     -1086      -955      -813      -949     -1016      -902     -1098     -1098     -1143      -809      -664     -1107     -1020   (net $ summed over timeframes)
+avgPF     0.83      0.61      0.72      0.73      0.76      0.76      0.74      0.68      0.68      0.68      0.75      0.80      0.76      0.76   (PF averaged over timeframes, capped at 10)
+win%      50.4      39.7      41.9      44.8      44.2      48.2      48.5      62.0      62.0      60.2      60.5      58.1      58.4      55.4
+
+=== Time-exit sweep, entry = close_x_slowEMA.  'hard N' closes after N bars; 'profit N' closes at the first profitable close once N bars have passed ===
+TF          off     hard1     hard2     hard3     hard4     hard6     hard8     prof0     prof1     prof2     prof3     prof4     prof6     prof8
+5m      -160/0.4   -119/0.1   -133/0.2   -124/0.4   -165/0.3   -184/0.3   -185/0.3   -117/0.2   -117/0.2   -147/0.2   -143/0.3   -136/0.3   -153/0.3   -151/0.3
+15m      -19/0.9    -20/0.9     54/1.3     -6/1.0     18/1.1     20/1.1     17/1.1     24/1.2     24/1.2    -14/0.9    -20/0.9    -28/0.9     27/1.1     23/1.1
+30m     -237/0.6    -77/0.6   -101/0.7   -156/0.6   -138/0.6   -254/0.5   -282/0.5      8/1.0      8/1.0    -19/0.9   -143/0.6   -161/0.6   -311/0.5   -277/0.5
+60m     -287/0.6   -135/0.6   -289/0.4   -191/0.6   -178/0.7   -206/0.7   -220/0.7    -85/0.7    -85/0.7   -164/0.7   -173/0.7   -181/0.7   -209/0.7   -264/0.6
+240m     133/1.1   -248/0.6   -537/0.4   -620/0.4   -219/0.8   -112/0.9   -131/0.9   -599/0.5   -599/0.5   -611/0.5   -614/0.5   -301/0.8   -163/0.9   -120/0.9
+1D      -149/0.9    237/1.6    100/1.2     -6/1.0     95/1.1   -150/0.9   -172/0.9    214/1.3    214/1.3     81/1.1    123/1.1    122/1.1   -199/0.8    105/1.1
+sum       -720      -361      -906     -1103      -586      -885      -972      -557      -557      -872      -971      -684     -1009      -684   (net $ summed over timeframes)
+avgPF     0.75      0.74      0.71      0.67      0.77      0.72      0.72      0.82      0.82      0.72      0.69      0.73      0.71      0.76   (PF averaged over timeframes, capped at 10)
+win%      49.1      40.1      40.7      43.3      45.5      43.7      46.4      61.6      61.6      59.0      59.4      57.5      55.9      55.7
+
+=== Time-exit sweep, entry = projected_cross.  'hard N' closes after N bars; 'profit N' closes at the first profitable close once N bars have passed ===
+TF          off     hard1     hard2     hard3     hard4     hard6     hard8     prof0     prof1     prof2     prof3     prof4     prof6     prof8
+5m       -96/0.5    -59/0.3    -72/0.3    -61/0.5    -80/0.4    -84/0.5   -107/0.4    -74/0.3    -74/0.3    -76/0.3    -70/0.5    -68/0.5    -81/0.5    -83/0.5
+15m       22/1.1     16/1.2     37/1.2      5/1.0     20/1.1      8/1.0     -9/1.0    -38/0.8    -38/0.8     -1/1.0    -22/0.9    -10/1.0     40/1.2     14/1.1
+30m     -136/0.7    -33/0.8     -6/1.0    -48/0.8    -89/0.7   -179/0.5   -149/0.6    -19/0.9    -19/0.9    -22/0.9    -29/0.9    -23/0.9   -185/0.5   -165/0.6
+60m     -265/0.6   -152/0.5   -217/0.5   -199/0.6   -192/0.6   -262/0.6   -313/0.5   -238/0.4   -238/0.4   -237/0.5   -220/0.5   -251/0.5   -265/0.6   -281/0.6
+240m      -3/1.0   -161/0.7   -574/0.3   -361/0.6    -35/1.0   -115/0.9     84/1.1   -124/0.8   -124/0.8   -401/0.5   -293/0.7    -85/0.9   -118/0.9     90/1.1
+1D      -342/0.7     12/1.0    -92/0.8    -24/1.0     32/1.1   -295/0.6   -205/0.8    111/1.2    111/1.2     76/1.1     70/1.1     29/1.0   -263/0.7     15/1.0
+sum       -820      -376      -924      -687      -345      -927      -699      -382      -382      -662      -564      -408      -873      -410   (net $ summed over timeframes)
+avgPF     0.76      0.74      0.70      0.74      0.81      0.67      0.72      0.73      0.73      0.73      0.76      0.81      0.73      0.80   (PF averaged over timeframes, capped at 10)
+win%      50.0      39.9      44.6      45.3      47.0      42.5      47.9      61.8      61.8      62.1      63.3      59.4      57.0      57.0
