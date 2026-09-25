@@ -108,3 +108,68 @@ python3 analysis/simulate.py 0.25 1.24            # default: regime pass-through
 python3 analysis/simulate.py 0.25 1.24 strict     # local regime reproduction
 python3 analysis/simulate.py 0.0 0.0              # zero-cost sensitivity
 ```
+
+## Same-candle entry: stop order at the EMA cross price (v2.3)
+
+Requested next: enter inside the signal candle rather than at its close. A close-of-bar
+trigger cannot do that, and `calc_on_every_tick` only works live. What can is a resting stop
+order at the price where the cross will happen. At the close of bar t-1 both EMAs are known,
+and each updates on bar t as `a * close + (1 - a) * prev`, so the close that makes them equal
+is
+
+```
+cross = ((1 - a_slow) * slow - (1 - a_fast) * fast) / (a_fast - a_slow)
+```
+
+The stop sits at that price plus a buffer and fills the moment bar t trades through it. That
+is the same candle in which the close-based cross is confirmed, but at the cross price rather
+than the close, and typically earlier in the bar. The trade-off is fills on bars that touch
+the level and then close back on the wrong side (unconfirmed crosses).
+
+`analysis/simulate_intrabar.py` compares it with the close entry, no session filter, same
+exits and costs. Buffer 0 and arming distance 1 ATR:
+
+| TF | Close of signal bar (net / PF) | Stop at cross price (net / PF) | Confirmed at close | Fill better than close, in ATR |
+|---|---|---|---|---|
+| 5m | -94 / 0.68 | -56 / 0.72 | 52 % | 0.04 |
+| 15m | -47 / 0.90 | -31 / 0.92 | 60 % | 0.15 |
+| 30m | -212 / 0.70 | -291 / 0.49 | 41 % | -0.11 |
+| 60m | -280 / 0.72 | -443 / 0.47 | 58 % | 0.14 |
+| 240m | -413 / 0.81 | +574 / 1.50 | 66 % | 0.11 |
+| 1D | +631 / 1.44 | +883 / 1.90 | 66 % | 0.14 |
+
+Unconfirmed fills are the losers everywhere (PF 0.24 to 0.68 outside 240m); confirmed ones
+are profitable on 5m, 15m, 240m and daily. A buffer beyond the cross price trades some fills
+for a higher confirmation rate. Sweep in `simulate_intrabar_sweep.out.txt`, pooled over the
+six timeframes:
+
+| Buffer (x ATR) | Arm within (x ATR) | Net $ sum | Avg PF | Win % | Confirmed |
+|---|---|---|---|---|---|
+| 0.0 | 1.0 | 636 | 1.00 | 53.7 | 57 % |
+| 0.1 | 2.0 | 1007 | 1.06 | 56.1 | 64 % |
+| 0.2 | 2.0 | 1184 | 1.18 | 58.2 | 73 % |
+| 0.3 | 2.0 | -10 | 0.97 | 56.8 | 83 % |
+| 0.5 | 2.0 | -346 | 0.85 | 55.5 | 88 % |
+
+Buffer 0.2 ATR with arming within 2 ATR is the best cell and is positive or near zero on
+every timeframe except 30m and 60m (15m: +70, PF 1.2). Beyond 0.3 ATR the buffer eats the
+price advantage that motivated the entry.
+
+Combining it with the profit-aware time exit did not help here: with the stop entry the
+exits are best left to the ATR stop, target and trail (`off` column of the second table in
+`simulate_intrabar.out.txt`), except on 15m where profit-exit N = 6 is marginally better.
+v2.3 therefore keeps the time exit input but the two settings should be re-tested together
+on full history.
+
+### What v2.3 changes
+
+- `Entry Trigger` gains `Stop at cross price (same candle)` and it is the default.
+- `Cross Stop Buffer (x ATR)` default 0.2 and `Max Distance To Arm (x ATR)` default 2.0.
+- Each bar close, when flat, filters pass and the fast EMA is still on the wrong side, the
+  script parks a stop entry at the cross price plus buffer with the ATR exit bracket attached;
+  when conditions lapse it cancels the order. Armed levels are plotted as circles.
+- Alerts carry `"reason":"stop_at_cross"` on the entry fill.
+
+Live note for the bridge: a stop entry is a resting order, so the broker side must support
+placing and cancelling it each bar, or the bridge must emulate it from the alert's `stop`
+price.
