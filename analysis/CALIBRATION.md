@@ -173,3 +173,20 @@ on full history.
 Live note for the bridge: a stop entry is a resting order, so the broker side must support
 placing and cancelling it each bar, or the bridge must emulate it from the alert's `stop`
 price.
+
+## Distance units (v2.4)
+
+`Distance Unit` in the Execution And Sizing group switches how the Stop Loss Distance, Take
+Profit Distance, Cross Stop Buffer and Max Distance To Arm values are read:
+
+| Unit | Meaning of a value of 2.0 |
+|---|---|
+| ATR multiple (default) | 2 x ATR(14), the behaviour of every earlier version |
+| Gold points | $2.00 per oz of price movement |
+| % of price | 2 % of the current close, about $86 at $4300 gold |
+
+The trailing stop keeps its relative definition (activation as a fraction of the take-profit
+distance, offset as a fraction of the stop distance), so it follows whichever unit is chosen.
+The defaults are sized for ATR multiples; when switching to points or percent, set the four
+values again. The calibration above was done in ATR units only; a points or percent
+configuration has not been tested here.
