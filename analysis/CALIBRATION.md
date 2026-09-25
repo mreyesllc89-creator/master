@@ -194,3 +194,55 @@ multiples; when switching to points or percent, set the values again.
 `Trade Direction` (Both, Buy only, Sell only) limits which side is taken; it applies to every
 entry trigger including the stop-at-cross order. The calibration above was done in ATR units only; a points or percent
 configuration has not been tested here.
+
+## Grid optimisation of the v2.4 inputs
+
+`analysis/optimize.py` sweeps stop (1 to 3 ATR), target (1 to 4 ATR), trailing stop (off, or
+activation 0.5 to 1.8 ATR with offset 0.3 to 0.6 ATR), cross buffer (0.1 to 0.3 ATR), trade
+direction and the time exit, 2160 parameter sets on all six bar exports with the
+stop-at-cross entry and the $1.49 round-trip cost. Sets are ranked by average capped profit
+factor times the share of timeframes that are positive, so a set that only works on one
+chart cannot win. Full output in `optimize.out.txt`.
+
+### Chosen defaults (both directions)
+
+| Input | v2.3 | v2.4 calibrated |
+|---|---|---|
+| Stop Loss Distance | 2.0 ATR | 2.0 ATR |
+| Take Profit Distance | 2.0 ATR | 3.0 ATR |
+| Trailing Unit | fraction of TP / SL | Distance Unit |
+| Trail Activation | 0.9 x TP (1.8 ATR) | 1.5 ATR |
+| Trail Offset | 0.3 x SL (0.6 ATR) | 0.5 ATR |
+| Cross Stop Buffer | 0.2 ATR | 0.2 ATR |
+| Time Exit | profit after 4 bars | Off |
+| Trade Direction | both | both |
+
+Result of that set per timeframe (net $ per 1 oz / profit factor): 5m +6 / 1.0, 15m +57 / 1.2,
+30m -86 / 0.7, 60m -169 / 0.7, 240m +686 / 1.9, 1D +753 / 1.7; 207 trades in total. It was the
+best-scoring set that trades both directions and does not depend on the time exit.
+
+### The long-only sets score higher, and why they are not the default
+
+The top of the table is all `Buy only` with a 3 ATR stop: average PF above 2, but only 79
+trades across six timeframes, negative on 15m and 60m, and 2018 to 2026 gold is one long
+uptrend. A long-only bias is a bet on that trend continuing, not a property of the signal.
+If you want it anyway, set Trade Direction to Buy only, Stop Loss 3.0, Take Profit 3.0,
+Trail 1.0 / 0.6 ATR, Cross Stop Buffer 0.3.
+
+### Split test
+
+Each export was cut in half and the finalists re-run on each half. For the chosen set:
+
+| TF | First half | Second half |
+|---|---|---|
+| 5m | -14 / 0.8 | +20 / 1.3 |
+| 15m | +116 / 2.4 | -58 / 0.7 |
+| 30m | +13 / 1.1 | -99 / 0.5 |
+| 60m | -157 / 0.4 | -12 / 1.0 |
+| 240m | +323 / 3.5 | +363 / 1.6 |
+| 1D | -61 / 0.8 | +815 / 2.3 |
+
+Only the 240m chart is positive in both halves. The 15m result flips sign, and the daily
+result comes entirely from the second half. That is the honest state of this optimisation:
+the defaults above are the best available on this data, but with one month of 15m bars the
+"optimum" is mostly noise. The full-history TradingView run of v2.4 is the test that matters.

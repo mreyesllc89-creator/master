@@ -11,7 +11,7 @@ review it.
   the solved EMA cross price, filling inside the signal bar instead of at its close.
 - `strategies/gold_vovix_devma_v2_4.pine` adds a Distance Unit selector so stop, target,
   cross buffer, arming distance and trailing stop can be set in ATR multiples, gold points or
-  % of price, plus a Buy only / Sell only switch.
+  % of price, plus a Buy only / Sell only switch. Defaults calibrated by `analysis/optimize.py`.
 - `analysis/REPORT.md` is the review of the v2 backtests. Short version: the 88 to 96
   percent win rates come from the trailing stop being specified in price points where Pine
   expects ticks, which makes the backtester exit every trade at the bar's best price.
