@@ -697,3 +697,93 @@ for days), the cash-open gap on the first bar of the session (the exports
 are cash-session bars, so the first 15m bar of each day carries the
 overnight move), and spread widening outside cash hours, which this feed
 does not trade.
+
+## 17. FlashGold v5 strategy: calibration for profit factor and win rate
+
+The FlashGold Continuation v5 indicator (TDI trade-zone filter) was converted
+to three strategies, `pine/FlashGold_v5_Strategy_{XAUUSD,SPX500,BTCUSD}.pine`,
+and calibrated with `calibration/flashgold_backtest.py`, a replica of the
+strategy's signal logic and order handling on TradingView's 4-point intrabar
+path. Results in `calibration/results/fg/`. Net per 1 oz, 1 contract at $1
+per index point, or 1 BTC, after the VT Markets costs used elsewhere in
+this report (SPX costs still the 0.5 point placeholder).
+
+### What could and could not be swept
+
+The indicator is built for 1m charts with child zones on 1s to 30s bars.
+There are no seconds exports, so the seconds zones could not be swept. The
+calibrated zone sets use the chart timeframe and its 2x / 4x / 8x
+multiples, read from the last CLOSED higher bar (the scripts got a
+"Higher-TF zones use the last CLOSED bar" input for this, the
+lookahead_on + [1] idiom, so the TradingView backtest cannot see the future
+the way plain request.security on a higher timeframe does). Burst, entry
+distance, hold-favourable, stop, target and trail were swept as ATR(14)
+multiples and the scripts got matching ATR units, so one grid served all
+three symbols.
+
+Grid: zone set {chart only, chart+2x+4x (2 aligned), chart+2x+4x+8x (3
+aligned), 2x+4x+8x (2 aligned)} x burst {any-combo, 0.25, 0.5, 1.0 ATR} x
+entry distance {0.1, 0.25 ATR} x hold {0, 3 bars} x SL {1, 1.5, 2, 3 ATR}
+x TP {0.5, 1, 1.5, 2, 3 R} x trail {off, on: activate 1 ATR, distance 0.75
+ATR} x close-on-opposite {off, on}; 5,120 cells per timeframe, 13
+timeframes: gold 5m to 60m, BTC 5m (MEXC) and 15m to 60m, SPX 1m to 60m.
+Reversal on the opposite signal on, entry stop lifetime 3 bars.
+
+Data is short: gold 5m is 2.6 days, gold 30m/60m 4 to 8 weeks, BTC 15m to
+60m 1 to 4 weeks, SPX 15m 5 months, SPX 1m 2.5 months. Every pick below is
+the best of 5,120 cells on weeks of data with a first-half / second-half
+check; treat the profit factors as upper bounds.
+
+### What moved profit factor and win rate, on every symbol
+
+- **Require the burst** ("Allow any combo" off). With any-combo on, the
+  parent direction alone fires a signal on almost every bar; the positive
+  fraction of the grid drops from 0.68 to 0.33 on BTC 15m and from 0.83 to
+  0.66 on gold 30m.
+- **Trailing stop on**: median win rate 0.60 against 0.40 without it, on
+  every timeframe, with the same or higher PF. This is the single biggest
+  lever for win rate.
+- **Wide stop, 2 to 3 ATR**: 1 ATR stops are the worst band everywhere.
+- **Higher-timeframe zones** (chart + 2x + 4x, 2 or 3 aligned) beat the
+  chart-only parent on BTC (0.91 against 0.58 positive on 60m) and gold
+  60m; the chart-only parent is best on SPX 15m.
+- **Entry hold 3 bars** helps SPX (all timeframes) and gold 15m, hurts BTC
+  and gold 5m.
+- Close-on-opposite-signal makes no difference; reversal is on anyway.
+
+### Before and after
+
+"Before" is the indicator's own structure in ATR terms (any combo, parent
+only, hold 3, SL 1.5 ATR, TP 2R, no trail). "After" is each build's shipped
+default on its default chart timeframe.
+
+| Build | chart | before: trades / win / net / PF | after: trades / win / net / PF | halves PF | max DD |
+|---|---|---|---|---|---|
+| XAUUSD | 60m | 34 / 41% / +162 / 1.33 | 87 / 76% / +541 / 1.93 | 2.09 / 1.82 | 107 |
+| SPX500 | 15m | 136 / 35% / -18 / 0.99 | 46 / 83% / +344 / 1.95 | 1.79 / 2.17 | 133 |
+| BTCUSD | 60m | 27 / 41% / +3,569 / 1.41 | 56 / 75% / +9,850 / 1.92 | 1.47 / 2.48 | 2,096 |
+
+Shipped defaults:
+
+- **XAUUSD, 60m chart**: zones 60 / 120 / 240 with 2 aligned, burst 0.5
+  ATR, entry distance 0.25 ATR, no hold, SL 2 ATR, TP 2R, trail on. The
+  same settings are positive on 15m (161 trades, PF 1.23) and 30m (82
+  trades, PF 1.34), flat on 10m, negative on 5m.
+- **SPX500, 15m chart**: zone = chart only, burst 0.5 ATR, entry distance
+  0.25 ATR, hold 3 bars, SL 3 ATR, TP 1.5R, trail on. On 60m: 37 trades,
+  92% win, PF 5.4 (too few trades to trust the PF); on 1m: 426 trades, 69%
+  win, PF 1.13.
+- **BTCUSD, 60m chart**: zones 60 / 120 / 240 / 480 with 3 aligned, burst
+  0.25 ATR, entry distance 0.25 ATR, no hold, SL 3 ATR, TP 1R, trail on.
+  On 15m set burst 0.5 ATR: 52 trades, 83% win, PF 1.82. 5m loses at every
+  setting.
+
+No single setting works across the three symbols: gold wants a 2 ATR stop
+and 2R, SPX a 3 ATR stop with the hold, BTC a 3 ATR stop with 1R and the
+8x zone. The three files therefore differ in their defaults as well as in
+their cost headers.
+
+Not swept: the seconds-based zones, the prior-drift filter (off), the time
+stop, position sizing (1 unit fixed), and anything on 1m gold or BTC (no
+usable 1m export). Re-run `python3 calibration/flashgold_backtest.py sweep
+--tfs <tf> --out fg` when longer exports are available.

@@ -10,7 +10,7 @@ execution.
 | `pine/XPW_Breakout_v2.10_XAUUSD.pine` | The same strategy with gold defaults (per-ounce costs, ounce sizing, SL 1.5 ATR / TP 2.5R from the gold sweep). See `CALIBRATION.md` section 13. |
 | `pine/XPW_Breakout_v2.10_SPX500.pine` | The same strategy with S&P 500 CFD defaults (costs in index points, contract sizing, percent geometry from the SPX sweep). See `CALIBRATION.md` section 16. |
 | `pine/XPW_Breakout_v2.01_XAUUSD.pine` | The previous (gold) version, kept for diffing. |
-| `pine/FlashGold_v5_Strategy_{XAUUSD,SPX500,BTCUSD}.pine` | Strategy conversion of the "FlashGold Continuation v5 - TDI Trade Zone Filter" indicator: same signal logic, plus entry-stop lifetime, SL/TP (points or ATR), trail, time stop, reversal, sizing and a cost header. Exit defaults are scaled per symbol but NOT calibrated (1m / seconds data needed). |
+| `pine/FlashGold_v5_Strategy_{XAUUSD,SPX500,BTCUSD}.pine` | Strategy conversion of the "FlashGold Continuation v5 - TDI Trade Zone Filter" indicator: same signal logic, plus entry-stop lifetime, SL/TP (points or ATR), trail, time stop, reversal, sizing and a cost header. Calibrated for profit factor and win rate on the intraday exports (`CALIBRATION.md` section 17; `calibration/flashgold_backtest.py`, results in `calibration/results/fg/`). Default charts: gold 60m, SPX 15m, BTC 60m. |
 | `CALIBRATION.md` | Cost presets, per-timeframe geometry, sweep results, what changed and why. |
 | `docs/XPW_Settings_by_Timeframe.pdf` | Every input of both builds, one sheet per timeframe, with the numbers behind each choice. |
 | `calibration/xpw_backtest.py` | Python replica of the TradingView broker emulator used for the sweep. |
