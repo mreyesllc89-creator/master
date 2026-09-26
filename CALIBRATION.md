@@ -619,3 +619,81 @@ loses in every band; don5 on BTC 240m loses 13,624).
   Follow on BTC 15m/240m with don20 and on gold pivots.
 - The engine's `--levels` and `--arm` flags reproduce every cell:
   `python3 calibration/xpw_backtest.py run --tf 60 --levels don20 --arm hold --sl-mode atr --sl 3 --tp-r 3 --barsn 3 --buf 0.5 --trail tick --cost vt_btc`.
+
+## 16. SPX500 build (SPCFD:SPX)
+
+First index. Data: SPCFD:SPX cash-session exports from TradingView, 15m
+(5 months), 30m (9 months), 60m (18 months), 120m (2.7 years), 180m (3.6
+years), 240m (5.4 years), daily (10.8 years), weekly (52 years). A 1m
+export (2.5 months) and 15s / 1s exports (one day) were stored but are too
+short to sweep; monthly and quarterly exports were stored but not swept (a
+3-bar pivot needs 7 months to confirm). Files `calibration/data/SPX_*.csv`,
+results `calibration/results/spx/` (15m to 120m) and `spx_high/` (180m to
+weekly). Costs: `spx_cfd` = 0.5 index points spread, 0.1 points slippage,
+no commission, a placeholder until the VT Markets SPX500 specification is
+confirmed. Round trip 0.7 points against a 15m ATR of about 10 points
+(cost/ATR 0.07), so costs do not decide anything on this symbol from 15m
+up. Net figures per contract at $1 per index point, fixed 1 contract.
+
+### Neither the BTC nor the gold geometry transfers
+
+At the BTC defaults (ATR 3.0 / 3R / BarsN 3 / buffer 0.5) SPX is PF 0.9 to
+1.15 on every intraday timeframe. At the gold defaults (ATR 1.5 / 2.5R /
+BarsN 3 / buffer 1.0) it is negative on 15m and 30m, flat on 60m, and only
+positive from 120m up. The grid marginals point the other way from both:
+percent stops beat ATR stops on every intraday timeframe (positive fraction
+0.69 to 0.82 against 0.54 to 0.68), the tick trail beats the bar trail and
+no trail everywhere, BarsN 8 is best on 15m, 30m and 120m and BarsN 3 on
+60m, and Follow edges Recheck on every timeframe.
+
+### The fill-bar artefact, again
+
+The best-looking cells use SL 0.10% or 0.25%: 100% and 69 to 96% of them
+are positive. On SPX 0.10% is 7.7 points, which is 0.8 ATR on 15m and 0.17
+ATR on daily bars, so from 60m up most of those trades are decided inside
+the fill bar by the emulator's path assumption (section 5). Same-bar exit
+share of the 0.10% / 2.5R cell: 25% on 15m, 36 to 39% on 30m, 53 to 55% on
+60m, 62 to 82% on 120m to daily, 96% on weekly. The 0.25% cell is clean to
+60m (4 to 28%), borderline on 120m and 180m (37 to 45%) and an artefact
+from 240m (49 to 61%). Every recommendation below is a cell with a same-bar
+share of 26% or less, and the 15m one (25%) is flagged for a Bar Magnifier
+check.
+
+### No single geometry from 30m to daily
+
+First-half / second-half split, pivot levels, Follow unless noted, same-bar
+share in the last column:
+
+| TF | geometry | trades | net | PF | max DD | halves | same-bar |
+|---|---|---|---|---|---|---|---|
+| 15m | Pct 0.1% / 0.25%, BarsN 5, buffer 0.5, tick trail | 173 | +400 | 1.49 | 102 | +282 / +118 | 25% |
+| 30m | ATR 3.0 / 3R, BarsN 8, buffer 2.0, tick trail | 78 | +764 | 1.67 | 296 | +573 / +171 | 1% |
+| 60m | Pct 0.5% / 1.0%, BarsN 3, buffer 2.0, tick trail | 143 | +1,320 | 1.59 | 333 | +917 / +437 | 10% |
+| 120m | same as 60m | 151 | +1,329 | 1.57 | 225 | +594 / +676 | 15% |
+| 180m | ATR 3.0 / 3R, BarsN 8, buffer 2.0, tick trail | 82 | +1,838 | 2.03 | 416 | +1,239 / +577 | 0% |
+| 240m | ATR 3.0 / 3R, BarsN 8, buffer 1.0, no trail | 34 | +3,450 | 2.42 | 803 | +1,719 / +1,538 | 0% |
+| daily | ATR 2.0 / 2.5R, BarsN 8, buffer 0.5, no trail | 56 | +4,767 | 2.66 | 451 | +1,602 / +3,090 | 0% |
+| weekly | daily block | 66 | +2,093 | 1.53 | 1,027 | +359 / +1,839 | 2% |
+
+The 60m/120m percent block loses on 30m (-131) and 180m (-30); the 30m/180m
+ATR block loses on 60m (-130) and 120m (second half -493). Each block is
+robust inside its own band and not outside it, which is why the SPX sheets
+in the PDF switch Geometry with the timeframe instead of shipping one
+setting. Donchian levels are not better than the pivot on SPX except on
+30m with the percent geometry (Donchian 10: 237 trades, +809, PF 1.34) and
+are worse on daily and weekly.
+
+### What shipped
+
+`pine/XPW_Breakout_v2.10_SPX500.pine`: logic byte-identical to the other
+builds; header commission 0.25 points cash per contract, slippage 10 ticks;
+CommCash 0.25, SlipUSD 0.1; FixedQty 1 contract, cap 10, step 1; Geometry
+Pct with SL 0.5% and TP 1.0%, BarsN 3, buffer 2.0 ATR, Emulator trail,
+Follow. That is the 60m / 120m block. The other timeframes are on the SPX
+sheets of `docs/XPW_Settings_by_Timeframe.pdf`.
+
+Not modelled: overnight financing on the index CFD (a daily-bar trade holds
+for days), the cash-open gap on the first bar of the session (the exports
+are cash-session bars, so the first 15m bar of each day carries the
+overnight move), and spread widening outside cash hours, which this feed
+does not trade.

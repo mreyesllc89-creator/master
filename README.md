@@ -1,4 +1,4 @@
-# XPW Breakout (BTCUSD calibration)
+# XPW Breakout (BTCUSD, XAUUSD and SPX500 calibration)
 
 TradingView Pine v6 rebuild of the "BTC Trading Robot" MT5 EA, recalibrated
 for BTCUSD with an explicit cost model, an extended entry module and tick
@@ -8,6 +8,7 @@ execution.
 |---|---|
 | `pine/XPW_Breakout_v2.10_BTCUSD.pine` | The strategy. Load it in the Pine editor on a BTCUSD chart. |
 | `pine/XPW_Breakout_v2.10_XAUUSD.pine` | The same strategy with gold defaults (per-ounce costs, ounce sizing, SL 1.5 ATR / TP 2.5R from the gold sweep). See `CALIBRATION.md` section 13. |
+| `pine/XPW_Breakout_v2.10_SPX500.pine` | The same strategy with S&P 500 CFD defaults (costs in index points, contract sizing, percent geometry from the SPX sweep). See `CALIBRATION.md` section 16. |
 | `pine/XPW_Breakout_v2.01_XAUUSD.pine` | The previous (gold) version, kept for diffing. |
 | `CALIBRATION.md` | Cost presets, per-timeframe geometry, sweep results, what changed and why. |
 | `docs/XPW_Settings_by_Timeframe.pdf` | Every input of both builds, one sheet per timeframe, with the numbers behind each choice. |
@@ -15,7 +16,8 @@ execution.
 | `calibration/data/BTCUSD_*.csv` | The five TradingView exports (1m, 15m, 30m, 60m, 240m) the BTC sweep ran on. |
 | `calibration/data/XAUUSD_*.csv` | The six OANDA gold exports (5m to 240m) the gold sweep ran on. |
 | `calibration/data/BTCUSDT_*.csv` | MEXC 5m, 30s and 15s BTC exports; see `CALIBRATION.md` section 14 (5m and below: do not). |
-| `calibration/results/` | Sweep CSVs, `summary.json`, `SWEEP_NOTES.md`, `parity.json`; `latch/` for the v2.10 arming sweep, `xau/` for gold, `btc5/` for BTC 5m and sub-minute, `don_btc/` and `don_xau/` for the Donchian / Follow sweep (`CALIBRATION.md` section 15). |
+| `calibration/data/SPX_*.csv` | SPCFD:SPX cash-session exports, 1m to quarterly; `calibration/resample_session.py` builds session-aligned bars from a 1m export. |
+| `calibration/results/` | Sweep CSVs, `summary.json`, `SWEEP_NOTES.md`, `parity.json`; `latch/` for the v2.10 arming sweep, `xau/` for gold, `btc5/` for BTC 5m and sub-minute, `don_btc/` and `don_xau/` for the Donchian / Follow sweep (`CALIBRATION.md` section 15), `spx/` and `spx_high/` for the S&P 500 sweep (section 16). |
 
 ## Quick start
 

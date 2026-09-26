@@ -98,11 +98,19 @@ GROUPS = [
   ("Mark realtime bars (Tick mode)", "on", "on", ""),
  ]),
 ]
+SPX_DEFAULTS = {
+ "Commission USD per contract per side": "0.25 pt", "Slippage USD per side": "0.1 pt",
+ "FixedQty fallback": "1 contract", "HARD qty cap": "10 contracts", "Qty step (rounds down)": "1",
+ "Geometry": "Pct", "TP as percent of entry (Pct mode)": "1.0", "SL as percent of entry (Pct mode)": "0.5",
+ "Buffer, ATR mult": "2.0",
+}
 HEADER = {
  "BTC": [("Properties > Commission", "cash per contract, 10.5 USD", "Header default. Properties > Defaults > Reset settings restores it."),
          ("Properties > Slippage", "500 ticks", "= 5 USD at mintick 0.01.")],
  "XAU": [("Properties > Commission", "cash per contract, 0.13 USD", "Header default. Properties > Defaults > Reset settings restores it."),
          ("Properties > Slippage", "5 ticks", "= 0.05 USD/oz at mintick 0.01.")],
+ "SPX": [("Properties > Commission", "cash per contract, 0.25 (index points)", "Half of a 0.5 point spread; placeholder until the VT Markets SPX500 spec is confirmed."),
+         ("Properties > Slippage", "10 ticks", "= 0.10 index points at mintick 0.01.")],
 }
 
 # ---------------------------------------------------------------- per-timeframe sheets
@@ -129,6 +137,42 @@ SHEETS = {
         stats="Donchian 20, ATR 3.0 / 3R, buffer 0.5, Emulator trail, Follow: 27 trades, +5,850, PF 1.50, max DD 5,683; first half +885 / second half +5,591.",
         notes=["99 days of 240m bars give 20 to 46 trades per cell and the sign flips between neighbours; the pivot defaults are +1,528 (Recheck) or -2,708 (Follow). Donchian 20 is the only level source positive in both halves. Every other Donchian length loses on 240m (length 5: -13,624).",
                "Use this sheet only with a larger position cap than you would regret; more history is needed before 240m counts as calibrated."]),
+  ]),
+ "SPX": dict(
+  symbol="SPX500 (SPCFD:SPX)", script="pine/XPW_Breakout_v2.10_SPX500.pine", unit="per 1 contract at $1 per index point, cash session, placeholder costs (0.5 pt spread, 0.1 pt slip)",
+  tfs=[
+   dict(tf="5m and below", verdict="NOT TESTED - do not trade", overrides={}, stats="The 1m export covers 2.5 months and the 15s / 1s exports one day: not enough to calibrate, and every lower timeframe tested on BTC and gold lost.",
+        notes=["No settings sheet."]),
+   dict(tf="15m", verdict="Borderline - verify with Bar Magnifier first", overrides={"SL as percent of entry (Pct mode)": "0.1", "TP as percent of entry (Pct mode)": "0.25", "   pivot bars each side": "5", "Buffer, ATR mult": "0.5"},
+        stats="Pct SL 0.1% / TP 0.25%, pivot bars 5, buffer 0.5, Emulator trail, Follow: 173 trades, +400, PF 1.49, max DD 102; first half +282 / second half +118. Donchian 10 instead of pivots: 272 trades, +717, PF 1.55 (+239 / +476).",
+        notes=["One trade in four resolves inside the fill bar (the stop is 0.8 ATR on 15m), so part of this result is the emulator's path assumption. Run it in the Strategy Tester with Bar Magnifier ON before trusting it; if the PF holds there, it is real.",
+               "Every wider geometry was negative in the second half of the 15m export (5 months). 15m SPX is the weakest timeframe here."]),
+   dict(tf="30m", verdict="Trade with the ATR block", overrides={"Geometry": "ATR", "   pivot bars each side": "8", "Trail execution": "Emulator"},
+        stats="ATR 3.0 / 3R, pivot bars 8, buffer 2.0, Emulator trail, Follow: 78 trades, +764, PF 1.67, max DD 296; first half +573 / second half +171; 1% fill-bar exits. 9 months of data.",
+        notes=["The SL/TP ATR inputs stay at their defaults (3.0 / 3R); only Geometry switches to ATR and pivot bars to 8.",
+               "Alternative with more trades: Pct SL 0.25% / TP 0.5%, Donchian 10 instead of pivots, buffer 0.5, Recheck: 237 trades, +809, PF 1.34, max DD 385 (+563 / +227), 15% fill-bar exits."]),
+   dict(tf="60m", verdict="SHIPPED DEFAULTS - change nothing", overrides={},
+        stats="143 trades, +1,320, PF 1.59, max DD 333; first half +917 / second half +437; 10% fill-bar exits. 18 months of data.",
+        notes=["Recheck instead of Follow halves the trade count (80 trades, +750, PF 1.55) and loses the second half (+10): keep Follow on SPX.",
+               "Alternative: Pct SL 0.25% / TP 0.5%, pivot bars 5, buffer 0.5, Recheck: 194 trades, +1,065, PF 1.54, max DD 179 (+733 / +298), but 26% of exits are inside the fill bar."]),
+   dict(tf="120m", verdict="SHIPPED DEFAULTS - change nothing", overrides={},
+        stats="151 trades, +1,329, PF 1.57, max DD 225; first half +594 / second half +676; 15% fill-bar exits. 2.7 years of data.",
+        notes=["Alternative: Geometry ATR, SL 1.5 ATR, TP 3R, pivot bars 3, buffer 1.0, Emulator trail: 183 trades, +1,696, PF 1.48, max DD 455 (+1,218 / +460), 6% fill-bar exits."]),
+   dict(tf="180m", verdict="Trade with the ATR block", overrides={"Geometry": "ATR", "   pivot bars each side": "8"},
+        stats="ATR 3.0 / 3R, pivot bars 8, buffer 2.0, Emulator trail, Follow: 82 trades, +1,838, PF 2.03, max DD 416; first half +1,239 / second half +577; no fill-bar exits. 3.6 years of data.",
+        notes=["Recheck: 70 trades, +1,898, PF 2.22, max DD 457 (+1,294 / +581). Either policy.",
+               "The shipped percent block fails here (-30 over the file); use the ATR block."]),
+   dict(tf="240m", verdict="Trade with the ATR block, few trades", overrides={"Geometry": "ATR", "   pivot bars each side": "8", "Buffer, ATR mult": "1.0", "Ratchet trail": "off"},
+        stats="ATR 3.0 / 3R, pivot bars 8, buffer 1.0, trail OFF, Follow: 34 trades, +3,450, PF 2.42, max DD 803; first half +1,719 / second half +1,538. 5.4 years of data, so about 6 trades a year.",
+        notes=["Alternative with more trades: Geometry ATR, SL 1.5 ATR, TP 3R, pivot bars 3, buffer 1.0, Emulator trail: 189 trades, +2,028, PF 1.40, max DD 1,031 (+1,369 / +612).",
+               "Every percent stop below 0.5% is a fill-bar artefact on 240m and above (46 to 96% same-bar exits) and is excluded."]),
+   dict(tf="Daily", verdict="Trade with the daily ATR block", overrides={"Geometry": "ATR", "SL, ATR mult (ATR mode)": "2.0", "TP, R multiple of SL (ATR mode)": "2.5", "   pivot bars each side": "8", "Buffer, ATR mult": "0.5", "Ratchet trail": "off"},
+        stats="ATR 2.0 / 2.5R, pivot bars 8, buffer 0.5, trail OFF, Follow: 56 trades, +4,767, PF 2.66, max DD 451; first half +1,602 / second half +3,090; no fill-bar exits. 10.8 years of data, about 5 trades a year.",
+        notes=["Alternative: ATR 3.0 / 3R, pivot bars 8, buffer 2.0, Emulator trail: 55 trades, +3,039, PF 4.29, max DD 296 (+938 / +2,024).",
+               "Positions hold for days: overnight financing on an index CFD is not modelled and will matter at this timeframe."]),
+   dict(tf="Weekly", verdict="Context only", overrides={"Geometry": "ATR", "SL, ATR mult (ATR mode)": "2.0", "TP, R multiple of SL (ATR mode)": "2.5", "   pivot bars each side": "8", "Buffer, ATR mult": "0.5", "Ratchet trail": "off"},
+        stats="Same block as daily: 66 trades, +2,093, PF 1.53, max DD 1,027 over 52 years (about one trade a year); first half +359 / second half +1,839.",
+        notes=["Not a trading timeframe for this system. Monthly and quarterly exports were stored but not swept: a 3-bar pivot needs 7 months to confirm."]),
   ]),
  "XAU": dict(
   symbol="XAUUSD", script="pine/XPW_Breakout_v2.10_XAUUSD.pine", unit="per 1 oz, VT Markets raw costs; multiply by 100 for one MT5 lot",
@@ -164,6 +208,7 @@ def para(t, st=S): return Paragraph(t, st)
 
 def sheet(sym, meta, tfd, story):
     col = 0 if sym == "BTC" else 1
+    spx = sym == "SPX"
     story.append(Paragraph(f"{meta['symbol']} - {tfd['tf']}: {tfd['verdict']}", H1))
     story.append(Paragraph(f"Script: {meta['script']}. Net figures {meta['unit']}. "
                            "Rows shaded yellow differ from the script defaults; everything else is left as the script loads it.", NOTE))
@@ -181,7 +226,7 @@ def sheet(sym, meta, tfd, story):
     ov = dict(tfd["overrides"])
     for gname, items in GROUPS:
         for label, dB, dX, note in items:
-            default = (dB, dX)[col]
+            default = SPX_DEFAULTS.get(label, dB) if spx else (dB, dX)[col]
             val = ov.pop(label, default)
             changed = val != default
             if changed:
@@ -216,9 +261,9 @@ def sheet(sym, meta, tfd, story):
 
 def cover(story):
     story.append(Paragraph("XPW Breakout v2.10 - settings by timeframe", H1))
-    story.append(Paragraph("BTCUSD and XAUUSD builds, TradingView Pine v6. One sheet per timeframe listing every input of the script and what to set it to. "
+    story.append(Paragraph("BTCUSD, XAUUSD and SPX500 builds, TradingView Pine v6. One sheet per timeframe listing every input of the script and what to set it to. "
                            "All numbers come from the calibration sweeps in CALIBRATION.md (sections 7, 13, 14 and 15) on the exports in calibration/data/: "
-                           "CRYPTO:BTCUSD 15m to 240m (99 days), MEXC:BTCUSDT 5m, OANDA:XAUUSD 5m to 240m. Costs are the VT Markets MT5 account.", B))
+                           "CRYPTO:BTCUSD 15m to 240m (99 days), MEXC:BTCUSDT 5m, OANDA:XAUUSD 5m to 240m, SPCFD:SPX 15m to weekly (5 months to 52 years). Costs are the VT Markets MT5 account; SPX costs are a placeholder (0.5 point spread) until the spec is confirmed.", B))
     story.append(Paragraph("How to apply a sheet", H2))
     for t in [
         "1. Open the chart on the symbol you trade and the sheet's timeframe. Paste the build's .pine file into the Pine editor and add it to the chart.",
@@ -242,16 +287,25 @@ def cover(story):
      ("XAUUSD 30m", "shipped defaults", "none", "54", "+194/oz", "1.65", "104"),
      ("XAUUSD 60m", "trade", "Donchian 20 instead of pivots", "49", "+238/oz", "1.52", "100"),
      ("XAUUSD 240m", "trade", "Donchian 5 instead of pivots", "64", "+942/oz", "1.73", "236"),
+     ("SPX500 5m and below", "not tested", "-", "-", "-", "-", "-"),
+     ("SPX500 15m", "borderline", "Pct 0.1% / 0.25%, pivot bars 5, buffer 0.5", "173", "+400/pt", "1.49", "102"),
+     ("SPX500 30m", "trade", "Geometry ATR (3.0 / 3R), pivot bars 8, buffer 2.0", "78", "+764/pt", "1.67", "296"),
+     ("SPX500 60m", "shipped defaults", "none", "143", "+1,320/pt", "1.59", "333"),
+     ("SPX500 120m", "shipped defaults", "none", "151", "+1,329/pt", "1.57", "225"),
+     ("SPX500 180m", "trade", "Geometry ATR (3.0 / 3R), pivot bars 8", "82", "+1,838/pt", "2.03", "416"),
+     ("SPX500 240m", "trade, few trades", "Geometry ATR (3.0 / 3R), pivot bars 8, buffer 1.0, trail off", "34", "+3,450/pt", "2.42", "803"),
+     ("SPX500 daily", "trade", "Geometry ATR 2.0 / 2.5R, pivot bars 8, buffer 0.5, trail off", "56", "+4,767/pt", "2.66", "451"),
+     ("SPX500 weekly", "context only", "daily block", "66", "+2,093/pt", "1.53", "1,027"),
     ]
     for r in summ: rows.append([para(x) for x in r])
     t = Table(rows, colWidths=[34*mm, 38*mm, 58*mm, 16*mm, 24*mm, 14*mm, 20*mm], repeatRows=1)
     t.setStyle(TableStyle([("GRID", (0,0), (-1,-1), 0.25, colors.HexColor("#bbbbbb")), ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#dde3ea")),
                            ("VALIGN", (0,0), (-1,-1), "TOP"), ("TOPPADDING", (0,0), (-1,-1), 1.5), ("BOTTOMPADDING", (0,0), (-1,-1), 1.5)]))
     story.append(t)
-    story.append(Paragraph("Net per 1 BTC or per 1 oz (x100 for one gold lot), fixed size, after VT Markets costs. Trade counts are over the whole export (99 days of BTC, 2 to 12 weeks of gold depending on the timeframe).", NOTE))
+    story.append(Paragraph("Net per 1 BTC, per 1 oz (x100 for one gold lot) or per 1 SPX contract at $1 per index point, fixed size, after costs. Trade counts are over the whole export: 99 days of BTC, 2 to 12 weeks of gold, 5 months (15m) to 52 years (weekly) of SPX.", NOTE))
     story.append(Paragraph("Reading the evidence", H2))
     for t in [
-        "<b>Shipped defaults</b> (BTC 60m; gold 15m and 30m) are the settings chosen to be positive across timeframes rather than best on one. They are the only rows validated by a first-half / second-half split and, for gold, a walk-forward (5 of 5 timeframes positive out of sample).",
+        "<b>Shipped defaults</b> (BTC 60m; gold 15m and 30m; SPX 60m and 120m) are the settings chosen to be positive across timeframes rather than best on one. SPX has no single geometry that works from 30m to daily: intraday wants a percent stop, 180m and above an ATR stop, so the sheets switch Geometry per timeframe. They are the only rows validated by a first-half / second-half split and, for gold, a walk-forward (5 of 5 timeframes positive out of sample).",
         "<b>Donchian rows</b> replace the pivot with a rolling prior-N high/low, so the buy stop and sell stop move every bar. They are recommended only where both halves of the export were positive and the level source was robust across the geometry grid. The wrong length is destructive (Donchian 50 on BTC 240m loses in every band).",
         "<b>Follow versus Recheck</b> (what a resting stop does when its level is replaced) is a wash across the grid: median PF difference under 0.1, more trades with Follow. Follow is the default because every calibration number was measured with it.",
         "<b>Single-cell alternatives</b> in the notes are the best plateau cell of that timeframe. They have 18 to 39 trades and the gold walk-forward showed per-timeframe picks failing out of sample 2 to 3 times in 5; use them with that in mind.",
@@ -261,7 +315,7 @@ def cover(story):
 
 story = []
 cover(story)
-for sym in ("BTC", "XAU"):
+for sym in ("BTC", "XAU", "SPX"):
     meta = SHEETS[sym]
     for tfd in meta["tfs"]:
         story.append(PageBreak())
