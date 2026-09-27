@@ -148,6 +148,16 @@
 //      (Pine deletes drawings on the per-tick rollback), so it survives
 //      Tick mode. With no extra timeframe enabled nothing is drawn and
 //      the script behaves exactly as before. Header: max_labels_count.
+//
+// ENTRY TIMING LABEL (v2.11 addition, purely additive, group 12)
+//  Q1  Every entry gets a grey label on its fill price: fill clock time,
+//      how far into the candle the fill happened and how long was left
+//      to the candle close (e.g. 1m candle, filled at 0:40 -> 20s left).
+//  Q2  The fill second exists ONLY LIVE. The emulator fills historical
+//      bars without an intrabar clock, so on history the label states
+//      the candle length and that the second is not available. In
+//      BarClose mode the entry is only seen at the close, and the label
+//      says so. Display only; nothing feeds back into trading.
 //--------------------------------------------------------------------
 // NOTES
 //  * Properties: this header already sets calc_on_every_tick. Leave
@@ -299,6 +309,9 @@ MTF2        = input.timeframe("60", "   timeframe 2", group=grpM, tooltip="Use a
 EnableTF3   = input.bool(false, "Add timeframe 3 (optional)", group=grpM)
 MTF3        = input.timeframe("240", "   timeframe 3", group=grpM, tooltip="Use a timeframe HIGHER than the chart. Its levels come from its last completed bar (non-repainting).")
 ZoneTolMult = input.float(1.0, "Same-zone tolerance (x entry buffer)", minval=0.1, step=0.1, group=grpM, tooltip="How close another timeframe's level must sit to this chart's entry level, in units of the entry buffer, to count as 'the same zone'.")
+
+grpQ = "12. Entry timing label"
+ShowEntryTime = input.bool(true, "Label every entry with its position inside the candle", group=grpQ, tooltip="Live (Tick mode): the second of the candle the fill happened at and how long was left to the close. History has no intrabar clock, so there the label only states the candle length.")
 
 // Rail: emulator-level cap on top of calcQty clamp (live with strategy.entry, F12)
 strategy.risk.max_position_size(MaxQtyHard)
@@ -780,6 +793,43 @@ if mtfMarkL
     label.new(bar_index, mtfPxL, mtfTxt("▲", mtfPxL, mtfLvlL), style=label.style_label_left, color=color.new(color.aqua, 0), textcolor=color.black, size=size.small, tooltip=mtfTip)
 if mtfMarkS
     label.new(bar_index, mtfPxS, mtfTxt("▼", mtfPxS, mtfLvlS), style=label.style_label_left, color=color.new(color.fuchsia, 0), textcolor=color.white, size=size.small, tooltip=mtfTip)
+
+//============== ENTRY TIMING LABEL (where inside the candle the fill happened) ==============//
+// Every entry, on the evaluation it opened (newTrade; direction and fill price shared with the MTF block).
+// The fill SECOND exists only live: the emulator fills historical bars with no intrabar clock, so on history
+// the label states the candle length and that the second is not available. Live, newTrade fires on the tick
+// that filled (Tick mode) or at the close (BarClose mode, where the fill itself may have been earlier), and
+// timenow is that tick's clock. Latched in varip on that tick and re-created per evaluation like the MTF label.
+fmtDur(int ms) =>
+    s  = math.max(0, math.round(ms / 1000.0))
+    hh = math.floor(s / 3600)
+    mm = math.floor((s % 3600) / 60)
+    ss = s % 60
+    hh > 0 ? str.tostring(hh) + "h " + str.tostring(mm) + "m " + str.tostring(ss) + "s" : mm > 0 ? str.tostring(mm) + "m " + str.tostring(ss) + "s" : str.tostring(ss) + "s"
+varip bool  etMark   = false
+varip bool  etLong   = false
+varip bool  etLive   = false
+varip float etPx     = na
+varip int   etBarMs  = 0
+varip int   etElapMs = 0
+varip int   etRemMs  = 0
+varip int   etClock  = 0
+if barstate.isnew
+    etMark := false
+if ShowEntryTime and newTrade and mtfTradeSz != 0
+    etMark   := true
+    etLong   := mtfTradeSz > 0
+    etPx     := mtfFillPx
+    etLive   := barstate.isrealtime
+    etBarMs  := time_close - time
+    etClock  := timenow
+    etElapMs := etLive ? math.max(0, math.min(timenow - time, etBarMs)) : 0      // clamped: server clock vs bar boundaries
+    etRemMs  := etBarMs - etElapMs
+etTxt = (etLong ? "ENTRY ▲ " : "ENTRY ▼ ") + str.tostring(etPx, format.mintick) + "\n" +
+     (etLive ? "filled " + str.format_time(etClock, "HH:mm:ss", syminfo.timezone) + " = " + fmtDur(etElapMs) + " into a " + fmtDur(etBarMs) + " candle\n" + fmtDur(etRemMs) + " left to candle close" + (tickMode ? "" : "\n(BarClose mode: seen at the close)")
+             : fmtDur(etBarMs) + " candle\nfill second n/a on history")
+if etMark
+    label.new(bar_index, etPx, etTxt, style=label.style_label_right, color=color.new(color.gray, 15), textcolor=color.white, size=size.small, tooltip="Where inside the candle this entry filled. Seconds are live only; history has no intrabar clock.")
 
 //============== POSITION MGMT: locked SL/TP/trail, ratchet, BE, time stop ==============//
 varip float trailL  = na
