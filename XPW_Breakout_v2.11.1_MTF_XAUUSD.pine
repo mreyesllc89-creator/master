@@ -1,9 +1,9 @@
 //@version=6
 //====================================================================
-// XPW_Breakout_v2.11 MTF (XAUUSD)   (Pine v6, single file, self-contained)
+// XPW_Breakout_v2.11.1 MTF (XAUUSD)   (Pine v6, single file, self-contained)
 //--------------------------------------------------------------------
-// v2.11 = v2.10 + the optional multi-timeframe confluence label (section
-// MULTI-TIMEFRAME CONFLUENCE below). Trading logic is unchanged from v2.10.
+// v2.11.1 = v2.10 + the multi-timeframe confluence label and the entry timing
+// label (sections below). Trading logic is unchanged from v2.10.
 //--------------------------------------------------------------------
 // GOLD BUILD. Logic is byte-identical to the BTCUSD build; only the
 // symbol defaults differ: costs in USD per OUNCE (TV gold CFDs quote
@@ -149,7 +149,7 @@
 //      Tick mode. With no extra timeframe enabled nothing is drawn and
 //      the script behaves exactly as before. Header: max_labels_count.
 //
-// ENTRY TIMING LABEL (v2.11 addition, purely additive, group 12)
+// ENTRY TIMING LABEL (v2.11.1 addition, purely additive, group 12)
 //  Q1  Every entry gets a grey label on its fill price: fill clock time,
 //      how far into the candle the fill happened and how long was left
 //      to the candle close (e.g. 1m candle, filled at 0:40 -> 20s left).
@@ -208,7 +208,7 @@
 //    either band exits in one script and not the other. From the first
 //    run after the fill both hold avg x (1 +/- pct) and agree.
 //====================================================================
-strategy("XPW Breakout v2.11 MTF (XAUUSD)", overlay=true,
+strategy("XPW Breakout v2.11.1 MTF (XAUUSD)", overlay=true,
      initial_capital=100000,
      pyramiding=0,
      calc_on_every_tick=true,
@@ -937,7 +937,7 @@ if ShowTable and barstate.islast
     per100    = bar_index > 0 ? strategy.closedtrades * 100.0 / bar_index : na
     bufAtr    = atrRef > 0 ? buffer / atrRef : na
     blocked   = ((allowL and trendL) or (allowS and trendS) ? "" : "trend ") + (coolOK ? "" : "cooldown ") + (dayOK ? "" : "maxday ") + (gateOK ? "" : "coil ") + (costOK ? "" : "cost ") + ((allowL and not retryOKL) or (allowS and not retryOKS) ? "losscap " : "") + (inSession and dowOK ? "" : "time ") + (na(atrRef) ? "atr-warmup " : "") + (distDead ? "MAXDIST<=BUFFER " : "")
-    row(0,  "XPW v2.11 MTF", ExecMode + " / " + EntryMode + (ArmLatch ? " / latch" : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
+    row(0,  "XPW v2.11.1 MTF", ExecMode + " / " + EntryMode + (ArmLatch ? " / latch" : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
     row(1,  "Levels", lvSrc == "" ? "NONE" : lvSrc, lvSrc == "" ? color.red : color.white)
     row(2,  "ATR " + str.tostring(AtrLen), str.tostring(atrRef, "#.##") + "  (" + str.tostring(atrPct, "#.###") + "%)", color.white)
     row(3,  "SL dist", str.tostring(slNow, "#.##") + "  (" + str.tostring(slNow / close * 100.0, "#.###") + "%)", color.white)
