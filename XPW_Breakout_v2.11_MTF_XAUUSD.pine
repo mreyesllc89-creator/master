@@ -1,6 +1,9 @@
 //@version=6
 //====================================================================
-// XPW_Breakout_v2.10 (XAUUSD)   (Pine v6, single file, self-contained)
+// XPW_Breakout_v2.11 MTF (XAUUSD)   (Pine v6, single file, self-contained)
+//--------------------------------------------------------------------
+// v2.11 = v2.10 + the optional multi-timeframe confluence label (section
+// MULTI-TIMEFRAME CONFLUENCE below). Trading logic is unchanged from v2.10.
 //--------------------------------------------------------------------
 // GOLD BUILD. Logic is byte-identical to the BTCUSD build; only the
 // symbol defaults differ: costs in USD per OUNCE (TV gold CFDs quote
@@ -120,23 +123,29 @@
 //      an SL that sits inside one bar's range resolves on the fill bar
 //      by the emulator's path assumption, not by the market.
 //
-// MULTI-TIMEFRAME CONFLUENCE (v2.10 addition, purely additive)
+// MULTI-TIMEFRAME CONFLUENCE (v2.11 addition, purely additive)
 //  M1  Optional: up to two extra timeframes (group "11. Multi-Timeframe
 //      Confluence") mirror this chart's Pivot/Donchian level picker via
-//      request.security (Previous-day is excluded here only, since
-//      nesting a request.security inside another is not allowed).
+//      request.security in the same non-repainting form as the
+//      previous-day levels (lookahead_on + [1] = last COMPLETED bar of
+//      that timeframe). Previous-day is excluded from the mirror only
+//      because a request.security cannot be nested inside another.
 //      Nothing about arming, sizing, entries or exits changes; this is
 //      a display-only confirmation layer.
-//  M2  On the bar an entry is actually placed (Stop/CloseConfirm/Retest,
-//      long or short), the level used on THIS chart is compared to the
-//      nearest same-direction level fetched from each enabled extra
-//      timeframe. "Same zone" = within ZoneTolMult x the entry buffer.
+//  M2  On the candle a trade actually OPENS (the existing newTrade flag,
+//      any trigger mode, long or short), the level the trade was placed
+//      at on THIS chart (lvlUsedL / lvlUsedS) is compared to the nearest
+//      same-direction level of each enabled extra timeframe. "Same
+//      zone" = within ZoneTolMult x the entry buffer.
 //  M3  When every enabled timeframe (this chart + the extra ones that
-//      are switched on) agrees on the same zone on the same candle, a
-//      distinct label ("MTF xN") is plotted, separate from any other
+//      are switched on) agrees on the same zone, a distinct label
+//      ("MTF xN") is drawn on that candle, separate from any other
 //      marker, so multi-timeframe correlated entries stand out from
-//      ordinary single-timeframe ones. With no extra timeframe enabled,
-//      behaviour is identical to v2.10 (nothing is drawn).
+//      ordinary single-timeframe ones. The result is latched in varip
+//      for the rest of the bar and the label re-created per evaluation
+//      (Pine deletes drawings on the per-tick rollback), so it survives
+//      Tick mode. With no extra timeframe enabled nothing is drawn and
+//      the script behaves exactly as before. Header: max_labels_count.
 //--------------------------------------------------------------------
 // NOTES
 //  * Properties: this header already sets calc_on_every_tick. Leave
@@ -187,7 +196,7 @@
 //    either band exits in one script and not the other. From the first
 //    run after the fill both hold avg x (1 +/- pct) and agree.
 //====================================================================
-strategy("XPW Breakout v2.10 (XAUUSD)", overlay=true,
+strategy("XPW Breakout v2.11 MTF (XAUUSD)", overlay=true,
      initial_capital=100000,
      pyramiding=0,
      calc_on_every_tick=true,
@@ -197,7 +206,8 @@ strategy("XPW Breakout v2.10 (XAUUSD)", overlay=true,
      commission_value=0.10,    // USD per OZ per side = CFD raw: $0.03 commission ($6/lot RT) + $0.07 half of a ~$0.15 spread. CFD std (no commission): ~0.15 = half of a $0.30 spread. VERIFY from an MT5 statement
      slippage=5,               // ticks per side. mintick 0.01 -> $0.05/oz pure execution slip. Must equal SlipUSD / syminfo.mintick (table prints it)
      margin_long=0, margin_short=0,
-     max_bars_back=500)
+     max_bars_back=500,
+     max_labels_count=500)     // MTF confluence labels (M3); default 50 would drop older ones
 
 //============== INPUTS ==============//
 grpX = "1. Execution"
@@ -283,9 +293,9 @@ ShowTickMark = input.bool(true, "Mark realtime bars (Tick mode)", group=grpD)
 grpM = "11. Multi-Timeframe Confluence"
 UseMTFLabel = input.bool(true, "Mark multi-timeframe confluence entries with a different label", group=grpM, tooltip="Display only: does not change arming, sizing, entries or exits.")
 EnableTF2   = input.bool(false, "Add timeframe 2 (optional)", group=grpM)
-MTF2        = input.timeframe("60", "   timeframe 2", group=grpM)
+MTF2        = input.timeframe("60", "   timeframe 2", group=grpM, tooltip="Use a timeframe HIGHER than the chart. Its levels come from its last completed bar (non-repainting).")
 EnableTF3   = input.bool(false, "Add timeframe 3 (optional)", group=grpM)
-MTF3        = input.timeframe("240", "   timeframe 3", group=grpM)
+MTF3        = input.timeframe("240", "   timeframe 3", group=grpM, tooltip="Use a timeframe HIGHER than the chart. Its levels come from its last completed bar (non-repainting).")
 ZoneTolMult = input.float(1.0, "Same-zone tolerance (x entry buffer)", minval=0.1, step=0.1, group=grpM, tooltip="How close another timeframe's level must sit to this chart's entry level, in units of the entry buffer, to count as 'the same zone'.")
 
 // Rail: emulator-level cap on top of calcQty clamp (live with strategy.entry, F12)
@@ -340,8 +350,11 @@ if UsePrevDay
 //============== MULTI-TIMEFRAME LEVEL MIRRORS (M1) ==============//
 // Same Pivot/Donchian picker as above, run on each optional extra timeframe via
 // request.security. Previous-day is left out here only because a request.security
-// call cannot be nested inside another one. Fetched unconditionally (Pine wants
-// request.security calls outside conditional branches); EnableTF2/3 just gate use.
+// call cannot be nested inside another one. Returned as [1] with lookahead_on = the
+// picker's value on that timeframe's last COMPLETED bar (pdH/pdL form, E1): with the
+// default lookahead_off a chart bar would see the final close of the HTF bar that
+// contains it (future leak on history, tick flicker live). Fetched unconditionally
+// (request.security belongs outside conditional branches); EnableTF2/3 gate the use.
 f_mtfLevels() =>
     _ph = ta.pivothigh(high, BarsN, BarsN)
     _pl = ta.pivotlow(low, BarsN, BarsN)
@@ -361,10 +374,10 @@ f_mtfLevels() =>
     if UseDonchian
         _up := not na(_donH) and _donH > close and (na(_up) or _donH < _up) ? _donH : _up
         _dn := not na(_donL) and _donL < close and (na(_dn) or _donL > _dn) ? _donL : _dn
-    [_up, _dn]
+    [_up[1], _dn[1]]
 
-[mtfUp2, mtfDn2] = request.security(syminfo.tickerid, MTF2, f_mtfLevels())
-[mtfUp3, mtfDn3] = request.security(syminfo.tickerid, MTF3, f_mtfLevels())
+[mtfUp2, mtfDn2] = request.security(syminfo.tickerid, MTF2, f_mtfLevels(), lookahead=barmerge.lookahead_on)
+[mtfUp3, mtfDn3] = request.security(syminfo.tickerid, MTF3, f_mtfLevels(), lookahead=barmerge.lookahead_on)
 mtfUp2v = EnableTF2 ? mtfUp2 : na
 mtfDn2v = EnableTF2 ? mtfDn2 : na
 mtfUp3v = EnableTF3 ? mtfUp3 : na
@@ -511,11 +524,6 @@ softOKS = softOK and allowS and trendS
 longFilt  = hardOK and softOKL
 shortFilt = hardOK and softOKS
 
-// M2: this-bar entry signal flags, plain (not var/varip) so they reset to false on every fresh evaluation
-// and only turn true where an entry is actually placed below.
-sigLong  = false
-sigShort = false
-
 // Confirmed close beyond the level that was nearest at the previous close (CloseConfirm / Retest)
 brkPxL = lvlUp[1]
 brkPxS = lvlDn[1]
@@ -617,7 +625,6 @@ if EntryMode == "Stop"
                 armTrgL  := trailTrg(armTpNL)
                 armDstL  := trailDst(armTpNL)
                 placeLong(lvlUp, qL, armSlL, armTpL, armTrgL, armDstL, 1)
-                sigLong  := true
             else
                 armedL := false
                 placeL := false
@@ -644,7 +651,6 @@ if EntryMode == "Stop"
                 armTrgS  := trailTrg(armTpNS)
                 armDstS  := trailDst(armTpNS)
                 placeShort(lvlDn, qS, armSlS, armTpS, armTrgS, armDstS, 1)
-                sigShort := true
             else
                 armedS := false
                 placeS := false
@@ -670,7 +676,6 @@ if EntryMode == "CloseConfirm"
             armTrgL  := trailTrg(armTpNL)
             armDstL  := trailDst(armTpNL)
             placeLong(close, qC, armSlL, armTpL, armTrgL, armDstL, 0)
-            sigLong  := true
     if brkS and shortFilt and retryOK(brkPxS, blockLvlS, blockCntS) and (MaxChaseAtr == 0 or brkPxS - close <= MaxChaseAtr * atrRef)
         qC = calcQty(close)
         if qC > 0
@@ -681,7 +686,6 @@ if EntryMode == "CloseConfirm"
             armTrgS  := trailTrg(armTpNS)
             armDstS  := trailDst(armTpNS)
             placeShort(close, qC, armSlS, armTpS, armTrgS, armDstS, 0)
-            sigShort := true
 
 if EntryMode == "Retest"
     if evalNow
@@ -715,7 +719,6 @@ if EntryMode == "Retest"
             armTrgL  := trailTrg(armTpNL)
             armDstL  := trailDst(armTpNL)
             placeLong(rtPxL, qRL, armSlL, armTpL, armTrgL, armDstL, 2)
-            sigLong  := true
         else
             strategy.cancel("BuyStop")
         qRS = calcQty(na(rtPxS) ? close : rtPxS)
@@ -727,7 +730,6 @@ if EntryMode == "Retest"
             armTrgS  := trailTrg(armTpNS)
             armDstS  := trailDst(armTpNS)
             placeShort(rtPxS, qRS, armSlS, armTpS, armTrgS, armDstS, 2)
-            sigShort := true
         else
             strategy.cancel("SellStop")
 else
@@ -735,20 +737,32 @@ else
     rtPxS := na
 
 //============== MULTI-TIMEFRAME CONFLUENCE LABEL (M2, M3) ==============//
-// Only evaluated on the bar an entry was actually placed above (sigLong / sigShort); does not
-// feed back into arming, sizing or exits. tfCount = this chart + whichever extra timeframes are on.
-mtfTfCount   = 1 + (EnableTF2 ? 1 : 0) + (EnableTF3 ? 1 : 0)
-mtfZoneTol   = buffer * ZoneTolMult
+// Evaluated once per trade, on the evaluation where it OPENED (newTrade; the resting order itself is
+// re-issued every evaluation, so the placement is not a usable "entry" event). Direction comes from the
+// trade just opened (the open one, or the last closed one after a same-bar round trip on history), and
+// the level compared is the one that trade was placed at (lvlUsedL/S): on the fill bar lvlUp/lvlDn have
+// already moved on to the next level. Display only: nothing here feeds arming, sizing or exits.
+mtfTfCount = 1 + (EnableTF2 ? 1 : 0) + (EnableTF3 ? 1 : 0)
+mtfZoneTol = buffer * ZoneTolMult
 mtfMatch(float base, float other, bool enabled) => not enabled or (not na(base) and not na(other) and math.abs(other - base) <= mtfZoneTol)
-mtfLongAll   = mtfMatch(lvlUp, mtfUp2v, EnableTF2) and mtfMatch(lvlUp, mtfUp3v, EnableTF3)
-mtfShortAll  = mtfMatch(lvlDn, mtfDn2v, EnableTF2) and mtfMatch(lvlDn, mtfDn3v, EnableTF3)
-mtfConfluenceLong  = UseMTFLabel and sigLong  and mtfTfCount >= 2 and mtfLongAll
-mtfConfluenceShort = UseMTFLabel and sigShort and mtfTfCount >= 2 and mtfShortAll
-
-if mtfConfluenceLong
-    label.new(bar_index, low, "MTF x" + str.tostring(mtfTfCount) + " ▲", style=label.style_label_up, color=color.new(color.aqua, 0), textcolor=color.black, size=size.small, tooltip="Same entry zone confirmed on " + str.tostring(mtfTfCount) + " timeframes on this candle")
-if mtfConfluenceShort
-    label.new(bar_index, high, "MTF x" + str.tostring(mtfTfCount) + " ▼", style=label.style_label_down, color=color.new(color.fuchsia, 0), textcolor=color.white, size=size.small, tooltip="Same entry zone confirmed on " + str.tostring(mtfTfCount) + " timeframes on this candle")
+mtfTradeSz = strategy.opentrades > 0 ? strategy.opentrades.size(strategy.opentrades - 1) : strategy.closedtrades > 0 ? strategy.closedtrades.size(strategy.closedtrades - 1) : 0.0
+// Result latched for the rest of the bar: Pine deletes drawings on the per-tick rollback, so the label is
+// re-created on every evaluation while the latch holds (one per bar on history, the last tick's live).
+varip bool mtfMarkL = false
+varip bool mtfMarkS = false
+if barstate.isnew
+    mtfMarkL := false
+    mtfMarkS := false
+if UseMTFLabel and newTrade and mtfTfCount >= 2
+    if mtfTradeSz > 0
+        mtfMarkL := mtfMatch(lvlUsedL, mtfUp2v, EnableTF2) and mtfMatch(lvlUsedL, mtfUp3v, EnableTF3)
+    if mtfTradeSz < 0
+        mtfMarkS := mtfMatch(lvlUsedS, mtfDn2v, EnableTF2) and mtfMatch(lvlUsedS, mtfDn3v, EnableTF3)
+mtfTip = "Same entry zone on " + str.tostring(mtfTfCount) + " timeframes on this candle"
+if mtfMarkL
+    label.new(bar_index, low, "MTF x" + str.tostring(mtfTfCount) + " ▲", style=label.style_label_up, color=color.new(color.aqua, 0), textcolor=color.black, size=size.small, tooltip=mtfTip)
+if mtfMarkS
+    label.new(bar_index, high, "MTF x" + str.tostring(mtfTfCount) + " ▼", style=label.style_label_down, color=color.new(color.fuchsia, 0), textcolor=color.white, size=size.small, tooltip=mtfTip)
 
 //============== POSITION MGMT: locked SL/TP/trail, ratchet, BE, time stop ==============//
 varip float trailL  = na
@@ -856,7 +870,7 @@ if ShowTable and barstate.islast
     per100    = bar_index > 0 ? strategy.closedtrades * 100.0 / bar_index : na
     bufAtr    = atrRef > 0 ? buffer / atrRef : na
     blocked   = ((allowL and trendL) or (allowS and trendS) ? "" : "trend ") + (coolOK ? "" : "cooldown ") + (dayOK ? "" : "maxday ") + (gateOK ? "" : "coil ") + (costOK ? "" : "cost ") + ((allowL and not retryOKL) or (allowS and not retryOKS) ? "losscap " : "") + (inSession and dowOK ? "" : "time ") + (na(atrRef) ? "atr-warmup " : "") + (distDead ? "MAXDIST<=BUFFER " : "")
-    row(0,  "XPW v2.10", ExecMode + " / " + EntryMode + (ArmLatch ? " / latch" : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
+    row(0,  "XPW v2.11 MTF", ExecMode + " / " + EntryMode + (ArmLatch ? " / latch" : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
     row(1,  "Levels", lvSrc == "" ? "NONE" : lvSrc, lvSrc == "" ? color.red : color.white)
     row(2,  "ATR " + str.tostring(AtrLen), str.tostring(atrRef, "#.##") + "  (" + str.tostring(atrPct, "#.###") + "%)", color.white)
     row(3,  "SL dist", str.tostring(slNow, "#.##") + "  (" + str.tostring(slNow / close * 100.0, "#.###") + "%)", color.white)
