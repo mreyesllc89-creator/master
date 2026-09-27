@@ -52,3 +52,29 @@ Strategy Tester's Inputs tab with "Load", or copy them into
   current price than the stop level is not armed.
 - The EA identifies its own orders and positions by magic number and symbol,
   so one chart per symbol with a different magic is fine.
+
+## FlashGold v5 (second EA in this folder)
+
+`FlashGold_v5.mq5` is the MQL5 port of `pine/FlashGold_v5_Strategy_*.pine`,
+built the same way, in steps. Step 1 (v0.10, in repo) already carries the
+whole calibrated strategy: presets XAUUSD / SPX500 / BTCUSD with the
+defaults from `CALIBRATION.md` section 17, TDI direction on the chart and on
+the higher-timeframe child zones (last CLOSED bar), burst gate, any-combo,
+prior drift, entry hold, one entry per bar, pending BuyStop / SellStop at
+Ask + distance / Bid - distance with attached SL and TP, pending lifetime,
+OCA, reversal on the opposite signal on netting and hedging accounts,
+server-side trailing stop after activation, time stop, fixed or risk-percent
+lots, panel. Step 2 will add the commission referee, a session filter, the
+Points unit and alerts.
+
+Run it on the preset's chart timeframe: XAUUSD H1, SPX500 M15, BTCUSD H1.
+The zone timeframes are multiples of the chart (gold H1 / H2 / H4, BTC H1 /
+H2 / H4 / H8, SPX the chart only); on another chart the multiples follow
+the chart and the init log says so. Preset files: `FG_XAUUSD.set`,
+`FG_SPX500.set`, `FG_BTCUSD.set` (magic 220001 to 220003). Tester model:
+"Every tick based on real ticks"; the trailing stop needs ticks.
+
+Differences from the Pine build to expect in a comparison: the entry stop is
+placed from the live Ask / Bid at the bar close instead of close +/- half
+the modelled spread; the trailing stop moves on ticks the server sees; on a
+netting account a reversal fills as one order of double volume.
