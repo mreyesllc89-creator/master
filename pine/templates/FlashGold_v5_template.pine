@@ -1,7 +1,7 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // Strategy conversion of "FlashGold Continuation v5 - TDI Trade Zone Filter" (© ghostsmartfire, indicator).
 //
-// FlashGold v5 STRATEGY (SPX500 build)
+// FlashGold v5 STRATEGY ({{SYMBOL}} build)
 // ---------------------------------------------------------------------------
 // What is kept from the indicator, unchanged: the bid/ask model from the spread
 // input, the TDI direction (RSI -> SMA fast / slow, fast rising = BUY), the
@@ -19,12 +19,12 @@
 // on higher timeframes (non-repainting).
 //
 // CALIBRATION (CALIBRATION.md section 17): the defaults below are the
-// 15m pick of the FlashGold sweep on SPCFD:SPX cash-session exports, 1m to 60m (2.5 to 18 months), chosen for profit
+// {{CAL_TF}} pick of the FlashGold sweep on {{CAL_DATA}}, chosen for profit
 // factor and win rate with both halves of the export positive. Seconds-based
 // child zones could not be swept (no seconds exports): the calibrated zone
 // set uses the chart timeframe and its 2x / 4x / 8x multiples, read from the
-// last closed bar. Set the chart to 15m and keep the parent = chart.
-// 15m: 46 trades, 83% win, +344 per contract, PF 1.95, halves 1.79 / 2.17, max DD 133. Same settings on 60m: 37 trades, 92% win, +1,282, PF 5.4 (few trades); on 1m: 426 trades, 69% win, PF 1.13. Zones = the chart only (parent direction), entry hold 3 bars.
+// last closed bar. Set the chart to {{CAL_TF}} and keep the parent = chart.
+// {{CAL_STATS}}
 //
 // S4 (visual only, added on request): optional extra timeframes run the same
 // signal on their own bars; when the chart entry and the extras fire on the
@@ -44,58 +44,58 @@
 //    backtest and the live behaviour match. The indicator repaints intrabar
 //    on the live bar; this strategy does not.
 //  - "Points" everywhere = syminfo.mintick units, as in the indicator.
-//    SPX: mintick 0.01, so 100 pts = 1 index point.
+//    {{POINTS_NOTE}}
 //@version=5
-strategy("FlashGold v5 Strategy (SPX500)", "FlashGold v5 S (SPX500)", overlay = true, max_labels_count = 500, max_lines_count = 500,
+strategy("FlashGold v5 Strategy ({{SYMBOL}})", "FlashGold v5 S ({{SYMBOL}})", overlay = true, max_labels_count = 500, max_lines_count = 500,
      pyramiding = 0, initial_capital = 100000, currency = currency.NONE,
-     default_qty_type = strategy.fixed, default_qty_value = 1,
-     commission_type = strategy.commission.cash_per_contract, commission_value = 0.25,  // index points per contract per side: half of a 0.5 point spread (placeholder until the broker spec is confirmed)
-     slippage = 10,                                                                      // ticks per side. mintick 0.01 -> 0.10 index points
+     default_qty_type = strategy.fixed, default_qty_value = {{QTY}},
+     commission_type = strategy.commission.cash_per_contract, commission_value = {{COMM}},  // {{COMM_NOTE}}
+     slippage = {{SLIP}},                                                                      // ticks per side. {{SLIP_NOTE}}
      calc_on_every_tick = false, process_orders_on_close = false, calc_on_order_fills = false, max_bars_back = 500)
 
 // ============================== INPUTS (indicator, unchanged) ==============================
 gCore = "FlashGold Core"
-spreadPoints          = input.float(50.0, "Spread pts", minval = 0.0, step = 0.1, group = gCore, tooltip = "Full spread in points (mintick units). Half of it offsets bid and ask; the header commission should equal half the spread in price units so the cost is charged.")
-entryDistPoints       = input.float(50.0, "Entry distance pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
-entryHoldBars         = input.int(3, "Entry hold bars", minval = 0, group = gCore)
-entryHoldMinFavPoints = input.float(10.0, "Hold min favorable pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
+spreadPoints          = input.float({{SPREAD}}, "Spread pts", minval = 0.0, step = 0.1, group = gCore, tooltip = "Full spread in points (mintick units). Half of it offsets bid and ask; the header commission should equal half the spread in price units so the cost is charged.")
+entryDistPoints       = input.float({{EDIST}}, "Entry distance pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
+entryHoldBars         = input.int({{HOLD}}, "Entry hold bars", minval = 0, group = gCore)
+entryHoldMinFavPoints = input.float({{HOLDFAV}}, "Hold min favorable pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
 oneEntryPerBar        = input.bool(true, "One entry per bar", group = gCore)
 
 gBurst = "Burst / Direction"
 DistUnit         = input.string("ATR", "Burst / entry distance / hold unit", options = ["ATR", "Points"], group = gBurst, tooltip = "STRATEGY ADDITION. ATR: the three thresholds below are read as multiples of ATR(14) of the chart (the calibrated form, portable across symbols and timeframes). Points: the indicator's original point inputs in the Core group are used.")
-burstAtrMult     = input.float(0.5, "Burst threshold, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
-entryDistAtrMult = input.float(0.25, "Entry distance, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
+burstAtrMult     = input.float({{BURST_ATR}}, "Burst threshold, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
+entryDistAtrMult = input.float({{EDIST_ATR}}, "Entry distance, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
 holdFavAtrMult   = input.float(0.1, "Hold min favorable, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
-burstPointsInput = input.float(150.0, "Burst threshold pts (Points unit)", minval = 0.0, step = 0.1, group = gBurst)
+burstPointsInput = input.float({{BURST}}, "Burst threshold pts (Points unit)", minval = 0.0, step = 0.1, group = gBurst)
 useBurstGate     = input.bool(true, "Require burst gate", group = gBurst)
-useAnyCombo      = input.bool(false, "Allow any combo", group = gBurst, tooltip = "If on, TDI parent/zone can approve direction even when burst is weaker.")
+useAnyCombo      = input.bool({{ANYCOMBO}}, "Allow any combo", group = gBurst, tooltip = "If on, TDI parent/zone can approve direction even when burst is weaker.")
 priorDriftBars   = input.int(60, "Prior drift bars", minval = 1, group = gBurst)
 usePriorFilter   = input.bool(false, "Use prior drift filter", group = gBurst)
 
 gZone = "TDI Trade Zone Filter"
 useTdiTradeZone = input.bool(true, "Use TDI trade-zone filter", group = gZone)
-tdiParentTf     = input.timeframe("15", "Parent obedience timeframe", group = gZone, tooltip = "Calibrated with the parent = the chart timeframe. Leave it equal to the chart.")
+tdiParentTf     = input.timeframe("{{PARENT}}", "Parent obedience timeframe", group = gZone, tooltip = "Calibrated with the parent = the chart timeframe. Leave it equal to the chart.")
 tdiRsiLen       = input.int(14, "TDI RSI length", minval = 2, group = gZone)
 tdiFastLen      = input.int(2, "TDI white fast length", minval = 1, group = gZone)
 tdiSlowLen      = input.int(7, "TDI slow length", minval = 1, group = gZone)
-minAlignedZones = input.int(1, "Minimum child zones aligned", minval = 0, maxval = 6, group = gZone)
+minAlignedZones = input.int({{MINALIGN}}, "Minimum child zones aligned", minval = 0, maxval = 6, group = gZone)
 allowNeutralParent = input.bool(false, "Allow trade if parent is flat", group = gZone)
 ignoreNaZones   = input.bool(true, "Ignore zones without data", group = gZone, tooltip = "STRATEGY ADDITION. A child zone whose timeframe has no data on this bar (seconds bars outside the plan's seconds window) is dropped from the active count instead of counting as MIX.")
 htfNoRepaint    = input.bool(true, "Higher-TF zones use the last CLOSED bar", group = gZone, tooltip = "STRATEGY ADDITION. A child zone on a timeframe HIGHER than the chart is read from its last closed bar (lookahead_on + [1] idiom), so history and realtime agree and the backtest cannot see the future. Off = the indicator's plain request.security, which repaints on higher timeframes.")
 showZoneTable   = input.bool(true, "Show TDI zone table", group = gZone)
 
-useZone1 = input.bool(true, "Use child zone 1", group = gZone)
-zoneTf1  = input.timeframe("15", "Zone 1 timeframe", group = gZone)
-useZone2 = input.bool(false, "Use child zone 2", group = gZone)
-zoneTf2  = input.timeframe("30", "Zone 2 timeframe", group = gZone)
-useZone3 = input.bool(false, "Use child zone 3", group = gZone)
-zoneTf3  = input.timeframe("60", "Zone 3 timeframe", group = gZone)
-useZone4 = input.bool(false, "Use child zone 4", group = gZone)
-zoneTf4  = input.timeframe("480", "Zone 4 timeframe", group = gZone)
-useZone5 = input.bool(false, "Use child zone 5", group = gZone)
-zoneTf5  = input.timeframe("1", "Zone 5 timeframe", group = gZone)
-useZone6 = input.bool(false, "Use child zone 6", group = gZone)
-zoneTf6  = input.timeframe("2", "Zone 6 timeframe", group = gZone)
+useZone1 = input.bool({{Z1U}}, "Use child zone 1", group = gZone)
+zoneTf1  = input.timeframe("{{Z1}}", "Zone 1 timeframe", group = gZone)
+useZone2 = input.bool({{Z2U}}, "Use child zone 2", group = gZone)
+zoneTf2  = input.timeframe("{{Z2}}", "Zone 2 timeframe", group = gZone)
+useZone3 = input.bool({{Z3U}}, "Use child zone 3", group = gZone)
+zoneTf3  = input.timeframe("{{Z3}}", "Zone 3 timeframe", group = gZone)
+useZone4 = input.bool({{Z4U}}, "Use child zone 4", group = gZone)
+zoneTf4  = input.timeframe("{{Z4}}", "Zone 4 timeframe", group = gZone)
+useZone5 = input.bool({{Z5U}}, "Use child zone 5", group = gZone)
+zoneTf5  = input.timeframe("{{Z5}}", "Zone 5 timeframe", group = gZone)
+useZone6 = input.bool({{Z6U}}, "Use child zone 6", group = gZone)
+zoneTf6  = input.timeframe("{{Z6}}", "Zone 6 timeframe", group = gZone)
 
 gVisual = "Visuals"
 showEntryLabels = input.bool(false, "Show entry labels", group = gVisual)
@@ -110,18 +110,18 @@ gS1 = "S1. Entry order"
 Direction       = input.string("Both", "Direction", options = ["Both", "Long", "Short"], group = gS1)
 entryValidBars  = input.int(3, "Cancel unfilled entry after N bars (0 = keep until filled)", minval = 0, group = gS1, tooltip = "The indicator only prints the entry price. The strategy places a stop order there and cancels it if price has not reached it after this many bars.")
 allowReverse    = input.bool(true, "Opposite signal may reverse an open position", group = gS1, tooltip = "On: a SELL signal while long places the sell stop; when it fills the long is closed and a short opened. Off: opposite signals are ignored while in a position.")
-exitOnOpposite  = input.bool(false, "Close at market on the opposite signal", group = gS1, tooltip = "On: the open position is closed at the close of the bar that prints the opposite signal, before any reversal order.")
+exitOnOpposite  = input.bool({{EXITOPP}}, "Close at market on the opposite signal", group = gS1, tooltip = "On: the open position is closed at the close of the bar that prints the opposite signal, before any reversal order.")
 
 gS2 = "S2. Exits"
 ExitMode        = input.string("ATR", "SL / TP / trail unit", options = ["ATR", "Points"], group = gS2)
-slPoints        = input.float(300, "Stop loss, pts (Points mode)", minval = 0.0, step = 1.0, group = gS2, tooltip = "0 = no stop loss (not recommended).")
-tpPoints        = input.float(600, "Take profit, pts (Points mode)", minval = 0.0, step = 1.0, group = gS2, tooltip = "0 = no target.")
+slPoints        = input.float({{SLPTS}}, "Stop loss, pts (Points mode)", minval = 0.0, step = 1.0, group = gS2, tooltip = "0 = no stop loss (not recommended).")
+tpPoints        = input.float({{TPPTS}}, "Take profit, pts (Points mode)", minval = 0.0, step = 1.0, group = gS2, tooltip = "0 = no target.")
 atrLen          = input.int(14, "ATR length (ATR mode)", minval = 1, group = gS2)
-slAtrMult       = input.float(3.0, "Stop loss, ATR mult (ATR mode)", minval = 0.1, step = 0.25, group = gS2)
-tpR             = input.float(1.5, "Take profit, R multiple of SL (ATR mode)", minval = 0.0, step = 0.25, group = gS2)
-useTrail        = input.bool(true, "Trailing stop", group = gS2)
-trailActPoints  = input.float(300, "Trail activation, pts of profit (Points mode)", minval = 0.0, step = 1.0, group = gS2)
-trailPoints     = input.float(200, "Trail distance, pts (Points mode)", minval = 1.0, step = 1.0, group = gS2)
+slAtrMult       = input.float({{SL_ATR}}, "Stop loss, ATR mult (ATR mode)", minval = 0.1, step = 0.25, group = gS2)
+tpR             = input.float({{TP_R}}, "Take profit, R multiple of SL (ATR mode)", minval = 0.0, step = 0.25, group = gS2)
+useTrail        = input.bool({{TRAIL}}, "Trailing stop", group = gS2)
+trailActPoints  = input.float({{TRAILACT}}, "Trail activation, pts of profit (Points mode)", minval = 0.0, step = 1.0, group = gS2)
+trailPoints     = input.float({{TRAILDST}}, "Trail distance, pts (Points mode)", minval = 1.0, step = 1.0, group = gS2)
 trailActAtr     = input.float(1.0, "Trail activation, ATR mult (ATR mode)", minval = 0.0, step = 0.05, group = gS2)
 trailDstAtr     = input.float(0.75, "Trail distance, ATR mult (ATR mode)", minval = 0.05, step = 0.05, group = gS2)
 maxBarsHeld     = input.int(0, "Time stop, bars (0 = off)", minval = 0, group = gS2)
@@ -131,22 +131,22 @@ useMtf          = input.bool(true, "Mark entries that also fire on other timefra
 mtfMinAgree     = input.int(3, "Timeframes that must agree (chart counts as one)", minval = 2, maxval = 5, group = gS4)
 mtfTolAtr       = input.float(0.5, "Same zone: entry prices within, ATR mult", minval = 0.0, step = 0.1, group = gS4)
 mtfUse1         = input.bool(true, "Extra timeframe 1", group = gS4)
-mtfTf1          = input.timeframe("5", "   timeframe 1", group = gS4)
+mtfTf1          = input.timeframe("{{MTF1}}", "   timeframe 1", group = gS4)
 mtfUse2         = input.bool(true, "Extra timeframe 2", group = gS4)
-mtfTf2          = input.timeframe("60", "   timeframe 2", group = gS4)
+mtfTf2          = input.timeframe("{{MTF2}}", "   timeframe 2", group = gS4)
 mtfUse3         = input.bool(true, "Extra timeframe 3", group = gS4)
-mtfTf3          = input.timeframe("240", "   timeframe 3", group = gS4)
+mtfTf3          = input.timeframe("{{MTF3}}", "   timeframe 3", group = gS4)
 mtfUse4         = input.bool(false, "Extra timeframe 4", group = gS4)
-mtfTf4          = input.timeframe("30", "   timeframe 4", group = gS4)
+mtfTf4          = input.timeframe("{{MTF4}}", "   timeframe 4", group = gS4)
 mtfShowPairs    = input.bool(true, "Also mark 2-timeframe agreement (small label)", group = gS4)
 mtfShowTable    = input.bool(true, "Correlation table", group = gS4)
 
 gS3 = "S3. Sizing"
 QtyMode         = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = gS3)
-fixedQty        = input.float(1, "Fixed quantity (contracts, $1 per point each)", minval = 0.0, group = gS3)
+fixedQty        = input.float({{QTY}}, "Fixed quantity (contracts{{QTY_UNIT}})", minval = 0.0, group = gS3)
 riskPct         = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0.0, step = 0.25, group = gS3, tooltip = "Quantity = equity x risk% / (stop distance x point value). Needs a stop loss > 0.")
-maxQty          = input.float(10, "Max quantity", minval = 0.0, group = gS3)
-qtyStep         = input.float(1, "Quantity step (rounds down)", minval = 0.000001, group = gS3)
+maxQty          = input.float({{MAXQTY}}, "Max quantity", minval = 0.0, group = gS3)
+qtyStep         = input.float({{QTYSTEP}}, "Quantity step (rounds down)", minval = 0.000001, group = gS3)
 
 // ============================== PRICE MODEL (indicator) ==============================
 pt = syminfo.mintick
