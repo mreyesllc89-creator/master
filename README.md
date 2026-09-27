@@ -6,7 +6,7 @@ execution.
 
 | Path | What it is |
 |---|---|
-| `pine/XPW_Breakout_v2.10_BTCUSD.pine` | The strategy. Load it in the Pine editor on a BTCUSD chart. |
+| `pine/XPW_Breakout_v2.10_BTCUSD.pine` | The strategy. Load it in the Pine editor on a BTCUSD chart. Group 11 adds optional extra timeframes and a purple "MTF BUY/SELL xN" label when the chart fill coincides with level breakouts on other timeframes in the same candle at the same price area, plus a table of which timeframes agree (visual only). |
 | `pine/XPW_Breakout_v2.10_XAUUSD.pine` | The same strategy with gold defaults (per-ounce costs, ounce sizing, SL 1.5 ATR / TP 2.5R from the gold sweep). See `CALIBRATION.md` section 13. |
 | `pine/XPW_Breakout_v2.10_SPX500.pine` | The same strategy with S&P 500 CFD defaults (costs in index points, contract sizing, percent geometry from the SPX sweep). See `CALIBRATION.md` section 16. |
 | `pine/XPW_Breakout_v2.01_XAUUSD.pine` | The previous (gold) version, kept for diffing. |

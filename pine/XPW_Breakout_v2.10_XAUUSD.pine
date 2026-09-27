@@ -271,6 +271,21 @@ ShowLevels  = input.bool(true, "Plot levels, TP and trail", group=grpD)
 ShowEma     = input.bool(false, "Plot trend EMA", group=grpD)
 ShowTickMark = input.bool(true, "Mark realtime bars (Tick mode)", group=grpD)
 
+grpM = "11. Multi-timeframe confluence labels (visual only)"
+useMtf       = input.bool(true, "Mark entries that also break out on other timeframes", group=grpM, tooltip="Visual only: the trading logic does not read any of this. Each extra timeframe runs the level logic (pivot / Donchian / previous day, BarsN and DonLen as set here) on its own bars and reports a breakout of its level. Higher timeframes are read from their last CLOSED bar and attributed to the chart candle in which that bar closed; lower timeframes are scanned bar by bar inside the chart candle.")
+mtfMinAgree  = input.int(3, "Timeframes that must agree (chart counts as one)", minval=2, maxval=5, group=grpM)
+mtfTolAtr    = input.float(0.5, "Same zone: level within, ATR mult of the chart fill", minval=0.0, step=0.1, group=grpM)
+mtfUse1      = input.bool(true, "Extra timeframe 1", group=grpM)
+mtfTf1       = input.timeframe("15", "   timeframe 1", group=grpM)
+mtfUse2      = input.bool(true, "Extra timeframe 2", group=grpM)
+mtfTf2       = input.timeframe("240", "   timeframe 2", group=grpM)
+mtfUse3      = input.bool(true, "Extra timeframe 3", group=grpM)
+mtfTf3       = input.timeframe("D", "   timeframe 3", group=grpM)
+mtfUse4      = input.bool(false, "Extra timeframe 4", group=grpM)
+mtfTf4       = input.timeframe("30", "   timeframe 4", group=grpM)
+mtfShowPairs = input.bool(true, "Also mark 2-timeframe agreement (small label)", group=grpM)
+mtfShowTable = input.bool(true, "Correlation table", group=grpM)
+
 // Rail: emulator-level cap on top of calcQty clamp (live with strategy.entry, F12)
 strategy.risk.max_position_size(MaxQtyHard)
 
@@ -741,6 +756,138 @@ else
     slDistS  := na
     trgLockS := na
     dstLockS := na
+
+//============== MULTI-TIMEFRAME CONFLUENCE (visual only, group 11) ==============//
+// Self-contained level-breakout event for another timeframe: the nearest enabled level above / below the
+// previous close on THAT timeframe (same sources, BarsN, DonLen) and a bar that trades through it.
+// The chart's own event is the real fill (strategy position opened). The arm buffer, gates and sizing are
+// not re-run on the extras: request.security cannot nest, and the event of interest is the breakout itself.
+xpwSelf() =>
+    phS = ta.pivothigh(high, BarsN, BarsN)
+    plS = ta.pivotlow(low, BarsN, BarsN)
+    var float sH = na
+    var float sL = na
+    if not na(phS)
+        sH := phS
+    if not na(plS)
+        sL := plS
+    dH = ta.highest(high, DonLen)[1]
+    dL = ta.lowest(low, DonLen)[1]
+    float lu = na
+    float ld = na
+    if UsePivot
+        lu := not na(sH) and sH > close and (na(lu) or sH < lu) ? sH : lu
+        ld := not na(sL) and sL < close and (na(ld) or sL > ld) ? sL : ld
+    if UseDonchian
+        lu := not na(dH) and dH > close and (na(lu) or dH < lu) ? dH : lu
+        ld := not na(dL) and dL < close and (na(ld) or dL > ld) ? dL : ld
+    // breakout of the level that stood at the previous close
+    bL = not na(lu[1]) and high >= lu[1]
+    bS = not na(ld[1]) and low <= ld[1]
+    [bL, bS, lu[1], ld[1]]
+
+xpwSelfPrev() =>
+    [b, s_, up, dn] = xpwSelf()
+    [b[1], s_[1], up[1], dn[1]]
+
+mtfEvent(bool use, string tf) =>
+    secs   = timeframe.in_seconds(tf)
+    secsCh = timeframe.in_seconds(timeframe.period)
+    isHi   = secs > secsCh
+    isLo   = secs < secsCh
+    hiTf   = isHi ? tf : timeframe.period
+    loTf   = isLo ? tf : timeframe.period
+    [hb, hs_, hup, hdn] = request.security(syminfo.tickerid, hiTf, xpwSelfPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+    htfClosed = ta.change(time(hiTf)) != 0
+    [lbA, lsA, lupA, ldnA] = request.security_lower_tf(syminfo.tickerid, loTf, xpwSelf(), ignore_invalid_timeframe=true)
+    bool lb = false
+    bool ls = false
+    float lup = na
+    float ldn = na
+    if isLo and array.size(lbA) > 0
+        for i = 0 to array.size(lbA) - 1
+            if array.get(lbA, i)
+                lb := true
+                lup := array.get(lupA, i)
+            if array.get(lsA, i)
+                ls := true
+                ldn := array.get(ldnA, i)
+    bool bFire = use and (isHi ? (htfClosed and hb) : isLo ? lb : false)
+    bool sFire = use and (isHi ? (htfClosed and hs_) : isLo ? ls : false)
+    [bFire, sFire, isHi ? hup : lup, isHi ? hdn : ldn]
+
+[x1b, x1s, x1u, x1d] = mtfEvent(mtfUse1, mtfTf1)
+[x2b, x2s, x2u, x2d] = mtfEvent(mtfUse2, mtfTf2)
+[x3b, x3s, x3u, x3d] = mtfEvent(mtfUse3, mtfTf3)
+[x4b, x4s, x4u, x4d] = mtfEvent(mtfUse4, mtfTf4)
+
+// the chart's own entry: a position opened on this evaluation (newTrade), its side and fill price
+chartEntryL = newTrade and strategy.position_size > 0
+chartEntryS = newTrade and strategy.position_size < 0
+chartFill   = strategy.position_size != 0 ? strategy.position_avg_price : na
+mtfNear(float lvl) => na(lvl) or na(chartFill) ? true : math.abs(lvl - chartFill) <= mtfTolAtr * atrRef
+ab1 = x1b and (not chartEntryL or mtfNear(x1u))
+ab2 = x2b and (not chartEntryL or mtfNear(x2u))
+ab3 = x3b and (not chartEntryL or mtfNear(x3u))
+ab4 = x4b and (not chartEntryL or mtfNear(x4u))
+as1 = x1s and (not chartEntryS or mtfNear(x1d))
+as2 = x2s and (not chartEntryS or mtfNear(x2d))
+as3 = x3s and (not chartEntryS or mtfNear(x3d))
+as4 = x4s and (not chartEntryS or mtfNear(x4d))
+mtfBuyAgree  = (chartEntryL ? 1 : 0) + (ab1 ? 1 : 0) + (ab2 ? 1 : 0) + (ab3 ? 1 : 0) + (ab4 ? 1 : 0)
+mtfSellAgree = (chartEntryS ? 1 : 0) + (as1 ? 1 : 0) + (as2 ? 1 : 0) + (as3 ? 1 : 0) + (as4 ? 1 : 0)
+
+mtfList(bool c, bool a1, bool a2, bool a3, bool a4) =>
+    (c ? timeframe.period + " " : "") + (a1 ? mtfTf1 + " " : "") + (a2 ? mtfTf2 + " " : "") + (a3 ? mtfTf3 + " " : "") + (a4 ? mtfTf4 + " " : "")
+
+var int mtfChartL = 0
+var int mtfChartS = 0
+var int mtfC1 = 0
+var int mtfC2 = 0
+var int mtfC3 = 0
+var int mtfC4 = 0
+var int mtfConf = 0
+var int mtfPair = 0
+if useMtf and barClosed
+    mtfChartL += chartEntryL ? 1 : 0
+    mtfChartS += chartEntryS ? 1 : 0
+    mtfC1 += (chartEntryL and ab1) or (chartEntryS and as1) ? 1 : 0
+    mtfC2 += (chartEntryL and ab2) or (chartEntryS and as2) ? 1 : 0
+    mtfC3 += (chartEntryL and ab3) or (chartEntryS and as3) ? 1 : 0
+    mtfC4 += (chartEntryL and ab4) or (chartEntryS and as4) ? 1 : 0
+    mtfConf += mtfBuyAgree >= mtfMinAgree or mtfSellAgree >= mtfMinAgree ? 1 : 0
+    mtfPair += mtfBuyAgree == 2 or mtfSellAgree == 2 ? 1 : 0
+    if mtfBuyAgree >= mtfMinAgree
+        label.new(bar_index, low, "MTF BUY x" + str.tostring(mtfBuyAgree) + "\n" + mtfList(chartEntryL, ab1, ab2, ab3, ab4), style=label.style_label_up, color=color.new(color.purple, 0), textcolor=color.white, size=size.normal)
+    else if mtfShowPairs and mtfBuyAgree == 2
+        label.new(bar_index, low, "mtf buy x2 " + mtfList(chartEntryL, ab1, ab2, ab3, ab4), style=label.style_label_up, color=color.new(color.teal, 40), textcolor=color.white, size=size.tiny)
+    if mtfSellAgree >= mtfMinAgree
+        label.new(bar_index, high, "MTF SELL x" + str.tostring(mtfSellAgree) + "\n" + mtfList(chartEntryS, as1, as2, as3, as4), style=label.style_label_down, color=color.new(color.purple, 0), textcolor=color.white, size=size.normal)
+    else if mtfShowPairs and mtfSellAgree == 2
+        label.new(bar_index, high, "mtf sell x2 " + mtfList(chartEntryS, as1, as2, as3, as4), style=label.style_label_down, color=color.new(color.teal, 40), textcolor=color.white, size=size.tiny)
+
+mtfPct(int c, int total) =>
+    total > 0 ? str.tostring(c * 100.0 / total, "#") + "%" : "-"
+
+var table mtfTb = table.new(position.bottom_right, 2, 8, bgcolor=color.new(color.black, 85), border_width=1, border_color=color.new(color.gray, 70))
+if useMtf and mtfShowTable and barstate.islast
+    mtfSigs = mtfChartL + mtfChartS
+    table.cell(mtfTb, 0, 0, "MTF confluence", text_color=color.white, text_size=size.small)
+    table.cell(mtfTb, 1, 0, "with chart " + timeframe.period, text_color=color.white, text_size=size.small)
+    table.cell(mtfTb, 0, 1, "Chart entries L/S", text_color=color.gray, text_size=size.tiny)
+    table.cell(mtfTb, 1, 1, str.tostring(mtfChartL) + " / " + str.tostring(mtfChartS), text_color=color.white, text_size=size.tiny)
+    table.cell(mtfTb, 0, 2, (mtfUse1 ? mtfTf1 : "off") + " agrees", text_color=color.gray, text_size=size.tiny)
+    table.cell(mtfTb, 1, 2, str.tostring(mtfC1) + "  (" + mtfPct(mtfC1, mtfSigs) + ")", text_color=color.white, text_size=size.tiny)
+    table.cell(mtfTb, 0, 3, (mtfUse2 ? mtfTf2 : "off") + " agrees", text_color=color.gray, text_size=size.tiny)
+    table.cell(mtfTb, 1, 3, str.tostring(mtfC2) + "  (" + mtfPct(mtfC2, mtfSigs) + ")", text_color=color.white, text_size=size.tiny)
+    table.cell(mtfTb, 0, 4, (mtfUse3 ? mtfTf3 : "off") + " agrees", text_color=color.gray, text_size=size.tiny)
+    table.cell(mtfTb, 1, 4, str.tostring(mtfC3) + "  (" + mtfPct(mtfC3, mtfSigs) + ")", text_color=color.white, text_size=size.tiny)
+    table.cell(mtfTb, 0, 5, (mtfUse4 ? mtfTf4 : "off") + " agrees", text_color=color.gray, text_size=size.tiny)
+    table.cell(mtfTb, 1, 5, str.tostring(mtfC4) + "  (" + mtfPct(mtfC4, mtfSigs) + ")", text_color=color.white, text_size=size.tiny)
+    table.cell(mtfTb, 0, 6, "x" + str.tostring(mtfMinAgree) + "+ confluence bars", text_color=color.gray, text_size=size.tiny)
+    table.cell(mtfTb, 1, 6, str.tostring(mtfConf), text_color=color.fuchsia, text_size=size.tiny)
+    table.cell(mtfTb, 0, 7, "x2 bars", text_color=color.gray, text_size=size.tiny)
+    table.cell(mtfTb, 1, 7, str.tostring(mtfPair), text_color=color.teal, text_size=size.tiny)
 
 //============== PLOTS / DIAGNOSTICS ==============//
 varip int rtBars = 0
