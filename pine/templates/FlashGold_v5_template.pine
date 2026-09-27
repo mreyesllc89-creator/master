@@ -1,7 +1,7 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // Strategy conversion of "FlashGold Continuation v5 - TDI Trade Zone Filter" (© ghostsmartfire, indicator).
 //
-// FlashGold v5 STRATEGY ({{SYMBOL}} build)
+// FlashGold v5 STRATEGY MTF ({{SYMBOL}} build)   MTF = calibrated defaults + the S4 multi-timeframe confluence labels
 // ---------------------------------------------------------------------------
 // What is kept from the indicator, unchanged: the bid/ask model from the spread
 // input, the TDI direction (RSI -> SMA fast / slow, fast rising = BUY), the
@@ -46,7 +46,7 @@
 //  - "Points" everywhere = syminfo.mintick units, as in the indicator.
 //    {{POINTS_NOTE}}
 //@version=5
-strategy("FlashGold v5 Strategy ({{SYMBOL}})", "FlashGold v5 S ({{SYMBOL}})", overlay = true, max_labels_count = 500, max_lines_count = 500,
+strategy("FlashGold v5 Strategy MTF ({{SYMBOL}})", "FlashGold v5 MTF {{SYMBOL}}", overlay = true, max_labels_count = 500, max_lines_count = 500,
      pyramiding = 0, initial_capital = 100000, currency = currency.NONE,
      default_qty_type = strategy.fixed, default_qty_value = {{QTY}},
      commission_type = strategy.commission.cash_per_contract, commission_value = {{COMM}},  // {{COMM_NOTE}}
@@ -615,7 +615,7 @@ if showSideTags and sellSignal
 var table tb = table.new(position.bottom_right, 2, 12, border_width = 1)
 
 if showZoneTable and barstate.islast
-    table.cell(tb, 0, 0, "FlashGold v5 S", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 0, "FlashGold v5 MTF", text_color = color.white, text_size = size.small)
     table.cell(tb, 1, 0, "TDI FILTER", text_color = color.white, text_size = size.small)
     table.cell(tb, 0, 1, "Parent", text_color = color.gray, text_size = size.tiny)
     table.cell(tb, 1, 1, dirText(parentSide), text_color = dirColor(parentSide), text_size = size.tiny)

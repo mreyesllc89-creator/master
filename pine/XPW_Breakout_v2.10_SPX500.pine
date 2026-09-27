@@ -1,6 +1,7 @@
 //@version=6
 //====================================================================
-// XPW_Breakout_v2.10 (SPX500)   (Pine v6, single file, self-contained)
+// XPW_Breakout_v2.10-MTF (SPX500)   (Pine v6, single file, self-contained)
+// -MTF = the v2.10 build plus the group 11 multi-timeframe confluence labels (visual only)
 //--------------------------------------------------------------------
 // S&P 500 CFD BUILD. Logic is byte-identical to the BTCUSD build; only
 // the symbol defaults differ: costs in index points per contract
@@ -177,7 +178,7 @@
 //    either band exits in one script and not the other. From the first
 //    run after the fill both hold avg x (1 +/- pct) and agree.
 //====================================================================
-strategy("XPW Breakout v2.10 (SPX500)", overlay=true,
+strategy("XPW Breakout v2.10-MTF (SPX500)", "XPW v2.10-MTF SPX500", overlay=true,
      initial_capital=100000,
      pyramiding=0,
      calc_on_every_tick=true,
@@ -930,7 +931,7 @@ if ShowTable and barstate.islast
     per100    = bar_index > 0 ? strategy.closedtrades * 100.0 / bar_index : na
     bufAtr    = atrRef > 0 ? buffer / atrRef : na
     blocked   = ((allowL and trendL) or (allowS and trendS) ? "" : "trend ") + (coolOK ? "" : "cooldown ") + (dayOK ? "" : "maxday ") + (gateOK ? "" : "coil ") + (costOK ? "" : "cost ") + ((allowL and not retryOKL) or (allowS and not retryOKS) ? "losscap " : "") + (inSession and dowOK ? "" : "time ") + (na(atrRef) ? "atr-warmup " : "") + (distDead ? "MAXDIST<=BUFFER " : "")
-    row(0,  "XPW v2.10", ExecMode + " / " + EntryMode + (ArmLatch ? (LvlMove == "Follow" ? " / latch-follow" : " / latch") : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
+    row(0,  "XPW v2.10-MTF", ExecMode + " / " + EntryMode + (ArmLatch ? (LvlMove == "Follow" ? " / latch-follow" : " / latch") : " / v2.01 arm") + " / trail " + (UseTrail ? TrailExec : "off"), color.white)
     row(1,  "Levels", lvSrc == "" ? "NONE" : lvSrc, lvSrc == "" ? color.red : color.white)
     row(2,  "ATR " + str.tostring(AtrLen), str.tostring(atrRef, "#.##") + "  (" + str.tostring(atrPct, "#.###") + "%)", color.white)
     row(3,  "SL dist", str.tostring(slNow, "#.##") + "  (" + str.tostring(slNow / close * 100.0, "#.###") + "%)", color.white)
