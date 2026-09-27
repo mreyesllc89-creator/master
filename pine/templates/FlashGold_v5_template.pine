@@ -128,15 +128,15 @@ maxBarsHeld     = input.int(0, "Time stop, bars (0 = off)", minval = 0, group = 
 
 gS4 = "S4. Multi-timeframe confluence labels (visual only)"
 useMtf          = input.bool(true, "Mark entries that also fire on other timeframes", group = gS4, tooltip = "Visual only: the trading logic is unchanged. Each extra timeframe runs the FlashGold signal (parent TDI + burst + hold, chart-only zone) on its own bars. Higher timeframes are read from their last CLOSED bar and attributed to the chart candle in which that bar closed; lower timeframes are scanned bar by bar inside the chart candle.")
-mtfMinAgree     = input.int(3, "Timeframes that must agree (chart counts as one)", minval = 2, maxval = 5, group = gS4)
+mtfMinAgree     = input.int({{MTFAGREE}}, "Timeframes that must agree (chart counts as one)", minval = 2, maxval = 5, group = gS4)
 mtfTolAtr       = input.float(0.5, "Same zone: entry prices within, ATR mult", minval = 0.0, step = 0.1, group = gS4)
 mtfUse1         = input.bool(true, "Extra timeframe 1", group = gS4)
 mtfTf1          = input.timeframe("{{MTF1}}", "   timeframe 1", group = gS4)
 mtfUse2         = input.bool(true, "Extra timeframe 2", group = gS4)
 mtfTf2          = input.timeframe("{{MTF2}}", "   timeframe 2", group = gS4)
-mtfUse3         = input.bool(true, "Extra timeframe 3", group = gS4)
+mtfUse3         = input.bool({{MTF3U}}, "Extra timeframe 3", group = gS4)
 mtfTf3          = input.timeframe("{{MTF3}}", "   timeframe 3", group = gS4)
-mtfUse4         = input.bool(false, "Extra timeframe 4", group = gS4)
+mtfUse4         = input.bool({{MTF4U}}, "Extra timeframe 4", group = gS4)
 mtfTf4          = input.timeframe("{{MTF4}}", "   timeframe 4", group = gS4)
 mtfShowPairs    = input.bool(true, "Also mark 2-timeframe agreement (small label)", group = gS4)
 mtfShowTable    = input.bool(true, "Correlation table", group = gS4)
@@ -486,9 +486,9 @@ mtfSignal(bool use, string tf) =>
     isLo   = secs < secsCh
     hiTf   = isHi ? tf : timeframe.period          // requests are only USED on their side; the other side gets the chart TF
     loTf   = isLo ? tf : timeframe.period
-    // higher timeframe: last CLOSED bar, attributed to the chart candle on which that bar closed
+    // higher timeframe: the signal of the last CLOSED higher bar stays live on every chart candle of the current
+    // higher bar (a chart entry inside that window, at that price area, counts). Calibrated in CALIBRATION.md section 18.
     [hb, hs_, hbp, hsp] = request.security(syminfo.tickerid, hiTf, fgSelfPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-    htfClosed = ta.change(time(hiTf)) != 0
     // lower timeframe: every lower bar inside this chart candle
     [lbA, lsA, lbpA, lspA] = request.security_lower_tf(syminfo.tickerid, loTf, fgSelf(), ignore_invalid_timeframe = true)
     bool lb = false
@@ -504,8 +504,8 @@ mtfSignal(bool use, string tf) =>
                 ls := true
                 lsp := array.get(lspA, i)
     // same timeframe as the chart: the chart's own signal, not counted twice
-    bool bFire = use and (isHi ? (htfClosed and hb) : isLo ? lb : false)
-    bool sFire = use and (isHi ? (htfClosed and hs_) : isLo ? ls : false)
+    bool bFire = use and (isHi ? hb : isLo ? lb : false)
+    bool sFire = use and (isHi ? hs_ : isLo ? ls : false)
     float bPx  = isHi ? hbp : lbp
     float sPx  = isHi ? hsp : lsp
     [bFire, sFire, bPx, sPx]

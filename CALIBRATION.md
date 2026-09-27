@@ -787,3 +787,100 @@ Not swept: the seconds-based zones, the prior-drift filter (off), the time
 stop, position sizing (1 unit fixed), and anything on 1m gold or BTC (no
 usable 1m export). Re-run `python3 calibration/flashgold_backtest.py sweep
 --tfs <tf> --out fg` when longer exports are available.
+
+## 18. Multi-timeframe confluence labels: what agrees with what
+
+Both script families carry an optional, visual-only confluence marker (XPW
+group 11, FlashGold group S4): extra timeframes run the script's own entry
+event on their bars, and a chart entry that coincides with them in the same
+candle and price area (within 0.5 ATR) gets a purple "MTF BUY/SELL xN"
+label listing the timeframes. `calibration/mtf_confluence.py` reproduces
+that on the exports and asks two questions per extra timeframe: how often
+does it agree with a chart entry, and are the chart trades with its
+agreement better than those without. Only the overlap of the exports counts
+(they cover different periods), so most cells are thin; the SPX 60m/120m
+rows and the gold 10m/15m rows are the ones with 40 to 90 trades.
+
+### The higher-timeframe rule had to change
+
+The first version attributed a higher-timeframe event to the chart candle in
+which the higher bar closed. On every symbol that agreed with 0 to 1% of
+chart entries, because a chart fill happens inside the higher bar, not at
+its close. The shipped rule is now: XPW reads the level that stood at the
+last higher close (the higher bar's own nearest pivot, the [1] idiom, no
+future data) and treats the chart candle that trades through it as the
+higher-timeframe breakout; FlashGold keeps the last closed higher bar's
+signal live through the whole next higher bar. Lower timeframes are scanned
+bar by bar inside the chart candle in both.
+
+### XPW: agreement and the trades it selects (shipped geometry, pivot, Follow)
+
+PF and win rate of chart trades WITH the extra timeframe's agreement against
+those WITHOUT. Net per unit.
+
+| chart | extra | overlap trades | agree | with: PF / win | without: PF / win |
+|---|---|---|---|---|---|
+| gold 15m | 10m | 87 | 71% | 1.88 / 56% | 0.67 / 40% |
+| gold 15m | 30m | 101 | 47% | 1.48 / 53% | 1.49 / 50% |
+| gold 15m | 60m | 101 | 15% | 1.12 / 53% | 1.55 / 51% |
+| gold 30m | 10m | 47 | 62% | 2.52 / 62% | 0.76 / 22% |
+| gold 30m | 15m | 51 | 73% | 1.93 / 54% | 1.32 / 36% |
+| gold 30m | 60m | 54 | 48% | 0.66 / 38% | 3.21 / 57% |
+| gold 30m | 240m | 54 | 7% | 0.45 / 25% | 1.74 / 50% |
+| gold 60m | 30m | 26 | 77% | 2.54 / 50% | 0.71 / 50% |
+| gold 60m | 240m | 55 | 15% | 0.40 / 50% | 1.48 / 43% |
+| BTC 60m | 30m | 14 | 79% | 2.72 / 73% | (3 trades) |
+| SPX 60m | 30m | 71 | 56% | 1.52 / 50% | 1.13 / 42% |
+| SPX 60m | 120m | 143 | 46% | 1.73 / 55% | 1.47 / 48% |
+| SPX 60m | 180m | 143 | 26% | 1.34 / 49% | 1.71 / 52% |
+| SPX 60m | 240m | 143 | 14% | 0.94 / 40% | 1.72 / 53% |
+| SPX 120m | 60m | 92 | 67% | 1.64 / 50% | 1.40 / 50% |
+| SPX 120m | 180m | 151 | 51% | 1.90 / 53% | 1.31 / 43% |
+| SPX 120m | 240m | 151 | 36% | 1.75 / 52% | 1.49 / 46% |
+| SPX 120m | daily | 151 | 12% | 0.78 / 39% | 1.69 / 50% |
+
+By number of agreeing timeframes, on the trades where every extra has data:
+SPX 60m (41 trades) x2 or more PF 1.83 / 54% against PF 0.38 / 33% below;
+SPX 120m (24 trades) x3 or more PF 7.40 / 75% against PF 0.47 / 25% below;
+gold 60m (23 trades) x2 or more PF 1.61 against 1.41; gold 15m (16 trades)
+no separation.
+
+Reading: on gold the useful confluence is the NEXT LOWER timeframe (10m
+for a 15m chart, 10m and 15m for a 30m chart, 30m for a 60m chart): trades
+that also break the lower timeframe's level are the good ones, and trades
+that do not are roughly break-even. A gold entry that lands on a 60m or
+240m level is a worse trade (PF 0.4 to 0.7): the higher level is where the
+move stalls. On SPX the picture is the reverse of the gold higher-TF one:
+30m and the next two higher timeframes (120m, 180m for a 60m chart; 60m,
+180m, 240m for a 120m chart) improve the trade, and the daily level hurts.
+BTC has too few overlapping trades to say anything beyond "30m agrees 79%
+of the time".
+
+Shipped defaults from this: XAUUSD extras 10 / 15 / 30 with 2 agreeing;
+BTCUSD 15 / 30 with 2 agreeing; SPX500 30 / 120 / 180 with 3 agreeing.
+
+### FlashGold: no consistent edge
+
+| chart | extra | overlap trades | agree | with: PF / win | without: PF / win |
+|---|---|---|---|---|---|
+| gold 60m | 10m | 36 | 58% | 1.10 / 67% | 3.25 / 73% |
+| gold 60m | 15m | 43 | 42% | 2.66 / 72% | 1.40 / 72% |
+| gold 60m | 30m | 47 | 21% | 2.80 / 80% | 1.51 / 70% |
+| gold 60m | 240m | 87 | 16% | 1.82 / 79% | 1.97 / 75% |
+| SPX 15m | 30m / 60m / 120m / 240m | 46 | 0 to 7% | too few | 1.75 to 2.04 |
+| BTC 60m | 15m | 19 | 68% | 2.01 / 77% | (6 trades) |
+| BTC 60m | 30m | 30 | 43% | 2.30 / 85% | 2.59 / 76% |
+| BTC 60m | 240m | 56 | 36% | 2.46 / 80% | 1.66 / 72% |
+
+Gold x2 agreement is good (10 trades, PF 9.2) and x3 is bad (12 trades, PF
+0.39); BTC 240m agreement helps; on SPX 15m the extras almost never fire
+inside the same candle because the 3-bar entry hold makes the signal rare.
+The FlashGold labels stay as an information overlay with the extras set to
+15 / 30 (gold), 30 / 60 / 240 (SPX) and 240 / 15 / 30 (BTC), 2 agreeing;
+do not filter FlashGold trades on them.
+
+Caveats: overlaps of 7 to 50 trades in most cells, one export period each,
+and the extra timeframes re-run the entry event without the chart's arm
+buffer, gates or zone filter (Pine cannot nest request.security). Treat the
+gold lower-timeframe result and the SPX 120m result as the two findings
+worth acting on; everything else is a count, not a conclusion.

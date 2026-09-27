@@ -264,16 +264,16 @@ ShowTickMark = input.bool(true, "Mark realtime bars (Tick mode)", group=grpD)
 
 grpM = "11. Multi-timeframe confluence labels (visual only)"
 useMtf       = input.bool(true, "Mark entries that also break out on other timeframes", group=grpM, tooltip="Visual only: the trading logic does not read any of this. Each extra timeframe runs the level logic (pivot / Donchian / previous day, BarsN and DonLen as set here) on its own bars and reports a breakout of its level. Higher timeframes are read from their last CLOSED bar and attributed to the chart candle in which that bar closed; lower timeframes are scanned bar by bar inside the chart candle.")
-mtfMinAgree  = input.int(3, "Timeframes that must agree (chart counts as one)", minval=2, maxval=5, group=grpM)
+mtfMinAgree  = input.int(2, "Timeframes that must agree (chart counts as one)", minval=2, maxval=5, group=grpM)
 mtfTolAtr    = input.float(0.5, "Same zone: level within, ATR mult of the chart fill", minval=0.0, step=0.1, group=grpM)
 mtfUse1      = input.bool(true, "Extra timeframe 1", group=grpM)
 mtfTf1       = input.timeframe("15", "   timeframe 1", group=grpM)
 mtfUse2      = input.bool(true, "Extra timeframe 2", group=grpM)
-mtfTf2       = input.timeframe("240", "   timeframe 2", group=grpM)
-mtfUse3      = input.bool(true, "Extra timeframe 3", group=grpM)
-mtfTf3       = input.timeframe("D", "   timeframe 3", group=grpM)
+mtfTf2       = input.timeframe("30", "   timeframe 2", group=grpM)
+mtfUse3      = input.bool(false, "Extra timeframe 3", group=grpM)
+mtfTf3       = input.timeframe("240", "   timeframe 3", group=grpM)
 mtfUse4      = input.bool(false, "Extra timeframe 4", group=grpM)
-mtfTf4       = input.timeframe("30", "   timeframe 4", group=grpM)
+mtfTf4       = input.timeframe("D", "   timeframe 4", group=grpM)
 mtfShowPairs = input.bool(true, "Also mark 2-timeframe agreement (small label)", group=grpM)
 mtfShowTable = input.bool(true, "Correlation table", group=grpM)
 
@@ -777,10 +777,6 @@ xpwSelf() =>
     bS = not na(ld[1]) and low <= ld[1]
     [bL, bS, lu[1], ld[1]]
 
-xpwSelfPrev() =>
-    [b, s_, up, dn] = xpwSelf()
-    [b[1], s_[1], up[1], dn[1]]
-
 mtfEvent(bool use, string tf) =>
     secs   = timeframe.in_seconds(tf)
     secsCh = timeframe.in_seconds(timeframe.period)
@@ -788,8 +784,12 @@ mtfEvent(bool use, string tf) =>
     isLo   = secs < secsCh
     hiTf   = isHi ? tf : timeframe.period
     loTf   = isLo ? tf : timeframe.period
-    [hb, hs_, hup, hdn] = request.security(syminfo.tickerid, hiTf, xpwSelfPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-    htfClosed = ta.change(time(hiTf)) != 0
+    // higher timeframe: the level that stood at the last higher close (the higher bar's lu[1]; lookahead_on is the
+    // [1] idiom, no future data) is live on every chart candle of the current higher bar. The chart candle that
+    // trades through it IS the higher-timeframe breakout candle. Calibrated in CALIBRATION.md section 18.
+    [hb0, hs0, hup, hdn] = request.security(syminfo.tickerid, hiTf, xpwSelf(), barmerge.gaps_off, barmerge.lookahead_on)
+    hb  = not na(hup) and high >= hup
+    hs_ = not na(hdn) and low <= hdn
     [lbA, lsA, lupA, ldnA] = request.security_lower_tf(syminfo.tickerid, loTf, xpwSelf(), ignore_invalid_timeframe=true)
     bool lb = false
     bool ls = false
@@ -803,8 +803,8 @@ mtfEvent(bool use, string tf) =>
             if array.get(lsA, i)
                 ls := true
                 ldn := array.get(ldnA, i)
-    bool bFire = use and (isHi ? (htfClosed and hb) : isLo ? lb : false)
-    bool sFire = use and (isHi ? (htfClosed and hs_) : isLo ? ls : false)
+    bool bFire = use and (isHi ? hb : isLo ? lb : false)
+    bool sFire = use and (isHi ? hs_ : isLo ? ls : false)
     [bFire, sFire, isHi ? hup : lup, isHi ? hdn : ldn]
 
 [x1b, x1s, x1u, x1d] = mtfEvent(mtfUse1, mtfTf1)

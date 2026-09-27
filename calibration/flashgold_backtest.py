@@ -163,7 +163,7 @@ def run(cfg: Cfg, d: Data = None):
     def close_pos(px, i, reason):
         nonlocal pos
         pnl = (px - pos["entry"]) * pos["side"] - 2 * comm
-        trades.append(dict(side=pos["side"], entry_bar=pos["bar"], exit_bar=i, pnl=pnl, reason=reason, bars=i - pos["bar"]))
+        trades.append(dict(side=pos["side"], entry_bar=pos["bar"], exit_bar=i, pnl=pnl, reason=reason, bars=i - pos["bar"], entry=pos["entry"]))
         pos = None
 
     for i in range(n):
