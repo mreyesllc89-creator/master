@@ -150,9 +150,9 @@
 //      the script behaves exactly as before. Header: max_labels_count.
 //
 // ENTRY TIMING LABEL (v2.11.1 addition, purely additive, group 12)
-//  Q1  Every entry gets a grey label on its fill price: fill clock time,
-//      how far into the candle the fill happened and how long was left
-//      to the candle close (e.g. 1m candle, filled at 0:40 -> 20s left).
+//  Q1  Every entry gets a large grey label on its fill price whose text
+//      is ONLY the time left in the candle after the fill (e.g. 1m
+//      candle, filled at 0:40 -> "20s left").
 //  Q2  The fill second exists ONLY LIVE. The emulator fills historical
 //      bars without an intrabar clock, so on history the label states
 //      the candle length and that the second is not available. In
@@ -813,7 +813,6 @@ varip float etPx     = na
 varip int   etBarMs  = 0
 varip int   etElapMs = 0
 varip int   etRemMs  = 0
-varip int   etClock  = 0
 if barstate.isnew
     etMark := false
 if ShowEntryTime and newTrade and mtfTradeSz != 0
@@ -822,14 +821,12 @@ if ShowEntryTime and newTrade and mtfTradeSz != 0
     etPx     := mtfFillPx
     etLive   := barstate.isrealtime
     etBarMs  := time_close - time
-    etClock  := timenow
     etElapMs := etLive ? math.max(0, math.min(timenow - time, etBarMs)) : 0      // clamped: server clock vs bar boundaries
     etRemMs  := etBarMs - etElapMs
-etTxt = (etLong ? "ENTRY ▲ " : "ENTRY ▼ ") + str.tostring(etPx, format.mintick) + "\n" +
-     (etLive ? "filled " + str.format_time(etClock, "HH:mm:ss", syminfo.timezone) + " = " + fmtDur(etElapMs) + " into a " + fmtDur(etBarMs) + " candle\n" + fmtDur(etRemMs) + " left to candle close" + (tickMode ? "" : "\n(BarClose mode: seen at the close)")
-             : fmtDur(etBarMs) + " candle\nfill second n/a on history")
+// Text is ONLY the time left in the candle after the fill; history has no fill second, so it reads n/a there.
+etTxt = etLive ? fmtDur(etRemMs) + " left" : "n/a"
 if etMark
-    label.new(bar_index, etPx, etTxt, style=label.style_label_right, color=color.new(color.gray, 15), textcolor=color.white, size=size.small, tooltip="Where inside the candle this entry filled. Seconds are live only; history has no intrabar clock.")
+    label.new(bar_index, etPx, etTxt, style=label.style_label_right, color=color.new(color.gray, 15), textcolor=color.white, size=size.large, tooltip="Time left in the candle after this entry filled (live only; history has no intrabar clock)" + (tickMode ? "" : ". BarClose mode sees the entry at the close."))
 
 //============== POSITION MGMT: locked SL/TP/trail, ratchet, BE, time stop ==============//
 varip float trailL  = na
