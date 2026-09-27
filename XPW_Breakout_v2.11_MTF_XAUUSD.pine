@@ -139,9 +139,11 @@
 //      zone" = within ZoneTolMult x the entry buffer.
 //  M3  When every enabled timeframe (this chart + the extra ones that
 //      are switched on) agrees on the same zone, a distinct label
-//      ("MTF xN") is drawn on that candle, separate from any other
-//      marker, so multi-timeframe correlated entries stand out from
-//      ordinary single-timeframe ones. The result is latched in varip
+//      ("MTF xN", fill price, level, time) is drawn with its tip ON THE
+//      FILL PRICE of the entry bar (Tick mode: the tick after the fill),
+//      separate from any other marker, so multi-timeframe correlated
+//      entries stand out and the exact entry point can be read off the
+//      chart. The result is latched in varip
 //      for the rest of the bar and the label re-created per evaluation
 //      (Pine deletes drawings on the per-tick rollback), so it survives
 //      Tick mode. With no extra timeframe enabled nothing is drawn and
@@ -745,24 +747,39 @@ else
 mtfTfCount = 1 + (EnableTF2 ? 1 : 0) + (EnableTF3 ? 1 : 0)
 mtfZoneTol = buffer * ZoneTolMult
 mtfMatch(float base, float other, bool enabled) => not enabled or (not na(base) and not na(other) and math.abs(other - base) <= mtfZoneTol)
-mtfTradeSz = strategy.opentrades > 0 ? strategy.opentrades.size(strategy.opentrades - 1) : strategy.closedtrades > 0 ? strategy.closedtrades.size(strategy.closedtrades - 1) : 0.0
+mtfOpenN   = strategy.opentrades - 1
+mtfClosedN = strategy.closedtrades - 1
+mtfTradeSz = strategy.opentrades > 0 ? strategy.opentrades.size(mtfOpenN) : strategy.closedtrades > 0 ? strategy.closedtrades.size(mtfClosedN) : 0.0
+mtfFillPx  = strategy.opentrades > 0 ? strategy.opentrades.entry_price(mtfOpenN) : strategy.closedtrades > 0 ? strategy.closedtrades.entry_price(mtfClosedN) : na
 // Result latched for the rest of the bar: Pine deletes drawings on the per-tick rollback, so the label is
 // re-created on every evaluation while the latch holds (one per bar on history, the last tick's live).
-varip bool mtfMarkL = false
-varip bool mtfMarkS = false
+// The label's tip sits on the FILL price of that bar (history: the fill bar; Tick mode: the tick after the
+// fill), with fill, level and time in the text, so the exact entry point is readable on the chart.
+varip bool  mtfMarkL = false
+varip bool  mtfMarkS = false
+varip float mtfPxL   = na
+varip float mtfPxS   = na
+varip float mtfLvlL  = na
+varip float mtfLvlS  = na
 if barstate.isnew
     mtfMarkL := false
     mtfMarkS := false
 if UseMTFLabel and newTrade and mtfTfCount >= 2
     if mtfTradeSz > 0
         mtfMarkL := mtfMatch(lvlUsedL, mtfUp2v, EnableTF2) and mtfMatch(lvlUsedL, mtfUp3v, EnableTF3)
+        mtfPxL   := mtfFillPx
+        mtfLvlL  := lvlUsedL
     if mtfTradeSz < 0
         mtfMarkS := mtfMatch(lvlUsedS, mtfDn2v, EnableTF2) and mtfMatch(lvlUsedS, mtfDn3v, EnableTF3)
-mtfTip = "Same entry zone on " + str.tostring(mtfTfCount) + " timeframes on this candle"
+        mtfPxS   := mtfFillPx
+        mtfLvlS  := lvlUsedS
+mtfWhen = str.format_time(time, "yyyy-MM-dd HH:mm", syminfo.timezone)
+mtfTxt(string arrow, float px, float lvl) => "MTF x" + str.tostring(mtfTfCount) + " " + arrow + "\nfill " + str.tostring(px, format.mintick) + "  lvl " + str.tostring(lvl, format.mintick) + "\n" + mtfWhen
+mtfTip = "Same entry zone on " + str.tostring(mtfTfCount) + " timeframes. Tip = fill price on the entry bar/tick."
 if mtfMarkL
-    label.new(bar_index, low, "MTF x" + str.tostring(mtfTfCount) + " ▲", style=label.style_label_up, color=color.new(color.aqua, 0), textcolor=color.black, size=size.small, tooltip=mtfTip)
+    label.new(bar_index, mtfPxL, mtfTxt("▲", mtfPxL, mtfLvlL), style=label.style_label_left, color=color.new(color.aqua, 0), textcolor=color.black, size=size.small, tooltip=mtfTip)
 if mtfMarkS
-    label.new(bar_index, high, "MTF x" + str.tostring(mtfTfCount) + " ▼", style=label.style_label_down, color=color.new(color.fuchsia, 0), textcolor=color.white, size=size.small, tooltip=mtfTip)
+    label.new(bar_index, mtfPxS, mtfTxt("▼", mtfPxS, mtfLvlS), style=label.style_label_left, color=color.new(color.fuchsia, 0), textcolor=color.white, size=size.small, tooltip=mtfTip)
 
 //============== POSITION MGMT: locked SL/TP/trail, ratchet, BE, time stop ==============//
 varip float trailL  = na
