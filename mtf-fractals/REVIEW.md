@@ -128,9 +128,12 @@ price format.
 - **Bias sign** is the opposite of v5 (finding 1). Re-create any alert or script
   built on the old "MTF fractal bias" plot.
 - **Break state is latched** and judged on each timeframe's own close: a break
-  fires one alert and keeps the row in Broken / Flip retest / Failed break until
-  the next fractal of that side prints. A daily level reads "Retest" while price
-  tests it intraday and "Broken" once the daily bar has closed beyond it.
+  fires one alert and keeps the row in Broken / Flip retest until that
+  timeframe closes back through the level by the buffer (Failed break) or the
+  next fractal of that side prints; a re-break fires the alert again. A daily
+  level reads "Retest" while price tests it intraday and "Broken" once the
+  daily bar has closed beyond it. With "Chart-TF signals on bar close only" on,
+  the Chart row's level and break state also wait for the bar close.
 - **Retest requires a departure first**: a level shows Holding until a chart bar
   has been entirely outside the band once, so the bar after confirmation does not
   immediately read Retest.
@@ -142,8 +145,11 @@ price format.
 - **Equal highs on the left side** now produce a fractal (input `tieLeft`, default
   on); the v5 strict rule is one click away. The rule is looser than the built-in
   Williams Fractal, which caps the plateau at 4 bars.
-- **Gold rollover filter** is on for the XAUUSD profile; the Σ row says
+- **Gold rollover filter** is on for the XAUUSD profile on venues that halt
+  (tokenised gold on crypto exchanges is excluded); the Σ row says
   "rollover filter" when it is active.
+- **Row defaults**: 5m off (it is only shown on 1m / seconds charts), Weekly on
+  (the only higher-TF row a D chart can show).
 
 ## 5. Known limits
 

@@ -17,19 +17,26 @@
 //                      band after a bar has been entirely outside it at least once
 //                      (also shown after a failed break)
 //       Broken       – this TF's close went through the level by more than the
-//                      break buffer; stays until the next fractal of that side
+//                      break buffer; stays until this TF closes back through the
+//                      level by the buffer (Failed break) or the next fractal
 //       Flip retest  – level broken earlier, a chart bar has left the band and the
 //                      current bar's range is back inside it (support ⇄ resistance)
 //       Failed break – level was broken, then this TF's close went back through it
-//                      by more than the break buffer; sticky until the next fractal
-//                      (shows Retest whenever the chart bar is inside the band)
+//                      by more than the break buffer; stays until the level is
+//                      broken again or the next fractal (shows Retest whenever
+//                      the chart bar is inside the band). A re-break fires the
+//                      break alert again.
 //   • Every higher-TF value (level, ATR, break state, age) comes from COMPLETED
 //     bars of that TF ([1] offset + lookahead_on), so the table is identical on
 //     history and in real time. Break / Failed break are judged on that TF's own
 //     close; Retest / Flip retest use the live chart bar.
-//   • The Chart row confirms fractals, updates its level and stage and fires its
-//     fractal / break alerts only on the bar close (input), so they cannot appear
-//     intrabar and vanish. Its Retest alert is a range event and fires at once.
+//   • The Chart row confirms fractals, updates its level and break state and
+//     fires its fractal / break alerts only on the bar close (input), so they
+//     cannot appear intrabar and vanish. Retest / Flip retest are range events
+//     on every row and update live.
+//   • Defaults differ from v5: 5m is off (it is only shown on 1m / seconds
+//     charts), Weekly is on (the only higher-TF row a D chart can show), and
+//     tied double tops / bottoms now print a fractal (input tieLeft).
 //   • Bias (data window, table column, optional tint): +1 per enabled TF whose
 //     last swing high is Broken / Flip retest, −1 per TF whose last swing low is
 //     Broken / Flip retest; intact levels, Retest and Failed break count 0.
@@ -55,13 +62,14 @@
 //       break buffer   0.15 × row ATR, floored at 0.012 % of the level (≈ $0.50
 //                     on gold, one quiet-hours spread) so a close inside the
 //                     spread never counts as Broken in thin sessions
-//       fractal        2 / 2   classic Williams
+//       fractal        2 / 2   Williams, right side strict; equal extremes on
+//                              the left allowed (input; Off = the strict v5 test)
 //   After ATR normalisation XAUUSD and BTCUSD need the same multipliers, so the
 //   inputs apply to every symbol. The symbol profile ("Auto" detects it) sets
 //   what genuinely differs: gold CFDs and COMEX halt 17:00–18:00 New York, so on
 //   timeframes up to 1H the XAUUSD profile ignores fractals whose centre bar
-//   opens 16:40–18:20 New York time (BTC trades 24/7); gold prints 2 decimals,
-//   BTC whole dollars.
+//   opens 16:40–18:20 New York time (not on crypto venues, where tokenised gold
+//   and BTC trade 24/7); gold prints 2 decimals, BTC whole dollars.
 // ─────────────────────────────────────────────────────────────────────────────
 indicator("MTF Fractals + Stage v6", shorttitle = "MTF Fractals v6", overlay = true, max_lines_count = 50, max_labels_count = 50)
 
@@ -80,9 +88,9 @@ rightBars      = input.int(2, "Bars right (confirm)", minval = 1, maxval = 10, g
 tieLeft        = input.bool(true, "Allow equal highs / lows on the left side", group = G_FRACT,
      tooltip = "On: equal highs / lows are tolerated anywhere in the left window, so the newest bar of a plateau or of a tight double top / bottom tied to the tick registers as the fractal (looser than the built-in Williams Fractal, which caps the plateau at 4 bars). Off: strict on both sides, as in the v5 script, so a tied extreme never prints a fractal.")
 rolloverMode   = input.string("Auto", "Ignore gold rollover-window fractals", options = ["Auto", "On", "Off"], group = G_FRACT,
-     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens 16:40-18:20 New York time are ignored. Auto = on for the XAUUSD profile only.")
+     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens 16:40-18:20 New York time are ignored. Auto = on for the XAUUSD profile on venues that halt (not tokenised gold on crypto exchanges); bitcoin stays off. Select On if your feed halts in this window.")
 chartCloseOnly = input.bool(true, "Chart-TF signals on bar close only", group = G_FRACT,
-     tooltip = "On: the Chart row confirms a fractal, updates its level and stage, draws the mark and fires the 'Chart up/dn fractal' and 'Chart swing high/low broken' alerts only once the chart bar has closed (equivalent to 'Once per bar close'). Off: v5 behaviour, a fractal can be confirmed intrabar and vanish if the bar's high/low later moves. Higher-TF rows always use completed bars.")
+     tooltip = "On: the Chart row confirms a fractal, updates its level and its Broken / Failed break state, draws the mark and fires the 'Chart up/dn fractal' and 'Chart swing high/low broken' alerts only once the chart bar has closed (equivalent to 'Once per bar close'); Retest / Flip retest still follow the live bar range. Off: v5 behaviour, a fractal can be confirmed and a break judged intrabar, and both can vanish if the bar later moves. Higher-TF rows always use completed bars.")
 
 bandMode   = input.string("ATR", "Band mode", options = ["ATR", "Percent"], group = G_STAGE,
      tooltip = "ATR: bands are multiples of ATR (recommended). Percent: band and buffer are a fixed % of the level on every timeframe (the v5 width); the retest and break logic is the same in both modes.")
@@ -93,7 +101,8 @@ breakMul   = input.float(0.15, "Break buffer (× ATR)", minval = 0.0,  maxval = 
      tooltip = "This TF's close must exceed the level by this much (of the row's own ATR) to count as Broken, and must close back through it by the same amount for a Failed break.")
 minBufPct  = input.float(0.012, "Min break buffer (% of level, ATR mode)", minval = 0.0, step = 0.002, group = G_STAGE,
      tooltip = "Floor under the ATR break buffer so a close inside the spread never counts as Broken when ATR collapses in thin sessions. 0.012 % ≈ $0.50 on $4,200 gold, ≈ $9 on $77,000 BTC (negligible next to its ATR buffer).")
-retestPct  = input.float(0.15,  "Retest band % (Percent mode)",  minval = 0.01, step = 0.01,  group = G_STAGE)
+retestPct  = input.float(0.15,  "Retest band % (Percent mode)",  minval = 0.01, step = 0.01,  group = G_STAGE,
+     tooltip = "Fixed % of the level for every row, so one value cannot fit every timeframe: 0.15 % is about half an hourly ATR on gold (the v5 setting), a tenth of a daily ATR, and on BTC about half of that again. Roughly 0.3 % for BTC intraday and 0.5 % or more for daily levels. ATR mode scales this automatically.")
 breakPct   = input.float(0.045, "Break buffer % (Percent mode)", minval = 0.0,  step = 0.005, group = G_STAGE,
      tooltip = "Fixed % of the level on every timeframe (3/10 of the Percent retest band, the same ratio as the ATR defaults). Set 0 for any close through the level to count (v5 had no buffer; Broken still stays until a Failed break or a new fractal).")
 maxAge     = input.int(0, "Expire level N bars after confirmation (0 = never)", minval = 0, group = G_STAGE,
@@ -105,7 +114,7 @@ use15    = input.bool(true,  "15m",      group = G_TF, inline = "tf1", tooltip =
 use60    = input.bool(true,  "1H",       group = G_TF, inline = "tf2")
 use240   = input.bool(true,  "4H",       group = G_TF, inline = "tf2")
 useD     = input.bool(true,  "Daily",    group = G_TF, inline = "tf2")
-useW     = input.bool(true,  "Weekly",   group = G_TF, inline = "tf2", tooltip = "1H: hidden on 45m charts. 4H: hidden on 45m and 3H charts. Weekly is the only higher-TF row available on a D chart and needs at least 5 weekly bars of loaded history.")
+useW     = input.bool(true,  "Weekly",   group = G_TF, inline = "tf2", tooltip = "1H: hidden on 45m charts. 4H: hidden on 45m and 3H charts. Weekly is the only higher-TF row available on a D chart and needs 'Bars left' + 'Bars right' + 1 completed weekly bars (5 with the defaults) before it can show a level.")
 
 showMarks    = input.bool(true,  "Plot fractal marks",             group = G_DISP)
 showStageTbl = input.bool(true,  "Stage table",                    group = G_DISP)
@@ -125,7 +134,8 @@ bool   isEq     = syminfo.type == "stock" or syminfo.type == "fund"
 bool   symGold  = str.contains(tick, "XAU") or (str.contains(tick, "GOLD") and not isEq) or (isFut and (root == "GC" or root == "MGC"))
 bool   symBtc   = ((str.startswith(tick, "BTC") or str.startswith(tick, "XBT")) and not isEq and not str.endswith(tick, ".D")) or (isFut and (root == "BTC" or root == "MBT"))
 string resolved = profile == "Auto" ? (symGold ? "XAUUSD" : symBtc ? "BTCUSD" : "Generic") : profile
-bool   rollOn   = rolloverMode == "On" or (rolloverMode == "Auto" and resolved == "XAUUSD")
+bool   isCrypto = syminfo.type == "crypto"
+bool   rollOn   = rolloverMode == "On" or (rolloverMode == "Auto" and resolved == "XAUUSD" and not isCrypto)
 string pxFmt    = resolved == "XAUUSD" ? "0.00" : resolved == "BTCUSD" ? "0" : format.mintick
 bool   useAtrBand = bandMode == "ATR"
 int    chartSec = timeframe.in_seconds(timeframe.isticks ? "1" : timeframe.period)
@@ -169,9 +179,9 @@ isDnFractal() =>
 // has. off = 1 together with lookahead_on is the standard non-repainting
 // higher-TF pattern. tfSec is the TF length in seconds, passed in so the
 // rollover filter never depends on how timeframe.in_seconds() behaves inside a
-// request. gate = false postpones a confirmation (used by the Chart row to wait
-// for the bar close); history is unaffected because every historical bar is
-// confirmed.
+// request. gate = false postpones both the fractal confirmation and the break /
+// failed-break judgement (used by the Chart row to wait for the bar close);
+// history is unaffected because every historical bar is confirmed.
 tfEngine(simple int off, simple int tfSec, bool gate) =>
     float atrRma  = ta.atr(atrLen)
     float atrSeed = ta.cum(ta.tr(true)) / (bar_index + 1)   // expanding mean while the RMA warms up
@@ -214,13 +224,13 @@ tfEngine(simple int off, simple int tfSec, bool gate) =>
             lastDn := na
             dnT    := na
             dnB    := 0
-    if not upNow and not na(lastUp)
+    if not upNow and not na(lastUp) and gate
         float bufUp = breakBuf(lastUp, atrV)
         if close > lastUp + bufUp
             upB := 1
         else if upB == 1 and close < lastUp - bufUp
             upB := 2
-    if not dnNow and not na(lastDn)
+    if not dnNow and not na(lastDn) and gate
         float bufDn = breakBuf(lastDn, atrV)
         if close < lastDn - bufDn
             dnB := 1
@@ -441,7 +451,7 @@ if showStageTbl and barstate.islast
     string profTxt = resolved + (rollOn ? " · rollover filter" : "") + "  L" + str.tostring(leftBars) + "/R" + str.tostring(rightBars) + (useAtrBand ? "  ATR" + str.tostring(atrLen) + " ×" + str.tostring(retestMul) + "/" + str.tostring(breakMul) : "  " + str.tostring(retestPct) + "%/" + str.tostring(breakPct) + "%")
     string sumTip  = "Sum of the per-TF bias over the enabled, usable timeframes." + (hiddenTxt == "" ? "" : "  Hidden: " + hiddenTxt + ". A row must be higher than the chart timeframe and a whole multiple of it; the Chart row covers the chart timeframe.")
     table.cell(t, 0, rowIdx, "Σ", text_color = color.gray, text_size = size.small)
-    table.cell(t, 1, rowIdx, profTxt, text_color = color.silver, text_size = size.small, tooltip = "Symbol profile · fractal left/right · ATR length × retest multiplier / break multiplier")
+    table.cell(t, 1, rowIdx, profTxt, text_color = color.silver, text_size = size.small, tooltip = "Symbol profile" + (rollOn ? " (rollover filter on)" : "") + " · fractal left/right · " + (useAtrBand ? "ATR length × retest multiplier / break multiplier" : "retest band % / break buffer % (Percent mode)"))
     table.cell(t, 2, rowIdx, "", text_size = size.small)
     table.cell(t, 3, rowIdx, "", text_size = size.small)
     table.cell(t, 4, rowIdx, "", text_size = size.small)
