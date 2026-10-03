@@ -32,8 +32,10 @@ value above the number of higher rows visible on the chart (1H chart: 4H, D,
 W = 3; D chart: W = 1) blocks every entry.
 
 A long and a short signal can only both qualify on the same bar (the close sits
-between a swing high that lies below a swing low) when the net bias is 0; the
-direction is then ambiguous and both are skipped.
+between a swing high that lies below a swing low) when the net bias is 0. When
+flat the direction is ambiguous and both are skipped; in a position only the
+signal in the position's own direction is dropped, so a qualifying opposite
+break still reverses the trade.
 
 **Other entry filters.** Backtest date range; trading session on intraday
 charts (exchange time, default always; ignored on D and above); gold rollover
@@ -52,7 +54,7 @@ with a narrower retest band or in Percent band mode.
 
 | Entry | ATR mode (default) | Structure mode |
 |-------|--------------------|----------------|
-| Breakout | the wider of entry − 1.5 × ATR and the far edge of the retest zone | beyond the opposite chart-TF swing plus its buffer, but never inside the zone (a swing inside the zone gives the zone edge); falls back to ATR mode when that swing is missing, at or above the entry, or more than 4 × ATR away |
+| Breakout | the wider of entry − 1.5 × ATR and the far edge of the retest zone | beyond the opposite chart-TF swing plus its buffer, but never inside the zone (a swing inside the zone gives the zone edge); falls back to ATR mode when that swing is missing, at or beyond the entry, or the stop would be more than 4 × ATR away |
 | Flip retest | just beyond the retested level's zone (≈ 0.65 × ATR past the level) | same |
 
 **Other exits.**
@@ -73,8 +75,9 @@ contracts on futures (GC, MGC, BTC, MBT, always rounded down to whole
 contracts). The size is capped at *Max position size* × equity (10× by
 default) and optionally rounded down to a *Quantity step* (1 for OANDA's whole
 ounces, 0.0001 for BTC). A size that rounds to 0 skips the signal; skipped
-signals are counted in the Data Window and flagged with a label on the last
-bar.
+signals are counted in the Data Window (each flip-retest level once) and
+flagged with a label on the last bar. A size can also round to 0 when *Max
+position size* is below one contract or lot step.
 
 Futures need enough equity for one whole contract. At 1 % risk with the default
 1H breakout stop, one contract risks about $2,000 on GC, $200 on MGC and $3,900

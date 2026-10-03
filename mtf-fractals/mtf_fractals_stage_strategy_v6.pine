@@ -11,7 +11,9 @@
 //   • Both entries need the net higher-TF bias (sum of the visible higher-TF
 //     rows, Chart row excluded) to be ≥ "Min net higher-TF bias" in the trade
 //     direction. Long and short can only both qualify on the same bar when that
-//     net bias is 0; both are then skipped.
+//     net bias is 0: when flat both are skipped; in a position only the
+//     same-direction signal is dropped, so an opposite-break reversal still
+//     goes through.
 //   • Stops sit beyond the level's retest zone (retest band + break buffer):
 //     breakout = the wider of entry − 1.5 × ATR and that zone (or the opposite
 //     swing in Structure mode); flip retest = just beyond the zone. Every stop
@@ -697,7 +699,7 @@ startDate  = input.time(timestamp("2024-01-01T00:00:00"), "Backtest start", grou
 endDate    = input.time(timestamp("2030-12-31T00:00:00"), "Backtest end",   group = G_STRAT)
 
 stopMode   = input.string("ATR", "Breakout stop placement", options = ["ATR", "Structure"], group = G_RISK,
-     tooltip = "ATR: the wider of entry − 'Breakout stop' × ATR and the far edge of the broken level's retest zone (level − retest band − break buffer), so a normal retest does not stop the trade. Structure: beyond the opposite chart-TF swing plus its buffer, but never inside the retest zone (a swing inside the zone gives the zone edge); falls back to ATR when that swing is missing, at or above the entry, or further than 'Max structure stop'. Flip-retest entries always stop just beyond the retested level's zone.")
+     tooltip = "ATR: the wider of entry − 'Breakout stop' × ATR and the far edge of the broken level's retest zone (level − retest band − break buffer), so a normal retest does not stop the trade. Structure: beyond the opposite chart-TF swing plus its buffer, but never inside the retest zone (a swing inside the zone gives the zone edge); falls back to ATR when that swing is missing, at or beyond the entry, or the stop would be further than 'Max structure stop'. Flip-retest entries always stop just beyond the retested level's zone.")
 stopAtr    = input.float(1.5, "Breakout stop (× chart ATR)", minval = 0.25, maxval = 10, step = 0.25, group = G_RISK,
      tooltip = "1.5 × ATR: about $20 on 1H gold, $780 on 1H BTC.")
 minStopAtr = input.float(0.5, "Min stop distance (× chart ATR)", minval = 0.1, maxval = 5, step = 0.05, group = G_RISK,
@@ -743,11 +745,18 @@ bool shortFlipSig  = useFlip and cDnSt == 5 and close < cDnL and (na(lastFlipDnT
 bool wantLong      = (longBreakSig or longFlipSig) and htfBias >= biasMin and dirMode != "Short only"
 bool wantShort     = (shortBreakSig or shortFlipSig) and htfBias <= -biasMin and dirMode != "Long only"
 // Both directions on one bar (the close sits between a swing high that lies
-// below a swing low) can only pass the bias filter when the net bias is 0:
-// the direction is ambiguous, so both are skipped.
+// below a swing low) can only pass the bias filter when the net bias is 0.
+// In a position, the signal in its own direction cannot trade anyway, so only
+// that one is dropped and an opposite-break reversal still goes through; when
+// flat the direction is ambiguous and both are skipped.
 if wantLong and wantShort
-    wantLong  := false
-    wantShort := false
+    if isLong
+        wantLong := false
+    else if isShort
+        wantShort := false
+    else
+        wantLong  := false
+        wantShort := false
 
 bool oppL     = exitOnOpp and isLong and cDnBrk     // swing low broke while long
 bool oppS     = exitOnOpp and isShort and cUpBrk    // swing high broke while short
@@ -767,7 +776,7 @@ longStopFor(bool isBreak) =>
         float atrStp    = math.min(close - stopAtr * cAtr, zoneStp)
         float rawStp    = na(cDnL) ? na : cDnL - breakBuf(cDnL, cAtr)
         float structStp = na(rawStp) ? na : math.min(rawStp, zoneStp)
-        bool  structOk  = stopMode == "Structure" and not na(rawStp) and rawStp < close and close - structStp <= maxStopAtr * cAtr
+        bool  structOk  = stopMode == "Structure" and not na(cDnL) and cDnL < close and close - structStp <= maxStopAtr * cAtr
         st := structOk ? structStp : atrStp
     math.min(st, close - minStopAtr * cAtr)
 
@@ -778,7 +787,7 @@ shortStopFor(bool isBreak) =>
         float atrStp    = math.max(close + stopAtr * cAtr, zoneStp)
         float rawStp    = na(cUpL) ? na : cUpL + breakBuf(cUpL, cAtr)
         float structStp = na(rawStp) ? na : math.max(rawStp, zoneStp)
-        bool  structOk  = stopMode == "Structure" and not na(rawStp) and rawStp > close and structStp - close <= maxStopAtr * cAtr
+        bool  structOk  = stopMode == "Structure" and not na(cUpL) and cUpL > close and structStp - close <= maxStopAtr * cAtr
         st := structOk ? structStp : atrStp
     math.max(st, close + minStopAtr * cAtr)
 
@@ -806,6 +815,8 @@ var float sTp      = na
 var float sRisk    = na
 var int   entryBar = na
 var int   nSkipped = 0      // signals dropped because the size rounded to 0
+var int   skipFlipUpT = na  // flip level already counted as skipped
+var int   skipFlipDnT = na
 
 // ── Entries (a reversal closes the open position in the same order) ─────────
 bool didLong  = false
@@ -815,7 +826,10 @@ if canLong
     float dist = close - st
     float q    = qtyFor(dist)
     if na(q) or q <= 0
-        nSkipped += 1
+        if longBreakSig or na(skipFlipUpT) or cUpT != skipFlipUpT
+            nSkipped += 1
+        if not longBreakSig
+            skipFlipUpT := cUpT
     else
         lStop    := st
         lRisk    := dist
@@ -832,7 +846,10 @@ if canShort
     float dist = st - close
     float q    = qtyFor(dist)
     if na(q) or q <= 0
-        nSkipped += 1
+        if shortBreakSig or na(skipFlipDnT) or cDnT != skipFlipDnT
+            nSkipped += 1
+        if not shortBreakSig
+            skipFlipDnT := cDnT
     else
         sStop    := st
         sRisk    := dist
@@ -879,4 +896,4 @@ var label skipLab = na
 if barstate.islast
     label.delete(skipLab)
     if nSkipped > 0
-        skipLab := label.new(bar_index, high, str.tostring(nSkipped) + " signal(s) skipped: size rounded to 0" + (isFutSym ? " contracts" : "") + ".\nRaise Initial capital or Risk per trade.", xloc = xloc.bar_index, yloc = yloc.abovebar, style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.white, size = lblSz)
+        skipLab := label.new(bar_index, high, str.tostring(nSkipped) + " signal(s) skipped: size rounded to 0" + (isFutSym ? " contracts" : "") + ".\nRaise Initial capital, Risk per trade or Max position size.", xloc = xloc.bar_index, yloc = yloc.abovebar, style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.white, size = lblSz)
