@@ -10,21 +10,21 @@
 //     reverse); one entry per level.
 //   • Both entries need the net higher-TF bias (sum of the visible higher-TF
 //     rows, Chart row excluded) to be ≥ "Min net higher-TF bias" in the trade
-//     direction. If long and short fire on the same bar the bias decides, and
-//     a bias of 0 skips both.
+//     direction. Long and short can only both qualify on the same bar when that
+//     net bias is 0; both are then skipped.
 //   • Stops sit beyond the level's retest zone (retest band + break buffer):
 //     breakout = the wider of entry − 1.5 × ATR and that zone (or the opposite
 //     swing in Structure mode); flip retest = just beyond the zone. Every stop
 //     is at least 0.5 × ATR from the entry. Target 2 R, stop to breakeven at
-//     +1 R (only once a bar has closed above the entry), optional ATR trail and
-//     time stop. An opposite chart-TF break closes the trade, or reverses it
-//     when the opposite entry passes its filters.
+//     +1 R (on a bar that reaches +1 R and closes beyond the entry), optional
+//     ATR trail and time stop. An opposite chart-TF break closes the trade, or
+//     reverses it when the opposite entry passes its filters.
 //   • Position size: equity × risk % ÷ (stop distance × point value), capped
 //     at "Max position size" × equity and rounded to the lot step (whole
 //     contracts on futures), so every trade risks the same fraction of the
 //     account on gold and on bitcoin.
-//   • No entries in the gold rollover window, outside the trading session, or
-//     outside the backtest range. Entries and market exits fill on the signal
+//   • No entries in the gold rollover window (rollover filter on, charts up to
+//     1H), outside the trading session, or outside the backtest range. Entries and market exits fill on the signal
 //     bar's close (process_orders_on_close); stops and targets are resting
 //     orders from the next bar. No margin check (margin 0): leverage is
 //     controlled by "Max position size".
@@ -139,7 +139,7 @@ rightBars      = input.int(2, "Bars right (confirm)", minval = 1, maxval = 10, g
 tieLeft        = input.bool(true, "Allow equal highs / lows on the left side", group = G_FRACT,
      tooltip = "On: equal highs / lows are tolerated anywhere in the left window, so the newest bar of a plateau or of a tight double top / bottom tied to the tick registers as the fractal (looser than the built-in Williams Fractal, which caps the plateau at 4 bars). Off: strict on both sides, as in the v5 script, so a tied extreme never prints a fractal.")
 rolloverMode   = input.string("Auto", "Ignore gold rollover-window fractals", options = ["Auto", "On", "Off"], group = G_FRACT,
-     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens in the 16:40-18:20 New York window are ignored (16:30-18:20 for 30m / 45m bars, 16:00-18:20 for 1H bars, so the bar that closes into the 17:00 halt is always included). Auto = on for the XAUUSD profile on venues that halt (not tokenised gold on crypto exchanges); bitcoin stays off. Select On if your feed halts in this window.")
+     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens in the 16:40-18:20 New York window are ignored (16:30-18:20 for 30m / 45m bars, 16:00-18:20 for 1H bars, so the bar that closes into the 17:00 halt is always included). Auto = on for the XAUUSD profile on venues that halt (not tokenised gold on crypto exchanges); bitcoin stays off. Select On if your feed halts in this window. In the strategy the same window (on the chart bar, charts up to 1H) also blocks new entries.")
 chartCloseOnly = input.bool(true, "Chart-TF signals on bar close only", group = G_FRACT,
      tooltip = "On: the Chart row confirms a fractal and updates its level and Broken / Failed break state only on the bar close; the strategy evaluates its entries and exits on that close. Off: only matters with 'Recalculate on every tick' in Properties, where fractals and breaks are then judged intrabar and can vanish before the bar closes (not recommended for backtesting). Higher-TF rows always use completed bars.")
 
@@ -195,8 +195,9 @@ bool   symBtc   = ((str.startswith(tick, "BTC") or str.startswith(tick, "XBT")) 
 string resolved = profile == "Auto" ? (symGold ? "XAUUSD" : symBtc ? "BTCUSD" : "Generic") : profile
 bool   isCrypto = syminfo.type == "crypto"
 bool   rollOn   = rolloverMode == "On" or (rolloverMode == "Auto" and resolved == "XAUUSD" and not isCrypto)
-// fmtPx only runs on the last bar, so close is the live price; a BTC-prefixed
-// product priced below 1,000 (leveraged token, ETN) keeps its own tick format.
+// pxFmt follows each bar's close (table and labels on the last bar, order alert
+// texts on order bars); a BTC-prefixed product priced below 1,000 (leveraged
+// token, ETN) keeps its own tick format.
 string pxFmt    = resolved == "XAUUSD" ? "0.00" : resolved == "BTCUSD" and close >= 1000 ? "0" : format.mintick
 bool   useAtrBand = bandMode == "ATR"
 int    chartSec = timeframe.in_seconds(timeframe.isticks ? "1" : timeframe.period)
@@ -684,7 +685,7 @@ maxExt     = input.float(1.5, "Max breakout extension (× chart ATR, 0 = off)", 
 useFlip    = input.bool(true, "Enter on flip retest", group = G_STRAT,
      tooltip = "Long when the chart-TF swing high is in Flip retest (broken earlier, price left and came back to it from above) and the bar closes above the level; short mirrored on the swing low. One entry per level.")
 biasMin    = input.int(0, "Min net higher-TF bias in trade direction", minval = 0, maxval = 11, group = G_STRAT,
-     tooltip = "Net sum of the bias of the visible higher-TF rows (Chart row excluded): +1 per row whose swing high is Broken / Flip retest, −1 per row whose swing low is. Longs need the net sum >= this value, shorts <= minus it. 0 = the net higher-TF bias must not be against the trade (one row for and one against still passes); 1 = net at least one row in the trade direction. Cannot exceed the number of higher-TF rows visible on the chart (1H chart: 3, D chart: 1).")
+     tooltip = "Net sum of the bias of the visible higher-TF rows (Chart row excluded): +1 per row whose swing high is Broken / Flip retest, −1 per row whose swing low is. Longs need the net sum >= this value, shorts <= minus it. 0 = the net higher-TF bias must not be against the trade (one row for and one against still passes); 1 = net at least one row in the trade direction. A value above the number of higher-TF rows visible on the chart (1H chart: 3, D chart: 1) blocks every entry.")
 allowRev   = input.bool(false, "Allow reversal on any opposite signal", group = G_STRAT,
      tooltip = "On: any opposite entry signal (break or flip retest) closes the position and opens the other direction. Off: only the opposite chart-TF break reverses, and only when 'Exit on opposite break' is on.")
 exitOnOpp  = input.bool(true, "Exit on opposite chart-TF break (reverse if it qualifies)", group = G_STRAT,
@@ -696,20 +697,20 @@ startDate  = input.time(timestamp("2024-01-01T00:00:00"), "Backtest start", grou
 endDate    = input.time(timestamp("2030-12-31T00:00:00"), "Backtest end",   group = G_STRAT)
 
 stopMode   = input.string("ATR", "Breakout stop placement", options = ["ATR", "Structure"], group = G_RISK,
-     tooltip = "ATR: the wider of entry − 'Breakout stop' × ATR and the far edge of the broken level's retest zone (level − retest band − break buffer), so a normal retest does not stop the trade. Structure: beyond the opposite chart-TF swing plus its buffer (never inside the retest zone), falling back to ATR when that swing is missing, on the wrong side, or further than 'Max structure stop'. Flip-retest entries always stop just beyond the retested level's zone.")
+     tooltip = "ATR: the wider of entry − 'Breakout stop' × ATR and the far edge of the broken level's retest zone (level − retest band − break buffer), so a normal retest does not stop the trade. Structure: beyond the opposite chart-TF swing plus its buffer, but never inside the retest zone (a swing inside the zone gives the zone edge); falls back to ATR when that swing is missing, at or above the entry, or further than 'Max structure stop'. Flip-retest entries always stop just beyond the retested level's zone.")
 stopAtr    = input.float(1.5, "Breakout stop (× chart ATR)", minval = 0.25, maxval = 10, step = 0.25, group = G_RISK,
      tooltip = "1.5 × ATR: about $20 on 1H gold, $780 on 1H BTC.")
 minStopAtr = input.float(0.5, "Min stop distance (× chart ATR)", minval = 0.1, maxval = 5, step = 0.05, group = G_RISK,
-     tooltip = "Floor on every stop distance so a stop never sits inside the noise and the position size cannot explode when the structure is very close.")
+     tooltip = "Safety floor on every initial stop distance. With the default ATR band the retest zone (about 0.65 × ATR) is already wider, so this only acts with a retest band below about 0.35 × ATR or in Percent band mode, where the zone can be much narrower than 0.5 × ATR.")
 maxStopAtr = input.float(4.0, "Max structure stop (× chart ATR)", minval = 1, maxval = 20, step = 0.5, group = G_RISK)
 rrTarget   = input.float(2.0, "Target (R multiple, 0 = none)", minval = 0, maxval = 20, step = 0.25, group = G_RISK)
 beR        = input.float(1.0, "Move stop to breakeven at (R, 0 = off)", minval = 0, maxval = 10, step = 0.25, group = G_RISK,
      tooltip = "Once a bar has reached this many R in favour and closed beyond the entry price, the stop moves to the entry price.")
 trailAtr   = input.float(0.0, "ATR trailing stop (× chart ATR, 0 = off)", minval = 0, maxval = 10, step = 0.25, group = G_RISK)
 riskPct    = input.float(1.0, "Risk per trade (% of equity)", minval = 0.05, maxval = 10, step = 0.05, group = G_RISK,
-     tooltip = "Size = equity × risk % ÷ (stop distance × point value): ounces / BTC on CFD and spot symbols, contracts on futures (GC, MGC, BTC, MBT). The same 1 % means the same account risk on gold and on bitcoin. Commission and slippage come on top.")
+     tooltip = "Size = equity × risk % ÷ (stop distance × point value): ounces / BTC on CFD and spot symbols, contracts on futures (GC, MGC, BTC, MBT). The same 1 % means the same account risk on gold and on bitcoin. Commission and slippage come on top. Futures need enough equity for one whole contract: at 1 % on 1H about $20k for MGC, $200k for GC and $400k for CME BTC; smaller sizes round to 0 and the signal is skipped (counted in the Data Window).")
 maxLev     = input.float(10, "Max position size (× equity)", minval = 0.1, maxval = 100, step = 0.5, group = G_RISK,
-     tooltip = "Caps the notional at this multiple of equity. 1 % risk with a 1.5-ATR stop needs about 2× on 1H gold and 4-7× on 5m-15m gold; 10 suits a gold CFD or BTC perpetual account. Set 1 for spot BTC without leverage. When the cap binds, the trade risks less than 'Risk per trade'.")
+     tooltip = "Caps the notional at this multiple of equity. 1 % risk with a 1.5-ATR breakout stop needs about 2× on 1H gold and 4-7× on 5m-15m gold; flip-retest stops are tighter (0.65-1.15 ATR) and need about 3-5× on 1H gold and 9-16× on 5m gold. 10 suits a gold CFD or BTC perpetual account; set 1 for spot BTC without leverage. When the cap binds, the trade risks less than 'Risk per trade'.")
 qtyStep    = input.float(0, "Quantity step (0 = no rounding)", minval = 0, step = 0.0001, group = G_RISK,
      tooltip = "Round the size down to your broker's lot step: 1 for OANDA gold (whole ounces), 0.01 for many gold CFDs, 0.0001 for BTC. Futures are always rounded down to whole contracts. A size that rounds to 0 skips the trade.")
 
@@ -742,10 +743,11 @@ bool shortFlipSig  = useFlip and cDnSt == 5 and close < cDnL and (na(lastFlipDnT
 bool wantLong      = (longBreakSig or longFlipSig) and htfBias >= biasMin and dirMode != "Short only"
 bool wantShort     = (shortBreakSig or shortFlipSig) and htfBias <= -biasMin and dirMode != "Long only"
 // Both directions on one bar (the close sits between a swing high that lies
-// below a swing low): follow the net higher-TF bias, skip when it is 0.
+// below a swing low) can only pass the bias filter when the net bias is 0:
+// the direction is ambiguous, so both are skipped.
 if wantLong and wantShort
-    wantLong  := htfBias > 0
-    wantShort := htfBias < 0
+    wantLong  := false
+    wantShort := false
 
 bool oppL     = exitOnOpp and isLong and cDnBrk     // swing low broke while long
 bool oppS     = exitOnOpp and isShort and cUpBrk    // swing high broke while short
@@ -763,8 +765,9 @@ longStopFor(bool isBreak) =>
     float st = zoneStp
     if isBreak
         float atrStp    = math.min(close - stopAtr * cAtr, zoneStp)
-        float structStp = na(cDnL) ? na : math.min(cDnL - breakBuf(cDnL, cAtr), zoneStp)
-        bool  structOk  = stopMode == "Structure" and not na(structStp) and structStp < close and close - structStp <= maxStopAtr * cAtr
+        float rawStp    = na(cDnL) ? na : cDnL - breakBuf(cDnL, cAtr)
+        float structStp = na(rawStp) ? na : math.min(rawStp, zoneStp)
+        bool  structOk  = stopMode == "Structure" and not na(rawStp) and rawStp < close and close - structStp <= maxStopAtr * cAtr
         st := structOk ? structStp : atrStp
     math.min(st, close - minStopAtr * cAtr)
 
@@ -773,8 +776,9 @@ shortStopFor(bool isBreak) =>
     float st = zoneStp
     if isBreak
         float atrStp    = math.max(close + stopAtr * cAtr, zoneStp)
-        float structStp = na(cUpL) ? na : math.max(cUpL + breakBuf(cUpL, cAtr), zoneStp)
-        bool  structOk  = stopMode == "Structure" and not na(structStp) and structStp > close and structStp - close <= maxStopAtr * cAtr
+        float rawStp    = na(cUpL) ? na : cUpL + breakBuf(cUpL, cAtr)
+        float structStp = na(rawStp) ? na : math.max(rawStp, zoneStp)
+        bool  structOk  = stopMode == "Structure" and not na(rawStp) and rawStp > close and structStp - close <= maxStopAtr * cAtr
         st := structOk ? structStp : atrStp
     math.max(st, close + minStopAtr * cAtr)
 
@@ -801,6 +805,7 @@ var float sStop    = na
 var float sTp      = na
 var float sRisk    = na
 var int   entryBar = na
+var int   nSkipped = 0      // signals dropped because the size rounded to 0
 
 // ── Entries (a reversal closes the open position in the same order) ─────────
 bool didLong  = false
@@ -809,7 +814,9 @@ if canLong
     float st   = longStopFor(longBreakSig)
     float dist = close - st
     float q    = qtyFor(dist)
-    if not na(q) and q > 0
+    if na(q) or q <= 0
+        nSkipped += 1
+    else
         lStop    := st
         lRisk    := dist
         lTp      := rrTarget > 0 ? close + rrTarget * dist : na
@@ -817,14 +824,16 @@ if canLong
         didLong  := true
         if longFlipSig and not longBreakSig
             lastFlipUpT := cUpT
-        strategy.entry("L", strategy.long, qty = q, comment = longBreakSig ? "L break" : "L flip", alert_message = msgOf("LONG"))
+        strategy.entry("L", strategy.long, qty = q, comment = longBreakSig ? "L break" : "L flip", alert_message = msgOf(isShort ? "REVERSE short to LONG" : "LONG") + " · position " + str.tostring(q) + " · stop " + fmtPx(lStop) + " · target " + fmtPx(lTp))
         strategy.exit("L-X", "L", stop = lStop, limit = lTp, comment_loss = "L stop", comment_profit = "L target", alert_message = "MTF Fractals: long exit " + syminfo.ticker + " (stop " + fmtPx(lStop) + ", target " + fmtPx(lTp) + ")")
 
 if canShort
     float st   = shortStopFor(shortBreakSig)
     float dist = st - close
     float q    = qtyFor(dist)
-    if not na(q) and q > 0
+    if na(q) or q <= 0
+        nSkipped += 1
+    else
         sStop    := st
         sRisk    := dist
         sTp      := rrTarget > 0 ? close - rrTarget * dist : na
@@ -832,7 +841,7 @@ if canShort
         didShort := true
         if shortFlipSig and not shortBreakSig
             lastFlipDnT := cDnT
-        strategy.entry("S", strategy.short, qty = q, comment = shortBreakSig ? "S break" : "S flip", alert_message = msgOf("SHORT"))
+        strategy.entry("S", strategy.short, qty = q, comment = shortBreakSig ? "S break" : "S flip", alert_message = msgOf(isLong ? "REVERSE long to SHORT" : "SHORT") + " · position " + str.tostring(q) + " · stop " + fmtPx(sStop) + " · target " + fmtPx(sTp))
         strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
 
 // ── Exit management while in a position (skipped on a reversal bar) ──────────
@@ -863,3 +872,11 @@ plot(strategy.position_size > 0 ? lStop : na, "Long stop",    color = color.new(
 plot(strategy.position_size > 0 ? lTp   : na, "Long target",  color = color.new(color.green, 0), style = plot.style_linebr, linewidth = 1)
 plot(strategy.position_size < 0 ? sStop : na, "Short stop",   color = color.new(color.red, 0),   style = plot.style_linebr, linewidth = 1)
 plot(strategy.position_size < 0 ? sTp   : na, "Short target", color = color.new(color.green, 0), style = plot.style_linebr, linewidth = 1)
+
+// ── Skipped signals ──────────────────────────────────────────────────────────
+plot(nSkipped, "Signals skipped (size 0)", display = display.data_window)
+var label skipLab = na
+if barstate.islast
+    label.delete(skipLab)
+    if nSkipped > 0
+        skipLab := label.new(bar_index, high, str.tostring(nSkipped) + " signal(s) skipped: size rounded to 0" + (isFutSym ? " contracts" : "") + ".\nRaise Initial capital or Risk per trade.", xloc = xloc.bar_index, yloc = yloc.abovebar, style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.white, size = lblSz)

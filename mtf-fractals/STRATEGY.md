@@ -27,27 +27,32 @@ rows (the Chart row excluded: +1 per row whose swing high is broken, −1 per ro
 whose swing low is broken) must be ≥ *Min net higher-TF bias* for a long and ≤
 minus that value for a short. With the default 0 the net higher-timeframe
 picture must not be against the trade (one row for and one against still
-passes); with 1 the net must lean at least one row in the trade direction. The
-value cannot exceed the number of higher rows visible on the chart (1H chart:
-4H, D, W = 3; D chart: W = 1).
+passes); with 1 the net must lean at least one row in the trade direction. A
+value above the number of higher rows visible on the chart (1H chart: 4H, D,
+W = 3; D chart: W = 1) blocks every entry.
 
-If a long and a short signal fire on the same bar (the close sits between a
-swing high that lies below a swing low), the net bias decides; at 0 both are
-skipped.
+A long and a short signal can only both qualify on the same bar (the close sits
+between a swing high that lies below a swing low) when the net bias is 0; the
+direction is then ambiguous and both are skipped.
 
 **Other entry filters.** Backtest date range; trading session on intraday
 charts (exchange time, default always; ignored on D and above); gold rollover
-window (on the XAUUSD profile, no entries on chart bars opening 16:40–18:20 New
-York; 16:30 for 30m and 45m charts, 16:00 for 1H). One position at a time.
+window (when the rollover filter is on, i.e. Auto on the XAUUSD profile at a
+venue that halts, or On; charts up to 1H only): no entries on chart bars
+opening 16:40–18:20 New York, 16:30 for 30m and 45m charts, 16:00 for 1H. One
+position at a time.
 
-**Stops.** Every stop sits beyond the broken level's **retest zone** (retest
-band + break buffer beyond the level, ≈ 0.65 × ATR), so a normal retest of the
-level does not stop the trade, and is at least *Min stop distance* (0.5 × ATR)
-from the entry.
+**Stops.** Every initial stop sits beyond the broken level's **retest zone**
+(retest band + break buffer beyond the level, ≈ 0.65 × ATR), so a normal retest
+of the level does not stop the trade before breakeven. Once the stop has moved
+to the entry (+1 R by default), a retest of the level closes the trade at the
+entry price. Every initial stop is also at least *Min stop distance* from the
+entry; with the default band the zone is already wider, so that floor only acts
+with a narrower retest band or in Percent band mode.
 
 | Entry | ATR mode (default) | Structure mode |
 |-------|--------------------|----------------|
-| Breakout | the wider of entry − 1.5 × ATR and the far edge of the retest zone | beyond the opposite chart-TF swing plus its buffer (never inside the zone); falls back to ATR mode when that swing is missing, on the wrong side, or more than 4 × ATR away |
+| Breakout | the wider of entry − 1.5 × ATR and the far edge of the retest zone | beyond the opposite chart-TF swing plus its buffer, but never inside the zone (a swing inside the zone gives the zone edge); falls back to ATR mode when that swing is missing, at or above the entry, or more than 4 × ATR away |
 | Flip retest | just beyond the retested level's zone (≈ 0.65 × ATR past the level) | same |
 
 **Other exits.**
@@ -61,12 +66,21 @@ from the entry.
 | Any-signal reversal | off | When on, any opposite entry signal reverses the position. |
 | Time stop | off | Close after N bars. |
 
-**Position size.** Each trade risks *Risk per trade* (1 %) of current equity:
-size = equity × 1 % ÷ (stop distance × point value). That is ounces on gold
-CFDs, BTC on spot bitcoin, and contracts on futures (GC, MGC, BTC, MBT, always
-rounded down to whole contracts; a size of 0 skips the trade). The size is
-capped at *Max position size* × equity (10× by default) and optionally rounded
-down to a *Quantity step* (1 for OANDA's whole ounces, 0.0001 for BTC).
+**Position size.** Each trade risks *Risk per trade* (1 %) of current equity,
+unless the leverage cap or rounding reduces it: size = equity × 1 % ÷ (stop
+distance × point value). That is ounces on gold CFDs, BTC on spot bitcoin, and
+contracts on futures (GC, MGC, BTC, MBT, always rounded down to whole
+contracts). The size is capped at *Max position size* × equity (10× by
+default) and optionally rounded down to a *Quantity step* (1 for OANDA's whole
+ounces, 0.0001 for BTC). A size that rounds to 0 skips the signal; skipped
+signals are counted in the Data Window and flagged with a label on the last
+bar.
+
+Futures need enough equity for one whole contract. At 1 % risk with the default
+1H breakout stop, one contract risks about $2,000 on GC, $200 on MGC and $3,900
+on CME BTC, so the default $10,000 capital trades none of them. Raise *Initial
+capital* to about $20,000 for MGC, $200,000 for GC or $400,000 for CME BTC, or
+raise *Risk per trade*. MBT and CFD / spot symbols are fine at $10,000.
 
 **Order model.** `process_orders_on_close` is on: entries and market exits fill
 at the close of the signal bar. Stops and targets are resting orders, live from
@@ -80,12 +94,12 @@ equity); leverage is controlled by *Max position size* instead.
 |---------|-----------|----------|-----------|
 | Breakout stop 1.5 × ATR | ≈ $20 | ≈ $780 | Beyond the retest zone (0.65 ATR) plus a push through it. |
 | Flip-retest stop | ≈ $8.50 past the level | ≈ $340 past the level | The flip has failed once price closes back through the zone; a wider stop would keep the trade after its premise is gone. |
-| Min stop 0.5 × ATR | ≈ $6.50 | ≈ $260 | Keeps the stop out of the noise and the size bounded. |
+| Min stop 0.5 × ATR | ≈ $6.50 | ≈ $260 | A safety floor. With the default band every stop is already ≥ 0.65 × ATR (the retest zone), so it only binds with a retest band below ≈ 0.35 × ATR or in Percent band mode. |
 | Max extension 1.5 × ATR | | | A close more than 1.5 ATR past the level needs a 2+ ATR stop to clear the zone; skipping those avoids chasing. |
 | Target 2 R | ≈ $40 | ≈ $1,560 | About three hourly ATRs: reachable within a session on a real breakout, enough to pay for the losers at a 40 % win rate. |
 | Breakeven at 1 R | | | Turns a breakout that ran one stop distance and came back into a scratch instead of a full loss. |
 | Risk 1 % | $100 → ≈ 5 oz (≈ 2× equity) | $100 → ≈ 0.13 BTC (≈ 1× equity) | Fixed-fractional sizing; ten losses in a row cost about 10 %. |
-| Max size 10× equity | | | Covers 1 % risk down to 5m gold (≈ 4–7× equity). Set 1 for spot BTC without leverage. |
+| Max size 10× equity | | | Covers 1 % risk on breakouts down to 5m gold (≈ 4–7× equity). Flip-retest stops are only ≈ 0.65–1.15 ATR, so they need ≈ 3–5× on 1H gold and ≈ 9–16× on 5m gold; on 5m the cap binds and those trades risk less than 1 %. Set 1 for spot BTC without leverage: flip retests and most trades below 1H are then capped below 1 % risk. |
 | Net bias ≥ 0 | | | The chart-timeframe break is the trigger; the higher timeframes only veto. Raise to 1 for fewer, more aligned trades. |
 
 On 5m charts the same multipliers give a ≈ $6 stop on gold and ≈ $225 on BTC;
@@ -97,8 +111,14 @@ Strategies cannot use `alertcondition`. Create a **Strategy alert** on the
 script (alert dialog → condition: the strategy → "Order fills and alert()
 function events") and use `{{strategy.order.alert_message}}` in the message
 box. Every entry, stop, target and close carries a ready-made text such as
-`MTF Fractals: LONG XAUUSD at 4172.50` or
-`MTF Fractals: long exit XAUUSD (stop 4152.40, target 4212.70)`.
+`MTF Fractals: LONG XAUUSD at 4172.50 · position 5.13 · stop 4152.40 · target 4212.70`
+or `MTF Fractals: long exit XAUUSD (stop 4152.40, target 4212.70)`.
+
+A reversal is a single order: its text reads `REVERSE long to SHORT …` and
+gives the new position size. The old position is closed by the same order, so
+no separate exit or "closed" text is sent. A bridge that sizes orders itself
+should treat LONG / SHORT as "go to this position" or use
+`{{strategy.position_size}}`.
 
 ## 4. Costs to set in Properties
 
@@ -123,7 +143,10 @@ defaults that is about 1.1 %; on 5m gold with a CFD spread it is about 1.05 %.
    15m–4H are the natural ranges for these rules) and set the costs.
 2. In the Strategy Tester check the number of trades (fewer than 100 is not
    enough to judge), profit factor, maximum drawdown and average trade in R.
-   The trade list should show no "Margin call" exits.
+   The margin check is off, so the tester never shows a margin call; check
+   leverage instead: the largest position value in the List of trades should
+   stay within what your account allows. The Data Window's "Signals skipped
+   (size 0)" should be 0 or small.
 3. Tune one thing at a time, in this order: *Min net higher-TF bias* (0 → 1),
    *Breakout stop* (1.0–2.5 ATR), *Target* (1.5–3 R), *Breakeven* (off / 1 R /
    1.5 R), then *Breakout stop placement* (ATR vs Structure). Do not tune the
@@ -136,8 +159,9 @@ defaults that is about 1.1 %; on 5m gold with a CFD spread it is about 1.05 %.
 
 ## 6. Known limits
 
-- Stops are sized from the chart timeframe's ATR at the signal bar; they do not
-  widen if volatility rises after entry (the trail can be used for that).
+- Stops are sized from the chart timeframe's ATR at the signal bar and never
+  widen after entry. The ATR trail uses the current ATR but only ratchets
+  toward price, so it does not help when volatility rises.
 - One position at a time, no scaling in or out.
 - The bias filter counts the higher-timeframe rows visible on the chart; on a
   4H chart only D and W contribute.
