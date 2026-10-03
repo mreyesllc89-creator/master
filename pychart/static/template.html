@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<style>
+  :root {
+    --bg: #131722; --panel: #1e222d; --text: #d1d4dc; --muted: #787b86;
+    --border: #2a2e39; --up: #26a69a; --down: #ef5350; --accent: #3987e5;
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    --bg: #ffffff; --panel: #f0f3fa; --text: #131722; --muted: #787b86;
+    --border: #d1d4dc; color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  body { display: flex; flex-direction: column; }
+  header { display: flex; align-items: center; gap: 16px; padding: 8px 16px; border-bottom: 1px solid var(--border);
+    background: var(--panel); flex-wrap: wrap; }
+  header .sym { font-size: 16px; font-weight: 600; }
+  header .tf { color: var(--muted); }
+  header .px { font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; }
+  header .chg { font-variant-numeric: tabular-nums; }
+  .pos { color: var(--up); } .neg { color: var(--down); }
+  header .spacer { flex: 1; }
+  header button { background: transparent; color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 10px; cursor: pointer; font: inherit; }
+  header button:hover { border-color: var(--accent); }
+  #wrap { position: relative; flex: 1; min-height: 0; }
+  #chart { position: absolute; inset: 0; }
+  #legend { position: absolute; left: 12px; top: 8px; z-index: 2; pointer-events: none;
+    font-variant-numeric: tabular-nums; display: flex; flex-direction: column; gap: 2px; }
+  #legend .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; white-space: nowrap; }
+  #legend .name { color: var(--muted); }
+  #legend .ohlc span { margin-right: 6px; }
+  #legend .ohlc b { font-weight: 500; }
+  #legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  #legend .val { color: var(--text); }
+  .pane-legend { position: absolute; left: 12px; z-index: 2; pointer-events: none; font-variant-numeric: tabular-nums;
+    white-space: nowrap; }
+  .pane-legend .name { color: var(--muted); margin-right: 8px; }
+  .pane-legend .item { margin-right: 10px; }
+  footer { padding: 4px 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); background: var(--panel); }
+  footer a { color: inherit; }
+</style>
+</head>
+<body>
+<header>
+  <span class="sym" id="h-sym"></span>
+  <span class="tf" id="h-tf"></span>
+  <span class="px" id="h-px"></span>
+  <span class="chg" id="h-chg"></span>
+  <span class="spacer"></span>
+  <span class="tf" id="h-bars"></span>
+  <button id="btn-fit" title="Fit all bars">Fit</button>
+  <button id="btn-theme" title="Toggle light / dark">Theme</button>
+</header>
+<div id="wrap">
+  <div id="chart"></div>
+  <div id="legend"></div>
+  <div id="pane-legends"></div>
+</div>
+<footer>pychart · built on <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">Lightweight Charts</a> (Apache-2.0)</footer>
+
+<script>/*__LWC__*/</script>
+<script>
+const MODEL = /*__MODEL__*/;
+(function () {
+  const LWC = window.LightweightCharts;
+  const root = document.documentElement;
+  let theme = MODEL.theme;
+  root.dataset.theme = theme;
+  const T = () => MODEL.themes[theme];
+  const fmt = (v) => (v == null || Number.isNaN(v)) ? '' : Number(v).toFixed(MODEL.precision);
+  const fmtVol = (v) => v >= 1e9 ? (v/1e9).toFixed(2)+'B' : v >= 1e6 ? (v/1e6).toFixed(2)+'M' : v >= 1e3 ? (v/1e3).toFixed(1)+'K' : String(Math.round(v));
+
+  // ---- header
+  document.getElementById('h-sym').textContent = MODEL.symbol;
+  document.getElementById('h-tf').textContent = MODEL.timeframe;
+  document.getElementById('h-bars').textContent = MODEL.bars + ' bars';
+  const px = document.getElementById('h-px'), chg = document.getElementById('h-chg');
+  px.textContent = fmt(MODEL.last.close);
+  const sign = MODEL.last.change >= 0 ? '+' : '';
+  chg.textContent = `${sign}${fmt(MODEL.last.change)} (${sign}${MODEL.last.changePct.toFixed(2)}%)`;
+  chg.className = 'chg ' + (MODEL.last.change >= 0 ? 'pos' : 'neg');
+  px.className = 'px ' + (MODEL.last.change >= 0 ? 'pos' : 'neg');
+
+  // ---- chart
+  const container = document.getElementById('chart');
+  const chartOptions = () => ({
+    autoSize: true,
+    layout: { background: { type: 'solid', color: T().bg }, textColor: T().text, panes: { separatorColor: T().border, separatorHoverColor: T().crosshair, enableResize: true } },
+    grid: { vertLines: { color: T().grid }, horzLines: { color: T().grid } },
+    crosshair: { mode: LWC.CrosshairMode.Normal, vertLine: { color: T().crosshair, labelBackgroundColor: T().panel }, horzLine: { color: T().crosshair, labelBackgroundColor: T().panel } },
+    rightPriceScale: { borderColor: T().border, scaleMargins: { top: 0.08, bottom: 0.22 } },
+    timeScale: { borderColor: T().border, timeVisible: MODEL.intraday, secondsVisible: false, rightOffset: 5, barSpacing: 8 },
+    localization: { priceFormatter: (p) => fmt(p) },
+  });
+  const chart = LWC.createChart(container, chartOptions());
+
+  const candles = chart.addSeries(LWC.CandlestickSeries, {
+    upColor: T().up, downColor: T().down, borderVisible: false, wickUpColor: T().up, wickDownColor: T().down,
+    priceFormat: { type: 'price', precision: MODEL.precision, minMove: Math.pow(10, -MODEL.precision) },
+  }, 0);
+  candles.setData(MODEL.candles);
+
+  const volume = chart.addSeries(LWC.HistogramSeries, {
+    priceFormat: { type: 'volume' }, priceScaleId: 'volume', lastValueVisible: false, priceLineVisible: false,
+  }, 0);
+  const volColor = (up) => (up ? T().up : T().down) + '66';
+  volume.setData(MODEL.volume.map(v => ({ time: v.time, value: v.value, color: volColor(v.up) })));
+  chart.priceScale('volume', 0).applyOptions({ scaleMargins: { top: 0.82, bottom: 0 }, visible: false });
+
+  const LINESTYLE = { line: LWC.LineStyle.Solid, dashed: LWC.LineStyle.Dashed };
+  const tracked = []; // {series, name, color, legendEl, kind}
+
+  function addLine(block, s, paneIndex, scaleId) {
+    const opts = {
+      color: s.color, lineWidth: 2, lineStyle: LINESTYLE[s.style] || 0,
+      priceLineVisible: false, lastValueVisible: paneIndex > 0, crosshairMarkerVisible: false,
+      priceFormat: { type: 'price', precision: paneIndex > 0 ? 2 : MODEL.precision, minMove: Math.pow(10, -(paneIndex > 0 ? 2 : MODEL.precision)) },
+    };
+    if (scaleId) opts.priceScaleId = scaleId;
+    let series;
+    if (s.style === 'histogram') {
+      series = chart.addSeries(LWC.HistogramSeries, { priceLineVisible: false, lastValueVisible: false, priceFormat: opts.priceFormat }, paneIndex);
+      series.setData(s.data.map(p => ({ time: p.time, value: p.value, color: p.value >= 0 ? T().up + 'aa' : T().down + 'aa' })));
+    } else {
+      series = chart.addSeries(LWC.LineSeries, opts, paneIndex);
+      series.setData(s.data);
+    }
+    return series;
+  }
+
+  // overlays on the price pane
+  const legend = document.getElementById('legend');
+  const ohlcRow = document.createElement('div'); ohlcRow.className = 'row ohlc'; legend.appendChild(ohlcRow);
+  for (const block of MODEL.overlays) {
+    const row = document.createElement('div'); row.className = 'row';
+    for (const s of block.series) {
+      const series = addLine(block, s, 0, null);
+      const el = document.createElement('span');
+      el.innerHTML = `<span class="dot" style="background:${s.color}"></span><span class="name">${s.name}</span> <span class="val"></span>`;
+      row.appendChild(el);
+      tracked.push({ series, name: s.name, el: el.querySelector('.val'), fmt });
+    }
+    legend.appendChild(row);
+  }
+  for (const block of MODEL.volumeOverlays) {
+    for (const s of block.series) {
+      const series = addLine(block, s, 0, 'volume');
+      series.applyOptions({ lineWidth: 1 });
+    }
+  }
+
+  // oscillator panes
+  const paneLegends = document.getElementById('pane-legends');
+  const paneLegendEls = [];
+  MODEL.panes.forEach((block, i) => {
+    const paneIndex = i + 1;
+    const el = document.createElement('div'); el.className = 'pane-legend';
+    el.innerHTML = `<span class="name">${block.title} (${block.key})</span>`;
+    let anchor = null;
+    for (const s of block.series) {
+      const series = addLine(block, s, paneIndex, null);
+      if (!anchor && s.style !== 'histogram') anchor = series;
+      const item = document.createElement('span'); item.className = 'item';
+      item.innerHTML = `<span class="dot" style="background:${s.style === 'histogram' ? T().muted : s.color}"></span><span class="val"></span>`;
+      el.appendChild(item);
+      tracked.push({ series, name: s.name, el: item.querySelector('.val'), fmt: (v) => v == null ? '' : Number(v).toFixed(2) });
+    }
+    for (const lvl of block.levels) {
+      (anchor || candles).createPriceLine({ price: lvl, color: T().muted, lineWidth: 1, lineStyle: LWC.LineStyle.Dotted, axisLabelVisible: false });
+    }
+    paneLegends.appendChild(el);
+    paneLegendEls.push({ el, paneIndex });
+  });
+
+  // pane heights: price pane gets ~65%, the rest split evenly
+  function layoutPanes() {
+    const panes = chart.panes();
+    if (panes.length <= 1) return;
+    const total = container.clientHeight;
+    const sub = Math.max(80, Math.floor(total * 0.35 / (panes.length - 1)));
+    for (let i = 1; i < panes.length; i++) panes[i].setHeight(sub);
+    positionPaneLegends();
+  }
+  function positionPaneLegends() {
+    let y = 0;
+    const panes = chart.panes();
+    for (let i = 0; i < panes.length; i++) {
+      const h = panes[i].getHeight ? panes[i].getHeight() : chart.paneSize(i).height;
+      const pl = paneLegendEls.find(p => p.paneIndex === i);
+      if (pl) pl.el.style.top = (y + 6) + 'px';
+      y += h + 1;
+    }
+  }
+  layoutPanes();
+  new ResizeObserver(() => { layoutPanes(); }).observe(container);
+
+  // ---- legend updates
+  function renderOHLC(bar) {
+    if (!bar) { ohlcRow.innerHTML = ''; return; }
+    const up = bar.close >= bar.open, cls = up ? 'pos' : 'neg';
+    const d = bar.close - bar.open, p = bar.open ? d / bar.open * 100 : 0;
+    ohlcRow.innerHTML =
+      `<span><b>${MODEL.symbol}</b></span>` +
+      `<span class="name">O</span><span class="${cls}">${fmt(bar.open)}</span>` +
+      `<span class="name">H</span><span class="${cls}">${fmt(bar.high)}</span>` +
+      `<span class="name">L</span><span class="${cls}">${fmt(bar.low)}</span>` +
+      `<span class="name">C</span><span class="${cls}">${fmt(bar.close)}</span>` +
+      `<span class="${cls}">${d >= 0 ? '+' : ''}${fmt(d)} (${p >= 0 ? '+' : ''}${p.toFixed(2)}%)</span>` +
+      (bar.volume != null ? `<span class="name">Vol</span><span>${fmtVol(bar.volume)}</span>` : '');
+  }
+  const lastBar = MODEL.candles[MODEL.candles.length - 1];
+  const lastVol = MODEL.volume[MODEL.volume.length - 1];
+  const lastValues = new Map();
+  for (const t of tracked) { const d = t.series.data(); lastValues.set(t, d.length ? d[d.length - 1].value : null); }
+  function showLast() {
+    renderOHLC({ ...lastBar, volume: lastVol && lastVol.value });
+    for (const t of tracked) t.el.textContent = t.fmt(lastValues.get(t));
+  }
+  showLast();
+
+  chart.subscribeCrosshairMove((param) => {
+    if (!param.time || !param.point) { showLast(); return; }
+    const bar = param.seriesData.get(candles);
+    const vol = param.seriesData.get(volume);
+    renderOHLC(bar ? { ...bar, volume: vol && vol.value } : null);
+    for (const t of tracked) {
+      const d = param.seriesData.get(t.series);
+      t.el.textContent = t.fmt(d ? d.value : null);
+    }
+  });
+
+  // ---- controls
+  document.getElementById('btn-fit').onclick = () => chart.timeScale().fitContent();
+  document.getElementById('btn-theme').onclick = () => {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    root.dataset.theme = theme;
+    chart.applyOptions(chartOptions());
+    candles.applyOptions({ upColor: T().up, downColor: T().down, wickUpColor: T().up, wickDownColor: T().down });
+    volume.setData(MODEL.volume.map(v => ({ time: v.time, value: v.value, color: volColor(v.up) })));
+  };
+  chart.timeScale().fitContent();
+  window.__pychart = { chart, candles, model: MODEL };
+})();
+</script>
+</body>
+</html>

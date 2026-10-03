@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pychart"
+version = "0.1.0"
+description = "TradingView-style charts and indicators in Python, rendered to self-contained HTML."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+yahoo = ["yfinance>=0.2"]
+dev = ["pytest>=7", "playwright"]
+
+[project.scripts]
+pychart = "pychart.cli:main"
+
+[tool.setuptools]
+packages = ["pychart"]
+
+[tool.setuptools.package-data]
+pychart = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
