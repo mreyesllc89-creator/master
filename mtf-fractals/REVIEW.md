@@ -27,15 +27,15 @@ Status column says otherwise.
 | 5 | high | "Broken" is stateless: one close through the level flips the stage, and it flips back to Holding / Retest as soon as price returns inside. With a zero buffer, one tick (0.001 on OANDA gold, $1 on Bitstamp) is enough. | Fixed: break buffer (0.15 × ATR with a spread floor) plus a latched break state judged on each TF's own close, with Flip retest and Failed break outcomes. The stateless mode was dropped rather than kept as an option, because it could never be made consistent with the non-repainting HTF rows. |
 | 6 | high | The retest band is a fixed 0.15 % of price on every timeframe and both symbols. It is about 0.5 × ATR on 1H gold, ~1 × ATR on 15m gold, 0.1 × ATR on daily gold and under 0.5 × ATR on every BTC timeframe above 5m. | Fixed: bands are ATR multiples; the % band survives as "Percent" mode. |
 | 7 | high | Alerts: only chart-TF confirmation alerts exist, and they fire on the first intrabar tick that satisfies the fractal test, then roll back. | Fixed: the Chart row confirms fractals, updates its level and stage and fires its fractal and break alerts only on the bar close (input, default on); break and retest alerts were added for the chart TF and for higher TFs. |
-| 8 | medium | Equal highs or lows on either side disqualify a fractal, so a double top or bottom with a tied extreme (round numbers on gold, $1 ticks on Bitstamp BTC) never produces a level. | Fixed: ties are allowed on the left (older) side, strict on the right, as in the built-in Williams Fractal. Input to restore the strict rule. |
+| 8 | medium | Equal highs or lows on either side disqualify a fractal, so a double top or bottom with a tied extreme (round numbers on gold, $1 ticks on Bitstamp BTC) never produces a level. | Fixed: ties are allowed on the left (older) side, strict on the right (looser than the built-in Williams Fractal, which caps a plateau at 4 bars). Input to restore the strict rule. |
 | 9 | medium | Retest is judged on the close only: a wick that tags the level and closes away, the textbook retest, never registers. | Fixed: a bar counts as near the level when its range reaches into the band. |
 | 10 | medium | "Confirmed" on an HTF row is only visible while the fractal is provisional and disappears when it is actually confirmed. | Fixed by the non-repainting change: Confirmed shows for the HTF bar after the confirming bar closed (Retest wins if the chart bar is back in the band). |
 | 11 | medium | On the first `leftBars + rightBars` bars every bar is a fractal because comparisons against `na` are false. | Fixed: bar-index guard. |
 | 12 | medium | D / W rows on low chart timeframes may have too few HTF bars to ever form a fractal and silently show "—". | Fixed: the row says "only N bars" when the context is too short. |
-| 13 | low | `upAge` / `dnAge` are computed and never used; `upPxNow` / `dnPxNow` are redundant. | Fixed: ages drive level lines, tooltips and expiry. |
+| 13 | low | `upAge` / `dnAge` are computed and never used; `upPxNow` / `dnPxNow` are redundant. | Fixed: ages drive the tooltips, the label text and the expiry input; the swing bar's open time anchors the level lines. |
 | 14 | low | `format.mintick` prints meaningless precision (0.01 at $80k BTC, 0.001 on OANDA gold). | Fixed: gold 2 decimals, BTC whole dollars, other symbols mintick. |
 | 15 | low | No level lines, no bias in the table, bias only in the Data Window. | Fixed: chart-TF level lines, optional HTF lines, bias column, Σ row, optional background tint. |
-| 16 | low | Table is allocated 5×9 but at most 8 rows are painted; labels are deleted and recreated every tick. | Harmless, left as is (table now 6×10, labels unchanged). |
+| 16 | low | Table is allocated 5×9 but at most 8 rows are painted; labels are deleted and recreated every tick. | Harmless, left as is (table now 6×14: header, up to 12 rows, Σ; labels unchanged). |
 
 Findings reviewed and deliberately **not** changed:
 
@@ -43,7 +43,7 @@ Findings reviewed and deliberately **not** changed:
   significant unbroken one, so in a downtrend the active resistance is the latest
   lower high. That is the v5 semantics and the more actionable level for breakout
   trading; a "structural level" mode is a possible extension.
-- All six `request.security` calls still run even when a row is disabled or
+- All eleven `request.security` calls still run even when a row is disabled or
   hidden (v6 dynamic requests would allow skipping them, but tuple destructuring
   inside an `if` block is block-scoped, so each gated request needs a dozen extra
   lines). Instead, a disabled or hidden row's request is pointed at the weekly
@@ -112,7 +112,7 @@ timeframe above 5m.
 | ATR length | 14 | Standard; seeded with an expanding mean so the first 13 bars of each context are classified too. |
 | Retest band | ±0.50 × √(row ATR × chart ATR), floored at the break buffer | A normal pullback reaches the level; half an ATR keeps Retest from showing on every bar near it. Geometric mean with the chart ATR keeps D / W bands readable on intraday charts; the floor keeps a level price is sitting on from reading Holding. |
 | Break buffer | 0.15 × row ATR, floor 0.012 % of the level | Gold: above one CFD spread even on 5m, and the floor (≈ $0.50) holds when the 5m ATR collapses in the 21:00–23:00 UTC lull. BTC: filters marginal closes in a fat-tailed market; the floor (≈ $9) is irrelevant next to its ATR buffer. On D it is $9.5 / $380, far below a real breakout close, so no real break is delayed. |
-| Rollover filter | XAUUSD profile only | Gold CFDs and COMEX halt 17:00–18:00 ET; the thin bars around the halt and the Sunday open print isolated extremes that are not tradable levels. Fractals whose centre bar opens in, or closes into, the 16:40–18:20 New York window on timeframes up to 1H are ignored (1H bar opening 16:00, 30m bar opening 16:30 included). BTC trades continuously. |
+| Rollover filter | XAUUSD profile only | Gold CFDs and COMEX halt 17:00–18:00 ET; the thin bars around the halt and the Sunday open print isolated extremes that are not tradable levels. Fractals whose centre bar opens in the 16:40–18:20 New York window on timeframes up to 1H are ignored (16:30–18:20 for 30m / 45m bars, 16:00–18:20 for 1H bars, so the bar that closes into the halt is always included). BTC trades continuously. |
 | Price format | gold 2 decimals, BTC whole dollars | Readability. |
 | Rows | 5s, 10s, 15s, 30s, 1m, 5m, 15m, 1H, 4H, D, W, all on | A row is shown only when it is higher than the chart timeframe and a whole multiple of it, so on a 1s chart every row is available and the Chart row is the 1s row; on a 5m chart the rows are 15m and up. Hidden rows cost nothing: their request is redirected to the weekly series. |
 | Percent mode | 0.15 % retest, 0.045 % buffer | The v5 band width with a buffer in the same 3 : 10 ratio as the ATR defaults. Only the width is v5's: the retest and break logic is the same as in ATR mode. Set the buffer to 0 for any close through the level to count. |
@@ -142,7 +142,9 @@ price format.
   flickering while provisional.
 - Rows that are lower than the chart TF, equal to it, or not a whole multiple of
   it (2m chart with the 5m and 15m rows, 45m with 1H and 4H, 3H with 4H) are
-  hidden. Standard chart timeframes from 1m to D keep every row above them.
+  hidden. Of the standard chart timeframes, 3m hides the 5m row, 45m hides 1H
+  and 4H, and 3H hides 4H; every other standard timeframe from 1m to D keeps
+  every row above it.
 - **Equal highs on the left side** now produce a fractal (input `tieLeft`, default
   on); the v5 strict rule is one click away. The rule is looser than the built-in
   Williams Fractal, which caps the plateau at 4 bars.

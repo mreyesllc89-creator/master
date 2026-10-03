@@ -42,7 +42,8 @@ chart bars. The practical consequences:
 
 There is no separate 1s row because nothing is lower than 1s: on a 1s chart
 the Chart row **is** the 1s row. Rows that are hidden are summarised in the
-tooltip of the Σ row ("3 row(s) below the chart TF, 5m (= chart)"). A row that
+tooltip of the Σ row ("5 row(s) below the chart TF, 5m (= chart)" on a 5m
+chart with every row enabled). A row that
 is not a whole multiple (the 1H row on a 45m chart, the 15m row on a 2m chart)
 is hidden for the same reliability reason.
 
@@ -50,10 +51,11 @@ Seconds rows need a TradingView plan that offers seconds charts. On seconds
 charts the loaded history is short, so the D and W rows may show
 "only N bars" until enough daily or weekly bars exist to form a fractal.
 
-Everything a higher-timeframe row shows comes from **completed** bars of that
-timeframe. The row for the daily timeframe does not change during the day; it
-updates once the daily bar has closed. This is what makes the table identical
-whether you look at history or at the live bar.
+The level, ATR, age and break state of a higher-timeframe row come from
+**completed** bars of that timeframe: the daily row's level and break state do
+not change during the day and update once the daily bar has closed. Its Retest
+and Flip retest readings follow the live chart bar. This is what makes the
+table identical whether you look at history or at the live bar.
 
 ## 3. The table
 
@@ -86,7 +88,7 @@ volatility of the timeframe and the symbol. With default settings:
 
 | Stage | Colour | Meaning | How it is decided |
 |-------|--------|---------|-------------------|
-| **Confirmed** | yellow | The fractal has just been confirmed. The level is fresh and untested. | The bar that confirms the fractal has closed (for a higher timeframe: the previous bar of that timeframe). On the Chart row with bar-close gating it also shows on the following bar, so it is visible live. |
+| **Confirmed** | yellow | The fractal has just been confirmed. The level is fresh and untested. | The bar that confirms the fractal has closed (for a higher timeframe: the previous bar of that timeframe). On the Chart row with bar-close gating it also shows on the following bar, so it is visible live, unless that bar has already left the band and come back, in which case it reads Retest. |
 | **Holding** | lime | No close through the level yet, and price is away from it. | Level intact and the chart bar is outside the band (or has not left the band since the fractal printed). |
 | **Retest** | orange | Price is back at the level and the level is still intact. Watch for a rejection or a break. | Level intact, a chart bar has been entirely outside the band at least once, and the current chart bar's range reaches into the band. |
 | **Broken** | red | This timeframe closed through the level by more than the buffer. | The row's own close beyond the level ± buffer. Stays until the level is closed back through (Failed break) or a new fractal replaces it. |
@@ -110,13 +112,13 @@ Retest band ≈ ±6.5, break buffer ≈ 2.0 (0.15 × 13; the 0.012 % floor is 0.
 
 | Hourly close / range | Stage | Why |
 |------|-------|-----|
-| confirms at 4,160 | Confirmed | the bar after the swing closed, two lower highs on the right |
+| confirms at 4,160 | Confirmed | the second bar after the swing closed, two lower highs on the right |
 | 4,155 (bar range 4,152–4,158) | Holding | outside the band, no break |
 | range 4,165–4,169 | Retest | bar reaches into the band after being outside it |
 | close 4,172.5 | Broken | close more than 2.0 above 4,170 |
 | close 4,181 | Broken | away from the level, "armed" for a flip retest |
 | range 4,166–4,173 | Flip retest | back inside the band from above |
-| close 4,167.5 | Failed break | closed back below 4,170 by more than 2.0 |
+| close 4,161 (bar range 4,158–4,163) | Failed break | closed back below 4,170 by more than 2.0 and the bar is entirely below the band |
 | range 4,166–4,172 | Retest | inside the band after the failed break |
 | close 4,173 | Broken | broke again; the "swing high broken" alert fires again |
 
@@ -178,9 +180,10 @@ calibration input below applies to every profile.
 - *Ignore gold rollover-window fractals* — gold CFDs and COMEX halt 17:00–18:00
   New York; the thin bars around the halt and the Sunday open print isolated
   extremes that are not tradable levels. On timeframes up to 1H, fractals whose
-  centre bar opens in, or closes into, the 16:40–18:20 New York window are
-  ignored (the 1H bar opening 16:00 and the 30m bar opening 16:30 included).
-  Auto turns this on for the XAUUSD profile on venues that halt; tokenised
+  centre bar opens in the 16:40–18:20 New York window are
+  ignored (16:30–18:20 for 30m / 45m bars, 16:00–18:20 for 1H bars, so the
+  bar that closes into the 17:00 halt is always included). Auto turns this on
+  for the XAUUSD profile on venues that halt; tokenised
   gold on crypto exchanges and bitcoin are exempt. Select On to force it on
   any symbol.
 - *Chart-TF signals on bar close only* — on by default: the Chart row confirms
@@ -247,9 +250,11 @@ Suggested setups:
 
 ## 10. Questions
 
-**Why does a row say "= chart" or "< chart"?** A row at or below the chart
-timeframe cannot be computed reliably from chart bars, so it is hidden. Switch
-to a lower chart timeframe to see it, or read the Chart row.
+**Why is a row missing, and why does the Σ-row tooltip list it as "below the
+chart TF", "= chart" or "not a multiple"?** A row at or below the chart
+timeframe, or not a whole multiple of it, cannot be computed reliably from
+chart bars, so it is hidden. Switch to a lower chart timeframe to see it, or
+read the Chart row.
 
 **Why does the Chart row show Holding when price is sitting on the level?**
 Retest requires price to have left the band at least once since the fractal

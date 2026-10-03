@@ -25,8 +25,9 @@
 //     previous level and restarts its stage at Confirmed):
 //       Confirmed    – fractal confirmed on this TF's latest bar (Chart row with
 //                      bar-close gating: also on the bar after; higher TFs: on the
-//                      previous closed bar of that TF; a higher-TF row shows
-//                      Retest instead while the chart bar is back in the band)
+//                      previous closed bar of that TF; in both cases the row
+//                      shows Retest instead when the chart bar has left the band
+//                      and is back in it)
 //       Holding      – no close through the level yet; chart price is outside the
 //                      retest band or has not left it since the fractal printed
 //       Retest       – level intact, the chart bar's range reaches into the retest
@@ -86,10 +87,10 @@
 //   inputs apply to every symbol. The symbol profile ("Auto" detects it) sets
 //   what genuinely differs: gold CFDs and COMEX halt 17:00–18:00 New York, so on
 //   timeframes up to 1H the XAUUSD profile ignores fractals whose centre bar
-//   opens in, or closes into, the 16:40–18:20 New York window (the 1H bar
-//   opening 16:00 and the 30m bar opening 16:30 included; not on crypto venues,
-//   where tokenised gold and BTC trade 24/7); gold prints 2 decimals, BTC whole
-//   dollars.
+//   opens in the 16:40–18:20 New York window (16:30–18:20 for 30m / 45m bars,
+//   16:00–18:20 for 1H bars, so the bar that closes into the 17:00 halt is
+//   always included; not on crypto venues, where tokenised gold and BTC trade
+//   24/7); gold prints 2 decimals, BTC whole dollars.
 // ─────────────────────────────────────────────────────────────────────────────
 indicator("MTF Fractals + Stage v6", shorttitle = "MTF Fractals v6", overlay = true, max_lines_count = 50, max_labels_count = 50)
 
@@ -108,7 +109,7 @@ rightBars      = input.int(2, "Bars right (confirm)", minval = 1, maxval = 10, g
 tieLeft        = input.bool(true, "Allow equal highs / lows on the left side", group = G_FRACT,
      tooltip = "On: equal highs / lows are tolerated anywhere in the left window, so the newest bar of a plateau or of a tight double top / bottom tied to the tick registers as the fractal (looser than the built-in Williams Fractal, which caps the plateau at 4 bars). Off: strict on both sides, as in the v5 script, so a tied extreme never prints a fractal.")
 rolloverMode   = input.string("Auto", "Ignore gold rollover-window fractals", options = ["Auto", "On", "Off"], group = G_FRACT,
-     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens in, or closes into, the 16:40-18:20 New York window are ignored (the 1H bar opening 16:00 and the 30m bar opening 16:30 included). Auto = on for the XAUUSD profile on venues that halt (not tokenised gold on crypto exchanges); bitcoin stays off. Select On if your feed halts in this window.")
+     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens in the 16:40-18:20 New York window are ignored (16:30-18:20 for 30m / 45m bars, 16:00-18:20 for 1H bars, so the bar that closes into the 17:00 halt is always included). Auto = on for the XAUUSD profile on venues that halt (not tokenised gold on crypto exchanges); bitcoin stays off. Select On if your feed halts in this window.")
 chartCloseOnly = input.bool(true, "Chart-TF signals on bar close only", group = G_FRACT,
      tooltip = "On: the Chart row confirms a fractal, updates its level and its Broken / Failed break state, draws the mark and fires the 'Chart up/dn fractal' and 'Chart swing high/low broken' alerts only once the chart bar has closed (equivalent to 'Once per bar close'); Retest / Flip retest still follow the live bar range. Off: v5 behaviour, a fractal can be confirmed and a break judged intrabar, and both can vanish if the bar later moves. Higher-TF rows always use completed bars.")
 
