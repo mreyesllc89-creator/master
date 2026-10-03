@@ -4,10 +4,25 @@
 //
 // What it does
 //   • Williams fractals (swing highs / swing lows) on the chart TF and on
-//     5m / 15m / 1H / 4H / D / W. Right side strict, so a fractal can never be
-//     broken on the bar that confirms it; equal extremes allowed on the left
-//     (input) so double tops / bottoms at a tied price register.
-//   • The most recent fractal of each side on each TF gets a stage:
+//     5s / 10s / 15s / 30s / 1m / 5m / 15m / 1H / 4H / D / W. A row is shown
+//     only when it is higher than the chart TF, so on a 1s chart every row is
+//     available and the Chart row is the 1s row (nothing is lower than 1s);
+//     on a 5m chart the rows are 15m and up. Right side strict, so a fractal
+//     can never be broken on the bar that confirms it; equal extremes allowed
+//     on the left (input) so double tops / bottoms at a tied price register.
+//
+// How to read the table (one row per timeframe)
+//     Swing hi  – price of the last swing high of that TF (resistance)
+//     Stage     – what price has done with that level since it printed
+//     Swing lo  – price of the last swing low of that TF (support)
+//     Bias      – +1 when the swing high is broken, −1 when the swing low is
+//                 broken, 0 otherwise; the Σ row sums the enabled rows
+//     Hover a level for its ATR, retest band, break buffer and age; hover a
+//     stage for what it means. Chart-row levels are also drawn as lines and
+//     labelled on the right edge of the chart.
+//   • The most recent fractal of each side on each TF gets a stage (the table
+//     always shows the latest swing of each side, so a new fractal replaces the
+//     previous level and restarts its stage at Confirmed):
 //       Confirmed    – fractal confirmed on this TF's latest bar (higher TFs: on
 //                      the previous closed bar of that TF; a higher-TF row shows
 //                      Retest instead while the chart bar is back in the band)
@@ -34,9 +49,9 @@
 //     fires its fractal / break alerts only on the bar close (input), so they
 //     cannot appear intrabar and vanish. Retest / Flip retest are range events
 //     on every row and update live.
-//   • Defaults differ from v5: 5m is off (it is only shown on 1m / seconds
-//     charts), Weekly is on (the only higher-TF row a D chart can show), and
-//     tied double tops / bottoms now print a fractal (input tieLeft).
+//   • Defaults differ from v5: every row is on (rows below the chart TF are
+//     simply hidden), Weekly is on (the only higher-TF row a D chart can show),
+//     and tied double tops / bottoms now print a fractal (input tieLeft).
 //   • Bias (data window, table column, optional tint): +1 per enabled TF whose
 //     last swing high is Broken / Flip retest, −1 per TF whose last swing low is
 //     Broken / Flip retest; intact levels, Retest and Failed break count 0.
@@ -108,20 +123,28 @@ breakPct   = input.float(0.045, "Break buffer % (Percent mode)", minval = 0.0,  
 maxAge     = input.int(0, "Expire level N bars after confirmation (0 = never)", minval = 0, group = G_STAGE,
      tooltip = "Counted in bars of the level's own timeframe, starting at the bar that confirms the fractal; the level is removed on the Nth bar. The table tooltip shows age from the fractal's centre bar (for higher-TF rows, as of that TF's last completed bar), which is 'Bars right' larger.")
 
-useChart = input.bool(true,  "Chart TF", group = G_TF, inline = "tf1")
-use5     = input.bool(false, "5m",       group = G_TF, inline = "tf1")
-use15    = input.bool(true,  "15m",      group = G_TF, inline = "tf1", tooltip = "A row is shown only when its length is above the chart length and a whole multiple of it. 5m: on 1m and seconds charts that divide 5 minutes (hidden on 2m / 3m / 4m). 15m: on 1m, 3m, 5m and such seconds charts (hidden on 2m, 4m, 10m). Hidden rows are listed in the Σ row tooltip.")
-use60    = input.bool(true,  "1H",       group = G_TF, inline = "tf2")
-use240   = input.bool(true,  "4H",       group = G_TF, inline = "tf2")
-useD     = input.bool(true,  "Daily",    group = G_TF, inline = "tf2")
-useW     = input.bool(true,  "Weekly",   group = G_TF, inline = "tf2", tooltip = "1H: hidden on 45m charts. 4H: hidden on 45m and 3H charts. Weekly is the only higher-TF row available on a D chart and needs 'Bars left' + 'Bars right' + 1 completed weekly bars (5 with the defaults) before it can show a level.")
+useChart = input.bool(true, "Chart TF", group = G_TF, inline = "tf0")
+use5S    = input.bool(true, "5s",       group = G_TF, inline = "tf0")
+use10S   = input.bool(true, "10s",      group = G_TF, inline = "tf0")
+use15S   = input.bool(true, "15s",      group = G_TF, inline = "tf0")
+use30S   = input.bool(true, "30s",      group = G_TF, inline = "tf0", tooltip = "Seconds rows appear only on seconds charts below them (1s chart: all four; 5s chart: 10s / 15s / 30s; 10s chart: 30s; 15s chart: 30s). On a 1s chart the Chart row is the 1s row: nothing is lower than 1s, so no separate 1s row exists. Seconds data needs a TradingView plan that offers seconds charts.")
+use1     = input.bool(true, "1m",       group = G_TF, inline = "tf1")
+use5     = input.bool(true, "5m",       group = G_TF, inline = "tf1")
+use15    = input.bool(true, "15m",      group = G_TF, inline = "tf1", tooltip = "A row is shown only when its length is above the chart length and a whole multiple of it. 1m: on seconds charts. 5m: on 1m and seconds charts that divide 5 minutes (hidden on 2m / 3m / 4m). 15m: on 1m, 3m, 5m and such seconds charts (hidden on 2m, 4m, 10m). Hidden rows are summarised in the Σ row tooltip.")
+use60    = input.bool(true, "1H",       group = G_TF, inline = "tf2")
+use240   = input.bool(true, "4H",       group = G_TF, inline = "tf2")
+useD     = input.bool(true, "Daily",    group = G_TF, inline = "tf2")
+useW     = input.bool(true, "Weekly",   group = G_TF, inline = "tf2", tooltip = "1H: hidden on 45m charts. 4H: hidden on 45m and 3H charts. Weekly is the only higher-TF row available on a D chart and needs 'Bars left' + 'Bars right' + 1 completed weekly bars (5 with the defaults) before it can show a level. On seconds charts the loaded history is short, so D and W rows may say 'only N bars'.")
 
-showMarks    = input.bool(true,  "Plot fractal marks",             group = G_DISP)
+showMarks    = input.bool(true,  "Plot fractal marks",             group = G_DISP, inline = "marks")
+bigMarks     = input.bool(true,  "large",                          group = G_DISP, inline = "marks", tooltip = "Triangle marks on confirmed chart-TF fractals: large (normal size) or small (tiny).")
 showStageTbl = input.bool(true,  "Stage table",                    group = G_DISP)
 showLabels   = input.bool(true,  "Labels on last chart fractals",  group = G_DISP)
 showLines    = input.bool(true,  "Level lines (chart TF)",         group = G_DISP)
 showHtfLines = input.bool(false, "Level lines (higher TFs)",       group = G_DISP)
 showBiasBg   = input.bool(false, "Background tint from MTF bias",  group = G_DISP)
+labelSize    = input.string("large",  "Label size",      options = ["small", "normal", "large", "huge"], group = G_DISP, inline = "size")
+tblSize      = input.string("normal", "Table text size", options = ["tiny", "small", "normal", "large"], group = G_DISP, inline = "size")
 tblPos       = input.string("top_right", "Table position", options = ["top_left", "top_right", "bottom_left", "bottom_right"], group = G_DISP)
 bullCol      = input.color(color.new(color.teal, 0), "Bull", group = G_DISP, inline = "col")
 bearCol      = input.color(color.new(color.red, 0),  "Bear", group = G_DISP, inline = "col")
@@ -295,6 +318,29 @@ stageColor(int s) =>
         6 => color.gray
         => color.gray
 
+// Plain-language meaning of each stage, shown in label and table tooltips.
+stageDesc(int s) =>
+    switch s
+        1 => "Confirmed: the fractal has just been confirmed on this timeframe. The level is fresh and untested."
+        2 => "Retest: the level is intact and the current chart bar reaches back into the retest band after having been away from it. Watch for rejection (level holds) or a close through it (break)."
+        3 => "Broken: this timeframe closed through the level by more than the break buffer. A broken swing high counts +1 to the bias, a broken swing low −1."
+        4 => "Holding: no close through the level yet and price is away from it (or has not left the band since the fractal printed)."
+        5 => "Flip retest: the level was broken, price moved away and the current chart bar is back at it from the other side. The old resistance is being tested as support, or the old support as resistance."
+        6 => "Failed break: the level was broken but this timeframe then closed back through it by more than the buffer. The break did not hold; the level is in play again."
+        => "No level yet: not enough bars of this timeframe to confirm a fractal."
+
+sizeOf(string s) =>
+    switch s
+        "tiny"   => size.tiny
+        "small"  => size.small
+        "normal" => size.normal
+        "large"  => size.large
+        "huge"   => size.huge
+        => size.normal
+
+string lblSz = sizeOf(labelSize)
+string tblSz = sizeOf(tblSize)
+
 // Rows lower than the chart TF would only see the last intrabar of each chart
 // bar; a row equal to the chart TF would be the Chart row one bar late (the
 // engine runs on completed bars); a row that is not a whole multiple of the
@@ -304,12 +350,22 @@ tfNote(simple string tf) =>
     int s = timeframe.in_seconds(tf)
     timeframe.isticks ? "tick chart" : s < chartSec ? "< chart" : s == chartSec ? "= chart" : s % chartSec != 0 ? "not a multiple" : ""
 
+string n5S  = tfNote("5S")
+string n10S = tfNote("10S")
+string n15S = tfNote("15S")
+string n30S = tfNote("30S")
+string n1   = tfNote("1")
 string n5   = tfNote("5")
 string n15  = tfNote("15")
 string n60  = tfNote("60")
 string n240 = tfNote("240")
 string nD   = tfNote("D")
 string nW   = tfNote("W")
+bool   v5S  = n5S == ""
+bool   v10S = n10S == ""
+bool   v15S = n15S == ""
+bool   v30S = n30S == ""
+bool   v1   = n1 == ""
 bool   v5   = n5 == ""
 bool   v15  = n15 == ""
 bool   v60  = n60 == ""
@@ -321,6 +377,11 @@ bool   vW   = nW == ""
 // weekly series (a few hundred bars on any symbol) instead of loading and
 // processing the full intraday history for nothing. All gates are simple, so
 // each request runs on every bar or never, and the engine state stays consistent.
+string tf5S  = use5S  and v5S  ? "5S"  : "W"
+string tf10S = use10S and v10S ? "10S" : "W"
+string tf15S = use15S and v15S ? "15S" : "W"
+string tf30S = use30S and v30S ? "30S" : "W"
+string tf1   = use1   and v1   ? "1"   : "W"
 string tf5   = use5   and v5   ? "5"   : "W"
 string tf15  = use15  and v15  ? "15"  : "W"
 string tf60  = use60  and v60  ? "60"  : "W"
@@ -333,10 +394,17 @@ bool chartGate = not chartCloseOnly or barstate.isconfirmed
 int cUpSt = sideStage(cUpL, cAtr, cAtr, cUpHit, cUpT, cUpB)
 int cDnSt = sideStage(cDnL, cAtr, cAtr, cDnHit, cDnT, cDnB)
 
-plotshape(showMarks and cUpHit, title = "Up fractal", style = shape.triangleup,   location = location.abovebar, color = bullCol, size = size.tiny, offset = -rightBars)
-plotshape(showMarks and cDnHit, title = "Dn fractal", style = shape.triangledown, location = location.belowbar, color = bearCol, size = size.tiny, offset = -rightBars)
+plotshape(showMarks and bigMarks and cUpHit,     title = "Up fractal",         style = shape.triangleup,   location = location.abovebar, color = bullCol, size = size.normal, offset = -rightBars)
+plotshape(showMarks and bigMarks and cDnHit,     title = "Dn fractal",         style = shape.triangledown, location = location.belowbar, color = bearCol, size = size.normal, offset = -rightBars)
+plotshape(showMarks and not bigMarks and cUpHit, title = "Up fractal (small)", style = shape.triangleup,   location = location.abovebar, color = bullCol, size = size.tiny,   offset = -rightBars)
+plotshape(showMarks and not bigMarks and cDnHit, title = "Dn fractal (small)", style = shape.triangledown, location = location.belowbar, color = bearCol, size = size.tiny,   offset = -rightBars)
 
 // ── Higher TFs (completed bars only) ─────────────────────────────────────────
+[u5S,  d5S,  a5S,  uh5S,  dh5S,  ua5S,  da5S,  ut5S,  dt5S,  ub5S,  db5S,  n5Sb]  = request.security(syminfo.tickerid, tf5S,  tfEngine(1, timeframe.in_seconds(tf5S),  true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u10S, d10S, a10S, uh10S, dh10S, ua10S, da10S, ut10S, dt10S, ub10S, db10S, n10Sb] = request.security(syminfo.tickerid, tf10S, tfEngine(1, timeframe.in_seconds(tf10S), true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u15S, d15S, a15S, uh15S, dh15S, ua15S, da15S, ut15S, dt15S, ub15S, db15S, n15Sb] = request.security(syminfo.tickerid, tf15S, tfEngine(1, timeframe.in_seconds(tf15S), true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u30S, d30S, a30S, uh30S, dh30S, ua30S, da30S, ut30S, dt30S, ub30S, db30S, n30Sb] = request.security(syminfo.tickerid, tf30S, tfEngine(1, timeframe.in_seconds(tf30S), true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u1,   d1,   a1,   uh1,   dh1,   ua1,   da1,   ut1,   dt1,   ub1,   db1,   n1b]   = request.security(syminfo.tickerid, tf1,   tfEngine(1, timeframe.in_seconds(tf1),   true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
 [u5,   d5,   a5,   uh5,   dh5,   ua5,   da5,   ut5,   dt5,   ub5,   db5,   n5b]   = request.security(syminfo.tickerid, tf5,   tfEngine(1, timeframe.in_seconds(tf5),   true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
 [u15,  d15,  a15,  uh15,  dh15,  ua15,  da15,  ut15,  dt15,  ub15,  db15,  n15b]  = request.security(syminfo.tickerid, tf15,  tfEngine(1, timeframe.in_seconds(tf15),  true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
 [u60,  d60,  a60,  uh60,  dh60,  ua60,  da60,  ut60,  dt60,  ub60,  db60,  n60b]  = request.security(syminfo.tickerid, tf60,  tfEngine(1, timeframe.in_seconds(tf60),  true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
@@ -344,6 +412,16 @@ plotshape(showMarks and cDnHit, title = "Dn fractal", style = shape.triangledown
 [uD,   dD,   aD,   uhD,   dhD,   uaD,   daD,   utD,   dtD,   ubD,   dbD,   nDb]   = request.security(syminfo.tickerid, tfD,   tfEngine(1, timeframe.in_seconds(tfD),   true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
 [uW,   dW,   aW,   uhW,   dhW,   uaW,   daW,   utW,   dtW,   ubW,   dbW,   nWb]   = request.security(syminfo.tickerid, "W",   tfEngine(1, timeframe.in_seconds("W"),   true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
 
+int us5S  = sideStage(u5S,  a5S,  cAtr, uh5S,  ut5S,  ub5S)
+int ds5S  = sideStage(d5S,  a5S,  cAtr, dh5S,  dt5S,  db5S)
+int us10S = sideStage(u10S, a10S, cAtr, uh10S, ut10S, ub10S)
+int ds10S = sideStage(d10S, a10S, cAtr, dh10S, dt10S, db10S)
+int us15S = sideStage(u15S, a15S, cAtr, uh15S, ut15S, ub15S)
+int ds15S = sideStage(d15S, a15S, cAtr, dh15S, dt15S, db15S)
+int us30S = sideStage(u30S, a30S, cAtr, uh30S, ut30S, ub30S)
+int ds30S = sideStage(d30S, a30S, cAtr, dh30S, dt30S, db30S)
+int us1   = sideStage(u1,   a1,   cAtr, uh1,   ut1,   ub1)
+int ds1   = sideStage(d1,   a1,   cAtr, dh1,   dt1,   db1)
 int us5   = sideStage(u5,   a5,   cAtr, uh5,   ut5,   ub5)
 int ds5   = sideStage(d5,   a5,   cAtr, dh5,   dt5,   db5)
 int us15  = sideStage(u15,  a15,  cAtr, uh15,  ut15,  ub15)
@@ -376,6 +454,11 @@ type Row
 
 rows = array.new<Row>()
 array.push(rows, Row.new("Chart", useChart, true, "",   cUpL, cDnL, cAtr, cUpSt, cDnSt, cUpAge, cDnAge, cUpT, cDnT, cN))
+array.push(rows, Row.new("5s",    use5S,    v5S,  n5S,  u5S,  d5S,  a5S,  us5S,  ds5S,  ua5S,  da5S,  ut5S,  dt5S,  n5Sb))
+array.push(rows, Row.new("10s",   use10S,   v10S, n10S, u10S, d10S, a10S, us10S, ds10S, ua10S, da10S, ut10S, dt10S, n10Sb))
+array.push(rows, Row.new("15s",   use15S,   v15S, n15S, u15S, d15S, a15S, us15S, ds15S, ua15S, da15S, ut15S, dt15S, n15Sb))
+array.push(rows, Row.new("30s",   use30S,   v30S, n30S, u30S, d30S, a30S, us30S, ds30S, ua30S, da30S, ut30S, dt30S, n30Sb))
+array.push(rows, Row.new("1m",    use1,     v1,   n1,   u1,   d1,   a1,   us1,   ds1,   ua1,   da1,   ut1,   dt1,   n1b))
 array.push(rows, Row.new("5m",    use5,     v5,   n5,   u5,   d5,   a5,   us5,   ds5,   ua5,   da5,   ut5,   dt5,   n5b))
 array.push(rows, Row.new("15m",   use15,    v15,  n15,  u15,  d15,  a15,  us15,  ds15,  ua15,  da15,  ut15,  dt15,  n15b))
 array.push(rows, Row.new("1H",    use60,    v60,  n60,  u60,  d60,  a60,  us60,  ds60,  ua60,  da60,  ut60,  dt60,  n60b))
@@ -397,13 +480,19 @@ biasOf(int upS, int dnS) =>
 
 int    bias      = 0
 int    nScore    = 0
+int    nBelow    = 0
 string hiddenTxt = ""
 for r in rows
     if r.on and r.valid
         bias   += biasOf(r.upSt, r.dnSt)
         nScore += 1
     else if r.on
-        hiddenTxt += (hiddenTxt == "" ? "" : ", ") + r.name + " (" + r.note + ")"
+        if r.note == "< chart"
+            nBelow += 1
+        else
+            hiddenTxt += (hiddenTxt == "" ? "" : ", ") + r.name + " (" + r.note + ")"
+if nBelow > 0
+    hiddenTxt := str.tostring(nBelow) + " row(s) below the chart TF" + (hiddenTxt == "" ? "" : ", " + hiddenTxt)
 
 plot(bias, "MTF fractal bias", display = display.data_window)
 bgcolor(showBiasBg and bias > 0 ? color.new(bullCol, 92) : showBiasBg and bias < 0 ? color.new(bearCol, 92) : na, title = "Bias tint")
@@ -414,7 +503,7 @@ pos = switch tblPos
     "top_right"    => position.top_right
     "bottom_left"  => position.bottom_left
     => position.bottom_right
-var table t = table.new(pos, 6, 10, bgcolor = color.new(#0d1117, 15), border_width = 1, border_color = color.new(color.gray, 60))
+var table t = table.new(pos, 6, 14, bgcolor = color.new(#0d1117, 15), border_width = 1, border_color = color.new(color.gray, 60))
 
 fmtPx(float x) =>
     na(x) ? "—" : str.tostring(x, pxFmt)
@@ -429,33 +518,34 @@ paintRow(int row, Row r) =>
     bool tooShort = r.nBars < leftBars + rightBars + 1
     string shortTxt = "only " + str.tostring(r.nBars) + " bars"
     string ageNote  = r.name == "Chart" ? " bars" : " bars (as of last closed " + r.name + " bar)"
-    table.cell(t, 0, row, r.name, text_color = color.silver, text_size = size.small)
-    table.cell(t, 1, row, fmtPx(r.upL), text_color = bullCol, text_size = size.small, tooltip = na(r.upL) ? "" : bandText(r.upL, r.atr) + "  ·  age " + str.tostring(r.upAge) + ageNote)
-    table.cell(t, 2, row, na(r.upL) and tooShort ? shortTxt : stageName(r.upSt), text_color = stageColor(r.upSt), text_size = size.small)
-    table.cell(t, 3, row, fmtPx(r.dnL), text_color = bearCol, text_size = size.small, tooltip = na(r.dnL) ? "" : bandText(r.dnL, r.atr) + "  ·  age " + str.tostring(r.dnAge) + ageNote)
-    table.cell(t, 4, row, na(r.dnL) and tooShort ? shortTxt : stageName(r.dnSt), text_color = stageColor(r.dnSt), text_size = size.small)
-    table.cell(t, 5, row, b > 0 ? "+1" : b < 0 ? "−1" : "0", text_color = b > 0 ? bullCol : b < 0 ? bearCol : color.gray, text_size = size.small)
+    string rowTip   = r.name == "Chart" ? "The chart's own timeframe. Level and break state update on the bar close; Retest follows the live bar." : "Levels and break state from completed " + r.name + " bars (no repainting); Retest follows the live chart bar."
+    table.cell(t, 0, row, r.name, text_color = color.silver, text_size = tblSz, tooltip = rowTip)
+    table.cell(t, 1, row, fmtPx(r.upL), text_color = bullCol, text_size = tblSz, tooltip = na(r.upL) ? "" : "Last swing high (resistance)  ·  " + bandText(r.upL, r.atr) + "  ·  age " + str.tostring(r.upAge) + ageNote)
+    table.cell(t, 2, row, na(r.upL) and tooShort ? shortTxt : stageName(r.upSt), text_color = stageColor(r.upSt), text_size = tblSz, tooltip = na(r.upL) and tooShort ? "Fewer completed bars than Bars left + Bars right + 1; a fractal cannot be confirmed yet." : stageDesc(r.upSt))
+    table.cell(t, 3, row, fmtPx(r.dnL), text_color = bearCol, text_size = tblSz, tooltip = na(r.dnL) ? "" : "Last swing low (support)  ·  " + bandText(r.dnL, r.atr) + "  ·  age " + str.tostring(r.dnAge) + ageNote)
+    table.cell(t, 4, row, na(r.dnL) and tooShort ? shortTxt : stageName(r.dnSt), text_color = stageColor(r.dnSt), text_size = tblSz, tooltip = na(r.dnL) and tooShort ? "Fewer completed bars than Bars left + Bars right + 1; a fractal cannot be confirmed yet." : stageDesc(r.dnSt))
+    table.cell(t, 5, row, b > 0 ? "+1" : b < 0 ? "−1" : "0", text_color = b > 0 ? bullCol : b < 0 ? bearCol : color.gray, text_size = tblSz, tooltip = "+1: swing high broken (price above resistance). −1: swing low broken (price below support). 0: both levels intact, or a failed break.")
 
 if showStageTbl and barstate.islast
-    table.cell(t, 0, 0, "TF",       text_color = color.gray, text_size = size.small)
-    table.cell(t, 1, 0, "Swing hi", text_color = color.gray, text_size = size.small)
-    table.cell(t, 2, 0, "Stage",    text_color = color.gray, text_size = size.small)
-    table.cell(t, 3, 0, "Swing lo", text_color = color.gray, text_size = size.small)
-    table.cell(t, 4, 0, "Stage",    text_color = color.gray, text_size = size.small)
-    table.cell(t, 5, 0, "Bias",     text_color = color.gray, text_size = size.small)
+    table.cell(t, 0, 0, "TF",       text_color = color.gray, text_size = tblSz, tooltip = "Timeframe of the row. Rows below the chart timeframe, equal to it, or not a whole multiple of it are hidden.")
+    table.cell(t, 1, 0, "Swing hi", text_color = color.gray, text_size = tblSz, tooltip = "Last confirmed swing high of that timeframe: resistance until broken.")
+    table.cell(t, 2, 0, "Stage",    text_color = color.gray, text_size = tblSz, tooltip = "Confirmed · Holding · Retest · Broken · Flip retest · Failed break. Hover a stage for its meaning.")
+    table.cell(t, 3, 0, "Swing lo", text_color = color.gray, text_size = tblSz, tooltip = "Last confirmed swing low of that timeframe: support until broken.")
+    table.cell(t, 4, 0, "Stage",    text_color = color.gray, text_size = tblSz, tooltip = "Confirmed · Holding · Retest · Broken · Flip retest · Failed break. Hover a stage for its meaning.")
+    table.cell(t, 5, 0, "Bias",     text_color = color.gray, text_size = tblSz, tooltip = "+1 broken swing high, −1 broken swing low, 0 otherwise. The Σ row sums the visible rows.")
     int rowIdx = 1
     for r in rows
         if r.on and r.valid
             paintRow(rowIdx, r)
             rowIdx += 1
     string profTxt = resolved + (rollOn ? " · rollover filter" : "") + "  L" + str.tostring(leftBars) + "/R" + str.tostring(rightBars) + (useAtrBand ? "  ATR" + str.tostring(atrLen) + " ×" + str.tostring(retestMul) + "/" + str.tostring(breakMul) : "  " + str.tostring(retestPct) + "%/" + str.tostring(breakPct) + "%")
-    string sumTip  = "Sum of the per-TF bias over the enabled, usable timeframes." + (hiddenTxt == "" ? "" : "  Hidden: " + hiddenTxt + ". A row must be higher than the chart timeframe and a whole multiple of it; the Chart row covers the chart timeframe.")
-    table.cell(t, 0, rowIdx, "Σ", text_color = color.gray, text_size = size.small)
-    table.cell(t, 1, rowIdx, profTxt, text_color = color.silver, text_size = size.small, tooltip = "Symbol profile" + (rollOn ? " (rollover filter on)" : "") + " · fractal left/right · " + (useAtrBand ? "ATR length × retest multiplier / break multiplier" : "retest band % / break buffer % (Percent mode)"))
-    table.cell(t, 2, rowIdx, "", text_size = size.small)
-    table.cell(t, 3, rowIdx, "", text_size = size.small)
-    table.cell(t, 4, rowIdx, "", text_size = size.small)
-    table.cell(t, 5, rowIdx, (bias > 0 ? "+" : "") + str.tostring(bias) + " / " + str.tostring(nScore), text_color = bias > 0 ? bullCol : bias < 0 ? bearCol : color.gray, text_size = size.small, tooltip = sumTip)
+    string sumTip  = "Sum of the per-TF bias over the enabled, usable timeframes (bias / rows counted). Positive: more timeframes have broken above resistance than below support." + (hiddenTxt == "" ? "" : "  Hidden: " + hiddenTxt + ". A row must be higher than the chart timeframe and a whole multiple of it; the Chart row covers the chart timeframe.")
+    table.cell(t, 0, rowIdx, "Σ", text_color = color.gray, text_size = tblSz)
+    table.cell(t, 1, rowIdx, profTxt, text_color = color.silver, text_size = tblSz, tooltip = "Symbol profile" + (rollOn ? " (rollover filter on)" : "") + " · fractal left/right · " + (useAtrBand ? "ATR length × retest multiplier / break multiplier" : "retest band % / break buffer % (Percent mode)"))
+    table.cell(t, 2, rowIdx, "", text_size = tblSz)
+    table.cell(t, 3, rowIdx, "", text_size = tblSz)
+    table.cell(t, 4, rowIdx, "", text_size = tblSz)
+    table.cell(t, 5, rowIdx, (bias > 0 ? "+" : "") + str.tostring(bias) + " / " + str.tostring(nScore), text_color = bias > 0 ? bullCol : bias < 0 ? bearCol : color.gray, text_size = tblSz, tooltip = sumTip)
 
 // ── Labels on last chart fractals ────────────────────────────────────────────
 var label upLab = na
@@ -464,9 +554,9 @@ if showLabels and barstate.islast
     label.delete(upLab)
     label.delete(dnLab)
     if not na(cUpL)
-        upLab := label.new(bar_index + 1, cUpL, "▲ " + stageName(cUpSt) + "  " + fmtPx(cUpL), xloc = xloc.bar_index, style = label.style_label_left, color = color.new(bullCol, 75), textcolor = bullCol, size = size.small)
+        upLab := label.new(bar_index + 1, cUpL, "▲ Swing high " + fmtPx(cUpL) + "\n" + stageName(cUpSt) + " · " + str.tostring(cUpAge) + " bars", xloc = xloc.bar_index, style = label.style_label_left, color = color.new(bullCol, 75), textcolor = bullCol, size = lblSz, tooltip = stageDesc(cUpSt) + "\n" + bandText(cUpL, cAtr))
     if not na(cDnL)
-        dnLab := label.new(bar_index + 1, cDnL, "▼ " + stageName(cDnSt) + "  " + fmtPx(cDnL), xloc = xloc.bar_index, style = label.style_label_left, color = color.new(bearCol, 75), textcolor = bearCol, size = size.small)
+        dnLab := label.new(bar_index + 1, cDnL, "▼ Swing low " + fmtPx(cDnL) + "\n" + stageName(cDnSt) + " · " + str.tostring(cDnAge) + " bars", xloc = xloc.bar_index, style = label.style_label_left, color = color.new(bearCol, 75), textcolor = bearCol, size = lblSz, tooltip = stageDesc(cDnSt) + "\n" + bandText(cDnL, cAtr))
 
 // ── Level lines ──────────────────────────────────────────────────────────────
 var line cUpLine = na
@@ -505,6 +595,16 @@ bool cUpBrk = enteredBroken(cUpSt) and chartGate
 bool cDnBrk = enteredBroken(cDnSt) and chartGate
 bool cUpRt  = enteredRetest(cUpSt)
 bool cDnRt  = enteredRetest(cDnSt)
+bool b5Su   = enteredBroken(us5S)
+bool b5Sd   = enteredBroken(ds5S)
+bool b10Su  = enteredBroken(us10S)
+bool b10Sd  = enteredBroken(ds10S)
+bool b15Su  = enteredBroken(us15S)
+bool b15Sd  = enteredBroken(ds15S)
+bool b30Su  = enteredBroken(us30S)
+bool b30Sd  = enteredBroken(ds30S)
+bool b1u    = enteredBroken(us1)
+bool b1d    = enteredBroken(ds1)
 bool b5u    = enteredBroken(us5)
 bool b5d    = enteredBroken(ds5)
 bool b15u   = enteredBroken(us15)
@@ -518,8 +618,8 @@ bool bDd    = enteredBroken(dsD)
 bool bWu    = enteredBroken(usW)
 bool bWd    = enteredBroken(dsW)
 
-bool htfUpBreak = (use5 and v5 and b5u) or (use15 and v15 and b15u) or (use60 and v60 and b60u) or (use240 and v240 and b240u) or (useD and vD and bDu) or (useW and vW and bWu)
-bool htfDnBreak = (use5 and v5 and b5d) or (use15 and v15 and b15d) or (use60 and v60 and b60d) or (use240 and v240 and b240d) or (useD and vD and bDd) or (useW and vW and bWd)
+bool htfUpBreak = (use5S and v5S and b5Su) or (use10S and v10S and b10Su) or (use15S and v15S and b15Su) or (use30S and v30S and b30Su) or (use1 and v1 and b1u) or (use5 and v5 and b5u) or (use15 and v15 and b15u) or (use60 and v60 and b60u) or (use240 and v240 and b240u) or (useD and vD and bDu) or (useW and vW and bWu)
+bool htfDnBreak = (use5S and v5S and b5Sd) or (use10S and v10S and b10Sd) or (use15S and v15S and b15Sd) or (use30S and v30S and b30Sd) or (use1 and v1 and b1d) or (use5 and v5 and b5d) or (use15 and v15 and b15d) or (use60 and v60 and b60d) or (use240 and v240 and b240d) or (useD and vD and bDd) or (useW and vW and bWd)
 
 alertcondition(cUpHit,     "Chart up fractal",        "Up fractal confirmed (chart TF) on {{ticker}}")
 alertcondition(cDnHit,     "Chart dn fractal",        "Down fractal confirmed (chart TF) on {{ticker}}")

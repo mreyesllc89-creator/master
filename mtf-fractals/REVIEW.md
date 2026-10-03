@@ -3,6 +3,7 @@
 Files:
 
 - `mtf_fractals_stage_v6.pine` — the Pine Script v6 rewrite (paste into the Pine Editor).
+- `GUIDE.md` — how to read the table, the six stages, the bias, the alerts and every setting.
 - `original_v5.pine` — the script as received, kept for reference.
 
 No Pine compiler exists outside TradingView, so the v6 script was checked by three
@@ -113,7 +114,7 @@ timeframe above 5m.
 | Break buffer | 0.15 × row ATR, floor 0.012 % of the level | Gold: above one CFD spread even on 5m, and the floor (≈ $0.50) holds when the 5m ATR collapses in the 21:00–23:00 UTC lull. BTC: filters marginal closes in a fat-tailed market; the floor (≈ $9) is irrelevant next to its ATR buffer. On D it is $9.5 / $380, far below a real breakout close, so no real break is delayed. |
 | Rollover filter | XAUUSD profile only | Gold CFDs and COMEX halt 17:00–18:00 ET; the thin bars around the halt and the Sunday open print isolated extremes that are not tradable levels. Fractals whose centre bar opens 16:40–18:20 New York time on timeframes up to 1H are ignored. BTC trades continuously. |
 | Price format | gold 2 decimals, BTC whole dollars | Readability. |
-| Default rows | 15m, 1H, 4H, D, W | 5m is only valid below a 5m chart and is the least useful level on either symbol. W is on so a D chart still has a higher-TF row. |
+| Rows | 5s, 10s, 15s, 30s, 1m, 5m, 15m, 1H, 4H, D, W, all on | A row is shown only when it is higher than the chart timeframe and a whole multiple of it, so on a 1s chart every row is available and the Chart row is the 1s row; on a 5m chart the rows are 15m and up. Hidden rows cost nothing: their request is redirected to the weekly series. |
 | Percent mode | 0.15 % retest, 0.045 % buffer | The v5 band width with a buffer in the same 3 : 10 ratio as the ATR defaults. Only the width is v5's: the retest and break logic is the same as in ATR mode. Set the buffer to 0 for any close through the level to count. |
 
 After ATR normalisation the two instruments need the same multipliers, so every
@@ -148,8 +149,12 @@ price format.
 - **Gold rollover filter** is on for the XAUUSD profile on venues that halt
   (tokenised gold on crypto exchanges is excluded); the Σ row says
   "rollover filter" when it is active.
-- **Row defaults**: 5m off (it is only shown on 1m / seconds charts), Weekly on
-  (the only higher-TF row a D chart can show).
+- **Rows** now run from 5s to W and are all on by default; rows at or below the
+  chart timeframe are hidden rather than shown. Weekly is on (the only
+  higher-TF row a D chart can show).
+- **Labels** show two lines (price, then stage and age) with a tooltip that
+  explains the stage; label size, table text size and fractal-mark size are
+  inputs (large labels and marks by default). Every table cell has a tooltip.
 
 ## 5. Known limits
 
@@ -157,6 +162,9 @@ price format.
   chart timeframe; other rows are hidden rather than shown with a caveat.
 - Tick-based charts (`100T`) have no time length, so all higher-TF rows are hidden
   there and the rollover filter is skipped.
+- Seconds rows need a TradingView plan with seconds charts. They are only
+  requested when the chart itself is a lower seconds timeframe, so on plans
+  without seconds data they are never requested.
 - Higher-TF contexts only cover the chart's own history, so on a 1m chart the W
   row may never have enough bars for a fractal. The row says "only N bars".
 - Higher-TF ages and levels are as of that timeframe's last completed bar; the
