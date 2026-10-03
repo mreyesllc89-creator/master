@@ -16,15 +16,16 @@
 //     Stage     – what price has done with that level since it printed
 //     Swing lo  – price of the last swing low of that TF (support)
 //     Bias      – +1 when the swing high is broken, −1 when the swing low is
-//                 broken, 0 otherwise; the Σ row sums the enabled rows
+//                 broken, 0 otherwise; the Σ row sums the enabled, visible rows
 //     Hover a level for its ATR, retest band, break buffer and age; hover a
 //     stage for what it means. Chart-row levels are also drawn as lines and
 //     labelled on the right edge of the chart.
 //   • The most recent fractal of each side on each TF gets a stage (the table
 //     always shows the latest swing of each side, so a new fractal replaces the
 //     previous level and restarts its stage at Confirmed):
-//       Confirmed    – fractal confirmed on this TF's latest bar (higher TFs: on
-//                      the previous closed bar of that TF; a higher-TF row shows
+//       Confirmed    – fractal confirmed on this TF's latest bar (Chart row with
+//                      bar-close gating: also on the bar after; higher TFs: on the
+//                      previous closed bar of that TF; a higher-TF row shows
 //                      Retest instead while the chart bar is back in the band)
 //       Holding      – no close through the level yet; chart price is outside the
 //                      retest band or has not left it since the fractal printed
@@ -33,7 +34,8 @@
 //                      (also shown after a failed break)
 //       Broken       – this TF's close went through the level by more than the
 //                      break buffer; stays until this TF closes back through the
-//                      level by the buffer (Failed break) or the next fractal
+//                      level by the buffer (Failed break), the next fractal, or
+//                      the level expires (Expire level input)
 //       Flip retest  – level broken earlier, a chart bar has left the band and the
 //                      current bar's range is back inside it (support ⇄ resistance)
 //       Failed break – level was broken, then this TF's close went back through it
@@ -52,9 +54,10 @@
 //   • Defaults differ from v5: every row is on (rows below the chart TF are
 //     simply hidden), Weekly is on (the only higher-TF row a D chart can show),
 //     and tied double tops / bottoms now print a fractal (input tieLeft).
-//   • Bias (data window, table column, optional tint): +1 per enabled TF whose
-//     last swing high is Broken / Flip retest, −1 per TF whose last swing low is
-//     Broken / Flip retest; intact levels, Retest and Failed break count 0.
+//   • Bias (data window, table column, optional tint): +1 per enabled, visible
+//     TF whose last swing high is Broken / Flip retest, −1 per TF whose last
+//     swing low is Broken / Flip retest; intact levels, Retest and Failed break
+//     count 0.
 //     NOTE: opposite sign to the v5 script, which scored intact levels and so
 //     read bearish on an upside breakout. Re-create anything built on the old
 //     "MTF fractal bias" value.
@@ -83,8 +86,10 @@
 //   inputs apply to every symbol. The symbol profile ("Auto" detects it) sets
 //   what genuinely differs: gold CFDs and COMEX halt 17:00–18:00 New York, so on
 //   timeframes up to 1H the XAUUSD profile ignores fractals whose centre bar
-//   opens 16:40–18:20 New York time (not on crypto venues, where tokenised gold
-//   and BTC trade 24/7); gold prints 2 decimals, BTC whole dollars.
+//   opens in, or closes into, the 16:40–18:20 New York window (the 1H bar
+//   opening 16:00 and the 30m bar opening 16:30 included; not on crypto venues,
+//   where tokenised gold and BTC trade 24/7); gold prints 2 decimals, BTC whole
+//   dollars.
 // ─────────────────────────────────────────────────────────────────────────────
 indicator("MTF Fractals + Stage v6", shorttitle = "MTF Fractals v6", overlay = true, max_lines_count = 50, max_labels_count = 50)
 
@@ -103,7 +108,7 @@ rightBars      = input.int(2, "Bars right (confirm)", minval = 1, maxval = 10, g
 tieLeft        = input.bool(true, "Allow equal highs / lows on the left side", group = G_FRACT,
      tooltip = "On: equal highs / lows are tolerated anywhere in the left window, so the newest bar of a plateau or of a tight double top / bottom tied to the tick registers as the fractal (looser than the built-in Williams Fractal, which caps the plateau at 4 bars). Off: strict on both sides, as in the v5 script, so a tied extreme never prints a fractal.")
 rolloverMode   = input.string("Auto", "Ignore gold rollover-window fractals", options = ["Auto", "On", "Off"], group = G_FRACT,
-     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens 16:40-18:20 New York time are ignored. Auto = on for the XAUUSD profile on venues that halt (not tokenised gold on crypto exchanges); bitcoin stays off. Select On if your feed halts in this window.")
+     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens in, or closes into, the 16:40-18:20 New York window are ignored (the 1H bar opening 16:00 and the 30m bar opening 16:30 included). Auto = on for the XAUUSD profile on venues that halt (not tokenised gold on crypto exchanges); bitcoin stays off. Select On if your feed halts in this window.")
 chartCloseOnly = input.bool(true, "Chart-TF signals on bar close only", group = G_FRACT,
      tooltip = "On: the Chart row confirms a fractal, updates its level and its Broken / Failed break state, draws the mark and fires the 'Chart up/dn fractal' and 'Chart swing high/low broken' alerts only once the chart bar has closed (equivalent to 'Once per bar close'); Retest / Flip retest still follow the live bar range. Off: v5 behaviour, a fractal can be confirmed and a break judged intrabar, and both can vanish if the bar later moves. Higher-TF rows always use completed bars.")
 
@@ -159,7 +164,9 @@ bool   symBtc   = ((str.startswith(tick, "BTC") or str.startswith(tick, "XBT")) 
 string resolved = profile == "Auto" ? (symGold ? "XAUUSD" : symBtc ? "BTCUSD" : "Generic") : profile
 bool   isCrypto = syminfo.type == "crypto"
 bool   rollOn   = rolloverMode == "On" or (rolloverMode == "Auto" and resolved == "XAUUSD" and not isCrypto)
-string pxFmt    = resolved == "XAUUSD" ? "0.00" : resolved == "BTCUSD" ? "0" : format.mintick
+// fmtPx only runs on the last bar, so close is the live price; a BTC-prefixed
+// product priced below 1,000 (leveraged token, ETN) keeps its own tick format.
+string pxFmt    = resolved == "XAUUSD" ? "0.00" : resolved == "BTCUSD" and close >= 1000 ? "0" : format.mintick
 bool   useAtrBand = bandMode == "ATR"
 int    chartSec = timeframe.in_seconds(timeframe.isticks ? "1" : timeframe.period)
 
@@ -210,9 +217,12 @@ tfEngine(simple int off, simple int tfSec, bool gate) =>
     float atrSeed = ta.cum(ta.tr(true)) / (bar_index + 1)   // expanding mean while the RMA warms up
     float atrV    = na(atrRma) ? atrSeed : atrRma
     int   nBars   = bar_index + 1
+    // Window starts at the open of the bar that closes into the 17:00 halt:
+    // 16:00 for 1H bars, 16:30 for 30m / 45m, 16:40 for 15m and below.
+    string rollSess = tfSec >= 3600 ? "1600-1820:1234567" : tfSec >= 1800 ? "1630-1820:1234567" : "1640-1820:1234567"
     int   rollT   = na
     if rollOn and tfSec <= 3600 and not timeframe.isticks
-        rollT := time(timeframe.period, "1640-1820:1234567", "America/New_York")
+        rollT := time(timeframe.period, rollSess, "America/New_York")
     bool  inRoll  = not na(rollT)
     bool  upNow   = isUpFractal() and not inRoll[rightBars] and gate
     bool  dnNow   = isDnFractal() and not inRoll[rightBars] and gate
@@ -327,7 +337,7 @@ stageDesc(int s) =>
         4 => "Holding: no close through the level yet and price is away from it (or has not left the band since the fractal printed)."
         5 => "Flip retest: the level was broken, price moved away and the current chart bar is back at it from the other side. The old resistance is being tested as support, or the old support as resistance."
         6 => "Failed break: the level was broken but this timeframe then closed back through it by more than the buffer. The break did not hold; the level is in play again."
-        => "No level yet: not enough bars of this timeframe to confirm a fractal."
+        => "No level: no fractal of this side has been confirmed on this timeframe within the loaded history, or the level expired (Expire level input)."
 
 sizeOf(string s) =>
     switch s
@@ -391,8 +401,11 @@ string tfD   = useD   and vD   ? "D"   : "W"
 // ── Chart TF ─────────────────────────────────────────────────────────────────
 bool chartGate = not chartCloseOnly or barstate.isconfirmed
 [cUpL, cDnL, cAtr, cUpHit, cDnHit, cUpAge, cDnAge, cUpT, cDnT, cUpB, cDnB, cN] = tfEngine(0, chartSec, chartGate)
-int cUpSt = sideStage(cUpL, cAtr, cAtr, cUpHit, cUpT, cUpB)
-int cDnSt = sideStage(cDnL, cAtr, cAtr, cDnHit, cDnT, cDnB)
+// With bar-close gating the confirming tick is immediately followed by the next
+// bar, so "Confirmed" is also shown on that next bar (cUpHit[1] is the committed
+// closing value: identical on history and in real time).
+int cUpSt = sideStage(cUpL, cAtr, cAtr, cUpHit or (chartCloseOnly and cUpHit[1]), cUpT, cUpB)
+int cDnSt = sideStage(cDnL, cAtr, cAtr, cDnHit or (chartCloseOnly and cDnHit[1]), cDnT, cDnB)
 
 plotshape(showMarks and bigMarks and cUpHit,     title = "Up fractal",         style = shape.triangleup,   location = location.abovebar, color = bullCol, size = size.normal, offset = -rightBars)
 plotshape(showMarks and bigMarks and cDnHit,     title = "Dn fractal",         style = shape.triangledown, location = location.belowbar, color = bearCol, size = size.normal, offset = -rightBars)
@@ -518,12 +531,13 @@ paintRow(int row, Row r) =>
     bool tooShort = r.nBars < leftBars + rightBars + 1
     string shortTxt = "only " + str.tostring(r.nBars) + " bars"
     string ageNote  = r.name == "Chart" ? " bars" : " bars (as of last closed " + r.name + " bar)"
-    string rowTip   = r.name == "Chart" ? "The chart's own timeframe. Level and break state update on the bar close; Retest follows the live bar." : "Levels and break state from completed " + r.name + " bars (no repainting); Retest follows the live chart bar."
+    string rowTip   = r.name == "Chart" ? (chartCloseOnly ? "The chart's own timeframe. Level and break state update on the bar close; Retest follows the live bar." : "The chart's own timeframe. Level and break state update intrabar ('Chart-TF signals on bar close only' is Off) and can change until the bar closes; Retest follows the live bar.") : "Levels and break state from completed " + r.name + " bars (no repainting); Retest follows the live chart bar."
+    string noLvlTip = tooShort ? "Fewer completed bars than Bars left + Bars right + 1; a fractal cannot be confirmed yet." : stageDesc(0)
     table.cell(t, 0, row, r.name, text_color = color.silver, text_size = tblSz, tooltip = rowTip)
     table.cell(t, 1, row, fmtPx(r.upL), text_color = bullCol, text_size = tblSz, tooltip = na(r.upL) ? "" : "Last swing high (resistance)  ·  " + bandText(r.upL, r.atr) + "  ·  age " + str.tostring(r.upAge) + ageNote)
-    table.cell(t, 2, row, na(r.upL) and tooShort ? shortTxt : stageName(r.upSt), text_color = stageColor(r.upSt), text_size = tblSz, tooltip = na(r.upL) and tooShort ? "Fewer completed bars than Bars left + Bars right + 1; a fractal cannot be confirmed yet." : stageDesc(r.upSt))
+    table.cell(t, 2, row, na(r.upL) and tooShort ? shortTxt : stageName(r.upSt), text_color = stageColor(r.upSt), text_size = tblSz, tooltip = na(r.upL) ? noLvlTip : stageDesc(r.upSt))
     table.cell(t, 3, row, fmtPx(r.dnL), text_color = bearCol, text_size = tblSz, tooltip = na(r.dnL) ? "" : "Last swing low (support)  ·  " + bandText(r.dnL, r.atr) + "  ·  age " + str.tostring(r.dnAge) + ageNote)
-    table.cell(t, 4, row, na(r.dnL) and tooShort ? shortTxt : stageName(r.dnSt), text_color = stageColor(r.dnSt), text_size = tblSz, tooltip = na(r.dnL) and tooShort ? "Fewer completed bars than Bars left + Bars right + 1; a fractal cannot be confirmed yet." : stageDesc(r.dnSt))
+    table.cell(t, 4, row, na(r.dnL) and tooShort ? shortTxt : stageName(r.dnSt), text_color = stageColor(r.dnSt), text_size = tblSz, tooltip = na(r.dnL) ? noLvlTip : stageDesc(r.dnSt))
     table.cell(t, 5, row, b > 0 ? "+1" : b < 0 ? "−1" : "0", text_color = b > 0 ? bullCol : b < 0 ? bearCol : color.gray, text_size = tblSz, tooltip = "+1: swing high broken (price above resistance). −1: swing low broken (price below support). 0: both levels intact, or a failed break.")
 
 if showStageTbl and barstate.islast
@@ -564,10 +578,10 @@ var line cDnLine = na
 if showLines and barstate.islast
     line.delete(cUpLine)
     line.delete(cDnLine)
-    if not na(cUpL)
-        cUpLine := line.new(math.max(bar_index - cUpAge, bar_index - 4000), cUpL, bar_index + 1, cUpL, xloc = xloc.bar_index, color = color.new(bullCol, 30), style = line.style_solid, width = 1)
-    if not na(cDnL)
-        cDnLine := line.new(math.max(bar_index - cDnAge, bar_index - 4000), cDnL, bar_index + 1, cDnL, xloc = xloc.bar_index, color = color.new(bearCol, 30), style = line.style_solid, width = 1)
+    if not na(cUpL) and not na(cUpT)
+        cUpLine := line.new(cUpT, cUpL, time + chartSec * 1000, cUpL, xloc = xloc.bar_time, color = color.new(bullCol, 30), style = line.style_solid, width = 1)
+    if not na(cDnL) and not na(cDnT)
+        cDnLine := line.new(cDnT, cDnL, time + chartSec * 1000, cDnL, xloc = xloc.bar_time, color = color.new(bearCol, 30), style = line.style_solid, width = 1)
 
 // Higher-TF lines start at the open time of the fractal's centre bar.
 var array<line> htfLines = array.new<line>()

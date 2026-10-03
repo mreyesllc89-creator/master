@@ -71,8 +71,9 @@ The **Σ row** shows the symbol profile and the active calibration (for example
 `+3 / 5` meaning "+3 summed over 5 rows". Hover the total for the list of hidden
 rows.
 
-Prices are printed with 2 decimals for gold, whole dollars for bitcoin, and the
-symbol's own tick size for anything else.
+Prices are printed with 2 decimals for gold, whole dollars for bitcoin (when
+the symbol trades above 1,000), and the symbol's own tick size for anything
+else.
 
 ## 4. The six stages
 
@@ -85,7 +86,7 @@ volatility of the timeframe and the symbol. With default settings:
 
 | Stage | Colour | Meaning | How it is decided |
 |-------|--------|---------|-------------------|
-| **Confirmed** | yellow | The fractal has just been confirmed. The level is fresh and untested. | The bar that confirms the fractal has closed (for a higher timeframe: the previous bar of that timeframe). |
+| **Confirmed** | yellow | The fractal has just been confirmed. The level is fresh and untested. | The bar that confirms the fractal has closed (for a higher timeframe: the previous bar of that timeframe). On the Chart row with bar-close gating it also shows on the following bar, so it is visible live. |
 | **Holding** | lime | No close through the level yet, and price is away from it. | Level intact and the chart bar is outside the band (or has not left the band since the fractal printed). |
 | **Retest** | orange | Price is back at the level and the level is still intact. Watch for a rejection or a break. | Level intact, a chart bar has been entirely outside the band at least once, and the current chart bar's range reaches into the band. |
 | **Broken** | red | This timeframe closed through the level by more than the buffer. | The row's own close beyond the level ± buffer. Stays until the level is closed back through (Failed break) or a new fractal replaces it. |
@@ -177,9 +178,11 @@ calibration input below applies to every profile.
 - *Ignore gold rollover-window fractals* — gold CFDs and COMEX halt 17:00–18:00
   New York; the thin bars around the halt and the Sunday open print isolated
   extremes that are not tradable levels. On timeframes up to 1H, fractals whose
-  centre bar opens 16:40–18:20 New York time are ignored. Auto turns this on
-  for the XAUUSD profile on venues that halt; tokenised gold on crypto
-  exchanges and bitcoin are exempt. Select On to force it on any symbol.
+  centre bar opens in, or closes into, the 16:40–18:20 New York window are
+  ignored (the 1H bar opening 16:00 and the 30m bar opening 16:30 included).
+  Auto turns this on for the XAUUSD profile on venues that halt; tokenised
+  gold on crypto exchanges and bitcoin are exempt. Select On to force it on
+  any symbol.
 - *Chart-TF signals on bar close only* — on by default: the Chart row confirms
   fractals and judges breaks when the bar closes, so marks, levels and the
   break alert cannot appear mid-bar and vanish. Off reproduces the v5
