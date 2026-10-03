@@ -4,6 +4,7 @@ Files:
 
 - `mtf_fractals_stage_v6.pine` — the Pine Script v6 rewrite (paste into the Pine Editor).
 - `GUIDE.md` — how to read the table, the six stages, the bias, the alerts and every setting.
+- `mtf_fractals_stage_strategy_v6.pine` — the same engine as a backtestable strategy (entries on chart-TF breaks and flip retests, ATR stops, R targets, risk-based sizing); `STRATEGY.md` explains the rules and how to tune them.
 - `original_v5.pine` — the script as received, kept for reference.
 
 No Pine compiler exists outside TradingView, so the v6 script was checked by three
