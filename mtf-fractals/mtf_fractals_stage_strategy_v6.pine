@@ -12,7 +12,8 @@
 //     max breakout extension 1.5 ATR, breakeven off, exit on the opposite
 //     chart-TF break on. The engine and entry / exit inputs then only act in
 //     Custom; Direction, session, rollover, backtest range, stop placement,
-//     min / max stop and sizing inputs still apply.
+//     min / max stop and sizing inputs still apply, and so does a Trailing
+//     stop set to anything but "Profile".
 //   • Intraday fade: short a swing high whose break failed (this TF closed back
 //     below it by the buffer), long a failed swing-low break; 2/2 fractal,
 //     retest band 0.5 ATR, break buffer 0.05 ATR, stop 1.5 ATR from the entry,
@@ -45,9 +46,10 @@
 //     swing in Structure mode); flip retest = just beyond the zone. Every stop
 //     is at least 0.5 × ATR from the entry. Target 2 R, stop to breakeven at
 //     +1 R (on a bar that reaches +1 R and closes beyond the entry), optional
-//     trailing stop (Swing, Chandelier or ATR from close, starting at a chosen
-//     R) and time stop. An opposite chart-TF break closes the trade, or
-//     reverses it when the opposite entry passes its filters.
+//     trailing stop (Swing, Chandelier or From close; distance and start in
+//     ATR / R, price points or ticks) and time stop. An opposite chart-TF
+//     break closes the trade, or reverses it when the opposite entry passes
+//     its filters.
 //   • Position size: equity × risk % ÷ (stop distance × point value), capped
 //     at "Max position size" × equity and rounded to the lot step (whole
 //     contracts on futures), so every trade risks the same fraction of the
@@ -165,7 +167,7 @@ profile = input.string("Auto", "Symbol profile", options = ["Auto", "XAUUSD", "B
      tooltip = "Auto detects XAU / GOLD / GC futures and BTC / XBT symbols. The profile only sets what differs between the markets: the gold rollover filter and the price format (gold 2 decimals, BTC whole dollars). The calibration inputs below apply to every symbol profile; the Strategy profile below can override them (Intraday fade and Trend fix them as calibrated, Custom uses them as set).")
 
 stratProfile = input.string("Auto", "Strategy profile", options = ["Auto", "Intraday fade", "Trend", "Custom"], group = G_PROF,
-     tooltip = "Calibrated on OANDA:XAUUSD (30m, 4H, D and W exports, 0.005 % commission). Auto on gold: Intraday fade below 4H (tick, seconds and 1m to 3H charts), Trend on 4H and above; on other symbols Auto = Custom. Intraday fade: trade against failed breaks of the chart-TF swing (2/2 fractal, retest band 0.5 ATR, break buffer 0.05 ATR, stop 1.5 ATR from the entry, target 1 R, no trailing, no higher-TF filter). Trend: breakouts and flip retests, long only, 3/3 fractal, retest band 0.35 ATR, break buffer 0.15 ATR, breakout stop 1-2 ATR (the wider of 1 ATR and level − 0.5 ATR), flip-retest stop level − 0.5 ATR, no target, chandelier trail 4 ATR from +1 R, higher-TF bias on every valid higher-TF row (even hidden ones). Both profiles also force ATR band mode, ATR 14, tied left extremes, min buffer 0.012 %, no level expiry, max extension 1.5 ATR, breakeven off and exit on the opposite break, so the Fractal, Stage calibration and entry / exit inputs only act in Custom. Direction, session, rollover, backtest range, stop placement, min / max stop and sizing still apply. Custom uses every input as set (uncalibrated defaults).")
+     tooltip = "Calibrated on OANDA:XAUUSD (30m, 4H, D and W exports, 0.005 % commission). Auto on gold: Intraday fade below 4H (tick, seconds and 1m to 3H charts), Trend on 4H and above; on other symbols Auto = Custom. Intraday fade: trade against failed breaks of the chart-TF swing (2/2 fractal, retest band 0.5 ATR, break buffer 0.05 ATR, stop 1.5 ATR from the entry, target 1 R, no trailing, no higher-TF filter). Trend: breakouts and flip retests, long only, 3/3 fractal, retest band 0.35 ATR, break buffer 0.15 ATR, breakout stop 1-2 ATR (the wider of 1 ATR and level − 0.5 ATR), flip-retest stop level − 0.5 ATR, no target, chandelier trail 4 ATR from +1 R, higher-TF bias on every valid higher-TF row (even hidden ones). Both profiles also force ATR band mode, ATR 14, tied left extremes, min buffer 0.012 %, no level expiry, max extension 1.5 ATR, breakeven off and exit on the opposite break, so the Fractal, Stage calibration and entry / exit inputs only act in Custom. Direction, session, rollover, backtest range, stop placement, min / max stop, sizing and a Trailing stop other than Profile still apply. Custom uses every input as set (uncalibrated defaults).")
 leftBarsIn     = input.int(2, "Bars left",            minval = 1, maxval = 10, group = G_FRACT, tooltip = "Custom strategy profile only; Intraday fade uses 2 / 2, Trend 3 / 3.")
 rightBarsIn    = input.int(2, "Bars right (confirm)", minval = 1, maxval = 10, group = G_FRACT, tooltip = "Custom strategy profile only; Intraday fade uses 2 / 2, Trend 3 / 3.")
 tieLeftIn      = input.bool(true, "Allow equal highs / lows on the left side", group = G_FRACT,
@@ -725,7 +727,7 @@ bool htfDnBreak = (use5S and v5S and b5Sd) or (use10S and v10S and b10Sd) or (us
 // Strategy
 // ═════════════════════════════════════════════════════════════════════════════
 string G_STRAT = "Strategy entries (Custom profile; Direction, session and dates always apply)"
-string G_RISK  = "Risk and exits (stop / target / trail inputs: Custom profile)"
+string G_RISK  = "Risk and exits (stop and target: Custom profile; trailing: any profile)"
 
 dirMode    = input.string("Both", "Direction", options = ["Both", "Long only", "Short only"], group = G_STRAT,
      tooltip = "Long only for spot accounts that cannot short (e.g. Bitstamp / Coinbase BTC).")
@@ -754,19 +756,21 @@ endDate    = input.time(timestamp("2030-12-31T00:00:00"), "Backtest end",   grou
 stopMode   = input.string("ATR", "Breakout stop placement", options = ["ATR", "Structure"], group = G_RISK,
      tooltip = "ATR: the wider of entry − 'Breakout stop' × ATR and the far edge of the broken level's retest zone (level − retest band − break buffer), so a normal retest does not stop the trade. Structure: beyond the opposite chart-TF swing plus its buffer, but never inside the retest zone (a swing inside the zone gives the zone edge); falls back to ATR when that swing is missing, at or beyond the entry, or the stop would be further than 'Max structure stop'. Flip-retest entries always stop just beyond the retested level's zone.")
 stopAtrIn  = input.float(1.5, "Breakout stop (× chart ATR)", minval = 0.25, maxval = 10, step = 0.25, group = G_RISK,
-     tooltip = "1.5 × ATR: about $20 on 1H gold, $780 on 1H BTC.")
+     tooltip = "1.5 × ATR: about $25 on 1H gold (autumn 2026), $780 on 1H BTC.")
 minStopAtr = input.float(0.5, "Min stop distance (× chart ATR)", minval = 0.1, maxval = 5, step = 0.05, group = G_RISK,
      tooltip = "Safety floor on every initial stop distance. With the default ATR band the retest zone (about 0.65 × ATR) is already wider, so this only acts with a retest band below about 0.35 × ATR or in Percent band mode, where the zone can be much narrower than 0.5 × ATR.")
 maxStopAtr = input.float(4.0, "Max structure stop (× chart ATR)", minval = 1, maxval = 20, step = 0.5, group = G_RISK)
 rrTargetIn = input.float(2.0, "Target (R multiple, 0 = none)", minval = 0, maxval = 20, step = 0.25, group = G_RISK)
 beRIn      = input.float(1.0, "Move stop to breakeven at (R, 0 = off)", minval = 0, maxval = 10, step = 0.25, group = G_RISK,
      tooltip = "Once a bar has reached this many R in favour and closed beyond the entry price, the stop moves to the entry price.")
-trailModeIn = input.string("Off", "Trailing stop", options = ["Off", "Swing", "Chandelier", "ATR from close"], group = G_RISK,
-     tooltip = "Swing: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer; short: above each new swing high). Chandelier: best price since entry − distance × ATR. ATR from close: close − distance × ATR. Every mode only ratchets toward price. Combine with Target 0 to let winners run.")
-trailAtrIn = input.float(3.0, "Trail distance (× chart ATR)", minval = 0.5, maxval = 10, step = 0.25, group = G_RISK,
-     tooltip = "Used by Chandelier and ATR from close.")
-trailStartRIn = input.float(0.0, "Start trailing at (R)", minval = 0, maxval = 10, step = 0.25, group = G_RISK,
-     tooltip = "Trailing starts once the trade has been this many R in profit (best price since entry). 0 = trailing is active at once (the stop can first move on the bar after entry).")
+trailModeIn = input.string("Profile", "Trailing stop", options = ["Profile", "Off", "Swing", "Chandelier", "From close"], group = G_RISK,
+     tooltip = "Profile: the strategy profile's trailing (Trend: Chandelier 4 ATR from +1 R; Intraday fade and Custom: off). Any other choice applies on top of every profile, including the calibrated ones (their backtest results assume Profile). Swing: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer; short: above each new swing high). Chandelier: best price since entry − distance. From close: close − distance (long; mirrored for shorts). The stop moves on the bar close and only ratchets toward price. Combine with Target 0 to let winners run.")
+trailUnitIn = input.string("ATR", "Trail units", options = ["ATR", "Points", "Ticks"], group = G_RISK,
+     tooltip = "Units of 'Trail distance' and 'Start trailing at'. ATR: distance in × chart ATR, start in R (multiples of the initial stop distance). Points: both in price units (1 point = $1 on XAUUSD, 1 point = $1 on BTCUSD; on futures 1 point is worth the contract's point value). Ticks: both in the symbol's minimum price step (what MetaTrader calls points; Pine's own trail_points also uses ticks). The Data Window shows the resulting trail distance in price.")
+trailDistIn = input.float(3.0, "Trail distance", minval = 0.0001, step = 0.25, group = G_RISK,
+     tooltip = "Used by Chandelier and From close, in 'Trail units'. ATR: 3 ≈ $50 on 1H gold. Points: e.g. 5 = $5 on gold, 500 = $500 on BTC. Ticks: e.g. 500 ticks of 0.01 = $5. One ATR(14) on OANDA gold, Sep-Oct 2026: 1m ≈ $2 and 5m ≈ $4.5 (estimated), 30m ≈ $11-13, 1H ≈ $16-19, 4H ≈ $36-38, D ≈ $95-105, W ≈ $150-265; it was 3-7 times smaller in 2015-2020, so a fixed point distance only suits short backtests. The stop never moves closer than 'Min stop distance' to the close with Chandelier.")
+trailStartIn = input.float(0.0, "Start trailing at", minval = 0, step = 0.25, group = G_RISK,
+     tooltip = "Trailing starts once the best price since entry has been this far in profit: R with ATR units, price points with Points, ticks with Ticks. 0 = trailing is active at once (the stop can first move on the bar after entry).")
 riskPct    = input.float(1.0, "Risk per trade (% of equity)", minval = 0.05, maxval = 10, step = 0.05, group = G_RISK,
      tooltip = "Size = equity × risk % ÷ (stop distance × point value): ounces / BTC on CFD and spot symbols, contracts on futures (GC, MGC, BTC, MBT). The same 1 % means the same account risk on gold and on bitcoin. Commission and slippage come on top. Futures need enough equity for one whole contract: at 1 % on 1H about $20k for MGC, $200k for GC and $400k for CME BTC; smaller sizes round to 0 and the signal is skipped (counted in the Data Window).")
 maxLev     = input.float(10, "Max position size (× equity)", minval = 0.1, maxval = 100, step = 0.5, group = G_RISK,
@@ -785,9 +789,13 @@ bool   exitOnOpp   = isFadeP or isTrendP ? true : exitOnOppIn
 float  stopAtr     = isFadeP ? 1.5 : isTrendP ? 1.0 : stopAtrIn
 float  rrTarget    = isFadeP ? 1.0 : isTrendP ? 0.0 : rrTargetIn
 float  beR         = isFadeP or isTrendP ? 0.0 : beRIn
-string trailMode   = isFadeP ? "Off" : isTrendP ? "Chandelier" : trailModeIn
-float  trailAtr    = isTrendP ? 4.0 : trailAtrIn
-float  trailStartR = isTrendP ? 1.0 : trailStartRIn
+// Trailing: "Profile" keeps the profile's own (Trend: chandelier 4 ATR from +1 R,
+// otherwise off); any other choice overrides every profile with the inputs.
+bool   trailProf   = trailModeIn == "Profile"
+string trailMode   = trailProf ? (isTrendP ? "Chandelier" : "Off") : trailModeIn
+string trailUnit   = trailProf ? "ATR" : trailUnitIn
+float  trailDist   = trailProf ? 4.0 : trailDistIn
+float  trailStart  = trailProf ? 1.0 : trailStartIn
 bool   profShortOk = not isTrendP           // the gold Trend profile is long only
 
 // ── Filters ──────────────────────────────────────────────────────────────────
@@ -955,23 +963,29 @@ if canShort
         strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
 
 // ── Exit management while in a position (skipped on a reversal bar) ──────────
+// Trail distance and start threshold in price, from the chosen units.
+float trailPx = trailUnit == "Points" ? trailDist : trailUnit == "Ticks" ? trailDist * syminfo.mintick : trailDist * cAtr
+
+trailStartPx(float risk) =>
+    trailUnit == "Points" ? trailStart : trailUnit == "Ticks" ? trailStart * syminfo.mintick : trailStart * risk
+
 if isLong and not didShort
     float ep = strategy.position_avg_price
     if beR > 0 and not na(lRisk) and high >= ep + beR * lRisk and close > ep
         lStop := math.max(lStop, ep)
     lBest := na(lBest) ? high : math.max(lBest, high)
-    if trailMode != "Off" and not lTrailOn and not na(lRisk) and lBest - ep >= trailStartR * lRisk
+    if trailMode != "Off" and not lTrailOn and not na(lRisk) and lBest - ep >= trailStartPx(lRisk)
         lTrailOn := true
     if lTrailOn
-        if trailMode == "ATR from close"
-            lStop := math.max(lStop, close - trailAtr * cAtr)
+        if trailMode == "From close"
+            lStop := math.max(lStop, close - trailPx)
         else if trailMode == "Chandelier"
-            lStop := math.max(lStop, math.min(lBest - trailAtr * cAtr, close - minStopAtr * cAtr))
+            lStop := math.max(lStop, math.min(lBest - trailPx, close - minStopAtr * cAtr))
         else if trailMode == "Swing" and cDnHit and not na(cDnT) and cDnT > entryT
             float swStp = cDnL - breakBuf(cDnL, cAtr)
             if swStp < close
                 lStop := math.max(lStop, swStp)
-    strategy.exit("L-X", "L", stop = lStop, limit = lTp, comment_loss = "L stop", comment_profit = "L target", alert_message = "MTF Fractals: long exit " + syminfo.ticker + " (stop " + fmtPx(lStop) + ", target " + fmtPx(lTp) + ")")
+    strategy.exit("L-X", "L", stop = lStop, limit = lTp, comment_loss = lTrailOn ? "L trail" : "L stop", comment_profit = "L target", alert_message = "MTF Fractals: long exit " + syminfo.ticker + " (stop " + fmtPx(lStop) + ", target " + fmtPx(lTp) + ")")
     bool timeL = maxBars > 0 and not na(entryBar) and bar_index - entryBar >= maxBars
     if oppL or timeL
         strategy.close("L", comment = oppL ? "L opp break" : "L time", alert_message = msgOf("long closed"))
@@ -981,18 +995,18 @@ if isShort and not didLong
     if beR > 0 and not na(sRisk) and low <= ep - beR * sRisk and close < ep
         sStop := math.min(sStop, ep)
     sBest := na(sBest) ? low : math.min(sBest, low)
-    if trailMode != "Off" and not sTrailOn and not na(sRisk) and ep - sBest >= trailStartR * sRisk
+    if trailMode != "Off" and not sTrailOn and not na(sRisk) and ep - sBest >= trailStartPx(sRisk)
         sTrailOn := true
     if sTrailOn
-        if trailMode == "ATR from close"
-            sStop := math.min(sStop, close + trailAtr * cAtr)
+        if trailMode == "From close"
+            sStop := math.min(sStop, close + trailPx)
         else if trailMode == "Chandelier"
-            sStop := math.min(sStop, math.max(sBest + trailAtr * cAtr, close + minStopAtr * cAtr))
+            sStop := math.min(sStop, math.max(sBest + trailPx, close + minStopAtr * cAtr))
         else if trailMode == "Swing" and cUpHit and not na(cUpT) and cUpT > entryT
             float swStp = cUpL + breakBuf(cUpL, cAtr)
             if swStp > close
                 sStop := math.min(sStop, swStp)
-    strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
+    strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = sTrailOn ? "S trail" : "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
     bool timeS = maxBars > 0 and not na(entryBar) and bar_index - entryBar >= maxBars
     if oppS or timeS
         strategy.close("S", comment = oppS ? "S opp break" : "S time", alert_message = msgOf("short closed"))
@@ -1005,6 +1019,7 @@ plot(strategy.position_size < 0 ? sTp   : na, "Short target", color = color.new(
 
 // ── Skipped signals ──────────────────────────────────────────────────────────
 plot(nSkipped, "Signals skipped (size 0)", display = display.data_window)
+plot(trailMode == "Chandelier" or trailMode == "From close" ? trailPx : na, "Trail distance (price)", display = display.data_window)
 var label skipLab = na
 if barstate.islast
     label.delete(skipLab)

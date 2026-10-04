@@ -55,8 +55,9 @@ buffer 0.012 %, levels never expire, breakouts more than 1.5 ATR beyond the
 level skipped, breakeven off, exit on the opposite chart-TF break on. The
 Fractal, Stage calibration, entry and exit inputs then only act in *Custom*.
 These still apply under every profile: *Direction*, trading session, gold
-rollover filter, backtest range, stop placement, min / max stop distance and
-the sizing inputs.
+rollover filter, backtest range, stop placement, min / max stop distance, the
+sizing inputs, and *Trailing stop* when it is set to anything but *Profile*
+(the results below assume *Profile*).
 
 Trend's higher-TF filter counts every valid higher-TF row (the rows a 4H chart
 can request: daily and weekly), even rows you switched off in the table; the
@@ -173,7 +174,7 @@ with a narrower retest band or in Percent band mode.
 |------|---------|---------|
 | Target | 2 R | Two times the stop distance from the entry. 0 disables it. |
 | Breakeven | at +1 R | Once a bar has reached 1 R in favour **and closed beyond the entry**, the stop moves to the entry price. |
-| Trailing stop | off | **Swing**: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer). **Chandelier**: highest high since entry − N × ATR (lowest low + N × ATR for shorts). **ATR from close**: close − N × ATR. *Start trailing at (R)* delays it until the trade has been that many R in profit. Every mode only ratchets toward price; set *Target* to 0 to let winners run. |
+| Trailing stop | Profile (Trend: chandelier 4 ATR from +1 R; otherwise off) | **Swing**: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer). **Chandelier**: highest high since entry − distance (lowest low + distance for shorts), never closer than *Min stop distance* to the close. **From close**: close − distance (close + distance for shorts). *Trail units* sets what *Trail distance* and *Start trailing at* mean: **ATR** (distance × chart ATR, start in R), **Points** (both in price: 5 = $5 on gold) or **Ticks** (both in the symbol's minimum price step, what MetaTrader calls points). *Start trailing at* delays trailing until the best price since entry is that far in profit. The stop moves on the bar close and only ratchets toward price; set *Target* to 0 to let winners run. Any choice other than *Profile* also applies on top of the calibrated gold profiles. |
 | Opposite break | on | A long is closed when the chart-TF swing low turns Broken (a short mirrored). If that break also passes the entry filters, the position is **reversed** instead, so the breakout is not lost. |
 | Any-signal reversal | off | When on, any opposite entry signal reverses the position. |
 | Time stop | off | Close after N bars. |
