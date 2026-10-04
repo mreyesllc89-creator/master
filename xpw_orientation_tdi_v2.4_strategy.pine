@@ -1,0 +1,642 @@
+//@version=6
+// ============================================================================
+//  XPW ORIENTATION TDI  -  v2.4 STRATEGY  -  trades the v2.4 event labels
+// ----------------------------------------------------------------------------
+//  This is the v2.4 indicator turned into a strategy. Calibration, ladder
+//  logic, rung map, agreement gate and labels are the indicator's, line for
+//  line. The only change to the indicator's own logic: an event is detected
+//  whether or not labels are shown, so hiding labels never stops trading.
+//
+//  STRATEGY (group "Strategy")
+//    Trade direction   Both / Long only (buy only) / Short only (sell only).
+//    ENTER             "1st LEG ENTER LONGS" / "2nd LEG ENTER LONGS" buy,
+//                      "... ENTER SHORTS" sell. Exactly the bars the labels
+//                      print on, with the same agreement gate. Signals come
+//                      from the chart rung "*" and, when "Also label the
+//                      READ HERE rung" is on, from the "<<" rung as well.
+//    EXIT              "exit once, then wait": END 1st LEG / END 2nd LEG
+//                      closes the side that leg was on (upright = longs,
+//                      inverted = shorts). Toggle with "Exit on END labels".
+//    Opposite signal   Both: reverses. Long only / Short only: the opposite
+//                      ENTER closes the position (toggle) but never opens one.
+//    AGREE labels      Optional extra entries on "AGREE LONG/SHORT xN".
+//    Trailing TP       Arms once price moves "activation" in your favour,
+//                      then trails "offset" behind the best price.
+//                      Units: ticks, price, or percent of entry.
+//    Stop loss         Optional fixed stop, same units.
+//  Orders are placed on the bar close where the label prints and fill on
+//  the next bar's open (TradingView default).
+//
+//  AGREEMENT (group "Agreement", off by default)
+//    Every rung casts one vote from its own position and side:
+//      LONG   a first / second / mid leg while upright,
+//             or END FIRST LEG while inverted (the divergence flips it long)
+//      SHORT  the same shapes while inverted,
+//             or END FIRST LEG while upright (DIV SHORT ZONE)
+//      none   STAIRCASE. "continue, no entry" disagrees with entering,
+//             so it BREAKS a domino chain.
+//      skip   no data, unreadable, or an inherited position (per input).
+//             Transparent: it neither counts nor breaks the chain.
+//    A label draws only when at least N rungs (2..10) agree with its side.
+//      domino  = the rungs must agree in one unbroken chain that contains
+//                the rung that fired. One rung after the next, top down.
+//      fractal = any N agreeing rungs inside the scope, contiguous or not.
+//                The same read repeating at different scales.
+//    Scope = the whole ladder (default), the chart rung and every higher
+//    rung, or the chart rung and every lower one. N is clamped to the rungs
+//    in scope and the READ HERE row says so.
+//    "AGREE LONG x5" / "AGREE SHORT x5" fires the instant the Nth rung
+//    joins, so a signal that was gated at its own bar still shows up the
+//    moment the ladder catches up (the domino effect). In domino mode that
+//    chain has to run through the rung you read (READ HERE << if there is
+//    one, else the chart rung *): the dominoes must reach the rung you act
+//    on. The rung map gets an AGREE column with every rung's vote, and the
+//    READ HERE row shows the long and short counts against the required N.
+//
+//  LABEL EVENTS (per rung: the chart rung "*" and the READ HERE rung "<<")
+//    DIV SHORT ZONE / DIV LONG ZONE  the refusal at the extreme (divergence
+//                                    on price). Upright ladder: price broke
+//                                    the high, TDI refused -> SHORT zone.
+//                                    Inverted: broke the low -> LONG zone.
+//    END 1st LEG / END 2nd LEG       which leg the divergence closed.
+//    exit once, then wait            attached to every END leg label.
+//    1st LEG  ENTER LONGS/SHORTS     a first leg formed (own shape).
+//    2nd LEG  ENTER LONGS/SHORTS     a second leg formed (own shape).
+//    END 2nd LEG                     a second leg went into a staircase or
+//                                    lost its shape into MID FIRST LEG.
+//    look for LONGS/SHORTS,          optional (Labels > info), off by default.
+//    continue, no entry
+//  Long labels sit at the candle low, short labels at the candle high, both
+//  pointing at the bar from the right, with the price in the text and a
+//  short tick line at that price. Inherited positions never label.
+//
+//  v2.2 FIXES (kept)
+//    D1. An INHERITED position no longer moves the orientation.
+//    D2. baseDir comes from the highest rung whose direction is computed.
+//    D3. READ HERE lands only on a rung with its OWN first or second leg.
+//    D4. The trend SMA is computed on every bar.
+//
+//  HISTORY TEST 2026-09-19 (XAUUSD 1m May-Sep 2026): the ENTER verdict showed
+//  NO SIGNAL on the 1 minute rung; every rung above it was underpowered. Read
+//  the map for location. Do not trade the verdict column on its own.
+// ============================================================================
+
+strategy("XPW Orientation TDI v2.4 Strategy", shorttitle="XPW-OTDI4 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+
+// ---------------------------------------------------------------- INPUTS ----
+rsiLen   = input.int(13,       "RSI length",            group="TDI core")
+fastLen  = input.int(2,        "Fast line (RSI SMA)",   group="TDI core")
+slowLen  = input.int(7,        "Signal line (RSI SMA)", group="TDI core")
+bbLen    = input.int(34,       "Base line / bands",     group="TDI core")
+bbMult   = input.float(1.6185, "Band width",            group="TDI core")
+
+scaleWin = input.bool(true, "Scale window with rung", group="Structure", tooltip="ON: each rung measures about 4 of its parent's bars. OFF: flat window on every rung, as in v1.")
+flatWin  = input.int(20, "Flat window (bars)", group="Structure", tooltip="Used on every rung when scaling is off.")
+areaLen  = input.int(5, "Area window (bars)", group="Structure", tooltip="How many bars must hold together to count as an area rather than a spike.")
+areaFrac = input.float(0.45, "Area compression max", group="Structure", tooltip="Area range / window range. At or below this = area. Above = V spike = illegible.")
+trendLen = input.int(20, "Trend window (bars)", group="Structure", tooltip="Only used by the highest rung that has a computed direction.")
+
+showTable = input.bool(true, "Show rung map", group="Display")
+tblSize   = input.string("normal", "Table text size", options=["tiny","small","normal","large","huge"], group="Display", tooltip="Makes the whole table bigger or smaller.")
+tblPos    = input.string("middle_right", "Table position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group="Display", tooltip="Where the table sits on the price chart.")
+
+// LABELS
+showLbl  = input.bool(true,  "Show event labels on price", group="Labels", tooltip="Display only. The strategy trades the events whether or not their labels are shown.")
+lblRead  = input.bool(true,  "Also label the READ HERE rung", group="Labels", tooltip="Labels from the << rung are prefixed with its name, e.g. '1 Min:'. The strategy also trades the << rung's events only while this is on.")
+lblInfo  = input.bool(false, "Info labels (look for / staircase)", group="Labels")
+lblSizeS = input.string("normal", "Label size", options=["tiny","small","normal","large","huge"], group="Labels")
+lblPrice = input.bool(true,  "Show price in label + price tick", group="Labels", tooltip="Adds the signal price to the label text and draws a short line at that price beside the candle.")
+lblTick  = input.int(3, "Price tick length (bars)", minval=1, maxval=20, group="Labels")
+cL1  = input.color(#00e676, "Long  - 1st leg",         group="Labels")
+cL2  = input.color(#00897b, "Long  - 2nd leg",         group="Labels")
+cS1  = input.color(#ff1744, "Short - 1st leg",         group="Labels")
+cS2  = input.color(#ad1457, "Short - 2nd leg",         group="Labels")
+cDL  = input.color(#76ff03, "Divergence LONG zone",    group="Labels")
+cDS  = input.color(#ff9100, "Divergence SHORT zone",   group="Labels")
+cEnd = input.color(#ffd600, "End of leg / exit once",  group="Labels")
+cInf = input.color(#90a4ae, "Info (look for / stair)", group="Labels")
+
+// AGREEMENT
+agreeOn    = input.bool(false, "Require rung agreement", group="Agreement", tooltip="ON: a label draws only when at least N rungs agree with its side. OFF: every event labels, as in v2.3.")
+agreeN     = input.int(3, "Rungs that must agree (N)", minval=2, maxval=10, group="Agreement")
+agreeMode  = input.string("domino", "Agreement mode", options=["domino","fractal"], group="Agreement", tooltip="domino: N rungs in one unbroken chain that contains the rung that fired. fractal: any N agreeing rungs inside the scope, contiguous or not.")
+agreeScope = input.string("whole ladder", "Scope", options=["whole ladder","chart rung and above","chart rung and below"], group="Agreement", tooltip="Which rungs may vote. 'chart rung and above' = the * rung and every higher timeframe. 'chart rung and below' = the * rung and every lower one. On a 1 Min chart 'below' is only the seconds rungs, so prefer the whole ladder or 'above'.")
+agreeInh   = input.string("skip (transparent)", "Inherited rungs", options=["skip (transparent)","vote with parent","no vote (breaks chain)"], group="Agreement", tooltip="A rung with no shape of its own shows its parent's position '(inh)'. skip: it neither counts nor breaks a chain. vote with parent: it repeats the parent's vote (not independent evidence, so it inflates the count). no vote: it breaks a domino chain.")
+agreeLbl   = input.bool(true, "Label the moment N rungs agree", group="Agreement", tooltip="Draws 'AGREE LONG xN' / 'AGREE SHORT xN' on the bar where the count first reaches N.")
+cAgL = input.color(#00bfa5, "Agree LONG",  group="Agreement")
+cAgS = input.color(#d500f9, "Agree SHORT", group="Agreement")
+
+// STRATEGY
+tradeDir   = input.string("Both", "Trade direction", options=["Both","Long only (buy only)","Short only (sell only)"], group="Strategy", tooltip="Long only: only ENTER LONGS labels open trades. Short only: only ENTER SHORTS labels open trades.")
+exitOnEnd  = input.bool(true, "Exit on END labels (exit once, then wait)", group="Strategy", tooltip="END 1st LEG / END 2nd LEG closes the side that leg was on: upright rung = longs, inverted rung = shorts.")
+oppCloses  = input.bool(true, "Opposite ENTER closes (one-side mode)", group="Strategy", tooltip="Long only / Short only: an ENTER label on the other side closes the open trade without opening a new one. In 'Both' an opposite ENTER always reverses.")
+tradeAgree = input.bool(false, "Also enter on AGREE labels", group="Strategy", tooltip="Needs 'Require rung agreement' on. Enters on the bar 'AGREE LONG xN' / 'AGREE SHORT xN' fires.")
+trailOn    = input.bool(true, "Use trailing take profit", group="Strategy")
+trailUnit  = input.string("price", "Trail / stop units", options=["ticks","price","percent"], group="Strategy", tooltip="ticks = minimum price moves. price = raw price distance (e.g. 2.0 on XAUUSD = $2). percent = % of the entry price.")
+trailAct   = input.float(2.0, "Trail activation", minval=0.0, step=0.1, group="Strategy", tooltip="Distance price must move in your favour before the trail arms.")
+trailOff   = input.float(1.0, "Trail offset", minval=0.0, step=0.1, group="Strategy", tooltip="Distance the stop trails behind the best price once armed.")
+slOn       = input.bool(false, "Use stop loss", group="Strategy")
+slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
+
+// PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
+hM   = scaleWin ? 20 : flatWin
+hW   = scaleWin ? 17 : flatWin
+hD   = scaleWin ? 28 : flatWin
+h4   = scaleWin ? 24 : flatWin
+h1h  = scaleWin ? 16 : flatWin
+h30  = scaleWin ? 12 : flatWin
+h15  = scaleWin ? 12 : flatWin
+h5   = scaleWin ? 12 : flatWin
+h1   = scaleWin ? 20 : flatWin
+hs30 = scaleWin ? 12 : flatWin
+hs15 = scaleWin ? 12 : flatWin
+hs5  = scaleWin ? 12 : flatWin
+hs1  = scaleWin ? 20 : flatWin
+
+// ------------------------------------------------------------- TDI CORE ----
+tdiCore() =>
+    r     = ta.rsi(close, rsiLen)
+    fast  = ta.sma(r, fastLen)
+    slow  = ta.sma(r, slowLen)
+    basis = ta.sma(r, bbLen)
+    dev   = bbMult * ta.stdev(r, bbLen)
+    [r, fast, slow, basis, basis + dev, basis - dev]
+
+// --------------------------------------------------------- RUNG MEASURE ----
+// DIRECTION-BLIND. Shape carries no direction; the parent supplies it later.
+rungState(simple int h) =>
+    [_r, fast, _slow, basis, _up, _lo] = tdiCore()
+
+    recentLow  = ta.lowest(low,   h)
+    priorLow   = ta.lowest(low,   h)[h]
+    recentHigh = ta.highest(high, h)
+    priorHigh  = ta.highest(high, h)[h]
+    fastLowR   = ta.lowest(fast,  h)
+    fastLowP   = ta.lowest(fast,  h)[h]
+    fastHighR  = ta.highest(fast, h)
+    fastHighP  = ta.highest(fast, h)[h]
+
+    brokeLow     = recentLow  < priorLow
+    brokeHigh    = recentHigh > priorHigh
+    tdiBrokeLow  = fastLowR   < fastLowP
+    tdiBrokeHigh = fastHighR  > fastHighP
+
+    refuseLow  = brokeLow  and not tdiBrokeLow
+    refuseHigh = brokeHigh and not tdiBrokeHigh
+
+    rngShort   = ta.highest(fast, areaLen) - ta.lowest(fast, areaLen)
+    rngLong    = ta.highest(fast, h)       - ta.lowest(fast, h)
+    compressed = rngLong > 0 and (rngShort / rngLong) <= areaFrac
+
+    stairUp   = brokeHigh and tdiBrokeHigh and not refuseHigh
+    stairDown = brokeLow  and tdiBrokeLow  and not refuseLow
+
+    smaC    = ta.sma(close, trendLen)
+    basisP  = basis[trendLen]
+    dirUp   = basis > basisP and close > smaC
+    dirDown = basis < basisP and close < smaC
+    dir     = dirUp ? 1.0 : dirDown ? -1.0 : 0.0
+    dirOk   = not na(basisP) and not na(smaC)
+
+    [dir, refuseLow ? 1.0 : 0.0, refuseHigh ? 1.0 : 0.0, compressed ? 1.0 : 0.0, stairUp ? 1.0 : 0.0, stairDown ? 1.0 : 0.0, dirOk ? 1.0 : 0.0]
+
+// ------------------------------------------------------------ RUNG FETCH ----
+LA = barmerge.lookahead_off
+[dM,  rlM,  rhM,  cM,  suM,  sdM,  okM ] = request.security(syminfo.tickerid, "M",   rungState(hM),   lookahead=LA)
+[dW,  rlW,  rhW,  cW,  suW,  sdW,  okW ] = request.security(syminfo.tickerid, "W",   rungState(hW),   lookahead=LA)
+[dD,  rlD,  rhD,  cD,  suD,  sdD,  okD ] = request.security(syminfo.tickerid, "D",   rungState(hD),   lookahead=LA)
+[d4,  rl4,  rh4,  c4,  su4,  sd4,  ok4 ] = request.security(syminfo.tickerid, "240", rungState(h4),   lookahead=LA)
+[d1h, rl1h, rh1h, c1h, su1h, sd1h, ok1h] = request.security(syminfo.tickerid, "60",  rungState(h1h),  lookahead=LA)
+[d30, rl30, rh30, c30, su30, sd30, ok30] = request.security(syminfo.tickerid, "30",  rungState(h30),  lookahead=LA)
+[d15, rl15, rh15, c15, su15, sd15, ok15] = request.security(syminfo.tickerid, "15",  rungState(h15),  lookahead=LA)
+[d5,  rl5,  rh5,  c5,  su5,  sd5,  ok5 ] = request.security(syminfo.tickerid, "5",   rungState(h5),   lookahead=LA)
+[d1,  rl1,  rh1,  c1,  su1,  sd1,  ok1 ] = request.security(syminfo.tickerid, "1",   rungState(h1),   lookahead=LA)
+[e30, f30, g30, i30, j30, k30, n30] = request.security(syminfo.tickerid, "30S", rungState(hs30), lookahead=LA)
+[e15, f15, g15, i15, j15, k15, n15] = request.security(syminfo.tickerid, "15S", rungState(hs15), lookahead=LA)
+[e5,  f5,  g5,  i5,  j5,  k5,  n5 ] = request.security(syminfo.tickerid, "5S",  rungState(hs5),  lookahead=LA)
+[e1,  f1,  g1,  i1,  j1,  k1,  n1 ] = request.security(syminfo.tickerid, "1S",  rungState(hs1),  lookahead=LA)
+
+// ------------------------------------------------------------- ASSEMBLY ----
+var array<string> tfName = array.from("1 Month","1 Week","1 Day","4 Hour","1 Hour","30 Min","15 Min","5 Min","1 Min","30 Sec","15 Sec","5 Sec","1 Sec")
+var array<float>  tfSec  = array.from(2592000.,604800.,86400.,14400.,3600.,1800.,900.,300.,60.,30.,15.,5.,1.)
+
+dirA = array.from(dM,  dW,  dD,  d4,  d1h,  d30,  d15,  d5,  d1,  e30, e15, e5, e1)
+rlA  = array.from(rlM, rlW, rlD, rl4, rl1h, rl30, rl15, rl5, rl1, f30, f15, f5, f1)
+rhA  = array.from(rhM, rhW, rhD, rh4, rh1h, rh30, rh15, rh5, rh1, g30, g15, g5, g1)
+cA   = array.from(cM,  cW,  cD,  c4,  c1h,  c30,  c15,  c5,  c1,  i30, i15, i5, i1)
+suA  = array.from(suM, suW, suD, su4, su1h, su30, su15, su5, su1, j30, j15, j5, j1)
+sdA  = array.from(sdM, sdW, sdD, sd4, sd1h, sd30, sd15, sd5, sd1, k30, k15, k5, k1)
+okA  = array.from(okM, okW, okD, ok4, ok1h, ok30, ok15, ok5, ok1, n30, n15, n5, n1)
+
+var array<string> posA    = array.new_string(13, "UNAVAILABLE")
+var array<string> shapeA  = array.new_string(13, "-")
+var array<float>  orientA = array.new_float(13, 1.0)
+var array<bool>   inhA    = array.new_bool(13, false)
+
+// D2. The side comes from the highest rung whose direction is computed.
+float baseDir = na
+for i = 0 to 12
+    if na(baseDir) and array.get(okA, i) == 1
+        baseDir := array.get(dirA, i) >= 0 ? 1.0 : -1.0
+baseDir := na(baseDir) ? 1.0 : baseDir
+bool flip = false
+
+for i = 0 to 12
+    bool   avail = not na(array.get(rlA, i))
+    float  o     = baseDir * (flip ? -1.0 : 1.0)
+    array.set(orientA, i, o)
+
+    bool refStart = o > 0 ? array.get(rlA, i) == 1 : array.get(rhA, i) == 1
+    bool refEnd   = o > 0 ? array.get(rhA, i) == 1 : array.get(rlA, i) == 1
+    bool stair    = o > 0 ? array.get(sdA, i) == 1 : array.get(suA, i) == 1
+    bool area     = array.get(cA, i) == 1
+
+    string shape = not avail ? "-" : stair ? "staircase" : refEnd ? "refusal hi" : refStart and area ? "refusal lo" : area ? "area" : "none"
+    array.set(shapeA, i, shape)
+
+    string pp  = i == 0 ? "" : array.get(posA, i - 1)
+    bool   inh = false
+    string pos = "UNAVAILABLE"
+
+    if avail
+        if stair
+            pos := "STAIRCASE"
+        else if refEnd
+            pos := "END FIRST LEG"
+        else if refStart and area
+            pos := pp == "END FIRST LEG" or pp == "FIRST LEG" or pp == "MID FIRST LEG" ? "SECOND LEG" : "FIRST LEG"
+        else if area
+            pos := pp == "SECOND LEG" or pp == "MID SECOND LEG" ? "MID SECOND LEG" : pp == "STAIRCASE" ? "STAIRCASE" : "MID FIRST LEG"
+        else
+            inh := true
+            pos := i == 0 or pp == "UNAVAILABLE" or pp == "UNREADABLE" ? "UNREADABLE" : pp
+
+    array.set(posA, i, pos)
+    array.set(inhA, i, inh)
+
+    // D1. Only a rung's OWN shape hands a new side down.
+    if pos == "END FIRST LEG" and not inh
+        flip := not flip
+    if pos == "FIRST LEG" and not inh
+        flip := false
+
+// --------------------------------------------------------- CHART ANCHOR ----
+chartSec = timeframe.in_seconds(timeframe.period)
+int chartIdx = 12
+for i = 0 to 12
+    if array.get(tfSec, i) >= chartSec
+        chartIdx := i
+
+// D3. READ HERE only lands on a rung with its OWN first or second leg.
+int readAt = -1
+for i = chartIdx to 12
+    if readAt == -1
+        string p = array.get(posA, i)
+        if (p == "FIRST LEG" or p == "SECOND LEG") and not array.get(inhA, i)
+            readAt := i
+
+verdictOf(int i) =>
+    string p    = array.get(posA, i)
+    bool   inh  = array.get(inhA, i)
+    string side = array.get(orientA, i) > 0 ? "LONGS" : "SHORTS"
+    string v = switch
+        p == "UNAVAILABLE"   => "no data"
+        p == "UNREADABLE"    => "STAY OUT"
+        inh                  => "no shape here"
+        p == "STAIRCASE"     => "continue, no entry"
+        p == "END FIRST LEG" => "exit once, then wait"
+        p == "FIRST LEG"     => "ENTER " + side
+        p == "SECOND LEG"    => "ENTER " + side
+        => "look for " + side
+    v
+
+// ------------------------------------------------------------ AGREEMENT ----
+// One vote per rung: +1 long, -1 short, 0 none (staircase), 9 skip.
+// Skip is transparent: it neither counts toward N nor breaks a domino chain.
+int VOTE_SKIP = 9
+var array<int> voteA = array.new_int(13, 0)
+for i = 0 to 12
+    string p    = array.get(posA, i)
+    bool   inh  = array.get(inhA, i)
+    int    side = array.get(orientA, i) > 0 ? 1 : -1
+    int v = VOTE_SKIP
+    if p == "UNAVAILABLE" or p == "UNREADABLE"
+        v := VOTE_SKIP
+    else if inh and agreeInh == "skip (transparent)"
+        v := VOTE_SKIP
+    else if inh and agreeInh == "no vote (breaks chain)"
+        v := 0
+    else if inh
+        // vote with parent: copy the parent's vote as already cast this bar.
+        // Not recomputed from this rung's side: the rung under an own-shape
+        // END FIRST LEG is already flipped, so recomputing would vote AGAINST
+        // the parent. (i > 0 here: an inherited i == 0 is UNREADABLE above.)
+        v := array.get(voteA, i - 1)
+    else
+        v := p == "FIRST LEG" or p == "SECOND LEG" or p == "MID FIRST LEG" or p == "MID SECOND LEG" ? side : p == "END FIRST LEG" ? -side : 0
+    array.set(voteA, i, v)
+
+int scopeLo   = agreeScope == "chart rung and below" ? chartIdx : 0
+int scopeHi   = agreeScope == "chart rung and above" ? chartIdx : 12
+int scopeSize = scopeHi - scopeLo + 1
+// N can never exceed the rungs that may vote; the READ HERE row says so.
+int needN     = math.min(agreeN, scopeSize)
+
+// The unbroken chain of vote v that runs through rung i, stepping over skip
+// votes and breaking on anything else. selfIn: count rung i as one of them
+// regardless of its own vote (an event rung always counts itself).
+// Both walks are clipped to the scope: a rung outside it is never counted
+// and never breaks the chain (the READ HERE rung can sit below the scope
+// when the scope is "chart rung and above").
+chainThrough(int i, int v, bool selfIn) =>
+    int n = selfIn ? 1 : 0
+    int dnFrom = math.max(i + 1, scopeLo)
+    if dnFrom <= scopeHi
+        for j = dnFrom to scopeHi
+            int vj = array.get(voteA, j)
+            if vj == v
+                n += 1
+            else if vj != VOTE_SKIP
+                break
+    int upFrom = math.min(i - 1, scopeHi)
+    if upFrom >= scopeLo
+        for j = upFrom to scopeLo
+            int vj = array.get(voteA, j)
+            if vj == v
+                n += 1
+            else if vj != VOTE_SKIP
+                break
+    n
+
+// How many rungs agree with vote v for an event on rung i. The event rung
+// always counts as one, in both modes.
+//   domino : the unbroken chain through rung i.
+//   fractal: every agreeing rung inside the scope, contiguous or not.
+agreeCount(int i, int v) =>
+    int n = 0
+    if v == 1 or v == -1
+        if agreeMode == "fractal"
+            n := 1
+            for j = scopeLo to scopeHi
+                if j != i and array.get(voteA, j) == v
+                    n += 1
+        else
+            n := chainThrough(i, v, true)
+    n
+
+// The agreement one side has right now, for the AGREE label and the table.
+//   fractal: the number of rungs on that side inside the scope.
+//   domino : the chain that runs through the rung you read: READ HERE (<<)
+//            when it exists, otherwise the chart rung (*). The same rung the
+//            event gate uses, so the label and the table never disagree.
+//            The dominoes have to reach that rung; a chain that stops above
+//            it does not count. An anchor rung that skips is stepped through.
+int anchor = readAt != -1 ? readAt : chartIdx
+sideCount(int v) =>
+    int n = 0
+    if agreeMode == "fractal"
+        for j = scopeLo to scopeHi
+            if array.get(voteA, j) == v
+                n += 1
+    else
+        int va = array.get(voteA, anchor)
+        n := va == v ? chainThrough(anchor, v, true) : va == VOTE_SKIP ? chainThrough(anchor, v, false) : 0
+    n
+
+int longN  = sideCount(1)
+int shortN = sideCount(-1)
+
+// ---------------------------------------------------------------- LABELS ----
+// Drawn on the price pane beside the candle. Long side = at the candle low,
+// short side = at the candle high. A label fires the moment a rung's position
+// CHANGES on the current bar, so history shows every instant it happened.
+// Pine rolls back objects drawn on a live bar between ticks, so a state
+// that flickers inside one bar leaves only the last label.
+lsz = switch lblSizeS
+    "tiny"   => size.tiny
+    "small"  => size.small
+    "large"  => size.large
+    "huge"   => size.huge
+    => size.normal
+
+// The signal price is the candle extreme the shape formed on: the low for a
+// long-side event, the high for a short-side event. The label sits at that
+// price, pointing left at the candle, and a short line marks the level.
+putLbl(string txt, color col, bool below) =>
+    float px = below ? low : high
+    string t = lblPrice ? txt + "\n@ " + str.tostring(px, format.mintick) : txt
+    label.new(bar_index, px, t, xloc=xloc.bar_index, yloc=yloc.price, color=col, style=label.style_label_left, textcolor=color.black, size=lsz, force_overlay=true)
+    if lblPrice
+        line.new(bar_index - lblTick, px, bar_index + lblTick, px, xloc=xloc.bar_index, color=col, style=line.style_solid, width=2, force_overlay=true)
+
+// Trade codes handed to the strategy, one per label event.
+int SIG_NONE        = 0
+int SIG_ENTER_LONG  = 1
+int SIG_ENTER_SHORT = -1
+int SIG_EXIT_LONG   = 2
+int SIG_EXIT_SHORT  = -2
+
+// Returns the rung's current position (the caller stores it as prev) and the
+// trade code of the label that fired. The event fires on exactly the
+// condition the indicator labels on; showLbl only decides whether it draws.
+rungEvents(int i, string prev, string tag) =>
+    string p    = array.get(posA, i)
+    bool   inh  = array.get(inhA, i)
+    bool   up   = array.get(orientA, i) > 0
+    string side = up ? "LONGS" : "SHORTS"
+    bool wasSecond = prev == "SECOND LEG" or prev == "MID SECOND LEG"
+    // Agreement gate. The event's side is the rung's own vote. An END 2nd LEG
+    // that rolled into a staircase has no vote, so it is judged on the side
+    // the leg was on.
+    int  v  = array.get(voteA, i)
+    int  ev = v == 1 or v == -1 ? v : (up ? 1 : -1)
+    int  n  = agreeOn ? agreeCount(i, ev) : 0
+    bool ok = not agreeOn or n >= needN
+    string ag = agreeOn ? "\n" + str.tostring(n) + " rungs agree" : ""
+    int sig = SIG_NONE
+    if ok and p != prev and not inh
+        if p == "END FIRST LEG"
+            // The divergence on price. Upright: broke the high, TDI refused -> short zone (top).
+            // Inverted: broke the low, TDI refused -> long zone (bottom).
+            // Exit once: the leg that ended was on this rung's side.
+            sig := up ? SIG_EXIT_LONG : SIG_EXIT_SHORT
+            if showLbl
+                string zone = up ? "DIV SHORT ZONE" : "DIV LONG ZONE"
+                string leg  = wasSecond ? "END 2nd LEG" : "END 1st LEG"
+                putLbl(tag + zone + "\n" + leg + "\nexit once, then wait" + ag, up ? cDS : cDL, not up)
+        else if p == "FIRST LEG"
+            sig := up ? SIG_ENTER_LONG : SIG_ENTER_SHORT
+            if showLbl
+                putLbl(tag + "1st LEG\nENTER " + side + ag, up ? cL1 : cS1, up)
+        else if p == "SECOND LEG"
+            sig := up ? SIG_ENTER_LONG : SIG_ENTER_SHORT
+            if showLbl
+                putLbl(tag + "2nd LEG\nENTER " + side + ag, up ? cL2 : cS2, up)
+        else if wasSecond and (p == "STAIRCASE" or p == "MID FIRST LEG")
+            sig := up ? SIG_EXIT_LONG : SIG_EXIT_SHORT
+            if showLbl
+                putLbl(tag + "END 2nd LEG" + ag, cEnd, up)
+        else if showLbl and lblInfo and p == "MID FIRST LEG"
+            putLbl(tag + "look for " + side + ag, cInf, up)
+        else if showLbl and lblInfo and p == "STAIRCASE"
+            putLbl(tag + "continue, no entry" + ag, cInf, up)
+    [p, sig]
+
+var string prevChart  = ""
+var string prevRead   = ""
+var int    prevReadAt = -1
+
+[pChart, sigChart] = rungEvents(chartIdx, prevChart, "")
+prevChart := pChart
+int sigRead = SIG_NONE
+if lblRead and readAt != -1 and readAt != chartIdx
+    string pr = readAt == prevReadAt ? prevRead : ""
+    [pRead, sR] = rungEvents(readAt, pr, array.get(tfName, readAt) + ": ")
+    prevRead := pRead
+    sigRead  := sR
+prevReadAt := readAt
+
+// The domino effect: the bar where the Nth rung joins one side.
+var int prevLongN  = 0
+var int prevShortN = 0
+bool agreeLongNow  = agreeOn and longN  >= needN and prevLongN  < needN
+bool agreeShortNow = agreeOn and shortN >= needN and prevShortN < needN
+if showLbl and agreeOn and agreeLbl
+    if agreeLongNow
+        putLbl("AGREE LONG x" + str.tostring(longN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgL, true)
+    if agreeShortNow
+        putLbl("AGREE SHORT x" + str.tostring(shortN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgS, false)
+prevLongN  := longN
+prevShortN := shortN
+
+// -------------------------------------------------------------- STRATEGY ----
+// Signals are the label events above, from the chart rung and (when its
+// labels are on) the READ HERE rung. If the two rungs ask for opposite
+// entries on the same bar, neither entry is taken.
+bool longSig  = sigChart == SIG_ENTER_LONG  or sigRead == SIG_ENTER_LONG  or (tradeAgree and agreeLongNow)
+bool shortSig = sigChart == SIG_ENTER_SHORT or sigRead == SIG_ENTER_SHORT or (tradeAgree and agreeShortNow)
+bool exitL    = exitOnEnd and (sigChart == SIG_EXIT_LONG  or sigRead == SIG_EXIT_LONG)
+bool exitS    = exitOnEnd and (sigChart == SIG_EXIT_SHORT or sigRead == SIG_EXIT_SHORT)
+if longSig and shortSig
+    longSig  := false
+    shortSig := false
+
+bool allowLong  = tradeDir != "Short only (sell only)"
+bool allowShort = tradeDir != "Long only (buy only)"
+
+bool goLong  = longSig  and allowLong
+bool goShort = shortSig and allowShort
+// One order per side per bar. An ENTER on the same bar as an END keeps the
+// trade (same side) or reverses it (opposite side, via strategy.entry), so
+// no separate close is sent then.
+bool oppL   = oppCloses and shortSig and not allowShort
+bool oppS   = oppCloses and longSig  and not allowLong
+bool closeL = strategy.position_size > 0 and not goLong  and not goShort and (exitL or oppL)
+bool closeS = strategy.position_size < 0 and not goShort and not goLong  and (exitS or oppS)
+
+if closeL
+    strategy.close("Long",  comment=exitL ? "exit once" : "opp ENTER")
+if closeS
+    strategy.close("Short", comment=exitS ? "exit once" : "opp ENTER")
+if goLong
+    strategy.entry("Long",  strategy.long,  comment="ENTER LONG")
+if goShort
+    strategy.entry("Short", strategy.short, comment="ENTER SHORT")
+
+// Distances in ticks, measured from the entry (or this close while the entry
+// is still pending, which is only used for the percent unit).
+float refPx = strategy.position_size != 0 ? strategy.position_avg_price : close
+toTicks(float d) =>
+    trailUnit == "ticks" ? d : trailUnit == "price" ? d / syminfo.mintick : refPx * d / 100.0 / syminfo.mintick
+
+float trPts = trailOn ? math.max(toTicks(trailAct), 0.0) : na
+float trOff = trailOn ? math.max(toTicks(trailOff), 1.0) : na
+float slPts = slOn    ? math.max(toTicks(slDist),   1.0) : na
+
+if trailOn or slOn
+    if allowLong
+        strategy.exit("Long X", from_entry="Long", trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP", comment_loss="SL")
+    if allowShort
+        strategy.exit("Short X", from_entry="Short", trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP", comment_loss="SL")
+
+// ----------------------------------------------------------- CHART PANE ----
+[_rNow, fastNow, slowNow, basisNow, upNow, loNow] = tdiCore()
+chartOrient = array.get(orientA, chartIdx)
+inv(v) => chartOrient > 0 ? v : 100.0 - v
+
+plot(inv(fastNow),  "Fast",      color=color.new(#26c6da, 0), linewidth=2)
+plot(inv(slowNow),  "Signal",    color=color.new(#ffa726, 0), linewidth=2)
+plot(inv(basisNow), "Base line", color=color.new(#b0bec5, 0), linewidth=1)
+pu = plot(inv(chartOrient > 0 ? upNow : loNow), "Band A", color=color.new(#546e7a, 40))
+pl = plot(inv(chartOrient > 0 ? loNow : upNow), "Band B", color=color.new(#546e7a, 40))
+fill(pu, pl, color=color.new(#546e7a, 92))
+hline(50, "50", color=color.new(#78909c, 60), linestyle=hline.style_dotted)
+
+// ---------------------------------------------------------------- TABLE ----
+if showTable and barstate.islast
+    tPos = switch tblPos
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+    var table t = table.new(tPos, 6, 15, border_width=1, force_overlay=true)
+    int lastCol = agreeOn ? 5 : 4
+    table.clear(t, 0, 0, lastCol, 14)
+    sz = switch tblSize
+        "tiny"  => size.tiny
+        "small" => size.small
+        "large" => size.large
+        "huge"  => size.huge
+        => size.normal
+    hdr = color.new(#263238, 0)
+
+    table.cell(t, 0, 0, "RUNG",     text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 1, 0, "ORIENT",   text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 2, 0, "SHAPE",    text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 3, 0, "POSITION", text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 4, 0, "VERDICT",  text_color=color.white, bgcolor=hdr, text_size=sz)
+    if agreeOn
+        table.cell(t, 5, 0, "AGREE", text_color=color.white, bgcolor=hdr, text_size=sz)
+
+    for i = 0 to 12
+        string p   = array.get(posA, i)
+        bool   av  = p != "UNAVAILABLE"
+        float  o   = array.get(orientA, i)
+        bool   inh = array.get(inhA, i)
+        string orS = not av ? "-" : (o > 0 ? "upright" : "INVERTED")
+        string pS  = p + (inh and av ? " (inh)" : "")
+
+        color bg = switch
+            not av               => color.new(#37474f, 30)
+            p == "SECOND LEG"    => color.new(#2e7d32, 20)
+            p == "FIRST LEG"     => color.new(#2e7d32, 20)
+            p == "END FIRST LEG" => color.new(#f9a825, 25)
+            p == "STAIRCASE"     => color.new(#1565c0, 25)
+            p == "UNREADABLE"    => color.new(#37474f, 30)
+            => color.new(#455a64, 30)
+
+        string mark = i == readAt ? "  <<" : (i == chartIdx ? "  *" : "")
+        table.cell(t, 0, i + 1, array.get(tfName, i) + mark, text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 1, i + 1, orS,                          text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 2, i + 1, array.get(shapeA, i),         text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 3, i + 1, pS,                           text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 4, i + 1, verdictOf(i),                 text_color=color.white, bgcolor=bg, text_size=sz)
+        if agreeOn
+            int    vv   = array.get(voteA, i)
+            bool   inSc = i >= scopeLo and i <= scopeHi
+            string vS   = not inSc ? "out of scope" : vv == 1 ? "LONG" : vv == -1 ? "SHORT" : vv == 0 ? "none" : "skip"
+            color  vbg  = not inSc ? color.new(#37474f, 30) : vv == 1 ? color.new(#1b5e20, 20) : vv == -1 ? color.new(#b71c1c, 20) : bg
+            table.cell(t, 5, i + 1, vS, text_color=color.white, bgcolor=vbg, text_size=sz)
+
+    string summary = readAt == -1 ? "nothing at or below " + array.get(tfName, chartIdx) + " - stay out" : array.get(tfName, readAt) + " - " + verdictOf(readAt)
+    if agreeOn
+        summary := summary + "  |  agree: LONG " + str.tostring(longN) + ", SHORT " + str.tostring(shortN) + " (need " + str.tostring(needN) + " of " + str.tostring(scopeSize) + " in scope, " + agreeMode + ")"
+        if agreeN > scopeSize
+            summary := summary + "  N " + str.tostring(agreeN) + " clamped to " + str.tostring(scopeSize)
+    table.cell(t, 0, 14, "READ HERE", text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 1, 14, summary,     text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.merge_cells(t, 1, 14, lastCol, 14)
