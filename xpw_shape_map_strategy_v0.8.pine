@@ -1,0 +1,733 @@
+//@version=6
+// XPW Shape Map Strategy v0.8
+// v0.8 = v0.7 with defaults calibrated on OKX BTCUSDT 30m (Sep 7 - Oct 4 2026):
+//        entry BOT/TOP tick, ATR exits (SL 3 ATR, no TP, trail from 2 ATR, 0.25 ATR
+//        distance), 0.05% commission per side, lower-TF chain filter OFF.
+//        That set was the only one profitable in both halves of the sample.
+// v0.7 = v0.6 strategy + Predict turn entries (stop order at the exact cross price)
+//        + S4 lower-TF chain (Chain Monitor v0.4D engine) as filter / entry signal.
+// Built from the XPW Shape Map v0.6 indicator. Same detection, same labels.
+// ONE entry signal at a time — pick it in "S1. Entry". Signals are never mixed:
+//   BOT/TOP square  -> BOT square = LONG,  TOP square = SHORT
+//   Turn ▲/▼        -> Turn ▲     = LONG,  Turn ▼     = SHORT
+//   BOT/TOP tick    -> BOT tick   = LONG,  TOP tick   = SHORT
+// S4 LOWER-TF CHAIN (Chain Monitor v0.4D engine): squares on 5 smaller timeframes
+// climb into a chain before this chart's lines cross. Used as a FILTER (default:
+// only enter while a same-side chain at level >= N is active) or as its own entry
+// signal ("Lower-TF chain" in S1). Rungs must rise and all be below the chart.
+// Seconds rungs need a TradingView plan with second data; history is limited to
+// ~100k intrabars per rung (1s rung on a 5m chart ~ 1 day).
+// Turn entries default to PREDICT: at each candle close the exact price where
+// fast and slow would cross on the next candle is calculated and a stop order
+// sits there, so the entry fills the moment price reaches the cross — live and
+// in the backtest. Blue dots on the price chart show that price.
+// "Enter on tick" ON (default): live, the strategy runs every tick and enters the
+// moment the signal appears inside the forming candle — no wait for the close.
+// On history there are no ticks, so backtests still enter on the next bar's open.
+// Margin is set to 1% (100:1, like a CFD account). With TradingView's default
+// 100% margin, 10 oz of gold costs more than a $10k account and every order is
+// silently rejected. Change it in Properties -> Margin if your broker differs.
+// "Points" = minimum ticks (XAUUSD: 1 pt = 0.01, so 5000 pts = $50).
+
+strategy("XPW Shape Map Strategy v0.8", shorttitle = "XPW-SM8 S", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 10, margin_long = 1, margin_short = 1, commission_type = strategy.commission.percent, commission_value = 0.05)
+
+// ───────────────────────── S1. ENTRY ─────────────────────────
+grpE = "S1. Entry"
+sigMode  = input.string("BOT/TOP tick", "Entry signal (one only)", options = ["BOT/TOP square", "Turn ▲/▼", "BOT/TOP tick", "Lower-TF chain"], group = grpE, tooltip = "Only this pair of labels opens trades. BOT side = long, TOP side = short. The other labels still draw but never trade. Lower-TF chain: enter the moment the lower-timeframe chain (S4) reaches the chosen level — the earliest warning of a turn on this chart.")
+tradeDir = input.string("Both", "Trade direction", options = ["Both", "Long only", "Short only"], group = grpE)
+enterTick = input.bool(true, "Enter on tick (don't wait for candle close)", group = grpE, tooltip = "ON: in realtime the script runs on every tick and enters the moment the signal appears inside the forming candle. The signal can still disappear before the candle closes; the trade stays open anyway. OFF: wait for the candle to close and fill on the next candle's open. On history there are no ticks, so the backtest always uses closed candles.")
+turnEntry = input.string("Predict (stop at cross price)", "Turn entry timing", options = ["Predict (stop at cross price)", "At the cross", "After hold (when ▲/▼ confirms)"], group = grpE, tooltip = "Predict: at each candle close the strategy calculates the exact price where fast would cross slow on the next candle and places a stop order there. It fills the instant price gets there — live and in the backtest. At the cross: enter when the cross is seen (candle close, or on tick if 'Enter on tick' is on). After hold: wait until the cross has held for 'Bars the cross must hold'.")
+failExit  = input.bool(true, "Turn: exit if the cross fails to hold", group = grpE, tooltip = "Predict / At the cross. If at a candle close the lines are back on the wrong side within 'Bars the cross must hold' candles of entry, close the trade.")
+oppMode  = input.string("Reverse", "Opposite signal while in a trade", options = ["Reverse", "Close only", "Ignore"], group = grpE, tooltip = "Reverse: close and open the other side. Close only: close and wait. Ignore: let the exits handle it.")
+
+// Backtest: process_orders_on_close fills at the signal candle's close instead of
+// the next candle's open, so history entries sit on the label's candle.
+// Signals may fire on any tick (enterTick ON) or only on a closed candle.
+sigBarOK = enterTick or barstate.isconfirmed
+
+// ───────────────────────── S2. EXITS ─────────────────────────
+grpX = "S2. Exits"
+exitUnit = input.string("ATR", "SL / TP / trail unit", options = ["Points", "ATR"], group = grpX)
+slPts    = input.float(5000,  "Stop loss, pts (Points mode)",   minval = 0, group = grpX, tooltip = "1 pt = 1 minimum tick. 0 = no stop loss.")
+tpPts    = input.float(50000, "Take profit, pts (Points mode)", minval = 0, group = grpX, tooltip = "1 pt = 1 minimum tick. 0 = no take profit.")
+exAtrLen = input.int(14,      "ATR length (ATR mode)", minval = 1, group = grpX)
+slAtrM   = input.float(3.0,   "Stop loss, ATR mult (ATR mode)", minval = 0, step = 0.1, group = grpX)
+tpR      = input.float(0.0,   "Take profit, R multiple of SL (ATR mode, 0 = off)", minval = 0, step = 0.1, group = grpX)
+trailOn  = input.bool(true,   "Trailing stop", group = grpX)
+trActPts = input.float(1500,  "Trail activation, pts of profit (Points mode)", minval = 0, group = grpX)
+trDisPts = input.float(100,   "Trail distance, pts (Points mode)", minval = 0, group = grpX)
+trActAtr = input.float(2.0,   "Trail activation, ATR mult (ATR mode)", minval = 0, step = 0.1, group = grpX)
+trDisAtr = input.float(0.25,   "Trail distance, ATR mult (ATR mode)", minval = 0, step = 0.1, group = grpX)
+timeStop = input.int(0,       "Time stop, bars (0 = off)", minval = 0, group = grpX)
+
+// ───────────────────────── S3. SIZING ─────────────────────────
+grpZ = "S3. Sizing"
+qtyMode  = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = grpZ)
+qtyFixed = input.float(10,  "Fixed quantity (contracts = oz, 100 = 1 lot)", minval = 0, group = grpZ)
+riskPct  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0, step = 0.1, group = grpZ, tooltip = "Quantity = equity x risk % / stop-loss distance. Needs a stop loss above 0.")
+qtyMax   = input.float(50,  "Max quantity", minval = 0, group = grpZ)
+qtyStep  = input.float(1,   "Quantity step (rounds down)", minval = 0.0001, group = grpZ)
+
+// ──────────────── S4. LOWER-TF CHAIN (Chain Monitor v0.4D engine) ────────────────
+// The same squares on five SMALLER timeframes. A BOT chain opens when rung 1 prints
+// a BOT square and climbs while each larger rung prints one inside its window.
+// It shows the turn forming BEFORE this chart's lines cross.
+grpC4 = "S4. Lower-TF chain (predicts the chart turn)"
+chainFilt = input.bool(false, "Filter: only enter while a same-side chain is active", group = grpC4, tooltip = "Applies to the square / turn / tick signals in S1. Long needs an active BOT chain, short needs an active TOP chain. 'Lower-TF chain' in S1 uses the chain as the entry itself.")
+chainLvl  = input.int(3, "Chain level needed (rungs that agree, 1-5)", minval = 1, maxval = 5, group = grpC4)
+chainKeep = input.int(3, "Chain stays valid for (chart bars after its last rung)", minval = 1, group = grpC4)
+cr1 = input.timeframe("1S",  "Rung 1 (smallest, opens the chain)", group = grpC4)
+cr2 = input.timeframe("10S", "Rung 2", group = grpC4)
+cr3 = input.timeframe("30S", "Rung 3", group = grpC4)
+cr4 = input.timeframe("1",   "Rung 4", group = grpC4)
+cr5 = input.timeframe("2",   "Rung 5 (largest, must be below the chart)", group = grpC4)
+cAgree = input.int(5, "Agreement window (bars of the HIGHER rung)", minval = 1, group = grpC4)
+cGrace = input.int(2, "Late grace (extra bars of the HIGHER rung)", minval = 0, group = grpC4)
+cTol   = input.int(1, "Higher rung may already have fired (its bars)", minval = 0, group = grpC4)
+showChainLbl = input.bool(true, "Label on price when a chain reaches the level", group = grpC4)
+
+grpC5 = "S4b. Lower-TF squares (keep identical to Chain Monitor)"
+cWidthMode = input.string("Seconds", "Width units", options = ["Seconds", "Bars"], group = grpC5)
+cAreaMode  = input.string("Bars", "Area lookback units", options = ["Bars", "Seconds"], group = grpC5)
+cAreaLook    = input.int(20, "Area lookback (bars)",    minval = 5, group = grpC5)
+cAreaLookSec = input.int(60, "Area lookback (seconds)", minval = 5, group = grpC5)
+cBotMinSec  = input.int(1,  "BOT min island (seconds)", minval = 1, group = grpC5)
+cBotMaxSec  = input.int(10, "BOT max island (seconds)", minval = 1, group = grpC5)
+cBotCtxSec  = input.int(3,  "BOT context (seconds)",    minval = 1, group = grpC5)
+cBotMinW    = input.int(1,  "BOT min width (bars)",     minval = 1, group = grpC5)
+cBotMaxW    = input.int(3,  "BOT max width (bars)",     minval = 1, group = grpC5)
+cBotCtx     = input.int(2,  "BOT context (bars)",       minval = 1, group = grpC5)
+cBotNeedLow = input.bool(true, "BOT requires LOW area", group = grpC5)
+cBotSep     = input.int(5,  "BOT min bars between squares", minval = 0, group = grpC5)
+cTopMinSec  = input.int(1,  "TOP min island (seconds)", minval = 1, group = grpC5)
+cTopMaxSec  = input.int(8,  "TOP max island (seconds)", minval = 1, group = grpC5)
+cTopCtxSec  = input.int(4,  "TOP context (seconds)",    minval = 1, group = grpC5)
+cTopMinW    = input.int(1,  "TOP min width (bars)",     minval = 1, group = grpC5)
+cTopMaxW    = input.int(2,  "TOP max width (bars)",     minval = 1, group = grpC5)
+cTopCtx     = input.int(3,  "TOP context (bars)",       minval = 1, group = grpC5)
+cTopNeedHigh = input.bool(true, "TOP requires HIGH area", group = grpC5)
+cTopSep     = input.int(5,  "TOP min bars between squares", minval = 0, group = grpC5)
+
+// ───────────────────────── TDI ─────────────────────────
+grpT = "TDI"
+rsiLen     = input.int(14,  "RSI length",     minval = 2, group = grpT)
+fastLen    = input.int(2,   "Fast MA length", minval = 1, group = grpT)
+slowLen    = input.int(7,   "Slow MA length", minval = 1, group = grpT)
+invertFill = input.bool(true, "My panel paints fast>slow as RED", group = grpT)
+
+r    = ta.rsi(close, rsiLen)
+fast = ta.sma(r, fastLen)
+slow = ta.sma(r, slowLen)
+
+pF = plot(fast, "Fast", color = color.new(color.gray, 30), linewidth = 1)
+pS = plot(slow, "Slow", color = color.new(color.silver, 30), linewidth = 1)
+
+isRed  = invertFill ? fast > slow : fast < slow
+isLime = not isRed
+
+fill(pF, pS, color = isRed ? color.new(color.red, 82) : color.new(color.lime, 82))
+
+// ───────────────────────── AREAS ─────────────────────────
+grpA = "Areas"
+areaLook = input.int(20,     "Area lookback", minval = 5, group = grpA)
+loFrac   = input.float(0.20, "LOW area: below this fraction",  minval = 0.0, maxval = 1.0, step = 0.01, group = grpA)
+hiFrac   = input.float(0.67, "HIGH area: above this fraction", minval = 0.0, maxval = 1.0, step = 0.01, group = grpA)
+
+hiW  = ta.highest(slow, areaLook)
+loW  = ta.lowest(slow, areaLook)
+rngW = hiW - loW
+posW = rngW > 0 ? (slow - loW) / rngW : 0.5
+inLow  = posW <= loFrac
+inHigh = posW >= hiFrac
+
+// ───────────────────── SHOW / HIDE ─────────────────────
+// Turn individual drawings on/off. Detection, counts and the table keep running.
+grpS = "Show / hide labels"
+showBotBox   = input.bool(true, "BOT square box",        group = grpS, inline = "sb")
+showBotLbl   = input.bool(true, "BOT square label",      group = grpS, inline = "sb")
+showTopBox   = input.bool(true, "TOP square box",        group = grpS, inline = "st")
+showTopLbl   = input.bool(true, "TOP square label",      group = grpS, inline = "st")
+showTurnUp   = input.bool(true, "Turn ▲ (after BOT)",    group = grpS, inline = "tn")
+showTurnDn   = input.bool(true, "Turn ▼ (after TOP)",    group = grpS, inline = "tn")
+showBotTick  = input.bool(true, "BOT tick (price chart)", group = grpS, inline = "tk")
+showTopTick  = input.bool(true, "TOP tick (price chart)", group = grpS, inline = "tk")
+
+// ───────────────────── ALL OPPORTUNITIES ─────────────────────
+// ON  = label every odd-colour wedge, anywhere, with no spacing.
+// OFF = strict v0.5 rules (area + context + spacing from the groups below).
+grpL = "Label ALL opportunities"
+allOn  = input.bool(true, "Label ALL opportunities (ignore area + spacing)", group = grpL)
+allCtx = input.int(1, "Context bars in ALL mode", minval = 1, group = grpL)
+
+// ───────────────────── BOTTOM SQUARE ─────────────────────
+grpB = "BOTTOM square (odd RED wedge, LOW area)"
+botOn      = input.bool(true, "Enable",                   group = grpB)
+botMinW    = input.int(1,  "Min width",     minval = 1,   group = grpB)
+botMaxW    = input.int(3,  "Max width",     minval = 1,   group = grpB)
+botCtxIn   = input.int(2,  "Context bars",  minval = 1,   group = grpB)
+botNeedLow = input.bool(true, "Require LOW area",         group = grpB)
+botSepIn   = input.int(5,  "Min bars between squares", minval = 0, group = grpB)
+
+// ─────────────────────── TOP SQUARE ───────────────────────
+grpP = "TOP square (odd LIME wedge, HIGH area)"
+topOn       = input.bool(true, "Enable",                  group = grpP)
+topMinW     = input.int(1,  "Min width",    minval = 1,   group = grpP)
+topMaxW     = input.int(2,  "Max width",    minval = 1,   group = grpP)
+topCtxIn    = input.int(3,  "Context bars", minval = 1,   group = grpP)
+topNeedHigh = input.bool(true, "Require HIGH area",       group = grpP)
+topSepIn    = input.int(5,  "Min bars between squares", minval = 0, group = grpP)
+
+// Effective settings: ALL mode overrides context, area and spacing.
+botCtx = allOn ? allCtx : botCtxIn
+topCtx = allOn ? allCtx : topCtxIn
+botSep = allOn ? 0 : botSepIn
+topSep = allOn ? 0 : topSepIn
+botArea = allOn or not botNeedLow  or inLow[botCtx]
+topArea = allOn or not topNeedHigh or inHigh[topCtx]
+
+// ───────────────────── WEDGE DETECTOR ─────────────────────
+// Pattern at the confirmed bar:
+//   offsets 0 .. ctx-1           = context colour  (restored)
+//   offsets ctx .. ctx+w-1       = ODD colour      (the wedge)
+//   offsets ctx+w .. ctx+w+ctx-1 = context colour  (before)
+detect(bool wantRedWedge, int minW, int maxW, int ctx) =>
+    int  wHi  = math.max(minW, maxW)
+    bool fired = false
+    int  wOut  = 0
+    for w = minW to wHi
+        if not fired
+            bool ok = true
+            for i = 0 to ctx - 1
+                bool v = wantRedWedge ? isLime[i] : isRed[i]
+                if not v
+                    ok := false
+            if ok
+                for i = 0 to w - 1
+                    bool v = wantRedWedge ? isRed[ctx + i] : isLime[ctx + i]
+                    if not v
+                        ok := false
+            if ok
+                for i = 0 to ctx - 1
+                    bool v = wantRedWedge ? isLime[ctx + w + i] : isRed[ctx + w + i]
+                    if not v
+                        ok := false
+            if ok
+                fired := true
+                wOut  := w
+    [fired, wOut]
+
+[botRaw, botWid] = detect(true,  botMinW, botMaxW, botCtx)
+[topRaw, topWid] = detect(false, topMinW, topMaxW, topCtx)
+
+var int lastBotBar   = -10000
+var int lastTopBar   = -10000
+var int lastBotWedge = -10000
+var int lastTopWedge = -10000
+
+botOK = botOn and botRaw and sigBarOK and botArea and (bar_index - lastBotBar >= botSep)
+topOK = topOn and topRaw and sigBarOK and topArea and (bar_index - lastTopBar >= topSep)
+
+var int nBotSq = 0
+var int nTopSq = 0
+
+if botOK
+    lastBotBar   := bar_index
+    lastBotWedge := bar_index - botCtx
+    nBotSq += 1
+    int lft = bar_index - botCtx - botWid + 1
+    int rgt = bar_index - botCtx
+    float hh = -1e10
+    float ll =  1e10
+    for i = 0 to botWid - 1
+        hh := math.max(hh, math.max(fast[botCtx + i], slow[botCtx + i]))
+        ll := math.min(ll, math.min(fast[botCtx + i], slow[botCtx + i]))
+    if showBotBox
+        box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.red, 0), border_width = 1, bgcolor = color.new(color.red, 65))
+    if showBotLbl
+        label.new(rgt, ll - 2.0, "BOT " + str.tostring(botWid), style = label.style_label_up, color = color.new(color.red, 25), textcolor = color.white, size = size.tiny)
+
+if topOK
+    lastTopBar   := bar_index
+    lastTopWedge := bar_index - topCtx
+    nTopSq += 1
+    int lft = bar_index - topCtx - topWid + 1
+    int rgt = bar_index - topCtx
+    float hh = -1e10
+    float ll =  1e10
+    for i = 0 to topWid - 1
+        hh := math.max(hh, math.max(fast[topCtx + i], slow[topCtx + i]))
+        ll := math.min(ll, math.min(fast[topCtx + i], slow[topCtx + i]))
+    if showTopBox
+        box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.lime, 0), border_width = 1, bgcolor = color.new(color.lime, 65))
+    if showTopLbl
+        label.new(rgt, hh + 2.0, "TOP " + str.tostring(topWid), style = label.style_label_down, color = color.new(color.green, 25), textcolor = color.white, size = size.tiny)
+
+// ───────────────────────── TURN MARK ─────────────────────────
+// The wedge warns. The turn confirms: the lines cross back and HOLD.
+grpN = "Turn mark"
+turnOn   = input.bool(true, "Enable",                       group = grpN)
+turnMax  = input.int(12, "Max bars to wait after a square", minval = 1, group = grpN)
+turnHold = input.int(2,  "Bars the cross must hold",        minval = 1, group = grpN)
+
+var bool botArmed  = false
+var int  botArmBar = 0
+var bool topArmed  = false
+var int  topArmBar = 0
+
+if botOK
+    botArmed  := true
+    botArmBar := bar_index
+if topOK
+    topArmed  := true
+    topArmBar := bar_index
+
+if botArmed and bar_index - botArmBar > turnMax
+    botArmed := false
+if topArmed and bar_index - topArmBar > turnMax
+    topArmed := false
+
+bool holdUp = true
+bool holdDn = true
+for i = 0 to turnHold
+    if not (fast[i] > slow[i])
+        holdUp := false
+    if not (fast[i] < slow[i])
+        holdDn := false
+
+crossedUpAt = ta.crossover(fast, slow)[turnHold]
+crossedDnAt = ta.crossunder(fast, slow)[turnHold]
+
+// The cross itself (no hold) — used by the strategy's "At the cross" timing.
+bool crossUpNow = ta.crossover(fast, slow)
+bool crossDnNow = ta.crossunder(fast, slow)
+botCrossNow = turnOn and sigBarOK and botArmed and crossUpNow
+topCrossNow = turnOn and sigBarOK and topArmed and crossDnNow
+
+botTurn = turnOn and sigBarOK and botArmed and crossedUpAt and holdUp
+topTurn = turnOn and sigBarOK and topArmed and crossedDnAt and holdDn
+
+var int nBotTurn   = 0
+var int nTopTurn   = 0
+var int lastBotGap = 0
+var int lastTopGap = 0
+
+if botTurn
+    botArmed := false
+    nBotTurn += 1
+    int tb = bar_index - turnHold
+    lastBotGap := tb - lastBotWedge
+    if showTurnUp
+        label.new(tb, math.min(fast[turnHold], slow[turnHold]) - 3.0, "▲", style = label.style_label_up, color = color.new(color.yellow, 10), textcolor = color.black, size = size.tiny)
+
+if topTurn
+    topArmed := false
+    nTopTurn += 1
+    int tb = bar_index - turnHold
+    lastTopGap := tb - lastTopWedge
+    if showTurnDn
+        label.new(tb, math.max(fast[turnHold], slow[turnHold]) + 3.0, "▼", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.black, size = size.tiny)
+
+// ──────────── TICKS (wick as a compressed cycle) ────────────
+grpK = "Ticks"
+tickOn       = input.bool(true, "Enable",                 group = grpK)
+atrLen       = input.int(14, "ATR length", minval = 2,    group = grpK)
+botWickRange = input.float(0.55, "BOTTOM: min lower wick / range", step = 0.05, group = grpK)
+botWickAtr   = input.float(0.8,  "BOTTOM: min lower wick / ATR",   step = 0.10, group = grpK)
+topWickRange = input.float(0.70, "TOP: min upper wick / range",    step = 0.05, group = grpK)
+topWickAtr   = input.float(1.20, "TOP: min upper wick / ATR",      step = 0.10, group = grpK)
+
+atrV   = ta.atr(atrLen)
+rngBar = high - low
+upWick = high - math.max(open, close)
+dnWick = math.min(open, close) - low
+
+botTick = tickOn and sigBarOK and rngBar > 0 and atrV > 0 and dnWick / rngBar >= botWickRange and dnWick / atrV >= botWickAtr
+topTick = tickOn and sigBarOK and rngBar > 0 and atrV > 0 and upWick / rngBar >= topWickRange and upWick / atrV >= topWickAtr
+
+var int nBotTk = 0
+var int nTopTk = 0
+
+if botTick
+    nBotTk += 1
+    if showBotTick
+        label.new(bar_index, low, "BOT", style = label.style_label_up, color = color.new(color.yellow, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
+if topTick
+    nTopTk += 1
+    if showTopTick
+        label.new(bar_index, high, "TOP", style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
+
+// ───────── LEGS: continuity vs distance (turn to turn) ─────────
+var bool   legOpen = false
+var int    legDir  = 0
+var float  legP0   = na
+var int    legB0   = 0
+var float  legPath = 0.0
+var string leg1    = "—"
+var string leg2    = "—"
+
+if legOpen and barstate.isconfirmed
+    legPath += math.abs(close - close[1])
+
+if botTurn or topTurn
+    if legOpen
+        float dist = math.abs(close - legP0)
+        int   bars = bar_index - legB0
+        float eff  = legPath > 0 ? dist / legPath : 0.0
+        leg2 := leg1
+        leg1 := (legDir > 0 ? "UP " : "DN ") + str.tostring(dist, "#.##") + " / " + str.tostring(bars) + "b / eff " + str.tostring(eff, "#.00")
+    legOpen := true
+    legDir  := botTurn ? 1 : -1
+    legP0   := close
+    legB0   := bar_index
+    legPath := 0.0
+
+// ──────────────── LOWER-TF CHAIN ENGINE ────────────────
+// Same square engine as Chain Monitor v0.4D, run inside each lower timeframe.
+cWedge(bool wantRedWedge, bool eRed, bool eLime, int minW, int maxW, int ctx) =>
+    int  wHi   = math.max(minW, maxW)
+    bool fired = false
+    int  wOut  = 0
+    for w = minW to wHi
+        if not fired
+            bool ok = true
+            for i = 0 to ctx - 1
+                bool v = wantRedWedge ? eLime[i] : eRed[i]
+                if not v
+                    ok := false
+            if ok
+                for i = 0 to w - 1
+                    bool v = wantRedWedge ? eRed[ctx + i] : eLime[ctx + i]
+                    if not v
+                        ok := false
+            if ok
+                for i = 0 to ctx - 1
+                    bool v = wantRedWedge ? eLime[ctx + w + i] : eRed[ctx + w + i]
+                    if not v
+                        ok := false
+            if ok
+                fired := true
+                wOut  := w
+    [fired, wOut]
+
+cSecToBars(int sec, int tfs, int lo) => math.max(lo, int(math.ceil(sec * 1.0 / tfs)))
+
+// Returns close TIME and close PRICE of the latest BOT and TOP square on that timeframe.
+cEngine() =>
+    int  tfs    = timeframe.in_seconds()
+    bool useSec = cWidthMode == "Seconds"
+    int bMinW = useSec ? cSecToBars(cBotMinSec, tfs, 1) : cBotMinW
+    int bMaxW = useSec ? math.max(bMinW, cSecToBars(cBotMaxSec, tfs, 1)) : cBotMaxW
+    int bCtx  = useSec ? cSecToBars(cBotCtxSec, tfs, 1) : cBotCtx
+    int tMinW = useSec ? cSecToBars(cTopMinSec, tfs, 1) : cTopMinW
+    int tMaxW = useSec ? math.max(tMinW, cSecToBars(cTopMaxSec, tfs, 1)) : cTopMaxW
+    int tCtx  = useSec ? cSecToBars(cTopCtxSec, tfs, 1) : cTopCtx
+    int aLook = cAreaMode == "Seconds" ? cSecToBars(cAreaLookSec, tfs, 5) : cAreaLook
+    float eR    = ta.rsi(close, rsiLen)
+    float eFast = ta.sma(eR, fastLen)
+    float eSlow = ta.sma(eR, slowLen)
+    bool  eRed  = invertFill ? eFast > eSlow : eFast < eSlow
+    bool  eLime = not eRed
+    float eHi   = ta.highest(eSlow, aLook)
+    float eLo   = ta.lowest(eSlow, aLook)
+    float eRng  = eHi - eLo
+    float ePos  = eRng > 0 ? (eSlow - eLo) / eRng : 0.5
+    [bRaw, bWid] = cWedge(true,  eRed, eLime, bMinW, bMaxW, bCtx)
+    [tRaw, tWid] = cWedge(false, eRed, eLime, tMinW, tMaxW, tCtx)
+    var int lastB = -10000
+    var int lastT = -10000
+    bool bOK = bRaw and (not cBotNeedLow  or ePos[bCtx] <= loFrac) and (bar_index - lastB >= cBotSep)
+    bool tOK = tRaw and (not cTopNeedHigh or ePos[tCtx] >= hiFrac) and (bar_index - lastT >= cTopSep)
+    var int   bK = na
+    var int   tK = na
+    var float bP = na
+    var float tP = na
+    if bOK
+        lastB := bar_index
+        bK := time_close
+        bP := close
+    if tOK
+        lastT := bar_index
+        tK := time_close
+        tP := close
+    [bK, tK, bP, tP]
+
+cCs = timeframe.in_seconds()
+cq1 = timeframe.in_seconds(cr1)
+cq2 = timeframe.in_seconds(cr2)
+cq3 = timeframe.in_seconds(cr3)
+cq4 = timeframe.in_seconds(cr4)
+cq5 = timeframe.in_seconds(cr5)
+chainTfOK = cq1 < cq2 and cq2 < cq3 and cq3 < cq4 and cq4 < cq5 and cq5 < cCs
+// A rung that is not below the chart would break the request; use the chart and mark the chain disabled.
+cu1 = cq1 < cCs ? cr1 : timeframe.period
+cu2 = cq2 < cCs ? cr2 : timeframe.period
+cu3 = cq3 < cCs ? cr3 : timeframe.period
+cu4 = cq4 < cCs ? cr4 : timeframe.period
+cu5 = cq5 < cCs ? cr5 : timeframe.period
+
+[cB1, cT1, cPB1, cPT1] = request.security_lower_tf(syminfo.tickerid, cu1, cEngine())
+[cB2, cT2, cPB2, cPT2] = request.security_lower_tf(syminfo.tickerid, cu2, cEngine())
+[cB3, cT3, cPB3, cPT3] = request.security_lower_tf(syminfo.tickerid, cu3, cEngine())
+[cB4, cT4, cPB4, cPT4] = request.security_lower_tf(syminfo.tickerid, cu4, cEngine())
+[cB5, cT5, cPB5, cPT5] = request.security_lower_tf(syminfo.tickerid, cu5, cEngine())
+
+// Latest square time / price per rung (index 1..5), carried across chart bars.
+var array<int>   chBT = array.new_int(6, na)
+var array<int>   chTT = array.new_int(6, na)
+var array<float> chBP = array.new_float(6, na)
+var array<float> chTP = array.new_float(6, na)
+var array<int>   chSec = array.from(0, cq1, cq2, cq3, cq4, cq5)
+
+cTake(array<int> a, array<float> pa, array<int> dstT, array<float> dstP, int k) =>
+    int n = array.size(a)
+    if n > 0
+        int v = array.get(a, n - 1)
+        if not na(v)
+            array.set(dstT, k, v)
+            array.set(dstP, k, n == array.size(pa) ? array.get(pa, n - 1) : close)
+
+cTake(cB1, cPB1, chBT, chBP, 1)
+cTake(cB2, cPB2, chBT, chBP, 2)
+cTake(cB3, cPB3, chBT, chBP, 3)
+cTake(cB4, cPB4, chBT, chBP, 4)
+cTake(cB5, cPB5, chBT, chBP, 5)
+cTake(cT1, cPT1, chTT, chTP, 1)
+cTake(cT2, cPT2, chTT, chTP, 2)
+cTake(cT3, cPT3, chTT, chTP, 3)
+cTake(cT4, cPT4, chTT, chTP, 4)
+cTake(cT5, cPT5, chTT, chTP, 5)
+
+// Climb from the latest rung-1 square: rung k agrees if its latest square is
+// inside [previous - tolerance, previous + window + grace] of rung k's bars.
+// Returns [level, time of the last agreeing rung, its price].
+cClimb(array<int> tt, array<float> pp) =>
+    int   lvl = 0
+    int   tl  = na
+    float pl  = na
+    int   t1  = array.get(tt, 1)
+    if not na(t1)
+        lvl := 1
+        tl  := t1
+        pl  := array.get(pp, 1)
+        bool go = true
+        for k = 2 to 5
+            if go
+                int tk  = array.get(tt, k)
+                int sec = array.get(chSec, k)
+                if not na(tk) and tk >= tl - cTol * sec * 1000 and tk <= tl + (cAgree + cGrace) * sec * 1000
+                    lvl := k
+                    pl  := array.get(pp, k)
+                    tl  := math.max(tl, tk)
+                else
+                    go := false
+    [lvl, tl, pl]
+
+[chLvlL, chTimeL, chPxL] = cClimb(chBT, chBP)
+[chLvlS, chTimeS, chPxS] = cClimb(chTT, chTP)
+
+int chNow   = barstate.isrealtime ? timenow : time_close
+int chKeep  = chainKeep * cCs * 1000
+bool chainL = chainTfOK and chLvlL >= chainLvl and chNow - chTimeL <= chKeep
+bool chainS = chainTfOK and chLvlS >= chainLvl and chNow - chTimeS <= chKeep
+// Opposite chains at once = no clear direction.
+bool chainBoth = chainL and chainS
+bool chainLOK  = chainL and not chainBoth
+bool chainSOK  = chainS and not chainBoth
+
+// New chain event (first update where this chain qualifies) — used for the entry and its label.
+var int usedChainL = na
+var int usedChainS = na
+bool chainNewL = chainLOK and chTimeL != usedChainL
+bool chainNewS = chainSOK and chTimeS != usedChainS
+if chainNewL
+    usedChainL := chTimeL
+    if showChainLbl
+        label.new(chTimeL, chPxL, "▲ L" + str.tostring(chLvlL), xloc = xloc.bar_time, style = label.style_label_up, color = color.new(color.lime, 10), textcolor = color.black, size = size.small, force_overlay = true)
+if chainNewS
+    usedChainS := chTimeS
+    if showChainLbl
+        label.new(chTimeS, chPxS, "▼ L" + str.tostring(chLvlS), xloc = xloc.bar_time, style = label.style_label_down, color = color.new(color.fuchsia, 10), textcolor = color.white, size = size.small, force_overlay = true)
+
+// ───────────────────────── STRATEGY ─────────────────────────
+// One signal pair only, chosen in S1. Nothing else opens a trade.
+bool isTurn      = sigMode == "Turn ▲/▼"
+bool turnPredict = isTurn and turnEntry == "Predict (stop at cross price)"
+bool turnAtCross = isTurn and turnEntry == "At the cross"
+bool isChain     = sigMode == "Lower-TF chain"
+bool longSig  = isChain ? chainNewL : sigMode == "BOT/TOP square" ? botOK : isTurn ? (turnAtCross ? botCrossNow : botTurn) : botTick
+bool shortSig = isChain ? chainNewS : sigMode == "BOT/TOP square" ? topOK : isTurn ? (turnAtCross ? topCrossNow : topTurn) : topTick
+// S4 filter: the chart signal must be backed by a same-side lower-TF chain.
+bool filtL = not chainFilt or isChain or chainLOK
+bool filtS = not chainFilt or isChain or chainSOK
+longSig  := longSig  and filtL
+shortSig := shortSig and filtS
+// Predict mode places stop orders instead (below); the market-order signals are off.
+if turnPredict
+    longSig  := false
+    shortSig := false
+// Both on one bar = no clear direction, skip.
+if longSig and shortSig
+    longSig  := false
+    shortSig := false
+
+var int nSigL = 0
+var int nSigS = 0
+if longSig
+    nSigL += 1
+if shortSig
+    nSigS += 1
+
+bool canLong  = tradeDir != "Short only"
+bool canShort = tradeDir != "Long only"
+
+// Exit distances in ticks. ATR is taken from the entry candle (or the current
+// candle while flat / waiting for a stop order to fill).
+float exAtr  = ta.atr(exAtrLen)
+float tk     = syminfo.mintick
+int   eOff   = strategy.position_size != 0 ? math.min(bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1), 499) : 0
+float atrE   = exAtr[eOff]
+float slTk   = exitUnit == "Points" ? slPts    : slAtrM   * atrE / tk
+float tpTk   = exitUnit == "Points" ? tpPts    : tpR      * slTk
+float taTk   = exitUnit == "Points" ? trActPts : trActAtr * atrE / tk
+float tdTk   = exitUnit == "Points" ? trDisPts : trDisAtr * atrE / tk
+
+calcQty() =>
+    float q = qtyFixed
+    if qtyMode == "Risk %"
+        float slPx = slTk * tk * syminfo.pointvalue
+        q := slPx > 0 ? strategy.equity * riskPct / 100 / slPx : 0.0
+    q := math.min(q, qtyMax)
+    math.floor(q / qtyStep) * qtyStep
+
+float pos = strategy.position_size
+
+// ── Market entries (square, tick, turn "At the cross" / "After hold") ──
+if sigBarOK and longSig
+    float q = calcQty()
+    if pos < 0
+        if oppMode == "Reverse" and canLong and q > 0
+            strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
+        else if oppMode != "Ignore"
+            strategy.close("Short", comment = "opp signal")
+    else if pos == 0 and canLong and q > 0
+        strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
+
+if sigBarOK and shortSig
+    float q = calcQty()
+    if pos > 0
+        if oppMode == "Reverse" and canShort and q > 0
+            strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
+        else if oppMode != "Ignore"
+            strategy.close("Long", comment = "opp signal")
+    else if pos == 0 and canShort and q > 0
+        strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
+
+// ── Predict: price where fast and slow cross on the NEXT candle ──
+// fast = SMA(rsi, fastLen), slow = SMA(rsi, slowLen). Next candle's RSI that
+// makes them equal:  r* = (Ss/slowLen - Sf/fastLen) / (1/fastLen - 1/slowLen)
+// with Sf, Ss = sums of the last fastLen-1 / slowLen-1 RSI values. Then invert
+// Wilder's RSI to get the close that produces r*.
+float chg  = ta.change(close)
+float upR  = ta.rma(math.max(chg, 0), rsiLen)
+float dnR  = ta.rma(math.max(-chg, 0), rsiLen)
+float sumF = fastLen > 1 ? math.sum(r, math.max(fastLen - 1, 1)) : 0.0
+float sumS = math.sum(r, math.max(slowLen - 1, 1))
+
+crossPrice() =>
+    float px = na
+    if slowLen > fastLen and not na(upR) and not na(dnR)
+        float rStar = (sumS / slowLen - sumF / fastLen) / (1.0 / fastLen - 1.0 / slowLen)
+        if rStar > 0.01 and rStar < 99.99
+            float a   = rsiLen
+            float up1 = upR * (a - 1) / a
+            float dn1 = dnR * (a - 1) / a
+            float rs  = rStar / (100 - rStar)
+            float r0  = up1 + dn1 > 0 ? 100 * up1 / (up1 + dn1) : 50
+            if rStar >= r0
+                px := close + a * (rs * dn1 - up1)
+            else
+                px := close - a * (up1 / rs - dn1)
+    px
+
+float xPx = crossPrice()
+
+if turnPredict and barstate.isconfirmed
+    float q = calcQty()
+    // Long: armed by a BOT square, fast still below slow -> buy stop at the cross price.
+    bool wantL = turnOn and filtL and botArmed and fast < slow and canLong and q > 0 and not na(xPx) and pos <= 0 and (pos == 0 or oppMode == "Reverse")
+    if wantL
+        strategy.entry("Long", strategy.long, qty = q, stop = math.ceil(xPx / tk) * tk, comment = "L predict")
+    else
+        strategy.cancel("Long")
+    // Short: armed by a TOP square, fast still above slow -> sell stop at the cross price.
+    bool wantS = turnOn and filtS and topArmed and fast > slow and canShort and q > 0 and not na(xPx) and pos >= 0 and (pos == 0 or oppMode == "Reverse")
+    if wantS
+        strategy.entry("Short", strategy.short, qty = q, stop = math.floor(xPx / tk) * tk, comment = "S predict")
+    else
+        strategy.cancel("Short")
+    // "Close only": no reversing stop, close on the actual cross instead.
+    if oppMode == "Close only"
+        if pos < 0 and botArmed and crossUpNow
+            strategy.close("Short", comment = "opp signal")
+        if pos > 0 and topArmed and crossDnNow
+            strategy.close("Long", comment = "opp signal")
+
+// Exits: SL / TP / trailing stop, in ticks from the entry price.
+float xSl = slTk > 0 ? slTk : na
+float xTp = tpTk > 0 ? tpTk : na
+float xTa = trailOn and tdTk > 0 ? taTk : na
+float xTd = trailOn and tdTk > 0 ? tdTk : na
+strategy.exit("Long X",  from_entry = "Long",  loss = xSl, profit = xTp, trail_points = xTa, trail_offset = xTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+strategy.exit("Short X", from_entry = "Short", loss = xSl, profit = xTp, trail_points = xTa, trail_offset = xTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+
+// Turn "Predict" / "At the cross": the cross did not hold -> get out.
+if failExit and (turnPredict or turnAtCross) and barstate.isconfirmed and strategy.position_size != 0
+    int held = bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1)
+    if held <= turnHold
+        if strategy.position_size > 0 and fast <= slow
+            strategy.close("Long", comment = "cross failed")
+        if strategy.position_size < 0 and fast >= slow
+            strategy.close("Short", comment = "cross failed")
+
+// Time stop.
+if timeStop > 0 and strategy.position_size != 0 and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= timeStop
+    strategy.close_all(comment = "time stop")
+
+// Predicted cross price (blue dots on the price chart while a stop is armed).
+plot(turnPredict and ((botArmed and fast < slow) or (topArmed and fast > slow)) ? xPx : na, "Predicted cross price", color = color.new(color.blue, 0), style = plot.style_circles, linewidth = 2, force_overlay = true)
+
+// ───────────────────────── TABLE ─────────────────────────
+grpD = "Display"
+showTable = input.bool(true, "Show table", group = grpD)
+
+var table t = table.new(position.middle_right, 2, 14, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
+
+if showTable and barstate.islast
+    table.cell(t, 0, 0, "XPW SM S v0.8" + (allOn ? " ALL" : ""), text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
+    table.cell(t, 1, 0, isRed ? "RED" : "LIME", text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
+    table.cell(t, 0, 1, "Area pos",    text_size = size.tiny)
+    table.cell(t, 1, 1, str.tostring(posW, "#.00") + (inLow ? " LOW" : inHigh ? " HIGH" : " MID"), text_size = size.tiny)
+    table.cell(t, 0, 2, "BOT squares", text_size = size.tiny)
+    table.cell(t, 1, 2, str.tostring(nBotSq), text_size = size.tiny)
+    table.cell(t, 0, 3, "TOP squares", text_size = size.tiny)
+    table.cell(t, 1, 3, str.tostring(nTopSq), text_size = size.tiny)
+    table.cell(t, 0, 4, "BOT turns",   text_size = size.tiny)
+    table.cell(t, 1, 4, str.tostring(nBotTurn) + "  gap " + str.tostring(lastBotGap) + "b", text_size = size.tiny)
+    table.cell(t, 0, 5, "TOP turns",   text_size = size.tiny)
+    table.cell(t, 1, 5, str.tostring(nTopTurn) + "  gap " + str.tostring(lastTopGap) + "b", text_size = size.tiny)
+    table.cell(t, 0, 6, "BOT ticks",   text_size = size.tiny)
+    table.cell(t, 1, 6, str.tostring(nBotTk), text_size = size.tiny)
+    table.cell(t, 0, 7, "TOP ticks",   text_size = size.tiny)
+    table.cell(t, 1, 7, str.tostring(nTopTk), text_size = size.tiny)
+    table.cell(t, 0, 8, "Leg -1",      text_size = size.tiny)
+    table.cell(t, 1, 8, leg1, text_size = size.tiny)
+    table.cell(t, 0, 9, "Leg -2",      text_size = size.tiny)
+    table.cell(t, 1, 9, leg2, text_size = size.tiny)
+    table.cell(t, 0, 10, "Trading",    text_size = size.tiny)
+    table.cell(t, 1, 10, sigMode + " / " + tradeDir, text_size = size.tiny)
+    table.cell(t, 0, 11, "Signals L / S", text_size = size.tiny)
+    table.cell(t, 1, 11, str.tostring(nSigL) + " / " + str.tostring(nSigS), text_size = size.tiny)
+    table.cell(t, 0, 12, "Chain BOT / TOP", text_size = size.tiny)
+    table.cell(t, 1, 12, chainTfOK ? "L" + str.tostring(chLvlL) + (chainLOK ? " ON" : "") + " / L" + str.tostring(chLvlS) + (chainSOK ? " ON" : "") : "RUNGS MUST RISE & BE < CHART", text_size = size.tiny, bgcolor = chainTfOK ? na : color.new(color.red, 40))
+    table.cell(t, 0, 13, "Chain filter", text_size = size.tiny)
+    table.cell(t, 1, 13, chainFilt ? "ON (L" + str.tostring(chainLvl) + "+)" : "off", text_size = size.tiny)
