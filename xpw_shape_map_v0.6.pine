@@ -1,5 +1,6 @@
 //@version=6
 // XPW Shape Map v0.6 — MAP LAYER ONLY, NO SIGNALS
+// PINCH labels: X = thin crossing sliver, KISS = lines touch without crossing.
 // "Show / hide labels" group: switch each drawing type on or off individually.
 // v0.6: "Label ALL opportunities" mode. Every odd-colour wedge gets a TOP/BOT
 // square + label, the same as the strict ones — no area filter, no spacing,
@@ -51,6 +52,8 @@ showTurnUp   = input.bool(true, "Turn ▲ (after BOT)",    group = grpS, inline 
 showTurnDn   = input.bool(true, "Turn ▼ (after TOP)",    group = grpS, inline = "tn")
 showBotTick  = input.bool(true, "BOT tick (price chart)", group = grpS, inline = "tk")
 showTopTick  = input.bool(true, "TOP tick (price chart)", group = grpS, inline = "tk")
+showPinchX   = input.bool(true, "PINCH cross (thin sliver)", group = grpS, inline = "pn")
+showPinchK   = input.bool(true, "KISS (touch, no cross)",    group = grpS, inline = "pn")
 
 // ───────────────────── ALL OPPORTUNITIES ─────────────────────
 // ON  = label every odd-colour wedge, anywhere, with no spacing.
@@ -250,6 +253,37 @@ if topTick
     if showTopTick
         label.new(bar_index, high, "TOP", style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
 
+// ──────────── PINCH (thin sliver where the lines meet) ────────────
+// The lines squeeze together until the gap is tiny, then open again.
+//   X    = they cross: a thin sliver of fill flips colour
+//   KISS = they touch and separate with the SAME colour (no flip)
+// Fires one bar late: bar 1 must be the tightest point vs bars 0 and 2.
+grpX = "Pinch"
+pinchOn  = input.bool(true, "Enable",                                group = grpX)
+pinchMax = input.float(1.5, "Max gap |fast - slow| (RSI points)", minval = 0.0, step = 0.1, group = grpX)
+pinchSep = input.int(3, "Min bars between pinches", minval = 0,      group = grpX)
+
+gap = math.abs(fast - slow)
+var int lastPinchBar = -10000
+pinchRaw = pinchOn and barstate.isconfirmed and gap[1] <= pinchMax and gap[1] < gap[2] and gap[1] <= gap[0] and (bar_index - lastPinchBar >= pinchSep)
+pinchCross = pinchRaw and isRed[2] != isRed[0]
+pinchKiss  = pinchRaw and isRed[2] == isRed[0]
+
+var int nPinchX = 0
+var int nPinchK = 0
+
+if pinchRaw
+    lastPinchBar := bar_index
+    float mid = (fast[1] + slow[1]) / 2
+    if pinchCross
+        nPinchX += 1
+        if showPinchX
+            label.new(bar_index - 1, mid, "X", style = label.style_label_center, color = color.new(color.aqua, 15), textcolor = color.black, size = size.tiny)
+    else
+        nPinchK += 1
+        if showPinchK
+            label.new(bar_index - 1, mid, "KISS", style = label.style_label_center, color = color.new(color.fuchsia, 15), textcolor = color.white, size = size.tiny)
+
 // ───────── LEGS: continuity vs distance (turn to turn) ─────────
 var bool   legOpen = false
 var int    legDir  = 0
@@ -279,7 +313,7 @@ if botTurn or topTurn
 grpD = "Display"
 showTable = input.bool(true, "Show table", group = grpD)
 
-var table t = table.new(position.middle_right, 2, 10, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
+var table t = table.new(position.middle_right, 2, 12, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
 
 if showTable and barstate.islast
     table.cell(t, 0, 0, "XPW Shape Map v0.6" + (allOn ? " ALL" : ""), text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
@@ -302,3 +336,7 @@ if showTable and barstate.islast
     table.cell(t, 1, 8, leg1, text_size = size.tiny)
     table.cell(t, 0, 9, "Leg -2",      text_size = size.tiny)
     table.cell(t, 1, 9, leg2, text_size = size.tiny)
+    table.cell(t, 0, 10, "PINCH X",    text_size = size.tiny)
+    table.cell(t, 1, 10, str.tostring(nPinchX), text_size = size.tiny)
+    table.cell(t, 0, 11, "KISS",       text_size = size.tiny)
+    table.cell(t, 1, 11, str.tostring(nPinchK), text_size = size.tiny)
