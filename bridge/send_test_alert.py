@@ -18,13 +18,15 @@ ap.add_argument("--url", default="http://127.0.0.1:8080/hook")
 ap.add_argument("--config", default=str(Path(__file__).with_name("config.json")))
 args = ap.parse_args()
 
-secret = json.loads(Path(args.config).read_text(encoding="utf-8"))["secret"]
-body = json.dumps({
-    "secret": secret,
+secret = json.loads(Path(args.config).read_text(encoding="utf-8")).get("secret", "")
+alert = {
     "symbol": args.symbol,
     "position": args.position,
     "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-}).encode()
+}
+if secret:
+    alert["secret"] = secret
+body = json.dumps(alert).encode()
 req = urllib.request.Request(args.url, body, {"Content-Type": "application/json"})
 try:
     with urllib.request.urlopen(req, timeout=10) as r:

@@ -1,5 +1,5 @@
 {
-  "secret": "CHANGE_ME_to_a_long_random_string",
+  "secret": "",
 
   "listen_host": "127.0.0.1",
   "listen_port": 8080,

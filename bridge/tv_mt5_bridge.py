@@ -34,8 +34,9 @@ log = logging.getLogger("bridge")
 # ---------------------------------------------------------------- config ----
 def load_config(path):
     cfg = json.loads(Path(path).read_text(encoding="utf-8"))
-    if not cfg.get("secret") or cfg["secret"].startswith("CHANGE_ME"):
-        sys.exit("config: set 'secret' to a long random string first")
+    cfg.setdefault("secret", "")
+    if cfg["secret"].startswith("CHANGE_ME"):
+        sys.exit("config: set 'secret' to a long random string, or \"\" for none while testing")
     cfg.setdefault("listen_host", "127.0.0.1")
     cfg.setdefault("listen_port", 8080)
     cfg.setdefault("path", "/hook")
@@ -172,7 +173,7 @@ def parse_alert(body, cfg):
     msg = json.loads(body)
     if not isinstance(msg, dict):
         raise ValueError("alert must be a JSON object")
-    if not hmac.compare_digest(str(msg.get("secret", "")), cfg["secret"]):
+    if cfg["secret"] and not hmac.compare_digest(str(msg.get("secret", "")), cfg["secret"]):
         raise PermissionError("bad secret")
 
     ticker = str(msg.get("symbol", "")).split(":")[-1].upper()
@@ -260,6 +261,9 @@ def main():
         format="%(asctime)s %(levelname)s %(message)s",
         handlers=[logging.StreamHandler(), logging.FileHandler(HERE / "bridge.log", encoding="utf-8")],
     )
+    if not cfg["secret"]:
+        log.warning("NO SECRET SET: any alert that reaches the bridge will be accepted. "
+                    "Fine for testing; set 'secret' before trading real money.")
     broker = Broker(cfg)
     srv = ThreadingHTTPServer((cfg["listen_host"], cfg["listen_port"]),
                               make_handler(cfg, broker))

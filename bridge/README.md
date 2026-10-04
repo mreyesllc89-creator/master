@@ -44,7 +44,8 @@ trades and other EAs are left alone.
 2. **Python 3.10+** from python.org (tick "Add to PATH"), then run:
    `pip install -r requirements.txt`
 3. **Config:** copy `config.example.json` to `config.json`.
-   - Set `secret` to a long random string. One way to get one:
+   - `secret` is empty by default, so alerts need no password while you
+     test. Before trading real money, set it to a long random string:
      `python -c "import secrets;print(secrets.token_urlsafe(32))"`
    - Under `symbols`, list each TradingView ticker you trade. Set
      `mt5_symbol` to your broker's exact name for it (e.g. `XAUUSD.m`,
@@ -66,7 +67,11 @@ trades and other EAs are left alone.
    Add the strategy to the chart and create an alert:
    - Condition: *XPW Orientation TDI v2.4 Strategy* → **Order fills only**
    - Webhook URL: `https://yourname.duckdns.org/hook`
-   - Message (paste exactly, with your secret):
+   - Message while testing (no secret):
+     ```json
+     {"symbol":"{{ticker}}","position":"{{strategy.market_position}}","time":"{{timenow}}"}
+     ```
+     Once you set a secret, add it to the front:
      ```json
      {"secret":"YOUR_SECRET","symbol":"{{ticker}}","position":"{{strategy.market_position}}","time":"{{timenow}}"}
      ```
