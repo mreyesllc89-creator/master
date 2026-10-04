@@ -1,0 +1,267 @@
+//@version=6
+// XPW Refusal Log v0.3 Strategy
+// The v0.3 indicator turned into a strategy. Measurement is UNCHANGED from v0.3:
+// same pushes, same leg gap, same cut, same export columns.
+//
+// WHAT TRADES
+//   A label prints when a push ends (joinBars bars without a new high).
+//     FIRST LEG  (leg gap above the cut)    -> ENTER LONG
+//     SECOND LEG (leg gap at or below it)   -> ENTER SHORT
+//     UNCLASSIFIED (inside the dead band)   -> nothing
+//   The order fills on the open of the bar after the label.
+//   An opposite label while in a trade reverses it.
+//
+// READ THIS BEFORE TRUSTING A RESULT
+//   legCut and legWin are still the uncalibrated divTol and divLook. Until your marks are
+//   scored, every trade here is a guess at that cut.
+//   The synthetic check on v0.3: SECOND LEG tag 83% on a divergent higher high, FIRST LEG tag
+//   55% (coin flip) and random tape leans 61% short. So the SHORT side is the only one the
+//   check supports. "Allow longs" is left on so you can see it, not because it is trusted.
+//   Tops only. No bottom-side event is ever traded here.
+//
+// EXITS (S2)
+//   Points mode: distances are in Pine's strategy.exit "points", i.e. minimum ticks.
+//   ATR mode:    stop = ATR mult x ATR, target = R multiple x stop, trail in ATR multiples.
+//                ATR is frozen on the signal bar so the stop does not move with volatility.
+//   Time stop:   closes the trade after N bars in it (0 = off).
+//
+// DATA: 1-second chart. One bar = one second, so windows read as seconds.
+
+strategy("XPW Refusal Log v0.3 Strategy", shorttitle="XPW RLOG v0.3 S", overlay=true, max_labels_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1)
+
+// ---------------- TDI : your panel, TDI 38/62 Precision Scalper [Refined] ----------------
+rsiLen = input.int(14, "RSI length (your panel = 14)", group="TDI")
+redLen = input.int(2, "Red line: SMA of RSI (your panel = 2)", group="TDI")
+
+// ---------------- As built : what Cycle Complete v0.2 computes today ----------------
+builtRsi = input.int(13, "As built: RSI length in Cycle Complete v0.2", group="As built")
+builtLook = input.int(20, "As built: divLook in Cycle Complete v0.2", group="As built")
+
+// ---------------- Pushes ----------------
+pushLook = input.int(20, "Push: price makes a new high over this many bars", group="Push")
+joinBars = input.int(3, "Push: bars without a new high that end the push", group="Push")
+
+// ---------------- Line windows (bars = seconds on a 1 s chart) ----------------
+w1 = input.int(20, "Line window 1", group="Line windows")
+w2 = input.int(60, "Line window 2", group="Line windows")
+w3 = input.int(180, "Line window 3", group="Line windows")
+w4 = input.int(600, "Line window 4", group="Line windows")
+corrLen = input.int(30, "Correlation window before the push", group="Line windows")
+
+// ---------------- Leg classification : PROVISIONAL until your marks are scored ----------------
+legWin = input.int(60, "Leg: window that defines the leg (this is divLook)", group="Leg")
+legCut = input.float(0.0, "Leg: cut between held and broke (this is divTol)", step=0.05, group="Leg")
+legBand = input.float(0.0, "Leg: dead band around the cut, leave 0 until the overlap is measured", step=0.05, group="Leg")
+
+// ---------------- Parent rung ----------------
+useParent = input.bool(false, "Parent: record the higher timeframe read", group="Parent")
+parentTf = input.timeframe("5", "Parent: timeframe", group="Parent")
+parentWin = input.int(20, "Parent: window on the parent rung", group="Parent")
+
+// ---------------- Display ----------------
+showLabels = input.bool(true, "Show labels", group="Display")
+showLeg = input.bool(true, "Put the leg word on the label", group="Display")
+col1 = input.color(color.aqua, "Colour: FIRST LEG", group="Display")
+col2 = input.color(color.purple, "Colour: SECOND LEG", group="Display")
+col0 = input.color(color.gray, "Colour: unclassified", group="Display")
+
+// ---------------- S1. Entries ----------------
+allowLong = input.bool(true, "Allow longs (FIRST LEG)", group="S1. Entries", tooltip="The synthetic check put the FIRST LEG tag at 55%, a coin flip. Turn this off to trade only the side the check supports.")
+allowShort = input.bool(true, "Allow shorts (SECOND LEG)", group="S1. Entries")
+needParent = input.bool(false, "Require the parent to agree", group="S1. Entries", tooltip="Your rule: a divergence alone does not count, it has to be happening on the higher timeframe too. Needs 'Parent: record the higher timeframe read' on. Long needs parent gap above the cut, short needs it at or below.")
+oppCloses = input.bool(true, "Opposite label reverses the trade", group="S1. Entries", tooltip="OFF: an opposite label is ignored while a trade is open.")
+
+// ---------------- S2. Exits ----------------
+exitUnit = input.string("Points", "SL / TP / trail unit", options=["Points", "ATR"], group="S2. Exits")
+slPts = input.float(5000, "Stop loss, pts (Points mode)", minval=0, group="S2. Exits", tooltip="Pine strategy.exit points = minimum ticks. 0 = no stop.")
+tpPts = input.float(50000, "Take profit, pts (Points mode)", minval=0, group="S2. Exits", tooltip="Pine strategy.exit points = minimum ticks. 0 = no target.")
+atrLen = input.int(14, "ATR length (ATR mode)", minval=1, group="S2. Exits")
+slAtr = input.float(2.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits")
+tpR = input.float(2.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="0 = no target.")
+useTrail = input.bool(true, "Trailing stop", group="S2. Exits")
+trActPts = input.float(1500, "Trail activation, pts of profit (Points mode)", minval=0, group="S2. Exits")
+trOffPts = input.float(100, "Trail distance, pts (Points mode)", minval=0, group="S2. Exits")
+trActAtr = input.float(4.0, "Trail activation, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits")
+trOffAtr = input.float(0.2, "Trail distance, ATR mult (ATR mode)", minval=0, step=0.05, group="S2. Exits")
+timeStop = input.int(0, "Time stop, bars (0 = off)", minval=0, group="S2. Exits")
+
+// ---------------- Series, evaluated on every bar ----------------
+red = ta.sma(ta.rsi(close, rsiLen), redLen)
+redBuilt = ta.sma(ta.rsi(close, builtRsi), redLen)
+top1 = ta.highest(red, w1)
+top2 = ta.highest(red, w2)
+top3 = ta.highest(red, w3)
+top4 = ta.highest(red, w4)
+topLeg = ta.highest(red, legWin)
+builtTest = redBuilt - ta.highest(redBuilt, builtLook)[1]
+newHi = high > ta.highest(high, pushLook)[1]
+corr = ta.correlation(close, red, corrLen)
+atr = ta.atr(atrLen)
+
+// Parent gap, read off the LAST COMPLETED parent bar so it does not repaint in realtime.
+parentGap() =>
+    pr = ta.sma(ta.rsi(close, rsiLen), redLen)
+    pr[1] - ta.highest(pr, parentWin)[2]
+pGap = useParent ? request.security(syminfo.tickerid, parentTf, parentGap(), lookahead=barmerge.lookahead_off) : na
+
+fmt(float v) => na(v) ? "na" : str.tostring(v, "#.##")
+
+// ---------------- Push state ----------------
+var bool inPush = false
+var int lastHiBar = 0
+var int pushBars = 0
+var float pushHigh = na
+var int pushHighBar = 0
+var int pushHighTime = 0
+var float pushRedMax = na
+var float builtMin = na
+var float L1 = na
+var float L2 = na
+var float L3 = na
+var float L4 = na
+var float Lleg = na
+var float corrPre = na
+var float pGapPre = na
+
+float oL1 = na
+float oL2 = na
+float oL3 = na
+float oL4 = na
+float oLeg = na
+float oBuilt = na
+float oBars = na
+float oCorr = na
+float oTime = na
+float oLegId = na
+float oSide = na
+float oParent = na
+int sig = 0
+
+if barstate.isconfirmed
+    if newHi
+        if not inPush
+            inPush := true
+            pushBars := 0
+            pushHigh := high
+            pushHighBar := bar_index
+            pushHighTime := time
+            pushRedMax := red
+            builtMin := builtTest
+            L1 := top1[1]
+            L2 := top2[1]
+            L3 := top3[1]
+            L4 := top4[1]
+            Lleg := topLeg[1]
+            corrPre := corr[1]
+            pGapPre := pGap
+        else
+            builtMin := na(builtMin) ? builtTest : math.min(builtMin, builtTest)
+            if high > pushHigh
+                pushHigh := high
+                pushHighBar := bar_index
+                pushHighTime := time
+        pushBars += 1
+        lastHiBar := bar_index
+    if inPush
+        pushRedMax := na(pushRedMax) ? red : math.max(pushRedMax, red)
+        if not newHi and bar_index - lastHiBar >= joinBars
+            oL1 := pushRedMax - L1
+            oL2 := pushRedMax - L2
+            oL3 := pushRedMax - L3
+            oL4 := pushRedMax - L4
+            oLeg := pushRedMax - Lleg
+            oBuilt := builtMin
+            oBars := pushBars
+            oCorr := corrPre
+            oParent := pGapPre
+            oTime := hour(pushHighTime, syminfo.timezone) * 10000 + minute(pushHighTime, syminfo.timezone) * 100 + second(pushHighTime, syminfo.timezone)
+            int legId = 0
+            if not na(oLeg)
+                if oLeg > legCut + legBand
+                    legId := 1
+                else if oLeg < legCut - legBand
+                    legId := 2
+            oLegId := legId
+            oSide := legId == 1 ? 1 : legId == 2 ? -1 : 0
+            sig := legId == 1 ? 1 : legId == 2 ? -1 : 0
+            sideWord = legId == 1 ? "LONG" : legId == 2 ? "SHORT" : "NO SIDE"
+            legWord = legId == 1 ? "1st" : legId == 2 ? "2nd" : "none"
+            legLong = legId == 1 ? "FIRST LEG, the red line broke its prior top, TDI went with price, up cycle, LONG" : legId == 2 ? "SECOND LEG, price made a new high and the red line refused, down cycle, SHORT" : "UNCLASSIFIED, the leg gap sits inside the dead band"
+            legCol = legId == 1 ? col1 : legId == 2 ? col2 : col0
+            txtCol = legId == 2 ? color.white : color.black
+            id = "H " + str.format_time(pushHighTime, "HH:mm:ss", syminfo.timezone)
+            face = showLeg ? id + " · " + legWord + " · " + sideWord : id + " · " + sideWord
+            txt = id + " | " + legLong + " | leg gap (window " + str.tostring(legWin) + ", cut " + str.tostring(legCut) + ") " + fmt(oLeg) + " | parent " + parentTf + " gap " + fmt(oParent) + " | line " + str.tostring(w1) + " " + fmt(oL1) + " | line " + str.tostring(w2) + " " + fmt(oL2) + " | line " + str.tostring(w3) + " " + fmt(oL3) + " | line " + str.tostring(w4) + " " + fmt(oL4) + " | as built " + fmt(oBuilt) + " | push bars " + str.tostring(pushBars) + " | corr " + fmt(oCorr)
+            log.info(txt)
+            if showLabels
+                label.new(pushHighBar, pushHigh, face, style=label.style_label_down, color=legCol, textcolor=txtCol, size=size.tiny, tooltip=txt)
+            inPush := false
+
+// ---------------- Entries ----------------
+// Parent agreement uses the same cut as the leg: above = with price (long), at or below = refused (short).
+bool parentLong = not needParent or (useParent and not na(oParent) and oParent > legCut)
+bool parentShort = not needParent or (useParent and not na(oParent) and oParent <= legCut)
+bool goLong = sig == 1 and allowLong and parentLong
+bool goShort = sig == -1 and allowShort and parentShort
+
+// ATR frozen on the signal bar, used for the whole trade.
+var float atrEntry = na
+
+bool flat = strategy.position_size == 0
+bool sentLong = goLong and strategy.position_size <= 0 and (flat or oppCloses)
+bool sentShort = goShort and strategy.position_size >= 0 and (flat or oppCloses)
+if sentLong
+    atrEntry := atr
+    strategy.entry("Long", strategy.long, comment="FIRST LEG LONG")
+if sentShort
+    atrEntry := atr
+    strategy.entry("Short", strategy.short, comment="SECOND LEG SHORT")
+
+// ---------------- Exits ----------------
+// Every distance in ticks, as strategy.exit expects for loss / profit / trail_points / trail_offset.
+toTicks(float d) => d / syminfo.mintick
+pos(float v) => v > 0 ? v : na
+
+float slT = na
+float tpT = na
+float trA = na
+float trO = na
+if exitUnit == "Points"
+    slT := pos(slPts)
+    tpT := pos(tpPts)
+    trA := useTrail ? trActPts : na
+    trO := useTrail ? pos(trOffPts) : na
+else
+    float slPx = slAtr * atrEntry
+    slT := pos(toTicks(slPx))
+    tpT := pos(toTicks(tpR * slPx))
+    trA := useTrail ? toTicks(trActAtr * atrEntry) : na
+    trO := useTrail ? pos(toTicks(trOffAtr * atrEntry)) : na
+if na(trO)
+    trA := na
+
+// Placed on the signal bar too, so the stop is live from the fill bar onward.
+if sentLong or (strategy.position_size > 0 and not sentShort)
+    strategy.exit("Long X", from_entry="Long", loss=slT, profit=tpT, trail_points=trA, trail_offset=trO, comment_loss="SL", comment_profit="TP", comment_trailing="trail")
+if sentShort or (strategy.position_size < 0 and not sentLong)
+    strategy.exit("Short X", from_entry="Short", loss=slT, profit=tpT, trail_points=trA, trail_offset=trO, comment_loss="SL", comment_profit="TP", comment_trailing="trail")
+
+// Time stop: bars since the open trade filled.
+if timeStop > 0 and strategy.position_size != 0
+    int entryBar = strategy.opentrades.entry_bar_index(strategy.opentrades - 1)
+    if bar_index - entryBar >= timeStop
+        strategy.close_all(comment="time stop")
+
+// ---------------- Export columns : the v0.3 set, unchanged ----------------
+plot(oL1, "line window 1", display=display.data_window)
+plot(oL2, "line window 2", display=display.data_window)
+plot(oL3, "line window 3", display=display.data_window)
+plot(oL4, "line window 4", display=display.data_window)
+plot(oBuilt, "as built", display=display.data_window)
+plot(oBars, "push bars", display=display.data_window)
+plot(oCorr, "corr before push", display=display.data_window)
+plot(oTime, "push time HHMMSS", display=display.data_window)
+plot(oLeg, "leg gap", display=display.data_window)
+plot(oLegId, "leg 1 first 2 second 0 none", display=display.data_window)
+plot(oSide, "side +1 long -1 short", display=display.data_window)
+plot(oParent, "parent gap", display=display.data_window)
