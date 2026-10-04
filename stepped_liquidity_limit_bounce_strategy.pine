@@ -148,8 +148,6 @@ plot(resLiq.size()  > 0 ? resLiq.last().price  : na, color=color.red,     style=
 // =========================================================================
 mtSymbol = str.length(pcSymbol) > 0 ? pcSymbol : syminfo.ticker
 
-// =========================================================================
-// =========================================================================
 fmtDistance(float ticks, float entryPx, bool isLong, bool isStop) =>
     string result = na
     if pcUnits == "Price"
