@@ -8,9 +8,12 @@
 // "Enter on tick" ON (default): live, the strategy runs every tick and enters the
 // moment the signal appears inside the forming candle — no wait for the close.
 // On history there are no ticks, so backtests still enter on the next bar's open.
+// Margin is set to 1% (100:1, like a CFD account). With TradingView's default
+// 100% margin, 10 oz of gold costs more than a $10k account and every order is
+// silently rejected. Change it in Properties -> Margin if your broker differs.
 // "Points" = minimum ticks (XAUUSD: 1 pt = 0.01, so 5000 pts = $50).
 
-strategy("XPW Shape Map v0.6 Strategy", shorttitle = "XPW-SM6 S", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 10)
+strategy("XPW Shape Map v0.6 Strategy", shorttitle = "XPW-SM6 S", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 10, margin_long = 1, margin_short = 1)
 
 // ───────────────────────── S1. ENTRY ─────────────────────────
 grpE = "S1. Entry"
@@ -312,36 +315,6 @@ if botTurn or topTurn
     legB0   := bar_index
     legPath := 0.0
 
-// ───────────────────────── TABLE ─────────────────────────
-grpD = "Display"
-showTable = input.bool(true, "Show table", group = grpD)
-
-var table t = table.new(position.middle_right, 2, 11, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
-
-if showTable and barstate.islast
-    table.cell(t, 0, 0, "XPW SM v0.6 S" + (allOn ? " ALL" : ""), text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
-    table.cell(t, 1, 0, isRed ? "RED" : "LIME", text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
-    table.cell(t, 0, 1, "Area pos",    text_size = size.tiny)
-    table.cell(t, 1, 1, str.tostring(posW, "#.00") + (inLow ? " LOW" : inHigh ? " HIGH" : " MID"), text_size = size.tiny)
-    table.cell(t, 0, 2, "BOT squares", text_size = size.tiny)
-    table.cell(t, 1, 2, str.tostring(nBotSq), text_size = size.tiny)
-    table.cell(t, 0, 3, "TOP squares", text_size = size.tiny)
-    table.cell(t, 1, 3, str.tostring(nTopSq), text_size = size.tiny)
-    table.cell(t, 0, 4, "BOT turns",   text_size = size.tiny)
-    table.cell(t, 1, 4, str.tostring(nBotTurn) + "  gap " + str.tostring(lastBotGap) + "b", text_size = size.tiny)
-    table.cell(t, 0, 5, "TOP turns",   text_size = size.tiny)
-    table.cell(t, 1, 5, str.tostring(nTopTurn) + "  gap " + str.tostring(lastTopGap) + "b", text_size = size.tiny)
-    table.cell(t, 0, 6, "BOT ticks",   text_size = size.tiny)
-    table.cell(t, 1, 6, str.tostring(nBotTk), text_size = size.tiny)
-    table.cell(t, 0, 7, "TOP ticks",   text_size = size.tiny)
-    table.cell(t, 1, 7, str.tostring(nTopTk), text_size = size.tiny)
-    table.cell(t, 0, 8, "Leg -1",      text_size = size.tiny)
-    table.cell(t, 1, 8, leg1, text_size = size.tiny)
-    table.cell(t, 0, 9, "Leg -2",      text_size = size.tiny)
-    table.cell(t, 1, 9, leg2, text_size = size.tiny)
-    table.cell(t, 0, 10, "Trading",    text_size = size.tiny)
-    table.cell(t, 1, 10, sigMode + " / " + tradeDir, text_size = size.tiny)
-
 // ───────────────────────── STRATEGY ─────────────────────────
 // One signal pair only, chosen in S1. Nothing else opens a trade.
 bool longSig  = sigMode == "BOT/TOP square" ? botOK : sigMode == "Turn ▲/▼" ? botTurn : botTick
@@ -350,6 +323,13 @@ bool shortSig = sigMode == "BOT/TOP square" ? topOK : sigMode == "Turn ▲/▼" 
 if longSig and shortSig
     longSig  := false
     shortSig := false
+
+var int nSigL = 0
+var int nSigS = 0
+if longSig
+    nSigL += 1
+if shortSig
+    nSigS += 1
 
 bool canLong  = tradeDir != "Short only"
 bool canShort = tradeDir != "Long only"
@@ -437,3 +417,35 @@ strategy.exit("Short X", from_entry = "Short", loss = xSl, profit = xTp, trail_p
 // Time stop.
 if timeStop > 0 and strategy.position_size != 0 and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= timeStop
     strategy.close_all(comment = "time stop")
+
+// ───────────────────────── TABLE ─────────────────────────
+grpD = "Display"
+showTable = input.bool(true, "Show table", group = grpD)
+
+var table t = table.new(position.middle_right, 2, 12, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
+
+if showTable and barstate.islast
+    table.cell(t, 0, 0, "XPW SM v0.6 S" + (allOn ? " ALL" : ""), text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
+    table.cell(t, 1, 0, isRed ? "RED" : "LIME", text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
+    table.cell(t, 0, 1, "Area pos",    text_size = size.tiny)
+    table.cell(t, 1, 1, str.tostring(posW, "#.00") + (inLow ? " LOW" : inHigh ? " HIGH" : " MID"), text_size = size.tiny)
+    table.cell(t, 0, 2, "BOT squares", text_size = size.tiny)
+    table.cell(t, 1, 2, str.tostring(nBotSq), text_size = size.tiny)
+    table.cell(t, 0, 3, "TOP squares", text_size = size.tiny)
+    table.cell(t, 1, 3, str.tostring(nTopSq), text_size = size.tiny)
+    table.cell(t, 0, 4, "BOT turns",   text_size = size.tiny)
+    table.cell(t, 1, 4, str.tostring(nBotTurn) + "  gap " + str.tostring(lastBotGap) + "b", text_size = size.tiny)
+    table.cell(t, 0, 5, "TOP turns",   text_size = size.tiny)
+    table.cell(t, 1, 5, str.tostring(nTopTurn) + "  gap " + str.tostring(lastTopGap) + "b", text_size = size.tiny)
+    table.cell(t, 0, 6, "BOT ticks",   text_size = size.tiny)
+    table.cell(t, 1, 6, str.tostring(nBotTk), text_size = size.tiny)
+    table.cell(t, 0, 7, "TOP ticks",   text_size = size.tiny)
+    table.cell(t, 1, 7, str.tostring(nTopTk), text_size = size.tiny)
+    table.cell(t, 0, 8, "Leg -1",      text_size = size.tiny)
+    table.cell(t, 1, 8, leg1, text_size = size.tiny)
+    table.cell(t, 0, 9, "Leg -2",      text_size = size.tiny)
+    table.cell(t, 1, 9, leg2, text_size = size.tiny)
+    table.cell(t, 0, 10, "Trading",    text_size = size.tiny)
+    table.cell(t, 1, 10, sigMode + " / " + tradeDir, text_size = size.tiny)
+    table.cell(t, 0, 11, "Signals L / S", text_size = size.tiny)
+    table.cell(t, 1, 11, str.tostring(nSigL) + " / " + str.tostring(nSigS), text_size = size.tiny)
