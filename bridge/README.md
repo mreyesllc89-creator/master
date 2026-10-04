@@ -98,3 +98,21 @@ trades and other EAs are left alone.
   test.
 - **Firewall:** never expose port 8080 itself. Only Caddy should be
   reachable from outside.
+
+## Offline tests and order failures
+
+From the repository root, run `python -m unittest discover -s bridge -v`.
+The tests use a local HTTP server and a fake MetaTrader5 module; they need
+no MT5 installation and never connect to a terminal.
+
+The bridge reconnects before syncing when the terminal connection is lost.
+Failed position reads stop the sync rather than being treated as an empty
+account. Filling uses FOK or IOC according to the symbol's execution rules;
+RETURN is never used for Market Execution. Stops are rounded to the symbol's
+price digits; broker stop-distance and tick-size restrictions still apply.
+Rejected, missing or partially filled order results return HTTP 500 and stop
+the sync. Orders are not automatically resent, since execution may already
+have occurred; check MT5 before sending a fresh target alert.
+
+An explicit `lots` override must be numeric and positive; zero or null is
+rejected rather than falling back to the configured lot size.

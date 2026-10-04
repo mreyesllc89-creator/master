@@ -6,7 +6,7 @@ Python package. No third-party relay sees your signals or account.
 
 Each alert carries the strategy's *target* position (long / short / flat)
 rather than a buy or sell instruction. The bridge makes MT5 match it, so a
-repeated, late or out-of-order alert never doubles a position, and every exit
+repeated alert never doubles a position, and every exit
 the TradingView strategy takes (END label, opposite ENTER, trailing TP, SL)
 is mirrored without extra alert logic.
 
@@ -73,11 +73,16 @@ class Broker:
         if not mt5.initialize(**kw):
             raise RuntimeError(f"MT5 initialize failed: {mt5.last_error()}")
         info = mt5.account_info()
+        terminal = mt5.terminal_info()
+        if info is None or terminal is None or not terminal.connected:
+            raise RuntimeError(f"MT5 account unavailable or disconnected: {mt5.last_error()}")
         log.info("MT5 connected: account %s on %s", info.login, info.server)
 
     def _ensure(self):
-        if self.mt5.terminal_info() is None:
+        info = self.mt5.terminal_info()
+        if info is None or not info.connected:
             log.warning("MT5 connection lost, reconnecting")
+            self.mt5.shutdown()
             self._connect()
 
     def sync(self, symbol, target, lots, sl_dist):
@@ -89,8 +94,11 @@ class Broker:
             mt5 = self.mt5
             if not mt5.symbol_select(symbol, True):
                 raise RuntimeError(f"symbol {symbol} not available: {mt5.last_error()}")
+            positions = mt5.positions_get(symbol=symbol)
+            if positions is None:
+                raise RuntimeError(f"positions_get failed: {mt5.last_error()}")
             positions = [
-                p for p in (mt5.positions_get(symbol=symbol) or ())
+                p for p in positions
                 if p.magic == self.cfg["magic"]
             ]
             want = {"long": mt5.POSITION_TYPE_BUY, "short": mt5.POSITION_TYPE_SELL}.get(target)
@@ -105,11 +113,20 @@ class Broker:
             return actions or ["already in sync"]
 
     def _filling(self, symbol):
-        mt5, mode = self.mt5, self.mt5.symbol_info(symbol).filling_mode
+        mt5 = self.mt5
+        info = mt5.symbol_info(symbol)
+        if info is None:
+            raise RuntimeError(f"symbol_info failed: {mt5.last_error()}")
+        if info.trade_exemode in (mt5.SYMBOL_TRADE_EXECUTION_REQUEST,
+                                 mt5.SYMBOL_TRADE_EXECUTION_INSTANT):
+            return mt5.ORDER_FILLING_FOK
+        mode = info.filling_mode
         if mode & 1:  # SYMBOL_FILLING_FOK
             return mt5.ORDER_FILLING_FOK
         if mode & 2:  # SYMBOL_FILLING_IOC
             return mt5.ORDER_FILLING_IOC
+        if info.trade_exemode == mt5.SYMBOL_TRADE_EXECUTION_MARKET:
+            raise RuntimeError("market execution requires FOK or IOC filling")
         return mt5.ORDER_FILLING_RETURN
 
     def _send(self, req):
@@ -127,9 +144,15 @@ class Broker:
             raise RuntimeError(f"order rejected ({getattr(res, 'retcode', '?')}): {err}")
         return res
 
+    def _tick(self, symbol):
+        tick = self.mt5.symbol_info_tick(symbol)
+        if tick is None or tick.ask <= 0 or tick.bid <= 0:
+            raise RuntimeError(f"no valid quote for {symbol}: {self.mt5.last_error()}")
+        return tick
+
     def _open(self, symbol, ptype, lots, sl_dist):
         mt5 = self.mt5
-        tick = mt5.symbol_info_tick(symbol)
+        tick = self._tick(symbol)
         buy = ptype == mt5.POSITION_TYPE_BUY
         price = tick.ask if buy else tick.bid
         req = dict(
@@ -140,12 +163,15 @@ class Broker:
             comment="tv-bridge",
         )
         if sl_dist:
-            req["sl"] = price - sl_dist if buy else price + sl_dist
+            info = mt5.symbol_info(symbol)
+            if info is None:
+                raise RuntimeError(f"symbol_info failed: {mt5.last_error()}")
+            req["sl"] = round(price - sl_dist if buy else price + sl_dist, info.digits)
         return self._send(req).order
 
     def _close(self, p):
         mt5 = self.mt5
-        tick = mt5.symbol_info_tick(p.symbol)
+        tick = self._tick(p.symbol)
         buy = p.type == mt5.POSITION_TYPE_BUY
         self._send(dict(
             symbol=p.symbol,
@@ -173,7 +199,7 @@ def parse_alert(body, cfg):
     msg = json.loads(body)
     if not isinstance(msg, dict):
         raise ValueError("alert must be a JSON object")
-    if cfg["secret"] and not hmac.compare_digest(str(msg.get("secret", "")), cfg["secret"]):
+    if cfg["secret"] and not hmac.compare_digest(str(msg.get("secret", "")).encode(), cfg["secret"].encode()):
         raise PermissionError("bad secret")
 
     ticker = str(msg.get("symbol", "")).split(":")[-1].upper()
@@ -185,12 +211,17 @@ def parse_alert(body, cfg):
     if target not in ("long", "short", "flat"):
         raise ValueError(f"position must be long/short/flat, got {target!r}")
 
-    lots = float(msg.get("lots") or sym_cfg["lots"])
+    try:
+        lots = float(msg.get("lots", sym_cfg["lots"]))
+    except (TypeError, ValueError):
+        raise ValueError("lots must be a number") from None
     if not 0 < lots <= sym_cfg.get("max_lots", sym_cfg["lots"]):
         raise ValueError(f"lots {lots} outside (0, max_lots]")
 
     max_age = cfg["max_alert_age_sec"]
     if max_age and msg.get("time"):
+        if not isinstance(msg["time"], str):
+            raise ValueError("time must be a timestamp string")
         sent = calendar.timegm(time.strptime(msg["time"][:19], "%Y-%m-%dT%H:%M:%S"))
         if time.time() - sent > max_age:
             raise ValueError(f"alert is older than {max_age}s")
@@ -226,7 +257,10 @@ def make_handler(cfg, broker):
                 return self.reply(403, "forbidden")
             if self.path != cfg["path"]:
                 return self.reply(404, "not found")
-            length = int(self.headers.get("Content-Length") or 0)
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                return self.reply(413, "bad length")
             if not 0 < length <= MAX_BODY:
                 return self.reply(413, "bad length")
             body = self.rfile.read(length)
