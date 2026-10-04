@@ -20,6 +20,8 @@
 //         - "Al cierre de la vela": the same replay, once per closed bar.
 //         Realtime tick results are lost on a chart reload (the history is
 //         then replayed instead), so they can differ slightly afterwards.
+// BITE 4: gates on server time (no-new window, blocked hours/days, weekend
+//         session and flatten), side mode, daily loss and M1 confirmation.
 //
 // Inputs marked (bite N) are already loaded from the preset but only become
 // active in that bite. MT5-only inputs (magic, slippage, Telegram, DB, CSV)
@@ -48,7 +50,7 @@ minStep     = input.float(0.2,  "Paso minimo (precio)", step = 0.1, group = grpG
 stepGrowth  = input.float(0.1,  "Crecimiento del paso por nivel (0.10 = +10%)", step = 0.01, group = grpGrid)
 chaseTrend  = input.bool(true,  "Seguir promediando aunque el regimen sea tendencia", group = grpGrid)
 advStepMult = input.float(1.0,  "Paso extra con tendencia fuerte en contra (1 = igual)", step = 0.1, group = grpGrid)
-addConfM1   = input.bool(false, "Promediar solo tras micro-rebote M1 (bite 4)", group = grpGrid)
+addConfM1   = input.bool(false, "Promediar solo tras micro-rebote M1", group = grpGrid)
 maxSprdAdd  = input.float(0.0,  "Spread max para promediar (0=sin limite)", step = 0.05, group = grpGrid)
 
 // ---------------------------------------------------------------- 4. Indicadores
@@ -58,8 +60,8 @@ atrAvgLB    = input.int(50,      "Ventana ATR promedio", minval = 1, group = grp
 ratchetArm  = input.float(0.7,   "Trinquete: se arma al % del TP", step = 0.05, group = grpInd)
 ratchetLock = input.float(0.5,   "Trinquete: % del pico protegido, 0=off", step = 0.05, group = grpInd)
 maxAtrRatio = input.float(1.157, "No sembrar si ATR/ATRavg > esto (0=off)", step = 0.01, group = grpInd)
-noNewFrom   = input.int(-1,      "No sembrar desde hora (-1=off) (bite 4)", minval = -1, maxval = 23, group = grpInd)
-noNewTo     = input.int(-1,      "...hasta hora, inclusive (bite 4)",       minval = -1, maxval = 23, group = grpInd)
+noNewFrom   = input.int(-1,      "No sembrar desde hora (-1=off)", minval = -1, maxval = 23, group = grpInd)
+noNewTo     = input.int(-1,      "...hasta hora, inclusive",       minval = -1, maxval = 23, group = grpInd)
 emaFastLen  = input.int(20,      "EMA rapida",    group = grpInd)
 emaMedLen   = input.int(50,      "EMA media",     group = grpInd)
 emaSlowLen  = input.int(100,     "EMA lenta",     group = grpInd)
@@ -115,10 +117,13 @@ stopCoolH   = input.float(24.0, "Stop catastrofe: horas de pausa (bite 6)", grou
 timeCutMin  = input.float(0.0,  "Corte por tiempo: minutos (0=off) (bite 6)", group = grpRisk)
 timeCutLoss = input.bool(false, "Corte por tiempo: solo en perdida (bite 6)", group = grpRisk)
 timeCutPause= input.float(0.0,  "Corte por tiempo: minutos de pausa (bite 6)", group = grpRisk)
-blockHours  = input.string("",  "Horas sin cestas nuevas, ej. 23,0,1 (bite 4)", group = grpRisk)
-blockDays   = input.string("",  "Dias sin cestas nuevas 0=Dom..6=Sab (bite 4)", group = grpRisk)
-sideMode    = input.int(0,      "Lado: 0=ambos 1=compras 2=ventas 3=a favor 4=contra (bite 4)", minval = 0, maxval = 4, group = grpRisk)
-sideLookH   = input.int(4,      "Lado: tendencia = precio vs cierre H1 de hace N horas (bite 4)", group = grpRisk)
+blockHours  = input.string("",  "Horas sin cestas nuevas, ej. 23,0,1", group = grpRisk)
+blockDays   = input.string("",  "Dias sin cestas nuevas 0=Dom..6=Sab", group = grpRisk)
+sideMode    = input.int(0,      "Lado: 0=ambos 1=compras 2=ventas 3=a favor 4=contra", minval = 0, maxval = 4, group = grpRisk)
+sideLookH   = input.int(4,      "Lado: tendencia = precio vs cierre H1 de hace N horas", group = grpRisk)
+dailyLoss   = input.float(0.0,  "Sin cestas nuevas si DD diario % (0=off)", group = grpRisk)
+serverTZ    = input.string("GMT+2", "Zona horaria del servidor MT5", group = grpRisk,
+     tooltip = "Las horas y dias bloqueados, la ventana sin siembra y el fin de semana usan la hora del SERVIDOR del broker (reloj del Market Watch). Ej.: GMT+2, GMT+3, Europe/Athens.")
 stopPause   = input.float(0.0,  "Stop de cesta: minutos de pausa (bite 6)", group = grpRisk)
 stopBudget  = input.float(0.0,  "Stop financiado: fraccion (0=off) (bite 6)", group = grpRisk)
 stopBudCap  = input.float(0.0,  "Stop financiado: tope (bite 6)", group = grpRisk)
@@ -134,8 +139,17 @@ grpTrend    = "7. Tendencia"
 trendBlock  = input.float(85.0, "Confianza de tendencia fuerte", group = grpTrend)
 adxTrend    = input.float(25.0, "ADX minimo de tendencia",       group = grpTrend)
 adxRange    = input.float(18.0, "ADX de rango",                  group = grpTrend)
-// 8. Recovery DD1..DD6 = 0, 9. Hedge (needs recovery >= 2), 9b. Compound = off,
-// 9c. Weekend = off in the preset: these modules never act, so they are not ported.
+
+// ---------------------------------------------------------------- 9c. Sesion / fin de semana
+grpSess     = "9c. Sesion / fin de semana (hora servidor)"
+avoidWknd   = input.bool(false, "Respetar horario", group = grpSess)
+wkndFlatten = input.bool(false, "Cerrar todo antes del fin de semana", group = grpSess)
+friStopH    = input.int(22,     "Viernes: no sembrar desde", minval = 0, maxval = 23, group = grpSess)
+friFlatH    = input.int(23,     "Viernes: cerrar todo desde", minval = 0, maxval = 23, group = grpSess)
+monStartH   = input.int(2,      "Lunes: sembrar desde", minval = 0, maxval = 23, group = grpSess)
+sunResumeH  = input.int(0,      "Domingo: sembrar desde (0=sin espera)", minval = 0, maxval = 23, group = grpSess)
+// 8. Recovery DD1..DD6 = 0, 9. Hedge (needs recovery >= 2) and 9b. Compound = off
+// in the preset: these modules never act, so they are not ported.
 
 // ---------------------------------------------------------------- Simulacion
 grpSim      = "Simulacion (libro virtual)"
@@ -340,11 +354,87 @@ levelLot(int sameSide) =>
 // ============================================================================
 volBlocks   = maxAtrRatio > 0 and atrRatio > maxAtrRatio
 riskBlocks  = regime == R_NEWS or assumedSprd > maxSpread
-seedBlocked = volBlocks or riskBlocks
-seedBuy     = trendRegime ? trendDir > 0 : not (strongTrend and trendDir < 0)
-seedSell    = trendRegime ? trendDir < 0 : not (strongTrend and trendDir > 0)
-seedText    = seedBlocked ? (volBlocks ? "BLOQUEADA (ATR alto)" : regime == R_NEWS ? "BLOQUEADA (noticia)" : "BLOQUEADA (spread)") :
-     seedBuy and seedSell ? "COMPRA + VENTA" : seedBuy ? "SOLO COMPRA" : seedSell ? "SOLO VENTA" : "NINGUNA"
+
+// ---- BITE 4: time, side and daily-loss gates (Engine.OnTick step 9)
+parseList(string csv) =>
+    out = array.new<int>()
+    if str.length(csv) > 0
+        for part in str.split(csv, ",")
+            v = str.tonumber(str.trim(part))
+            if not na(v)
+                out.push(int(v))
+    out
+
+var array<int> blockHList = parseList(blockHours)
+var array<int> blockDList = parseList(blockDays)
+
+// iClose(H1, N): close of the H1 bar N hours back (for side modes 3 and 4).
+h1Past = request.security(syminfo.tickerid, "60", close[math.max(sideLookH, 1)])
+
+srvDow(int t) =>
+    dayofweek(t, serverTZ) - 1          // 0 = Sunday ... 6 = Saturday, like MQL5
+srvHour(int t) =>
+    hour(t, serverTZ)
+
+// SessionEngine.CanOpenNew (the broker-session check is implicit: no ticks when closed).
+sessionCanOpen(int t) =>
+    d = srvDow(t)
+    h = srvHour(t)
+    not avoidWknd or not (d == 6 or (d == 5 and h >= friStopH) or (d == 0 and sunResumeH > 0 and h < sunResumeH) or (d == 1 and h < monStartH))
+
+// SessionEngine.ShouldFlatten
+sessionFlatten(int t) =>
+    d = srvDow(t)
+    wkndFlatten and (d == 6 or (d == 5 and srvHour(t) >= friFlatH))
+
+// Engine.HourBlocksNew: no seeding from hour A to hour B (inclusive, may wrap midnight).
+hourBlocks(int t) =>
+    h = srvHour(t)
+    noNewFrom >= 0 and noNewTo >= 0 and (noNewFrom <= noNewTo ? (h >= noNewFrom and h <= noNewTo) : (h >= noNewFrom or h <= noNewTo))
+
+// Engine.SideAllowed: 0 = both, +1 = buys only, -1 = sells only.
+sideAllowed(float bid) =>
+    int sd = 0
+    if sideMode == 1
+        sd := 1
+    else if sideMode == 2
+        sd := -1
+    else if (sideMode == 3 or sideMode == 4) and not na(h1Past) and h1Past > 0
+        d = bid > h1Past ? 1 : -1
+        sd := sideMode == 3 ? d : -d
+    sd
+
+// Why a new basket may not be seeded right now ("" = allowed).
+newBlockReason(int t, float equity, float dayStart) =>
+    string r = ""
+    if volBlocks
+        r := "ATR alto"
+    else if regime == R_NEWS
+        r := "noticia"
+    else if assumedSprd > maxSpread
+        r := "spread"
+    else if dailyLoss > 0 and dayStart > 0 and (dayStart - equity) / dayStart * 100.0 >= dailyLoss
+        r := "perdida diaria"
+    else if not sessionCanOpen(t)
+        r := "sesion / fin de semana"
+    else if hourBlocks(t)
+        r := "ventana sin siembra"
+    else if blockHList.includes(srvHour(t)) or blockDList.includes(srvDow(t))
+        r := "hora/dia bloqueado"
+    r
+
+// Sides a new basket would open (SeedSingle in trend, SeedGrid otherwise).
+seedSides(float bid) =>
+    sd = sideAllowed(bid)
+    bool canBuy  = false
+    bool canSell = false
+    if trendRegime
+        canBuy  := trendDir > 0 and sd >= 0
+        canSell := trendDir < 0 and sd <= 0
+    else
+        canBuy  := not ((strongTrend and trendDir < 0) or sd < 0)
+        canSell := not ((strongTrend and trendDir > 0) or sd > 0)
+    [canBuy, canSell]
 
 // ============================================================================
 // BITE 2+3 — Virtual ledger and tick engine
@@ -384,6 +474,12 @@ type Book
     int   maxPos      = 0
     float maxLots     = 0.0
     int   ticks       = 0
+    int   nOther      = 0     // weekend flatten (more reasons in bite 6)
+    int   m1Key       = 0     // current M1 candle (minute number) seen by the engine
+    float m1Lo        = na    // its low / high in bid prices (M1Confirms)
+    float m1Hi        = na
+    int   dayKey      = 0     // server day, for the daily-loss anchor
+    float dayStartBal = na
 
 // varip: on realtime bars every tick's changes persist (like the EA's OnTick).
 // On historical bars it behaves like var.
@@ -441,6 +537,7 @@ closeAll(Book b, float net, int total, string reason, int tms, float px) =>
     b.nTP         := b.nTP + (reason == "basket_tp" ? 1 : 0)
     b.nRatchet    := b.nRatchet + (reason == "ratchet_tp" ? 1 : 0)
     b.nTrail      := b.nTrail + (reason == "trail_tp" ? 1 : 0)
+    b.nOther      := b.nOther + (reason == "weekend_flat" ? 1 : 0)
     b.lastHarvest := tms
     b.lastAdd     := tms
     b.openT       := na
@@ -459,20 +556,29 @@ basketTP(int total, float timeMin) =>
 trailPullback() =>
     math.max(trailStep * clamp(atrRatio, 0.7, 2.0), 0.01)
 
+// Engine.M1Confirms: the current M1 candle is no longer making a new adverse extreme.
+m1Confirms(Book b, bool buySide, float sN, float bid, float ask) =>
+    not addConfM1 or (buySide ? (na(b.m1Lo) or bid - b.m1Lo >= 0.20 * sN) : (na(b.m1Hi) or b.m1Hi - ask >= 0.20 * sN))
+
 // Engine.GridAdds: at most one entry per tick.
 gridAdds(Book b, float bid, float ask, int tms) =>
     [nb, ns, lots, loB, hiS, fl] = stats(b, bid, ask)
     bool added = false
     if doGrid and not (maxTotLvl > 0 and nb + ns >= maxTotLvl)
-        if not blkBuy and nb > 0 and nb < maxLevels and loB - ask >= levelStep(nb, advBuy)
-            added := openPos(b, 1, ask, levelLot(nb), "GridBuy N" + str.tostring(nb + 1), lots, tms)
-        if not added and not blkSell and ns > 0 and ns < maxLevels and bid - hiS >= levelStep(ns, advSell)
-            added := openPos(b, -1, bid, levelLot(ns), "GridSell N" + str.tostring(ns + 1), lots, tms)
-        // Refill the missing side to stay two-sided.
+        if not blkBuy and nb > 0 and nb < maxLevels
+            sN = levelStep(nb, advBuy)
+            if loB - ask >= sN and m1Confirms(b, true, sN, bid, ask)
+                added := openPos(b, 1, ask, levelLot(nb), "GridBuy N" + str.tostring(nb + 1), lots, tms)
+        if not added and not blkSell and ns > 0 and ns < maxLevels
+            sN = levelStep(ns, advSell)
+            if bid - hiS >= sN and m1Confirms(b, false, sN, bid, ask)
+                added := openPos(b, -1, bid, levelLot(ns), "GridSell N" + str.tostring(ns + 1), lots, tms)
+        // Refill the missing side to stay two-sided (if the side mode allows it).
         if not added
-            if ns == 0 and nb > 0 and loB - bid >= gStep * 0.5 and not advSell
+            sd = sideAllowed(bid)
+            if ns == 0 and nb > 0 and loB - bid >= gStep * 0.5 and not advSell and sd <= 0
                 added := openPos(b, -1, bid, normLot(baseLot * gScale, maxLotOrder), "Refill", lots, tms)
-            else if nb == 0 and ns > 0 and ask - hiS >= gStep * 0.5 and not advBuy
+            else if nb == 0 and ns > 0 and ask - hiS >= gStep * 0.5 and not advBuy and sd >= 0
                 added := openPos(b, 1, ask, normLot(baseLot * gScale, maxLotOrder), "Refill", lots, tms)
     added
 
@@ -480,8 +586,11 @@ gridAdds(Book b, float bid, float ask, int tms) =>
 trendAdd(Book b, float bid, float ask, int tms) =>
     [nb, ns, lots, loB, hiS, fl] = stats(b, bid, ask)
     near = 0.5 * atr
+    sd = sideAllowed(bid)
     bool added = false
-    if trendDir > 0 and nb > 0 and nb < maxLevels and (bid <= emaF + near or bid <= emaM + near) and rsi < 60 and bid <= loB - step
+    if sd != 0 and sd != trendDir
+        added := false
+    else if trendDir > 0 and nb > 0 and nb < maxLevels and (bid <= emaF + near or bid <= emaM + near) and rsi < 60 and bid <= loB - step
         added := openPos(b, 1, ask, normLot(baseLot, maxLotOrder), "TrendAdd", lots, tms)
     else if trendDir < 0 and ns > 0 and ns < maxLevels and (ask >= emaF - near or ask >= emaM - near) and rsi > 40 and ask >= hiS + step
         added := openPos(b, -1, bid, normLot(baseLot, maxLotOrder), "TrendAdd", lots, tms)
@@ -492,54 +601,77 @@ seed(Book b, float bid, float ask, int tms) =>
     lotS = normLot(baseLot * gScale, maxLotOrder)
     b.peak := 0.0
     bool ok = false
+    [canBuy, canSell] = seedSides(bid)
     if trendRegime
-        if trendDir != 0
+        if canBuy or canSell
             ok := openPos(b, trendDir, trendDir > 0 ? ask : bid, normLot(baseLot, maxLotOrder), "TrendSeed", 0.0, tms)
     else
-        okB = seedBuy ? openPos(b, 1, ask, lotS, "Seed", 0.0, tms) : false
-        okS = seedSell ? openPos(b, -1, bid, lotS, "Seed", okB ? lotS : 0.0, tms) : false
+        okB = canBuy ? openPos(b, 1, ask, lotS, "Seed", 0.0, tms) : false
+        okS = canSell ? openPos(b, -1, bid, lotS, "Seed", okB ? lotS : 0.0, tms) : false
         ok := okB or okS
     ok
 
-// One EA tick (Engine.OnTick, steps 12-15).
+// One EA tick (Engine.OnTick, steps 9-15).
 engineTick(Book b, float px, int tms) =>
     bid = px - halfSpr
     ask = px + halfSpr
     b.lastPx := px
     b.lastT  := tms
     b.ticks  := b.ticks + 1
+    // M1 candle of this tick (low/high in bid prices) for M1Confirms.
+    mKey = int(math.floor(tms / 60000))
+    if mKey != b.m1Key
+        b.m1Key := mKey
+        b.m1Lo  := bid
+        b.m1Hi  := bid
+    else
+        b.m1Lo := math.min(b.m1Lo, bid)
+        b.m1Hi := math.max(b.m1Hi, bid)
+    // Daily anchor (UpdatePnLAnchors): balance at the start of the server day.
+    dKey = year(tms, serverTZ) * 10000 + month(tms, serverTZ) * 100 + dayofmonth(tms, serverTZ)
+    if dKey != b.dayKey
+        b.dayKey      := dKey
+        b.dayStartBal := startBal + b.realized
     bool closed = false
-    // 12) Exits
+    float netNow = 0.0
     if b.pos.size() > 0
         [nb, ns, lots, loB, hiS, net] = stats(b, bid, ask)
+        netNow := net
         total = nb + ns
         b.worstNet := math.min(b.worstNet, net)
         b.maxPos   := math.max(b.maxPos, total)
         b.maxLots  := math.max(b.maxLots, lots)
-        target = basketTP(total, (tms - b.openT) / 60000.0)
-        string why = net >= target ? "basket_tp" : ""
-        // Ratchet: once the peak reached arm% of the target, keep lock% of it.
-        if why == "" and ratchetLock > 0 and target > 0 and b.peak >= target * ratchetArm and net <= b.peak * ratchetLock and net > 0
-            why := "ratchet_tp"
-        if why == ""
-            if net > b.peak and net >= target * ratchetArm
-                b.peak := net
-            // Trailing: only above the breakeven pad and the activation profit.
-            if net >= bePad and net >= trailAct
-                if net > b.peak
+        string why = ""
+        if sessionFlatten(tms)
+            // 11c) Weekend: flatten everything.
+            why := "weekend_flat"
+        else
+            // 12) Exits
+            target = basketTP(total, (tms - b.openT) / 60000.0)
+            why := net >= target ? "basket_tp" : ""
+            // Ratchet: once the peak reached arm% of the target, keep lock% of it.
+            if why == "" and ratchetLock > 0 and target > 0 and b.peak >= target * ratchetArm and net <= b.peak * ratchetLock and net > 0
+                why := "ratchet_tp"
+            if why == ""
+                if net > b.peak and net >= target * ratchetArm
                     b.peak := net
-                if b.peak - net >= trailPullback()
-                    why := "trail_tp"
+                // Trailing: only above the breakeven pad and the activation profit.
+                if net >= bePad and net >= trailAct
+                    if net > b.peak
+                        b.peak := net
+                    if b.peak - net >= trailPullback()
+                        why := "trail_tp"
         if why != ""
             closeAll(b, net, total, why, tms, px)
+            netNow := 0.0
             closed := true
-    // 14) Anti-spike timers, then 15) entries
-    if not closed and tms - b.lastAdd >= minSecs * 1000 and tms - b.lastHarvest >= restartSecs * 1000
+    // 14) Anti-spike timers, then 15) entries (nothing at all while flattening).
+    if not closed and not sessionFlatten(tms) and tms - b.lastAdd >= minSecs * 1000 and tms - b.lastHarvest >= restartSecs * 1000
         if b.pos.size() > 0
             gridAdds(b, bid, ask, tms)
             if trendRegime and allowAdd
                 trendAdd(b, bid, ask, tms)
-        else if not seedBlocked
+        else if newBlockReason(tms, startBal + b.realized + netNow, b.dayStartBal) == ""
             seed(b, bid, ask, tms)
     closed
 
@@ -618,6 +750,8 @@ dTotal  = dNb + dNs
 nowMs   = barstate.isrealtime ? timenow : time_close
 dAgeMin = dTotal > 0 ? (nowMs - bk.openT) / 60000.0 : 0.0
 dTarget = dTotal > 0 ? basketTP(dTotal, dAgeMin) : na
+dBlock  = newBlockReason(nowMs, startBal + bk.realized + dNet, bk.dayStartBal)
+[dBuy, dSell] = seedSides(bidC)
 dArmed  = dTotal > 0 and ratchetLock > 0 and bk.peak >= dTarget * ratchetArm
 
 plot(dTotal > 0 ? dNet : na, "Neto cesta", display = display.data_window)
@@ -662,7 +796,7 @@ if barstate.islast and showLadder
         array.push(ladderTxt, label.new(bar_index + 3, pB, "B" + str.tostring(nB + k + 1) + " " + str.tostring(levelLot(nB + k), "#.##"), style = label.style_none, textcolor = color.lime, size = size.tiny))
         array.push(ladderTxt, label.new(bar_index + 3, pS, "S" + str.tostring(nS + k + 1) + " " + str.tostring(levelLot(nS + k), "#.##"), style = label.style_none, textcolor = color.fuchsia, size = size.tiny))
 
-var table dash = table.new(position.top_right, 2, 20, bgcolor = color.new(color.black, 15), border_width = 1)
+var table dash = table.new(position.top_right, 2, 21, bgcolor = color.new(color.black, 15), border_width = 1)
 dashRow(int r, string k, string v, color c) =>
     table.cell(dash, 0, r, k, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
     table.cell(dash, 1, r, v, text_color = c,            text_size = size.small, text_halign = text.align_right)
@@ -677,17 +811,18 @@ if barstate.islast and showDash
     dashRow(3,  "ATR / ratio",  str.tostring(atr, "#.##") + " / " + str.tostring(atrRatio, "#.###"), color.white)
     dashRow(4,  "Volatilidad",  volBucket + "  mart x" + str.tostring(gMart, "#.##"), color.white)
     dashRow(5,  "Paso grid",    str.tostring(gStep, "#.##"), color.white)
-    dashRow(6,  "Siembra",      seedText, seedBlocked ? color.orange : color.lime)
+    dashRow(6,  "Siembra",      dBlock != "" ? "BLOQUEADA (" + dBlock + ")" : dBuy and dSell ? "COMPRA + VENTA" : dBuy ? "SOLO COMPRA" : dSell ? "SOLO VENTA" : "NINGUNA", dBlock != "" ? color.orange : color.lime)
     dashRow(7,  "Cesta",        dTotal > 0 ? "B " + str.tostring(dNb) + " / S " + str.tostring(dNs) + "  " + str.tostring(dLots, "#.##") + " lotes" : "sin cesta", color.white)
     dashRow(8,  "Neto / objetivo", dTotal > 0 ? money(dNet) + " / " + str.tostring(dTarget, "#.##") : "-", dNet >= 0 ? color.lime : color.red)
     dashRow(9,  "Pico / trinquete", dTotal > 0 ? str.tostring(bk.peak, "#.##") + (dArmed ? "  suelo " + str.tostring(bk.peak * ratchetLock, "#.##") : "  sin armar") : "-", dArmed ? color.aqua : color.gray)
     dashRow(10, "Trailing",     dTotal > 0 ? (dNet >= math.max(trailAct, bePad) ? "ACTIVO  retroceso " + str.tostring(trailPullback(), "#.##") : "desde " + str.tostring(math.max(trailAct, bePad), "#.##")) : "-", color.white)
     dashRow(11, "Edad cesta",   dTotal > 0 ? str.tostring(dAgeMin, "#") + " min" : "-", color.white)
     dashRow(12, "Cestas cerradas", str.tostring(bk.baskets) + "  (ganadas " + str.tostring(bk.wins) + ")", color.white)
-    dashRow(13, "Cierres TP/trinq/trail", str.tostring(bk.nTP) + " / " + str.tostring(bk.nRatchet) + " / " + str.tostring(bk.nTrail), color.white)
+    dashRow(13, "Cierres TP/trinq/trail/finde", str.tostring(bk.nTP) + " / " + str.tostring(bk.nRatchet) + " / " + str.tostring(bk.nTrail) + " / " + str.tostring(bk.nOther), color.white)
     dashRow(14, "Realizado",    money(bk.realized), bk.realized >= 0 ? color.lime : color.red)
     dashRow(15, "Peor flotante", money(bk.worstNet), color.orange)
     dashRow(16, "Max pos / lotes", str.tostring(bk.maxPos) + " / " + str.tostring(bk.maxLots, "#.##"), color.white)
     dashRow(17, "Equity sim.",  str.tostring(startBal + bk.realized + dNet, "#,##0.00"), color.white)
     dashRow(18, "Ejecucion",    execMode + (barstate.isrealtime and isTickMode ? " (EN VIVO)" : "") + "  ticks " + str.tostring(bk.ticks), color.gray)
-    dashRow(19, "Bite",         "3 / ticks + trinquete + trailing", color.gray)
+    dashRow(19, "Hora servidor", str.format_time(nowMs, "EEE HH:mm", serverTZ) + "  (" + serverTZ + ")" + (sideMode > 0 ? "  lado " + str.tostring(sideAllowed(bidC)) : ""), color.gray)
+    dashRow(20, "Bite",         "4 / filtros de horario, lado y M1", color.gray)
