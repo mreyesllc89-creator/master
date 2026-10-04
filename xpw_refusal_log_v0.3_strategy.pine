@@ -27,7 +27,7 @@
 //
 // DATA: 1-second chart. One bar = one second, so windows read as seconds.
 
-strategy("XPW Refusal Log v0.3 Strategy", shorttitle="XPW RLOG v0.3 S", overlay=true, max_labels_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1)
+strategy("XPW Refusal Log v0.3 Strategy", shorttitle="XPW RLOG v0.3 S", overlay=true, max_labels_count=500, pyramiding=0, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, margin_long=0, margin_short=0)
 
 // ---------------- TDI : your panel, TDI 38/62 Precision Scalper [Refined] ----------------
 rsiLen = input.int(14, "RSI length (your panel = 14)", group="TDI")
@@ -70,6 +70,8 @@ allowLong = input.bool(true, "Allow longs (FIRST LEG)", group="S1. Entries", too
 allowShort = input.bool(true, "Allow shorts (SECOND LEG)", group="S1. Entries")
 needParent = input.bool(false, "Require the parent to agree", group="S1. Entries", tooltip="Your rule: a divergence alone does not count, it has to be happening on the higher timeframe too. Needs 'Parent: record the higher timeframe read' on. Long needs parent gap above the cut, short needs it at or below.")
 oppCloses = input.bool(true, "Opposite label reverses the trade", group="S1. Entries", tooltip="OFF: an opposite label is ignored while a trade is open.")
+qty = input.float(1, "Order size (contracts / units)", minval=0.000001, group="S1. Entries", tooltip="Margin checks are off (margin 0), so the order fills whatever the symbol price is versus initial capital.")
+showSig = input.bool(true, "Mark entry signals under the bar", group="S1. Entries", tooltip="A triangle on every bar where a label asked for a trade. Triangles but no trades = an order problem. No triangles = no signals passed the filters.")
 
 // ---------------- S2. Exits ----------------
 exitUnit = input.string("Points", "SL / TP / trail unit", options=["Points", "ATR"], group="S2. Exits")
@@ -212,10 +214,13 @@ bool sentLong = goLong and strategy.position_size <= 0 and (flat or oppCloses)
 bool sentShort = goShort and strategy.position_size >= 0 and (flat or oppCloses)
 if sentLong
     atrEntry := atr
-    strategy.entry("Long", strategy.long, comment="FIRST LEG LONG")
+    strategy.entry("Long", strategy.long, qty=qty, comment="FIRST LEG LONG")
 if sentShort
     atrEntry := atr
-    strategy.entry("Short", strategy.short, comment="SECOND LEG SHORT")
+    strategy.entry("Short", strategy.short, qty=qty, comment="SECOND LEG SHORT")
+
+plotshape(showSig and goLong, "long signal", shape.triangleup, location.belowbar, col1, size=size.tiny)
+plotshape(showSig and goShort, "short signal", shape.triangledown, location.abovebar, col2, size=size.tiny)
 
 // ---------------- Exits ----------------
 // Every distance in ticks, as strategy.exit expects for loss / profit / trail_points / trail_offset.
