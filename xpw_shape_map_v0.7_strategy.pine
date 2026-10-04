@@ -1,0 +1,552 @@
+//@version=6
+// XPW Shape Map v0.7 STRATEGY
+// Built from the XPW Shape Map v0.6 indicator. Same detection, same labels.
+// ONE entry signal at a time — pick it in "S1. Entry". Signals are never mixed:
+//   BOT/TOP square  -> BOT square = LONG,  TOP square = SHORT
+//   Turn ▲/▼        -> Turn ▲     = LONG,  Turn ▼     = SHORT
+//   BOT/TOP tick    -> BOT tick   = LONG,  TOP tick   = SHORT
+// Turn entries default to PREDICT: at each candle close the exact price where
+// fast and slow would cross on the next candle is calculated and a stop order
+// sits there, so the entry fills the moment price reaches the cross — live and
+// in the backtest. Blue dots on the price chart show that price.
+// "Enter on tick" ON (default): live, the strategy runs every tick and enters the
+// moment the signal appears inside the forming candle — no wait for the close.
+// On history there are no ticks, so backtests still enter on the next bar's open.
+// Margin is set to 1% (100:1, like a CFD account). With TradingView's default
+// 100% margin, 10 oz of gold costs more than a $10k account and every order is
+// silently rejected. Change it in Properties -> Margin if your broker differs.
+// "Points" = minimum ticks (XAUUSD: 1 pt = 0.01, so 5000 pts = $50).
+//
+// v0.7 — entry calibration, no missed entries:
+//   * Predict buffer: move the stop N ticks past (+) or ahead of (-) the cross
+//     price. A small + buffer filters wicks that touch the cross and fail
+//     ("cross failed" exits); a - buffer gets in earlier.
+//   * Catch missed crosses: if the cross happens at a candle close but the
+//     stop did not fill (cross more than one candle away when the stop was
+//     priced, gap, rounding), enter at that close instead of skipping it.
+//   * Predict arms on "Every cross": trade every fast/slow cross, not only the
+//     ones that follow a BOT/TOP square.
+//   * Margin cap: quantity is cut to what the account's margin allows, so
+//     orders are not silently rejected after a drawdown (10 BTC at 1% margin
+//     needs ~$8.7k — on a $10k account one losing streak blocked every entry).
+
+strategy("XPW Shape Map v0.7 Strategy", shorttitle = "XPW-SM7 S", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 10, margin_long = 1, margin_short = 1)
+
+// ───────────────────────── S1. ENTRY ─────────────────────────
+grpE = "S1. Entry"
+sigMode  = input.string("Turn ▲/▼", "Entry signal (one only)", options = ["BOT/TOP square", "Turn ▲/▼", "BOT/TOP tick"], group = grpE, tooltip = "Only this pair of labels opens trades. BOT side = long, TOP side = short. The other labels still draw but never trade.")
+tradeDir = input.string("Both", "Trade direction", options = ["Both", "Long only", "Short only"], group = grpE)
+enterTick = input.bool(true, "Enter on tick (don't wait for candle close)", group = grpE, tooltip = "ON: in realtime the script runs on every tick and enters the moment the signal appears inside the forming candle. The signal can still disappear before the candle closes; the trade stays open anyway. OFF: wait for the candle to close and fill on the next candle's open. On history there are no ticks, so the backtest always uses closed candles.")
+turnEntry = input.string("Predict (stop at cross price)", "Turn entry timing", options = ["Predict (stop at cross price)", "At the cross", "After hold (when ▲/▼ confirms)"], group = grpE, tooltip = "Predict: at each candle close the strategy calculates the exact price where fast would cross slow on the next candle and places a stop order there. It fills the instant price gets there — live and in the backtest. At the cross: enter when the cross is seen (candle close, or on tick if 'Enter on tick' is on). After hold: wait until the cross has held for 'Bars the cross must hold'.")
+failExit  = input.bool(true, "Turn: exit if the cross fails to hold", group = grpE, tooltip = "Predict / At the cross. If at a candle close the lines are back on the wrong side within 'Bars the cross must hold' candles of entry, close the trade.")
+oppMode  = input.string("Reverse", "Opposite signal while in a trade", options = ["Reverse", "Close only", "Ignore"], group = grpE, tooltip = "Reverse: close and open the other side. Close only: close and wait. Ignore: let the exits handle it.")
+
+// ─────────────────── S1b. PREDICT CALIBRATION ───────────────────
+grpC = "S1b. Predict calibration"
+armMode  = input.string("Squares (BOT/TOP)", "Predict arms on", options = ["Squares (BOT/TOP)", "Every cross"], group = grpC, tooltip = "Squares: a stop is only placed after a BOT square (long) or TOP square (short), for 'Max bars to wait after a square'. Every cross: a stop always sits at the next cross price, so no cross is missed.")
+predBuf  = input.float(0, "Predict buffer, pts (+ = past the cross, - = earlier)", group = grpC, tooltip = "Moves the stop away from the exact cross price. +N: price must go N ticks beyond the cross — fewer fills on wicks that touch the cross and fail. -N: fill N ticks before the cross — earlier entry, more false starts.")
+catchUp  = input.bool(true, "Catch missed crosses at candle close", group = grpC, tooltip = "If the lines cross at a candle close but the stop did not fill (the cross was more than one candle away when the stop was priced, a gap, rounding), enter at that close instead of missing the trade.")
+maxChase = input.float(0, "Catch-up: max chase from cross price, pts (0 = no limit)", minval = 0, group = grpC, tooltip = "Skip the catch-up entry if the close is already further than this beyond the predicted cross price.")
+
+// Backtest: process_orders_on_close fills at the signal candle's close instead of
+// the next candle's open, so history entries sit on the label's candle.
+// Signals may fire on any tick (enterTick ON) or only on a closed candle.
+sigBarOK = enterTick or barstate.isconfirmed
+
+// ───────────────────────── S2. EXITS ─────────────────────────
+grpX = "S2. Exits"
+exitUnit = input.string("Points", "SL / TP / trail unit", options = ["Points", "ATR"], group = grpX)
+slPts    = input.float(5000,  "Stop loss, pts (Points mode)",   minval = 0, group = grpX, tooltip = "1 pt = 1 minimum tick. 0 = no stop loss.")
+tpPts    = input.float(50000, "Take profit, pts (Points mode)", minval = 0, group = grpX, tooltip = "1 pt = 1 minimum tick. 0 = no take profit.")
+exAtrLen = input.int(14,      "ATR length (ATR mode)", minval = 1, group = grpX)
+slAtrM   = input.float(2.0,   "Stop loss, ATR mult (ATR mode)", minval = 0, step = 0.1, group = grpX)
+tpR      = input.float(2.0,   "Take profit, R multiple of SL (ATR mode)", minval = 0, step = 0.1, group = grpX)
+trailOn  = input.bool(true,   "Trailing stop", group = grpX)
+trActPts = input.float(1500,  "Trail activation, pts of profit (Points mode)", minval = 0, group = grpX)
+trDisPts = input.float(100,   "Trail distance, pts (Points mode)", minval = 0, group = grpX)
+trActAtr = input.float(4.0,   "Trail activation, ATR mult (ATR mode)", minval = 0, step = 0.1, group = grpX)
+trDisAtr = input.float(0.2,   "Trail distance, ATR mult (ATR mode)", minval = 0, step = 0.1, group = grpX)
+timeStop = input.int(0,       "Time stop, bars (0 = off)", minval = 0, group = grpX)
+
+// ───────────────────────── S3. SIZING ─────────────────────────
+grpZ = "S3. Sizing"
+qtyMode  = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = grpZ)
+qtyFixed = input.float(10,  "Fixed quantity (contracts = oz, 100 = 1 lot)", minval = 0, group = grpZ)
+riskPct  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0, step = 0.1, group = grpZ, tooltip = "Quantity = equity x risk % / stop-loss distance. Needs a stop loss above 0.")
+qtyMax   = input.float(50,  "Max quantity", minval = 0, group = grpZ)
+qtyStep  = input.float(1,   "Quantity step (rounds down)", minval = 0.0001, group = grpZ)
+mgnCap   = input.bool(true, "Cap quantity to available margin", group = grpZ, tooltip = "Cuts the quantity to what the equity can carry at the margin below, so TradingView never silently rejects an entry.")
+mgnPct   = input.float(1.0, "Margin % (match Properties -> Margin)", minval = 0.01, step = 0.1, group = grpZ)
+
+// ───────────────────────── TDI ─────────────────────────
+grpT = "TDI"
+rsiLen     = input.int(14,  "RSI length",     minval = 2, group = grpT)
+fastLen    = input.int(2,   "Fast MA length", minval = 1, group = grpT)
+slowLen    = input.int(7,   "Slow MA length", minval = 1, group = grpT)
+invertFill = input.bool(true, "My panel paints fast>slow as RED", group = grpT)
+
+r    = ta.rsi(close, rsiLen)
+fast = ta.sma(r, fastLen)
+slow = ta.sma(r, slowLen)
+
+pF = plot(fast, "Fast", color = color.new(color.gray, 30), linewidth = 1)
+pS = plot(slow, "Slow", color = color.new(color.silver, 30), linewidth = 1)
+
+isRed  = invertFill ? fast > slow : fast < slow
+isLime = not isRed
+
+fill(pF, pS, color = isRed ? color.new(color.red, 82) : color.new(color.lime, 82))
+
+// ───────────────────────── AREAS ─────────────────────────
+grpA = "Areas"
+areaLook = input.int(20,     "Area lookback", minval = 5, group = grpA)
+loFrac   = input.float(0.20, "LOW area: below this fraction",  minval = 0.0, maxval = 1.0, step = 0.01, group = grpA)
+hiFrac   = input.float(0.67, "HIGH area: above this fraction", minval = 0.0, maxval = 1.0, step = 0.01, group = grpA)
+
+hiW  = ta.highest(slow, areaLook)
+loW  = ta.lowest(slow, areaLook)
+rngW = hiW - loW
+posW = rngW > 0 ? (slow - loW) / rngW : 0.5
+inLow  = posW <= loFrac
+inHigh = posW >= hiFrac
+
+// ───────────────────── SHOW / HIDE ─────────────────────
+// Turn individual drawings on/off. Detection, counts and the table keep running.
+grpS = "Show / hide labels"
+showBotBox   = input.bool(true, "BOT square box",        group = grpS, inline = "sb")
+showBotLbl   = input.bool(true, "BOT square label",      group = grpS, inline = "sb")
+showTopBox   = input.bool(true, "TOP square box",        group = grpS, inline = "st")
+showTopLbl   = input.bool(true, "TOP square label",      group = grpS, inline = "st")
+showTurnUp   = input.bool(true, "Turn ▲ (after BOT)",    group = grpS, inline = "tn")
+showTurnDn   = input.bool(true, "Turn ▼ (after TOP)",    group = grpS, inline = "tn")
+showBotTick  = input.bool(true, "BOT tick (price chart)", group = grpS, inline = "tk")
+showTopTick  = input.bool(true, "TOP tick (price chart)", group = grpS, inline = "tk")
+
+// ───────────────────── ALL OPPORTUNITIES ─────────────────────
+// ON  = label every odd-colour wedge, anywhere, with no spacing.
+// OFF = strict v0.5 rules (area + context + spacing from the groups below).
+grpL = "Label ALL opportunities"
+allOn  = input.bool(true, "Label ALL opportunities (ignore area + spacing)", group = grpL)
+allCtx = input.int(1, "Context bars in ALL mode", minval = 1, group = grpL)
+
+// ───────────────────── BOTTOM SQUARE ─────────────────────
+grpB = "BOTTOM square (odd RED wedge, LOW area)"
+botOn      = input.bool(true, "Enable",                   group = grpB)
+botMinW    = input.int(1,  "Min width",     minval = 1,   group = grpB)
+botMaxW    = input.int(3,  "Max width",     minval = 1,   group = grpB)
+botCtxIn   = input.int(2,  "Context bars",  minval = 1,   group = grpB)
+botNeedLow = input.bool(true, "Require LOW area",         group = grpB)
+botSepIn   = input.int(5,  "Min bars between squares", minval = 0, group = grpB)
+
+// ─────────────────────── TOP SQUARE ───────────────────────
+grpP = "TOP square (odd LIME wedge, HIGH area)"
+topOn       = input.bool(true, "Enable",                  group = grpP)
+topMinW     = input.int(1,  "Min width",    minval = 1,   group = grpP)
+topMaxW     = input.int(2,  "Max width",    minval = 1,   group = grpP)
+topCtxIn    = input.int(3,  "Context bars", minval = 1,   group = grpP)
+topNeedHigh = input.bool(true, "Require HIGH area",       group = grpP)
+topSepIn    = input.int(5,  "Min bars between squares", minval = 0, group = grpP)
+
+// Effective settings: ALL mode overrides context, area and spacing.
+botCtx = allOn ? allCtx : botCtxIn
+topCtx = allOn ? allCtx : topCtxIn
+botSep = allOn ? 0 : botSepIn
+topSep = allOn ? 0 : topSepIn
+botArea = allOn or not botNeedLow  or inLow[botCtx]
+topArea = allOn or not topNeedHigh or inHigh[topCtx]
+
+// ───────────────────── WEDGE DETECTOR ─────────────────────
+// Pattern at the confirmed bar:
+//   offsets 0 .. ctx-1           = context colour  (restored)
+//   offsets ctx .. ctx+w-1       = ODD colour      (the wedge)
+//   offsets ctx+w .. ctx+w+ctx-1 = context colour  (before)
+detect(bool wantRedWedge, int minW, int maxW, int ctx) =>
+    int  wHi  = math.max(minW, maxW)
+    bool fired = false
+    int  wOut  = 0
+    for w = minW to wHi
+        if not fired
+            bool ok = true
+            for i = 0 to ctx - 1
+                bool v = wantRedWedge ? isLime[i] : isRed[i]
+                if not v
+                    ok := false
+            if ok
+                for i = 0 to w - 1
+                    bool v = wantRedWedge ? isRed[ctx + i] : isLime[ctx + i]
+                    if not v
+                        ok := false
+            if ok
+                for i = 0 to ctx - 1
+                    bool v = wantRedWedge ? isLime[ctx + w + i] : isRed[ctx + w + i]
+                    if not v
+                        ok := false
+            if ok
+                fired := true
+                wOut  := w
+    [fired, wOut]
+
+[botRaw, botWid] = detect(true,  botMinW, botMaxW, botCtx)
+[topRaw, topWid] = detect(false, topMinW, topMaxW, topCtx)
+
+var int lastBotBar   = -10000
+var int lastTopBar   = -10000
+var int lastBotWedge = -10000
+var int lastTopWedge = -10000
+
+botOK = botOn and botRaw and sigBarOK and botArea and (bar_index - lastBotBar >= botSep)
+topOK = topOn and topRaw and sigBarOK and topArea and (bar_index - lastTopBar >= topSep)
+
+var int nBotSq = 0
+var int nTopSq = 0
+
+if botOK
+    lastBotBar   := bar_index
+    lastBotWedge := bar_index - botCtx
+    nBotSq += 1
+    int lft = bar_index - botCtx - botWid + 1
+    int rgt = bar_index - botCtx
+    float hh = -1e10
+    float ll =  1e10
+    for i = 0 to botWid - 1
+        hh := math.max(hh, math.max(fast[botCtx + i], slow[botCtx + i]))
+        ll := math.min(ll, math.min(fast[botCtx + i], slow[botCtx + i]))
+    if showBotBox
+        box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.red, 0), border_width = 1, bgcolor = color.new(color.red, 65))
+    if showBotLbl
+        label.new(rgt, ll - 2.0, "BOT " + str.tostring(botWid), style = label.style_label_up, color = color.new(color.red, 25), textcolor = color.white, size = size.tiny)
+
+if topOK
+    lastTopBar   := bar_index
+    lastTopWedge := bar_index - topCtx
+    nTopSq += 1
+    int lft = bar_index - topCtx - topWid + 1
+    int rgt = bar_index - topCtx
+    float hh = -1e10
+    float ll =  1e10
+    for i = 0 to topWid - 1
+        hh := math.max(hh, math.max(fast[topCtx + i], slow[topCtx + i]))
+        ll := math.min(ll, math.min(fast[topCtx + i], slow[topCtx + i]))
+    if showTopBox
+        box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.lime, 0), border_width = 1, bgcolor = color.new(color.lime, 65))
+    if showTopLbl
+        label.new(rgt, hh + 2.0, "TOP " + str.tostring(topWid), style = label.style_label_down, color = color.new(color.green, 25), textcolor = color.white, size = size.tiny)
+
+// ───────────────────────── TURN MARK ─────────────────────────
+// The wedge warns. The turn confirms: the lines cross back and HOLD.
+grpN = "Turn mark"
+turnOn   = input.bool(true, "Enable",                       group = grpN)
+turnMax  = input.int(12, "Max bars to wait after a square", minval = 1, group = grpN)
+turnHold = input.int(2,  "Bars the cross must hold",        minval = 1, group = grpN)
+
+var bool botArmed  = false
+var int  botArmBar = 0
+var bool topArmed  = false
+var int  topArmBar = 0
+
+if botOK
+    botArmed  := true
+    botArmBar := bar_index
+if topOK
+    topArmed  := true
+    topArmBar := bar_index
+
+if botArmed and bar_index - botArmBar > turnMax
+    botArmed := false
+if topArmed and bar_index - topArmBar > turnMax
+    topArmed := false
+
+bool holdUp = true
+bool holdDn = true
+for i = 0 to turnHold
+    if not (fast[i] > slow[i])
+        holdUp := false
+    if not (fast[i] < slow[i])
+        holdDn := false
+
+crossedUpAt = ta.crossover(fast, slow)[turnHold]
+crossedDnAt = ta.crossunder(fast, slow)[turnHold]
+
+// The cross itself (no hold) — used by the strategy's "At the cross" timing.
+bool crossUpNow = ta.crossover(fast, slow)
+bool crossDnNow = ta.crossunder(fast, slow)
+botCrossNow = turnOn and sigBarOK and botArmed and crossUpNow
+topCrossNow = turnOn and sigBarOK and topArmed and crossDnNow
+
+// Predict arming, captured BEFORE the turn confirmation clears botArmed/topArmed,
+// so the cross candle itself still counts as armed.
+bool armEvery = armMode == "Every cross"
+bool armL = turnOn and (armEvery or botArmed)
+bool armS = turnOn and (armEvery or topArmed)
+
+botTurn = turnOn and sigBarOK and botArmed and crossedUpAt and holdUp
+topTurn = turnOn and sigBarOK and topArmed and crossedDnAt and holdDn
+
+var int nBotTurn   = 0
+var int nTopTurn   = 0
+var int lastBotGap = 0
+var int lastTopGap = 0
+
+if botTurn
+    botArmed := false
+    nBotTurn += 1
+    int tb = bar_index - turnHold
+    lastBotGap := tb - lastBotWedge
+    if showTurnUp
+        label.new(tb, math.min(fast[turnHold], slow[turnHold]) - 3.0, "▲", style = label.style_label_up, color = color.new(color.yellow, 10), textcolor = color.black, size = size.tiny)
+
+if topTurn
+    topArmed := false
+    nTopTurn += 1
+    int tb = bar_index - turnHold
+    lastTopGap := tb - lastTopWedge
+    if showTurnDn
+        label.new(tb, math.max(fast[turnHold], slow[turnHold]) + 3.0, "▼", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.black, size = size.tiny)
+
+// ──────────── TICKS (wick as a compressed cycle) ────────────
+grpK = "Ticks"
+tickOn       = input.bool(true, "Enable",                 group = grpK)
+atrLen       = input.int(14, "ATR length", minval = 2,    group = grpK)
+botWickRange = input.float(0.55, "BOTTOM: min lower wick / range", step = 0.05, group = grpK)
+botWickAtr   = input.float(0.8,  "BOTTOM: min lower wick / ATR",   step = 0.10, group = grpK)
+topWickRange = input.float(0.70, "TOP: min upper wick / range",    step = 0.05, group = grpK)
+topWickAtr   = input.float(1.20, "TOP: min upper wick / ATR",      step = 0.10, group = grpK)
+
+atrV   = ta.atr(atrLen)
+rngBar = high - low
+upWick = high - math.max(open, close)
+dnWick = math.min(open, close) - low
+
+botTick = tickOn and sigBarOK and rngBar > 0 and atrV > 0 and dnWick / rngBar >= botWickRange and dnWick / atrV >= botWickAtr
+topTick = tickOn and sigBarOK and rngBar > 0 and atrV > 0 and upWick / rngBar >= topWickRange and upWick / atrV >= topWickAtr
+
+var int nBotTk = 0
+var int nTopTk = 0
+
+if botTick
+    nBotTk += 1
+    if showBotTick
+        label.new(bar_index, low, "BOT", style = label.style_label_up, color = color.new(color.yellow, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
+if topTick
+    nTopTk += 1
+    if showTopTick
+        label.new(bar_index, high, "TOP", style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
+
+// ───────── LEGS: continuity vs distance (turn to turn) ─────────
+var bool   legOpen = false
+var int    legDir  = 0
+var float  legP0   = na
+var int    legB0   = 0
+var float  legPath = 0.0
+var string leg1    = "—"
+var string leg2    = "—"
+
+if legOpen and barstate.isconfirmed
+    legPath += math.abs(close - close[1])
+
+if botTurn or topTurn
+    if legOpen
+        float dist = math.abs(close - legP0)
+        int   bars = bar_index - legB0
+        float eff  = legPath > 0 ? dist / legPath : 0.0
+        leg2 := leg1
+        leg1 := (legDir > 0 ? "UP " : "DN ") + str.tostring(dist, "#.##") + " / " + str.tostring(bars) + "b / eff " + str.tostring(eff, "#.00")
+    legOpen := true
+    legDir  := botTurn ? 1 : -1
+    legP0   := close
+    legB0   := bar_index
+    legPath := 0.0
+
+// ───────────────────────── STRATEGY ─────────────────────────
+// One signal pair only, chosen in S1. Nothing else opens a trade.
+bool isTurn      = sigMode == "Turn ▲/▼"
+bool turnPredict = isTurn and turnEntry == "Predict (stop at cross price)"
+bool turnAtCross = isTurn and turnEntry == "At the cross"
+bool longSig  = sigMode == "BOT/TOP square" ? botOK : isTurn ? (turnAtCross ? botCrossNow : botTurn) : botTick
+bool shortSig = sigMode == "BOT/TOP square" ? topOK : isTurn ? (turnAtCross ? topCrossNow : topTurn) : topTick
+// Predict mode places stop orders instead (below); the market-order signals are off.
+if turnPredict
+    longSig  := false
+    shortSig := false
+// Both on one bar = no clear direction, skip.
+if longSig and shortSig
+    longSig  := false
+    shortSig := false
+
+var int nSigL = 0
+var int nSigS = 0
+if longSig
+    nSigL += 1
+if shortSig
+    nSigS += 1
+
+bool canLong  = tradeDir != "Short only"
+bool canShort = tradeDir != "Long only"
+
+// Exit distances in ticks. ATR is taken from the entry candle (or the current
+// candle while flat / waiting for a stop order to fill).
+float exAtr  = ta.atr(exAtrLen)
+float tk     = syminfo.mintick
+int   eOff   = strategy.position_size != 0 ? math.min(bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1), 499) : 0
+float atrE   = exAtr[eOff]
+float slTk   = exitUnit == "Points" ? slPts    : slAtrM   * atrE / tk
+float tpTk   = exitUnit == "Points" ? tpPts    : tpR      * slTk
+float taTk   = exitUnit == "Points" ? trActPts : trActAtr * atrE / tk
+float tdTk   = exitUnit == "Points" ? trDisPts : trDisAtr * atrE / tk
+
+calcQty() =>
+    float q = qtyFixed
+    if qtyMode == "Risk %"
+        float slPx = slTk * tk * syminfo.pointvalue
+        q := slPx > 0 ? strategy.equity * riskPct / 100 / slPx : 0.0
+    q := math.min(q, qtyMax)
+    // Margin cap (5% headroom for the fill moving past the close).
+    if mgnCap and close > 0
+        q := math.min(q, 0.95 * strategy.equity / (close * syminfo.pointvalue * mgnPct / 100))
+    math.max(math.floor(q / qtyStep) * qtyStep, 0.0)
+
+float pos = strategy.position_size
+
+// ── Market entries (square, tick, turn "At the cross" / "After hold") ──
+if sigBarOK and longSig
+    float q = calcQty()
+    if pos < 0
+        if oppMode == "Reverse" and canLong and q > 0
+            strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
+        else if oppMode != "Ignore"
+            strategy.close("Short", comment = "opp signal")
+    else if pos == 0 and canLong and q > 0
+        strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
+
+if sigBarOK and shortSig
+    float q = calcQty()
+    if pos > 0
+        if oppMode == "Reverse" and canShort and q > 0
+            strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
+        else if oppMode != "Ignore"
+            strategy.close("Long", comment = "opp signal")
+    else if pos == 0 and canShort and q > 0
+        strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
+
+// ── Predict: price where fast and slow cross on the NEXT candle ──
+// fast = SMA(rsi, fastLen), slow = SMA(rsi, slowLen). Next candle's RSI that
+// makes them equal:  r* = (Ss/slowLen - Sf/fastLen) / (1/fastLen - 1/slowLen)
+// with Sf, Ss = sums of the last fastLen-1 / slowLen-1 RSI values. Then invert
+// Wilder's RSI to get the close that produces r*.
+float chg  = ta.change(close)
+float upR  = ta.rma(math.max(chg, 0), rsiLen)
+float dnR  = ta.rma(math.max(-chg, 0), rsiLen)
+float sumF = fastLen > 1 ? math.sum(r, math.max(fastLen - 1, 1)) : 0.0
+float sumS = math.sum(r, math.max(slowLen - 1, 1))
+
+crossPrice() =>
+    float px = na
+    if slowLen > fastLen and not na(upR) and not na(dnR)
+        float rStar = (sumS / slowLen - sumF / fastLen) / (1.0 / fastLen - 1.0 / slowLen)
+        if rStar > 0.01 and rStar < 99.99
+            float a   = rsiLen
+            float up1 = upR * (a - 1) / a
+            float dn1 = dnR * (a - 1) / a
+            float rs  = rStar / (100 - rStar)
+            float r0  = up1 + dn1 > 0 ? 100 * up1 / (up1 + dn1) : 50
+            if rStar >= r0
+                px := close + a * (rs * dn1 - up1)
+            else
+                px := close - a * (up1 / rs - dn1)
+    px
+
+float xPx = crossPrice()
+// Stop prices with the calibration buffer, rounded to the tick on the safe side.
+float stopL = na(xPx) ? na : math.ceil((xPx + predBuf * tk) / tk) * tk
+float stopS = na(xPx) ? na : math.floor((xPx - predBuf * tk) / tk) * tk
+
+// Did a trade already open on this candle (filled, maybe even closed again)?
+bool enteredThisBar = (strategy.opentrades > 0 and strategy.opentrades.entry_bar_index(strategy.opentrades - 1) == bar_index) or (strategy.closedtrades > 0 and strategy.closedtrades.entry_bar_index(strategy.closedtrades - 1) == bar_index)
+
+if turnPredict and barstate.isconfirmed
+    float q = calcQty()
+    // Long: armed, fast still below slow -> buy stop at the cross price.
+    bool wantL = armL and fast < slow and canLong and q > 0 and not na(stopL) and pos <= 0 and (pos == 0 or oppMode == "Reverse")
+    if wantL
+        strategy.entry("Long", strategy.long, qty = q, stop = stopL, comment = "L predict")
+    else
+        strategy.cancel("Long")
+    // Short: armed, fast still above slow -> sell stop at the cross price.
+    bool wantS = armS and fast > slow and canShort and q > 0 and not na(stopS) and pos >= 0 and (pos == 0 or oppMode == "Reverse")
+    if wantS
+        strategy.entry("Short", strategy.short, qty = q, stop = stopS, comment = "S predict")
+    else
+        strategy.cancel("Short")
+    // Catch-up: the lines crossed at this close but no stop filled -> enter now.
+    // Placed after the cancels above so they don't remove it.
+    if catchUp and not enteredThisBar
+        bool okChaseL = maxChase <= 0 or na(stopL[1]) or close - stopL[1] <= maxChase * tk
+        bool okChaseS = maxChase <= 0 or na(stopS[1]) or stopS[1] - close <= maxChase * tk
+        if crossUpNow and armL and canLong and q > 0 and okChaseL and (pos == 0 or (pos < 0 and oppMode == "Reverse"))
+            strategy.entry("Long", strategy.long, qty = q, comment = "L cross")
+        else if crossDnNow and armS and canShort and q > 0 and okChaseS and (pos == 0 or (pos > 0 and oppMode == "Reverse"))
+            strategy.entry("Short", strategy.short, qty = q, comment = "S cross")
+    // "Close only": no reversing stop, close on the actual cross instead.
+    if oppMode == "Close only"
+        if pos < 0 and armL and crossUpNow
+            strategy.close("Short", comment = "opp signal")
+        if pos > 0 and armS and crossDnNow
+            strategy.close("Long", comment = "opp signal")
+
+// Exits: SL / TP / trailing stop, in ticks from the entry price.
+float xSl = slTk > 0 ? slTk : na
+float xTp = tpTk > 0 ? tpTk : na
+float xTa = trailOn and tdTk > 0 ? taTk : na
+float xTd = trailOn and tdTk > 0 ? tdTk : na
+strategy.exit("Long X",  from_entry = "Long",  loss = xSl, profit = xTp, trail_points = xTa, trail_offset = xTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+strategy.exit("Short X", from_entry = "Short", loss = xSl, profit = xTp, trail_points = xTa, trail_offset = xTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+
+// Turn "Predict" / "At the cross": the cross did not hold -> get out.
+if failExit and (turnPredict or turnAtCross) and barstate.isconfirmed and strategy.position_size != 0
+    int held = bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1)
+    if held <= turnHold
+        if strategy.position_size > 0 and fast <= slow
+            strategy.close("Long", comment = "cross failed")
+        if strategy.position_size < 0 and fast >= slow
+            strategy.close("Short", comment = "cross failed")
+
+// Time stop.
+if timeStop > 0 and strategy.position_size != 0 and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= timeStop
+    strategy.close_all(comment = "time stop")
+
+// Predicted stop price (blue = buy stop, orange = sell stop) while a stop is armed.
+bool showL = turnPredict and armL and fast < slow
+bool showS = turnPredict and armS and fast > slow
+plot(showL ? stopL : showS ? stopS : na, "Predicted cross price", color = showL ? color.new(color.blue, 0) : color.new(color.orange, 0), style = plot.style_circles, linewidth = 2, force_overlay = true)
+
+// ───────────────────────── TABLE ─────────────────────────
+grpD = "Display"
+showTable = input.bool(true, "Show table", group = grpD)
+
+var table t = table.new(position.middle_right, 2, 12, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
+
+if showTable and barstate.islast
+    table.cell(t, 0, 0, "XPW SM v0.7 S" + (allOn ? " ALL" : ""), text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
+    table.cell(t, 1, 0, isRed ? "RED" : "LIME", text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
+    table.cell(t, 0, 1, "Area pos",    text_size = size.tiny)
+    table.cell(t, 1, 1, str.tostring(posW, "#.00") + (inLow ? " LOW" : inHigh ? " HIGH" : " MID"), text_size = size.tiny)
+    table.cell(t, 0, 2, "BOT squares", text_size = size.tiny)
+    table.cell(t, 1, 2, str.tostring(nBotSq), text_size = size.tiny)
+    table.cell(t, 0, 3, "TOP squares", text_size = size.tiny)
+    table.cell(t, 1, 3, str.tostring(nTopSq), text_size = size.tiny)
+    table.cell(t, 0, 4, "BOT turns",   text_size = size.tiny)
+    table.cell(t, 1, 4, str.tostring(nBotTurn) + "  gap " + str.tostring(lastBotGap) + "b", text_size = size.tiny)
+    table.cell(t, 0, 5, "TOP turns",   text_size = size.tiny)
+    table.cell(t, 1, 5, str.tostring(nTopTurn) + "  gap " + str.tostring(lastTopGap) + "b", text_size = size.tiny)
+    table.cell(t, 0, 6, "BOT ticks",   text_size = size.tiny)
+    table.cell(t, 1, 6, str.tostring(nBotTk), text_size = size.tiny)
+    table.cell(t, 0, 7, "TOP ticks",   text_size = size.tiny)
+    table.cell(t, 1, 7, str.tostring(nTopTk), text_size = size.tiny)
+    table.cell(t, 0, 8, "Leg -1",      text_size = size.tiny)
+    table.cell(t, 1, 8, leg1, text_size = size.tiny)
+    table.cell(t, 0, 9, "Leg -2",      text_size = size.tiny)
+    table.cell(t, 1, 9, leg2, text_size = size.tiny)
+    table.cell(t, 0, 10, "Trading",    text_size = size.tiny)
+    table.cell(t, 1, 10, sigMode + " / " + tradeDir, text_size = size.tiny)
+    table.cell(t, 0, 11, "Qty now",    text_size = size.tiny)
+    table.cell(t, 1, 11, str.tostring(calcQty()) + (mgnCap ? " (margin cap)" : ""), text_size = size.tiny)
