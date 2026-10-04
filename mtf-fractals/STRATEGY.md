@@ -11,6 +11,88 @@ below are calibrated in ATR units from the same volatility figures as the
 indicator and are a sensible starting point, not an optimised result. Section 5
 explains how to test and tune them in the Strategy Tester.
 
+## 0. Gold calibration (OANDA:XAUUSD)
+
+The defaults were calibrated on four OANDA:XAUUSD exports from TradingView:
+weekly (2014–2026), daily (2024–2026), 4H (Apr–Oct 2026) and 30m (Sep–Oct
+2026). The work went in three steps.
+
+1. **Replica.** A Python copy of the strategy was checked against
+   TradingView's own exported plots: fractal marks matched 100 % on 4H and
+   30m and 155 of 156 on the daily, and with your settings 21 of 22 30m trades
+   matched bar for bar. The exports also show that the chart they came from
+   ran Band mode = Percent, Direction = Long only, and had the timeframe rows
+   switched off (the bias column is 0 on every bar).
+2. **Search.** 60,000 combinations of fractal width, break buffer, retest
+   band, entry type, direction, higher-TF filter, stop, target, breakeven,
+   trailing stop, extension filter and session were run on 30m, 1H, 2H, 4H,
+   8H, 12H, daily and weekly charts (1H, 2H, 8H and 12H rebuilt from the
+   exports), with costs of 0.005 % per side.
+3. **Selection.** Settings were chosen by their average effect across all
+   runs, not by the single best run, then stress-tested: every setting moved
+   one step, 4× costs, and thirds of the data.
+
+**What the data says.** Gold trends on large timeframes and mean-reverts on
+small ones. Breakouts of swing highs and lows lose on every chart below 4H
+(win rates 7–24 %), because most intraday breaks fail. Trading against a
+failed break is the only rule that held up there, and only just. From 4H up,
+long-only breakouts held with a trailing stop and no fixed target were strongly
+positive, and shorts against gold's long-term uptrend lost.
+
+Hence the **Strategy profile** input. On gold, Auto picks:
+
+| Profile | Charts | Entry | Fractal | Break buffer | Retest band | Stop | Target | Trailing | Higher-TF filter | Direction |
+|---------|--------|-------|---------|--------------|-------------|------|--------|----------|------------------|-----------|
+| Intraday fade | 1m to 2H | failed break (fade) | 2 / 2 | 0.05 ATR | 0.5 ATR | 1.5 ATR | 1 R | off | off | both |
+| Trend | 4H and above | breakout + flip retest | 3 / 3 | 0.15 ATR | 0.35 ATR | 1 ATR | none | chandelier 4 ATR from +1 R | on | long only |
+
+Both profiles exit on the opposite chart-TF break and skip breakouts more than
+1.5 ATR beyond the level. *Custom* uses every input as set; *Direction* always
+applies on top of any profile.
+
+**Results** (expectancy per trade in R after 0.005 % costs per side; n =
+trades; w = win rate):
+
+| Chart | Your settings | Previous defaults | New Auto profile |
+|-------|---------------|-------------------|------------------|
+| 30m | −0.41 R (n 23, w 13 %) | −0.06 R (n 34) | +0.04 R (n 19, w 47 %) |
+| 1H | −0.47 R (n 12) | −0.41 R (n 18) | +0.23 R (n 14, w 57 %) |
+| 2H | −0.41 R (n 5) | −0.46 R (n 9) | −0.35 R (n 6) |
+| 4H | −0.25 R (n 22) | +0.13 R (n 35) | +1.74 R (n 7, w 28 %) |
+| Daily | +0.64 R (n 28) | +0.23 R (n 40) | +1.89 R (n 16, w 38 %, PF 4.3, max DD 3.2 R) |
+| Weekly | +0.45 R (n 29) | +0.13 R (n 39) | +4.14 R (n 13, w 46 %, PF 8.7, max DD 3.7 R) |
+
+How much to trust each row:
+
+- **Trend, daily and weekly: strong.** Every one of 36 neighbouring settings
+  stays profitable and 4× costs change nothing. The edge comes from a few large
+  trend legs: most trades end at the stop and a handful run 5–20 R. It is
+  regime dependent; the weekly 2014–2018 third (gold falling) lost about 0.7 R
+  per trade.
+- **Trend, 4H: promising but thin** (7 trades in 5 months of a falling market).
+- **Intraday fade, 30m and 1H: weak.** About breakeven on 30m and +0.23 R on
+  1H, from 3 weeks of data. It turns slightly negative on 30m at 0.02 %
+  costs. Treat it as a starting point to paper-trade, not a proven edge.
+
+**1-minute and 5-minute charts.** No 1m or 5m data was available, so these use
+the Intraday fade profile extrapolated from 30m and 1H. On gold, Auto selects
+it automatically. Set it by hand like this:
+
+| Setting | 1m | 5m |
+|---------|----|----|
+| Strategy profile | Intraday fade (or Auto) | Intraday fade (or Auto) |
+| Direction | Both (Long only halves the trades) | Both |
+| Commission | 0.005 % (gold CFD spread) | 0.005 % |
+| Risk per trade | 0.5 % | 0.5–1 % |
+| Max position size | 10 (1 % risk needs ≈ 15–20× on 1m) | 10 |
+| Trading session | 0300-1200 or 0800-1700 New York is worth testing | same |
+
+The break buffer has a floor of 0.012 % of the price (≈ $0.50), so on 1m and
+5m charts it is the spread floor, not 0.05 ATR, that defines a break. On 1m
+the stop (1.5 ATR ≈ $2.5–3) is about 8–12 times the spread; costs eat a large
+share of every R there. Export 1m and 5m charts (a few thousand bars each) to
+calibrate them properly.
+
 ## 1. Rules
 
 **Entries** (evaluated on the bar close):
