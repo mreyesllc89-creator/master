@@ -1,6 +1,6 @@
 # TokioXAU SinLimites V3 — TradingView port
 
-`TokioXAU_SinLimites_V3.pine` is a Pine Script v6 indicator that reproduces the
+`TokioXAU_SinLimites_V3.pine` is a Pine Script v6 strategy that reproduces the
 MT5 expert advisor in `../mql5/` (`TokioXAU_SinLimites_V3.mq5` + `Core/*.mqh`).
 Its defaults are the values of `../mql5/TokioXAU_SinLimites_V3.set`.
 
@@ -16,6 +16,16 @@ Its defaults are the values of `../mql5/TokioXAU_SinLimites_V3.set`.
   TradingView strategies cannot, so the script keeps its own book of positions and
   computes the basket P/L in account money (100 oz per lot). Results are in the
   dashboard and on the chart, not in the Strategy Tester.
+- **Strategy Tester.** TradingView strategies hold one net position, so the
+  strategy keeps the ledger's **net exposure** (buy lots − sell lots, lock included;
+  1 lot = 100 oz, see "Cantidad de la estrategia por 1 lote"). A hedged basket gains
+  or loses exactly what its net exposure does, so the tester's equity curve follows
+  the ledger. Differences: on history the net is adjusted at each bar close (the
+  ledger fills inside the bar at the replayed prices), and the tester has no spread
+  unless you add slippage/commission in Properties. The tester's "trades" are net
+  position changes, not individual grid positions. Starting balance = *Initial
+  capital* in Properties (also used for the % of balance rules). Margin is set to
+  1% (1:100) so TradingView does not liquidate the simulation.
 - **Ticks.** Mode "Cada tick": on live bars the engine runs on every price update,
   like `OnTick`. History has no ticks, so each bar is replayed as a price path
   (optionally from lower-timeframe sub-bars), with synthetic ticks so no grid level
@@ -37,7 +47,7 @@ Its defaults are the values of `../mql5/TokioXAU_SinLimites_V3.set`.
 
 ## Alerts
 
-Create an alert on the indicator with the condition **"Any alert() function call"**.
+Create an alert on the strategy with the condition **"Any alert() function call"**.
 Alerts are only sent in real time (never for replayed history).
 
 Text example:

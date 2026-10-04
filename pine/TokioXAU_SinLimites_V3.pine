@@ -28,6 +28,8 @@
 // BITE 6: stops and risk: time cut, catastrophe stop, basket stop (also the
 //         funded stop), pauses, side flip after a stop, equity stop and the
 //         circuit breakers (stop-add, derisk cut, close all).
+// STRATEGY: the ledger stays the engine; the strategy holds the ledger's net
+//         exposure so the Strategy Tester shows the equity curve and stats.
 // BITE 7: alerts for every event (text or JSON for webhooks), each position
 //         with a unique id so a bridge can mirror the ledger on a broker.
 //
@@ -35,7 +37,9 @@
 // active in that bite. MT5-only inputs (magic, slippage, Telegram, DB, CSV)
 // have no TradingView equivalent and are left out.
 // ============================================================================
-indicator("TokioXAU SinLimites V3", overlay = true, max_labels_count = 500, max_lines_count = 100)
+strategy("TokioXAU SinLimites V3", overlay = true, max_labels_count = 500, max_lines_count = 100,
+     initial_capital = 1000, currency = currency.USD, default_qty_type = strategy.fixed, default_qty_value = 1,
+     process_orders_on_close = true, calc_on_every_tick = true, margin_long = 1, margin_short = 1)
 
 // ---------------------------------------------------------------- 2. Lotaje / Martingala
 grpLot      = "2. Lotaje / Martingala"
@@ -140,8 +144,8 @@ stopPause   = input.float(0.0,  "Stop de cesta: minutos de pausa", group = grpRi
 stopBudget  = input.float(0.0,  "Stop financiado: fraccion (0=off)", group = grpRisk)
 stopBudCap  = input.float(0.0,  "Stop financiado: tope", group = grpRisk)
 stopFlipH   = input.float(0.0,  "Tras stop: horas solo del lado del movimiento", group = grpRisk)
-startBal    = input.float(1000.0, "Balance inicial de la simulacion", group = grpRisk,
-     tooltip = "Solo se usa para los porcentajes de balance (supervivencia, candado, stop catastrofe).")
+// Starting balance = "Initial capital" in the strategy Properties tab.
+startBal    = strategy.initial_capital
 
 minSecs     = input.int(1,      "Segundos minimos entre entradas", minval = 0, group = grpRisk)
 restartSecs = input.int(2,      "Pausa tras cosecha (segundos)", minval = 0, group = grpRisk)
@@ -177,6 +181,13 @@ maxSynth    = input.int(60,      "Maximo de ticks sinteticos por tramo", minval 
 simStart    = input.time(timestamp("2000-01-01T00:00:00"), "Simular desde", group = grpSim)
 
 // ---------------------------------------------------------------- Visual
+// ---------------------------------------------------------------- Estrategia
+grpStrat    = "Estrategia (Strategy Tester)"
+mirrorOn    = input.bool(true,  "Copiar la exposicion neta del libro a la estrategia", group = grpStrat,
+     tooltip = "TradingView solo permite UNA posicion neta. La estrategia mantiene en todo momento la exposicion neta del libro virtual (lotes compra - lotes venta, candado incluido). La suma de una cesta cubierta gana o pierde exactamente lo mismo que su exposicion neta.")
+unitsPerLot = input.float(100.0, "Cantidad de la estrategia por 1 lote", group = grpStrat,
+     tooltip = "XAUUSD en TradingView se opera en onzas: 1 lote = 100 oz, 0.01 lote = 1 oz. Cambialo si tu simbolo usa otra unidad.")
+
 // ---------------------------------------------------------------- Alertas
 grpAlert    = "Alertas"
 alertsOn    = input.bool(true,     "Enviar alertas", group = grpAlert,
@@ -1034,6 +1045,25 @@ if ready
         for k = 0 to pathP.size() - 1
             runTo(bk, pathP.get(k), pathT.get(k))
 
+// ============================================================================
+// Strategy mirror: one net position = buys - sells (+ lock) of the ledger.
+// History: adjusted on each bar close, after that bar's replay.
+// Realtime "Cada tick": adjusted on every tick (same order id = replaces a pending one).
+// ============================================================================
+netLotsOf(Book b) =>
+    float n = 0.0
+    for p in b.pos
+        n += p.side * p.lot
+    for p in b.lockPos
+        n += p.side * p.lot
+    n
+
+targetQty = math.round(netLotsOf(bk) * unitsPerLot, 6)
+diffQty   = math.round(targetQty - strategy.position_size, 6)
+if mirrorOn and ready and math.abs(diffQty) > 0 and (barstate.isconfirmed or (isTickMode and barstate.isrealtime))
+    strategy.order("Neto", diffQty > 0 ? strategy.long : strategy.short, math.abs(diffQty),
+         comment = "neto " + str.tostring(targetQty / unitsPerLot, "0.00") + " lotes")
+
 // Draw this bar's markers (redrawn on every realtime tick, kept on the last one).
 if showFills and bk.marks.size() > 0
     for m in bk.marks
@@ -1148,7 +1178,7 @@ if barstate.islast and showDash
     dashRow(14, "Realizado",    money(bk.realized), bk.realized >= 0 ? color.lime : color.red)
     dashRow(15, "Peor flotante", money(bk.worstNet), color.orange)
     dashRow(16, "Max pos / lotes", str.tostring(bk.maxPos) + " / " + str.tostring(bk.maxLots, "#.##"), color.white)
-    dashRow(17, "Equity sim.",  str.tostring(dEq, "#,##0.00"), color.white)
+    dashRow(17, "Equity libro / tester", str.tostring(dEq, "#,##0.00") + " / " + str.tostring(strategy.initial_capital + strategy.netprofit + strategy.openprofit, "#,##0.00"), color.white)
     dashRow(18, "Ejecucion",    execMode + (barstate.isrealtime and isTickMode ? " (EN VIVO)" : "") + "  ticks " + str.tostring(bk.ticks), color.gray)
     dashRow(19, "Hora servidor", str.format_time(nowMs, "EEE HH:mm", serverTZ) + "  (" + serverTZ + ")" + (sideMode > 0 ? "  lado " + str.tostring(sideAllowed(bidC, bk.flipDir, bk.flipUntil, nowMs)) : ""), color.gray)
-    dashRow(20, "Bite",         "7 / completo + alertas", color.gray)
+    dashRow(20, "Bite",         "estrategia (neto del libro)", color.gray)
