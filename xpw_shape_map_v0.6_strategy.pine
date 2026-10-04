@@ -5,6 +5,10 @@
 //   BOT/TOP square  -> BOT square = LONG,  TOP square = SHORT
 //   Turn ▲/▼        -> Turn ▲     = LONG,  Turn ▼     = SHORT
 //   BOT/TOP tick    -> BOT tick   = LONG,  TOP tick   = SHORT
+// Turn entries default to PREDICT: at each candle close the exact price where
+// fast and slow would cross on the next candle is calculated and a stop order
+// sits there, so the entry fills the moment price reaches the cross — live and
+// in the backtest. Blue dots on the price chart show that price.
 // "Enter on tick" ON (default): live, the strategy runs every tick and enters the
 // moment the signal appears inside the forming candle — no wait for the close.
 // On history there are no ticks, so backtests still enter on the next bar's open.
@@ -20,8 +24,8 @@ grpE = "S1. Entry"
 sigMode  = input.string("Turn ▲/▼", "Entry signal (one only)", options = ["BOT/TOP square", "Turn ▲/▼", "BOT/TOP tick"], group = grpE, tooltip = "Only this pair of labels opens trades. BOT side = long, TOP side = short. The other labels still draw but never trade.")
 tradeDir = input.string("Both", "Trade direction", options = ["Both", "Long only", "Short only"], group = grpE)
 enterTick = input.bool(true, "Enter on tick (don't wait for candle close)", group = grpE, tooltip = "ON: in realtime the script runs on every tick and enters the moment the signal appears inside the forming candle. The signal can still disappear before the candle closes; the trade stays open anyway. OFF: wait for the candle to close and fill on the next candle's open. On history there are no ticks, so the backtest always uses closed candles.")
-turnEntry = input.string("At the cross", "Turn entry timing", options = ["At the cross", "After hold (when ▲/▼ confirms)"], group = grpE, tooltip = "At the cross: enter on the candle where the lines cross, which is where the ▲/▼ label is drawn. After hold: wait until the cross has held for 'Bars the cross must hold' (later, fewer fakeouts).")
-failExit  = input.bool(true, "Turn: exit if the cross fails to hold", group = grpE, tooltip = "At the cross only. If the lines cross back within 'Bars the cross must hold' candles, close the trade (checked at candle close).")
+turnEntry = input.string("Predict (stop at cross price)", "Turn entry timing", options = ["Predict (stop at cross price)", "At the cross", "After hold (when ▲/▼ confirms)"], group = grpE, tooltip = "Predict: at each candle close the strategy calculates the exact price where fast would cross slow on the next candle and places a stop order there. It fills the instant price gets there — live and in the backtest. At the cross: enter when the cross is seen (candle close, or on tick if 'Enter on tick' is on). After hold: wait until the cross has held for 'Bars the cross must hold'.")
+failExit  = input.bool(true, "Turn: exit if the cross fails to hold", group = grpE, tooltip = "Predict / At the cross. If at a candle close the lines are back on the wrong side within 'Bars the cross must hold' candles of entry, close the trade.")
 oppMode  = input.string("Reverse", "Opposite signal while in a trade", options = ["Reverse", "Close only", "Ignore"], group = grpE, tooltip = "Reverse: close and open the other side. Close only: close and wait. Ignore: let the exits handle it.")
 
 // Backtest: process_orders_on_close fills at the signal candle's close instead of
@@ -327,9 +331,15 @@ if botTurn or topTurn
 
 // ───────────────────────── STRATEGY ─────────────────────────
 // One signal pair only, chosen in S1. Nothing else opens a trade.
-bool turnAtCross = turnEntry == "At the cross"
-bool longSig  = sigMode == "BOT/TOP square" ? botOK : sigMode == "Turn ▲/▼" ? (turnAtCross ? botCrossNow : botTurn) : botTick
-bool shortSig = sigMode == "BOT/TOP square" ? topOK : sigMode == "Turn ▲/▼" ? (turnAtCross ? topCrossNow : topTurn) : topTick
+bool isTurn      = sigMode == "Turn ▲/▼"
+bool turnPredict = isTurn and turnEntry == "Predict (stop at cross price)"
+bool turnAtCross = isTurn and turnEntry == "At the cross"
+bool longSig  = sigMode == "BOT/TOP square" ? botOK : isTurn ? (turnAtCross ? botCrossNow : botTurn) : botTick
+bool shortSig = sigMode == "BOT/TOP square" ? topOK : isTurn ? (turnAtCross ? topCrossNow : topTurn) : topTick
+// Predict mode places stop orders instead (below); the market-order signals are off.
+if turnPredict
+    longSig  := false
+    shortSig := false
 // Both on one bar = no clear direction, skip.
 if longSig and shortSig
     longSig  := false
@@ -345,20 +355,16 @@ if shortSig
 bool canLong  = tradeDir != "Short only"
 bool canShort = tradeDir != "Long only"
 
-// Exit distances in ticks, fixed at the moment of entry.
-float exAtr = ta.atr(exAtrLen)
-float tk    = syminfo.mintick
-float slTk  = exitUnit == "Points" ? slPts    : slAtrM   * exAtr / tk
-float tpTk  = exitUnit == "Points" ? tpPts    : tpR      * slTk
-float taTk  = exitUnit == "Points" ? trActPts : trActAtr * exAtr / tk
-float tdTk  = exitUnit == "Points" ? trDisPts : trDisAtr * exAtr / tk
-
-// varip: keeps the values between ticks of the same candle, so a tick entry
-// still has its SL/TP when the order fills on the next tick.
-varip float eSl = na
-varip float eTp = na
-varip float eTa = na
-varip float eTd = na
+// Exit distances in ticks. ATR is taken from the entry candle (or the current
+// candle while flat / waiting for a stop order to fill).
+float exAtr  = ta.atr(exAtrLen)
+float tk     = syminfo.mintick
+int   eOff   = strategy.position_size != 0 ? math.min(bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1), 499) : 0
+float atrE   = exAtr[eOff]
+float slTk   = exitUnit == "Points" ? slPts    : slAtrM   * atrE / tk
+float tpTk   = exitUnit == "Points" ? tpPts    : tpR      * slTk
+float taTk   = exitUnit == "Points" ? trActPts : trActAtr * atrE / tk
+float tdTk   = exitUnit == "Points" ? trDisPts : trDisAtr * atrE / tk
 
 calcQty() =>
     float q = qtyFixed
@@ -370,63 +376,87 @@ calcQty() =>
 
 float pos = strategy.position_size
 
-openSide(bool isLong) =>
-    float q = calcQty()
-    if q > 0
-        if isLong
-            strategy.entry("Long",  strategy.long,  qty = q, comment = "L " + sigMode)
-        else
-            strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
-    q > 0
-
+// ── Market entries (square, tick, turn "At the cross" / "After hold") ──
 if sigBarOK and longSig
+    float q = calcQty()
     if pos < 0
-        if oppMode == "Reverse" and canLong
-            if openSide(true)
-                eSl := slTk
-                eTp := tpTk
-                eTa := taTk
-                eTd := tdTk
-            else
-                strategy.close("Short", comment = "opp signal")
+        if oppMode == "Reverse" and canLong and q > 0
+            strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
         else if oppMode != "Ignore"
             strategy.close("Short", comment = "opp signal")
-    else if pos == 0 and canLong
-        if openSide(true)
-            eSl := slTk
-            eTp := tpTk
-            eTa := taTk
-            eTd := tdTk
+    else if pos == 0 and canLong and q > 0
+        strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
 
 if sigBarOK and shortSig
+    float q = calcQty()
     if pos > 0
-        if oppMode == "Reverse" and canShort
-            if openSide(false)
-                eSl := slTk
-                eTp := tpTk
-                eTa := taTk
-                eTd := tdTk
-            else
-                strategy.close("Long", comment = "opp signal")
+        if oppMode == "Reverse" and canShort and q > 0
+            strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
         else if oppMode != "Ignore"
             strategy.close("Long", comment = "opp signal")
-    else if pos == 0 and canShort
-        if openSide(false)
-            eSl := slTk
-            eTp := tpTk
-            eTa := taTk
-            eTd := tdTk
+    else if pos == 0 and canShort and q > 0
+        strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
+
+// ── Predict: price where fast and slow cross on the NEXT candle ──
+// fast = SMA(rsi, fastLen), slow = SMA(rsi, slowLen). Next candle's RSI that
+// makes them equal:  r* = (Ss/slowLen - Sf/fastLen) / (1/fastLen - 1/slowLen)
+// with Sf, Ss = sums of the last fastLen-1 / slowLen-1 RSI values. Then invert
+// Wilder's RSI to get the close that produces r*.
+float chg  = ta.change(close)
+float upR  = ta.rma(math.max(chg, 0), rsiLen)
+float dnR  = ta.rma(math.max(-chg, 0), rsiLen)
+float sumF = fastLen > 1 ? math.sum(r, math.max(fastLen - 1, 1)) : 0.0
+float sumS = math.sum(r, math.max(slowLen - 1, 1))
+
+crossPrice() =>
+    float px = na
+    if slowLen > fastLen and not na(upR) and not na(dnR)
+        float rStar = (sumS / slowLen - sumF / fastLen) / (1.0 / fastLen - 1.0 / slowLen)
+        if rStar > 0.01 and rStar < 99.99
+            float a   = rsiLen
+            float up1 = upR * (a - 1) / a
+            float dn1 = dnR * (a - 1) / a
+            float rs  = rStar / (100 - rStar)
+            float r0  = up1 + dn1 > 0 ? 100 * up1 / (up1 + dn1) : 50
+            if rStar >= r0
+                px := close + a * (rs * dn1 - up1)
+            else
+                px := close - a * (up1 / rs - dn1)
+    px
+
+float xPx = crossPrice()
+
+if turnPredict and barstate.isconfirmed
+    float q = calcQty()
+    // Long: armed by a BOT square, fast still below slow -> buy stop at the cross price.
+    bool wantL = turnOn and botArmed and fast < slow and canLong and q > 0 and not na(xPx) and pos <= 0 and (pos == 0 or oppMode == "Reverse")
+    if wantL
+        strategy.entry("Long", strategy.long, qty = q, stop = math.ceil(xPx / tk) * tk, comment = "L predict")
+    else
+        strategy.cancel("Long")
+    // Short: armed by a TOP square, fast still above slow -> sell stop at the cross price.
+    bool wantS = turnOn and topArmed and fast > slow and canShort and q > 0 and not na(xPx) and pos >= 0 and (pos == 0 or oppMode == "Reverse")
+    if wantS
+        strategy.entry("Short", strategy.short, qty = q, stop = math.floor(xPx / tk) * tk, comment = "S predict")
+    else
+        strategy.cancel("Short")
+    // "Close only": no reversing stop, close on the actual cross instead.
+    if oppMode == "Close only"
+        if pos < 0 and botArmed and crossUpNow
+            strategy.close("Short", comment = "opp signal")
+        if pos > 0 and topArmed and crossDnNow
+            strategy.close("Long", comment = "opp signal")
 
 // Exits: SL / TP / trailing stop, in ticks from the entry price.
-float xSl = eSl > 0 ? eSl : na
-float xTp = eTp > 0 ? eTp : na
-float xTa = trailOn and eTd > 0 ? eTa : na
-float xTd = trailOn and eTd > 0 ? eTd : na
+float xSl = slTk > 0 ? slTk : na
+float xTp = tpTk > 0 ? tpTk : na
+float xTa = trailOn and tdTk > 0 ? taTk : na
+float xTd = trailOn and tdTk > 0 ? tdTk : na
 strategy.exit("Long X",  from_entry = "Long",  loss = xSl, profit = xTp, trail_points = xTa, trail_offset = xTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
 strategy.exit("Short X", from_entry = "Short", loss = xSl, profit = xTp, trail_points = xTa, trail_offset = xTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
 
-// Turn "At the cross": the cross did not hold -> get out.
-if failExit and sigMode == "Turn ▲/▼" and turnAtCross and barstate.isconfirmed and strategy.position_size != 0
+// Turn "Predict" / "At the cross": the cross did not hold -> get out.
+if failExit and (turnPredict or turnAtCross) and barstate.isconfirmed and strategy.position_size != 0
     int held = bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1)
     if held <= turnHold
         if strategy.position_size > 0 and fast <= slow
@@ -437,6 +467,9 @@ if failExit and sigMode == "Turn ▲/▼" and turnAtCross and barstate.isconfirm
 // Time stop.
 if timeStop > 0 and strategy.position_size != 0 and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= timeStop
     strategy.close_all(comment = "time stop")
+
+// Predicted cross price (blue dots on the price chart while a stop is armed).
+plot(turnPredict and ((botArmed and fast < slow) or (topArmed and fast > slow)) ? xPx : na, "Predicted cross price", color = color.new(color.blue, 0), style = plot.style_circles, linewidth = 2, force_overlay = true)
 
 // ───────────────────────── TABLE ─────────────────────────
 grpD = "Display"
