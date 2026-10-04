@@ -766,15 +766,15 @@ beRIn      = input.float(1.0, "Move stop to breakeven at (R, 0 = off)", minval =
 trailModeIn = input.string("Profile", "Trailing stop", options = ["Profile", "Off", "Swing", "Chandelier", "From close"], group = G_RISK,
      tooltip = "Profile: the strategy profile's trailing (Trend: Chandelier 4 ATR from +1 R; Intraday fade and Custom: off). Any other choice applies on top of every profile, including the calibrated ones (their backtest results assume Profile). Swing: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer; short: above each new swing high). Chandelier: best price since entry − distance. From close: close − distance (long; mirrored for shorts). The stop moves on the bar close and only ratchets toward price. Combine with Target 0 to let winners run.")
 trailUnitIn = input.string("ATR", "Trail units", options = ["ATR", "Points", "Ticks"], group = G_RISK,
-     tooltip = "Units of 'Trail distance' and 'Start trailing at'. ATR: distance in × chart ATR, start in R (multiples of the initial stop distance). Points: both in price units (1 point = $1 on XAUUSD, 1 point = $1 on BTCUSD; on futures 1 point is worth the contract's point value). Ticks: both in the symbol's minimum price step (what MetaTrader calls points; Pine's own trail_points also uses ticks). The Data Window shows the resulting trail distance in price.")
+     tooltip = "Units of 'Trail distance' and 'Start trailing at'. ATR: distance in × chart ATR, start in R (multiples of the initial stop distance). Points: both in price units (1 point = $1 on XAUUSD, 1 point = $1 on BTCUSD; on futures 1 point is worth the contract's point value). Ticks: both in the chart symbol's minimum price step (syminfo.mintick; Pine's own trail_points also uses ticks): 0.001 on OANDA:XAUUSD, so $5 = 5000 ticks there, 0.01 on 2-decimal gold CFDs (500 ticks), 0.1 on GC / MGC (50 ticks). Ticks equal MetaTrader points only when your MetaTrader symbol has as many decimals as the chart symbol; Points avoids the question. The Data Window shows the trail distance in price.")
 trailDistIn = input.float(3.0, "Trail distance", minval = 0.0001, step = 0.25, group = G_RISK,
-     tooltip = "Used by Chandelier and From close, in 'Trail units'. ATR: 3 ≈ $50 on 1H gold. Points: e.g. 5 = $5 on gold, 500 = $500 on BTC. Ticks: e.g. 500 ticks of 0.01 = $5. One ATR(14) on OANDA gold, Sep-Oct 2026: 1m ≈ $2 and 5m ≈ $4.5 (estimated), 30m ≈ $11-13, 1H ≈ $16-19, 4H ≈ $36-38, D ≈ $95-105, W ≈ $150-265; it was 3-7 times smaller in 2015-2020, so a fixed point distance only suits short backtests. The stop never moves closer than 'Min stop distance' to the close with Chandelier.")
+     tooltip = "Used by Chandelier and From close, in 'Trail units'. ATR: 3 ≈ $50 on 1H gold. Points: e.g. 5 = $5 on gold, 500 = $500 on BTC. Ticks: e.g. 5000 ticks = $5 on OANDA:XAUUSD (tick 0.001). One ATR(14) on OANDA gold, Sep-Oct 2026: 1m ≈ $2 and 5m ≈ $4.5 (estimated), 30m ≈ $11-13, 1H ≈ $16-19, 4H ≈ $36-38, D ≈ $95-105, W ≈ $225-245; it was 3-8 times smaller in 2015-2020, so a fixed point distance only suits short backtests (it does not follow volatility). Chandelier never puts the stop closer to the close than 'Min stop distance' × ATR (0.5 ATR ≈ $1 on 1m, $2.3 on 5m, $6 on 30m, $8 on 1H gold), in every unit, so a smaller Chandelier distance has no effect; From close has no such floor.")
 trailStartIn = input.float(0.0, "Start trailing at", minval = 0, step = 0.25, group = G_RISK,
-     tooltip = "Trailing starts once the best price since entry has been this far in profit: R with ATR units, price points with Points, ticks with Ticks. 0 = trailing is active at once (the stop can first move on the bar after entry).")
+     tooltip = "Trailing starts once the best price since entry has been this far in profit: R with ATR units, price points with Points, ticks with Ticks (5000 = $5 on OANDA:XAUUSD). 0 = trailing is active at once (the stop can first move on the bar after entry).")
 riskPct    = input.float(1.0, "Risk per trade (% of equity)", minval = 0.05, maxval = 10, step = 0.05, group = G_RISK,
-     tooltip = "Size = equity × risk % ÷ (stop distance × point value): ounces / BTC on CFD and spot symbols, contracts on futures (GC, MGC, BTC, MBT). The same 1 % means the same account risk on gold and on bitcoin. Commission and slippage come on top. Futures need enough equity for one whole contract: at 1 % on 1H about $20k for MGC, $200k for GC and $400k for CME BTC; smaller sizes round to 0 and the signal is skipped (counted in the Data Window).")
+     tooltip = "Size = equity × risk % ÷ (stop distance × point value): ounces / BTC on CFD and spot symbols, contracts on futures (GC, MGC, BTC, MBT). The same 1 % means the same account risk on gold and on bitcoin. Commission and slippage come on top. Futures need enough equity for one whole contract: at 1 % on 1H about $25k for MGC, $250k for GC and $400k for CME BTC; smaller sizes round to 0 and the signal is skipped (counted in the Data Window).")
 maxLev     = input.float(10, "Max position size (× equity)", minval = 0.1, maxval = 100, step = 0.5, group = G_RISK,
-     tooltip = "Caps the notional at this multiple of equity. 1 % risk with a 1.5-ATR breakout stop needs about 2× on 1H gold and 4-7× on 5m-15m gold; flip-retest stops are tighter (0.65-1.15 ATR) and need about 3-5× on 1H gold and 9-16× on 5m gold. 10 suits a gold CFD or BTC perpetual account; set 1 for spot BTC without leverage. When the cap binds, the trade risks less than 'Risk per trade'.")
+     tooltip = "Caps the notional at this multiple of equity. 1 % risk with a 1.5-ATR breakout stop needs about 2× on 1H gold and 4-6× on 5m-15m gold; flip-retest stops are tighter (0.65-1.15 ATR) and need about 2-4× on 1H gold and 8-14× on 5m gold (gold near $4,200, Sep-Oct 2026 ATR). 10 suits a gold CFD or BTC perpetual account; set 1 for spot BTC without leverage. When the cap binds, the trade risks less than 'Risk per trade'.")
 qtyStep    = input.float(0, "Quantity step (0 = no rounding)", minval = 0, step = 0.0001, group = G_RISK,
      tooltip = "Round the size down to your broker's lot step: 1 for OANDA gold (whole ounces), 0.01 for many gold CFDs, 0.0001 for BTC. Futures are always rounded down to whole contracts. A size that rounds to 0 skips the trade.")
 
@@ -907,6 +907,8 @@ var float lBest    = na     // highest high since a long entry
 var float sBest    = na     // lowest low since a short entry
 var bool  lTrailOn = false
 var bool  sTrailOn = false
+var bool  lTrailed = false  // the trail has moved the stop (exit labelled "trail")
+var bool  sTrailed = false
 var int   nSkipped = 0      // signals dropped because the size rounded to 0
 var int   skipFlipUpT = na  // flip level already counted as skipped
 var int   skipFlipDnT = na
@@ -930,6 +932,7 @@ if canLong
         entryT   := time
         lBest    := na
         lTrailOn := false
+        lTrailed := false
         lTp      := rrTarget > 0 ? close + rrTarget * dist : na
         entryBar := bar_index
         didLong  := true
@@ -954,6 +957,7 @@ if canShort
         entryT   := time
         sBest    := na
         sTrailOn := false
+        sTrailed := false
         sTp      := rrTarget > 0 ? close - rrTarget * dist : na
         entryBar := bar_index
         didShort := true
@@ -977,6 +981,7 @@ if isLong and not didShort
     if trailMode != "Off" and not lTrailOn and not na(lRisk) and lBest - ep >= trailStartPx(lRisk)
         lTrailOn := true
     if lTrailOn
+        float lPrev = lStop
         if trailMode == "From close"
             lStop := math.max(lStop, close - trailPx)
         else if trailMode == "Chandelier"
@@ -985,7 +990,9 @@ if isLong and not didShort
             float swStp = cDnL - breakBuf(cDnL, cAtr)
             if swStp < close
                 lStop := math.max(lStop, swStp)
-    strategy.exit("L-X", "L", stop = lStop, limit = lTp, comment_loss = lTrailOn ? "L trail" : "L stop", comment_profit = "L target", alert_message = "MTF Fractals: long exit " + syminfo.ticker + " (stop " + fmtPx(lStop) + ", target " + fmtPx(lTp) + ")")
+        if lStop > lPrev
+            lTrailed := true
+    strategy.exit("L-X", "L", stop = lStop, limit = lTp, comment_loss = lTrailed ? "L trail" : "L stop", comment_profit = "L target", alert_message = "MTF Fractals: long exit " + syminfo.ticker + " (stop " + fmtPx(lStop) + ", target " + fmtPx(lTp) + ")")
     bool timeL = maxBars > 0 and not na(entryBar) and bar_index - entryBar >= maxBars
     if oppL or timeL
         strategy.close("L", comment = oppL ? "L opp break" : "L time", alert_message = msgOf("long closed"))
@@ -998,6 +1005,7 @@ if isShort and not didLong
     if trailMode != "Off" and not sTrailOn and not na(sRisk) and ep - sBest >= trailStartPx(sRisk)
         sTrailOn := true
     if sTrailOn
+        float sPrev = sStop
         if trailMode == "From close"
             sStop := math.min(sStop, close + trailPx)
         else if trailMode == "Chandelier"
@@ -1006,7 +1014,9 @@ if isShort and not didLong
             float swStp = cUpL + breakBuf(cUpL, cAtr)
             if swStp > close
                 sStop := math.min(sStop, swStp)
-    strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = sTrailOn ? "S trail" : "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
+        if sStop < sPrev
+            sTrailed := true
+    strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = sTrailed ? "S trail" : "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
     bool timeS = maxBars > 0 and not na(entryBar) and bar_index - entryBar >= maxBars
     if oppS or timeS
         strategy.close("S", comment = oppS ? "S opp break" : "S time", alert_message = msgOf("short closed"))

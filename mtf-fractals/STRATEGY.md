@@ -109,12 +109,45 @@ it automatically. Set it by hand like this:
 | Quantity step | 1 for OANDA (whole ounces), 0.01 for most CFDs | same |
 | Trading session (New York time) | 0300-1200 or 0800-1700 is worth testing | same |
 | Gold rollover filter | Auto (no entries 16:40–18:20 New York) | Auto |
+| Trailing stop | Profile (off; the data does not support a trail here) | same |
+| Optional points trail | Chandelier, *Trail units* Points, distance 1.5, start 1.5 (≈ 0.75 ATR from ≈ 0.5 R), target kept at 1 R | Chandelier, Points, distance 3.5, start 3.5 |
 
 The break buffer has a floor of 0.012 % of the price (≈ $0.50), so on 1m and
 5m charts it is the spread floor, not 0.05 ATR, that defines a break. On 1m
 the stop (1.5 ATR ≈ $2.5–3) is about 8–12 times the spread; costs eat a large
 share of every R there. Export 1m and 5m charts (a few thousand bars each) to
 calibrate them properly.
+
+**Trailing in points (tested on the replica).** One ATR(14) on OANDA gold in
+Sep–Oct 2026, to convert between ATR and dollars:
+
+| 1m | 5m | 30m | 1H | 2H | 4H | Daily | Weekly |
+|----|----|-----|----|----|----|-------|--------|
+| ≈ $2 (est.) | ≈ $4.5 (est.) | $11–13 | $16–19 | ≈ $23 | $36–38 | $95–105 | $225–245 |
+
+- **Intraday fade.** On the 3 weeks of 30m data, a Chandelier trail starting at
+  about +$10 (≈ 0.5 R) with a $5–12 distance, keeping the 1 R target, beat no
+  trail on 30m (+0.04 → +0.25 R), 1H (+0.23 → +0.46 R) and 2H (−0.35 →
+  −0.07 R). Starting at 0 was the weakest choice, and Chandelier distances
+  below 0.5 ATR change nothing (the *Min stop distance* floor sets the stop).
+  But this is one 3-week sample (1H and 2H are the same bars resampled), and
+  the same rule in ATR units over 76 fade trades on 4H to weekly data gained
+  nothing (+0.02 vs +0.016 R per trade); removing the target lost money there.
+  Hence *Profile* (no trail) stays the recommendation; the optional points
+  trail in the table above is the scaled-down version of that +$10 / $8
+  setting. The ATR-unit equivalent, Chandelier 0.75 ATR from 0.5 R, adapts to
+  the session and is the better choice if you use one.
+- **Trend.** On 4H, where ATR stayed between $33 and $42, a $145 Chandelier
+  equalled 4 ATR (+11.8 R vs +12.2 R). On daily and weekly charts a fixed
+  dollar trail is a different exit in every year: a weekly $1,000 trail was
+  24–36 ATR wide in 2015–2019 (never switched on) and 3.8 ATR in 2026. Its
+  apparent gains there came from being far wider than 4 ATR during the 2025
+  trend. Keep *Profile* (4 ATR from +1 R) for Trend.
+- **Points or ATR.** Points suit live trading over a short window at a known
+  volatility, or a broker or prop-firm rule in dollars: check *Trail distance
+  (price)* in the Data Window against the current ATR and reset the points
+  when ATR has drifted by about 30 %. For any backtest longer than a few weeks,
+  use ATR units.
 
 ## 1. Rules
 
@@ -174,7 +207,7 @@ with a narrower retest band or in Percent band mode.
 |------|---------|---------|
 | Target | 2 R | Two times the stop distance from the entry. 0 disables it. |
 | Breakeven | at +1 R | Once a bar has reached 1 R in favour **and closed beyond the entry**, the stop moves to the entry price. |
-| Trailing stop | Profile (Trend: chandelier 4 ATR from +1 R; otherwise off) | **Swing**: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer). **Chandelier**: highest high since entry − distance (lowest low + distance for shorts), never closer than *Min stop distance* to the close. **From close**: close − distance (close + distance for shorts). *Trail units* sets what *Trail distance* and *Start trailing at* mean: **ATR** (distance × chart ATR, start in R), **Points** (both in price: 5 = $5 on gold) or **Ticks** (both in the symbol's minimum price step, what MetaTrader calls points). *Start trailing at* delays trailing until the best price since entry is that far in profit. The stop moves on the bar close and only ratchets toward price; set *Target* to 0 to let winners run. Any choice other than *Profile* also applies on top of the calibrated gold profiles. |
+| Trailing stop | Profile (Trend: chandelier 4 ATR from +1 R; otherwise off) | **Swing**: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer). **Chandelier**: highest high since entry − distance (lowest low + distance for shorts), never closer to the close than *Min stop distance* × ATR in any unit (so a Chandelier distance below 0.5 ATR has no effect). **From close**: close − distance (close + distance for shorts), no floor. *Trail units* sets what *Trail distance* and *Start trailing at* mean: **ATR** (distance × chart ATR, start in R), **Points** (both in price: 5 = $5 on gold) or **Ticks** (both in the chart symbol's minimum price step: 0.001 on OANDA:XAUUSD, so $5 = 5000 ticks; 0.01 on 2-decimal gold CFDs; 0.1 on GC / MGC. Ticks equal MetaTrader points only when the decimals match, so Points is the safer choice). Points and Ticks do not follow volatility (section 6). *Start trailing at* delays trailing until the best price since entry is that far in profit. The stop moves on the bar close and only ratchets toward price; set *Target* to 0 to let winners run. Any choice other than *Profile* also applies on top of the calibrated gold profiles. |
 | Opposite break | on | A long is closed when the chart-TF swing low turns Broken (a short mirrored). If that break also passes the entry filters, the position is **reversed** instead, so the breakout is not lost. |
 | Any-signal reversal | off | When on, any opposite entry signal reverses the position. |
 | Time stop | off | Close after N bars. |
@@ -191,9 +224,9 @@ flagged with a label on the last bar. A size can also round to 0 when *Max
 position size* is below one contract or lot step.
 
 Futures need enough equity for one whole contract. At 1 % risk with the default
-1H breakout stop, one contract risks about $2,000 on GC, $200 on MGC and $3,900
+1H breakout stop, one contract risks about $2,500 on GC, $250 on MGC and $3,900
 on CME BTC, so the default $10,000 capital trades none of them. Raise *Initial
-capital* to about $20,000 for MGC, $200,000 for GC or $400,000 for CME BTC, or
+capital* to about $25,000 for MGC, $250,000 for GC or $400,000 for CME BTC, or
 raise *Risk per trade*. MBT and CFD / spot symbols are fine at $10,000.
 
 **Order model.** `process_orders_on_close` is on: entries and market exits fill
@@ -204,19 +237,19 @@ equity); leverage is controlled by *Max position size* instead.
 
 ## 2. Why these defaults
 
-| Setting | Gold (1H) | BTC (1H) | Reasoning |
+| Setting | Gold (1H, ATR ≈ $16.5, Sep–Oct 2026) | BTC (1H) | Reasoning |
 |---------|-----------|----------|-----------|
-| Breakout stop 1.5 × ATR | ≈ $20 | ≈ $780 | Beyond the retest zone (0.65 ATR) plus a push through it. |
-| Flip-retest stop | ≈ $8.50 past the level | ≈ $340 past the level | The flip has failed once price closes back through the zone; a wider stop would keep the trade after its premise is gone. |
-| Min stop 0.5 × ATR | ≈ $6.50 | ≈ $260 | A safety floor. With the default band every stop is already ≥ 0.65 × ATR (the retest zone), so it only binds with a retest band below ≈ 0.35 × ATR or in Percent band mode. |
+| Breakout stop 1.5 × ATR | ≈ $25 | ≈ $780 | Beyond the retest zone (0.65 ATR) plus a push through it. |
+| Flip-retest stop | ≈ $11 past the level | ≈ $340 past the level | The flip has failed once price closes back through the zone; a wider stop would keep the trade after its premise is gone. |
+| Min stop 0.5 × ATR | ≈ $8 | ≈ $260 | A safety floor. With the default band every stop is already ≥ 0.65 × ATR (the retest zone), so it only binds with a retest band below ≈ 0.35 × ATR or in Percent band mode. |
 | Max extension 1.5 × ATR | | | A close more than 1.5 ATR past the level needs a 2+ ATR stop to clear the zone; skipping those avoids chasing. |
-| Target 2 R | ≈ $40 | ≈ $1,560 | About three hourly ATRs: reachable within a session on a real breakout, enough to pay for the losers at a 40 % win rate. |
+| Target 2 R | ≈ $50 | ≈ $1,560 | About three hourly ATRs: reachable within a session on a real breakout, enough to pay for the losers at a 40 % win rate. |
 | Breakeven at 1 R | | | Turns a breakout that ran one stop distance and came back into a scratch instead of a full loss. |
-| Risk 1 % | $100 → ≈ 5 oz (≈ 2× equity) | $100 → ≈ 0.13 BTC (≈ 1× equity) | Fixed-fractional sizing; ten losses in a row cost about 10 %. |
-| Max size 10× equity | | | Covers 1 % risk on breakouts down to 5m gold (≈ 4–7× equity). Flip-retest stops are only ≈ 0.65–1.15 ATR, so they need ≈ 3–5× on 1H gold and ≈ 9–16× on 5m gold; on 5m the cap binds and those trades risk less than 1 %. Set 1 for spot BTC without leverage: flip retests and most trades below 1H are then capped below 1 % risk. |
+| Risk 1 % | $100 → ≈ 4 oz (≈ 1.7× equity) | $100 → ≈ 0.13 BTC (≈ 1× equity) | Fixed-fractional sizing; ten losses in a row cost about 10 %. |
+| Max size 10× equity | | | Covers 1 % risk on breakouts down to 5m gold (≈ 4–6× equity). Flip-retest stops are only ≈ 0.65–1.15 ATR, so they need ≈ 2–4× on 1H gold and ≈ 8–14× on 5m gold; on 5m the cap binds and those trades risk less than 1 %. Set 1 for spot BTC without leverage: flip retests and most trades below 1H are then capped below 1 % risk. |
 | Net bias ≥ 0 | | | The chart-timeframe break is the trigger; the higher timeframes only veto. Raise to 1 for fewer, more aligned trades. |
 
-On 5m charts the same multipliers give a ≈ $6 stop on gold and ≈ $225 on BTC;
+On 5m charts the same multipliers give a ≈ $7 stop on gold and ≈ $225 on BTC;
 costs then matter far more (section 4), and a net bias of 1 is worth testing.
 
 ## 3. Alerts
@@ -274,8 +307,12 @@ defaults that is about 1.1 %; on 5m gold with a CFD spread it is about 1.05 %.
 ## 6. Known limits
 
 - Stops are sized from the chart timeframe's ATR at the signal bar and never
-  widen after entry. The trailing modes use the current ATR or new swings but
-  only ratchet toward price, so they do not help when volatility rises.
+  widen after entry. The trailing modes use the current ATR, a fixed distance
+  in points or ticks, or new swings, and only ratchet toward price, so they do
+  not help when volatility rises. A points or ticks distance also does not
+  scale with volatility: gold's weekly ATR was 3–8 times smaller in 2015–2020
+  than in 2026, so a fixed distance tuned today was effectively off in a long
+  backtest. Use ATR units for backtests that span years.
 - One position at a time, no scaling in or out.
 - The bias filter counts the higher-timeframe rows visible on the chart; on a
   4H chart only D and W contribute.
