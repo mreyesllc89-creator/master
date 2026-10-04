@@ -30,9 +30,11 @@
 //                          placed when the label prints and kept for
 //                          "Limit valid (bars)". It fills only if price comes
 //                          back to that level, never before the label exists.
-//    Signal candle close   (default) market fill at the close of the
-//                          label's candle: the moment that candle closes
-//                          and the label is confirmed, not the next open.
+//    Signal tick           (default) live: the script runs on every tick
+//                          and the market order goes in on the tick the
+//                          label appears, without waiting for the candle to
+//                          close. History has no ticks, so backtest bars
+//                          fill at the close of the label's candle.
 //    A fill at the candle's low on the label candle itself is impossible: the
 //    label is only known once that candle has closed, so a backtest that
 //    filled there would be using the future.
@@ -91,7 +93,7 @@
 //  the map for location. Do not trade the verdict column on its own.
 // ============================================================================
 
-strategy("XPW Orientation TDI v2.4 Strategy", shorttitle="XPW-OTDI4 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true)
+strategy("XPW Orientation TDI v2.4 Strategy", shorttitle="XPW-OTDI4 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
 
 // ---------------------------------------------------------------- INPUTS ----
 rsiLen   = input.int(13,       "RSI length",            group="TDI core")
@@ -147,7 +149,7 @@ trailAct   = input.float(2.0, "Trail activation", minval=0.0, step=0.1, group="S
 trailOff   = input.float(1.0, "Trail offset", minval=0.0, step=0.1, group="Strategy", tooltip="Distance the stop trails behind the best price once armed.")
 slOn       = input.bool(false, "Use stop loss", group="Strategy")
 slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
-entryFill  = input.string("Signal candle close", "Entry fill", options=["Signal candle close","Limit at label price"], group="Strategy", tooltip="Limit at label price: buy limit at the label's price (candle low), sell limit at the candle high, filled only if price returns to it. Signal candle close: market fill at the close of the label's candle.")
+entryFill  = input.string("Signal tick", "Entry fill", options=["Signal tick","Limit at label price"], group="Strategy", tooltip="Limit at label price: buy limit at the label's price (candle low), sell limit at the candle high, filled only if price returns to it. Signal tick: live, a market fill on the tick the label appears; in the backtest, at the close of the label's candle.")
 limitBars  = input.int(5, "Limit valid (bars)", minval=1, maxval=500, group="Strategy", tooltip="An unfilled limit entry is cancelled after this many bars, or sooner when an END label or an opposite signal arrives.")
 
 // PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
