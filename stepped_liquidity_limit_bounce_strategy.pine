@@ -41,10 +41,13 @@ adxLength      = input.int(14, "ADX Length", minval=1, group=grp_logic)
 adxThreshold   = input.int(20, "ADX Trend Threshold", group=grp_logic)
 
 grp_speed = "Order Flow Mechanics"
-wickRatioLimit = input.float(0.60, title="Minimum Wick Rejection Ratio", group=grp_speed, step=0.05)
-velocityMulti  = input.float(2.0, title="Institutional Speed Multiplier", group=grp_speed, step=0.1)
-useVolFilter   = input.bool(true, title="Use Volume Surge Filter", group=grp_speed)
-volSurgeMult   = input.float(1.5, title="Volume Surge Multiplier", group=grp_speed)
+confirmMode    = input.string("Absorption OR Velocity", title="Confirmation Mode", options=["Absorption OR Velocity", "Absorption AND Velocity", "Absorption Only", "Velocity Only", "None"], group=grp_speed, tooltip="AND is very strict: a long rejection wick and a large body rarely occur together.")
+wickRatioLimit = input.float(0.45, title="Minimum Wick Rejection Ratio", group=grp_speed, step=0.05)
+velocityMulti  = input.float(1.3, title="Institutional Speed Multiplier", group=grp_speed, step=0.1)
+touchLookback  = input.int(3, title="Level Touch Lookback (Bars)", minval=1, group=grp_speed, tooltip="Confirmation candle may come up to this many bars after the level was touched.")
+useVolFilter   = input.bool(false, title="Use Volume Surge Filter", group=grp_speed)
+volSurgeMult   = input.float(1.2, title="Volume Surge Multiplier", group=grp_speed)
+showDebug      = input.bool(true, title="Show Filter Diagnostics Table", group=grp_speed)
 
 // =========================================================================
 // CORE INDICATORS & VOLATILITY MATH
@@ -85,7 +88,9 @@ isBearVelocity = (close < open) and (candleBody > avgBodySpeed * velocityMulti)
 
 // Volume Surge
 volMA = ta.sma(volume, 20)
-volOK = not useVolFilter or (volume > volMA * volSurgeMult)
+// Symbols without volume data (na/0) pass instead of blocking every trade
+hasVolume = not na(volMA) and volMA > 0
+volOK     = not useVolFilter or not hasVolume or (volume > volMA * volSurgeMult)
 
 // =========================================================================
 // MULTI-LEVEL LIQUIDITY (Arrays)
@@ -228,18 +233,45 @@ longTrendOK     = not useTrendFilter or close > htfEMA
 shortTrendOK    = not useTrendFilter or close < htfEMA
 trendStrengthOK = adxVal > adxThreshold
 
-activeSupportPrice    = getTriggeredLevelPrice(suppLiq, low,  tolerancePrice, minTouches)
-activeResistancePrice = getTriggeredLevelPrice(resLiq,  high, tolerancePrice, minTouches)
+touchedSupportNow    = getTriggeredLevelPrice(suppLiq, low,  tolerancePrice, minTouches)
+touchedResistanceNow = getTriggeredLevelPrice(resLiq,  high, tolerancePrice, minTouches)
+
+// Remember the most recent touch so confirmation can follow a few bars later
+var float lastSupportTouch    = na
+var float lastResistanceTouch = na
+var int   supportTouchBar     = na
+var int   resistanceTouchBar  = na
+if not na(touchedSupportNow)
+    lastSupportTouch := touchedSupportNow
+    supportTouchBar  := bar_index
+if not na(touchedResistanceNow)
+    lastResistanceTouch := touchedResistanceNow
+    resistanceTouchBar  := bar_index
+
+activeSupportPrice    = not na(supportTouchBar)    and bar_index - supportTouchBar    < touchLookback ? lastSupportTouch    : na
+activeResistancePrice = not na(resistanceTouchBar) and bar_index - resistanceTouchBar < touchLookback ? lastResistanceTouch : na
+
+bullAbs = isBullAbsorption or isBullAbsorption[1]
+bearAbs = isBearAbsorption or isBearAbsorption[1]
+confirm(bool absorb, bool velocity) =>
+    switch confirmMode
+        "Absorption OR Velocity"  => absorb or velocity
+        "Absorption AND Velocity" => absorb and velocity
+        "Absorption Only"         => absorb
+        "Velocity Only"           => velocity
+        => true
+bullConfirm = confirm(bullAbs, isBullVelocity) and close > open
+bearConfirm = confirm(bearAbs, isBearVelocity) and close < open
 
 // close must be on the correct side of the level, otherwise the "limit" is marketable / rejected by the broker
 longCondition  = canLong and strategy.position_size == 0 and na(pendingLongPrice) and
      not na(activeSupportPrice) and close > activeSupportPrice and
-     (isBullAbsorption or isBullAbsorption[1]) and isBullVelocity and
+     bullConfirm and
      volOK and longTrendOK and trendStrengthOK and not na(slTicks) and not na(tpTicks)
 
 shortCondition = canShort and strategy.position_size == 0 and na(pendingShortPrice) and
      not na(activeResistancePrice) and close < activeResistancePrice and
-     (isBearAbsorption or isBearAbsorption[1]) and isBearVelocity and
+     bearConfirm and
      volOK and shortTrendOK and trendStrengthOK and not na(slTicks) and not na(tpTicks)
 
 // --- 3) Place new limit orders (alert fires on placement, not on TV fill) ---
@@ -270,3 +302,65 @@ if not na(lockedShortSL)
 // Pending order markers
 plot(pendingLongPrice,  "Pending Buy Limit",  color=color.new(color.lime, 0),   style=plot.style_circles, linewidth=2)
 plot(pendingShortPrice, "Pending Sell Limit", color=color.new(color.orange, 0), style=plot.style_circles, linewidth=2)
+
+// =========================================================================
+// FILTER DIAGNOSTICS (counts bars where each stage passed)
+// =========================================================================
+var int cTouchL = 0
+var int cConfL = 0
+var int cTrendL = 0
+var int cSigL = 0
+var int cTouchS = 0
+var int cConfS = 0
+var int cTrendS = 0
+var int cSigS = 0
+var int cVol = 0
+var int cAdx = 0
+var int cFill = 0
+if not na(activeSupportPrice)
+    cTouchL += 1
+    if bullConfirm
+        cConfL += 1
+        if longTrendOK and trendStrengthOK and volOK
+            cTrendL += 1
+if not na(activeResistancePrice)
+    cTouchS += 1
+    if bearConfirm
+        cConfS += 1
+        if shortTrendOK and trendStrengthOK and volOK
+            cTrendS += 1
+cVol    += volOK ? 1 : 0
+cAdx    += trendStrengthOK ? 1 : 0
+cSigL   += longCondition ? 1 : 0
+cSigS   += shortCondition ? 1 : 0
+cFill   += newFill ? 1 : 0
+
+var table dbg = table.new(position.top_right, 3, 9, bgcolor=color.new(color.black, 20), border_width=1)
+if showDebug and barstate.islast
+    table.cell(dbg, 0, 0, "Stage",              text_color=color.white)
+    table.cell(dbg, 1, 0, "Long",               text_color=color.lime)
+    table.cell(dbg, 2, 0, "Short",              text_color=color.orange)
+    table.cell(dbg, 0, 1, "Levels tracked",     text_color=color.white)
+    table.cell(dbg, 1, 1, str.tostring(suppLiq.size()), text_color=color.white)
+    table.cell(dbg, 2, 1, str.tostring(resLiq.size()),  text_color=color.white)
+    table.cell(dbg, 0, 2, "Level touched",      text_color=color.white)
+    table.cell(dbg, 1, 2, str.tostring(cTouchL), text_color=color.white)
+    table.cell(dbg, 2, 2, str.tostring(cTouchS), text_color=color.white)
+    table.cell(dbg, 0, 3, "+ Confirmation",     text_color=color.white)
+    table.cell(dbg, 1, 3, str.tostring(cConfL), text_color=color.white)
+    table.cell(dbg, 2, 3, str.tostring(cConfS), text_color=color.white)
+    table.cell(dbg, 0, 4, "+ Trend/ADX/Vol",    text_color=color.white)
+    table.cell(dbg, 1, 4, str.tostring(cTrendL), text_color=color.white)
+    table.cell(dbg, 2, 4, str.tostring(cTrendS), text_color=color.white)
+    table.cell(dbg, 0, 5, "Orders placed",      text_color=color.white)
+    table.cell(dbg, 1, 5, str.tostring(cSigL),  text_color=color.white)
+    table.cell(dbg, 2, 5, str.tostring(cSigS),  text_color=color.white)
+    table.cell(dbg, 0, 6, "Fills (total)",      text_color=color.white)
+    table.cell(dbg, 1, 6, str.tostring(cFill),  text_color=color.white)
+    table.cell(dbg, 2, 6, "",                   text_color=color.white)
+    table.cell(dbg, 0, 7, "ADX OK bars",        text_color=color.white)
+    table.cell(dbg, 1, 7, str.tostring(cAdx),   text_color=color.white)
+    table.cell(dbg, 2, 7, "",                   text_color=color.white)
+    table.cell(dbg, 0, 8, "Volume OK bars",     text_color=color.white)
+    table.cell(dbg, 1, 8, str.tostring(cVol),   text_color=color.white)
+    table.cell(dbg, 2, 8, "",                   text_color=color.white)
