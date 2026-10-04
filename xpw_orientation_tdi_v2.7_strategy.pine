@@ -1,6 +1,6 @@
 //@version=6
 // ============================================================================
-//  XPW ORIENTATION TDI  -  v2.6 STRATEGY (EVERY LABEL)  -  trades the v2.4 labels
+//  XPW ORIENTATION TDI  -  v2.7 STRATEGY (EVERY LABEL, HIDEABLE LABELS)
 // ----------------------------------------------------------------------------
 //  This is the v2.4 indicator turned into a strategy. Calibration, ladder
 //  logic, rung map, agreement gate and labels are the indicator's, line for
@@ -28,6 +28,9 @@
 //                      then trails "offset" behind the best price.
 //                      Units: ticks, price, or percent of entry.
 //    Stop loss         Optional fixed stop, same units.
+//    LABELS            v2.7: every label type has its own show/hide tick box
+//                      next to its colour. Hiding is display only; the
+//                      strategy still trades every label.
 //  ENTRY FILL ("Entry fill" input)
 //    Limit at label price  a buy limit at the label's price (the
 //                          candle low) or a sell limit at the candle high,
@@ -102,7 +105,7 @@
 //  the map for location. Do not trade the verdict column on its own.
 // ============================================================================
 
-strategy("XPW Orientation TDI v2.6 Strategy - Every Label", shorttitle="XPW-OTDI6 S-ALL", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
+strategy("XPW Orientation TDI v2.7 Strategy", shorttitle="XPW-OTDI7 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
 
 // ---------------------------------------------------------------- INPUTS ----
 rsiLen   = input.int(13,       "RSI length",            group="TDI core")
@@ -124,18 +127,26 @@ tblPos    = input.string("middle_right", "Table position", options=["top_right",
 // LABELS
 showLbl  = input.bool(true,  "Show event labels on price", group="Labels", tooltip="Display only. The strategy trades the events whether or not their labels are shown.")
 lblRead  = input.bool(true,  "Also label the READ HERE rung", group="Labels", tooltip="Labels from the << rung are prefixed with its name, e.g. '1 Min:'. The strategy also trades the << rung's events only while this is on.")
-lblInfo  = input.bool(false, "Info labels (look for / staircase)", group="Labels")
 lblSizeS = input.string("normal", "Label size", options=["tiny","small","normal","large","huge"], group="Labels")
 lblPrice = input.bool(true,  "Show price in label + price tick", group="Labels", tooltip="Adds the signal price to the label text and draws a short line at that price beside the candle.")
 lblTick  = input.int(3, "Price tick length (bars)", minval=1, maxval=20, group="Labels")
-cL1  = input.color(#00e676, "Long  - 1st leg",         group="Labels")
-cL2  = input.color(#00897b, "Long  - 2nd leg",         group="Labels")
-cS1  = input.color(#ff1744, "Short - 1st leg",         group="Labels")
-cS2  = input.color(#ad1457, "Short - 2nd leg",         group="Labels")
-cDL  = input.color(#76ff03, "Divergence LONG zone",    group="Labels")
-cDS  = input.color(#ff9100, "Divergence SHORT zone",   group="Labels")
-cEnd = input.color(#ffd600, "End of leg / exit once",  group="Labels")
-cInf = input.color(#90a4ae, "Info (look for / stair)", group="Labels")
+// Each label type: tick = show, untick = hide. Hiding never changes trading.
+shL1  = input.bool(true,  "Long  - 1st leg",         inline="L1",  group="Labels")
+cL1   = input.color(#00e676, "",                     inline="L1",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shL2  = input.bool(true,  "Long  - 2nd leg",         inline="L2",  group="Labels")
+cL2   = input.color(#00897b, "",                     inline="L2",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shS1  = input.bool(true,  "Short - 1st leg",         inline="S1",  group="Labels")
+cS1   = input.color(#ff1744, "",                     inline="S1",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shS2  = input.bool(true,  "Short - 2nd leg",         inline="S2",  group="Labels")
+cS2   = input.color(#ad1457, "",                     inline="S2",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shDL  = input.bool(true,  "Divergence LONG zone",    inline="DL",  group="Labels")
+cDL   = input.color(#76ff03, "",                     inline="DL",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shDS  = input.bool(true,  "Divergence SHORT zone",   inline="DS",  group="Labels")
+cDS   = input.color(#ff9100, "",                     inline="DS",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shEnd = input.bool(true,  "End of leg / exit once",  inline="END", group="Labels")
+cEnd  = input.color(#ffd600, "",                     inline="END", group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+lblInfo = input.bool(false, "Info (look for / stair)", inline="INF", group="Labels")
+cInf  = input.color(#90a4ae, "",                     inline="INF", group="Labels", tooltip="Off by default. Display only.")
 
 // AGREEMENT
 agreeOn    = input.bool(false, "Require rung agreement", group="Agreement", tooltip="ON: a label draws only when at least N rungs agree with its side. OFF: every event labels, as in v2.3.")
@@ -143,9 +154,11 @@ agreeN     = input.int(3, "Rungs that must agree (N)", minval=2, maxval=10, grou
 agreeMode  = input.string("domino", "Agreement mode", options=["domino","fractal"], group="Agreement", tooltip="domino: N rungs in one unbroken chain that contains the rung that fired. fractal: any N agreeing rungs inside the scope, contiguous or not.")
 agreeScope = input.string("whole ladder", "Scope", options=["whole ladder","chart rung and above","chart rung and below"], group="Agreement", tooltip="Which rungs may vote. 'chart rung and above' = the * rung and every higher timeframe. 'chart rung and below' = the * rung and every lower one. On a 1 Min chart 'below' is only the seconds rungs, so prefer the whole ladder or 'above'.")
 agreeInh   = input.string("skip (transparent)", "Inherited rungs", options=["skip (transparent)","vote with parent","no vote (breaks chain)"], group="Agreement", tooltip="A rung with no shape of its own shows its parent's position '(inh)'. skip: it neither counts nor breaks a chain. vote with parent: it repeats the parent's vote (not independent evidence, so it inflates the count). no vote: it breaks a domino chain.")
-agreeLbl   = input.bool(true, "Label the moment N rungs agree", group="Agreement", tooltip="Draws 'AGREE LONG xN' / 'AGREE SHORT xN' on the bar where the count first reaches N.")
-cAgL = input.color(#00bfa5, "Agree LONG",  group="Agreement")
-cAgS = input.color(#d500f9, "Agree SHORT", group="Agreement")
+agreeLbl   = input.bool(true, "Label the moment N rungs agree", group="Agreement", tooltip="Draws 'AGREE LONG xN' / 'AGREE SHORT xN' on the bar where the count first reaches N. Display only: with 'Also enter on AGREE labels' the strategy trades them either way.")
+shAgL = input.bool(true, "Agree LONG",  inline="AGL", group="Agreement")
+cAgL  = input.color(#00bfa5, "",        inline="AGL", group="Agreement", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shAgS = input.bool(true, "Agree SHORT", inline="AGS", group="Agreement")
+cAgS  = input.color(#d500f9, "",        inline="AGS", group="Agreement", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
 
 // STRATEGY
 tradeDir   = input.string("Both", "Trade direction", options=["Both","Long only (buy only)","Short only (sell only)"], group="Strategy", tooltip="Long only: only ENTER LONGS labels open trades. Short only: only ENTER SHORTS labels open trades.")
@@ -487,21 +500,21 @@ rungEvents(int i, string prev, string tag, float entryPx) =>
             // Inverted: broke the low, TDI refused -> long zone (bottom).
             // Exit once: the leg that ended was on this rung's side.
             sig := up ? SIG_EXIT_LONG : SIG_EXIT_SHORT
-            if showLbl
+            if showLbl and (up ? shDS : shDL)
                 string zone = up ? "DIV SHORT ZONE" : "DIV LONG ZONE"
                 string leg  = wasSecond ? "END 2nd LEG" : "END 1st LEG"
                 putLbl(tag + zone + "\n" + leg + "\nexit once, then wait" + ag, up ? cDS : cDL, not up)
         else if p == "FIRST LEG"
             sig := up ? SIG_ENTER_LONG : SIG_ENTER_SHORT
-            if showLbl
+            if showLbl and (up ? shL1 : shS1)
                 putLbl(tag + "1st LEG\nENTER " + side + ag, up ? cL1 : cS1, up, entryPx)
         else if p == "SECOND LEG"
             sig := up ? SIG_ENTER_LONG : SIG_ENTER_SHORT
-            if showLbl
+            if showLbl and (up ? shL2 : shS2)
                 putLbl(tag + "2nd LEG\nENTER " + side + ag, up ? cL2 : cS2, up, entryPx)
         else if wasSecond and (p == "STAIRCASE" or p == "MID FIRST LEG")
             sig := up ? SIG_EXIT_LONG : SIG_EXIT_SHORT
-            if showLbl
+            if showLbl and shEnd
                 putLbl(tag + "END 2nd LEG" + ag, cEnd, up)
         else if showLbl and lblInfo and p == "MID FIRST LEG"
             putLbl(tag + "look for " + side + ag, cInf, up)
@@ -536,9 +549,9 @@ var int prevShortN = 0
 bool agreeLongNow  = agreeOn and longN  >= needN and prevLongN  < needN
 bool agreeShortNow = agreeOn and shortN >= needN and prevShortN < needN
 if showLbl and agreeOn and agreeLbl
-    if agreeLongNow
+    if agreeLongNow and shAgL
         putLbl("AGREE LONG x" + str.tostring(longN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgL, true, tradeAgree ? entryPx : na)
-    if agreeShortNow
+    if agreeShortNow and shAgS
         putLbl("AGREE SHORT x" + str.tostring(shortN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgS, false, tradeAgree ? entryPx : na)
 prevLongN  := longN
 prevShortN := shortN
