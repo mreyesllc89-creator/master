@@ -1,0 +1,272 @@
+//@version=6
+strategy("Stepped Liquidity Limit Bounce - Enhanced", overlay=true, margin_long=100, margin_short=100, process_orders_on_close=true)
+
+// =========================================================================
+// INPUTS & SETTINGS
+// =========================================================================
+grp_trade = "Trade Direction & Risk"
+tradeDirection = input.string("Both", title="Trade Direction", options=["Buy Only", "Sell Only", "Both"], group=grp_trade)
+cancelBars     = input.int(4, title="Cancel Unfilled Order (Bars)", minval=1, group=grp_trade)
+useATR         = input.bool(true, title="Use ATR for SL/TP/Cancel", group=grp_trade)
+
+grp_vol = "Volatility Settings"
+atrLength     = input.int(14, "ATR Length", minval=1, group=grp_vol)
+atrMultTol    = input.float(0.5, "Touch Tolerance × ATR", minval=0, group=grp_vol)
+atrMultSL     = input.float(1.5, "SL × ATR", minval=0.1, group=grp_vol)
+atrMultTP     = input.float(6.0, "TP × ATR", minval=0.1, group=grp_vol)
+atrMultCancel = input.float(4.0, "Cancel Distance × ATR", minval=0.1, group=grp_vol)
+
+// All fixed distances are in TICKS (syminfo.mintick), same unit strategy.exit() uses.
+grp_fixed = "Fixed Distances (used when ATR is off, in ticks)"
+fixedTolTicks    = input.float(150,  "Fixed Touch Tolerance (ticks)", minval=0, group=grp_fixed)
+fixedSLTicks     = input.float(150,  "Fixed SL (ticks)", minval=1, group=grp_fixed)
+fixedTPTicks     = input.float(900,  "Fixed TP (ticks)", minval=1, group=grp_fixed)
+fixedCancelTicks = input.float(5000, "Fixed Cancel Distance (ticks)", minval=1, group=grp_fixed)
+
+grp_pc = "PineConnector Integration"
+licenseID   = input.string("8252815278293", title="License ID", group=grp_pc)
+riskVolume  = input.float(1.0, title="Risk / Lot Size (risk=)", minval=0, group=grp_pc)
+pcUnits     = input.string("Pips", title="SL/TP Units Sent", options=["Pips", "Points", "Price"], group=grp_pc, tooltip="Must match the Target Type set in your PineConnector EA. Points = ticks (syminfo.mintick). Price = absolute SL/TP prices.")
+ticksPerPip = input.int(10, title="Ticks per Pip", minval=1, group=grp_pc, tooltip="10 for 5-digit FX / 3-digit JPY pairs. Check your broker for metals, indices and crypto.")
+
+grp_logic = "Micro-Structure & Steps"
+pivotLeft      = input.int(5, title="Pivot Left Strength", minval=1, group=grp_logic)
+pivotRight     = input.int(3, title="Pivot Right Strength", minval=1, group=grp_logic)
+maxLevels      = input.int(5, title="Max Liquidity Levels to Track", minval=1, group=grp_logic)
+minTouches     = input.int(1, title="Min Touches for a Valid Level", minval=1, group=grp_logic)
+useTrendFilter = input.bool(true, "Use HTF Trend Filter", group=grp_logic)
+htfTimeframe   = input.timeframe("240", "Higher TF for Trend", group=grp_logic)
+htfEmaLength   = input.int(50, "HTF EMA Length", minval=1, group=grp_logic)
+adxLength      = input.int(14, "ADX Length", minval=1, group=grp_logic)
+adxThreshold   = input.int(20, "ADX Trend Threshold", group=grp_logic)
+
+grp_speed = "Order Flow Mechanics"
+wickRatioLimit = input.float(0.60, title="Minimum Wick Rejection Ratio", group=grp_speed, step=0.05)
+velocityMulti  = input.float(2.0, title="Institutional Speed Multiplier", group=grp_speed, step=0.1)
+useVolFilter   = input.bool(true, title="Use Volume Surge Filter", group=grp_speed)
+volSurgeMult   = input.float(1.5, title="Volume Surge Multiplier", group=grp_speed)
+
+// =========================================================================
+// CORE INDICATORS & VOLATILITY MATH
+// =========================================================================
+atr = ta.atr(atrLength)
+
+// ATR expressed in ticks so every distance below shares one unit
+atrInTicks = atr / syminfo.mintick
+
+toleranceTicks = useATR ? atrInTicks * atrMultTol    : fixedTolTicks
+slTicks        = useATR ? atrInTicks * atrMultSL     : fixedSLTicks
+tpTicks        = useATR ? atrInTicks * atrMultTP     : fixedTPTicks
+cancelDistTicks = useATR ? atrInTicks * atrMultCancel : fixedCancelTicks
+
+tolerancePrice = toleranceTicks * syminfo.mintick
+
+// HTF Trend: previous completed HTF bar + lookahead_on = no repainting, no future leak
+htfEMA = request.security(syminfo.tickerid, htfTimeframe, ta.ema(close, htfEmaLength)[1], lookahead=barmerge.lookahead_on)
+
+// ADX (Pine has no ta.adx; it comes from ta.dmi)
+[diPlus, diMinus, adxVal] = ta.dmi(adxLength, adxLength)
+
+// Wick & Velocity
+candleRange     = high - low
+bullishWick     = math.min(open, close) - low
+bearishWick     = high - math.max(open, close)
+candleRangeSafe = candleRange == 0 ? syminfo.mintick : candleRange
+bullWickRatio   = bullishWick / candleRangeSafe
+bearWickRatio   = bearishWick / candleRangeSafe
+
+isBullAbsorption = bullWickRatio >= wickRatioLimit
+isBearAbsorption = bearWickRatio >= wickRatioLimit
+
+candleBody     = math.abs(close - open)
+avgBodySpeed   = ta.sma(candleBody, 10)
+isBullVelocity = (close > open) and (candleBody > avgBodySpeed * velocityMulti)
+isBearVelocity = (close < open) and (candleBody > avgBodySpeed * velocityMulti)
+
+// Volume Surge
+volMA = ta.sma(volume, 20)
+volOK = not useVolFilter or (volume > volMA * volSurgeMult)
+
+// =========================================================================
+// MULTI-LEVEL LIQUIDITY (Arrays)
+// =========================================================================
+type LiqLevel
+    float price
+    int   touchCount
+
+var array<LiqLevel> suppLiq = array.new<LiqLevel>()
+var array<LiqLevel> resLiq  = array.new<LiqLevel>()
+
+// Merge a pivot into an existing level within tolerance, otherwise add it as a new level.
+addOrMergeLevel(array<LiqLevel> levels, float pivotPrice, float tol, int maxCount) =>
+    bool merged = false
+    for lvl in levels
+        if math.abs(lvl.price - pivotPrice) <= tol
+            lvl.touchCount := lvl.touchCount + 1
+            merged := true
+            break
+    if not merged
+        levels.push(LiqLevel.new(pivotPrice, 1))
+    if levels.size() > maxCount
+        levels.shift()
+    merged
+
+// Returns the price of the closest qualifying level within tolerance (na if none).
+getTriggeredLevelPrice(array<LiqLevel> levels, float priceToCheck, float tol, int minT) =>
+    float best     = na
+    float bestDist = na
+    for lvl in levels
+        dist = math.abs(priceToCheck - lvl.price)
+        if lvl.touchCount >= minT and dist <= tol and (na(bestDist) or dist < bestDist)
+            best     := lvl.price
+            bestDist := dist
+    best
+
+pivotLow  = ta.pivotlow(low, pivotLeft, pivotRight)
+pivotHigh = ta.pivothigh(high, pivotLeft, pivotRight)
+
+if not na(pivotLow)
+    addOrMergeLevel(suppLiq, pivotLow, tolerancePrice, maxLevels)
+if not na(pivotHigh)
+    addOrMergeLevel(resLiq, pivotHigh, tolerancePrice, maxLevels)
+
+// Plot stepped levels (newest for visibility)
+plot(suppLiq.size() > 0 ? suppLiq.last().price : na, color=color.fuchsia, style=plot.style_linebr, linewidth=2, title="Stepped Support")
+plot(resLiq.size()  > 0 ? resLiq.last().price  : na, color=color.red,     style=plot.style_linebr, linewidth=2, title="Stepped Resistance")
+
+// =========================================================================
+// PINECONNECTOR MESSAGE BUILDERS
+// =========================================================================
+fmtDistance(float ticks, float entryPx, bool isLong, bool isStop) =>
+    string result = na
+    if pcUnits == "Price"
+        float dir = (isLong == isStop) ? -1.0 : 1.0
+        result := str.tostring(entryPx + dir * ticks * syminfo.mintick, format.mintick)
+    else if pcUnits == "Pips"
+        result := str.tostring(ticks / ticksPerPip, "#.#")
+    else
+        result := str.tostring(math.round(ticks))
+    result
+
+buildLimitMsg(bool isLong, float entryPx, float slT, float tpT) =>
+    licenseID + (isLong ? ",buylimit," : ",selllimit,") + syminfo.ticker +
+         ",risk=" + str.tostring(riskVolume) +
+         ",price=" + str.tostring(entryPx, format.mintick) +
+         ",sl=" + fmtDistance(slT, entryPx, isLong, true) +
+         ",tp=" + fmtDistance(tpT, entryPx, isLong, false)
+
+cancelLongMsg  = licenseID + ",cancellong," + syminfo.ticker
+cancelShortMsg = licenseID + ",cancelshort," + syminfo.ticker
+
+// =========================================================================
+// ORDER STATE
+// =========================================================================
+var int   barsSinceLongOrder  = na
+var int   barsSinceShortOrder = na
+var float pendingLongPrice    = na
+var float pendingShortPrice   = na
+// SL/TP are frozen at order time so the bracket does not drift with ATR
+var float lockedLongSL  = na
+var float lockedLongTP  = na
+var float lockedShortSL = na
+var float lockedShortTP = na
+
+// --- 1) Fill detection: clear state and pull the opposite pending order ---
+// Counting trades (not position_size) also catches a fill that hit SL/TP on the same bar.
+tradeCount = strategy.opentrades + strategy.closedtrades
+newFill    = tradeCount > nz(tradeCount[1])
+string lastEntryId = na
+if newFill
+    lastEntryId := strategy.opentrades > 0 ? strategy.opentrades.entry_id(strategy.opentrades - 1) : strategy.closedtrades.entry_id(strategy.closedtrades - 1)
+
+if newFill and lastEntryId == "Long"
+    if not na(pendingShortPrice)
+        strategy.cancel("Short")
+        alert(cancelShortMsg, alert.freq_once_per_bar_close)
+    pendingLongPrice    := na
+    pendingShortPrice   := na
+    barsSinceLongOrder  := na
+    barsSinceShortOrder := na
+
+if newFill and lastEntryId == "Short"
+    if not na(pendingLongPrice)
+        strategy.cancel("Long")
+        alert(cancelLongMsg, alert.freq_once_per_bar_close)
+    pendingLongPrice    := na
+    pendingShortPrice   := na
+    barsSinceLongOrder  := na
+    barsSinceShortOrder := na
+
+// --- 2) Age pending orders and cancel on time / distance ---
+if not na(pendingLongPrice)
+    barsSinceLongOrder += 1
+    longTimeout = barsSinceLongOrder >= cancelBars
+    longRunaway = close > pendingLongPrice + cancelDistTicks * syminfo.mintick
+    if longTimeout or longRunaway
+        strategy.cancel("Long")
+        alert(cancelLongMsg, alert.freq_once_per_bar_close)
+        pendingLongPrice   := na
+        barsSinceLongOrder := na
+
+if not na(pendingShortPrice)
+    barsSinceShortOrder += 1
+    shortTimeout = barsSinceShortOrder >= cancelBars
+    shortRunaway = close < pendingShortPrice - cancelDistTicks * syminfo.mintick
+    if shortTimeout or shortRunaway
+        strategy.cancel("Short")
+        alert(cancelShortMsg, alert.freq_once_per_bar_close)
+        pendingShortPrice   := na
+        barsSinceShortOrder := na
+
+// =========================================================================
+// ENTRY CONDITIONS (with all filters)
+// =========================================================================
+canLong  = tradeDirection == "Buy Only"  or tradeDirection == "Both"
+canShort = tradeDirection == "Sell Only" or tradeDirection == "Both"
+
+longTrendOK     = not useTrendFilter or close > htfEMA
+shortTrendOK    = not useTrendFilter or close < htfEMA
+trendStrengthOK = adxVal > adxThreshold
+
+activeSupportPrice    = getTriggeredLevelPrice(suppLiq, low,  tolerancePrice, minTouches)
+activeResistancePrice = getTriggeredLevelPrice(resLiq,  high, tolerancePrice, minTouches)
+
+// close must be on the correct side of the level, otherwise the "limit" is marketable / rejected by the broker
+longCondition  = canLong and strategy.position_size == 0 and na(pendingLongPrice) and
+     not na(activeSupportPrice) and close > activeSupportPrice and
+     (isBullAbsorption or isBullAbsorption[1]) and isBullVelocity and
+     volOK and longTrendOK and trendStrengthOK and not na(slTicks) and not na(tpTicks)
+
+shortCondition = canShort and strategy.position_size == 0 and na(pendingShortPrice) and
+     not na(activeResistancePrice) and close < activeResistancePrice and
+     (isBearAbsorption or isBearAbsorption[1]) and isBearVelocity and
+     volOK and shortTrendOK and trendStrengthOK and not na(slTicks) and not na(tpTicks)
+
+// --- 3) Place new limit orders (alert fires on placement, not on TV fill) ---
+if longCondition
+    lockedLongSL       := math.max(1, math.round(slTicks))
+    lockedLongTP       := math.max(1, math.round(tpTicks))
+    pendingLongPrice   := activeSupportPrice
+    barsSinceLongOrder := 0
+    strategy.entry("Long", strategy.long, limit=activeSupportPrice)
+    alert(buildLimitMsg(true, activeSupportPrice, lockedLongSL, lockedLongTP), alert.freq_once_per_bar_close)
+
+if shortCondition
+    lockedShortSL       := math.max(1, math.round(slTicks))
+    lockedShortTP       := math.max(1, math.round(tpTicks))
+    pendingShortPrice   := activeResistancePrice
+    barsSinceShortOrder := 0
+    strategy.entry("Short", strategy.short, limit=activeResistancePrice)
+    alert(buildLimitMsg(false, activeResistancePrice, lockedShortSL, lockedShortTP), alert.freq_once_per_bar_close)
+
+// =========================================================================
+// EXITS (frozen brackets; broker side handled by the sl=/tp= sent above)
+// =========================================================================
+if not na(lockedLongSL)
+    strategy.exit("Exit Long", "Long", loss=lockedLongSL, profit=lockedLongTP)
+if not na(lockedShortSL)
+    strategy.exit("Exit Short", "Short", loss=lockedShortSL, profit=lockedShortTP)
+
+// Pending order markers
+plot(pendingLongPrice,  "Pending Buy Limit",  color=color.new(color.lime, 0),   style=plot.style_circles, linewidth=2)
+plot(pendingShortPrice, "Pending Sell Limit", color=color.new(color.orange, 0), style=plot.style_circles, linewidth=2)
