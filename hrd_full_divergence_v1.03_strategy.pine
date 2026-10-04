@@ -10,6 +10,14 @@
 //    OPPOSITE signal: Reverse, Close only, or Ignore.
 //    TIME    optional exit after N bars in trade.
 //    Optional horizon filter: only trade divergences touching a D/W/M level.
+//  TICK EXECUTION: calc_on_every_tick=true, so on the live bar the script runs
+//    on every tick and enters the moment a divergence confirms (Signal timing
+//    = On tick); market orders fill on the next tick, not the next bar open.
+//    Stop/target are stop/limit orders and fill intrabar at their price.
+//    use_bar_magnifier=true makes the backtest fill stops/targets from
+//    lower-timeframe data (TradingView Premium+); without it the tester
+//    assumes an OHLC path. Historical bars only have OHLC, so backtested
+//    entries still happen at bar close -> next bar open.
 //  Defaults: 10% equity per trade, 0.05% commission, 1 tick slippage.
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -27,10 +35,12 @@
 //    * Minimum oscillator spread filter (no 0.01-point "divergences").
 //    * Label offset uses ATR instead of 30 * mintick.
 //    * Duplicate alertconditions removed; divergence alertconditions added.
-//  Signals print on the pivot CONFIRMATION bar (pivot + Pivot Strength bars),
-//  so nothing repaints. The line/label is drawn back at the pivot itself.
+//  v1.03 tick mode: "Signal timing" = On tick (default) fires signals, alerts
+//  and entries intrabar on the live bar; "On bar close" waits for the close.
+//  Signals print on the pivot CONFIRMATION bar (pivot + Pivot Strength bars).
+//  The line/label is drawn back at the pivot itself.
 // ============================================================================
-strategy("HRD Full Divergence v1.03 Strategy", shorttitle="HRD Div S", overlay=true, max_lines_count=500, max_labels_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.05, slippage=1)
+strategy("HRD Full Divergence v1.03 Strategy", shorttitle="HRD Div S", overlay=true, max_lines_count=500, max_labels_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, commission_type=strategy.commission.percent, commission_value=0.05, slippage=1, calc_on_every_tick=true, use_bar_magnifier=true, process_orders_on_close=false)
 
 // ============================ INPUTS ============================
 grpColors    = "Horizon Colors"
@@ -69,6 +79,8 @@ showDivLines = input.bool(true, "Show Divergence Lines", group=grpVis)
 showLabels   = input.bool(true, "Show Score Labels",     group=grpVis)
 showWeak     = input.bool(false, "Also draw sub-threshold divergences (faded)", group=grpVis)
 alertsOn     = input.bool(true, "Enable alert() calls",  group=grpVis)
+sigTiming    = input.string("On tick", "Signal timing", options=["On tick", "On bar close"], group=grpVis, tooltip="On tick: signals/alerts/entries fire intrabar the moment the pivot confirms on the live bar (can vanish if that bar later breaks the pivot). On bar close: wait for the bar to close (never repaints).")
+onTick       = sigTiming == "On tick"
 
 // ============================ HORIZONS (HTF prev H/L) ============================
 // [1] + lookahead_on = previous *completed* HTF bar -> no repaint
@@ -235,8 +247,11 @@ if not na(ph)
         drawDiv(-1, k, bearScore, array.get(phBars, idx), array.get(phPx, idx), cBar, ph, atrAt)
     pushPivot(phBars, phPx, phOs, cBar, ph, cOs)
 
-bullDiv = bullScore >= scoreThreshold and bullScore > 0
-bearDiv = bearScore >= scoreThreshold and bearScore > 0
+// On tick: act intrabar. On bar close: only once the bar is confirmed
+// (barstate.isconfirmed is true on every historical bar).
+bool timingOk = onTick or barstate.isconfirmed
+bullDiv = timingOk and bullScore >= scoreThreshold and bullScore > 0
+bearDiv = timingOk and bearScore >= scoreThreshold and bearScore > 0
 
 // Confirmation-bar markers (the bar a strategy/alert can act on)
 plotshape(bullDiv, "Bull Div Confirmed", shape.circle, location.belowbar, color.lime, size=size.tiny)
@@ -249,9 +264,9 @@ plot(bearScore, "Bear Score",    display=display.data_window)
 
 // ============================ ALERTS ============================
 if alertsOn and bullDiv
-    alert("HRD " + bullKind + " Bullish | Score " + str.tostring(bullScore) + " | " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
+    alert("HRD " + bullKind + " Bullish | Score " + str.tostring(bullScore) + " | " + syminfo.ticker + " " + timeframe.period, onTick ? alert.freq_once_per_bar : alert.freq_once_per_bar_close)
 if alertsOn and bearDiv
-    alert("HRD " + bearKind + " Bearish | Score " + str.tostring(bearScore) + " | " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar_close)
+    alert("HRD " + bearKind + " Bearish | Score " + str.tostring(bearScore) + " | " + syminfo.ticker + " " + timeframe.period, onTick ? alert.freq_once_per_bar : alert.freq_once_per_bar_close)
 
 alertcondition(bullBreak, "Bullish Breakout",   "HRD Bull Break of horizon")
 alertcondition(bearBreak, "Bearish Breakout",   "HRD Bear Break of horizon")
