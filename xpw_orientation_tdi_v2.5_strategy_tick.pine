@@ -35,6 +35,11 @@
 //                          label appears, without waiting for the candle to
 //                          close. History has no ticks, so backtest bars
 //                          fill at the close of the label's candle.
+//                          ENTER labels show THAT price (the entry price),
+//                          not the candle low/high, so label = fill. On a
+//                          5 Min chart a 1 Min rung's signal is only known
+//                          when the 5 Min candle closes; run the chart on
+//                          the rung you trade to enter sooner.
 //    A fill at the candle's low on the label candle itself is impossible: the
 //    label is only known once that candle has closed, so a backtest that
 //    filled there would be using the future.
@@ -151,6 +156,7 @@ slOn       = input.bool(false, "Use stop loss", group="Strategy")
 slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
 entryFill  = input.string("Signal tick", "Entry fill", options=["Signal tick","Limit at label price"], group="Strategy", tooltip="Limit at label price: buy limit at the label's price (candle low), sell limit at the candle high, filled only if price returns to it. Signal tick: live, a market fill on the tick the label appears; in the backtest, at the close of the label's candle.")
 limitBars  = input.int(5, "Limit valid (bars)", minval=1, maxval=500, group="Strategy", tooltip="An unfilled limit entry is cancelled after this many bars, or sooner when an END label or an opposite signal arrives.")
+useLimit   = entryFill == "Limit at label price"
 
 // PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
 hM   = scaleWin ? 20 : flatWin
@@ -436,8 +442,10 @@ lsz = switch lblSizeS
 // The signal price is the candle extreme the shape formed on: the low for a
 // long-side event, the high for a short-side event. The label sits at that
 // price, pointing left at the candle, and a short line marks the level.
-putLbl(string txt, color col, bool below) =>
-    float px = below ? low : high
+// atPx: draw at this price instead (ENTER labels in Signal tick mode use the
+// price the strategy enters at, so the label and the fill always match).
+putLbl(string txt, color col, bool below, float atPx = na) =>
+    float px = not na(atPx) ? atPx : below ? low : high
     string t = lblPrice ? txt + "\n@ " + str.tostring(px, format.mintick) : txt
     label.new(bar_index, px, t, xloc=xloc.bar_index, yloc=yloc.price, color=col, style=label.style_label_left, textcolor=color.black, size=lsz, force_overlay=true)
     if lblPrice
@@ -453,7 +461,7 @@ int SIG_EXIT_SHORT  = -2
 // Returns the rung's current position (the caller stores it as prev) and the
 // trade code of the label that fired. The event fires on exactly the
 // condition the indicator labels on; showLbl only decides whether it draws.
-rungEvents(int i, string prev, string tag) =>
+rungEvents(int i, string prev, string tag, float entryPx) =>
     string p    = array.get(posA, i)
     bool   inh  = array.get(inhA, i)
     bool   up   = array.get(orientA, i) > 0
@@ -481,11 +489,11 @@ rungEvents(int i, string prev, string tag) =>
         else if p == "FIRST LEG"
             sig := up ? SIG_ENTER_LONG : SIG_ENTER_SHORT
             if showLbl
-                putLbl(tag + "1st LEG\nENTER " + side + ag, up ? cL1 : cS1, up)
+                putLbl(tag + "1st LEG\nENTER " + side + ag, up ? cL1 : cS1, up, entryPx)
         else if p == "SECOND LEG"
             sig := up ? SIG_ENTER_LONG : SIG_ENTER_SHORT
             if showLbl
-                putLbl(tag + "2nd LEG\nENTER " + side + ag, up ? cL2 : cS2, up)
+                putLbl(tag + "2nd LEG\nENTER " + side + ag, up ? cL2 : cS2, up, entryPx)
         else if wasSecond and (p == "STAIRCASE" or p == "MID FIRST LEG")
             sig := up ? SIG_EXIT_LONG : SIG_EXIT_SHORT
             if showLbl
@@ -500,12 +508,19 @@ var string prevChart  = ""
 var string prevRead   = ""
 var int    prevReadAt = -1
 
-[pChart, sigChart] = rungEvents(chartIdx, prevChart, "")
+// Entry price shown on ENTER labels in Signal tick mode: the price of the
+// tick the entry first fired on in this bar (varip keeps it across live
+// ticks; on history it is the candle close, where the backtest fills).
+varip float tickPx  = na
+varip int   tickBar = -1
+float entryPx = not useLimit ? (tickBar == bar_index ? tickPx : close) : na
+
+[pChart, sigChart] = rungEvents(chartIdx, prevChart, "", entryPx)
 prevChart := pChart
 int sigRead = SIG_NONE
 if lblRead and readAt != -1 and readAt != chartIdx
     string pr = readAt == prevReadAt ? prevRead : ""
-    [pRead, sR] = rungEvents(readAt, pr, array.get(tfName, readAt) + ": ")
+    [pRead, sR] = rungEvents(readAt, pr, array.get(tfName, readAt) + ": ", entryPx)
     prevRead := pRead
     sigRead  := sR
 prevReadAt := readAt
@@ -517,9 +532,9 @@ bool agreeLongNow  = agreeOn and longN  >= needN and prevLongN  < needN
 bool agreeShortNow = agreeOn and shortN >= needN and prevShortN < needN
 if showLbl and agreeOn and agreeLbl
     if agreeLongNow
-        putLbl("AGREE LONG x" + str.tostring(longN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgL, true)
+        putLbl("AGREE LONG x" + str.tostring(longN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgL, true, tradeAgree ? entryPx : na)
     if agreeShortNow
-        putLbl("AGREE SHORT x" + str.tostring(shortN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgS, false)
+        putLbl("AGREE SHORT x" + str.tostring(shortN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgS, false, tradeAgree ? entryPx : na)
 prevLongN  := longN
 prevShortN := shortN
 
@@ -540,7 +555,6 @@ bool allowShort = tradeDir != "Long only (buy only)"
 
 bool goLong  = longSig  and allowLong
 bool goShort = shortSig and allowShort
-bool useLimit = entryFill == "Limit at label price"
 // One order per side per bar. Market mode: an ENTER on the same bar as an END
 // keeps the trade (same side) or reverses it (strategy.entry), so no separate
 // close is sent. Limit mode: an opposite ENTER closes the open trade now,
@@ -560,6 +574,10 @@ var float limL    = na
 var float limS    = na
 var int   limLBar = na
 var int   limSBar = na
+if (goLong or goShort) and tickBar != bar_index
+    tickPx  := close
+    tickBar := bar_index
+
 if useLimit
     // Drop a pending entry that went stale or that the ladder now contradicts.
     if not na(limL) and (strategy.position_size > 0 or exitL or goShort or bar_index - limLBar >= limitBars)
