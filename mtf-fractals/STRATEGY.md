@@ -63,7 +63,7 @@ with a narrower retest band or in Percent band mode.
 |------|---------|---------|
 | Target | 2 R | Two times the stop distance from the entry. 0 disables it. |
 | Breakeven | at +1 R | Once a bar has reached 1 R in favour **and closed beyond the entry**, the stop moves to the entry price. |
-| ATR trail | off | Stop trails `close − N × ATR` when enabled. |
+| Trailing stop | off | **Swing**: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer). **Chandelier**: highest high since entry − N × ATR (lowest low + N × ATR for shorts). **ATR from close**: close − N × ATR. *Start trailing at (R)* delays it until the trade has been that many R in profit. Every mode only ratchets toward price; set *Target* to 0 to let winners run. |
 | Opposite break | on | A long is closed when the chart-TF swing low turns Broken (a short mirrored). If that break also passes the entry filters, the position is **reversed** instead, so the breakout is not lost. |
 | Any-signal reversal | off | When on, any opposite entry signal reverses the position. |
 | Time stop | off | Close after N bars. |
@@ -163,8 +163,8 @@ defaults that is about 1.1 %; on 5m gold with a CFD spread it is about 1.05 %.
 ## 6. Known limits
 
 - Stops are sized from the chart timeframe's ATR at the signal bar and never
-  widen after entry. The ATR trail uses the current ATR but only ratchets
-  toward price, so it does not help when volatility rises.
+  widen after entry. The trailing modes use the current ATR or new swings but
+  only ratchet toward price, so they do not help when volatility rises.
 - One position at a time, no scaling in or out.
 - The bias filter counts the higher-timeframe rows visible on the chart; on a
   4H chart only D and W contribute.

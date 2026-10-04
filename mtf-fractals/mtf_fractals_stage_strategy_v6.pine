@@ -19,7 +19,8 @@
 //     swing in Structure mode); flip retest = just beyond the zone. Every stop
 //     is at least 0.5 × ATR from the entry. Target 2 R, stop to breakeven at
 //     +1 R (on a bar that reaches +1 R and closes beyond the entry), optional
-//     ATR trail and time stop. An opposite chart-TF break closes the trade, or
+//     trailing stop (Swing, Chandelier or ATR from close, starting at a chosen
+//     R) and time stop. An opposite chart-TF break closes the trade, or
 //     reverses it when the opposite entry passes its filters.
 //   • Position size: equity × risk % ÷ (stop distance × point value), capped
 //     at "Max position size" × equity and rounded to the lot step (whole
@@ -708,7 +709,12 @@ maxStopAtr = input.float(4.0, "Max structure stop (× chart ATR)", minval = 1, m
 rrTarget   = input.float(2.0, "Target (R multiple, 0 = none)", minval = 0, maxval = 20, step = 0.25, group = G_RISK)
 beR        = input.float(1.0, "Move stop to breakeven at (R, 0 = off)", minval = 0, maxval = 10, step = 0.25, group = G_RISK,
      tooltip = "Once a bar has reached this many R in favour and closed beyond the entry price, the stop moves to the entry price.")
-trailAtr   = input.float(0.0, "ATR trailing stop (× chart ATR, 0 = off)", minval = 0, maxval = 10, step = 0.25, group = G_RISK)
+trailMode  = input.string("Off", "Trailing stop", options = ["Off", "Swing", "Chandelier", "ATR from close"], group = G_RISK,
+     tooltip = "Swing: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer; short: above each new swing high). Chandelier: best price since entry − distance × ATR. ATR from close: close − distance × ATR. Every mode only ratchets toward price. Combine with Target 0 to let winners run.")
+trailAtr   = input.float(3.0, "Trail distance (× chart ATR)", minval = 0.5, maxval = 10, step = 0.25, group = G_RISK,
+     tooltip = "Used by Chandelier and ATR from close.")
+trailStartR = input.float(0.0, "Start trailing at (R)", minval = 0, maxval = 10, step = 0.25, group = G_RISK,
+     tooltip = "Trailing starts once the trade has been this many R in profit (best price since entry). 0 = from the first bar after entry.")
 riskPct    = input.float(1.0, "Risk per trade (% of equity)", minval = 0.05, maxval = 10, step = 0.05, group = G_RISK,
      tooltip = "Size = equity × risk % ÷ (stop distance × point value): ounces / BTC on CFD and spot symbols, contracts on futures (GC, MGC, BTC, MBT). The same 1 % means the same account risk on gold and on bitcoin. Commission and slippage come on top. Futures need enough equity for one whole contract: at 1 % on 1H about $20k for MGC, $200k for GC and $400k for CME BTC; smaller sizes round to 0 and the signal is skipped (counted in the Data Window).")
 maxLev     = input.float(10, "Max position size (× equity)", minval = 0.1, maxval = 100, step = 0.5, group = G_RISK,
@@ -814,6 +820,11 @@ var float sStop    = na
 var float sTp      = na
 var float sRisk    = na
 var int   entryBar = na
+var int   entryT   = na     // open time of the entry bar (swings after it can trail)
+var float lBest    = na     // highest high since a long entry
+var float sBest    = na     // lowest low since a short entry
+var bool  lTrailOn = false
+var bool  sTrailOn = false
 var int   nSkipped = 0      // signals dropped because the size rounded to 0
 var int   skipFlipUpT = na  // flip level already counted as skipped
 var int   skipFlipDnT = na
@@ -833,6 +844,9 @@ if canLong
     else
         lStop    := st
         lRisk    := dist
+        entryT   := time
+        lBest    := na
+        lTrailOn := false
         lTp      := rrTarget > 0 ? close + rrTarget * dist : na
         entryBar := bar_index
         didLong  := true
@@ -853,6 +867,9 @@ if canShort
     else
         sStop    := st
         sRisk    := dist
+        entryT   := time
+        sBest    := na
+        sTrailOn := false
         sTp      := rrTarget > 0 ? close - rrTarget * dist : na
         entryBar := bar_index
         didShort := true
@@ -866,8 +883,18 @@ if isLong and not didShort
     float ep = strategy.position_avg_price
     if beR > 0 and not na(lRisk) and high >= ep + beR * lRisk and close > ep
         lStop := math.max(lStop, ep)
-    if trailAtr > 0
-        lStop := math.max(lStop, close - trailAtr * cAtr)
+    lBest := na(lBest) ? high : math.max(lBest, high)
+    if trailMode != "Off" and not lTrailOn and not na(lRisk) and lBest - ep >= trailStartR * lRisk
+        lTrailOn := true
+    if lTrailOn
+        if trailMode == "ATR from close"
+            lStop := math.max(lStop, close - trailAtr * cAtr)
+        else if trailMode == "Chandelier"
+            lStop := math.max(lStop, math.min(lBest - trailAtr * cAtr, close - minStopAtr * cAtr))
+        else if trailMode == "Swing" and cDnHit and not na(cDnT) and cDnT > entryT
+            float swStp = cDnL - breakBuf(cDnL, cAtr)
+            if swStp < close
+                lStop := math.max(lStop, swStp)
     strategy.exit("L-X", "L", stop = lStop, limit = lTp, comment_loss = "L stop", comment_profit = "L target", alert_message = "MTF Fractals: long exit " + syminfo.ticker + " (stop " + fmtPx(lStop) + ", target " + fmtPx(lTp) + ")")
     bool timeL = maxBars > 0 and not na(entryBar) and bar_index - entryBar >= maxBars
     if oppL or timeL
@@ -877,8 +904,18 @@ if isShort and not didLong
     float ep = strategy.position_avg_price
     if beR > 0 and not na(sRisk) and low <= ep - beR * sRisk and close < ep
         sStop := math.min(sStop, ep)
-    if trailAtr > 0
-        sStop := math.min(sStop, close + trailAtr * cAtr)
+    sBest := na(sBest) ? low : math.min(sBest, low)
+    if trailMode != "Off" and not sTrailOn and not na(sRisk) and ep - sBest >= trailStartR * sRisk
+        sTrailOn := true
+    if sTrailOn
+        if trailMode == "ATR from close"
+            sStop := math.min(sStop, close + trailAtr * cAtr)
+        else if trailMode == "Chandelier"
+            sStop := math.min(sStop, math.max(sBest + trailAtr * cAtr, close + minStopAtr * cAtr))
+        else if trailMode == "Swing" and cUpHit and not na(cUpT) and cUpT > entryT
+            float swStp = cUpL + breakBuf(cUpL, cAtr)
+            if swStp > close
+                sStop := math.min(sStop, swStp)
     strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
     bool timeS = maxBars > 0 and not na(entryBar) and bar_index - entryBar >= maxBars
     if oppS or timeS
