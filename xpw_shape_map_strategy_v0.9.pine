@@ -9,6 +9,9 @@
 //        - Stop loss 3 -> 5 ATR, trail activation 2 -> 1.5 ATR (distance 0.25 ATR).
 //        Sample replay: 17 trades, 17 wins, 16 of them long (BTC rose in the sample).
 //        No stop was hit in the sample, so the real profit factor is unknown and lower.
+//        Sizing defaults to Risk % (1% of equity per stop-loss, step 0.001): the old
+//        fixed 10 units = 10 BTC on BTC, more than a 10k account can hold, so every
+//        order was rejected. Table rows "Orders sent / filled" flag rejections.
 // v0.8 = v0.7 with defaults calibrated on OKX BTCUSDT 30m (Sep 7 - Oct 4 2026):
 //        entry BOT/TOP tick, ATR exits (SL 3 ATR, no TP, trail from 2 ATR, 0.25 ATR
 //        distance), 0.05% commission per side, lower-TF chain filter OFF.
@@ -72,11 +75,11 @@ timeStop = input.int(0,       "Time stop, bars (0 = off)", minval = 0, group = g
 
 // ───────────────────────── S3. SIZING ─────────────────────────
 grpZ = "S3. Sizing"
-qtyMode  = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = grpZ)
+qtyMode  = input.string("Risk %", "Quantity", options = ["Fixed", "Risk %"], group = grpZ, tooltip = "Risk %: size so a stop-loss hit costs this % of equity — works on any symbol (BTC, gold...). Fixed: always the same quantity; 10 is gold-sized (10 oz) and is far too big for BTC (10 BTC).")
 qtyFixed = input.float(10,  "Fixed quantity (contracts = oz, 100 = 1 lot)", minval = 0, group = grpZ)
 riskPct  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0, step = 0.1, group = grpZ, tooltip = "Quantity = equity x risk % / stop-loss distance. Needs a stop loss above 0.")
 qtyMax   = input.float(50,  "Max quantity", minval = 0, group = grpZ)
-qtyStep  = input.float(1,   "Quantity step (rounds down)", minval = 0.0001, group = grpZ)
+qtyStep  = input.float(0.001, "Quantity step (rounds down)", minval = 0.0001, group = grpZ)
 
 // ──────────────── S4. LOWER-TF CHAIN (Chain Monitor v0.4D engine) ────────────────
 // The same squares on five SMALLER timeframes. A BOT chain opens when rung 1 prints
@@ -611,26 +614,39 @@ calcQty() =>
 
 float pos = strategy.position_size
 
+// Diagnostics: orders sent vs trades filled (TradingView silently rejects orders
+// the account cannot afford, which leaves the report empty).
+var int   nSent = 0
+var float lastQ = na
+
 // ── Market entries (square, tick, turn "At the cross" / "After hold") ──
 if sigBarOK and longSig
     float q = calcQty()
     if pos < 0
         if oppMode == "Reverse" and canLong and q > 0
             strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
+            nSent += 1
+            lastQ := q
         else if oppMode != "Ignore"
             strategy.close("Short", comment = "opp signal")
     else if pos == 0 and canLong and q > 0
         strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
+        nSent += 1
+        lastQ := q
 
 if sigBarOK and shortSig
     float q = calcQty()
     if pos > 0
         if oppMode == "Reverse" and canShort and q > 0
             strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
+            nSent += 1
+            lastQ := q
         else if oppMode != "Ignore"
             strategy.close("Long", comment = "opp signal")
     else if pos == 0 and canShort and q > 0
         strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
+        nSent += 1
+        lastQ := q
 
 // ── Predict: price where fast and slow cross on the NEXT candle ──
 // fast = SMA(rsi, fastLen), slow = SMA(rsi, slowLen). Next candle's RSI that
@@ -710,7 +726,7 @@ plot(turnPredict and ((botArmed and fast < slow) or (topArmed and fast > slow)) 
 grpD = "Display"
 showTable = input.bool(true, "Show table", group = grpD)
 
-var table t = table.new(position.middle_right, 2, 14, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
+var table t = table.new(position.middle_right, 2, 16, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
 
 if showTable and barstate.islast
     table.cell(t, 0, 0, "XPW SM S v0.9" + (allOn ? " ALL" : ""), text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = size.tiny)
@@ -741,3 +757,9 @@ if showTable and barstate.islast
     table.cell(t, 1, 12, chainTfOK ? "L" + str.tostring(chLvlL) + (chainLOK ? " ON" : "") + " / L" + str.tostring(chLvlS) + (chainSOK ? " ON" : "") : "RUNGS MUST RISE & BE < CHART", text_size = size.tiny, bgcolor = chainTfOK ? na : color.new(color.red, 40))
     table.cell(t, 0, 13, "Chain filter", text_size = size.tiny)
     table.cell(t, 1, 13, chainFilt ? "ON (L" + str.tostring(chainLvl) + "+)" : "off", text_size = size.tiny)
+    int nFill = strategy.closedtrades + strategy.opentrades
+    bool rejected = nSent > 0 and nFill == 0
+    table.cell(t, 0, 14, "Orders sent / filled", text_size = size.tiny)
+    table.cell(t, 1, 14, str.tostring(nSent) + " / " + str.tostring(nFill) + (rejected ? "  REJECTED: size too big for equity/margin" : ""), text_size = size.tiny, bgcolor = rejected ? color.new(color.red, 40) : na)
+    table.cell(t, 0, 15, "Last qty / value", text_size = size.tiny)
+    table.cell(t, 1, 15, na(lastQ) ? "-" : str.tostring(lastQ, "#.###") + " / " + str.tostring(lastQ * close * syminfo.pointvalue, "#") + " vs equity " + str.tostring(strategy.equity, "#"), text_size = size.tiny)
