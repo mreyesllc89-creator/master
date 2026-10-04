@@ -4,12 +4,12 @@
 // ----------------------------------------------------------------------------
 //  Same logic as tdi_plus_enhanced_strategy.pine, with defaults set for
 //  BTCUSD (spot or CFD, 1 contract = 1 BTC):
-//    * Exits default to ATR mode, so they scale with BTC's price and
-//      volatility on any timeframe. Wider stop and trail than gold:
-//      SL 2 x ATR, TP 3R, trail starts at 2.5 x ATR, trails 1 x ATR.
-//    * "Points" mode is replaced by "USD" mode: distances are in dollars
-//      of BTC price, so they mean the same on every broker whatever its
-//      tick size (SL $1500, TP $4500, trail from $2000 at $750).
+//    * Exits default to Points mode, MT5 style: 1 point = 0.01 of BTC price
+//      ("Point size" input), so 100 points = $1 whatever the broker's tick.
+//      SL 150000 pts ($1500), TP 450000 pts ($4500), trail starts at
+//      200000 pts ($2000) and trails 75000 pts ($750).
+//    * ATR mode is still available: SL 2 x ATR, TP 3R, trail starts at
+//      2.5 x ATR, trails 1 x ATR.
 //    * Sizing defaults to Risk 1% of equity, in BTC: fixed 0.05 BTC,
 //      max 1 BTC, step 0.001 BTC.
 //    * Commission 0.1% per side (typical crypto taker fee).
@@ -36,8 +36,8 @@
 //  only: the opposite signal closes the position when "Exit on opposite
 //  signal" is on, but never opens one.
 //
-//  S2. EXITS  - stop loss, take profit and trailing stop in USD (price
-//               distance) or ATR. In ATR mode the TP is an
+//  S2. EXITS  - stop loss, take profit and trailing stop in Points
+//               (1 point = "Point size" of price) or ATR. In ATR mode the TP is an
 //               R multiple of the SL distance. Distances are frozen at entry.
 //               Optional time stop closes a trade after N bars.
 //  S3. SIZING - Fixed quantity, or Risk % of equity per trade (needs a stop
@@ -79,15 +79,16 @@ UseCross     = input.bool(false, "Enter on price/signal cross (mid filtered)", g
 
 grpX = "S2. EXITS"
 ExitOnOpp    = input.bool(true, "Exit on opposite signal", group=grpX)
-ExitUnit     = input.string("ATR", "SL / TP / trail unit", options=["USD", "ATR"], group=grpX)
-SLPts        = input.float(1500, "Stop loss, $ (USD mode)", minval=0, group=grpX, tooltip="Distance in dollars of BTC price. 0 = off.")
-TPPts        = input.float(4500, "Take profit, $ (USD mode)", minval=0, group=grpX, tooltip="Distance in dollars of BTC price. 0 = off.")
+ExitUnit     = input.string("Points", "SL / TP / trail unit", options=["Points", "ATR"], group=grpX)
+PointSize    = input.float(0.01, "Point size (price per point)", minval=0, step=0.01, group=grpX, tooltip="0.01 = MT5-style BTCUSD point (100 pts = $1). 0 = use the symbol's tick size.")
+SLPts        = input.float(150000, "Stop loss, pts (Points mode)", minval=0, group=grpX, tooltip="150000 pts x 0.01 = $1500. 0 = off.")
+TPPts        = input.float(450000, "Take profit, pts (Points mode)", minval=0, group=grpX, tooltip="450000 pts x 0.01 = $4500. 0 = off.")
 ATRLen       = input.int(14, "ATR length (ATR mode)", minval=1, group=grpX)
 SLATR        = input.float(2.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
 TPR          = input.float(3.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group=grpX)
 UseTrail     = input.bool(true, "Trailing stop", group=grpX)
-TrailActPts  = input.float(2000, "Trail activation, $ of profit (USD mode)", minval=0, group=grpX)
-TrailDistPts = input.float(750, "Trail distance, $ (USD mode)", minval=0, group=grpX)
+TrailActPts  = input.float(200000, "Trail activation, pts of profit (Points mode)", minval=0, group=grpX)
+TrailDistPts = input.float(75000, "Trail distance, pts (Points mode)", minval=0, group=grpX)
 TrailActATR  = input.float(2.5, "Trail activation, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
 TrailDistATR = input.float(1.0, "Trail distance, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
 TimeStopBars = input.int(0, "Time stop, bars (0 = off)", minval=0, group=grpX)
@@ -172,13 +173,13 @@ allowShort = TradeDir != "Buy only"
 
 // — S2. Exit distances (ticks) —
 atr    = ta.atr(ATRLen)
-isUsd  = ExitUnit == "USD"
+isPts  = ExitUnit == "Points"
 atrTk  = atr / syminfo.mintick
-usdTk  = 1 / syminfo.mintick     // ticks per $1 of price
-slTk   = isUsd ? (SLPts > 0 ? SLPts * usdTk : na) : (SLATR > 0 ? SLATR * atrTk : na)
-tpTk   = isUsd ? (TPPts > 0 ? TPPts * usdTk : na) : (TPR > 0 ? slTk * TPR : na)
-trActTk = UseTrail ? (isUsd ? TrailActPts * usdTk : TrailActATR * atrTk) : na
-trOffTk = UseTrail ? (isUsd ? TrailDistPts * usdTk : TrailDistATR * atrTk) : na
+ptTk   = PointSize > 0 ? PointSize / syminfo.mintick : 1.0   // ticks per point
+slTk   = isPts ? (SLPts > 0 ? SLPts * ptTk : na) : (SLATR > 0 ? SLATR * atrTk : na)
+tpTk   = isPts ? (TPPts > 0 ? TPPts * ptTk : na) : (TPR > 0 ? slTk * TPR : na)
+trActTk = UseTrail ? (isPts ? TrailActPts * ptTk : TrailActATR * atrTk) : na
+trOffTk = UseTrail ? (isPts ? TrailDistPts * ptTk : TrailDistATR * atrTk) : na
 
 // — S3. Sizing —
 calcQty() =>
@@ -275,7 +276,7 @@ var int nLongSig  = 0
 var int nShortSig = 0
 nLongSig  += goLong ? 1 : 0
 nShortSig += goShort ? 1 : 0
-var table info = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 20), border_width=1)
+var table info = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 20), border_width=1)
 if ShowInfo and barstate.islast
     table.cell(info, 0, 0, "Signals L / S", text_color=color.white, text_size=size.small)
     table.cell(info, 1, 0, str.tostring(nLongSig) + " / " + str.tostring(nShortSig), text_color=color.white, text_size=size.small)
@@ -285,3 +286,5 @@ if ShowInfo and barstate.islast
     table.cell(info, 1, 2, str.tostring(entryQty), text_color=entryQty > 0 ? color.white : color.red, text_size=size.small)
     table.cell(info, 0, 3, "Direction", text_color=color.white, text_size=size.small)
     table.cell(info, 1, 3, TradeDir, text_color=color.white, text_size=size.small)
+    table.cell(info, 0, 4, "1 point =", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 4, "$" + str.tostring(PointSize > 0 ? PointSize : syminfo.mintick), text_color=color.white, text_size=size.small)
