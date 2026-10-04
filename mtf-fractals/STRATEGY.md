@@ -6,10 +6,12 @@ its `alertcondition()` calls removed (strategies alert on order fills
 instead): the same engine, table, labels and lines. A strategy section is
 appended that places orders from the chart-timeframe stages.
 
-Important: no backtest could be run here (no TradingView access). The defaults
-below are calibrated in ATR units from the same volatility figures as the
-indicator and are a sensible starting point, not an optimised result. Section 5
-explains how to test and tune them in the Strategy Tester.
+Important: only the two gold **strategy profiles** (section 0) are
+calibrated, on a Python replica of the strategy run over your TradingView
+exports. The *Custom* profile keeps the earlier input defaults (sections 1–2),
+which were set in ATR units from volatility figures, not from a backtest:
+a starting point, not an optimised result. Section 5 explains how to test and
+tune them in the Strategy Tester.
 
 ## 0. Gold calibration (OANDA:XAUUSD)
 
@@ -43,15 +45,27 @@ Hence the **Strategy profile** input. On gold, Auto picks:
 
 | Profile | Charts | Entry | Fractal | Break buffer | Retest band | Stop | Target | Trailing | Higher-TF filter | Direction |
 |---------|--------|-------|---------|--------------|-------------|------|--------|----------|------------------|-----------|
-| Intraday fade | 1m to 2H | failed break (fade) | 2 / 2 | 0.05 ATR | 0.5 ATR | 1.5 ATR | 1 R | off | off | both |
-| Trend | 4H and above | breakout + flip retest | 3 / 3 | 0.15 ATR | 0.35 ATR | 1 ATR | none | chandelier 4 ATR from +1 R | on | long only |
+| Intraday fade | tick, seconds, 1m to 3H | failed break (fade) | 2 / 2 | 0.05 ATR | 0.5 ATR | 1.5 ATR from entry | 1 R | off | off | both |
+| Trend | 4H and above | breakout + flip retest | 3 / 3 | 0.15 ATR | 0.35 ATR | breakout: the wider of 1 ATR and level − 0.5 ATR (1–2 ATR); flip retest: level − 0.5 ATR | none | chandelier 4 ATR from +1 R | on, every valid higher-TF row | long only |
 
-Both profiles exit on the opposite chart-TF break and skip breakouts more than
-1.5 ATR beyond the level. *Custom* uses every input as set; *Direction* always
-applies on top of any profile.
+Both profiles also fix the rest of the engine as it was calibrated: ATR band
+mode (so a chart set to *Percent*, like the one the exports came from, is
+switched to ATR), ATR length 14, tied left extremes allowed, minimum break
+buffer 0.012 %, levels never expire, breakouts more than 1.5 ATR beyond the
+level skipped, breakeven off, exit on the opposite chart-TF break on. The
+Fractal, Stage calibration, entry and exit inputs then only act in *Custom*.
+These still apply under every profile: *Direction*, trading session, gold
+rollover filter, backtest range, stop placement, min / max stop distance and
+the sizing inputs.
 
-**Results** (expectancy per trade in R after 0.005 % costs per side; n =
-trades; w = win rate):
+Trend's higher-TF filter counts every valid higher-TF row (the rows a 4H chart
+can request: daily and weekly), even rows you switched off in the table; the
+Σ row in the table only counts the rows shown.
+
+**Results** (expectancy per trade in R after 0.005 % commission per side; n =
+trades; w = win rate). Data windows: 30m Sep–Oct 2026 (about 3 weeks), 1H and
+2H rebuilt from that 30m data, 4H Apr–Oct 2026, daily 2024–2026, weekly
+2014–2026:
 
 | Chart | Your settings | Previous defaults | New Auto profile |
 |-------|---------------|-------------------|------------------|
@@ -71,8 +85,13 @@ How much to trust each row:
   per trade.
 - **Trend, 4H: promising but thin** (7 trades in 5 months of a falling market).
 - **Intraday fade, 30m and 1H: weak.** About breakeven on 30m and +0.23 R on
-  1H, from 3 weeks of data. It turns slightly negative on 30m at 0.02 %
-  costs. Treat it as a starting point to paper-trade, not a proven edge.
+  1H, from 3 weeks of data. At the script's default 0.02 % commission the 30m
+  result turns to −0.04 R, so set your real commission (0.005 % for a gold
+  CFD) in Properties. Treat it as a starting point to paper-trade, not a
+  proven edge.
+- **2H and 3H: no edge found.** The fade lost on 2H (−0.35 R, 6 trades) and 3H
+  was not tested; Auto still applies the fade there. Prefer 30m / 1H or 4H
+  and above.
 
 **1-minute and 5-minute charts.** No 1m or 5m data was available, so these use
 the Intraday fade profile extrapolated from 30m and 1H. On gold, Auto selects
@@ -82,10 +101,13 @@ it automatically. Set it by hand like this:
 |---------|----|----|
 | Strategy profile | Intraday fade (or Auto) | Intraday fade (or Auto) |
 | Direction | Both (Long only halves the trades) | Both |
-| Commission | 0.005 % (gold CFD spread) | 0.005 % |
+| Commission (Properties) | 0.005 % (gold CFD spread; the script default is 0.02 %) | 0.005 % |
+| Slippage (Properties) | 2 ticks | 2 ticks |
 | Risk per trade | 0.5 % | 0.5–1 % |
 | Max position size | 10 (1 % risk needs ≈ 15–20× on 1m) | 10 |
-| Trading session | 0300-1200 or 0800-1700 New York is worth testing | same |
+| Quantity step | 1 for OANDA (whole ounces), 0.01 for most CFDs | same |
+| Trading session (New York time) | 0300-1200 or 0800-1700 is worth testing | same |
+| Gold rollover filter | Auto (no entries 16:40–18:20 New York) | Auto |
 
 The break buffer has a floor of 0.012 % of the price (≈ $0.50), so on 1m and
 5m charts it is the spread floor, not 0.05 ATR, that defines a break. On 1m
@@ -102,9 +124,14 @@ calibrate them properly.
 | Breakout | The chart-TF swing high turns **Broken**: the bar closes above the last swing high by more than the break buffer, and not more than 1.5 × ATR above it (no chasing). A re-break after a failed break counts. | The chart-TF swing low turns Broken, mirrored. |
 | Flip retest | The chart-TF swing high is in **Flip retest** (broken earlier, price left and came back to the level from above) and the bar closes above the level. One entry per level. | Mirrored on the swing low. |
 
-Both entry types are on by default; either can be switched off.
+| Fade (off by default) | The chart-TF swing **low** turns **Failed break**: it was broken, then the bar closed back above it by more than the break buffer. Stop *Breakout stop* × ATR below the entry. | The chart-TF swing high turns Failed break, mirrored. |
 
-**Higher-timeframe bias filter.** The net bias of the visible higher-timeframe
+Breakout and flip retest are on by default and the fade is off; each can be
+switched on or off (the Intraday fade profile uses only the fade, Trend only
+the other two).
+
+**Higher-timeframe bias filter** (on by default; *Use higher-TF bias filter*
+turns it off). The net bias of the visible higher-timeframe
 rows (the Chart row excluded: +1 per row whose swing high is broken, −1 per row
 whose swing low is broken) must be ≥ *Min net higher-TF bias* for a long and ≤
 minus that value for a short. With the default 0 the net higher-timeframe
@@ -113,14 +140,15 @@ passes); with 1 the net must lean at least one row in the trade direction. A
 value above the number of higher rows visible on the chart (1H chart: 4H, D,
 W = 3; D chart: W = 1) blocks every entry.
 
-A long and a short signal can only both qualify on the same bar (the close sits
-between a swing high that lies below a swing low) when the net bias is 0. When
+A long and a short signal can both qualify on the same bar (the close sits
+between a swing high that lies below a swing low; with the bias filter on, only
+when the net bias is 0). When
 flat the direction is ambiguous and both are skipped; in a position only the
 signal in the position's own direction is dropped, so a qualifying opposite
 break still reverses the trade.
 
 **Other entry filters.** Backtest date range; trading session on intraday
-charts (exchange time, default always; ignored on D and above); gold rollover
+charts (New York time, default always; ignored on D and above); gold rollover
 window (when the rollover filter is on, i.e. Auto on the XAUUSD profile at a
 venue that halts, or On; charts up to 1H only): no entries on chart bars
 opening 16:40–18:20 New York, 16:30 for 30m and 45m charts, 16:00 for 1H. One
