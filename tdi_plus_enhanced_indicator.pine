@@ -1,0 +1,155 @@
+//@version=6
+// ============================================================================
+//  TDI+ (Enhanced)  -  INDICATOR  -  repaired version
+// ----------------------------------------------------------------------------
+//  Traders Dynamic Index with volatility bands, angle read-out, RSI
+//  divergences and Shark Fin signals.
+//
+//  Repairs over the previous "final version":
+//    * Divergences: the old search loop walked back to bar 0 on every bar
+//      (`for j = idx + rng to bar_index - 3`), used `var` inside the search
+//      functions (stale results carried between calls) and kept the arrow
+//      values in `var` floats, so once an arrow fired it plotted on every
+//      bar after it. Replaced with confirmed pivots (ta.pivotlow/pivothigh)
+//      compared to the previous pivot - no repainting, no runaway loops,
+//      arrows drawn on the actual pivot bar.
+//    * Arrow distance was 0.03 on a 0-100 RSI scale (invisible). Now 3.
+//    * Shark Fin labels fired on every bar outside the band and hit the
+//      label limit. They now fire once, on the cross, as plotshapes.
+//      The "recent_max" condition was always true when the cross was, so
+//      it was removed. Fin completion (re-entry inside the band) added.
+//    * Angle was calculated but never shown - now in the Data Window.
+//    * Added the classic 32 / 50 / 68 levels and alerts for every signal.
+// ============================================================================
+indicator("TDI+ (Enhanced)", shorttitle="TDI+", overlay=false, max_lines_count=500)
+
+// — Inputs —
+grpT = "TDI"
+RSIPeriod        = input.int(21, "RSI Period", minval=1, group=grpT)
+PriceLinePeriod  = input.int(2, "Price Line Period", minval=1, group=grpT)
+SignalLinePeriod = input.int(7, "Signal Line Period", minval=1, group=grpT)
+VolatilityPeriod = input.int(34, "Volatility Band Period", minval=2, group=grpT)
+BandMult         = input.float(1.6185, "Band Multiplier", minval=0.1, step=0.01, group=grpT)
+ShowBg           = input.bool(true, "Colour background outside bands", group=grpT)
+
+grpA = "Angle"
+ApplyToOpt    = input.string("Fast Line", "Apply Angle To", options=["Fast Line", "Slow Line", "RSI Line", "Mid Line"], group=grpA)
+AngleLookback = input.int(1, "Angle Lookback Bars", minval=1, group=grpA)
+
+grpD = "Divergence"
+PlotBull       = input.bool(true, "Plot Bullish Divergence", group=grpD)
+PlotHiddenBull = input.bool(false, "Plot Hidden Bullish", group=grpD)
+PlotBear       = input.bool(true, "Plot Bearish Divergence", group=grpD)
+PlotHiddenBear = input.bool(false, "Plot Hidden Bearish", group=grpD)
+PivotLeft      = input.int(5, "Pivot Lookback Left", minval=1, group=grpD)
+PivotRight     = input.int(5, "Pivot Lookback Right (confirmation bars)", minval=1, group=grpD)
+RangeMin       = input.int(5, "Min Bars Between Pivots", minval=1, group=grpD)
+RangeMax       = input.int(60, "Max Bars Between Pivots", minval=2, group=grpD)
+ArrowDist      = input.float(3.0, "Arrow Distance (RSI points)", minval=0, group=grpD)
+DrawDivLines   = input.bool(true, "Draw Divergence Lines", group=grpD)
+
+grpS = "Shark Fin"
+ShowBreakout = input.bool(true, "Show band breakouts", group=grpS)
+ShowFin      = input.bool(true, "Show fin completion (back inside band)", group=grpS)
+
+// — RSI & Bands —
+slow     = ta.rsi(close, RSIPeriod)
+ma_mid   = ta.sma(slow, VolatilityPeriod)
+stdev    = ta.stdev(slow, VolatilityPeriod)
+upper    = ma_mid + BandMult * stdev
+lower    = ma_mid - BandMult * stdev
+rsiLine  = ta.sma(slow, PriceLinePeriod)
+fastLine = ta.sma(slow, SignalLinePeriod)
+
+// — Background colors —
+bgColor = rsiLine >= upper ? color.new(color.green, 85) : rsiLine <= lower ? color.new(color.red, 85) : na
+bgcolor(ShowBg ? bgColor : na)
+
+// — Angle Calculation —
+angle_src = switch ApplyToOpt
+    "Fast Line" => fastLine
+    "Slow Line" => slow
+    "RSI Line"  => rsiLine
+    => ma_mid
+
+get_angle(int count) =>
+    slope = angle_src - angle_src[count]
+    ang = math.atan(slope) * 180 / math.pi
+    ang < 0 ? 360 + ang : ang
+
+angle_val = get_angle(AngleLookback)
+
+// — Divergence Logic (confirmed pivots on the RSI price line) —
+plFound = not na(ta.pivotlow(rsiLine, PivotLeft, PivotRight))
+phFound = not na(ta.pivothigh(rsiLine, PivotLeft, PivotRight))
+
+barsSincePL = ta.barssince(plFound[1])
+barsSincePH = ta.barssince(phFound[1])
+plInRange   = barsSincePL >= RangeMin and barsSincePL <= RangeMax
+phInRange   = barsSincePH >= RangeMin and barsSincePH <= RangeMax
+
+pivBar   = bar_index - PivotRight
+rsiPiv   = rsiLine[PivotRight]
+lowPiv   = low[PivotRight]
+highPiv  = high[PivotRight]
+
+prevRsiPL = ta.valuewhen(plFound, rsiPiv, 1)
+prevLowPL = ta.valuewhen(plFound, lowPiv, 1)
+prevBarPL = ta.valuewhen(plFound, pivBar, 1)
+prevRsiPH = ta.valuewhen(phFound, rsiPiv, 1)
+prevHighPH = ta.valuewhen(phFound, highPiv, 1)
+prevBarPH = ta.valuewhen(phFound, pivBar, 1)
+
+bullDivCond       = PlotBull       and plFound and plInRange and rsiPiv > prevRsiPL and lowPiv < prevLowPL
+hiddenBullDivCond = PlotHiddenBull and plFound and plInRange and rsiPiv < prevRsiPL and lowPiv > prevLowPL
+bearDivCond       = PlotBear       and phFound and phInRange and rsiPiv < prevRsiPH and highPiv > prevHighPH
+hiddenBearDivCond = PlotHiddenBear and phFound and phInRange and rsiPiv > prevRsiPH and highPiv < prevHighPH
+
+if DrawDivLines
+    if bullDivCond
+        line.new(prevBarPL, prevRsiPL, pivBar, rsiPiv, color=color.lime, width=2)
+    if hiddenBullDivCond
+        line.new(prevBarPL, prevRsiPL, pivBar, rsiPiv, color=color.new(color.lime, 40), width=1, style=line.style_dashed)
+    if bearDivCond
+        line.new(prevBarPH, prevRsiPH, pivBar, rsiPiv, color=color.red, width=2)
+    if hiddenBearDivCond
+        line.new(prevBarPH, prevRsiPH, pivBar, rsiPiv, color=color.new(color.red, 40), width=1, style=line.style_dashed)
+
+// — Shark Fin —
+upper_break = ta.crossover(rsiLine, upper)    // price line pierces upper band
+lower_break = ta.crossunder(rsiLine, lower)   // price line pierces lower band
+upper_fin   = ta.crossunder(rsiLine, upper)   // back inside from above: bearish fin
+lower_fin   = ta.crossover(rsiLine, lower)    // back inside from below: bullish fin
+
+// — Plotting —
+hline(68, "Level 68", color=color.gray, linestyle=hline.style_dotted)
+hline(50, "Level 50", color=color.gray, linestyle=hline.style_dashed)
+hline(32, "Level 32", color=color.gray, linestyle=hline.style_dotted)
+
+plot(rsiLine, color=color.green, title="RSI Price Line", linewidth=2)
+plot(fastLine, color=color.red, title="Fast Line")
+plot(slow, color=color.white, title="Slow Line")
+plot(ma_mid, color=color.yellow, title="Middle Band")
+plot(upper, color=color.aqua, title="Upper Band")
+plot(lower, color=color.aqua, title="Lower Band")
+plot(angle_val, title="Angle", color=color.orange, display=display.data_window)
+
+plotshape(bullDivCond ? rsiPiv - ArrowDist : na, title="Bull Divergence", style=shape.arrowup, location=location.absolute, color=color.lime, size=size.small, offset=-PivotRight)
+plotshape(hiddenBullDivCond ? rsiPiv - ArrowDist : na, title="Hidden Bull Divergence", style=shape.arrowup, location=location.absolute, color=color.new(color.lime, 40), size=size.tiny, text="H", textcolor=color.lime, offset=-PivotRight)
+plotshape(bearDivCond ? rsiPiv + ArrowDist : na, title="Bear Divergence", style=shape.arrowdown, location=location.absolute, color=color.red, size=size.small, offset=-PivotRight)
+plotshape(hiddenBearDivCond ? rsiPiv + ArrowDist : na, title="Hidden Bear Divergence", style=shape.arrowdown, location=location.absolute, color=color.new(color.red, 40), size=size.tiny, text="H", textcolor=color.red, offset=-PivotRight)
+
+plotshape(ShowBreakout and upper_break ? upper : na, title="Upper Shark Fin Breakout", style=shape.labeldown, location=location.absolute, color=color.green, text="Shark Fin 🔼", textcolor=color.white, size=size.small)
+plotshape(ShowBreakout and lower_break ? lower : na, title="Lower Shark Fin Breakout", style=shape.labelup, location=location.absolute, color=color.red, text="Shark Fin 🔽", textcolor=color.white, size=size.small)
+plotshape(ShowFin and upper_fin ? upper : na, title="Upper Fin Complete", style=shape.triangledown, location=location.absolute, color=color.orange, size=size.tiny)
+plotshape(ShowFin and lower_fin ? lower : na, title="Lower Fin Complete", style=shape.triangleup, location=location.absolute, color=color.teal, size=size.tiny)
+
+// — Alerts —
+alertcondition(upper_break, title="Upper Shark Fin Breakout", message="Upper Shark Fin breakout on {{ticker}}")
+alertcondition(lower_break, title="Lower Shark Fin Breakout", message="Lower Shark Fin breakout on {{ticker}}")
+alertcondition(upper_fin, title="Upper Fin Complete", message="TDI price line back below upper band on {{ticker}}")
+alertcondition(lower_fin, title="Lower Fin Complete", message="TDI price line back above lower band on {{ticker}}")
+alertcondition(bullDivCond, title="Bullish Divergence", message="TDI bullish divergence on {{ticker}}")
+alertcondition(bearDivCond, title="Bearish Divergence", message="TDI bearish divergence on {{ticker}}")
+alertcondition(hiddenBullDivCond, title="Hidden Bullish Divergence", message="TDI hidden bullish divergence on {{ticker}}")
+alertcondition(hiddenBearDivCond, title="Hidden Bearish Divergence", message="TDI hidden bearish divergence on {{ticker}}")
