@@ -8,8 +8,12 @@
 //     FIRST LEG  (leg gap above the cut)    -> ENTER LONG
 //     SECOND LEG (leg gap at or below it)   -> ENTER SHORT
 //     UNCLASSIFIED (inside the dead band)   -> nothing
-//   The label is drawn on the push-high bar, but the push is only KNOWN to be over joinBars
-//   bars later. The strategy enters on that bar, the first bar the signal exists:
+//   Entry timing "At the push" (default): the leg is read on the candle where price first
+//   makes its new high, and the trade fills on that candle's close. Only that candle and
+//   earlier ones are used, so it is tradable live. The label prints later and may disagree;
+//   then the trade is closed ("label disagrees").
+//   Entry timing "When the push ends": the label is drawn on the push-high bar, but the push
+//   is only KNOWN to be over joinBars bars later. The strategy enters on that bar:
 //     "Signal bar close"  fills on the close of that bar (no extra bar of delay).
 //     "Label price"       rests a limit at the label's price (the push high) for N bars.
 //   Entering back on the label bar itself would use future bars and fake the backtest.
@@ -76,6 +80,8 @@ allowLong = input.bool(true, "Allow longs (FIRST LEG)", group="S1. Entries", too
 allowShort = input.bool(true, "Allow shorts (SECOND LEG)", group="S1. Entries")
 needParent = input.bool(false, "Require the parent to agree", group="S1. Entries", tooltip="Your rule: a divergence alone does not count, it has to be happening on the higher timeframe too. Needs 'Parent: record the higher timeframe read' on. Long needs parent gap above the cut, short needs it at or below.")
 oppCloses = input.bool(true, "Opposite label reverses the trade", group="S1. Entries", tooltip="OFF: an opposite label is ignored while a trade is open.")
+entryTiming = input.string("At the push (first new high)", "Entry timing", options=["At the push (first new high)", "When the push ends (confirmed label)"], group="S1. Entries", tooltip="At the push: reads the leg on the candle where price first makes its new high and enters on that candle's close. Nothing from later bars is used, so it is tradable live. It is a PROVISIONAL read: the label prints later and can disagree. When the push ends: waits for the label, joinBars candles later.")
+exitOnFlip = input.bool(true, "At the push: close if the label disagrees", group="S1. Entries", tooltip="When the push ends and its label calls the other leg (or unclassified), the trade that push opened is closed.")
 entryMode = input.string("Signal bar close", "Entry price", options=["Signal bar close", "Label price (limit)"], group="S1. Entries", tooltip="Signal bar close: market fill on the close of the bar the signal is confirmed. Label price: limit order at the push high the label marks. A short fills only if price comes back up to it; a long is above market so it fills at once.")
 limitBars = input.int(20, "Label price: cancel the limit after N bars", minval=1, group="S1. Entries")
 qty = input.float(1, "Order size (contracts / units)", minval=0.000001, group="S1. Entries", tooltip="Margin checks are off (margin 0), so the order fills whatever the symbol price is versus initial capital.")
@@ -122,6 +128,7 @@ var int lastHiBar = 0
 var int pushBars = 0
 var float pushHigh = na
 var int pushHighBar = 0
+var int pushStartBar = 0
 var int pushHighTime = 0
 var float pushRedMax = na
 var float builtMin = na
@@ -155,6 +162,7 @@ if newHi
         pushBars := 0
         pushHigh := high
         pushHighBar := bar_index
+        pushStartBar := bar_index
         pushHighTime := time
         pushRedMax := red
         builtMin := builtTest
@@ -209,11 +217,23 @@ if inPush
         inPush := false
 
 // ---------------- Entries ----------------
+// Early read: on the push's first new-high candle, the leg gap so far. Uses only this bar and
+// earlier, so no look-ahead. The running red max can only rise later in the push, so a SHORT
+// read can flip to LONG by the time the label prints, never the other way.
+bool early = entryTiming == "At the push (first new high)"
+int earlySig = 0
+if inPush and newHi and pushBars == 1 and not na(pushRedMax - Lleg)
+    float g0 = pushRedMax - Lleg
+    earlySig := g0 > legCut + legBand ? 1 : g0 < legCut - legBand ? -1 : 0
+int tradeSig = early ? earlySig : sig
+float parRead = early ? pGapPre : oParent
+if early and earlySig != 0
+    sigPx := high
 // Parent agreement uses the same cut as the leg: above = with price (long), at or below = refused (short).
-bool parentLong = not needParent or (useParent and not na(oParent) and oParent > legCut)
-bool parentShort = not needParent or (useParent and not na(oParent) and oParent <= legCut)
-bool goLong = sig == 1 and allowLong and parentLong
-bool goShort = sig == -1 and allowShort and parentShort
+bool parentLong = not needParent or (useParent and not na(parRead) and parRead > legCut)
+bool parentShort = not needParent or (useParent and not na(parRead) and parRead <= legCut)
+bool goLong = tradeSig == 1 and allowLong and parentLong
+bool goShort = tradeSig == -1 and allowShort and parentShort
 
 // ATR frozen on the signal bar, used for the whole trade.
 var float atrEntry = na
@@ -232,6 +252,16 @@ if sentShort
     strategy.entry("Short", strategy.short, qty=qty, limit=useLimit ? sigPx : na, comment="SECOND LEG SHORT")
     limitSentBar := useLimit ? bar_index : na
 
+// The push that opened the trade, so the flip exit only touches that trade.
+var int entPush = na
+if sentLong or sentShort
+    entPush := pushStartBar
+if early and exitOnFlip and not na(oLegId) and entPush == pushStartBar
+    if strategy.position_size > 0 and oLegId != 1
+        strategy.close("Long", comment="label disagrees")
+    if strategy.position_size < 0 and oLegId != 2
+        strategy.close("Short", comment="label disagrees")
+
 // Drop a resting label-price limit that has not filled in time.
 if useLimit and not na(limitSentBar) and not sentLong and not sentShort and bar_index - limitSentBar >= limitBars
     strategy.cancel("Long")
@@ -243,7 +273,7 @@ if not na(limitSentBar) and strategy.position_size != strategy.position_size[1]
 plotshape(showSig and goLong, "long signal", shape.triangleup, location.belowbar, col1, size=size.tiny, text="ENTER")
 plotshape(showSig and goShort, "short signal", shape.triangledown, location.abovebar, col2, size=size.tiny, text="ENTER")
 // Dotted line from the label (push high) to the bar the entry is sent on.
-if showSig and (goLong or goShort)
+if showSig and not early and (goLong or goShort)
     line.new(pushHighBar, sigPx, bar_index, sigPx, color=goLong ? col1 : col2, style=line.style_dotted)
 
 // ---------------- Exits ----------------
