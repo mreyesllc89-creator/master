@@ -1,0 +1,148 @@
+//@version=6
+// ============================================================================
+// TokioXAU_SinLimites_V3 — TradingView port (built step by step)
+// Source EA: mql5/TokioXAU_SinLimites_V3.mq5 (logic lives in Core/Engine.mqh)
+//
+// BITE 1: inputs, indicators, regime, ATR grid step and lot ladder preview.
+//         No orders are sent yet — this bite only shows what the EA "sees".
+// ============================================================================
+strategy("TokioXAU SinLimites V3", overlay = true, pyramiding = 100,
+     default_qty_type = strategy.fixed, default_qty_value = 1,
+     process_orders_on_close = true, max_labels_count = 100)
+
+// ---------------------------------------------------------------- 2. Lotaje / Martingala
+grpLot       = "2. Lotaje / Martingala"
+baseLot      = input.float(0.01, "Lote base (nivel 1)",           minval = 0.01, step = 0.01, group = grpLot)
+maxLotOrder  = input.float(0.3,  "Tope de lote por orden",        minval = 0.01, step = 0.01, group = grpLot)
+maxLevels    = input.int(999,    "Niveles maximos por lado",      minval = 1,                 group = grpLot)
+martLow      = input.float(1.35, "Mult. martingala ATR bajo",     step = 0.01,                group = grpLot)
+martMed      = input.float(1.25, "Mult. martingala ATR medio",    step = 0.01,                group = grpLot)
+martHigh     = input.float(1.15, "Mult. martingala ATR alto",     step = 0.01,                group = grpLot)
+martXHigh    = input.float(1.0,  "Mult. martingala ATR extremo",  step = 0.01,                group = grpLot)
+martMaxLvls  = input.int(8,      "Niveles con martingala (0=siempre)", minval = 0,            group = grpLot)
+// ASSUMPTION: the ATR/ATRavg cut-offs for low/med/high/extreme live in Engine.mqh.
+// Exposed here so they can be matched once the engine is available.
+volLowMax    = input.float(0.85, "Corte ATR bajo (ATR/ATRavg <)",  step = 0.01, group = grpLot)
+volMedMax    = input.float(1.0,  "Corte ATR medio (ATR/ATRavg <)", step = 0.01, group = grpLot)
+volHighMax   = input.float(1.3,  "Corte ATR alto (ATR/ATRavg <)",  step = 0.01, group = grpLot)
+
+// ---------------------------------------------------------------- 3. Grid
+grpGrid      = "3. Grid / persecucion del precio"
+useATRStep   = input.bool(true,  "Paso por ATR",                   group = grpGrid)
+atrMult      = input.float(0.3,  "Paso = ATR * mult",  step = 0.05, group = grpGrid)
+fixedStep    = input.float(1.5,  "Paso fijo (precio)", step = 0.1,  group = grpGrid)
+minStep      = input.float(0.2,  "Paso minimo (precio)", step = 0.1, group = grpGrid)
+stepGrowth   = input.float(0.1,  "Crecimiento del paso por nivel (0.10 = +10%)", step = 0.01, group = grpGrid)
+
+// ---------------------------------------------------------------- 4. Indicadores
+grpInd       = "4. Indicadores / filtros de entrada"
+atrPeriod    = input.int(7,      "ATR",                        minval = 1, group = grpInd)
+atrAvgLB     = input.int(50,     "Ventana ATR promedio",       minval = 1, group = grpInd)
+maxAtrRatio  = input.float(1.157,"No sembrar si ATR/ATRavg > (0=off)", step = 0.01, group = grpInd)
+emaFastLen   = input.int(20,     "EMA rapida",    group = grpInd)
+emaMedLen    = input.int(50,     "EMA media",     group = grpInd)
+emaSlowLen   = input.int(100,    "EMA lenta",     group = grpInd)
+emaTrendLen  = input.int(200,    "EMA tendencia", group = grpInd)
+adxPeriod    = input.int(14,     "ADX",           group = grpInd)
+rsiPeriod    = input.int(14,     "RSI",           group = grpInd)
+
+// ---------------------------------------------------------------- 7. Tendencia
+grpTrend     = "7. Tendencia"
+trendBlock   = input.float(85.0, "Confianza de tendencia fuerte", group = grpTrend)
+adxTrend     = input.float(25.0, "ADX minimo de tendencia",       group = grpTrend)
+adxRange     = input.float(18.0, "ADX de rango",                  group = grpTrend)
+
+// ---------------------------------------------------------------- Visual
+grpVis       = "Visual"
+showEmas     = input.bool(true,  "Mostrar EMAs",          group = grpVis)
+showLadder   = input.bool(true,  "Mostrar escalera grid", group = grpVis)
+ladderDepth  = input.int(5,      "Niveles a mostrar", minval = 1, maxval = 10, group = grpVis)
+showDash     = input.bool(true,  "Mostrar dashboard",     group = grpVis)
+
+// ============================================================================
+// Indicators
+// ============================================================================
+atr      = ta.atr(atrPeriod)
+atrAvg   = ta.sma(atr, atrAvgLB)
+atrRatio = atrAvg > 0 ? atr / atrAvg : 1.0
+
+emaF = ta.ema(close, emaFastLen)
+emaM = ta.ema(close, emaMedLen)
+emaS = ta.ema(close, emaSlowLen)
+emaT = ta.ema(close, emaTrendLen)
+[diPlus, diMinus, adx] = ta.dmi(adxPeriod, adxPeriod)
+rsi = ta.rsi(close, rsiPeriod)
+
+// ============================================================================
+// Regime / trend
+// ASSUMPTION: Engine.mqh has its own trend-confidence formula (it also reads
+// CCI, MACD, BB, momentum, volume, swings). This is a placeholder score built
+// from EMA stacking + DI direction, scaled by ADX strength. Replace in a later bite.
+// ============================================================================
+bullScore = (emaF > emaM ? 1 : 0) + (emaM > emaS ? 1 : 0) + (emaS > emaT ? 1 : 0) + (close > emaT ? 1 : 0) + (diPlus > diMinus ? 1 : 0)
+bearScore = (emaF < emaM ? 1 : 0) + (emaM < emaS ? 1 : 0) + (emaS < emaT ? 1 : 0) + (close < emaT ? 1 : 0) + (diMinus > diPlus ? 1 : 0)
+trendDir  = bullScore > bearScore ? 1 : bearScore > bullScore ? -1 : 0
+trendConf = math.max(bullScore, bearScore) / 5.0 * 100.0 * math.min(adx / adxTrend, 1.0)
+
+regime      = adx >= adxTrend ? "TENDENCIA" : adx <= adxRange ? "RANGO" : "NEUTRAL"
+strongTrend = adx >= adxTrend and trendConf >= trendBlock
+
+// ============================================================================
+// Grid step and lot ladder
+// ============================================================================
+volBucket = atrRatio < volLowMax ? "BAJO" : atrRatio < volMedMax ? "MEDIO" : atrRatio < volHighMax ? "ALTO" : "EXTREMO"
+martMult  = atrRatio < volLowMax ? martLow : atrRatio < volMedMax ? martMed : atrRatio < volHighMax ? martHigh : martXHigh
+
+baseStep = useATRStep ? math.max(atr * atrMult, minStep) : math.max(fixedStep, minStep)
+
+// Distance between level (lvl-1) and level lvl; grows by stepGrowth per level.
+stepForLevel(int lvl) =>
+    baseStep * math.pow(1.0 + stepGrowth, lvl - 1)
+
+// Lot for level lvl. After martMaxLvls the lot stays flat.
+// ASSUMPTION: "lote plano" = keep the last martingale lot (could also mean back to base lot).
+lotForLevel(int lvl) =>
+    effLvl = martMaxLvls > 0 ? math.min(lvl, martMaxLvls) : lvl
+    math.round(math.min(baseLot * math.pow(martMult, effLvl - 1), maxLotOrder), 2)
+
+seedAllowedVol = maxAtrRatio <= 0 or atrRatio <= maxAtrRatio
+
+// ============================================================================
+// Visuals
+// ============================================================================
+plot(showEmas ? emaF : na, "EMA rapida",    color.new(color.aqua, 0))
+plot(showEmas ? emaM : na, "EMA media",     color.new(color.yellow, 0))
+plot(showEmas ? emaS : na, "EMA lenta",     color.new(color.orange, 0))
+plot(showEmas ? emaT : na, "EMA tendencia", color.new(color.red, 0), 2)
+
+bgcolor(strongTrend ? (trendDir > 0 ? color.new(color.green, 88) : color.new(color.red, 88)) : na, title = "Tendencia fuerte")
+bgcolor(not seedAllowedVol ? color.new(color.gray, 85) : na, title = "Volatilidad bloquea siembra")
+
+// Preview of where buy/sell grid levels would sit if a basket opened on the last close.
+var array<line> ladder = array.new<line>()
+if barstate.islast and showLadder
+    for l in ladder
+        line.delete(l)
+    array.clear(ladder)
+    dist = 0.0
+    for i = 1 to ladderDepth
+        dist += stepForLevel(i)
+        array.push(ladder, line.new(bar_index - 10, close - dist, bar_index + 5, close - dist, color = color.new(color.lime, 30), style = line.style_dotted))
+        array.push(ladder, line.new(bar_index - 10, close + dist, bar_index + 5, close + dist, color = color.new(color.fuchsia, 30), style = line.style_dotted))
+
+var table dash = table.new(position.top_right, 2, 10, bgcolor = color.new(color.black, 15), border_width = 1)
+dashRow(int r, string k, string v, color c) =>
+    table.cell(dash, 0, r, k, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+    table.cell(dash, 1, r, v, text_color = c,            text_size = size.small, text_halign = text.align_right)
+
+if barstate.islast and showDash
+    dashRow(0, "ATR / ATRavg", str.tostring(atr, format.mintick) + " / " + str.tostring(atrRatio, "#.###"), color.white)
+    dashRow(1, "Volatilidad",  volBucket + "  x" + str.tostring(martMult, "#.##"), color.white)
+    dashRow(2, "Regimen",      regime, color.white)
+    dashRow(3, "ADX",          str.tostring(adx, "#.#"), color.white)
+    dashRow(4, "Tendencia",    (trendDir > 0 ? "ALCISTA" : trendDir < 0 ? "BAJISTA" : "PLANA") + "  " + str.tostring(trendConf, "#") + "%", trendDir > 0 ? color.lime : trendDir < 0 ? color.red : color.gray)
+    dashRow(5, "RSI",          str.tostring(rsi, "#.#"), color.white)
+    dashRow(6, "Paso base",    str.tostring(baseStep, format.mintick), color.white)
+    dashRow(7, "Lotes 1-4",    str.tostring(lotForLevel(1)) + " / " + str.tostring(lotForLevel(2)) + " / " + str.tostring(lotForLevel(3)) + " / " + str.tostring(lotForLevel(4)), color.white)
+    dashRow(8, "Siembra",      seedAllowedVol ? "PERMITIDA" : "BLOQUEADA (ATR)", seedAllowedVol ? color.lime : color.orange)
+    dashRow(9, "Bite",         "1 / indicadores", color.gray)
