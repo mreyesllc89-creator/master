@@ -28,12 +28,15 @@
 //               Optional time stop closes a trade after N bars.
 //  S3. SIZING - Fixed quantity, or Risk % of equity per trade (needs a stop
 //               loss; falls back to the fixed quantity when SL is off).
-//               Capped at Max quantity and rounded down to Quantity step.
+//               Capped at Max quantity and at equity x Max leverage (so an
+//               order is never rejected for lack of funds), then rounded
+//               down to Quantity step. A status table shows signal count,
+//               closed trades and the next order size.
 //  Orders are placed on bar close and fill on the next bar's open.
 // ============================================================================
 strategy("TDI+ (Enhanced) Strategy", shorttitle="TDI+ S", overlay=false, max_lines_count=500,
          pyramiding=0, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=10,
-         commission_type=strategy.commission.percent, commission_value=0.05)
+         margin_long=0, margin_short=0, commission_type=strategy.commission.percent, commission_value=0.05)
 
 // — Inputs —
 grpT = "TDI"
@@ -81,6 +84,8 @@ FixedQty = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minva
 RiskPct  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0, step=0.1, group=grpQ, tooltip="Quantity = equity x risk % / stop-loss distance in money. Needs a stop loss; uses the fixed quantity when SL is off.")
 MaxQty   = input.float(50, "Max quantity", minval=0, group=grpQ)
 QtyStep  = input.float(1, "Quantity step (rounds down)", minval=0, group=grpQ)
+Leverage = input.float(20, "Max leverage (x equity)", minval=0.01, step=0.5, group=grpQ, tooltip="Position value is capped at equity x leverage, so orders are never rejected for lack of funds. 1 = no leverage.")
+ShowInfo = input.bool(true, "Show status table", group=grpQ)
 
 // — RSI & Bands —
 slow     = ta.rsi(close, RSIPeriod)
@@ -166,7 +171,8 @@ calcQty() =>
     if QtyMode == "Risk" and slTk > 0
         perUnitRisk = slTk * syminfo.mintick * syminfo.pointvalue
         q := strategy.equity * RiskPct / 100 / perUnitRisk
-    q := math.min(q, MaxQty)
+    affordable = strategy.equity * Leverage * 0.98 / (close * syminfo.pointvalue)
+    q := math.min(q, MaxQty, affordable)
     QtyStep > 0 ? math.floor(q / QtyStep) * QtyStep : q
 
 entryQty = calcQty()
@@ -242,3 +248,19 @@ plotshape(goShort, title="Short Signal", style=shape.circle, location=location.t
 // — Alerts —
 alertcondition(goLong, title="TDI+ Long Signal", message="TDI+ long signal on {{ticker}}")
 alertcondition(goShort, title="TDI+ Short Signal", message="TDI+ short signal on {{ticker}}")
+
+// — Status table —
+var int nLongSig  = 0
+var int nShortSig = 0
+nLongSig  += goLong ? 1 : 0
+nShortSig += goShort ? 1 : 0
+var table info = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 20), border_width=1)
+if ShowInfo and barstate.islast
+    table.cell(info, 0, 0, "Signals L / S", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 0, str.tostring(nLongSig) + " / " + str.tostring(nShortSig), text_color=color.white, text_size=size.small)
+    table.cell(info, 0, 1, "Closed trades", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 1, str.tostring(strategy.closedtrades), text_color=color.white, text_size=size.small)
+    table.cell(info, 0, 2, "Next qty", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 2, str.tostring(entryQty), text_color=entryQty > 0 ? color.white : color.red, text_size=size.small)
+    table.cell(info, 0, 3, "Direction", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 3, TradeDir, text_color=color.white, text_size=size.small)
