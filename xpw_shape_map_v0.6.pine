@@ -1,5 +1,6 @@
 //@version=6
 // XPW Shape Map v0.6 — MAP LAYER ONLY, NO SIGNALS
+// "Show / hide labels" group: switch each drawing type on or off individually.
 // v0.6: "Label ALL opportunities" mode. Every odd-colour wedge gets a TOP/BOT
 // square + label, the same as the strict ones — no area filter, no spacing,
 // and only 1 context bar on each side. Turn it off to get v0.5 behaviour back.
@@ -38,6 +39,18 @@ rngW = hiW - loW
 posW = rngW > 0 ? (slow - loW) / rngW : 0.5
 inLow  = posW <= loFrac
 inHigh = posW >= hiFrac
+
+// ───────────────────── SHOW / HIDE ─────────────────────
+// Turn individual drawings on/off. Detection, counts and the table keep running.
+grpS = "Show / hide labels"
+showBotBox   = input.bool(true, "BOT square box",        group = grpS, inline = "sb")
+showBotLbl   = input.bool(true, "BOT square label",      group = grpS, inline = "sb")
+showTopBox   = input.bool(true, "TOP square box",        group = grpS, inline = "st")
+showTopLbl   = input.bool(true, "TOP square label",      group = grpS, inline = "st")
+showTurnUp   = input.bool(true, "Turn ▲ (after BOT)",    group = grpS, inline = "tn")
+showTurnDn   = input.bool(true, "Turn ▼ (after TOP)",    group = grpS, inline = "tn")
+showBotTick  = input.bool(true, "BOT tick (price chart)", group = grpS, inline = "tk")
+showTopTick  = input.bool(true, "TOP tick (price chart)", group = grpS, inline = "tk")
 
 // ───────────────────── ALL OPPORTUNITIES ─────────────────────
 // ON  = label every odd-colour wedge, anywhere, with no spacing.
@@ -128,8 +141,10 @@ if botOK
     for i = 0 to botWid - 1
         hh := math.max(hh, math.max(fast[botCtx + i], slow[botCtx + i]))
         ll := math.min(ll, math.min(fast[botCtx + i], slow[botCtx + i]))
-    box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.red, 0), border_width = 1, bgcolor = color.new(color.red, 65))
-    label.new(rgt, ll - 2.0, "BOT " + str.tostring(botWid), style = label.style_label_up, color = color.new(color.red, 25), textcolor = color.white, size = size.tiny)
+    if showBotBox
+        box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.red, 0), border_width = 1, bgcolor = color.new(color.red, 65))
+    if showBotLbl
+        label.new(rgt, ll - 2.0, "BOT " + str.tostring(botWid), style = label.style_label_up, color = color.new(color.red, 25), textcolor = color.white, size = size.tiny)
 
 if topOK
     lastTopBar   := bar_index
@@ -142,8 +157,10 @@ if topOK
     for i = 0 to topWid - 1
         hh := math.max(hh, math.max(fast[topCtx + i], slow[topCtx + i]))
         ll := math.min(ll, math.min(fast[topCtx + i], slow[topCtx + i]))
-    box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.lime, 0), border_width = 1, bgcolor = color.new(color.lime, 65))
-    label.new(rgt, hh + 2.0, "TOP " + str.tostring(topWid), style = label.style_label_down, color = color.new(color.green, 25), textcolor = color.white, size = size.tiny)
+    if showTopBox
+        box.new(lft, hh + 1.5, rgt, ll - 1.5, border_color = color.new(color.lime, 0), border_width = 1, bgcolor = color.new(color.lime, 65))
+    if showTopLbl
+        label.new(rgt, hh + 2.0, "TOP " + str.tostring(topWid), style = label.style_label_down, color = color.new(color.green, 25), textcolor = color.white, size = size.tiny)
 
 // ───────────────────────── TURN MARK ─────────────────────────
 // The wedge warns. The turn confirms: the lines cross back and HOLD.
@@ -193,14 +210,16 @@ if botTurn
     nBotTurn += 1
     int tb = bar_index - turnHold
     lastBotGap := tb - lastBotWedge
-    label.new(tb, math.min(fast[turnHold], slow[turnHold]) - 3.0, "▲", style = label.style_label_up, color = color.new(color.yellow, 10), textcolor = color.black, size = size.tiny)
+    if showTurnUp
+        label.new(tb, math.min(fast[turnHold], slow[turnHold]) - 3.0, "▲", style = label.style_label_up, color = color.new(color.yellow, 10), textcolor = color.black, size = size.tiny)
 
 if topTurn
     topArmed := false
     nTopTurn += 1
     int tb = bar_index - turnHold
     lastTopGap := tb - lastTopWedge
-    label.new(tb, math.max(fast[turnHold], slow[turnHold]) + 3.0, "▼", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.black, size = size.tiny)
+    if showTurnDn
+        label.new(tb, math.max(fast[turnHold], slow[turnHold]) + 3.0, "▼", style = label.style_label_down, color = color.new(color.orange, 10), textcolor = color.black, size = size.tiny)
 
 // ──────────── TICKS (wick as a compressed cycle) ────────────
 grpK = "Ticks"
@@ -224,10 +243,12 @@ var int nTopTk = 0
 
 if botTick
     nBotTk += 1
-    label.new(bar_index, low, "BOT", style = label.style_label_up, color = color.new(color.yellow, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
+    if showBotTick
+        label.new(bar_index, low, "BOT", style = label.style_label_up, color = color.new(color.yellow, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
 if topTick
     nTopTk += 1
-    label.new(bar_index, high, "TOP", style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
+    if showTopTick
+        label.new(bar_index, high, "TOP", style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.black, size = size.tiny, force_overlay = true)
 
 // ───────── LEGS: continuity vs distance (turn to turn) ─────────
 var bool   legOpen = false
