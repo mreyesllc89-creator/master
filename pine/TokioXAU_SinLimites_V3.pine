@@ -28,6 +28,8 @@
 // BITE 6: stops and risk: time cut, catastrophe stop, basket stop (also the
 //         funded stop), pauses, side flip after a stop, equity stop and the
 //         circuit breakers (stop-add, derisk cut, close all).
+// BITE 7: alerts for every event (text or JSON for webhooks), each position
+//         with a unique id so a bridge can mirror the ledger on a broker.
 //
 // Inputs marked (bite N) are already loaded from the preset but only become
 // active in that bite. MT5-only inputs (magic, slippage, Telegram, DB, CSV)
@@ -175,6 +177,18 @@ maxSynth    = input.int(60,      "Maximo de ticks sinteticos por tramo", minval 
 simStart    = input.time(timestamp("2000-01-01T00:00:00"), "Simular desde", group = grpSim)
 
 // ---------------------------------------------------------------- Visual
+// ---------------------------------------------------------------- Alertas
+grpAlert    = "Alertas"
+alertsOn    = input.bool(true,     "Enviar alertas", group = grpAlert,
+     tooltip = "Crea la alerta en TradingView con la condicion 'Cualquier llamada a la funcion alert()'. Solo se envian en tiempo real (nunca por el historico).")
+alertFmt    = input.string("Texto", "Formato del mensaje", options = ["Texto", "JSON"], group = grpAlert,
+     tooltip = "JSON: un objeto por evento, pensado para webhooks / puentes hacia el broker.")
+alertTag    = input.string("TokioXAU_V3", "Identificador (campo ea)", group = grpAlert)
+alEntries   = input.bool(true,     "Entradas: siembra, grid, refill, tendencia", group = grpAlert)
+alCloses    = input.bool(true,     "Cierres de cesta: TP, trinquete, trailing, stops, cortes", group = grpAlert)
+alUnwind    = input.bool(true,     "Cierres parciales: scalps, pagos, recortes", group = grpAlert)
+alLock      = input.bool(true,     "Candado: poner y quitar", group = grpAlert)
+
 grpVis      = "Visual"
 showEmas    = input.bool(true,  "Mostrar EMAs",          group = grpVis)
 showSwings  = input.bool(false, "Mostrar swings (BOS)",  group = grpVis)
@@ -466,6 +480,7 @@ type Pos
     float price
     float lot
     int   t
+    int   id        // unique id, sent in the alerts so a bridge can close this exact position
 
 // Chart marker waiting to be drawn (kept in the varip book so that markers
 // created on realtime ticks survive the tick rollback).
@@ -533,6 +548,7 @@ type Book
     int   nStop       = 0
     int   nTimeCut    = 0
     int   nCuts       = 0
+    int   nextId      = 1     // position id counter (alerts)
 
 // varip: on realtime bars every tick's changes persist (like the EA's OnTick).
 // On historical bars it behaves like var.
@@ -589,6 +605,26 @@ lockFloating(Book b, float bidP, float askP) =>
         sum += posPf(p, bidP, askP)
     sum
 
+// Sends one event as an alert (realtime only: replayed history never alerts).
+// ev: open | close_one | close_all ; cat: 1 entries, 2 basket closes, 3 partial closes, 4 lock.
+emitAlert(int cat, string ev, int side, float lot, float price, int id, string tag, float net, int npos) =>
+    on = cat == 1 ? alEntries : cat == 2 ? alCloses : cat == 3 ? alUnwind : alLock
+    if alertsOn and on and barstate.isrealtime
+        sideTxt = side > 0 ? "buy" : side < 0 ? "sell" : ""
+        string msg = ""
+        if alertFmt == "JSON"
+            msg := '{"ea":"' + alertTag + '","symbol":"' + syminfo.ticker + '","event":"' + ev + '","side":"' + sideTxt +
+                 '","lot":' + str.tostring(nz(lot), "0.00") + ',"price":' + str.tostring(nz(price), "0.00###") +
+                 ',"id":' + str.tostring(id) + ',"tag":"' + tag + '","net":' + str.tostring(nz(net), "0.00") +
+                 ',"positions":' + str.tostring(npos) + ',"time":' + str.tostring(timenow) + '}'
+        else
+            msg := alertTag + " " + syminfo.ticker + " | " + ev + (sideTxt != "" ? " " + sideTxt : "") +
+                 (lot > 0 ? " " + str.tostring(lot, "0.00") : "") + " @ " + str.tostring(price, format.mintick) +
+                 " | " + tag + (id > 0 ? " #" + str.tostring(id) : "") + (ev != "open" ? " | neto " + str.tostring(net, "0.00") : "") +
+                 " | pos " + str.tostring(npos)
+        alert(msg, alert.freq_all)
+    true
+
 addMark(Book b, float price, int kind, string txt, string tip, float net) =>
     b.marks.push(Mark.new(bar_index, price, kind, txt, tip, net))
     true
@@ -597,7 +633,9 @@ addMark(Book b, float price, int kind, string txt, string tip, float net) =>
 openPos(Book b, int side, float price, float lot, string tag, float lotsNow, int tms) =>
     bool ok = false
     if lot > 0 and lotsNow + lot <= maxTotLots + 1e-9
-        b.pos.push(Pos.new(side, price, lot, tms))
+        b.pos.push(Pos.new(side, price, lot, tms, b.nextId))
+        emitAlert(1, "open", side, lot, price, b.nextId, tag, 0.0, b.pos.size())
+        b.nextId := b.nextId + 1
         if na(b.openT)
             b.openT := tms
         b.lastAdd := tms
@@ -634,6 +672,7 @@ closeAll(Book b, float net, int total, float delta, string reason, int tms, floa
     b.sinceStop   := reason == "basket_stop_hard" ? 0.0 : b.sinceStop + res
     // Anti-martingale: only quick wins (few positions) extend the streak.
     b.winStreak   := res > 0 and (cleanWinLvl <= 0 or total <= cleanWinLvl) ? b.winStreak + 1 : 0
+    emitAlert(2, "close_all", 0, 0.0, px, 0, reason, res, total)
     addMark(b, px, 0, (res >= 0 ? "+" : "") + str.tostring(res, "#.##") + "\n" + str.tostring(total) + " pos",
          reason + (b.scalps + b.paydowns > 0 ? "  scalps " + str.tostring(b.scalps) + " pagos " + str.tostring(b.paydowns) : "") + (b.locks > 0 ? "  candados " + str.tostring(b.locks) : "") + (b.cut != 0 ? "  recortes " + str.tostring(b.cut, "#.##") : ""), res)
     b.lastHarvest := tms
@@ -767,6 +806,7 @@ scalpAndPayDown(Book b, float bid, float ask, int tms) =>
                         b.scalps    := b.scalps + 1
                         b.nScalpTot := b.nScalpTot + 1
                         b.lastScalp := tms
+                        emitAlert(3, "close_one", want, q.lot, want > 0 ? bid : ask, q.id, "scalp", pf, b.pos.size())
                         addMark(b, want > 0 ? bid : ask, 2, "$", "Scalp " + (want > 0 ? "compra" : "venta") + " +" + str.tostring(pf, "#.##") + "  banco " + str.tostring(b.bank, "#.##"), pf)
                         acted := true
         if not acted and payDown and b.bank > 0 and nb + ns >= 2 and wI >= 0 and wPf < 0 and b.bank + wPf >= payDownBuf
@@ -780,6 +820,7 @@ scalpAndPayDown(Book b, float bid, float ask, int tms) =>
             b.paydowns  := b.paydowns + 1
             b.nPayTot   := b.nPayTot + 1
             b.lastScalp := tms
+            emitAlert(3, "close_one", w.side, w.lot, w.side > 0 ? bid : ask, w.id, "paydown", wPf, b.pos.size())
             addMark(b, w.price, 3, "x", "Pago de la peor " + (w.side > 0 ? "compra" : "venta") + " " + str.tostring(wPf, "#.##") + "  banco " + str.tostring(b.bank, "#.##"), wPf)
             acted := true
     acted
@@ -797,6 +838,8 @@ manageLock(Book b, float bid, float ask, float px, int tms, float balance) =>
             reb = b.lockDir > 0 ? px - b.lockExtreme : b.lockExtreme - px
             if atr > 0 and reb >= unlockATR * atr
                 got = lockFloating(b, bid, ask)
+                for lp in b.lockPos
+                    emitAlert(4, "close_one", lp.side, lp.lot, lp.side > 0 ? bid : ask, lp.id, "unlock", posPf(lp, bid, ask), nb + ns)
                 b.lockPos.clear()
                 b.bank   := b.bank + got
                 b.locked := false
@@ -809,7 +852,9 @@ manageLock(Book b, float bid, float ask, float px, int tms, float balance) =>
                 while rest >= 0.01 and guard < 50
                     guard += 1
                     lot = normLot(math.min(rest, maxLotOrder), maxLotOrder)
-                    b.lockPos.push(Pos.new(delta > 0 ? -1 : 1, delta > 0 ? bid : ask, lot, tms))
+                    b.lockPos.push(Pos.new(delta > 0 ? -1 : 1, delta > 0 ? bid : ask, lot, tms, b.nextId))
+                    emitAlert(4, "open", delta > 0 ? -1 : 1, lot, delta > 0 ? bid : ask, b.nextId, "lock", net, nb + ns)
+                    b.nextId := b.nextId + 1
                     rest := math.round(rest - lot, 2)
                 b.locked      := true
                 b.lockDir     := delta > 0 ? 1 : -1
@@ -878,6 +923,7 @@ engineTick(Book b, float px, int tms) =>
         b.cut         := b.cut + wPf0
         b.nCuts       := b.nCuts + 1
         b.lastPartial := tms
+        emitAlert(3, "close_one", w.side, w.lot, w.side > 0 ? bid : ask, w.id, "breaker_cut", wPf0, b.pos.size())
         addMark(b, w.price, 6, "-", "Cortacircuitos: recorte de la peor " + str.tostring(wPf0, "#.##"), wPf0)
 
     if not closed and b.pos.size() > 0
@@ -1105,4 +1151,4 @@ if barstate.islast and showDash
     dashRow(17, "Equity sim.",  str.tostring(dEq, "#,##0.00"), color.white)
     dashRow(18, "Ejecucion",    execMode + (barstate.isrealtime and isTickMode ? " (EN VIVO)" : "") + "  ticks " + str.tostring(bk.ticks), color.gray)
     dashRow(19, "Hora servidor", str.format_time(nowMs, "EEE HH:mm", serverTZ) + "  (" + serverTZ + ")" + (sideMode > 0 ? "  lado " + str.tostring(sideAllowed(bidC, bk.flipDir, bk.flipUntil, nowMs)) : ""), color.gray)
-    dashRow(20, "Bite",         "6 / stops y riesgo", color.gray)
+    dashRow(20, "Bite",         "7 / completo + alertas", color.gray)
