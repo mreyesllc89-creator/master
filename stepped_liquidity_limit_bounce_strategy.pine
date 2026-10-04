@@ -1,7 +1,7 @@
 //@version=6
-// Calibrated for BTCUSD (crypto, 24/7). Recommended chart: 1H with 4H trend filter.
+// Calibrated for BTCUSD (crypto, 24/7). Works on any timeframe; best tested results on 4H.
 strategy("Stepped Liquidity Limit Bounce - BTCUSD", overlay=true, margin_long=100, margin_short=100, process_orders_on_close=true,
-     initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     initial_capital=100000, default_qty_type=strategy.percent_of_equity, default_qty_value=10,
      commission_type=strategy.commission.percent, commission_value=0.06)
 
 // =========================================================================
@@ -11,6 +11,7 @@ grp_trade = "Trade Direction & Risk"
 tradeDirection = input.string("Both", title="Trade Direction", options=["Buy Only", "Sell Only", "Both"], group=grp_trade)
 cancelBars     = input.int(6, title="Cancel Unfilled Order (Bars)", minval=1, group=grp_trade)
 useATR         = input.bool(true, title="Use ATR for SL/TP/Cancel", group=grp_trade)
+equityPct      = input.float(10, title="Position Size (% of Equity)", minval=0.1, maxval=100, group=grp_trade, tooltip="Backtest sizing. Rounded to the symbol's minimum contract, never below it.")
 
 grp_vol = "Volatility Settings"
 atrLength     = input.int(14, "ATR Length", minval=1, group=grp_vol)
@@ -39,7 +40,8 @@ pivotRight     = input.int(3, title="Pivot Right Strength", minval=1, group=grp_
 maxLevels      = input.int(8, title="Max Liquidity Levels to Track", minval=1, group=grp_logic)
 minTouches     = input.int(1, title="Min Touches for a Valid Level", minval=1, group=grp_logic)
 useTrendFilter = input.bool(true, "Use HTF Trend Filter", group=grp_logic)
-htfTimeframe   = input.timeframe("240", "Higher TF for Trend", group=grp_logic)
+autoHTF        = input.bool(true, "Auto Higher TF (4× chart timeframe)", group=grp_logic)
+htfTimeframe   = input.timeframe("240", "Manual Higher TF for Trend", group=grp_logic, tooltip="Used only when Auto is off. Ignored if lower than the chart timeframe.")
 htfEmaLength   = input.int(50, "HTF EMA Length", minval=1, group=grp_logic)
 adxLength      = input.int(14, "ADX Length", minval=1, group=grp_logic)
 adxThreshold   = input.int(20, "ADX Trend Threshold", group=grp_logic)
@@ -69,7 +71,10 @@ cancelDistTicks = useATR ? atrInTicks * atrMultCancel : fixedCancelPrice / symin
 tolerancePrice = toleranceTicks * syminfo.mintick
 
 // HTF Trend: previous completed HTF bar + lookahead_on = no repainting, no future leak
-htfEMA = request.security(syminfo.tickerid, htfTimeframe, ta.ema(close, htfEmaLength)[1], lookahead=barmerge.lookahead_on)
+// Trend timeframe must be above the chart timeframe so any chart TF works
+autoTF  = timeframe.from_seconds(timeframe.in_seconds() * 4)
+trendTF = autoHTF or timeframe.in_seconds(htfTimeframe) <= timeframe.in_seconds() ? autoTF : htfTimeframe
+htfEMA = request.security(syminfo.tickerid, trendTF, ta.ema(close, htfEmaLength)[1], lookahead=barmerge.lookahead_on)
 
 // ADX (Pine has no ta.adx; it comes from ta.dmi)
 [diPlus, diMinus, adxVal] = ta.dmi(adxLength, adxLength)
@@ -168,6 +173,12 @@ buildLimitMsg(bool isLong, float entryPx, float slT, float tpT) =>
 
 cancelLongMsg  = licenseID + ",cancellong," + mtSymbol
 cancelShortMsg = licenseID + ",cancelshort," + mtSymbol
+
+// Explicit size so fractional BTC is never rounded down to 0 (which silently blocks every order)
+calcQty(float px) =>
+    float step = syminfo.mincontract > 0 ? syminfo.mincontract : 0.00000001
+    float raw  = strategy.equity * equityPct / 100 / px
+    math.max(step, math.floor(raw / step) * step)
 
 // =========================================================================
 // ORDER STATE
@@ -286,7 +297,7 @@ if longCondition
     lockedLongTP       := math.max(1, math.round(tpTicks))
     pendingLongPrice   := activeSupportPrice
     barsSinceLongOrder := 0
-    strategy.entry("Long", strategy.long, limit=activeSupportPrice)
+    strategy.entry("Long", strategy.long, qty=calcQty(activeSupportPrice), limit=activeSupportPrice)
     alert(buildLimitMsg(true, activeSupportPrice, lockedLongSL, lockedLongTP), alert.freq_once_per_bar_close)
 
 if shortCondition
@@ -294,7 +305,7 @@ if shortCondition
     lockedShortTP       := math.max(1, math.round(tpTicks))
     pendingShortPrice   := activeResistancePrice
     barsSinceShortOrder := 0
-    strategy.entry("Short", strategy.short, limit=activeResistancePrice)
+    strategy.entry("Short", strategy.short, qty=calcQty(activeResistancePrice), limit=activeResistancePrice)
     alert(buildLimitMsg(false, activeResistancePrice, lockedShortSL, lockedShortTP), alert.freq_once_per_bar_close)
 
 // =========================================================================
@@ -341,7 +352,7 @@ cSigL   += longCondition ? 1 : 0
 cSigS   += shortCondition ? 1 : 0
 cFill   += newFill ? 1 : 0
 
-var table dbg = table.new(position.top_right, 3, 9, bgcolor=color.new(color.black, 20), border_width=1)
+var table dbg = table.new(position.top_right, 3, 11, bgcolor=color.new(color.black, 20), border_width=1)
 if showDebug and barstate.islast
     table.cell(dbg, 0, 0, "Stage",              text_color=color.white)
     table.cell(dbg, 1, 0, "Long",               text_color=color.lime)
@@ -370,3 +381,9 @@ if showDebug and barstate.islast
     table.cell(dbg, 0, 8, "Volume OK bars",     text_color=color.white)
     table.cell(dbg, 1, 8, str.tostring(cVol),   text_color=color.white)
     table.cell(dbg, 2, 8, "",                   text_color=color.white)
+    table.cell(dbg, 0, 9, "Trend TF",           text_color=color.white)
+    table.cell(dbg, 1, 9, trendTF,              text_color=color.white)
+    table.cell(dbg, 2, 9, "",                   text_color=color.white)
+    table.cell(dbg, 0, 10, "Order qty",         text_color=color.white)
+    table.cell(dbg, 1, 10, str.tostring(calcQty(close)), text_color=color.white)
+    table.cell(dbg, 2, 10, "min " + str.tostring(syminfo.mincontract), text_color=color.white)
