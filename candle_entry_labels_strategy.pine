@@ -1,0 +1,507 @@
+//@version=6
+// Candle Entry Labels STRATEGY: LONG / SHORT labels on the entry candle, entry
+// time on any chart timeframe, the move after the entry measured in ticks (or
+// price / percent) and time, and real orders you can backtest.
+//
+// What it does
+//   * Turns the "Candle Entry Labels" indicator into a strategy. The signal is
+//     decided when a candle CLOSES and the order fills at the OPEN of the next
+//     candle (TradingView's default fill). That open is the entry candle: the
+//     LONG / SHORT label, the dot and every measurement start from the real
+//     fill price, so labels and Strategy Tester trades are always the same.
+//   * "Signal read at = Candle beginning (open)" keeps the indicator's
+//     open-based EMA reading: it is evaluated at the previous close, using that
+//     close as the next candle's open (on 24/7 markets such as BTCUSD the two
+//     are the same price to within a few ticks).
+//   * Signals can come from a higher timeframe (e.g. 4H signals on a 15m chart):
+//     the order is placed on the first chart candle after the signal bar closes.
+//   * Stop loss (ATR or percent), take profit (R multiple of the stop), ATR
+//     trailing stop, trend filter (EMA), long/short/both, time exit.
+//   * Each trade gets: entry label + dot, best point (MFE), worst point (MAE),
+//     END label with the result, exit reason and P/L, a live label on the open
+//     trade, and a table of recent trades.
+//
+// Labels: every label type has its own size, from "tiny" to "huge", or "Off"
+// to remove it. A master switch hides all of them at once. TradingView's own
+// trade arrows are separate: Settings > Style > "Trades on chart".
+//
+// Calibration (defaults). Backtested on BITSTAMP BTC/USD 4H with 0.1%
+// commission, 100% of equity per trade, fill at next open:
+//   EMA 21/55 cross (close reading), trend filter EMA 200, long only,
+//   stop 2 x ATR(14), no take profit, no trailing, exit on opposite signal.
+//   Chosen on 2018-2022 data, then checked on unseen 2023 - Oct 2026 data:
+//     2018-2022  +740%  max DD 38%  50 trades  PF 2.30  (buy & hold +23%)
+//     2023-2026  +172%  max DD 21%  40 trades  PF 2.40  (buy & hold +413%)
+//   Neighbouring settings (EMA 20/50 - 50/100, stop 1.5 - 4 ATR) are also
+//   profitable on the unseen period, so the defaults are not a lone lucky
+//   point. The same settings on 1H do NOT hold up (PF < 1 in 2023-2026): use
+//   4H (or a 4H signal timeframe on a lower chart). Past results do not
+//   guarantee future results; your feed's numbers will differ slightly.
+//
+strategy("Candle Entry Labels Strategy: Long/Short, Ticks & Timing",
+     shorttitle = "Entry Labels Strategy",
+     overlay = true,
+     initial_capital = 10000,
+     default_qty_type = strategy.percent_of_equity,
+     default_qty_value = 100,
+     commission_type = strategy.commission.percent,
+     commission_value = 0.1,
+     slippage = 2,
+     pyramiding = 0,
+     margin_long = 100,
+     margin_short = 100,
+     max_labels_count = 500,
+     max_lines_count = 500,
+     max_boxes_count = 100,
+     max_bars_back = 5000)
+
+// ─────────────────────────── Inputs: entry signal ───────────────────────────
+grpSig = "Entry signal"
+sigMode  = input.string("EMA cross", "Signal type",
+     options = ["EMA cross", "Engulfing candle", "Breakout", "External"], group = grpSig,
+     tooltip = "EMA cross: fast EMA crosses slow EMA.\nEngulfing: bullish / bearish engulfing candle.\nBreakout: close breaks the highest high / lowest low of the lookback.\nExternal: use the two source inputs below (a value > 0 fires the signal).")
+sigRead  = input.string("Candle close", "Signal read at",
+     options = ["Candle close", "Candle beginning (open)"], group = grpSig,
+     tooltip = "Both readings decide at a candle's close and enter at the next candle's open.\nCandle close: classic crossover of the EMAs on closes (calibrated default).\nCandle beginning (open): the indicator's open-based EMA reading, i.e. the EMAs updated with the next open, using the close as that open. Engulfing and Breakout read the same either way.")
+sigTf    = input.timeframe("", "Signal timeframe (blank = chart)", group = grpSig,
+     tooltip = "Signals, trend filter and ATR are computed on this timeframe. The order goes in on the first chart candle after the signal bar closes, so nothing repaints.")
+emaFast  = input.int(21, "EMA fast", minval = 1, group = grpSig)
+emaSlow  = input.int(55, "EMA slow", minval = 2, group = grpSig)
+brkLen   = input.int(20, "Breakout lookback", minval = 2, group = grpSig)
+extLong  = input.source(close, "External long source",  group = grpSig, tooltip = "External mode only: fires a LONG when this value turns > 0.")
+extShort = input.source(close, "External short source", group = grpSig, tooltip = "External mode only: fires a SHORT when this value turns > 0.")
+
+// ─────────────────────────── Inputs: strategy ───────────────────────────
+grpStr = "Strategy (defaults calibrated on BTCUSD 4H)"
+tradeDir  = input.string("Long only", "Trade direction", options = ["Both", "Long only", "Short only"], group = grpStr,
+     tooltip = "Both: an opposite signal reverses the position.\nLong only / Short only: the opposite signal only closes the position.\nOn BTCUSD, Long only was clearly more robust than Both.")
+closeOpp  = input.bool(true, "Close on opposite signal", group = grpStr,
+     tooltip = "Close the position when the opposite raw signal appears, even if the trend filter blocks the new entry.")
+useTrend  = input.bool(true, "Trend filter: longs above / shorts below EMA", inline = "tr", group = grpStr)
+trendLen  = input.int(200, "", minval = 2, inline = "tr", group = grpStr)
+slMode    = input.string("ATR", "Stop loss", options = ["ATR", "Percent", "Off"], group = grpStr)
+slAtr     = input.float(2.0, "Stop: ATR multiple", minval = 0.1, step = 0.25, group = grpStr)
+slPct     = input.float(5.0, "Stop: percent of price", minval = 0.1, step = 0.5, group = grpStr)
+atrLen    = input.int(14, "ATR length", minval = 1, group = grpStr)
+tpR       = input.float(0.0, "Take profit: R multiple of the stop (0 = off)", minval = 0, step = 0.5, group = grpStr,
+     tooltip = "2 = take profit at twice the stop distance. Needs a stop. Off by default: on BTCUSD letting winners run worked better.")
+trailOn   = input.bool(false, "ATR trailing stop", group = grpStr)
+trailAct  = input.float(3.0, "Trailing: activate after ATR ×", minval = 0, step = 0.5, group = grpStr)
+trailOff  = input.float(2.0, "Trailing: distance ATR ×", minval = 0.1, step = 0.5, group = grpStr)
+timeExit  = input.bool(false, "Time exit after N bars", inline = "te", group = grpStr)
+maxBars   = input.int(50, "", minval = 1, inline = "te", group = grpStr)
+startT    = input.time(timestamp("01 Jan 2018 00:00 +0000"), "Trade from", group = grpStr)
+endT      = input.time(timestamp("31 Dec 2099 00:00 +0000"), "Trade until", group = grpStr)
+
+// ─────────────────────────── Inputs: labels ───────────────────────────
+grpLbl = "Labels (size or Off for each one)"
+showLbls  = input.bool(true, "Show labels (master switch)", group = grpLbl)
+entrySzIn = input.string("normal", "Entry label LONG / SHORT", options = ["Off", "tiny", "small", "normal", "large", "huge"], group = grpLbl)
+dotSzIn   = input.string("small",  "Entry dot (fill price)",   options = ["Off", "tiny", "small", "normal", "large", "huge"], group = grpLbl)
+mfeSzIn   = input.string("small",  "Best point (MFE) label",   options = ["Off", "tiny", "small", "normal", "large", "huge"], group = grpLbl)
+maeSzIn   = input.string("tiny",   "Worst point (MAE) label",  options = ["Off", "tiny", "small", "normal", "large", "huge"], group = grpLbl)
+exitSzIn  = input.string("small",  "END label (result)",       options = ["Off", "tiny", "small", "normal", "large", "huge"], group = grpLbl)
+liveSzIn  = input.string("small",  "Live label (open trade)",  options = ["Off", "tiny", "small", "normal", "large", "huge"], group = grpLbl)
+showLines = input.bool(true, "Lines entry → best / worst point", group = grpLbl)
+showBox   = input.bool(false, "Shade entry → exit", group = grpLbl)
+compact   = input.bool(false, "Compact text (side / result only)", group = grpLbl)
+showPrice = input.bool(true, "Entry label: price", group = grpLbl)
+showTime  = input.bool(true, "Entry label: time", group = grpLbl)
+showTf    = input.bool(true, "Entry label: signal timeframe", group = grpLbl)
+showPnl   = input.bool(true, "END label: exit reason and P/L", group = grpLbl)
+unitIn    = input.string("Ticks", "Measure moves in", options = ["Ticks", "Price", "Percent"], group = grpLbl,
+     tooltip = "Ticks use the symbol's tick size (syminfo.mintick). On BTCUSD Price or Percent is often easier to read.")
+showValue = input.bool(false, "Show money value per contract", group = grpLbl)
+timeFmt   = input.string("yyyy-MM-dd HH:mm", "Time format", group = grpLbl,
+     tooltip = "Java-style pattern, e.g. 'HH:mm', 'dd MMM HH:mm:ss', 'yyyy-MM-dd HH:mm'.")
+tzInput   = input.string("", "Timezone (blank = exchange)", group = grpLbl,
+     tooltip = "IANA name such as America/New_York, Europe/London, UTC. Blank uses the symbol's exchange timezone.")
+lblTransp = input.int(0, "Label background transparency", minval = 0, maxval = 90, group = grpLbl)
+longCol   = input.color(#089981, "Long color",  group = grpLbl)
+shortCol  = input.color(#f23645, "Short color", group = grpLbl)
+textCol   = input.color(color.white, "Label text color", group = grpLbl)
+mfeCol    = input.color(#2962ff, "Best point color", group = grpLbl)
+maeCol    = input.color(#787b86, "Worst point color", group = grpLbl)
+
+// ─────────────────────────── Inputs: table ───────────────────────────
+grpTbl = "Trades table"
+tblSzIn   = input.string("small", "Table text size", options = ["Off", "tiny", "small", "normal", "large", "huge"], group = grpTbl)
+tblRows   = input.int(10, "Rows", minval = 1, maxval = 30, group = grpTbl)
+tblPos    = input.string("top_right", "Position",
+     options = ["top_right", "top_left", "bottom_right", "bottom_left", "middle_right", "middle_left"], group = grpTbl)
+
+// ─────────────────────────── Helpers ───────────────────────────
+f_size(string s) =>
+    s == "tiny" ? size.tiny : s == "small" ? size.small : s == "normal" ? size.normal : s == "large" ? size.large : size.huge
+f_on(string s) =>
+    showLbls and s != "Off"
+f_pos(string p) =>
+    p == "top_right"    ? position.top_right    :
+     p == "top_left"     ? position.top_left     :
+     p == "bottom_right" ? position.bottom_right :
+     p == "bottom_left"  ? position.bottom_left  :
+     p == "middle_right" ? position.middle_right : position.middle_left
+
+string tz = tzInput == "" ? syminfo.timezone : tzInput
+f_time(int t) =>
+    na(t) ? "" : str.format_time(t, timeFmt, tz)
+
+// Signed move (in the trade's favour) → "+123 ticks" / "+123.45" / "+1.23%"
+f_mv(float dist, float base) =>
+    string out = ""
+    if unitIn == "Ticks"
+        int tk = math.round(dist / syminfo.mintick)
+        out := (tk > 0 ? "+" : "") + str.tostring(tk) + " ticks"
+    else if unitIn == "Price"
+        out := (dist > 0 ? "+" : "") + str.tostring(dist, format.mintick)
+    else
+        float pc = dist / base * 100
+        out := (pc > 0 ? "+" : "") + str.tostring(pc, "0.00") + "%"
+    out
+f_valueStr(float dist) =>
+    showValue ? " (" + str.tostring(dist * syminfo.pointvalue, "#.##") + " " + syminfo.currency + ")" : ""
+
+// Milliseconds → "1d 2h 3m" / "2h 3m" / "3m"
+f_dur(int ms) =>
+    float s = math.max(ms, 0) / 1000.0
+    int d = int(math.floor(s / 86400))
+    int h = int(math.floor((s - d * 86400) / 3600))
+    int m = int(math.floor((s - d * 86400 - h * 3600) / 60))
+    string out = ""
+    if d > 0
+        out += str.tostring(d) + "d "
+    if h > 0 or d > 0
+        out += str.tostring(h) + "h "
+    out += str.tostring(m) + "m"
+    out
+
+// ─────────────────────────── Signal engine ───────────────────────────
+// Evaluated at a candle's close; returns the signal for an entry at the NEXT
+// candle's open, plus trend state, ATR and the signal bar time. Called at the
+// chart timeframe and through request.security() at the signal timeframe.
+bool readOpen = sigRead == "Candle beginning (open)"
+
+f_next() =>
+    float efC = ta.ema(close, emaFast)
+    float esC = ta.ema(close, emaSlow)
+    // Open reading: EMAs updated with the next open, taken as this close
+    float aF  = 2.0 / (emaFast + 1)
+    float aS  = 2.0 / (emaSlow + 1)
+    float efN = aF * close + (1 - aF) * efC
+    float esN = aS * close + (1 - aS) * esC
+    bool xUp  = ta.crossover(efC, esC)
+    bool xDn  = ta.crossunder(efC, esC)
+    bool emaL = readOpen ? (efN > esN and efC <= esC) : xUp
+    bool emaS = readOpen ? (efN < esN and efC >= esC) : xDn
+    bool engL = close > open and close[1] < open[1] and close >= open[1] and open <= close[1]
+    bool engS = close < open and close[1] > open[1] and close <= open[1] and open >= close[1]
+    float hh  = ta.highest(high, brkLen)[1]
+    float ll  = ta.lowest(low, brkLen)[1]
+    bool brkL = ta.crossover(close, hh)
+    bool brkS = ta.crossunder(close, ll)
+    bool extL = extLong > 0 and not (extLong[1] > 0)
+    bool extS = extShort > 0 and not (extShort[1] > 0)
+    bool l = sigMode == "EMA cross" ? emaL : sigMode == "Engulfing candle" ? engL : sigMode == "Breakout" ? brkL : extL
+    bool s = sigMode == "EMA cross" ? emaS : sigMode == "Engulfing candle" ? engS : sigMode == "Breakout" ? brkS : extS
+    float tE = ta.ema(close, trendLen)
+    [l, s, close > tE, close < tE, ta.atr(atrLen), close, time]
+
+bool useHtf = sigTf != "" and sigTf != timeframe.period
+string reqTf = useHtf ? sigTf : timeframe.period
+
+[nL, nS, nUp, nDn, nAtr, nC, nT] = f_next()
+// Last CLOSED signal-timeframe bar: final at the first chart bar of the next one → no repainting
+[hL, hS, hUp, hDn, hAtr, hC, hT] = request.security(syminfo.tickerid, reqTf,
+     [nL[1], nS[1], nUp[1], nDn[1], nAtr[1], nC[1], nT[1]], lookahead = barmerge.lookahead_on)
+bool htfChange = timeframe.change(reqTf)
+
+bool  sigL   = useHtf ? htfChange and hL : nL
+bool  sigS   = useHtf ? htfChange and hS : nS
+bool  trUp   = not useTrend or (useHtf ? hUp : nUp)
+bool  trDn   = not useTrend or (useHtf ? hDn : nDn)
+float sigAtr = useHtf ? hAtr : nAtr
+float sigPx  = useHtf ? hC : nC
+int   sigT   = useHtf ? hT : nT
+
+// ─────────────────────────── Trade record ───────────────────────────
+type Entry
+    int    dir          // 1 = long, -1 = short
+    float  price        // fill price (entry candle open)
+    int    t            // entry candle time
+    int    sigT         // signal bar time (signal timeframe)
+    int    bar          // entry bar index
+    float  mfe          // best price reached
+    int    mfeBar
+    int    mfeT
+    float  mae          // worst price reached
+    int    maeBar
+    int    maeT
+    bool   isOpen
+    float  exitPrice
+    int    exitT
+    int    exitBar
+    string reason
+    float  pnl
+
+var Entry cur = na
+var array<Entry> hist = array.new<Entry>()
+var label liveLbl = na
+var int labeledIdx = 0     // trades that already have an entry label
+var int doneIdx = 0        // closed trades already finished on the chart
+var int lastSigT = na      // signal bar time of the last order sent
+string mktExit = ""        // reason when this bar sends a market exit (fills at next open)
+
+f_bg(color c) =>
+    color.new(c, lblTransp)
+
+// Extend a trade's best / worst point with a price seen on bar b at time t
+f_trackPx(Entry e, float hi, float lo, int b, int t) =>
+    if e.dir == 1
+        if hi > e.mfe
+            e.mfe := hi
+            e.mfeBar := b
+            e.mfeT := t
+        if lo < e.mae
+            e.mae := lo
+            e.maeBar := b
+            e.maeT := t
+    else
+        if lo < e.mfe
+            e.mfe := lo
+            e.mfeBar := b
+            e.mfeT := t
+        if hi > e.mae
+            e.mae := hi
+            e.maeBar := b
+            e.maeT := t
+
+// New trade filled at the open of bar eBar: label + dot on that candle
+f_newEntry(int d, float px, int eBar, int eT) =>
+    Entry e = Entry.new(dir = d, price = px, t = eT, sigT = lastSigT, bar = eBar,
+         mfe = px, mfeBar = eBar, mfeT = eT, mae = px, maeBar = eBar, maeT = eT,
+         isOpen = true, exitPrice = na, exitT = na, exitBar = na, reason = "", pnl = na)
+    color dirCol = d == 1 ? longCol : shortCol
+    int off = math.min(math.max(bar_index - eBar, 0), 4999)
+    if f_on(entrySzIn)
+        string txt = d == 1 ? "LONG ▲" : "SHORT ▼"
+        if not compact
+            if showPrice
+                txt += "\n@ " + str.tostring(px, format.mintick)
+            if showTime
+                txt += "\n" + f_time(eT)
+            if showTf and useHtf
+                txt += " (" + sigTf + " signal)"
+        string tip = (d == 1 ? "Long entry" : "Short entry")
+             + "\nSignal: " + sigMode + " (" + sigRead + ")" + (useHtf ? " on " + sigTf : "")
+             + "\nSignal bar: " + f_time(lastSigT)
+             + "\nEntry candle open: " + f_time(eT)
+             + "\nFill price: " + str.tostring(px, format.mintick)
+             + "\nTick size: " + str.tostring(syminfo.mintick)
+        label.new(eBar, d == 1 ? low[off] : high[off], txt, xloc.bar_index, yloc.price, f_bg(dirCol),
+             d == 1 ? label.style_label_up : label.style_label_down, textCol, f_size(entrySzIn), tooltip = tip)
+    if f_on(dotSzIn)
+        label.new(eBar, px, "", xloc.bar_index, yloc.price, dirCol, label.style_circle, textCol, f_size(dotSzIn),
+             tooltip = "Entry @ " + str.tostring(px, format.mintick) + " (candle open) " + f_time(eT))
+    array.push(hist, e)
+    if array.size(hist) > 200
+        array.shift(hist)
+    e
+
+// Trade closed: draw best / worst / END marks
+f_closeMove(Entry e, float px, int bIdx, int tNow, string reason, float pnl) =>
+    e.isOpen    := false
+    e.exitPrice := px
+    e.exitT     := tNow
+    e.exitBar   := bIdx
+    e.reason    := reason
+    e.pnl       := pnl
+    float mfeDist = (e.mfe - e.price) * e.dir
+    float maeDist = (e.mae - e.price) * e.dir
+    float resDist = (px - e.price) * e.dir
+    color dirCol  = e.dir == 1 ? longCol : shortCol
+    if showBox
+        box.new(e.bar, math.max(e.price, px), bIdx, math.min(e.price, px),
+             border_color = color.new(dirCol, 60), bgcolor = color.new(resDist >= 0 ? dirCol : maeCol, 88))
+    if mfeDist > 0
+        if showLines and showLbls
+            line.new(e.bar, e.price, e.mfeBar, e.mfe, xloc.bar_index, extend.none, color.new(mfeCol, 20), line.style_dashed, 1)
+        if f_on(mfeSzIn)
+            string mfeTxt = (e.dir == 1 ? "▲ best " : "▼ best ") + f_mv(mfeDist, e.price) + f_valueStr(mfeDist)
+            if not compact
+                mfeTxt += "\n" + f_dur(e.mfeT - e.t) + " · " + str.tostring(e.mfeBar - e.bar) + " bars · " + f_time(e.mfeT)
+            label.new(e.mfeBar, e.mfe, mfeTxt, xloc.bar_index, yloc.price, f_bg(mfeCol),
+                 e.dir == 1 ? label.style_label_down : label.style_label_up, textCol, f_size(mfeSzIn),
+                 tooltip = "Best point of the move\nPrice: " + str.tostring(e.mfe, format.mintick))
+    if maeDist < 0
+        if showLines and showLbls
+            line.new(e.bar, e.price, e.maeBar, e.mae, xloc.bar_index, extend.none, color.new(maeCol, 40), line.style_dotted, 1)
+        if f_on(maeSzIn)
+            string maeTxt = "worst " + f_mv(maeDist, e.price)
+            if not compact
+                maeTxt += "\n" + f_dur(e.maeT - e.t) + " · " + f_time(e.maeT)
+            label.new(e.maeBar, e.mae, maeTxt, xloc.bar_index, yloc.price, f_bg(maeCol),
+                 e.dir == 1 ? label.style_label_up : label.style_label_down, textCol, f_size(maeSzIn))
+    if f_on(exitSzIn)
+        string exitTxt = "END " + f_mv(resDist, e.price) + f_valueStr(resDist)
+        if not compact
+            if showPnl
+                exitTxt += "\n" + reason + " · P/L " + str.tostring(pnl, "#,##0.00") + " " + strategy.account_currency
+            exitTxt += "\n" + f_dur(tNow - e.t) + " · " + str.tostring(bIdx - e.bar) + " bars · " + f_time(tNow)
+        label.new(bIdx, px, exitTxt, xloc.bar_index, yloc.price, f_bg(resDist >= 0 ? dirCol : maeCol),
+             label.style_label_left, textCol, f_size(exitSzIn))
+
+// ─────────────────────────── 1) Trades that filled on this bar ───────────────────────────
+// Orders sent at the previous close fill at this bar's open; stops / targets
+// may fill inside the bar. Trades are handled in order: closes, then opens.
+string prevMkt = bar_index > 0 ? mktExit[1] : ""
+bool exitedAtOpen = not na(prevMkt) and prevMkt != ""
+
+while doneIdx < strategy.closedtrades
+    int k = doneIdx
+    float ePx = strategy.closedtrades.entry_price(k)
+    int   eB  = strategy.closedtrades.entry_bar_index(k)
+    Entry e = na
+    if labeledIdx > k and not na(cur)
+        e := cur
+    else
+        e := f_newEntry(strategy.closedtrades.size(k) > 0 ? 1 : -1, ePx, eB, strategy.closedtrades.entry_time(k))
+        labeledIdx += 1
+    float xPx = strategy.closedtrades.exit_price(k)
+    int   xB  = strategy.closedtrades.exit_bar_index(k)
+    int   xT  = strategy.closedtrades.exit_time(k)
+    bool atOpen = exitedAtOpen and eB < xB and xB == bar_index
+    string why = atOpen ? prevMkt : strategy.closedtrades.exit_comment(k)
+    if na(why) or why == ""
+        why := "Exit"
+    // On the exit bar only the stretch from the open (or the fill) to the exit was held
+    if not atOpen and xB == bar_index
+        float fromPx = eB == bar_index ? ePx : open
+        f_trackPx(e, math.max(fromPx, xPx), math.min(fromPx, xPx), xB, xT)
+    f_closeMove(e, xPx, xB, xT, why, strategy.closedtrades.profit(k))
+    doneIdx += 1
+
+while labeledIdx < strategy.closedtrades + strategy.opentrades
+    int j = labeledIdx - strategy.closedtrades
+    cur := f_newEntry(strategy.opentrades.size(j) > 0 ? 1 : -1, strategy.opentrades.entry_price(j),
+         strategy.opentrades.entry_bar_index(j), strategy.opentrades.entry_time(j))
+    labeledIdx += 1
+
+// ─────────────────────────── 2) Track the open trade ───────────────────────────
+bool tradeOpen = not na(cur) and cur.isOpen and strategy.position_size != 0
+if tradeOpen
+    f_trackPx(cur, high, low, bar_index, time)
+
+// Live label on the open trade
+if tradeOpen and f_on(liveSzIn)
+    float nowDist  = (close - cur.price) * cur.dir
+    float bestDist = (cur.mfe - cur.price) * cur.dir
+    string liveTxt = (cur.dir == 1 ? "LONG open " : "SHORT open ") + f_mv(nowDist, cur.price)
+    if not compact
+        liveTxt += "\nbest " + f_mv(bestDist, cur.price) + " @ " + f_time(cur.mfeT)
+             + "\n" + f_dur(time - cur.t) + " · " + str.tostring(bar_index - cur.bar) + " bars"
+    color lc = color.new(cur.dir == 1 ? longCol : shortCol, math.max(lblTransp, 30))
+    if na(liveLbl)
+        liveLbl := label.new(bar_index, cur.dir == 1 ? high : low, liveTxt, xloc.bar_index, yloc.price, lc,
+             cur.dir == 1 ? label.style_label_down : label.style_label_up, textCol, f_size(liveSzIn))
+    else
+        label.set_xy(liveLbl, bar_index, cur.dir == 1 ? high : low)
+        label.set_text(liveLbl, liveTxt)
+        label.set_color(liveLbl, lc)
+        label.set_style(liveLbl, cur.dir == 1 ? label.style_label_down : label.style_label_up)
+else if not na(liveLbl)
+    label.delete(liveLbl)
+    liveLbl := na
+
+// ─────────────────────────── 3) Orders for the next open ───────────────────────────
+bool inRange  = time >= startT and time <= endT
+bool canLong  = tradeDir != "Short only"
+bool canShort = tradeDir != "Long only"
+float pos     = strategy.position_size
+
+bool timeUp  = timeExit and pos != 0 and strategy.opentrades > 0
+     and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) + 1 >= maxBars
+
+bool goLong  = inRange and sigL and trUp and canLong and pos <= 0
+bool goShort = inRange and sigS and trDn and canShort and pos >= 0 and not goLong
+
+// Stop / target / trailing distances in ticks, frozen when the order is sent
+var float slTk = na
+var float tpTk = na
+var float trTk = na
+var float toTk = na
+if goLong or goShort
+    float slDist = slMode == "ATR" ? sigAtr * slAtr : slMode == "Percent" ? sigPx * slPct / 100 : na
+    slTk := na(slDist) ? na : math.max(1, math.round(slDist / syminfo.mintick))
+    tpTk := na(slTk) or tpR <= 0 ? na : math.max(1, math.round(slTk * tpR))
+    trTk := trailOn ? math.max(0, math.round(sigAtr * trailAct / syminfo.mintick)) : na
+    toTk := trailOn ? math.max(1, math.round(sigAtr * trailOff / syminfo.mintick)) : na
+    lastSigT := sigT
+
+if goLong
+    if pos < 0
+        mktExit := "Reverse"
+    strategy.entry("Long", strategy.long, comment = "LONG")
+else if goShort
+    if pos > 0
+        mktExit := "Reverse"
+    strategy.entry("Short", strategy.short, comment = "SHORT")
+else if closeOpp and pos > 0 and sigS
+    mktExit := "Opposite signal"
+    strategy.close("Long", comment = "Opposite")
+else if closeOpp and pos < 0 and sigL
+    mktExit := "Opposite signal"
+    strategy.close("Short", comment = "Opposite")
+else if timeUp
+    mktExit := "Time"
+    strategy.close_all(comment = "Time")
+
+if not (na(slTk) and na(tpTk) and na(trTk))
+    strategy.exit("Long exit", from_entry = "Long", loss = slTk, profit = tpTk, trail_points = trTk, trail_offset = toTk,
+         comment_loss = "Stop", comment_profit = "Target", comment_trailing = "Trailing")
+    strategy.exit("Short exit", from_entry = "Short", loss = slTk, profit = tpTk, trail_points = trTk, trail_offset = toTk,
+         comment_loss = "Stop", comment_profit = "Target", comment_trailing = "Trailing")
+
+// ─────────────────────────── Alerts ───────────────────────────
+// Create one alert with "Any alert() function call" (or use the strategy's
+// order-fill alerts). Fires at the signal candle's close; the order fills at
+// the next open.
+if goLong
+    alert("LONG entry on " + syminfo.ticker + " " + timeframe.period + ": fills at next candle open (signal close "
+         + str.tostring(close, format.mintick) + ")", alert.freq_once_per_bar_close)
+if goShort
+    alert("SHORT entry on " + syminfo.ticker + " " + timeframe.period + ": fills at next candle open (signal close "
+         + str.tostring(close, format.mintick) + ")", alert.freq_once_per_bar_close)
+
+// ─────────────────────────── Table of recent trades ───────────────────────────
+if barstate.islast and showLbls and tblSzIn != "Off"
+    int cols = 10
+    var table tbl = table.new(f_pos(tblPos), cols, tblRows + 1, border_width = 1,
+         frame_color = color.new(color.gray, 50), border_color = color.new(color.gray, 80))
+    string ts = f_size(tblSzIn)
+    color hdrBg = color.new(color.gray, 60)
+    table.clear(tbl, 0, 0, cols - 1, tblRows)
+    array<string> hdr = array.from("#", "Side", "Entry time", "Entry", "Best", "To best", "Worst", "Result", "Exit", "Duration")
+    for c = 0 to cols - 1
+        table.cell(tbl, c, 0, array.get(hdr, c), text_color = color.white, bgcolor = hdrBg, text_size = ts)
+    int n = array.size(hist)
+    for i = 0 to tblRows - 1
+        int idx = n - 1 - i
+        if idx < 0
+            break
+        Entry e = array.get(hist, idx)
+        color dirCol  = e.dir == 1 ? longCol : shortCol
+        float mfeDist = (e.mfe - e.price) * e.dir
+        float maeDist = (e.mae - e.price) * e.dir
+        float resDist = ((e.isOpen ? close : e.exitPrice) - e.price) * e.dir
+        int   tEnd    = e.isOpen ? time : e.exitT
+        color resBg   = color.new(resDist >= 0 ? longCol : shortCol, 70)
+        table.cell(tbl, 0, i + 1, str.tostring(idx + 1), text_color = color.white, text_size = ts)
+        table.cell(tbl, 1, i + 1, e.dir == 1 ? "LONG" : "SHORT", text_color = color.white, bgcolor = color.new(dirCol, 30), text_size = ts)
+        table.cell(tbl, 2, i + 1, f_time(e.t), text_color = color.white, text_size = ts)
+        table.cell(tbl, 3, i + 1, str.tostring(e.price, format.mintick), text_color = color.white, text_size = ts)
+        table.cell(tbl, 4, i + 1, f_mv(mfeDist, e.price), text_color = color.white, text_size = ts)
+        table.cell(tbl, 5, i + 1, f_dur(e.mfeT - e.t), text_color = color.white, text_size = ts)
+        table.cell(tbl, 6, i + 1, f_mv(maeDist, e.price), text_color = color.white, text_size = ts)
+        table.cell(tbl, 7, i + 1, f_mv(resDist, e.price) + (e.isOpen ? " (open)" : ""), text_color = color.white, bgcolor = resBg, text_size = ts)
+        table.cell(tbl, 8, i + 1, e.isOpen ? "—" : e.reason, text_color = color.white, text_size = ts)
+        table.cell(tbl, 9, i + 1, f_dur(tEnd - e.t), text_color = color.white, text_size = ts)
