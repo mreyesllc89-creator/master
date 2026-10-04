@@ -1,0 +1,25 @@
+{
+  "secret": "CHANGE_ME_to_a_long_random_string",
+
+  "listen_host": "127.0.0.1",
+  "listen_port": 8080,
+  "path": "/hook",
+  "allowed_ips": [],
+
+  "dry_run": true,
+  "magic": 240424,
+  "deviation_points": 20,
+  "max_alert_age_sec": 30,
+
+  "mt5": {
+    "path": "",
+    "login": 0,
+    "password": "",
+    "server": ""
+  },
+
+  "symbols": {
+    "XAUUSD": { "mt5_symbol": "XAUUSD", "lots": 0.01, "max_lots": 0.10, "sl_distance": 0 },
+    "EURUSD": { "mt5_symbol": "EURUSD", "lots": 0.01, "max_lots": 0.10, "sl_distance": 0 }
+  }
+}

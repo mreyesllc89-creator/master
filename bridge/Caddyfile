@@ -1,0 +1,17 @@
+# Caddy terminates HTTPS on port 443 (TradingView only posts to 80/443) with a
+# free, auto-renewed Let's Encrypt certificate, and drops anything that is not
+# from TradingView's published webhook IPs before it reaches the bridge.
+# Replace the hostname with your own (a free DuckDNS name works).
+
+yourname.duckdns.org {
+	@tradingview remote_ip 52.89.214.238 34.212.75.30 54.218.53.128 52.32.178.7
+	handle @tradingview {
+		reverse_proxy 127.0.0.1:8080
+	}
+	handle {
+		abort
+	}
+	log {
+		output file caddy.log
+	}
+}
