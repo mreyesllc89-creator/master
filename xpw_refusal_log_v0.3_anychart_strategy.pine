@@ -1,5 +1,10 @@
 //@version=6
 // XPW Refusal Log v0.3 Strategy
+// ANY CHART: exits default to PERCENT of the entry price and size to PERCENT of equity, so the
+// same settings load on any symbol and timeframe. Commission 0.05% per side is built in.
+// Python replica results with these defaults (0.05% fee, Jan 2025 - Oct 2026 for BTC):
+//   BTCUSD 4h PF 1.68   BTCUSD 1h PF 1.14   BTCUSD 15m PF 0.93
+//   EURUSD 1h PF 0.39   GOOG 1d PF 0.79     (no edge shown outside BTC 1h / 4h)
 // The v0.3 indicator turned into a strategy. Measurement is UNCHANGED from v0.3:
 // same pushes, same leg gap, same cut, same export columns.
 //
@@ -29,6 +34,7 @@
 //   Tops only. No bottom-side event is ever traded here.
 //
 // EXITS (S2)
+//   Percent mode: distances are % of the entry price (default, any symbol).
 //   Points mode: distances are in Pine's strategy.exit "points", i.e. minimum ticks.
 //   ATR mode:    stop = ATR mult x ATR, target = R multiple x stop, trail in ATR multiples.
 //                ATR is frozen on the signal bar so the stop does not move with volatility.
@@ -37,7 +43,7 @@
 // DATA: any timeframe. Every window is in BARS of the chart you load it on
 // (on a 1 s chart a bar is a second, on a 5 min chart it is 5 minutes).
 
-strategy("XPW Refusal Log v0.3 Strategy", shorttitle="XPW RLOG v0.3 S", overlay=true, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, margin_long=0, margin_short=0, process_orders_on_close=true)
+strategy("XPW Refusal Log v0.3 Strategy", shorttitle="XPW RLOG v0.3 S", overlay=true, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, margin_long=0, margin_short=0, process_orders_on_close=true, commission_type=strategy.commission.percent, commission_value=0.05, slippage=1)
 
 // ---------------- TDI : your panel, TDI 38/62 Precision Scalper [Refined] ----------------
 rsiLen = input.int(14, "RSI length (your panel = 14)", group="TDI")
@@ -81,14 +87,20 @@ allowShort = input.bool(true, "Allow shorts (SECOND LEG)", group="S1. Entries")
 needParent = input.bool(false, "Require the parent to agree", group="S1. Entries", tooltip="Your rule: a divergence alone does not count, it has to be happening on the higher timeframe too. Needs 'Parent: record the higher timeframe read' on. Long needs parent gap above the cut, short needs it at or below.")
 oppCloses = input.bool(true, "Opposite label reverses the trade", group="S1. Entries", tooltip="OFF: an opposite label is ignored while a trade is open.")
 entryTiming = input.string("At the push (first new high)", "Entry timing", options=["At the push (first new high)", "When the push ends (confirmed label)"], group="S1. Entries", tooltip="At the push: reads the leg on the candle where price first makes its new high and enters on that candle's close. Nothing from later bars is used, so it is tradable live. It is a PROVISIONAL read: the label prints later and can disagree. When the push ends: waits for the label, joinBars candles later.")
-exitOnFlip = input.bool(true, "At the push: close if the label disagrees", group="S1. Entries", tooltip="When the push ends and its label calls the other leg (or unclassified), the trade that push opened is closed.")
+exitOnFlip = input.bool(false, "At the push: close if the label disagrees", group="S1. Entries", tooltip="When the push ends and its label calls the other leg (or unclassified), the trade that push opened is closed.")
 entryMode = input.string("Signal bar close", "Entry price", options=["Signal bar close", "Label price (limit)"], group="S1. Entries", tooltip="Signal bar close: market fill on the close of the bar the signal is confirmed. Label price: limit order at the push high the label marks. A short fills only if price comes back up to it; a long is above market so it fills at once.")
 limitBars = input.int(20, "Label price: cancel the limit after N bars", minval=1, group="S1. Entries")
-qty = input.float(1, "Order size (contracts / units)", minval=0.000001, group="S1. Entries", tooltip="Margin checks are off (margin 0), so the order fills whatever the symbol price is versus initial capital.")
+sizeMode = input.string("% of equity", "Order size mode", options=["% of equity", "Fixed units"], group="S1. Entries", tooltip="% of equity works on any symbol. Fixed units = contracts, shares, coins or lots.")
+sizePct = input.float(100, "Order size, % of equity", minval=0.1, group="S1. Entries")
+qtyFixed = input.float(1, "Order size, fixed units", minval=0.000001, group="S1. Entries", tooltip="Margin checks are off (margin 0), so the order fills whatever the symbol price is versus initial capital.")
 showSig = input.bool(true, "Mark entry signals under the bar", group="S1. Entries", tooltip="A triangle on every bar where a label asked for a trade. Triangles but no trades = an order problem. No triangles = no signals passed the filters.")
 
 // ---------------- S2. Exits ----------------
-exitUnit = input.string("Points", "SL / TP / trail unit", options=["Points", "ATR"], group="S2. Exits")
+exitUnit = input.string("Percent", "SL / TP / trail unit", options=["Percent", "Points", "ATR"], group="S2. Exits", tooltip="Percent: % of the entry price, works on any symbol. Points: minimum ticks. ATR: multiples of ATR.")
+slPct = input.float(5.5, "Stop loss, % (Percent mode)", minval=0, step=0.1, group="S2. Exits", tooltip="0 = no stop. Tested on BTCUSD 1h/4h.")
+tpPct = input.float(55, "Take profit, % (Percent mode)", minval=0, step=0.5, group="S2. Exits", tooltip="0 = no target.")
+trActPct = input.float(1.7, "Trail activation, % of profit (Percent mode)", minval=0, step=0.1, group="S2. Exits")
+trOffPct = input.float(0.11, "Trail distance, % (Percent mode)", minval=0, step=0.01, group="S2. Exits")
 slPts = input.float(5000, "Stop loss, pts (Points mode)", minval=0, group="S2. Exits", tooltip="Pine strategy.exit points = minimum ticks. 0 = no stop.")
 tpPts = input.float(50000, "Take profit, pts (Points mode)", minval=0, group="S2. Exits", tooltip="Pine strategy.exit points = minimum ticks. 0 = no target.")
 atrLen = input.int(14, "ATR length (ATR mode)", minval=1, group="S2. Exits")
@@ -235,12 +247,16 @@ bool parentShort = not needParent or (useParent and not na(parRead) and parRead 
 bool goLong = tradeSig == 1 and allowLong and parentLong
 bool goShort = tradeSig == -1 and allowShort and parentShort
 
+// Order size. Futures need whole contracts, so % of equity rounds down there (0 = no trade, see the panel).
+float qtyRaw = sizeMode == "% of equity" ? strategy.equity * sizePct / 100 / (close * syminfo.pointvalue) : qtyFixed
+float qty = syminfo.type == "futures" and sizeMode == "% of equity" ? math.floor(qtyRaw) : qtyRaw
+
 // ATR frozen on the signal bar, used for the whole trade.
 var float atrEntry = na
 
 bool flat = strategy.position_size == 0
-bool sentLong = goLong and strategy.position_size <= 0 and (flat or oppCloses)
-bool sentShort = goShort and strategy.position_size >= 0 and (flat or oppCloses)
+bool sentLong = qty > 0 and goLong and strategy.position_size <= 0 and (flat or oppCloses)
+bool sentShort = qty > 0 and goShort and strategy.position_size >= 0 and (flat or oppCloses)
 bool useLimit = entryMode == "Label price (limit)"
 var int limitSentBar = na
 if sentLong
@@ -285,7 +301,13 @@ float slT = na
 float tpT = na
 float trA = na
 float trO = na
-if exitUnit == "Points"
+float refPx = strategy.position_size != 0 ? strategy.position_avg_price : close
+if exitUnit == "Percent"
+    slT := pos(toTicks(refPx * slPct / 100))
+    tpT := pos(toTicks(refPx * tpPct / 100))
+    trA := useTrail ? toTicks(refPx * trActPct / 100) : na
+    trO := useTrail ? pos(toTicks(refPx * trOffPct / 100)) : na
+else if exitUnit == "Points"
     slT := pos(slPts)
     tpT := pos(tpPts)
     trA := useTrail ? trActPts : na
