@@ -337,11 +337,11 @@ syncStartMark(Chain c, color col) =>
     if showMark and lineOn(c.level)
         if na(c.mkS)
             c.mkS := newMark(c.bS, c.p0, col)
-        else
-            line.set_color(c.mkS, col)
+        line.set_color(c.mkS, col)
     else if not na(c.mkS)
         line.delete(c.mkS)
         c.mkS := na
+    c.mkS
 
 // remove every drawing a chain owns
 dropDrawings(Chain c) =>
