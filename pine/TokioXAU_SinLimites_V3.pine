@@ -25,6 +25,9 @@
 // BITE 5: V3 unwinding of deep baskets: per-position scalps, the bank paying
 //         the worst position, real depth, deep-basket TP, survival mode,
 //         anti-martingale win streak and the hedge lock.
+// BITE 6: stops and risk: time cut, catastrophe stop, basket stop (also the
+//         funded stop), pauses, side flip after a stop, equity stop and the
+//         circuit breakers (stop-add, derisk cut, close all).
 //
 // Inputs marked (bite N) are already loaded from the preset but only become
 // active in that bite. MT5-only inputs (magic, slippage, Telegram, DB, CSV)
@@ -113,24 +116,28 @@ maxSpread   = input.float(0.6,  "Spread max para SEMBRAR (precio)", step = 0.05,
 assumedSprd = input.float(0.3,  "Spread asumido (TradingView no tiene spread historico)", step = 0.05, group = grpRisk)
 blockAddAdx = input.float(0.0,  "ADX que bloquea adds contra tendencia (0=off)", group = grpRisk)
 maxTotLvl   = input.int(0,      "Tope global de posiciones (0=off)", minval = 0, group = grpRisk)
-basketStop  = input.float(0.0,  "Perdida maxima por cesta (0=off) (bite 6)", group = grpRisk)
-deepStopLvl = input.int(0,      "Stop catastrofe: desde N posiciones (0=off) (bite 6)", group = grpRisk)
-deepStopPct = input.float(20.0, "Stop catastrofe: % balance (bite 6)", group = grpRisk)
-stopCoolH   = input.float(24.0, "Stop catastrofe: horas de pausa (bite 6)", group = grpRisk)
-timeCutMin  = input.float(0.0,  "Corte por tiempo: minutos (0=off) (bite 6)", group = grpRisk)
-timeCutLoss = input.bool(false, "Corte por tiempo: solo en perdida (bite 6)", group = grpRisk)
-timeCutPause= input.float(0.0,  "Corte por tiempo: minutos de pausa (bite 6)", group = grpRisk)
+basketStop  = input.float(0.0,  "Perdida maxima por cesta (0=off)", group = grpRisk)
+deepStopLvl = input.int(0,      "Stop catastrofe: desde N posiciones (0=off)", group = grpRisk)
+deepStopPct = input.float(20.0, "Stop catastrofe: % balance", group = grpRisk)
+stopCoolH   = input.float(24.0, "Stop catastrofe: horas de pausa", group = grpRisk)
+timeCutMin  = input.float(0.0,  "Corte por tiempo: minutos (0=off)", group = grpRisk)
+timeCutLoss = input.bool(false, "Corte por tiempo: solo en perdida", group = grpRisk)
+timeCutPause= input.float(0.0,  "Corte por tiempo: minutos de pausa", group = grpRisk)
 blockHours  = input.string("",  "Horas sin cestas nuevas, ej. 23,0,1", group = grpRisk)
 blockDays   = input.string("",  "Dias sin cestas nuevas 0=Dom..6=Sab", group = grpRisk)
 sideMode    = input.int(0,      "Lado: 0=ambos 1=compras 2=ventas 3=a favor 4=contra", minval = 0, maxval = 4, group = grpRisk)
 sideLookH   = input.int(4,      "Lado: tendencia = precio vs cierre H1 de hace N horas", group = grpRisk)
 dailyLoss   = input.float(0.0,  "Sin cestas nuevas si DD diario % (0=off)", group = grpRisk)
+equityStop  = input.float(0.0,  "Cierre total por DD% de equity (0=off)", group = grpRisk)
+brkMaxMin   = input.float(0.0,  "Cortacircuitos: minutos antes de recortar la peor (0=off)", group = grpRisk)
+brkStopAdd  = input.float(0.0,  "Cortacircuitos: flotante % balance que corta adds (0=off)", group = grpRisk)
+// InpMarginMin / InpBrkMarginFloor need the broker's margin level: not simulated (0 in the preset).
 serverTZ    = input.string("GMT+2", "Zona horaria del servidor MT5", group = grpRisk,
      tooltip = "Las horas y dias bloqueados, la ventana sin siembra y el fin de semana usan la hora del SERVIDOR del broker (reloj del Market Watch). Ej.: GMT+2, GMT+3, Europe/Athens.")
-stopPause   = input.float(0.0,  "Stop de cesta: minutos de pausa (bite 6)", group = grpRisk)
-stopBudget  = input.float(0.0,  "Stop financiado: fraccion (0=off) (bite 6)", group = grpRisk)
-stopBudCap  = input.float(0.0,  "Stop financiado: tope (bite 6)", group = grpRisk)
-stopFlipH   = input.float(0.0,  "Tras stop: horas solo del lado del movimiento (bite 6)", group = grpRisk)
+stopPause   = input.float(0.0,  "Stop de cesta: minutos de pausa", group = grpRisk)
+stopBudget  = input.float(0.0,  "Stop financiado: fraccion (0=off)", group = grpRisk)
+stopBudCap  = input.float(0.0,  "Stop financiado: tope", group = grpRisk)
+stopFlipH   = input.float(0.0,  "Tras stop: horas solo del lado del movimiento", group = grpRisk)
 startBal    = input.float(1000.0, "Balance inicial de la simulacion", group = grpRisk,
      tooltip = "Solo se usa para los porcentajes de balance (supervivencia, candado, stop catastrofe).")
 
@@ -401,9 +408,12 @@ hourBlocks(int t) =>
     noNewFrom >= 0 and noNewTo >= 0 and (noNewFrom <= noNewTo ? (h >= noNewFrom and h <= noNewTo) : (h >= noNewFrom or h <= noNewTo))
 
 // Engine.SideAllowed: 0 = both, +1 = buys only, -1 = sells only.
-sideAllowed(float bid) =>
+// After a stop or time cut (stopFlipH): only the side of the move that caused it.
+sideAllowed(float bid, int flipDir, int flipUntil, int t) =>
     int sd = 0
-    if sideMode == 1
+    if stopFlipH > 0 and flipDir != 0 and t < flipUntil
+        sd := flipDir
+    else if sideMode == 1
         sd := 1
     else if sideMode == 2
         sd := -1
@@ -413,9 +423,13 @@ sideAllowed(float bid) =>
     sd
 
 // Why a new basket may not be seeded right now ("" = allowed).
-newBlockReason(int t, float equity, float dayStart) =>
+newBlockReason(int t, float equity, float dayStart, int noNewUntil, int brk) =>
     string r = ""
-    if volBlocks
+    if brk != 0
+        r := "cortacircuitos"
+    else if t < noNewUntil
+        r := "pausa tras stop"
+    else if volBlocks
         r := "ATR alto"
     else if regime == R_NEWS
         r := "noticia"
@@ -432,8 +446,8 @@ newBlockReason(int t, float equity, float dayStart) =>
     r
 
 // Sides a new basket would open (SeedSingle in trend, SeedGrid otherwise).
-seedSides(float bid) =>
-    sd = sideAllowed(bid)
+seedSides(float bid, int flipDir, int flipUntil, int t) =>
+    sd = sideAllowed(bid, flipDir, flipUntil, t)
     bool canBuy  = false
     bool canSell = false
     if trendRegime
@@ -458,7 +472,7 @@ type Pos
 type Mark
     int    bar
     float  price
-    int    kind     // +1 buy, -1 sell, 0 basket close, 2 scalp, 3 pay-down, 4 lock, 5 unlock
+    int    kind     // +1 buy, -1 sell, 0 basket close, 2 scalp, 3 pay-down, 4 lock, 5 unlock, 6 breaker cut
     string txt
     string tip
     float  net
@@ -507,6 +521,18 @@ type Book
     int   nScalpTot   = 0
     int   nPayTot     = 0
     int   nLockTot    = 0
+    // Stops and risk (bite 6)
+    float cut         = 0.0   // realized by breaker cuts: in the final result, NOT in the TP net (like the EA)
+    float sinceStop   = 0.0   // m_sinceStop: realized since the last basket stop (funds the next stop)
+    int   noNewUntil  = 0     // m_noNewUntil: pause after a stop / time cut
+    int   flipDir     = 0
+    int   flipUntil   = 0
+    float peakEq      = na    // equity peak for the equity-stop DD%
+    int   brk         = 0     // 0 ok, 1 stop-add, 2 derisk, 3 close all
+    int   lastPartial = 0
+    int   nStop       = 0
+    int   nTimeCut    = 0
+    int   nCuts       = 0
 
 // varip: on realtime bars every tick's changes persist (like the EA's OnTick).
 // On historical bars it behaves like var.
@@ -580,18 +606,36 @@ openPos(Book b, int side, float price, float lot, string tag, float lotsNow, int
     ok
 
 // Engine.CloseAll + FinalizeClose + ResetBasketState (the ledger closes instantly).
-closeAll(Book b, float net, int total, string reason, int tms, float px) =>
-    b.realized    := b.realized + net
+// delta = net basket lots when the close was requested (m_closeDelta).
+closeAll(Book b, float net, int total, float delta, string reason, int tms, float px) =>
+    res = net + b.cut                          // the whole basket's realized result
+    b.realized    := b.realized + res
     b.baskets     := b.baskets + 1
-    b.wins        := b.wins + (net > 0 ? 1 : 0)
+    b.wins        := b.wins + (res > 0 ? 1 : 0)
+    isTP    = reason == "basket_tp" or reason == "ratchet_tp" or reason == "trail_tp"
+    isStop  = reason == "basket_stop_hard" or reason == "deep_stop"
     b.nTP         := b.nTP + (reason == "basket_tp" ? 1 : 0)
     b.nRatchet    := b.nRatchet + (reason == "ratchet_tp" ? 1 : 0)
     b.nTrail      := b.nTrail + (reason == "trail_tp" ? 1 : 0)
-    b.nOther      := b.nOther + (reason == "basket_tp" or reason == "ratchet_tp" or reason == "trail_tp" ? 0 : 1)
+    b.nStop       := b.nStop + (isStop ? 1 : 0)
+    b.nTimeCut    := b.nTimeCut + (reason == "time_cut" ? 1 : 0)
+    b.nOther      := b.nOther + (isTP or isStop or reason == "time_cut" ? 0 : 1)
+    // Pauses after a stop or a time cut.
+    if reason == "deep_stop" and stopCoolH > 0
+        b.noNewUntil := tms + int(stopCoolH * 3600000)
+    if reason == "time_cut" and timeCutPause > 0
+        b.noNewUntil := tms + int(timeCutPause * 60000)
+    if reason == "basket_stop_hard" and stopPause > 0
+        b.noNewUntil := tms + int(stopPause * 60000)
+    // Flip after the stop: a net-short basket died on a rally -> buys only for a while (and vice versa).
+    if (reason == "basket_stop_hard" or reason == "time_cut") and stopFlipH > 0 and delta != 0.0
+        b.flipDir   := delta < 0.0 ? 1 : -1
+        b.flipUntil := tms + int(stopFlipH * 3600000)
+    b.sinceStop   := reason == "basket_stop_hard" ? 0.0 : b.sinceStop + res
     // Anti-martingale: only quick wins (few positions) extend the streak.
-    b.winStreak   := net > 0 and (cleanWinLvl <= 0 or total <= cleanWinLvl) ? b.winStreak + 1 : 0
-    addMark(b, px, 0, (net >= 0 ? "+" : "") + str.tostring(net, "#.##") + "\n" + str.tostring(total) + " pos",
-         reason + (b.scalps + b.paydowns > 0 ? "  scalps " + str.tostring(b.scalps) + " pagos " + str.tostring(b.paydowns) : "") + (b.locks > 0 ? "  candados " + str.tostring(b.locks) : ""), net)
+    b.winStreak   := res > 0 and (cleanWinLvl <= 0 or total <= cleanWinLvl) ? b.winStreak + 1 : 0
+    addMark(b, px, 0, (res >= 0 ? "+" : "") + str.tostring(res, "#.##") + "\n" + str.tostring(total) + " pos",
+         reason + (b.scalps + b.paydowns > 0 ? "  scalps " + str.tostring(b.scalps) + " pagos " + str.tostring(b.paydowns) : "") + (b.locks > 0 ? "  candados " + str.tostring(b.locks) : "") + (b.cut != 0 ? "  recortes " + str.tostring(b.cut, "#.##") : ""), res)
     b.lastHarvest := tms
     b.lastAdd     := tms
     b.openT       := na
@@ -599,6 +643,7 @@ closeAll(Book b, float net, int total, string reason, int tms, float px) =>
     b.pos.clear()
     b.lockPos.clear()
     b.bank        := 0.0
+    b.cut         := 0.0
     b.scalps      := 0
     b.paydowns    := 0
     b.paidBuy     := 0
@@ -609,6 +654,15 @@ closeAll(Book b, float net, int total, string reason, int tms, float px) =>
     b.lockNet     := 0.0
     b.lockExtreme := na
     b.locks       := 0
+
+// Current basket stop in money (with the funded stop, it grows with profit since the last stop).
+stopMoneyNow(Book b) =>
+    float sm = basketStop
+    if sm > 0 and stopBudget > 0
+        sm := math.max(sm, stopBudget * b.sinceStop)
+        if stopBudCap > 0
+            sm := math.min(sm, stopBudCap)
+    sm
 
 // TPManager.BasketTP. V3: a deep basket only aims for breakeven + deepTP.
 basketTP(int total, float timeMin) =>
@@ -649,7 +703,7 @@ gridAdds(Book b, float bid, float ask, int tms, float balance) =>
                 added := openPos(b, -1, bid, levelLotB(b.effBase, mt, dS), "GridSell N" + str.tostring(dS + 1), lots, tms)
         // Refill the missing side to stay two-sided (if the side mode allows it).
         if not added
-            sd = sideAllowed(bid)
+            sd = sideAllowed(bid, b.flipDir, b.flipUntil, tms)
             lotR = normLot(b.effBase * gScale, maxLotOrder)
             if ns == 0 and nb > 0 and loB - bid >= st * 0.5 and not advSell and sd <= 0
                 added := openPos(b, -1, bid, lotR, "Refill", lots, tms)
@@ -661,7 +715,7 @@ gridAdds(Book b, float bid, float ask, int tms, float balance) =>
 trendAdd(Book b, float bid, float ask, int tms) =>
     [nb, ns, lots, loB, hiS, fl, delta, wI, wPf] = stats(b, bid, ask)
     near = 0.5 * atr
-    sd = sideAllowed(bid)
+    sd = sideAllowed(bid, b.flipDir, b.flipUntil, tms)
     lotT = normLot(b.effBase, maxLotOrder)
     bool added = false
     if sd != 0 and sd != trendDir
@@ -677,7 +731,7 @@ seed(Book b, float bid, float ask, int tms) =>
     lotS = normLot(b.effBase * gScale, maxLotOrder)
     b.peak := 0.0
     bool ok = false
-    [canBuy, canSell] = seedSides(bid)
+    [canBuy, canSell] = seedSides(bid, b.flipDir, b.flipUntil, tms)
     if trendRegime
         if canBuy or canSell
             ok := openPos(b, trendDir, trendDir > 0 ? ask : bid, normLot(b.effBase, maxLotOrder), "TrendSeed", 0.0, tms)
@@ -793,17 +847,44 @@ engineTick(Book b, float px, int tms) =>
         boost = winBoost > 0 ? math.min(math.max(winBoostMax, 1.0), 1.0 + winBoost * b.winStreak) : 1.0
         b.effBase := normLot(baseLot, maxLotOrder) * boost
     bool closed = false
-    float netNow = 0.0
-    // Every grid position closed by scalps: account for the basket (external_close).
+    // Every grid position already closed (scalps / cuts): account for the basket (external_close).
     if b.pos.size() == 0 and not na(b.openT)
-        lf = lockFloating(b, bid, ask)
-        closeAll(b, b.bank + lf, 0, "external_close", tms, px)
+        closeAll(b, b.bank + lockFloating(b, bid, ask), 0, 0.0, "external_close", tms, px)
         closed := true
-    if b.pos.size() > 0
+
+    // 10) Circuit breakers (CircuitBreaker.mqh). Equity = simulated account.
+    [nb0, ns0, lots0, loB0, hiS0, fl0, delta0, wI0, wPf0] = stats(b, bid, ask)
+    net0 = fl0 + b.bank + lockFloating(b, bid, ask)
+    eq   = startBal + b.realized + b.cut + net0
+    b.peakEq := na(b.peakEq) ? eq : math.max(b.peakEq, eq)
+    ddPct = b.peakEq > 0 ? (b.peakEq - eq) / b.peakEq * 100.0 : 0.0
+    bal0  = startBal + b.realized + b.cut + b.bank
+    int brk = 0
+    if nb0 + ns0 > 0
+        if brkMaxMin > 0 and (tms - b.openT) / 60000.0 > brkMaxMin and fl0 < 0
+            brk := 2
+        if brkStopAdd > 0 and bal0 > 0 and -fl0 / bal0 * 100.0 >= brkStopAdd and brk == 0
+            brk := 1
+    if equityStop > 0 and ddPct >= equityStop
+        brk := 3
+    b.brk := brk
+    if not closed and brk == 3 and nb0 + ns0 > 0
+        closeAll(b, net0, nb0 + ns0, delta0, "breaker_close", tms, px)
+        closed := true
+    if not closed and brk == 2 and nb0 + ns0 > 1 and wI0 >= 0 and tms - b.lastPartial >= minSecs * 10 * 1000
+        // DERISK: cut the worst position. Its loss is realized but stays out of the TP net.
+        w = b.pos.get(wI0)
+        b.pos.remove(wI0)
+        b.cut         := b.cut + wPf0
+        b.nCuts       := b.nCuts + 1
+        b.lastPartial := tms
+        addMark(b, w.price, 6, "-", "Cortacircuitos: recorte de la peor " + str.tostring(wPf0, "#.##"), wPf0)
+
+    if not closed and b.pos.size() > 0
         [nb, ns, lots, loB, hiS, fl, delta, wI, wPf] = stats(b, bid, ask)
         net = fl + b.bank + lockFloating(b, bid, ask)   // banked money and the lock count
-        netNow := net
         total = nb + ns
+        balance = startBal + b.realized + b.cut + b.bank
         b.worstNet := math.min(b.worstNet, net)
         b.maxPos   := math.max(b.maxPos, total)
         b.maxLots  := math.max(b.maxLots, lots)
@@ -812,13 +893,21 @@ engineTick(Book b, float px, int tms) =>
             // 11c) Weekend: flatten everything.
             why := "weekend_flat"
         else
-            // 12) Exits
-            target = basketTP(total, (tms - b.openT) / 60000.0)
-            why := net >= target ? "basket_tp" : ""
-            // Ratchet: once the peak reached arm% of the target, keep lock% of it.
-            if why == "" and ratchetLock > 0 and target > 0 and b.peak >= target * ratchetArm and net <= b.peak * ratchetLock and net > 0
+            // 12) Exits, in the EA's order.
+            timeMin = (tms - b.openT) / 60000.0
+            target  = basketTP(total, timeMin)
+            sm      = stopMoneyNow(b)
+            if timeCutMin > 0 and timeMin >= timeCutMin and (not timeCutLoss or net < 0)
+                why := "time_cut"
+            else if deepStopLvl > 0 and total >= deepStopLvl and net <= -balance * deepStopPct / 100.0
+                why := "deep_stop"
+            else if sm > 0 and net <= -sm
+                why := "basket_stop_hard"
+            else if net >= target
+                why := "basket_tp"
+            else if ratchetLock > 0   // ratchet: once the peak reached arm% of the target, keep lock% of it and target > 0 and b.peak >= target * ratchetArm and net <= b.peak * ratchetLock and net > 0
                 why := "ratchet_tp"
-            if why == ""
+            else
                 if net > b.peak and net >= target * ratchetArm
                     b.peak := net
                 // Trailing: only above the breakeven pad and the activation profit.
@@ -828,22 +917,22 @@ engineTick(Book b, float px, int tms) =>
                     if b.peak - net >= trailPullback()
                         why := "trail_tp"
         if why != ""
-            closeAll(b, net, total, why, tms, px)
-            netNow := 0.0
+            closeAll(b, net, total, delta, why, tms, px)
             closed := true
         else if not b.locked
             // V3: unwind deep baskets
             scalpAndPayDown(b, bid, ask, tms)
+
     // 14) Anti-spike timers, then 15) entries (nothing at all while flattening).
     if not closed and not sessionFlatten(tms) and tms - b.lastAdd >= minSecs * 1000 and tms - b.lastHarvest >= restartSecs * 1000
-        balance = startBal + b.realized + b.bank
+        balance = startBal + b.realized + b.cut + b.bank
         if b.pos.size() > 0
             // 15a) Open basket: the lock first; with the lock on, no averaging.
-            if not manageLock(b, bid, ask, px, tms, balance)
+            if not manageLock(b, bid, ask, px, tms, balance) and brk == 0
                 gridAdds(b, bid, ask, tms, balance)
                 if trendRegime and allowAdd
                     trendAdd(b, bid, ask, tms)
-        else if newBlockReason(tms, startBal + b.realized + netNow, b.dayStartBal) == ""
+        else if newBlockReason(tms, eq, b.dayStartBal, b.noNewUntil, brk) == ""
             seed(b, bid, ask, tms)
     closed
 
@@ -908,7 +997,7 @@ if showFills and bk.marks.size() > 0
                      color = m.net >= 0 ? color.new(color.teal, 10) : color.new(color.maroon, 10),
                      textcolor = color.white, size = size.tiny, tooltip = m.tip)
             else if m.kind >= 2
-                mc = m.kind == 2 ? color.aqua : m.kind == 3 ? color.orange : color.yellow
+                mc = m.kind == 2 ? color.aqua : m.kind == 3 ? color.orange : m.kind == 6 ? color.red : color.yellow
                 label.new(bar_index, m.price, m.txt, style = label.style_label_center,
                      color = color.new(mc, 20), textcolor = color.black, size = size.tiny, tooltip = m.tip)
             else
@@ -929,8 +1018,11 @@ dEff    = nz(bk.effBase, baseLot)
 nowMs   = barstate.isrealtime ? timenow : time_close
 dAgeMin = dTotal > 0 ? (nowMs - bk.openT) / 60000.0 : 0.0
 dTarget = dTotal > 0 ? basketTP(dTotal, dAgeMin) : na
-dBlock  = newBlockReason(nowMs, startBal + bk.realized + dNet, bk.dayStartBal)
-[dBuy, dSell] = seedSides(bidC)
+dBlock  = newBlockReason(nowMs, startBal + bk.realized + bk.cut + dNet, bk.dayStartBal, bk.noNewUntil, bk.brk)
+[dBuy, dSell] = seedSides(bidC, bk.flipDir, bk.flipUntil, nowMs)
+dStop   = stopMoneyNow(bk)
+dEq     = startBal + bk.realized + bk.cut + dNet
+dDD     = na(bk.peakEq) or bk.peakEq <= 0 ? 0.0 : (bk.peakEq - dEq) / bk.peakEq * 100.0
 dArmed  = dTotal > 0 and ratchetLock > 0 and bk.peak >= dTarget * ratchetArm
 
 plot(dTotal > 0 ? dNet : na, "Neto cesta", display = display.data_window)
@@ -975,7 +1067,7 @@ if barstate.islast and showLadder
         array.push(ladderTxt, label.new(bar_index + 3, pB, "B" + str.tostring(nB + k + 1) + " " + str.tostring(levelLotB(dEff, gMart, nB + k), "#.##"), style = label.style_none, textcolor = color.lime, size = size.tiny))
         array.push(ladderTxt, label.new(bar_index + 3, pS, "S" + str.tostring(nS + k + 1) + " " + str.tostring(levelLotB(dEff, gMart, nS + k), "#.##"), style = label.style_none, textcolor = color.fuchsia, size = size.tiny))
 
-var table dash = table.new(position.top_right, 2, 26, bgcolor = color.new(color.black, 15), border_width = 1)
+var table dash = table.new(position.top_right, 2, 30, bgcolor = color.new(color.black, 15), border_width = 1)
 dashRow(int r, string k, string v, color c) =>
     table.cell(dash, 0, r, k, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
     table.cell(dash, 1, r, v, text_color = c,            text_size = size.small, text_halign = text.align_right)
@@ -1002,11 +1094,15 @@ if barstate.islast and showDash
     dashRow(10, "Trailing",     dTotal > 0 ? (dNet >= math.max(trailAct, bePad) ? "ACTIVO  retroceso " + str.tostring(trailPullback(), "#.##") : "desde " + str.tostring(math.max(trailAct, bePad), "#.##")) : "-", color.white)
     dashRow(11, "Edad cesta",   dTotal > 0 ? str.tostring(dAgeMin, "#") + " min" : "-", color.white)
     dashRow(12, "Cestas cerradas", str.tostring(bk.baskets) + "  (ganadas " + str.tostring(bk.wins) + ")", color.white)
-    dashRow(13, "Cierres TP/trinq/trail/otros", str.tostring(bk.nTP) + " / " + str.tostring(bk.nRatchet) + " / " + str.tostring(bk.nTrail) + " / " + str.tostring(bk.nOther), color.white)
+    dashRow(13, "Cierres TP/trinq/trail", str.tostring(bk.nTP) + " / " + str.tostring(bk.nRatchet) + " / " + str.tostring(bk.nTrail), color.white)
+    dashRow(26, "Stops / cortes tiempo / otros", str.tostring(bk.nStop) + " / " + str.tostring(bk.nTimeCut) + " / " + str.tostring(bk.nOther) + (bk.nCuts > 0 ? "  recortes " + str.tostring(bk.nCuts) : ""), bk.nStop > 0 ? color.orange : color.white)
+    dashRow(27, "Stop de cesta", dStop > 0 ? "-" + str.tostring(dStop, "#.##") + (stopBudget > 0 ? "  (ganado " + str.tostring(bk.sinceStop, "#.##") + ")" : "") : "off", color.white)
+    dashRow(28, "Pausa / giro", (nowMs < bk.noNewUntil ? "pausa hasta " + str.format_time(bk.noNewUntil, "dd/MM HH:mm", serverTZ) : "sin pausa") + (stopFlipH > 0 and bk.flipDir != 0 and nowMs < bk.flipUntil ? "  solo " + (bk.flipDir > 0 ? "compras" : "ventas") : ""), nowMs < bk.noNewUntil ? color.orange : color.gray)
+    dashRow(29, "DD equity / cortacircuitos", str.tostring(dDD, "#.##") + "%  " + (bk.brk == 0 ? "OK" : bk.brk == 1 ? "STOP-ADD" : bk.brk == 2 ? "DERISK" : "CIERRE TOTAL"), bk.brk == 0 ? color.gray : color.red)
     dashRow(14, "Realizado",    money(bk.realized), bk.realized >= 0 ? color.lime : color.red)
     dashRow(15, "Peor flotante", money(bk.worstNet), color.orange)
     dashRow(16, "Max pos / lotes", str.tostring(bk.maxPos) + " / " + str.tostring(bk.maxLots, "#.##"), color.white)
-    dashRow(17, "Equity sim.",  str.tostring(startBal + bk.realized + dNet, "#,##0.00"), color.white)
+    dashRow(17, "Equity sim.",  str.tostring(dEq, "#,##0.00"), color.white)
     dashRow(18, "Ejecucion",    execMode + (barstate.isrealtime and isTickMode ? " (EN VIVO)" : "") + "  ticks " + str.tostring(bk.ticks), color.gray)
-    dashRow(19, "Hora servidor", str.format_time(nowMs, "EEE HH:mm", serverTZ) + "  (" + serverTZ + ")" + (sideMode > 0 ? "  lado " + str.tostring(sideAllowed(bidC)) : ""), color.gray)
-    dashRow(20, "Bite",         "5 / desarme V3 + candado", color.gray)
+    dashRow(19, "Hora servidor", str.format_time(nowMs, "EEE HH:mm", serverTZ) + "  (" + serverTZ + ")" + (sideMode > 0 ? "  lado " + str.tostring(sideAllowed(bidC, bk.flipDir, bk.flipUntil, nowMs)) : ""), color.gray)
+    dashRow(20, "Bite",         "6 / stops y riesgo", color.gray)
