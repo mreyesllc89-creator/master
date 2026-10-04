@@ -80,14 +80,15 @@ def backtest(D,pushes,mode,flip):
     return dict(trades=len(R),win=(R>0).mean() if len(R) else 0,totR=R.sum(),avgR=R.mean() if len(R) else 0,
                 pf=w/ls if ls else np.inf,dist=np.mean(dist))
 
-for name,df in [("EURUSD 1h",EURUSD),("GOOG 1d",GOOG)]:
-    D=prep(df); P=signals(D)
-    lab=np.array([p['lab'] for p in P]); e0=np.array([p['e0'] for p in P]); e1=np.array([p['e1'] for p in P])
-    print(f"\n{name}: {len(P)} pushes | labels long {np.sum(lab>0)} short {np.sum(lab<0)}")
-    print(f"  read agrees with label: E0 {np.mean(e0==lab):.0%}   E1 {np.mean(e1==lab):.0%}")
-    print(f"  {'mode':34s}{'trades':>7s}{'win':>6s}{'total R':>9s}{'avg R':>7s}{'PF':>6s}{'entry vs label px (ATR)':>25s}")
-    for mode,flip,desc in [("E0",True,"E0 resting order at breakout +flip"),("E0",False,"E0 resting order, no flip"),
-                           ("E1",True,"E1 first new-high close +flip"),("E1",False,"E1 first new-high close, no flip"),
-                           ("E2",False,"E2 label (push end)")]:
-        r=backtest(D,P,mode,flip)
-        print(f"  {desc:34s}{r['trades']:7d}{r['win']:6.0%}{r['totR']:9.1f}{r['avgR']:7.2f}{r['pf']:6.2f}{r['dist']:25.2f}")
+if __name__=="__main__":
+  for name,df in [("EURUSD 1h",EURUSD),("GOOG 1d",GOOG)]:
+      D=prep(df); P=signals(D)
+      lab=np.array([p['lab'] for p in P]); e0=np.array([p['e0'] for p in P]); e1=np.array([p['e1'] for p in P])
+      print(f"\n{name}: {len(P)} pushes | labels long {np.sum(lab>0)} short {np.sum(lab<0)}")
+      print(f"  read agrees with label: E0 {np.mean(e0==lab):.0%}   E1 {np.mean(e1==lab):.0%}")
+      print(f"  {'mode':34s}{'trades':>7s}{'win':>6s}{'total R':>9s}{'avg R':>7s}{'PF':>6s}{'entry vs label px (ATR)':>25s}")
+      for mode,flip,desc in [("E0",True,"E0 resting order at breakout +flip"),("E0",False,"E0 resting order, no flip"),
+                             ("E1",True,"E1 first new-high close +flip"),("E1",False,"E1 first new-high close, no flip"),
+                             ("E2",False,"E2 label (push end)")]:
+          r=backtest(D,P,mode,flip)
+          print(f"  {desc:34s}{r['trades']:7d}{r['win']:6.0%}{r['totR']:9.1f}{r['avgR']:7.2f}{r['pf']:6.2f}{r['dist']:25.2f}")
