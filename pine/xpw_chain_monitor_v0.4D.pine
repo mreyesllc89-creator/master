@@ -1,0 +1,604 @@
+//@version=6
+// XPW Chain Monitor v0.4D - LOOK DOWN, forest edition. v0.4 engine, rungs BELOW the chart, chosen by you.
+//
+// Load it on a higher chart (15m, 1h...). Pick five lower timeframes, smallest first
+// (default 1s, 10s, 1m, 3m, 5m). The chain opens when the SMALLEST rung prints its square
+// and climbs while each larger rung agrees inside its window. One label per chain, anchored at
+// the EXACT TICK (time + price) of the rung-1 square, body to the LEFT of it; it GROWS one size per rung:
+//   "1s"  ->  "1s > 10s"  ->  "1s > 10s > 1m"  ->  ...  ->  "... > 5m OK"   (all agree)
+//   or    "1s > 10s X wall 1m"                                              (the wall)
+// When the chain resolves, an END label is added at the EXACT TICK of the last rung that fired,
+// body to the RIGHT, and a line links start -> end. Dots mark both ticks.
+// FOREST: every rung-1 square opens its own chain; chains climb in parallel and each has its own
+// growing label. Late grace tags "late". Reach = rolling mean final level (out of 5). NET travel
+// at horizon end sits next to MFE/MAE so continuation and climax are distinguishable.
+//
+// PRICE ACCURACY: choose the decimals shown in every label, optionally list the price at EACH rung
+// in the label, and draw a thin horizontal PRICE MARKER across the chart candle at the exact tick
+// price (start and end) so you can see where on the candle it happened. Hover a dot for the exact
+// price and time.
+// LINE VISIBILITY: "Lines for L1..L5" lets you hide the link and price-marker lines per chain level
+// (e.g. untick L1 and L2 to only see lines on chains that climbed to L3 or more).
+//
+// Mechanics: request.security_lower_tf() returns every intrabar value inside each chart bar,
+// so historical chains are reconstructed from the exact square times. On the live bar the
+// label grows tick by tick. Limit: TradingView serves ~100k intrabars per request, so from a
+// 15m chart the 1s rung only has data for the last ~110 chart bars (about a day).
+//
+// Square = the v0.7 Shape Map primitive (odd-colour island closes). Width in SECONDS by default
+// (v0.6 fix), so the same island is recognised on every rung. Bottoms and tops never pooled.
+//
+// GHOST CANDLES: an indicator cannot make the chart's own candles transparent. Turn "Ghost candles"
+// on, then hide the originals: right-click chart > Settings > Symbol > untick Body, Borders, Wick.
+
+indicator("XPW Chain Monitor v0.4D Look-Down Forest", overlay = true, max_labels_count = 500, max_lines_count = 500, max_bars_back = 500)
+
+// ------------- TDI (keep identical to Shape Map v0.7) -------------
+grpT = "TDI (keep identical to Shape Map v0.7)"
+rsiLen     = input.int(14, "RSI length",     minval = 2, group = grpT)
+fastLen    = input.int(2,  "Fast MA length", minval = 1, group = grpT)
+slowLen    = input.int(7,  "Slow MA length", minval = 1, group = grpT)
+invertFill = input.bool(true, "My panel paints fast>slow as RED", group = grpT)
+
+grpW = "Square size units"
+widthMode = input.string("Seconds", "Width units", options = ["Seconds", "Bars"], group = grpW, tooltip = "Seconds: island width and context are durations; every rung converts to its own bar count (rounded up, min 1). Bars: fixed bar counts on every rung (v0.3 behaviour).")
+areaMode  = input.string("Bars", "Area lookback units", options = ["Bars", "Seconds"], group = grpW)
+
+grpA = "Areas"
+areaLook    = input.int(20,   "Area lookback (bars)",    minval = 5, group = grpA)
+areaLookSec = input.int(60,   "Area lookback (seconds)", minval = 5, group = grpA)
+loFrac      = input.float(0.20, "LOW area: below this fraction",  minval = 0.0, maxval = 1.0, step = 0.01, group = grpA)
+hiFrac      = input.float(0.67, "HIGH area: above this fraction", minval = 0.0, maxval = 1.0, step = 0.01, group = grpA)
+
+grpB = "BOTTOM square (odd RED island, LOW area)"
+botMinSec  = input.int(1,  "Min island (seconds)",  minval = 1, group = grpB)
+botMaxSec  = input.int(10, "Max island (seconds)",  minval = 1, group = grpB)
+botCtxSec  = input.int(3,  "Context (seconds)",     minval = 1, group = grpB)
+botMinW    = input.int(1, "Min width (bars)",    minval = 1, group = grpB)
+botMaxW    = input.int(3, "Max width (bars)",    minval = 1, group = grpB)
+botCtx     = input.int(2, "Context (bars)",      minval = 1, group = grpB)
+botNeedLow = input.bool(true, "Require LOW area", group = grpB)
+botSep     = input.int(5, "Min bars between squares", minval = 0, group = grpB)
+
+grpP = "TOP square (odd LIME island, HIGH area)"
+topMinSec   = input.int(1,  "Min island (seconds)",  minval = 1, group = grpP)
+topMaxSec   = input.int(8,  "Max island (seconds)",  minval = 1, group = grpP)
+topCtxSec   = input.int(4,  "Context (seconds)",     minval = 1, group = grpP)
+topMinW     = input.int(1, "Min width (bars)",    minval = 1, group = grpP)
+topMaxW     = input.int(2, "Max width (bars)",    minval = 1, group = grpP)
+topCtx      = input.int(3, "Context (bars)",      minval = 1, group = grpP)
+topNeedHigh = input.bool(true, "Require HIGH area", group = grpP)
+topSep      = input.int(5, "Min bars between squares", minval = 0, group = grpP)
+
+// ------------- RUNGS (your choice, all LOWER than the chart) -------------
+grpR = "Rungs (lower timeframes, smallest first)"
+r1 = input.timeframe("1S",  "Rung 1 (smallest, opens the chain)", group = grpR)
+r2 = input.timeframe("10S", "Rung 2", group = grpR)
+r3 = input.timeframe("1",   "Rung 3", group = grpR)
+r4 = input.timeframe("3",   "Rung 4", group = grpR)
+r5 = input.timeframe("5",   "Rung 5 (largest, all agree)", group = grpR)
+
+// ------------- CHAIN -------------
+grpC = "Chain"
+agreeBars   = input.int(5, "Agreement window (bars of the HIGHER rung)", minval = 1, group = grpC)
+graceBars   = input.int(2, "Late grace (extra bars of the HIGHER rung)", minval = 0, group = grpC)
+tolBars     = input.int(1, "Higher rung may already have fired (its bars)", minval = 0, group = grpC)
+horizonBars = input.int(4, "Measure travel for (bars of RUNG 5, after the verdict)", minval = 1, group = grpC)
+atrLen      = input.int(14, "ATR length (rung 5)", minval = 2, group = grpC)
+tgtAtr      = input.float(1.0, "Target travel (x rung-5 ATR)", minval = 0.1, step = 0.1, group = grpC)
+alertLvl    = input.int(3, "Alert when a chain resolves at level >=", minval = 1, maxval = 5, group = grpC)
+maxChains   = input.int(60, "Max chains alive (forest cap)", minval = 5, maxval = 200, group = grpC)
+reachLen    = input.int(20, "Reach gauge: last N chains", minval = 3, maxval = 200, group = grpC)
+showLabels  = input.bool(true, "Growing chain labels", group = grpC)
+minLabelLvl = input.int(1, "Keep verdict labels only for level >=", minval = 1, maxval = 5, group = grpC, tooltip = "Chains that resolve below this level have their drawings removed. 5 = only chains that reach all five stay on the chart.")
+showTable   = input.bool(true, "Show table", group = grpC)
+tblPos      = input.string("Top right", "Table position", options = ["Top right", "Middle right", "Bottom right", "Top left"], group = grpC)
+tblSizeIn   = input.string("Normal", "Table text size", options = ["Tiny", "Small", "Normal", "Large"], group = grpC)
+
+// ------------- LABELS & VISUALS -------------
+grpL = "Labels & visuals"
+lblBoost    = input.int(2, "Label size boost (0 = original)", minval = 0, maxval = 4, group = grpL, tooltip = "Every chain label starts this many sizes bigger.")
+showDot     = input.bool(true, "Dots at the exact ticks (time + price)", group = grpL, tooltip = "Hover a dot to see the exact price and time of that tick.")
+showEnd     = input.bool(true, "End label (where the last rung fired)", group = grpL)
+showLink    = input.bool(true, "Link start -> end", group = grpL)
+longCol     = input.color(color.lime,    "LONG chain colour (BOT square)",  group = grpL)
+longTxt     = input.color(color.black,   "LONG label text",                 group = grpL)
+shortCol    = input.color(color.fuchsia, "SHORT chain colour (TOP square)", group = grpL)
+shortTxt    = input.color(color.white,   "SHORT label text",                group = grpL)
+ghost       = input.bool(true, "Ghost candles (see-through copy)", group = grpL, tooltip = "Then hide the chart's own candles: right-click > Settings > Symbol > untick Body, Borders, Wick.")
+ghostTr     = input.int(80, "Ghost candle transparency", minval = 0, maxval = 100, group = grpL)
+ghostUp     = input.color(color.teal, "Ghost up",   group = grpL)
+ghostDn     = input.color(color.red,  "Ghost down", group = grpL)
+
+// ------------- PRICE ACCURACY -------------
+grpX = "Price accuracy"
+priceDec   = input.int(-1, "Price decimals (-1 = symbol tick size)", minval = -1, maxval = 10, group = grpX, tooltip = "How many decimals every label shows. -1 uses the symbol's own tick size.")
+showRungPx = input.bool(false, "Show the price at EVERY rung in the label", group = grpX, tooltip = "1s 1.2345 > 10s 1.2350 > ... instead of only the start price.")
+showMark   = input.bool(true, "Price marker across the candle (exact tick price)", group = grpX, tooltip = "Thin horizontal line across the chart candle that contains the tick, at its exact price. Start and end.")
+markWidth  = input.int(2, "Price marker width", minval = 1, maxval = 5, group = grpX)
+
+// ------------- LINE VISIBILITY PER LEVEL -------------
+grpV = "Lines per chain level (link + price markers)"
+lineL1 = input.bool(true, "Lines for L1 chains (only rung 1 fired)", group = grpV)
+lineL2 = input.bool(true, "Lines for L2 chains", group = grpV)
+lineL3 = input.bool(true, "Lines for L3 chains", group = grpV)
+lineL4 = input.bool(true, "Lines for L4 chains", group = grpV)
+lineL5 = input.bool(true, "Lines for L5 chains (all agree)", group = grpV)
+
+tblSize = tblSizeIn == "Tiny" ? size.tiny : tblSizeIn == "Small" ? size.small : tblSizeIn == "Normal" ? size.normal : size.large
+
+lineOn(int lvl) => lvl <= 1 ? lineL1 : lvl == 2 ? lineL2 : lvl == 3 ? lineL3 : lvl == 4 ? lineL4 : lineL5
+
+fmtP(float p) => priceDec < 0 ? str.tostring(p, format.mintick) : priceDec == 0 ? str.tostring(p, "0") : str.tostring(p, "0." + str.repeat("0", priceDec))
+
+fmtT(int t) => str.format_time(t, "yyyy-MM-dd HH:mm:ss", syminfo.timezone)
+
+// ------------- LADDER -------------
+niceTf(simple int s) =>
+    s < 60 ? str.tostring(s) + "s" : s < 3600 ? str.tostring(s / 60, "#") + "m" : s < 86400 ? str.tostring(s / 3600, "#") + "h" : s < 604800 ? "D" : s < 2592000 ? "W" : "M"
+
+cs = timeframe.in_seconds()
+q1 = timeframe.in_seconds(r1)
+q2 = timeframe.in_seconds(r2)
+q3 = timeframe.in_seconds(r3)
+q4 = timeframe.in_seconds(r4)
+q5 = timeframe.in_seconds(r5)
+var array<int>    tfSec    = array.from(0, q1, q2, q3, q4, q5)
+var array<string> rungName = array.from("", niceTf(q1), niceTf(q2), niceTf(q3), niceTf(q4), niceTf(q5))
+tfOK = q1 < q2 and q2 < q3 and q3 < q4 and q4 < q5 and q5 < cs
+// a rung that is not below the chart would break the lower-tf request; substitute the chart itself and disable
+u1 = q1 < cs ? r1 : timeframe.period
+u2 = q2 < cs ? r2 : timeframe.period
+u3 = q3 < cs ? r3 : timeframe.period
+u4 = q4 < cs ? r4 : timeframe.period
+u5 = q5 < cs ? r5 : timeframe.period
+horizonMs = horizonBars * q5 * 1000
+
+// ------------- WEDGE (v0.7 detect, unchanged) -------------
+wedge(bool wantRedWedge, bool isRed, bool isLime, int minW, int maxW, int ctx) =>
+    int  wHi   = math.max(minW, maxW)
+    bool fired = false
+    int  wOut  = 0
+    for w = minW to wHi
+        if not fired
+            bool ok = true
+            for i = 0 to ctx - 1
+                bool v = wantRedWedge ? isLime[i] : isRed[i]
+                if not v
+                    ok := false
+            if ok
+                for i = 0 to w - 1
+                    bool v = wantRedWedge ? isRed[ctx + i] : isLime[ctx + i]
+                    if not v
+                        ok := false
+            if ok
+                for i = 0 to ctx - 1
+                    bool v = wantRedWedge ? isLime[ctx + w + i] : isRed[ctx + w + i]
+                    if not v
+                        ok := false
+            if ok
+                fired := true
+                wOut  := w
+    [fired, wOut]
+
+secToBars(int sec, int tfs, int lo) => math.max(lo, int(math.ceil(sec * 1.0 / tfs)))
+
+// ------------- ENGINE (runs inside each lower-tf request) -------------
+// Returns the close TIME and close PRICE of the latest BOT square and TOP square as of each intrabar.
+engine() =>
+    int  tfs    = timeframe.in_seconds()
+    bool useSec = widthMode == "Seconds"
+    int bMinW = useSec ? secToBars(botMinSec, tfs, 1) : botMinW
+    int bMaxW = useSec ? math.max(bMinW, secToBars(botMaxSec, tfs, 1)) : botMaxW
+    int bCtx  = useSec ? secToBars(botCtxSec, tfs, 1) : botCtx
+    int tMinW = useSec ? secToBars(topMinSec, tfs, 1) : topMinW
+    int tMaxW = useSec ? math.max(tMinW, secToBars(topMaxSec, tfs, 1)) : topMaxW
+    int tCtx  = useSec ? secToBars(topCtxSec, tfs, 1) : topCtx
+    int aLook = areaMode == "Seconds" ? secToBars(areaLookSec, tfs, 5) : areaLook
+
+    float r    = ta.rsi(close, rsiLen)
+    float fast = ta.sma(r, fastLen)
+    float slow = ta.sma(r, slowLen)
+    bool  isRed  = invertFill ? fast > slow : fast < slow
+    bool  isLime = not isRed
+    float hiW  = ta.highest(slow, aLook)
+    float loW  = ta.lowest(slow, aLook)
+    float rngW = hiW - loW
+    float posW = rngW > 0 ? (slow - loW) / rngW : 0.5
+    bool  inLow  = posW <= loFrac
+    bool  inHigh = posW >= hiFrac
+
+    [botRaw, botWid] = wedge(true,  isRed, isLime, bMinW, bMaxW, bCtx)
+    [topRaw, topWid] = wedge(false, isRed, isLime, tMinW, tMaxW, tCtx)
+
+    var int lastBotBar = -10000
+    var int lastTopBar = -10000
+    bool botOK = botRaw and (not botNeedLow  or inLow[bCtx])  and (bar_index - lastBotBar >= botSep)
+    bool topOK = topRaw and (not topNeedHigh or inHigh[tCtx]) and (bar_index - lastTopBar >= topSep)
+
+    var int   bSqK = na
+    var int   tSqK = na
+    var float bSqP = na
+    var float tSqP = na
+    if botOK
+        lastBotBar := bar_index
+        bSqK := time_close
+        bSqP := close
+    if topOK
+        lastTopBar := bar_index
+        tSqK := time_close
+        tSqP := close
+    [bSqK, tSqK, bSqP, tSqP]
+
+[aB1, aT1, pB1, pT1] = request.security_lower_tf(syminfo.tickerid, u1, engine())
+[aB2, aT2, pB2, pT2] = request.security_lower_tf(syminfo.tickerid, u2, engine())
+[aB3, aT3, pB3, pT3] = request.security_lower_tf(syminfo.tickerid, u3, engine())
+[aB4, aT4, pB4, pT4] = request.security_lower_tf(syminfo.tickerid, u4, engine())
+[aB5, aT5, pB5, pT5] = request.security_lower_tf(syminfo.tickerid, u5, engine())
+atr5 = request.security(syminfo.tickerid, u5, ta.atr(atrLen))
+
+// ------------- EVENT STREAM -------------
+// Every distinct new square time in this chart bar becomes an event (time, rung, price at that tick).
+var array<int> seenB = array.new_int(6, na)
+var array<int> seenT = array.new_int(6, na)
+var array<int> lastB = array.new_int(6, na)   // latest square time per rung (for the table)
+var array<int> lastT = array.new_int(6, na)
+
+collect(array<int> a, array<float> p, array<int> evT, array<int> evR, array<float> evP, int rung, array<int> seen, array<int> latest) =>
+    int last = array.get(seen, rung)
+    if array.size(a) > 0
+        for i = 0 to array.size(a) - 1
+            int v = array.get(a, i)
+            if not na(v) and (na(last) or v > last)
+                array.push(evT, v)
+                array.push(evR, rung)
+                array.push(evP, i < array.size(p) ? array.get(p, i) : close)
+                last := v
+    array.set(seen, rung, last)
+    if not na(last)
+        array.set(latest, rung, last)
+
+// ------------- STATE -------------
+// one object per chain. open=true while climbing; open=false while measuring (endT set)
+type Chain
+    int   dir
+    int   t0            // exact tick time of the rung-1 square (START)
+    int   lastT         // exact tick time of the latest rung that fired (END)
+    int   deadline
+    float p0            // price at the start tick
+    float lastP         // price at the latest rung tick
+    int   originBar
+    int   bS            // open time of the chart candle holding the start tick
+    int   bE            // open time of the chart candle holding the end tick
+    array<float> rp     // price at each rung tick, index 1..5
+    int   level      = 1
+    bool  open       = true
+    bool  grace      = false
+    bool  late       = false
+    int   finalLevel = -1
+    int   endT       = na
+    float mfe        = 0.0
+    float mae        = 0.0
+    label lb         = na   // growing start label
+    label dotS       = na   // dot at start tick
+    label lbE        = na   // end label
+    label dotE       = na   // dot at end tick
+    line  ln         = na   // link start -> end
+    line  mkS        = na   // price marker across the start candle
+    line  mkE        = na   // price marker across the end candle
+
+var array<Chain> chains = array.new<Chain>()
+
+// stats by level 1..5, index = (dir > 0 ? 0 : 6) + level
+var array<int>   sN    = array.new_int(12, 0)
+var array<float> sMfe  = array.new_float(12, 0.0)
+var array<float> sMae  = array.new_float(12, 0.0)
+var array<float> sNet  = array.new_float(12, 0.0)
+var array<int>   sHit  = array.new_int(12, 0)
+var array<int>   sLate = array.new_int(12, 0)
+sIdx(int dir, int lvl) => (dir > 0 ? 0 : 6) + math.max(1, math.min(5, lvl))
+
+var array<float> reachB   = array.new_float()
+var array<float> reachT   = array.new_float()
+var array<float> reachAll = array.new_float()
+pushReach(array<float> buf, float v) =>
+    array.push(buf, v)
+    if array.size(buf) > reachLen
+        array.shift(buf)
+reachOf(array<float> buf) => array.size(buf) > 0 ? array.avg(buf) : na
+
+winMs(int rung)   => agreeBars * array.get(tfSec, rung) * 1000
+graceMs(int rung) => graceBars * array.get(tfSec, rung) * 1000
+tolMs(int rung)   => tolBars   * array.get(tfSec, rung) * 1000
+
+// label size ladder, shifted up by the boost
+lvlSize(int lvl) =>
+    int s = math.min(5, math.max(1, lvl) + lblBoost)
+    s <= 1 ? size.tiny : s == 2 ? size.small : s == 3 ? size.normal : s == 4 ? size.large : size.huge
+
+chainCol(int dir, int tr) => color.new(dir > 0 ? longCol : shortCol, tr)
+chainTxt(int dir)         => dir > 0 ? longTxt : shortTxt
+
+// path text; with "every rung" on each rung carries its own tick price, otherwise the start price is appended
+pathStr(Chain c) =>
+    string s = ""
+    for i = 1 to c.level
+        s := s + (i > 1 ? " > " : "") + array.get(rungName, i)
+        if showRungPx
+            s := s + " " + fmtP(array.get(c.rp, i))
+    showRungPx ? s : s + "  " + fmtP(c.p0)
+
+// horizontal marker across the chart candle (open time bt) at price px
+newMark(int bt, float px, color col) =>
+    line.new(bt, px, bt + cs * 1000, px, xloc = xloc.bar_time, color = col, width = markWidth, style = line.style_solid)
+
+// start marker follows the chain's current level and the per-level toggle
+syncStartMark(Chain c, color col) =>
+    if showMark and lineOn(c.level)
+        if na(c.mkS)
+            c.mkS := newMark(c.bS, c.p0, col)
+        else
+            line.set_color(c.mkS, col)
+    else if not na(c.mkS)
+        line.delete(c.mkS)
+        c.mkS := na
+
+// remove every drawing a chain owns
+dropDrawings(Chain c) =>
+    if not na(c.lb)
+        label.delete(c.lb)
+    if not na(c.dotS)
+        label.delete(c.dotS)
+    if not na(c.lbE)
+        label.delete(c.lbE)
+    if not na(c.dotE)
+        label.delete(c.dotE)
+    if not na(c.ln)
+        line.delete(c.ln)
+    if not na(c.mkS)
+        line.delete(c.mkS)
+    if not na(c.mkE)
+        line.delete(c.mkE)
+    c.lb   := na
+    c.dotS := na
+    c.lbE  := na
+    c.dotE := na
+    c.ln   := na
+    c.mkS  := na
+    c.mkE  := na
+
+resolveChain(Chain c, bool allAgree, int verdictT) =>
+    c.open := false
+    c.endT := verdictT + horizonMs
+    pushReach(c.dir > 0 ? reachB : reachT, c.level)
+    pushReach(reachAll, c.level)
+    if c.level < minLabelLvl
+        dropDrawings(c)
+    else
+        string verd  = allAgree ? " OK" : " X wall " + array.get(rungName, c.level + 1)
+        string lateS = c.late ? " late" : ""
+        int    tr    = allAgree ? 0 : 55
+        color  col   = chainCol(c.dir, tr)
+        bool   lines = lineOn(c.level)
+        if not na(c.lb)
+            label.set_text(c.lb, pathStr(c) + verd + lateS)
+            label.set_color(c.lb, col)
+            if allAgree
+                label.set_size(c.lb, size.huge)
+        if not na(c.dotS)
+            label.set_color(c.dotS, col)
+        syncStartMark(c, col)
+        // END drawings at the tick of the last rung that fired
+        if c.level > 1 and not na(c.lastT)
+            if showLink and lines
+                c.ln := line.new(c.t0, c.p0, c.lastT, c.lastP, xloc = xloc.bar_time, color = col, width = allAgree ? 2 : 1, style = line.style_dashed)
+            if showMark and lines
+                c.mkE := newMark(c.bE, c.lastP, col)
+            if showLabels
+                if showDot
+                    c.dotE := label.new(c.lastT, c.lastP, "", xloc = xloc.bar_time, style = label.style_circle, color = col, size = size.tiny, tooltip = "END L" + str.tostring(c.level) + " " + array.get(rungName, c.level) + "\nprice " + fmtP(c.lastP) + "\n" + fmtT(c.lastT))
+                if showEnd
+                    c.lbE := label.new(c.lastT, c.lastP, "END  L" + str.tostring(c.level) + verd + lateS + "  " + fmtP(c.lastP), xloc = xloc.bar_time, style = label.style_label_left, color = col, textcolor = chainTxt(c.dir), size = allAgree ? size.huge : lvlSize(c.level))
+    c.finalLevel := c.level
+
+// close a chain if the clock `now` has passed its deadline (grace first)
+expire(Chain c, int now) =>
+    if c.open and now > c.deadline
+        if graceBars > 0 and not c.grace
+            c.grace    := true
+            c.deadline := c.deadline + graceMs(c.level + 1)
+        if c.open and now > c.deadline
+            resolveChain(c, false, c.deadline)
+
+openChain(int dir, int t, float px) =>
+    if array.size(chains) >= maxChains
+        bool evicted = false
+        for j = 0 to array.size(chains) - 1
+            Chain cj = array.get(chains, j)
+            if not cj.open
+                dropDrawings(cj)
+                array.remove(chains, j)
+                evicted := true
+                break
+        if not evicted
+            Chain c0 = array.shift(chains)
+            dropDrawings(c0)
+    Chain c = Chain.new(dir = dir, t0 = t, lastT = t, deadline = t + winMs(2), p0 = px, lastP = px, originBar = bar_index, bS = time, bE = time, rp = array.new_float(6, na))
+    array.set(c.rp, 1, px)
+    if showLabels
+        // START: anchored at the exact tick, body to the LEFT, pointing right at it
+        c.lb := label.new(t, px, pathStr(c), xloc = xloc.bar_time, style = label.style_label_right, color = chainCol(dir, 70), textcolor = chainTxt(dir), size = lvlSize(1))
+        if showDot
+            c.dotS := label.new(t, px, "", xloc = xloc.bar_time, style = label.style_circle, color = chainCol(dir, 0), size = size.tiny, tooltip = "START " + array.get(rungName, 1) + (dir > 0 ? " BOT" : " TOP") + "\nprice " + fmtP(px) + "\n" + fmtT(t))
+    syncStartMark(c, chainCol(dir, 40))
+    array.push(chains, c)
+
+// feed one event (time t, rung, price px) to every open chain of this side; rung 1 also opens a new chain
+feed(int dir, int rung, int t, float px) =>
+    int n = array.size(chains)
+    if n > 0
+        for i = 0 to n - 1
+            Chain c = array.get(chains, i)
+            if c.dir == dir and c.open
+                expire(c, t)
+                if c.open and rung == c.level + 1 and t >= c.lastT - tolMs(rung) and t <= c.deadline
+                    if c.grace
+                        c.late  := true
+                        c.grace := false
+                    c.level := rung
+                    array.set(c.rp, rung, px)
+                    if t >= c.lastT
+                        c.bE := time
+                    c.lastT := math.max(t, c.lastT)
+                    c.lastP := px
+                    if not na(c.lb)
+                        label.set_text(c.lb, pathStr(c))
+                        label.set_size(c.lb, lvlSize(c.level))
+                        label.set_color(c.lb, chainCol(c.dir, 70 - 14 * c.level))
+                    syncStartMark(c, chainCol(c.dir, 40))
+                    if c.level >= 5
+                        resolveChain(c, true, t)
+                    else
+                        c.deadline := c.lastT + winMs(c.level + 1)
+    if rung == 1
+        openChain(dir, t, px)
+
+// ------------- PER BAR (every update: live bar grows tick by tick) -------------
+int nowT = barstate.isrealtime ? timenow : time_close
+int botResolved = -1
+int topResolved = -1
+
+if tfOK
+    array<int>   evT = array.new_int()
+    array<int>   evR = array.new_int()
+    array<float> evP = array.new_float()
+    collect(aB1, pB1, evT, evR, evP, 1, seenB, lastB)
+    collect(aB2, pB2, evT, evR, evP, 2, seenB, lastB)
+    collect(aB3, pB3, evT, evR, evP, 3, seenB, lastB)
+    collect(aB4, pB4, evT, evR, evP, 4, seenB, lastB)
+    collect(aB5, pB5, evT, evR, evP, 5, seenB, lastB)
+    if array.size(evT) > 0
+        array<int> order = array.sort_indices(evT)
+        for j = 0 to array.size(order) - 1
+            int k = array.get(order, j)
+            feed(1, array.get(evR, k), array.get(evT, k), array.get(evP, k))
+    array.clear(evT)
+    array.clear(evR)
+    array.clear(evP)
+    collect(aT1, pT1, evT, evR, evP, 1, seenT, lastT)
+    collect(aT2, pT2, evT, evR, evP, 2, seenT, lastT)
+    collect(aT3, pT3, evT, evR, evP, 3, seenT, lastT)
+    collect(aT4, pT4, evT, evR, evP, 4, seenT, lastT)
+    collect(aT5, pT5, evT, evR, evP, 5, seenT, lastT)
+    if array.size(evT) > 0
+        array<int> order2 = array.sort_indices(evT)
+        for j = 0 to array.size(order2) - 1
+            int k2 = array.get(order2, j)
+            feed(-1, array.get(evR, k2), array.get(evT, k2), array.get(evP, k2))
+    // end-of-update expiry for everything still open
+    int n = array.size(chains)
+    if n > 0
+        for i = 0 to n - 1
+            Chain c = array.get(chains, i)
+            if c.open
+                expire(c, nowT)
+                if not c.open
+                    if c.dir > 0
+                        botResolved := math.max(botResolved, c.finalLevel)
+                    else
+                        topResolved := math.max(topResolved, c.finalLevel)
+
+// measuring, on closed chart bars only
+int openB = 0
+int openT = 0
+if barstate.isconfirmed
+    int n = array.size(chains)
+    if n > 0
+        for i = n - 1 to 0
+            Chain c = array.get(chains, i)
+            if not c.open
+                if time < c.endT
+                    c.mfe := math.max(c.mfe, c.dir > 0 ? high - c.p0 : c.p0 - low)
+                    c.mae := math.max(c.mae, c.dir > 0 ? c.p0 - low  : high - c.p0)
+                if time_close >= c.endT
+                    int   k   = sIdx(c.dir, c.finalLevel)
+                    float net = c.dir * (close - c.p0)
+                    float tgt = tgtAtr * atr5
+                    array.set(sN,   k, array.get(sN,   k) + 1)
+                    array.set(sMfe, k, array.get(sMfe, k) + c.mfe)
+                    array.set(sMae, k, array.get(sMae, k) + c.mae)
+                    array.set(sNet, k, array.get(sNet, k) + net)
+                    if not na(tgt) and c.mfe >= tgt
+                        array.set(sHit, k, array.get(sHit, k) + 1)
+                    if c.late
+                        array.set(sLate, k, array.get(sLate, k) + 1)
+                    array.remove(chains, i)
+if array.size(chains) > 0
+    for i = 0 to array.size(chains) - 1
+        Chain c = array.get(chains, i)
+        if c.open
+            if c.dir > 0
+                openB += 1
+            else
+                openT += 1
+
+// ------------- GHOST CANDLES -------------
+gCol = color.new(close >= open ? ghostUp : ghostDn, ghostTr)
+plotcandle(ghost ? open : na, ghost ? high : na, ghost ? low : na, ghost ? close : na, "Ghost candles", color = gCol, wickcolor = gCol, bordercolor = gCol)
+
+// ------------- TABLE -------------
+ageStr(int k, int now) => na(k) ? "-" : str.tostring(math.round((now - k) / 1000)) + "s ago"
+
+totalN(int dir) =>
+    int t = 0
+    for L = 1 to 5
+        t += array.get(sN, sIdx(dir, L))
+    t
+
+statStr(int dir, int L) =>
+    int k   = sIdx(dir, L)
+    int cnt = array.get(sN, k)
+    int tot = totalN(dir)
+    cnt == 0 ? "-" : "n" + str.tostring(cnt) + " (" + str.tostring(math.round(100.0 * cnt / tot)) + "%) | MFE " + str.tostring(array.get(sMfe, k) / cnt, "#.##") + " | MAE " + str.tostring(array.get(sMae, k) / cnt, "#.##") + " | NET " + str.tostring(array.get(sNet, k) / cnt, "#.##") + " | hit " + str.tostring(math.round(100.0 * array.get(sHit, k) / cnt)) + "%" + (array.get(sLate, k) > 0 ? " | late " + str.tostring(array.get(sLate, k)) : "")
+
+reachStr(array<float> buf) =>
+    float v = reachOf(buf)
+    na(v) ? "-" : str.tostring(v, "#.##") + " / 5  (n" + str.tostring(array.size(buf)) + ")"
+
+posStr = tblPos == "Top right" ? position.top_right : tblPos == "Middle right" ? position.middle_right : tblPos == "Bottom right" ? position.bottom_right : position.top_left
+var table T = table.new(posStr, 3, 14, border_width = 1, frame_width = 1, frame_color = color.new(color.gray, 50))
+cellBg = color.new(color.black, 15)
+
+if showTable and barstate.islast
+    table.cell(T, 0, 0, "XPW Look-Down Forest | chart " + niceTf(cs), text_color = color.white, bgcolor = color.new(color.blue, 40), text_size = tblSize)
+    table.cell(T, 1, 0, tfOK ? "LONG / BOT (little red)" : "RUNGS MUST INCREASE", text_color = longTxt, bgcolor = tfOK ? longCol : color.new(color.red, 40), text_size = tblSize)
+    table.cell(T, 2, 0, tfOK ? "SHORT / TOP (little lime)" : "and all be below the chart", text_color = shortTxt, bgcolor = tfOK ? shortCol : color.new(color.red, 40), text_size = tblSize)
+    for i = 1 to 5
+        table.cell(T, 0, i, "rung " + str.tostring(i) + " | " + array.get(rungName, i), text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+        table.cell(T, 1, i, ageStr(array.get(lastB, i), nowT), text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+        table.cell(T, 2, i, ageStr(array.get(lastT, i), nowT), text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+    table.cell(T, 0, 6, "open chains", text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+    table.cell(T, 1, 6, tfOK ? str.tostring(openB) : "disabled", text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+    table.cell(T, 2, 6, tfOK ? str.tostring(openT) : "disabled", text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+    float ra = reachOf(reachAll)
+    table.cell(T, 0, 7, "reach | last " + str.tostring(reachLen) + " | all " + (na(ra) ? "-" : str.tostring(ra, "#.##")), text_color = color.white, bgcolor = color.new(color.purple, 40), text_size = tblSize)
+    table.cell(T, 1, 7, reachStr(reachB), text_color = color.white, bgcolor = color.new(color.purple, 40), text_size = tblSize)
+    table.cell(T, 2, 7, reachStr(reachT), text_color = color.white, bgcolor = color.new(color.purple, 40), text_size = tblSize)
+    for L = 1 to 5
+        table.cell(T, 0, 7 + L, L == 5 ? "L5 | all agree" : "L" + str.tostring(L) + " | wall " + array.get(rungName, L + 1), text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+        table.cell(T, 1, 7 + L, statStr(1,  L), text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+        table.cell(T, 2, 7 + L, statStr(-1, L), text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+    table.cell(T, 0, 13, "measure", text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+    table.cell(T, 1, 13, str.tostring(horizonBars) + " x " + array.get(rungName, 5) + " after verdict | grace " + str.tostring(graceBars), text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+    table.cell(T, 2, 13, "target " + str.tostring(tgtAtr, "#.#") + "xATR = " + str.tostring(tgtAtr * atr5, "#.##"), text_color = color.white, bgcolor = cellBg, text_size = tblSize)
+
+plot(reachOf(reachAll), "Reach (all, last N)", display = display.data_window)
+plot(reachOf(reachB),   "Reach BOT",           display = display.data_window)
+plot(reachOf(reachT),   "Reach TOP",           display = display.data_window)
+plot(openB, "Open BOT chains", display = display.data_window)
+plot(openT, "Open TOP chains", display = display.data_window)
+plot(botResolved, "BOT resolved level this update", display = display.data_window)
+plot(topResolved, "TOP resolved level this update", display = display.data_window)
+
+alertcondition(botResolved >= alertLvl, "XPW BOT chain reached level", "XPW Look-Down Forest: a BOT chain resolved at or above the alert level")
+alertcondition(topResolved >= alertLvl, "XPW TOP chain reached level", "XPW Look-Down Forest: a TOP chain resolved at or above the alert level")
