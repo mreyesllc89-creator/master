@@ -1,0 +1,192 @@
+//@version=5
+indicator("MTF Fractals + Stage", overlay=true, max_labels_count=500)
+
+// ── Inputs ──────────────────────────────────────────────────────────────
+leftBars  = input.int(2, "Bars left", minval=1, maxval=5, group="Fractal")
+rightBars = input.int(2, "Bars right (confirm)", minval=1, maxval=5, group="Fractal")
+
+useChart = input.bool(true, "Chart TF", group="Timeframes")
+use5     = input.bool(true, "5m", group="Timeframes")
+use15    = input.bool(true, "15m", group="Timeframes")
+use60    = input.bool(true, "1H", group="Timeframes")
+use240   = input.bool(true, "4H", group="Timeframes")
+useD     = input.bool(true, "Daily", group="Timeframes")
+useW     = input.bool(false, "Weekly", group="Timeframes")
+
+showMarks    = input.bool(true, "Plot fractal marks", group="Display")
+showStageTbl = input.bool(true, "Stage table", group="Display")
+showLabels   = input.bool(true, "Labels on last chart fractals", group="Display")
+tblPos       = input.string("top_right", "Table position", options=["top_left","top_right","bottom_left","bottom_right"], group="Display")
+retestPct    = input.float(0.15, "Retest band %", minval=0.01, step=0.01, group="Display")
+
+bullCol = input.color(color.new(color.teal, 0), "Bull", group="Display")
+bearCol = input.color(color.new(color.red, 0), "Bear", group="Display")
+
+// ── Williams fractal (confirmed after rightBars close) ──────────────────
+isUpFractal() =>
+    bool ok = true
+    float mid = high[rightBars]
+    for i = 0 to leftBars + rightBars
+        if i != rightBars and high[i] >= mid
+            ok := false
+    ok
+
+isDnFractal() =>
+    bool ok = true
+    float mid = low[rightBars]
+    for i = 0 to leftBars + rightBars
+        if i != rightBars and low[i] <= mid
+            ok := false
+    ok
+
+// Stages for the ACTIVE (most recent) fractal of each side:
+// Confirmed – just printed
+// Holding  – still valid (price has not broken it)
+// Retest   – price back inside retest band
+// Broken   – close took out the fractal level
+stageOf(bool isUp, float lvl) =>
+    int st = na
+    if not na(lvl)
+        bool broken = isUp ? close > lvl : close < lvl
+        bool retest = math.abs(close - lvl) / lvl * 100.0 <= retestPct
+        if broken
+            st := 3
+        else if retest
+            st := 2
+        else
+            st := 4
+    st
+
+stageName(int s) =>
+    s == 1 ? "Confirmed" : s == 2 ? "Retest" : s == 3 ? "Broken" : s == 4 ? "Holding" : "—"
+
+stageColor(int s) =>
+    s == 1 ? color.yellow : s == 2 ? color.orange : s == 3 ? color.red : s == 4 ? color.lime : color.gray
+
+// ── Per-TF engine (safe inside request.security) ────────────────────────
+tfEngine() =>
+    bool upNow = isUpFractal()
+    bool dnNow = isDnFractal()
+    float upPxNow = upNow ? high[rightBars] : float(na)
+    float dnPxNow = dnNow ? low[rightBars] : float(na)
+
+    var float lastUp = na
+    var float lastDn = na
+    var int   upAge  = 100000
+    var int   dnAge  = 100000
+
+    if upNow
+        lastUp := upPxNow
+        upAge := 0
+    else
+        upAge += 1
+
+    if dnNow
+        lastDn := dnPxNow
+        dnAge := 0
+    else
+        dnAge += 1
+
+    int upSt = stageOf(true, lastUp)
+    int dnSt = stageOf(false, lastDn)
+    if upNow
+        upSt := 1
+    if dnNow
+        dnSt := 1
+
+    [lastUp, lastDn, upSt, dnSt, upNow, dnNow]
+
+// ── Chart TF ────────────────────────────────────────────────────────────
+[cUpLvl, cDnLvl, cUpSt, cDnSt, cUpHit, cDnHit] = tfEngine()
+
+plotshape(showMarks and cUpHit, title="Up fractal", style=shape.triangleup, location=location.abovebar, color=bullCol, size=size.tiny, offset=-rightBars)
+plotshape(showMarks and cDnHit, title="Dn fractal", style=shape.triangledown, location=location.belowbar, color=bearCol, size=size.tiny, offset=-rightBars)
+
+// ── Higher TFs ──────────────────────────────────────────────────────────
+[u5, d5, us5, ds5, uh5, dh5] = request.security(syminfo.tickerid, "5", tfEngine(), barmerge.gaps_off, barmerge.lookahead_off)
+[u15, d15, us15, ds15, uh15, dh15] = request.security(syminfo.tickerid, "15", tfEngine(), barmerge.gaps_off, barmerge.lookahead_off)
+[u60, d60, us60, ds60, uh60, dh60] = request.security(syminfo.tickerid, "60", tfEngine(), barmerge.gaps_off, barmerge.lookahead_off)
+[u240, d240, us240, ds240, uh240, dh240] = request.security(syminfo.tickerid, "240", tfEngine(), barmerge.gaps_off, barmerge.lookahead_off)
+[uD, dD, usD, dsD, uhD, dhD] = request.security(syminfo.tickerid, "D", tfEngine(), barmerge.gaps_off, barmerge.lookahead_off)
+[uW, dW, usW, dsW, uhW, dhW] = request.security(syminfo.tickerid, "W", tfEngine(), barmerge.gaps_off, barmerge.lookahead_off)
+
+// ── Stage table ─────────────────────────────────────────────────────────
+pos = tblPos == "top_left" ? position.top_left : tblPos == "top_right" ? position.top_right : tblPos == "bottom_left" ? position.bottom_left : position.bottom_right
+var table t = table.new(pos, 5, 9, bgcolor=color.new(#0d1117, 15), border_width=1, border_color=color.new(color.gray, 60))
+
+paintRow(int row, string name, float upL, int upS, float dnL, int dnS) =>
+    table.cell(t, 0, row, name, text_color=color.silver, text_size=size.small)
+    table.cell(t, 1, row, na(upL) ? "—" : str.tostring(upL, format.mintick), text_color=bullCol, text_size=size.small)
+    table.cell(t, 2, row, stageName(upS), text_color=stageColor(upS), text_size=size.small)
+    table.cell(t, 3, row, na(dnL) ? "—" : str.tostring(dnL, format.mintick), text_color=bearCol, text_size=size.small)
+    table.cell(t, 4, row, stageName(dnS), text_color=stageColor(dnS), text_size=size.small)
+
+if showStageTbl and barstate.islast
+    table.cell(t, 0, 0, "TF", text_color=color.gray, text_size=size.small)
+    table.cell(t, 1, 0, "Up", text_color=color.gray, text_size=size.small)
+    table.cell(t, 2, 0, "Up stage", text_color=color.gray, text_size=size.small)
+    table.cell(t, 3, 0, "Dn", text_color=color.gray, text_size=size.small)
+    table.cell(t, 4, 0, "Dn stage", text_color=color.gray, text_size=size.small)
+
+    int r = 1
+    if useChart
+        paintRow(r, "Chart", cUpLvl, cUpSt, cDnLvl, cDnSt)
+        r += 1
+    if use5
+        paintRow(r, "5m", u5, us5, d5, ds5)
+        r += 1
+    if use15
+        paintRow(r, "15m", u15, us15, d15, ds15)
+        r += 1
+    if use60
+        paintRow(r, "1H", u60, us60, d60, ds60)
+        r += 1
+    if use240
+        paintRow(r, "4H", u240, us240, d240, ds240)
+        r += 1
+    if useD
+        paintRow(r, "D", uD, usD, dD, dsD)
+        r += 1
+    if useW
+        paintRow(r, "W", uW, usW, dW, dsW)
+
+// ── Labels on last chart fractals ───────────────────────────────────────
+var label upLab = na
+var label dnLab = na
+if showLabels and barstate.islast
+    label.delete(upLab)
+    label.delete(dnLab)
+    if not na(cUpLvl)
+        upLab := label.new(bar_index + 1, cUpLvl, "▲ " + stageName(cUpSt) + "  " + str.tostring(cUpLvl, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(bullCol, 75), textcolor=bullCol, size=size.small)
+    if not na(cDnLvl)
+        dnLab := label.new(bar_index + 1, cDnLvl, "▼ " + stageName(cDnSt) + "  " + str.tostring(cDnLvl, format.mintick), xloc=xloc.bar_index, style=label.style_label_left, color=color.new(bearCol, 75), textcolor=bearCol, size=size.small)
+
+// ── MTF bias (data window) ──────────────────────────────────────────────
+biasScore(int upS, int dnS) =>
+    int b = 0
+    if upS == 1 or upS == 2 or upS == 4
+        b += 1
+    if dnS == 1 or dnS == 2 or dnS == 4
+        b -= 1
+    b
+
+int bias = 0
+if useChart
+    bias += biasScore(cUpSt, cDnSt)
+if use5
+    bias += biasScore(us5, ds5)
+if use15
+    bias += biasScore(us15, ds15)
+if use60
+    bias += biasScore(us60, ds60)
+if use240
+    bias += biasScore(us240, ds240)
+if useD
+    bias += biasScore(usD, dsD)
+if useW
+    bias += biasScore(usW, dsW)
+
+plot(bias, "MTF fractal bias", display=display.data_window)
+
+alertcondition(cUpHit, "Chart up fractal", "Up fractal confirmed (chart TF)")
+alertcondition(cDnHit, "Chart dn fractal", "Down fractal confirmed (chart TF)")
