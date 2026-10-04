@@ -3,18 +3,35 @@
 //  TDI+ (Enhanced)  -  STRATEGY  -  BTCUSD calibration
 // ----------------------------------------------------------------------------
 //  Same logic as tdi_plus_enhanced_strategy.pine, with defaults set for
-//  BTCUSD (spot or CFD, 1 contract = 1 BTC):
-//    * Exits default to Points mode, MT5 style: 1 point = 0.01 of BTC price
-//      ("Point size" input), so 100 points = $1 whatever the broker's tick.
-//      SL 150000 pts ($1500), TP 450000 pts ($4500), trail starts at
-//      200000 pts ($2000) and trails 75000 pts ($750).
-//    * ATR mode is still available: SL 2 x ATR, TP 3R, trail starts at
-//      2.5 x ATR, trails 1 x ATR.
+//  BTCUSD (spot or CFD, 1 contract = 1 BTC), calibrated on MEXC BTCUSDT
+//  10-minute data, 29 Sep - 4 Oct 2026 (739 bars), 0.05% fee per side.
+//
+//  CALIBRATION RESULT
+//    * Entries: band BREAKOUT only, both directions. The Shark Fin
+//      "complete" (reversal) entry lost money in the last 40% of the data
+//      with every exit tested, so it is off by default, as are the
+//      divergence and cross entries.
+//    * Exit preset (S2. EXITS), 1 point = $0.01:
+//        Best PF        SL 15000  TP 200000  no trail
+//                       PF 2.10, win 30%, 20 trades
+//        Best win rate  SL 100000 no TP      trail from 30000 at 2500
+//                       PF 1.29, win 70%, 20 trades (small wins, rare
+//                       larger losses)
+//        Longest TP     SL 15000  TP 300000  trail from 50000 at 10000
+//                       PF 1.51, win 35%, 23 trades
+//        Best trailing  SL 15000  no TP      trail from 50000 at 15000
+//                       PF 1.52, win 32%, 22 trades
+//        Custom         uses the values typed in below
+//      Each preset was profitable in both the first 60% and the last 40%
+//      of the data. That is only 20-23 trades over five days, so treat
+//      these as a starting point and re-check on more history.
+//    * Points mode is MT5 style: 1 point = 0.01 of BTC price ("Point size"
+//      input), 100 points = $1, whatever the broker's tick size.
 //    * Sizing defaults to Risk 1% of equity, in BTC: fixed 0.05 BTC,
 //      max 1 BTC, step 0.001 BTC.
-//    * Commission 0.1% per side (typical crypto taker fee).
+//    * Commission 0.05% per side (MEXC spot taker). Set yours in
+//      Properties.
 //    * A warning shows on the chart if the symbol is not BTC.
-//  Tuned as a starting point for 1H-4H charts; re-check on your own data.
 // ----------------------------------------------------------------------------
 //  The TDI, band, divergence and Shark Fin calculations are identical to
 //  tdi_plus_enhanced_indicator.pine. Choose which signals open trades:
@@ -50,7 +67,7 @@
 // ============================================================================
 strategy("TDI+ (Enhanced) Strategy - BTCUSD", shorttitle="TDI+ BTC", overlay=false, max_lines_count=500, max_labels_count=50,
          pyramiding=0, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.05,
-         margin_long=0, margin_short=0, commission_type=strategy.commission.percent, commission_value=0.1)
+         margin_long=0, margin_short=0, commission_type=strategy.commission.percent, commission_value=0.05)
 
 // — Inputs —
 grpT = "TDI"
@@ -71,24 +88,25 @@ DrawDivLines = input.bool(true, "Draw Divergence Lines", group=grpD)
 
 grpE = "Strategy - entries"
 TradeDir     = input.string("Both", "Trade Direction", options=["Both", "Buy only", "Sell only"], group=grpE)
-UseDiv       = input.bool(true, "Enter on regular divergence", group=grpE)
+UseDiv       = input.bool(false, "Enter on regular divergence", group=grpE)
 UseHiddenDiv = input.bool(false, "Enter on hidden divergence", group=grpE)
-UseFin       = input.bool(true, "Enter on Shark Fin complete", group=grpE)
-UseBreakout  = input.bool(false, "Enter on band breakout (momentum)", group=grpE)
+UseFin       = input.bool(false, "Enter on Shark Fin complete", group=grpE)
+UseBreakout  = input.bool(true, "Enter on band breakout (momentum)", group=grpE)
 UseCross     = input.bool(false, "Enter on price/signal cross (mid filtered)", group=grpE)
 
 grpX = "S2. EXITS"
 ExitOnOpp    = input.bool(true, "Exit on opposite signal", group=grpX)
-ExitUnit     = input.string("Points", "SL / TP / trail unit", options=["Points", "ATR"], group=grpX)
+ExitPreset   = input.string("Best PF", "Exit preset", options=["Best PF", "Best win rate", "Longest TP", "Best trailing", "Custom"], group=grpX, tooltip="Calibrated on MEXC BTCUSDT 10m, breakout entries, both directions.\nBest PF: SL 15000, TP 200000, no trail.\nBest win rate: SL 100000, no TP, trail from 30000 at 2500.\nLongest TP: SL 15000, TP 300000, trail from 50000 at 10000.\nBest trailing: SL 15000, no TP, trail from 50000 at 15000.\nCustom: uses the values below. (1 point = $0.01)")
+ExitUnit     = input.string("Points", "SL / TP / trail unit (Custom)", options=["Points", "ATR"], group=grpX)
 PointSize    = input.float(0.01, "Point size (price per point)", minval=0, step=0.01, group=grpX, tooltip="0.01 = MT5-style BTCUSD point (100 pts = $1). 0 = use the symbol's tick size.")
-SLPts        = input.float(150000, "Stop loss, pts (Points mode)", minval=0, group=grpX, tooltip="150000 pts x 0.01 = $1500. 0 = off.")
-TPPts        = input.float(450000, "Take profit, pts (Points mode)", minval=0, group=grpX, tooltip="450000 pts x 0.01 = $4500. 0 = off.")
+SLPts        = input.float(15000, "Stop loss, pts (Points mode)", minval=0, group=grpX, tooltip="15000 pts x 0.01 = $150. 0 = off.")
+TPPts        = input.float(200000, "Take profit, pts (Points mode)", minval=0, group=grpX, tooltip="200000 pts x 0.01 = $2000. 0 = off.")
 ATRLen       = input.int(14, "ATR length (ATR mode)", minval=1, group=grpX)
 SLATR        = input.float(2.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
 TPR          = input.float(3.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group=grpX)
-UseTrail     = input.bool(true, "Trailing stop", group=grpX)
-TrailActPts  = input.float(200000, "Trail activation, pts of profit (Points mode)", minval=0, group=grpX)
-TrailDistPts = input.float(75000, "Trail distance, pts (Points mode)", minval=0, group=grpX)
+UseTrail     = input.bool(false, "Trailing stop (Custom)", group=grpX)
+TrailActPts  = input.float(50000, "Trail activation, pts of profit (Points mode)", minval=0, group=grpX)
+TrailDistPts = input.float(15000, "Trail distance, pts (Points mode)", minval=0, group=grpX)
 TrailActATR  = input.float(2.5, "Trail activation, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
 TrailDistATR = input.float(1.0, "Trail distance, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
 TimeStopBars = input.int(0, "Time stop, bars (0 = off)", minval=0, group=grpX)
@@ -176,10 +194,39 @@ atr    = ta.atr(ATRLen)
 isPts  = ExitUnit == "Points"
 atrTk  = atr / syminfo.mintick
 ptTk   = PointSize > 0 ? PointSize / syminfo.mintick : 1.0   // ticks per point
-slTk   = isPts ? (SLPts > 0 ? SLPts * ptTk : na) : (SLATR > 0 ? SLATR * atrTk : na)
-tpTk   = isPts ? (TPPts > 0 ? TPPts * ptTk : na) : (TPR > 0 ? slTk * TPR : na)
-trActTk = UseTrail ? (isPts ? TrailActPts * ptTk : TrailActATR * atrTk) : na
-trOffTk = UseTrail ? (isPts ? TrailDistPts * ptTk : TrailDistATR * atrTk) : na
+cSL    = isPts ? (SLPts > 0 ? SLPts * ptTk : na) : (SLATR > 0 ? SLATR * atrTk : na)
+cTP    = isPts ? (TPPts > 0 ? TPPts * ptTk : na) : (TPR > 0 ? cSL * TPR : na)
+cAct   = UseTrail ? (isPts ? TrailActPts * ptTk : TrailActATR * atrTk) : na
+cOff   = UseTrail ? (isPts ? TrailDistPts * ptTk : TrailDistATR * atrTk) : na
+
+// Presets, in calibrated points (1 point = $0.01), converted to ticks.
+presetTk = 0.01 / syminfo.mintick
+float pSL  = na
+float pTP  = na
+float pAct = na
+float pOff = na
+if ExitPreset == "Best PF"
+    pSL := 15000
+    pTP := 200000
+else if ExitPreset == "Best win rate"
+    pSL  := 100000
+    pAct := 30000
+    pOff := 2500
+else if ExitPreset == "Longest TP"
+    pSL  := 15000
+    pTP  := 300000
+    pAct := 50000
+    pOff := 10000
+else if ExitPreset == "Best trailing"
+    pSL  := 15000
+    pAct := 50000
+    pOff := 15000
+
+usePreset = ExitPreset != "Custom"
+slTk    = usePreset ? pSL * presetTk : cSL
+tpTk    = usePreset ? pTP * presetTk : cTP
+trActTk = usePreset ? pAct * presetTk : cAct
+trOffTk = usePreset ? pOff * presetTk : cOff
 
 // — S3. Sizing —
 calcQty() =>
@@ -276,7 +323,7 @@ var int nLongSig  = 0
 var int nShortSig = 0
 nLongSig  += goLong ? 1 : 0
 nShortSig += goShort ? 1 : 0
-var table info = table.new(position.top_right, 2, 5, bgcolor=color.new(color.black, 20), border_width=1)
+var table info = table.new(position.top_right, 2, 6, bgcolor=color.new(color.black, 20), border_width=1)
 if ShowInfo and barstate.islast
     table.cell(info, 0, 0, "Signals L / S", text_color=color.white, text_size=size.small)
     table.cell(info, 1, 0, str.tostring(nLongSig) + " / " + str.tostring(nShortSig), text_color=color.white, text_size=size.small)
@@ -286,5 +333,7 @@ if ShowInfo and barstate.islast
     table.cell(info, 1, 2, str.tostring(entryQty), text_color=entryQty > 0 ? color.white : color.red, text_size=size.small)
     table.cell(info, 0, 3, "Direction", text_color=color.white, text_size=size.small)
     table.cell(info, 1, 3, TradeDir, text_color=color.white, text_size=size.small)
+    table.cell(info, 0, 5, "Exit preset", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 5, ExitPreset, text_color=color.white, text_size=size.small)
     table.cell(info, 0, 4, "1 point =", text_color=color.white, text_size=size.small)
     table.cell(info, 1, 4, "$" + str.tostring(PointSize > 0 ? PointSize : syminfo.mintick), text_color=color.white, text_size=size.small)
