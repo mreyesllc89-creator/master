@@ -126,23 +126,28 @@ Sep–Oct 2026, to convert between ATR and dollars:
 | ≈ $2 (est.) | ≈ $4.5 (est.) | $11–13 | $16–19 | ≈ $23 | $36–38 | $95–105 | $225–245 |
 
 - **Intraday fade.** On the 3 weeks of 30m data, a Chandelier trail starting at
-  about +$10 (≈ 0.5 R) with a $5–12 distance, keeping the 1 R target, beat no
-  trail on 30m (+0.04 → +0.25 R), 1H (+0.23 → +0.46 R) and 2H (−0.35 →
-  −0.07 R). Starting at 0 was the weakest choice, and Chandelier distances
-  below 0.5 ATR change nothing (the *Min stop distance* floor sets the stop).
+  about +$10 (≈ 0.5 R) with an $8 distance, keeping the 1 R target, beat no
+  trail on 30m (+0.04 → +0.25 R per trade; +0.16 to +0.25 R across $5–12),
+  1H (+0.23 → +0.46 R) and 2H (−0.35 → −0.07 R). Starting at 0 was the
+  weakest choice. Chandelier distances below 0.5 ATR all give the same result:
+  the *Min stop distance* floor (close − 0.5 ATR) sets the stop instead.
   But this is one 3-week sample (1H and 2H are the same bars resampled), and
   the same rule in ATR units over 76 fade trades on 4H to weekly data gained
-  nothing (+0.02 vs +0.016 R per trade); removing the target lost money there.
+  nothing (+0.02 vs +0.016 R per trade); removing the target there earned
+  about 0 R per trade, and lost with wider trails.
   Hence *Profile* (no trail) stays the recommendation; the optional points
   trail in the table above is the scaled-down version of that +$10 / $8
   setting. The ATR-unit equivalent, Chandelier 0.75 ATR from 0.5 R, adapts to
   the session and is the better choice if you use one.
 - **Trend.** On 4H, where ATR stayed between $33 and $42, a $145 Chandelier
-  equalled 4 ATR (+11.8 R vs +12.2 R). On daily and weekly charts a fixed
-  dollar trail is a different exit in every year: a weekly $1,000 trail was
-  24–36 ATR wide in 2015–2019 (never switched on) and 3.8 ATR in 2026. Its
-  apparent gains there came from being far wider than 4 ATR during the 2025
-  trend. Keep *Profile* (4 ATR from +1 R) for Trend.
+  equalled 4 ATR (total +11.8 R vs +12.2 R over 7 trades; +1.69 vs +1.74 R per
+  trade). On daily and weekly charts a fixed dollar trail is a different exit
+  in every year: a weekly $1,000 trail was 24–36 ATR wide in 2015–2019 (it
+  never moved the stop) and 3.8 ATR in 2026. Its apparent gains came from being
+  far wider than 4 ATR: on the weekly chart from one 2019–2020 trade that it
+  let run to the opposite break (+15.7 R instead of +6.1 R), on the daily chart
+  from the 2025 trend ($400 was about 7.7 ATR then). Keep *Profile* (4 ATR from
+  +1 R) for Trend.
 - **Points or ATR.** Points suit live trading over a short window at a known
   volatility, or a broker or prop-firm rule in dollars: check *Trail distance
   (price)* in the Data Window against the current ATR and reset the points
@@ -207,7 +212,7 @@ with a narrower retest band or in Percent band mode.
 |------|---------|---------|
 | Target | 2 R | Two times the stop distance from the entry. 0 disables it. |
 | Breakeven | at +1 R | Once a bar has reached 1 R in favour **and closed beyond the entry**, the stop moves to the entry price. |
-| Trailing stop | Profile (Trend: chandelier 4 ATR from +1 R; otherwise off) | **Swing**: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer). **Chandelier**: highest high since entry − distance (lowest low + distance for shorts), never closer to the close than *Min stop distance* × ATR in any unit (so a Chandelier distance below 0.5 ATR has no effect). **From close**: close − distance (close + distance for shorts), no floor. *Trail units* sets what *Trail distance* and *Start trailing at* mean: **ATR** (distance × chart ATR, start in R), **Points** (both in price: 5 = $5 on gold) or **Ticks** (both in the chart symbol's minimum price step: 0.001 on OANDA:XAUUSD, so $5 = 5000 ticks; 0.01 on 2-decimal gold CFDs; 0.1 on GC / MGC. Ticks equal MetaTrader points only when the decimals match, so Points is the safer choice). Points and Ticks do not follow volatility (section 6). *Start trailing at* delays trailing until the best price since entry is that far in profit. The stop moves on the bar close and only ratchets toward price; set *Target* to 0 to let winners run. Any choice other than *Profile* also applies on top of the calibrated gold profiles. |
+| Trailing stop | Profile (Trend: chandelier 4 ATR from +1 R; otherwise off) | **Swing**: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer). **Chandelier**: highest high since entry − distance (lowest low + distance for shorts), never closer to the close than *Min stop distance* × ATR in any unit (a smaller distance acts like close − 0.5 ATR: it cannot trail tighter than that). **From close**: close − distance (close + distance for shorts), no floor. *Trail units* sets what *Trail distance* and *Start trailing at* mean: **ATR** (distance × chart ATR, start in R), **Points** (both in price: 5 = $5 on gold) or **Ticks** (both in the chart symbol's minimum price step: 0.001 on OANDA:XAUUSD, so $5 = 5000 ticks; 0.01 on 2-decimal gold CFDs; 0.1 on GC / MGC. Ticks equal MetaTrader points only when the decimals match, so Points is the safer choice). Points and Ticks do not follow volatility (section 6). *Start trailing at* delays trailing until the best price since entry is that far in profit. The stop moves on the bar close and only ratchets toward price; set *Target* to 0 to let winners run. Any choice other than *Profile* also applies on top of the calibrated gold profiles. |
 | Opposite break | on | A long is closed when the chart-TF swing low turns Broken (a short mirrored). If that break also passes the entry filters, the position is **reversed** instead, so the breakout is not lost. |
 | Any-signal reversal | off | When on, any opposite entry signal reverses the position. |
 | Time stop | off | Close after N bars. |
@@ -241,7 +246,7 @@ equity); leverage is controlled by *Max position size* instead.
 |---------|-----------|----------|-----------|
 | Breakout stop 1.5 × ATR | ≈ $25 | ≈ $780 | Beyond the retest zone (0.65 ATR) plus a push through it. |
 | Flip-retest stop | ≈ $11 past the level | ≈ $340 past the level | The flip has failed once price closes back through the zone; a wider stop would keep the trade after its premise is gone. |
-| Min stop 0.5 × ATR | ≈ $8 | ≈ $260 | A safety floor. With the default band every stop is already ≥ 0.65 × ATR (the retest zone), so it only binds with a retest band below ≈ 0.35 × ATR or in Percent band mode. |
+| Min stop 0.5 × ATR | ≈ $8 | ≈ $260 | A safety floor. With the default band every stop is already ≥ 0.65 × ATR (the retest zone), so it only binds with a retest band below ≈ 0.35 × ATR or in Percent band mode. It is also the closest a Chandelier trail can get to the close, in any trail unit. |
 | Max extension 1.5 × ATR | | | A close more than 1.5 ATR past the level needs a 2+ ATR stop to clear the zone; skipping those avoids chasing. |
 | Target 2 R | ≈ $50 | ≈ $1,560 | About three hourly ATRs: reachable within a session on a real breakout, enough to pay for the losers at a 40 % win rate. |
 | Breakeven at 1 R | | | Turns a breakout that ran one stop distance and came back into a scratch instead of a full loss. |
@@ -310,9 +315,10 @@ defaults that is about 1.1 %; on 5m gold with a CFD spread it is about 1.05 %.
   widen after entry. The trailing modes use the current ATR, a fixed distance
   in points or ticks, or new swings, and only ratchet toward price, so they do
   not help when volatility rises. A points or ticks distance also does not
-  scale with volatility: gold's weekly ATR was 3–8 times smaller in 2015–2020
-  than in 2026, so a fixed distance tuned today was effectively off in a long
-  backtest. Use ATR units for backtests that span years.
+  scale with volatility: gold's weekly ATR was about 3–9 times smaller in
+  2015–2020 than in Sep–Oct 2026, so a fixed distance tuned today was
+  effectively off in a long backtest. Use ATR units for backtests that span
+  years.
 - One position at a time, no scaling in or out.
 - The bias filter counts the higher-timeframe rows visible on the chart; on a
   4H chart only D and W contribute.
