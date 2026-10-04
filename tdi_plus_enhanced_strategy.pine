@@ -18,14 +18,21 @@
 //                         by the middle band (above mid for longs, below for
 //                         shorts). Off by default.
 //
-//  Trade direction: Both reverses on an opposite signal. Long only / Short
+//  Trade direction: Both reverses on an opposite signal. Buy only / Sell
 //  only: the opposite signal closes the position when "Exit on opposite
 //  signal" is on, but never opens one.
-//  Optional stop loss / take profit in percent of entry (0 = off).
+//
+//  S2. EXITS  - stop loss, take profit and trailing stop in Points (ticks,
+//               1 point = syminfo.mintick) or ATR. In ATR mode the TP is an
+//               R multiple of the SL distance. Distances are frozen at entry.
+//               Optional time stop closes a trade after N bars.
+//  S3. SIZING - Fixed quantity, or Risk % of equity per trade (needs a stop
+//               loss; falls back to the fixed quantity when SL is off).
+//               Capped at Max quantity and rounded down to Quantity step.
 //  Orders are placed on bar close and fill on the next bar's open.
 // ============================================================================
 strategy("TDI+ (Enhanced) Strategy", shorttitle="TDI+ S", overlay=false, max_lines_count=500,
-         pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+         pyramiding=0, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=10,
          commission_type=strategy.commission.percent, commission_value=0.05)
 
 // — Inputs —
@@ -46,17 +53,34 @@ ArrowDist    = input.float(3.0, "Arrow Distance (RSI points)", minval=0, group=g
 DrawDivLines = input.bool(true, "Draw Divergence Lines", group=grpD)
 
 grpE = "Strategy - entries"
-TradeDir     = input.string("Both", "Trade Direction", options=["Both", "Long only", "Short only"], group=grpE)
+TradeDir     = input.string("Both", "Trade Direction", options=["Both", "Buy only", "Sell only"], group=grpE)
 UseDiv       = input.bool(true, "Enter on regular divergence", group=grpE)
 UseHiddenDiv = input.bool(false, "Enter on hidden divergence", group=grpE)
 UseFin       = input.bool(true, "Enter on Shark Fin complete", group=grpE)
 UseBreakout  = input.bool(false, "Enter on band breakout (momentum)", group=grpE)
 UseCross     = input.bool(false, "Enter on price/signal cross (mid filtered)", group=grpE)
 
-grpX = "Strategy - exits"
-ExitOnOpp = input.bool(true, "Exit on opposite signal", group=grpX)
-SLPct     = input.float(0.0, "Stop Loss % (0 = off)", minval=0, step=0.1, group=grpX)
-TPPct     = input.float(0.0, "Take Profit % (0 = off)", minval=0, step=0.1, group=grpX)
+grpX = "S2. EXITS"
+ExitOnOpp    = input.bool(true, "Exit on opposite signal", group=grpX)
+ExitUnit     = input.string("Points", "SL / TP / trail unit", options=["Points", "ATR"], group=grpX)
+SLPts        = input.float(5000, "Stop loss, pts (Points mode)", minval=0, group=grpX, tooltip="1 point = 1 tick (syminfo.mintick). 0 = off.")
+TPPts        = input.float(50000, "Take profit, pts (Points mode)", minval=0, group=grpX, tooltip="1 point = 1 tick (syminfo.mintick). 0 = off.")
+ATRLen       = input.int(14, "ATR length (ATR mode)", minval=1, group=grpX)
+SLATR        = input.float(2.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
+TPR          = input.float(2.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group=grpX)
+UseTrail     = input.bool(true, "Trailing stop", group=grpX)
+TrailActPts  = input.float(1500, "Trail activation, pts of profit (Points mode)", minval=0, group=grpX)
+TrailDistPts = input.float(100, "Trail distance, pts (Points mode)", minval=0, group=grpX)
+TrailActATR  = input.float(4.0, "Trail activation, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
+TrailDistATR = input.float(0.2, "Trail distance, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
+TimeStopBars = input.int(0, "Time stop, bars (0 = off)", minval=0, group=grpX)
+
+grpQ = "S3. SIZING"
+QtyMode  = input.string("Fixed", "Quantity", options=["Fixed", "Risk"], group=grpQ)
+FixedQty = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0, group=grpQ)
+RiskPct  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0, step=0.1, group=grpQ, tooltip="Quantity = equity x risk % / stop-loss distance in money. Needs a stop loss; uses the fixed quantity when SL is off.")
+MaxQty   = input.float(50, "Max quantity", minval=0, group=grpQ)
+QtyStep  = input.float(1, "Quantity step (rounds down)", minval=0, group=grpQ)
 
 // — RSI & Bands —
 slow     = ta.rsi(close, RSIPeriod)
@@ -124,32 +148,71 @@ shortSig = (UseDiv and bearDivCond) or (UseHiddenDiv and hiddenBearDivCond) or (
 goLong  = longSig and not shortSig
 goShort = shortSig and not longSig
 
-allowLong  = TradeDir != "Short only"
-allowShort = TradeDir != "Long only"
+allowLong  = TradeDir != "Sell only"
+allowShort = TradeDir != "Buy only"
+
+// — S2. Exit distances (ticks) —
+atr    = ta.atr(ATRLen)
+isPts  = ExitUnit == "Points"
+atrTk  = atr / syminfo.mintick
+slTk   = isPts ? (SLPts > 0 ? SLPts : na) : (SLATR > 0 ? SLATR * atrTk : na)
+tpTk   = isPts ? (TPPts > 0 ? TPPts : na) : (TPR > 0 ? slTk * TPR : na)
+trActTk = UseTrail ? (isPts ? TrailActPts : TrailActATR * atrTk) : na
+trOffTk = UseTrail ? (isPts ? TrailDistPts : TrailDistATR * atrTk) : na
+
+// — S3. Sizing —
+calcQty() =>
+    float q = FixedQty
+    if QtyMode == "Risk" and slTk > 0
+        perUnitRisk = slTk * syminfo.mintick * syminfo.pointvalue
+        q := strategy.equity * RiskPct / 100 / perUnitRisk
+    q := math.min(q, MaxQty)
+    QtyStep > 0 ? math.floor(q / QtyStep) * QtyStep : q
+
+entryQty = calcQty()
+
+// Exit distances frozen at entry, one set per side.
+var float lSL  = na
+var float lTP  = na
+var float lAct = na
+var float lOff = na
+var float sSL  = na
+var float sTP  = na
+var float sAct = na
+var float sOff = na
 
 // — Orders —
 if goLong
-    if allowLong
-        strategy.entry("Long", strategy.long)
-    else if ExitOnOpp
+    if allowLong and entryQty > 0 and strategy.position_size <= 0
+        strategy.entry("Long", strategy.long, qty=entryQty)
+        lSL  := slTk
+        lTP  := tpTk
+        lAct := trActTk
+        lOff := trOffTk
+    else if not allowLong and ExitOnOpp
         strategy.close("Short", comment="Opp signal")
 
 if goShort
-    if allowShort
-        strategy.entry("Short", strategy.short)
-    else if ExitOnOpp
+    if allowShort and entryQty > 0 and strategy.position_size >= 0
+        strategy.entry("Short", strategy.short, qty=entryQty)
+        sSL  := slTk
+        sTP  := tpTk
+        sAct := trActTk
+        sOff := trOffTk
+    else if not allowShort and ExitOnOpp
         strategy.close("Long", comment="Opp signal")
 
-if SLPct > 0 or TPPct > 0
-    entryPx = strategy.position_avg_price
-    if strategy.position_size > 0
-        strategy.exit("Long SL/TP", from_entry="Long",
-                      stop  = SLPct > 0 ? entryPx * (1 - SLPct / 100) : na,
-                      limit = TPPct > 0 ? entryPx * (1 + TPPct / 100) : na)
-    if strategy.position_size < 0
-        strategy.exit("Short SL/TP", from_entry="Short",
-                      stop  = SLPct > 0 ? entryPx * (1 + SLPct / 100) : na,
-                      limit = TPPct > 0 ? entryPx * (1 - TPPct / 100) : na)
+if not na(lSL) or not na(lTP) or not na(lAct)
+    strategy.exit("Long Exit", from_entry="Long", loss=lSL, profit=lTP, trail_points=lAct, trail_offset=lOff,
+                  comment_loss="SL", comment_profit="TP", comment_trailing="Trail")
+if not na(sSL) or not na(sTP) or not na(sAct)
+    strategy.exit("Short Exit", from_entry="Short", loss=sSL, profit=sTP, trail_points=sAct, trail_offset=sOff,
+                  comment_loss="SL", comment_profit="TP", comment_trailing="Trail")
+
+// Time stop
+if TimeStopBars > 0 and strategy.opentrades > 0
+    if bar_index - strategy.opentrades.entry_bar_index(0) >= TimeStopBars
+        strategy.close_all(comment="Time stop")
 
 // — Plotting —
 hline(68, "Level 68", color=color.gray, linestyle=hline.style_dotted)
