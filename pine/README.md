@@ -14,8 +14,8 @@ Its defaults are the values of `../mql5/TokioXAU_SinLimites_V3.set`.
 
 - **Virtual ledger.** The EA runs buys and sells at the same time (hedging account).
   TradingView strategies cannot, so the script keeps its own book of positions and
-  computes the basket P/L in account money (100 oz per lot). Results are in the
-  dashboard and on the chart, not in the Strategy Tester.
+  computes the basket P/L in account money (100 oz per lot). The ledger is the
+  exact simulation (dashboard and chart); the Strategy Tester mirrors it below.
 - **Strategy Tester.** TradingView strategies hold one net position, so the
   strategy keeps the ledger's **net exposure** (buy lots − sell lots, lock included;
   1 lot = 100 oz, see "Cantidad de la estrategia por 1 lote"). A hedged basket gains
