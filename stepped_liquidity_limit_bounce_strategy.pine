@@ -1,38 +1,42 @@
 //@version=6
-strategy("Stepped Liquidity Limit Bounce - Enhanced", overlay=true, margin_long=100, margin_short=100, process_orders_on_close=true)
+// Calibrated for BTCUSD (crypto, 24/7). Recommended chart: 1H with 4H trend filter.
+strategy("Stepped Liquidity Limit Bounce - BTCUSD", overlay=true, margin_long=100, margin_short=100, process_orders_on_close=true,
+     initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.06)
 
 // =========================================================================
 // INPUTS & SETTINGS
 // =========================================================================
 grp_trade = "Trade Direction & Risk"
 tradeDirection = input.string("Both", title="Trade Direction", options=["Buy Only", "Sell Only", "Both"], group=grp_trade)
-cancelBars     = input.int(4, title="Cancel Unfilled Order (Bars)", minval=1, group=grp_trade)
+cancelBars     = input.int(6, title="Cancel Unfilled Order (Bars)", minval=1, group=grp_trade)
 useATR         = input.bool(true, title="Use ATR for SL/TP/Cancel", group=grp_trade)
 
 grp_vol = "Volatility Settings"
 atrLength     = input.int(14, "ATR Length", minval=1, group=grp_vol)
-atrMultTol    = input.float(0.5, "Touch Tolerance × ATR", minval=0, group=grp_vol)
-atrMultSL     = input.float(1.5, "SL × ATR", minval=0.1, group=grp_vol)
-atrMultTP     = input.float(6.0, "TP × ATR", minval=0.1, group=grp_vol)
-atrMultCancel = input.float(4.0, "Cancel Distance × ATR", minval=0.1, group=grp_vol)
+atrMultTol    = input.float(0.3, "Touch Tolerance × ATR", minval=0, group=grp_vol)
+atrMultSL     = input.float(2.0, "SL × ATR", minval=0.1, group=grp_vol)
+atrMultTP     = input.float(4.0, "TP × ATR", minval=0.1, group=grp_vol)
+atrMultCancel = input.float(3.0, "Cancel Distance × ATR", minval=0.1, group=grp_vol)
 
-// All fixed distances are in TICKS (syminfo.mintick), same unit strategy.exit() uses.
-grp_fixed = "Fixed Distances (used when ATR is off, in ticks)"
-fixedTolTicks    = input.float(150,  "Fixed Touch Tolerance (ticks)", minval=0, group=grp_fixed)
-fixedSLTicks     = input.float(150,  "Fixed SL (ticks)", minval=1, group=grp_fixed)
-fixedTPTicks     = input.float(900,  "Fixed TP (ticks)", minval=1, group=grp_fixed)
-fixedCancelTicks = input.float(5000, "Fixed Cancel Distance (ticks)", minval=1, group=grp_fixed)
+// Fixed distances are in PRICE units ($ for BTCUSD) because BTC tick size differs between feeds/brokers.
+grp_fixed = "Fixed Distances (used when ATR is off, in price $)"
+fixedTolPrice    = input.float(150,  "Fixed Touch Tolerance ($)", minval=0, group=grp_fixed)
+fixedSLPrice     = input.float(800,  "Fixed SL ($)", minval=0.01, group=grp_fixed)
+fixedTPPrice     = input.float(1600, "Fixed TP ($)", minval=0.01, group=grp_fixed)
+fixedCancelPrice = input.float(1500, "Fixed Cancel Distance ($)", minval=0.01, group=grp_fixed)
 
 grp_pc = "PineConnector Integration"
 licenseID   = input.string("8252815278293", title="License ID", group=grp_pc)
-riskVolume  = input.float(1.0, title="Risk / Lot Size (risk=)", minval=0, group=grp_pc)
-pcUnits     = input.string("Pips", title="SL/TP Units Sent", options=["Pips", "Points", "Price"], group=grp_pc, tooltip="Must match the Target Type set in your PineConnector EA. Points = ticks (syminfo.mintick). Price = absolute SL/TP prices.")
-ticksPerPip = input.int(10, title="Ticks per Pip", minval=1, group=grp_pc, tooltip="10 for 5-digit FX / 3-digit JPY pairs. Check your broker for metals, indices and crypto.")
+riskVolume  = input.float(0.01, title="Risk / Lot Size (risk=)", minval=0, step=0.01, group=grp_pc, tooltip="On most MT brokers 1.00 lot BTCUSD = 1 BTC. Start small.")
+pcSymbol    = input.string("", title="MT Symbol Override", group=grp_pc, tooltip="Leave blank to use the chart ticker. Set this if your broker names it differently (e.g. BTCUSDm, BTCUSD.a).")
+pcUnits     = input.string("Price", title="SL/TP Units Sent", options=["Pips", "Points", "Price"], group=grp_pc, tooltip="Must match the Target Type set in your PineConnector EA. Points = ticks (syminfo.mintick). Price = absolute SL/TP prices.")
+ticksPerPip = input.int(100, title="Ticks per Pip", minval=1, group=grp_pc, tooltip="Only used in Pips mode. BTCUSD pip size varies by broker; Price mode avoids this.")
 
 grp_logic = "Micro-Structure & Steps"
 pivotLeft      = input.int(5, title="Pivot Left Strength", minval=1, group=grp_logic)
 pivotRight     = input.int(3, title="Pivot Right Strength", minval=1, group=grp_logic)
-maxLevels      = input.int(5, title="Max Liquidity Levels to Track", minval=1, group=grp_logic)
+maxLevels      = input.int(8, title="Max Liquidity Levels to Track", minval=1, group=grp_logic)
 minTouches     = input.int(1, title="Min Touches for a Valid Level", minval=1, group=grp_logic)
 useTrendFilter = input.bool(true, "Use HTF Trend Filter", group=grp_logic)
 htfTimeframe   = input.timeframe("240", "Higher TF for Trend", group=grp_logic)
@@ -57,10 +61,10 @@ atr = ta.atr(atrLength)
 // ATR expressed in ticks so every distance below shares one unit
 atrInTicks = atr / syminfo.mintick
 
-toleranceTicks = useATR ? atrInTicks * atrMultTol    : fixedTolTicks
-slTicks        = useATR ? atrInTicks * atrMultSL     : fixedSLTicks
-tpTicks        = useATR ? atrInTicks * atrMultTP     : fixedTPTicks
-cancelDistTicks = useATR ? atrInTicks * atrMultCancel : fixedCancelTicks
+toleranceTicks  = useATR ? atrInTicks * atrMultTol    : fixedTolPrice    / syminfo.mintick
+slTicks         = useATR ? atrInTicks * atrMultSL     : fixedSLPrice     / syminfo.mintick
+tpTicks         = useATR ? atrInTicks * atrMultTP     : fixedTPPrice     / syminfo.mintick
+cancelDistTicks = useATR ? atrInTicks * atrMultCancel : fixedCancelPrice / syminfo.mintick
 
 tolerancePrice = toleranceTicks * syminfo.mintick
 
@@ -142,6 +146,10 @@ plot(resLiq.size()  > 0 ? resLiq.last().price  : na, color=color.red,     style=
 // =========================================================================
 // PINECONNECTOR MESSAGE BUILDERS
 // =========================================================================
+mtSymbol = str.length(pcSymbol) > 0 ? pcSymbol : syminfo.ticker
+
+// =========================================================================
+// =========================================================================
 fmtDistance(float ticks, float entryPx, bool isLong, bool isStop) =>
     string result = na
     if pcUnits == "Price"
@@ -154,14 +162,14 @@ fmtDistance(float ticks, float entryPx, bool isLong, bool isStop) =>
     result
 
 buildLimitMsg(bool isLong, float entryPx, float slT, float tpT) =>
-    licenseID + (isLong ? ",buylimit," : ",selllimit,") + syminfo.ticker +
+    licenseID + (isLong ? ",buylimit," : ",selllimit,") + mtSymbol +
          ",risk=" + str.tostring(riskVolume) +
          ",price=" + str.tostring(entryPx, format.mintick) +
          ",sl=" + fmtDistance(slT, entryPx, isLong, true) +
          ",tp=" + fmtDistance(tpT, entryPx, isLong, false)
 
-cancelLongMsg  = licenseID + ",cancellong," + syminfo.ticker
-cancelShortMsg = licenseID + ",cancelshort," + syminfo.ticker
+cancelLongMsg  = licenseID + ",cancellong," + mtSymbol
+cancelShortMsg = licenseID + ",cancelshort," + mtSymbol
 
 // =========================================================================
 // ORDER STATE
