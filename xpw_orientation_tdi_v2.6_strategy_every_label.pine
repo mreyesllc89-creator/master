@@ -1,6 +1,6 @@
 //@version=6
 // ============================================================================
-//  XPW ORIENTATION TDI  -  v2.5 STRATEGY (TICK ENTRY)  -  trades the v2.4 labels
+//  XPW ORIENTATION TDI  -  v2.6 STRATEGY (EVERY LABEL)  -  trades the v2.4 labels
 // ----------------------------------------------------------------------------
 //  This is the v2.4 indicator turned into a strategy. Calibration, ladder
 //  logic, rung map, agreement gate and labels are the indicator's, line for
@@ -102,7 +102,7 @@
 //  the map for location. Do not trade the verdict column on its own.
 // ============================================================================
 
-strategy("XPW Orientation TDI v2.5 Strategy - Tick Entry", shorttitle="XPW-OTDI5 S-TICK", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
+strategy("XPW Orientation TDI v2.6 Strategy - Every Label", shorttitle="XPW-OTDI6 S-ALL", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
 
 // ---------------------------------------------------------------- INPUTS ----
 rsiLen   = input.int(13,       "RSI length",            group="TDI core")
