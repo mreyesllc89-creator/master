@@ -1,0 +1,334 @@
+//@version=6
+// Defaults updated to match the supplied input screenshots. Historical calibration comments below describe the original breakout setup, not these defaults.
+// ============================================================================
+//  TDI+ (Enhanced) - STRATEGY - user-selected defaults and signal alerts
+// ----------------------------------------------------------------------------
+//  Same logic as tdi_plus_enhanced_strategy.pine, with defaults set for
+//  BTCUSD (spot or CFD, 1 contract = 1 BTC), calibrated on MEXC BTCUSDT
+//  10-minute data, 29 Sep - 4 Oct 2026 (739 bars), 0.05% fee per side.
+//
+//  CALIBRATION RESULT
+//    * Entries: band BREAKOUT only, both directions. The Shark Fin
+//      "complete" (reversal) entry lost money in the last 40% of the data
+//      with every exit tested, so it is off by default, as are the
+//      divergence and cross entries.
+//    * Exit preset (S2. EXITS), 1 point = $0.01:
+//        Best PF        SL 15000  TP 200000  no trail
+//                       PF 2.10, win 30%, 20 trades
+//        Best win rate  SL 100000 no TP      trail from 30000 at 2500
+//                       PF 1.29, win 70%, 20 trades (small wins, rare
+//                       larger losses)
+//        Longest TP     SL 15000  TP 300000  trail from 50000 at 10000
+//                       PF 1.51, win 35%, 23 trades
+//        Best trailing  SL 15000  no TP      trail from 50000 at 15000
+//                       PF 1.52, win 32%, 22 trades
+//        Custom         uses the values typed in below
+//      Each preset was profitable in both the first 60% and the last 40%
+//      of the data. That is only 20-23 trades over five days, so treat
+//      these as a starting point and re-check on more history.
+//    * Points mode is MT5 style: 1 point = 0.01 of BTC price ("Point size"
+//      input), 100 points = $1, whatever the broker's tick size.
+//    * Sizing defaults to Risk 1% of equity, in BTC: fixed 0.05 BTC,
+//      max 1 BTC, step 0.001 BTC.
+//    * Commission 0.05% per side (MEXC spot taker). Set yours in
+//      Properties.
+//    * A warning shows on the chart if the symbol is not BTC.
+// ----------------------------------------------------------------------------
+//  The TDI, band, divergence and Shark Fin calculations are identical to
+//  tdi_plus_enhanced_indicator.pine. Choose which signals open trades:
+//
+//    Regular divergence   Bull div = long, bear div = short. Pivots are
+//                         confirmed, so the order goes in "Pivot Lookback
+//                         Right" bars after the pivot (no repainting).
+//    Hidden divergence    Same, for hidden divergences (off by default).
+//    Shark Fin complete   Price line returns inside the band:
+//                         back above lower band = long,
+//                         back below upper band = short.
+//    Band breakout        Momentum: price line crosses above upper = long,
+//                         below lower = short (off by default).
+//    Price/Signal cross   Price line crosses the fast (signal) line, filtered
+//                         by the middle band (above mid for longs, below for
+//                         shorts). Off by default.
+//
+//  Trade direction: Both reverses on an opposite signal. Buy only / Sell
+//  only: the opposite signal closes the position when "Exit on opposite
+//  signal" is on, but never opens one.
+//
+//  S2. EXITS  - stop loss, take profit and trailing stop in Points
+//               (1 point = "Point size" of price) or ATR. In ATR mode the TP is an
+//               R multiple of the SL distance. Distances are frozen at entry.
+//               Optional time stop closes a trade after N bars.
+//  S3. SIZING - Fixed quantity, or Risk % of equity per trade (needs a stop
+//               loss; falls back to the fixed quantity when SL is off).
+//               Capped at Max quantity and at equity x Max leverage (so an
+//               order is never rejected for lack of funds), then rounded
+//               down to Quantity step. A status table shows signal count,
+//               closed trades and the next order size.
+//  Orders are placed on bar close and fill on the next bar's open.
+// ============================================================================
+strategy("TDI+ (Enhanced) Strategy - BTCUSD", shorttitle="TDI+ BTC", overlay=false, max_lines_count=500, max_labels_count=50,
+         pyramiding=0, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.05,
+         margin_long=0, margin_short=0, commission_type=strategy.commission.percent, commission_value=0.05)
+// — Inputs —
+grpT = "TDI"
+RSIPeriod        = input.int(21, "RSI Period", minval=1, group=grpT)
+PriceLinePeriod  = input.int(2, "Price Line Period", minval=1, group=grpT)
+SignalLinePeriod = input.int(7, "Signal Line Period", minval=1, group=grpT)
+VolatilityPeriod = input.int(34, "Volatility Band Period", minval=2, group=grpT)
+BandMult         = input.float(1.6185, "Band Multiplier", minval=0.1, step=0.01, group=grpT)
+ShowBg           = input.bool(true, "Colour background outside bands", group=grpT)
+grpD = "Divergence"
+PivotLeft    = input.int(5, "Pivot Lookback Left", minval=1, group=grpD)
+PivotRight   = input.int(5, "Pivot Lookback Right (confirmation bars)", minval=1, group=grpD)
+RangeMin     = input.int(5, "Min Bars Between Pivots", minval=1, group=grpD)
+RangeMax     = input.int(60, "Max Bars Between Pivots", minval=2, group=grpD)
+ArrowDist    = input.float(3.0, "Arrow Distance (RSI points)", minval=0, group=grpD)
+DrawDivLines = input.bool(true, "Draw Divergence Lines", group=grpD)
+grpE = "Strategy - entries"
+TradeDir     = input.string("Sell only", "Trade Direction", options=["Both", "Buy only", "Sell only"], group=grpE)
+UseDiv       = input.bool(false, "Enter on regular divergence", group=grpE)
+UseHiddenDiv = input.bool(false, "Enter on hidden divergence", group=grpE)
+UseFin       = input.bool(false, "Enter on Shark Fin complete", group=grpE)
+UseBreakout  = input.bool(false, "Enter on band breakout (momentum)", group=grpE)
+UseCross     = input.bool(true, "Enter on price/signal cross (mid filtered)", group=grpE)
+grpX = "S2. EXITS"
+ExitOnOpp    = input.bool(true, "Exit on opposite signal", group=grpX)
+ExitPreset   = input.string("Custom", "Exit preset", options=["Best PF", "Best win rate", "Longest TP", "Best trailing", "Custom"], group=grpX, tooltip="Calibrated on MEXC BTCUSDT 10m, breakout entries, both directions.\nBest PF: SL 15000, TP 200000, no trail.\nBest win rate: SL 100000, no TP, trail from 30000 at 2500.\nLongest TP: SL 15000, TP 300000, trail from 50000 at 10000.\nBest trailing: SL 15000, no TP, trail from 50000 at 15000.\nCustom: uses the values below. (1 point = $0.01)")
+ExitUnit     = input.string("Points", "SL / TP / trail unit (Custom)", options=["Points", "ATR"], group=grpX)
+PointSize    = input.float(0.01, "Point size (price per point)", minval=0, step=0.01, group=grpX, tooltip="0.01 = MT5-style BTCUSD point (100 pts = $1). 0 = use the symbol's tick size.")
+SLPts        = input.float(5000, "Stop loss, pts (Points mode)", minval=0, group=grpX, tooltip="15000 pts x 0.01 = $150. 0 = off.")
+TPPts        = input.float(50000, "Take profit, pts (Points mode)", minval=0, group=grpX, tooltip="200000 pts x 0.01 = $2000. 0 = off.")
+ATRLen       = input.int(14, "ATR length (ATR mode)", minval=1, group=grpX)
+SLATR        = input.float(0.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
+TPR          = input.float(5.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group=grpX)
+UseTrail     = input.bool(true, "Trailing stop (Custom)", group=grpX)
+TrailActPts  = input.float(3500, "Trail activation, pts of profit (Points mode)", minval=0, group=grpX)
+TrailDistPts = input.float(100, "Trail distance, pts (Points mode)", minval=0, group=grpX)
+TrailActATR  = input.float(0.2, "Trail activation, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
+TrailDistATR = input.float(1.0, "Trail distance, ATR mult (ATR mode)", minval=0, step=0.1, group=grpX)
+TimeStopBars = input.int(0, "Time stop, bars (0 = off)", minval=0, group=grpX)
+grpQ = "S3. SIZING"
+QtyMode  = input.string("Risk", "Quantity", options=["Fixed", "Risk"], group=grpQ)
+FixedQty = input.float(0.05, "Fixed quantity (BTC)", minval=0, step=0.001, group=grpQ)
+RiskPct  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0, step=0.1, group=grpQ, tooltip="Quantity = equity x risk % / stop-loss distance in money. Needs a stop loss; uses the fixed quantity when SL is off.")
+MaxQty   = input.float(1.0, "Max quantity (BTC)", minval=0, step=0.001, group=grpQ)
+QtyStep  = input.float(0.001, "Quantity step (BTC, rounds down)", minval=0, step=0.001, group=grpQ)
+Leverage = input.float(1, "Max leverage (x equity)", minval=0.01, step=0.5, group=grpQ, tooltip="Position value is capped at equity x leverage, so orders are never rejected for lack of funds. 1 = no leverage.")
+ShowInfo = input.bool(true, "Show status table", group=grpQ)
+// — RSI & Bands —
+slow     = ta.rsi(close, RSIPeriod)
+ma_mid   = ta.sma(slow, VolatilityPeriod)
+stdev    = ta.stdev(slow, VolatilityPeriod)
+upper    = ma_mid + BandMult * stdev
+lower    = ma_mid - BandMult * stdev
+rsiLine  = ta.sma(slow, PriceLinePeriod)
+fastLine = ta.sma(slow, SignalLinePeriod)
+
+bgColor = rsiLine >= upper ? color.new(color.green, 85) : rsiLine <= lower ? color.new(color.red, 85) : na
+bgcolor(ShowBg ? bgColor : na)
+
+// — Divergence Logic (confirmed pivots on the RSI price line) —
+plFound = not na(ta.pivotlow(rsiLine, PivotLeft, PivotRight))
+phFound = not na(ta.pivothigh(rsiLine, PivotLeft, PivotRight))
+
+barsSincePL = ta.barssince(plFound[1])
+barsSincePH = ta.barssince(phFound[1])
+plInRange   = barsSincePL >= RangeMin and barsSincePL <= RangeMax
+phInRange   = barsSincePH >= RangeMin and barsSincePH <= RangeMax
+
+pivBar  = bar_index - PivotRight
+rsiPiv  = rsiLine[PivotRight]
+lowPiv  = low[PivotRight]
+highPiv = high[PivotRight]
+
+prevRsiPL  = ta.valuewhen(plFound, rsiPiv, 1)
+prevLowPL  = ta.valuewhen(plFound, lowPiv, 1)
+prevBarPL  = ta.valuewhen(plFound, pivBar, 1)
+prevRsiPH  = ta.valuewhen(phFound, rsiPiv, 1)
+prevHighPH = ta.valuewhen(phFound, highPiv, 1)
+prevBarPH  = ta.valuewhen(phFound, pivBar, 1)
+
+bullDivCond       = plFound and plInRange and rsiPiv > prevRsiPL and lowPiv < prevLowPL
+hiddenBullDivCond = plFound and plInRange and rsiPiv < prevRsiPL and lowPiv > prevLowPL
+bearDivCond       = phFound and phInRange and rsiPiv < prevRsiPH and highPiv > prevHighPH
+hiddenBearDivCond = phFound and phInRange and rsiPiv > prevRsiPH and highPiv < prevHighPH
+
+if DrawDivLines
+    if UseDiv and bullDivCond
+        line.new(prevBarPL, prevRsiPL, pivBar, rsiPiv, color=color.lime, width=2)
+    if UseHiddenDiv and hiddenBullDivCond
+        line.new(prevBarPL, prevRsiPL, pivBar, rsiPiv, color=color.new(color.lime, 40), width=1, style=line.style_dashed)
+    if UseDiv and bearDivCond
+        line.new(prevBarPH, prevRsiPH, pivBar, rsiPiv, color=color.red, width=2)
+    if UseHiddenDiv and hiddenBearDivCond
+        line.new(prevBarPH, prevRsiPH, pivBar, rsiPiv, color=color.new(color.red, 40), width=1, style=line.style_dashed)
+
+// — Shark Fin —
+upper_break = ta.crossover(rsiLine, upper)
+lower_break = ta.crossunder(rsiLine, lower)
+upper_fin   = ta.crossunder(rsiLine, upper)
+lower_fin   = ta.crossover(rsiLine, lower)
+
+// — Price / signal cross —
+crossUp   = ta.crossover(rsiLine, fastLine) and rsiLine > ma_mid
+crossDown = ta.crossunder(rsiLine, fastLine) and rsiLine < ma_mid
+
+// — Signals —
+longSig  = (UseDiv and bullDivCond) or (UseHiddenDiv and hiddenBullDivCond) or (UseFin and lower_fin) or (UseBreakout and upper_break) or (UseCross and crossUp)
+shortSig = (UseDiv and bearDivCond) or (UseHiddenDiv and hiddenBearDivCond) or (UseFin and upper_fin) or (UseBreakout and lower_break) or (UseCross and crossDown)
+
+// Conflicting signals on the same bar cancel each other.
+goLong  = longSig and not shortSig
+goShort = shortSig and not longSig
+
+allowLong  = TradeDir != "Sell only"
+allowShort = TradeDir != "Buy only"
+
+// — S2. Exit distances (ticks) —
+atr    = ta.atr(ATRLen)
+isPts  = ExitUnit == "Points"
+atrTk  = atr / syminfo.mintick
+ptTk   = PointSize > 0 ? PointSize / syminfo.mintick : 1.0   // ticks per point
+cSL    = isPts ? (SLPts > 0 ? SLPts * ptTk : na) : (SLATR > 0 ? SLATR * atrTk : na)
+cTP    = isPts ? (TPPts > 0 ? TPPts * ptTk : na) : (TPR > 0 ? cSL * TPR : na)
+cAct   = UseTrail ? (isPts ? TrailActPts * ptTk : TrailActATR * atrTk) : na
+cOff   = UseTrail ? (isPts ? TrailDistPts * ptTk : TrailDistATR * atrTk) : na
+
+// Presets, in calibrated points (1 point = $0.01), converted to ticks.
+presetTk = 0.01 / syminfo.mintick
+float pSL  = na
+float pTP  = na
+float pAct = na
+float pOff = na
+if ExitPreset == "Best PF"
+    pSL := 15000
+    pTP := 200000
+else if ExitPreset == "Best win rate"
+    pSL  := 100000
+    pAct := 30000
+    pOff := 2500
+else if ExitPreset == "Longest TP"
+    pSL  := 15000
+    pTP  := 300000
+    pAct := 50000
+    pOff := 10000
+else if ExitPreset == "Best trailing"
+    pSL  := 15000
+    pAct := 50000
+    pOff := 15000
+
+usePreset = ExitPreset != "Custom"
+slTk    = usePreset ? pSL * presetTk : cSL
+tpTk    = usePreset ? pTP * presetTk : cTP
+trActTk = usePreset ? pAct * presetTk : cAct
+trOffTk = usePreset ? pOff * presetTk : cOff
+
+// — S3. Sizing —
+calcQty() =>
+    float q = FixedQty
+    if QtyMode == "Risk" and slTk > 0
+        perUnitRisk = slTk * syminfo.mintick * syminfo.pointvalue
+        q := strategy.equity * RiskPct / 100 / perUnitRisk
+    affordable = strategy.equity * Leverage * 0.98 / (close * syminfo.pointvalue)
+    q := math.min(q, MaxQty, affordable)
+    QtyStep > 0 ? math.floor(q / QtyStep) * QtyStep : q
+
+entryQty = calcQty()
+
+// Exit distances frozen at entry, one set per side.
+var float lSL  = na
+var float lTP  = na
+var float lAct = na
+var float lOff = na
+var float sSL  = na
+var float sTP  = na
+var float sAct = na
+var float sOff = na
+
+// — Orders —
+if goLong
+    if allowLong and entryQty > 0 and strategy.position_size <= 0
+        strategy.entry("Long", strategy.long, qty=entryQty)
+        lSL  := slTk
+        lTP  := tpTk
+        lAct := trActTk
+        lOff := trOffTk
+    else if not allowLong and ExitOnOpp
+        strategy.close("Short", comment="Opp signal")
+
+if goShort
+    if allowShort and entryQty > 0 and strategy.position_size >= 0
+        strategy.entry("Short", strategy.short, qty=entryQty)
+        sSL  := slTk
+        sTP  := tpTk
+        sAct := trActTk
+        sOff := trOffTk
+    else if not allowShort and ExitOnOpp
+        strategy.close("Long", comment="Opp signal")
+
+if not na(lSL) or not na(lTP) or not na(lAct)
+    strategy.exit("Long Exit", from_entry="Long", loss=lSL, profit=lTP, trail_points=lAct, trail_offset=lOff,
+                  comment_loss="SL", comment_profit="TP", comment_trailing="Trail")
+if not na(sSL) or not na(sTP) or not na(sAct)
+    strategy.exit("Short Exit", from_entry="Short", loss=sSL, profit=sTP, trail_points=sAct, trail_offset=sOff,
+                  comment_loss="SL", comment_profit="TP", comment_trailing="Trail")
+
+// Time stop
+if TimeStopBars > 0 and strategy.opentrades > 0
+    if bar_index - strategy.opentrades.entry_bar_index(0) >= TimeStopBars
+        strategy.close_all(comment="Time stop")
+
+// — Plotting —
+hline(68, "Level 68", color=color.gray, linestyle=hline.style_dotted)
+hline(50, "Level 50", color=color.gray, linestyle=hline.style_dashed)
+hline(32, "Level 32", color=color.gray, linestyle=hline.style_dotted)
+
+plot(rsiLine, color=color.green, title="RSI Price Line", linewidth=2)
+plot(fastLine, color=color.red, title="Fast Line")
+plot(slow, color=color.white, title="Slow Line")
+plot(ma_mid, color=color.yellow, title="Middle Band")
+plot(upper, color=color.aqua, title="Upper Band")
+plot(lower, color=color.aqua, title="Lower Band")
+
+plotshape(UseDiv and bullDivCond ? rsiPiv - ArrowDist : na, title="Bull Divergence", style=shape.arrowup, location=location.absolute, color=color.lime, size=size.small, offset=-PivotRight)
+plotshape(UseHiddenDiv and hiddenBullDivCond ? rsiPiv - ArrowDist : na, title="Hidden Bull Divergence", style=shape.arrowup, location=location.absolute, color=color.new(color.lime, 40), size=size.tiny, text="H", textcolor=color.lime, offset=-PivotRight)
+plotshape(UseDiv and bearDivCond ? rsiPiv + ArrowDist : na, title="Bear Divergence", style=shape.arrowdown, location=location.absolute, color=color.red, size=size.small, offset=-PivotRight)
+plotshape(UseHiddenDiv and hiddenBearDivCond ? rsiPiv + ArrowDist : na, title="Hidden Bear Divergence", style=shape.arrowdown, location=location.absolute, color=color.new(color.red, 40), size=size.tiny, text="H", textcolor=color.red, offset=-PivotRight)
+
+plotshape(upper_break ? upper : na, title="Upper Shark Fin Breakout", style=shape.labeldown, location=location.absolute, color=color.green, text="Shark Fin 🔼", textcolor=color.white, size=size.small)
+plotshape(lower_break ? lower : na, title="Lower Shark Fin Breakout", style=shape.labelup, location=location.absolute, color=color.red, text="Shark Fin 🔽", textcolor=color.white, size=size.small)
+plotshape(upper_fin ? upper : na, title="Upper Fin Complete", style=shape.triangledown, location=location.absolute, color=color.orange, size=size.tiny)
+plotshape(lower_fin ? lower : na, title="Lower Fin Complete", style=shape.triangleup, location=location.absolute, color=color.teal, size=size.tiny)
+
+plotshape(goLong, title="Long Signal", style=shape.circle, location=location.bottom, color=color.lime, size=size.tiny)
+plotshape(goShort, title="Short Signal", style=shape.circle, location=location.top, color=color.red, size=size.tiny)
+
+// — Alerts —
+alertcondition(goLong, title="TDI+ Long Signal", message="TDI+ long signal on {{ticker}}")
+alertcondition(goShort, title="TDI+ Short Signal", message="TDI+ short signal on {{ticker}}")
+
+// — Symbol check —
+var label symWarn = na
+if barstate.islast and syminfo.basecurrency != "BTC" and syminfo.basecurrency != "XBT"
+    label.delete(symWarn)
+    symWarn := label.new(bar_index, 50, "This copy is calibrated for BTCUSD.\nChart symbol: " + syminfo.ticker, style=label.style_label_left, color=color.orange, textcolor=color.black, size=size.normal)
+
+// — Status table —
+var int nLongSig  = 0
+var int nShortSig = 0
+nLongSig  += goLong ? 1 : 0
+nShortSig += goShort ? 1 : 0
+var table info = table.new(position.top_right, 2, 6, bgcolor=color.new(color.black, 20), border_width=1)
+if ShowInfo and barstate.islast
+    table.cell(info, 0, 0, "Signals L / S", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 0, str.tostring(nLongSig) + " / " + str.tostring(nShortSig), text_color=color.white, text_size=size.small)
+    table.cell(info, 0, 1, "Closed trades", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 1, str.tostring(strategy.closedtrades), text_color=color.white, text_size=size.small)
+    table.cell(info, 0, 2, "Next qty", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 2, str.tostring(entryQty), text_color=entryQty > 0 ? color.white : color.red, text_size=size.small)
+    table.cell(info, 0, 3, "Direction", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 3, TradeDir, text_color=color.white, text_size=size.small)
+    table.cell(info, 0, 5, "Exit preset", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 5, ExitPreset, text_color=color.white, text_size=size.small)
+    table.cell(info, 0, 4, "1 point =", text_color=color.white, text_size=size.small)
+    table.cell(info, 1, 4, "$" + str.tostring(PointSize > 0 ? PointSize : syminfo.mintick), text_color=color.white, text_size=size.small)
