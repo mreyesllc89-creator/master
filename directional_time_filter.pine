@@ -1,0 +1,130 @@
+//@version=6
+// ============================================================================
+//  DIRECTIONAL TIME FILTER  -  v1.0
+// ----------------------------------------------------------------------------
+//  A time-boxed direction gate you can bolt onto any script.
+//
+//  You say: "from THIS second, for the next N minutes,
+//            only take BUYS while <reference> is ABOVE <buy level>
+//            and only take SELLS while <reference> is BELOW <sell level>."
+//  When the N minutes are over, the filter closes: no new trades at all
+//  until you set a new start time.
+//
+//  Example:  start = 14:30:00, duration = 15, levels = 50 / 50
+//            14:30:00 -> 14:45:00   buy signals pass only if ref > 50
+//                                   sell signals pass only if ref < 50
+//            after 14:45:00         every signal is blocked
+//
+//  INPUTS (group "Directional time filter")
+//    Enable filter      Off = every signal passes, as if the filter is absent.
+//    Start time         The second the window opens. Tick "confirm" in the
+//                       script settings or click the chart to pick it.
+//    Duration (min)     Length of the window. 0 = never expires.
+//    Reference          The series compared to the levels: close, an RSI,
+//                       a TDI line, anything. "Use RSI of reference" (on by
+//                       default) compares RSI(14) of it instead, so the
+//                       default is "RSI(14) of close above/below 50".
+//    Buy above          Buys pass only while reference > this level.
+//    Sell below         Sells pass only while reference < this level.
+//    Allow buys/sells   Turn a side off completely inside the window.
+//    Before start       What happens before the window opens:
+//                       "Block" (no trades) or "Pass" (filter not active yet).
+//
+//  OUTPUTS (Data Window / "Source" dropdown of another script)
+//    DTF window open    1 while the window is open, 0 otherwise.
+//    DTF buy allowed    1 when a buy may be taken on this bar, 0 otherwise.
+//    DTF sell allowed   1 when a sell may be taken on this bar, 0 otherwise.
+//    DTF expired        1 on the first bar after the window closes.
+//
+//  HOW TO USE IT
+//  A) Paste into your own script (recommended)
+//     Copy everything between the "BEGIN" and "END" markers below into your
+//     script, below your own inputs. Then gate your entries:
+//
+//         if myBuySignal and dtfBuyOk
+//             strategy.entry("L", strategy.long)
+//         if mySellSignal and dtfSellOk
+//             strategy.entry("S", strategy.short)
+//
+//     To use one of your script's own series as the reference (e.g. your
+//     TDI/RSI line), replace the dtfRef line with  dtfRef = myLine
+//     Optional, in a strategy, to flatten when the window ends:
+//
+//         if dtfExpired
+//             strategy.close_all(comment="DTF window ended")
+//
+//  B) Link without editing (indicator -> strategy)
+//     Add this indicator to the chart. In your strategy add
+//         dtfBuyExt  = input.source(close, "DTF buy allowed")
+//         dtfSellExt = input.source(close, "DTF sell allowed")
+//     and in the strategy's settings pick "Directional Time Filter: DTF buy
+//     allowed" / "... DTF sell allowed" as those sources. Gate with
+//         myBuySignal and dtfBuyExt > 0.5
+//
+//  TIMING
+//  Historical bars are judged at their close time (when a signal confirms).
+//  On the live bar the current clock (timenow) is used, so the window opens
+//  and closes on the exact second, not on the next bar.
+// ============================================================================
+indicator("Directional Time Filter", "DTF", overlay=true)
+
+// ======================= BEGIN DIRECTIONAL TIME FILTER =======================
+GRP_DTF = "Directional time filter"
+dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF)
+dtfStart     = input.time(timestamp("2026-01-01T00:00:00"), "Start time", confirm=true, group=GRP_DTF, tooltip="The second the window opens (exchange time zone). Click the chart or type a date and time.")
+dtfMinutes   = input.float(15, "Duration (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="How long the window stays open. 0 = never expires.")
+dtfRef       = input.source(close, "Reference", group=GRP_DTF, tooltip="The series compared to the levels. Pick a plotted line from another indicator (e.g. RSI) or replace this line in code with your own series.")
+dtfUseRsi    = input.bool(true, "Use RSI of reference", inline="rsi", group=GRP_DTF, tooltip="On: the levels are compared to RSI(length) of the reference (good for 'above 50'). Off: compared to the reference itself (e.g. raw price).")
+dtfRsiLen    = input.int(14, "Length", minval=1, inline="rsi", group=GRP_DTF)
+dtfBuyLevel  = input.float(50, "Buy only above", group=GRP_DTF)
+dtfSellLevel = input.float(50, "Sell only below", group=GRP_DTF)
+dtfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_DTF)
+dtfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_DTF)
+dtfBefore    = input.string("Block", "Before start", options=["Block", "Pass"], group=GRP_DTF, tooltip="Block: no trades before the window opens. Pass: signals are unfiltered until the window opens.")
+
+dtfValue = dtfUseRsi ? ta.rsi(dtfRef, dtfRsiLen) : dtfRef
+
+// Clock: bar close on history, real clock on the live bar.
+dtfClock = barstate.isrealtime ? timenow : nz(time_close, time)
+dtfEnd   = dtfMinutes > 0 ? dtfStart + math.round(dtfMinutes * 60000) : na
+
+dtfBeforeStart = dtfClock < dtfStart
+dtfOpen        = not dtfBeforeStart and (na(dtfEnd) or dtfClock < dtfEnd)
+dtfAfterEnd    = not na(dtfEnd) and dtfClock >= dtfEnd
+
+// Final gates: use these to filter your entries.
+dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowBuy  and dtfValue > dtfBuyLevel)
+dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowSell and dtfValue < dtfSellLevel)
+
+// True on the first bar after the window has closed (to flatten if wanted).
+dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1]
+// ======================== END DIRECTIONAL TIME FILTER ========================
+
+// ---- Visuals ---------------------------------------------------------------
+GRP_VIS = "Visuals"
+showBg    = input.bool(true, "Shade window", group=GRP_VIS)
+showTable = input.bool(true, "Status table", group=GRP_VIS)
+
+bgcolor(showBg and dtfOn and dtfOpen ? (dtfBuyOk ? color.new(color.green, 85) : dtfSellOk ? color.new(color.red, 85) : color.new(color.gray, 88)) : na, title="Window")
+plotshape(dtfExpired, "Window ended", shape.xcross, location.top, color.orange, size=size.tiny, text="DTF end", textcolor=color.orange)
+
+// Exported values (Data Window + linkable as a source from other scripts).
+plot(dtfOn and dtfOpen ? 1 : 0, "DTF window open", display=display.data_window)
+plot(dtfBuyOk ? 1 : 0, "DTF buy allowed", display=display.data_window)
+plot(dtfSellOk ? 1 : 0, "DTF sell allowed", display=display.data_window)
+plot(dtfExpired ? 1 : 0, "DTF expired", display=display.data_window)
+plot(dtfValue, "DTF reference value", display=display.data_window)
+
+var table dtfTable = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 20), border_width=1)
+if showTable and barstate.islast
+    string state = not dtfOn ? "OFF" : dtfBeforeStart ? "WAITING" : dtfOpen ? "OPEN" : "ENDED"
+    color  stCol = not dtfOn ? color.gray : dtfBeforeStart ? color.yellow : dtfOpen ? color.lime : color.orange
+    string left  = dtfOpen and not na(dtfEnd) ? str.tostring(math.max(0, (dtfEnd - dtfClock) / 60000.0), "#.#") + " min" : "-"
+    table.cell(dtfTable, 0, 0, "DTF", text_color=color.white)
+    table.cell(dtfTable, 1, 0, state, text_color=stCol)
+    table.cell(dtfTable, 0, 1, "Time left", text_color=color.white)
+    table.cell(dtfTable, 1, 1, left, text_color=color.white)
+    table.cell(dtfTable, 0, 2, "Buy  (> " + str.tostring(dtfBuyLevel) + ")", text_color=color.white)
+    table.cell(dtfTable, 1, 2, dtfBuyOk ? "ALLOWED" : "BLOCKED", text_color=dtfBuyOk ? color.lime : color.red)
+    table.cell(dtfTable, 0, 3, "Sell (< " + str.tostring(dtfSellLevel) + ")", text_color=color.white)
+    table.cell(dtfTable, 1, 3, dtfSellOk ? "ALLOWED" : "BLOCKED", text_color=dtfSellOk ? color.lime : color.red)
