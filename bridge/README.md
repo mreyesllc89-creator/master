@@ -83,17 +83,24 @@ trades and other EAs are left alone.
 
 ## Notes
 
-- **Signal labels:** optionally add `"comment": "GOLD_XPW_M1"` to the alert
-  message. Use a different name for each strategy/chart, and keep that name
-  on both its entries and exits. Names may be empty (the old default), or
-  contain 1-20 ASCII letters, digits, spaces, `_`, `-` or `.`; a name consisting
-  only of spaces is rejected. The bridge records the source in its logs and
-  sends `tv:GOLD_XPW_M1` on an opening order and `tv:GOLD_XPW_M1 close` on a
-  closing order. Brokers may change order comments, so retain the bridge log.
-  For example:
+- **Automatic signal labels:** use the message in `alert_message.example.json`:
   ```json
-  {"symbol":"{{ticker}}","position":"{{strategy.market_position}}","time":"{{timenow}}","comment":"GOLD_XPW_M1"}
+  {"symbol":"{{ticker}}","position":"{{strategy.market_position}}","time":"{{timenow}}","comment":"XPW {{interval}} {{strategy.market_position}}"}
   ```
+  Set `XPW` to a short strategy name once per alert. TradingView fills in the
+  chart timeframe and target direction automatically; its documented
+  [placeholders](https://www.tradingview.com/support/solutions/43000531021-how-to-use-a-variable-value-in-alert/)
+  do not include the strategy title. A five-minute short signal becomes
+  `XPW 5 short`, giving an opening order comment `tv:XPW 5 short`. A `flat`
+  signal on that chart gives the closing comment `tv:XPW 5 flat close`.
+  Numeric intervals are minutes (`60` means one hour); seconds, days, weeks
+  and months use TradingView's interval suffixes. Do not append a fixed `m`
+  if you also use those charts. Alerts use the timeframe saved when created;
+  recreate the alert if you change its strategy or chart settings.
+  The fully expanded comment must contain 1-20 ASCII letters, digits, spaces,
+  `_`, `-` or `.`; an all-space comment is rejected. Keep strategy names short.
+  A static label such as `GOLD_XPW_M1` also works. The bridge records the
+  source in its logs; brokers may change order comments, so retain that log.
   Comments are labels only. All signals for a symbol still share the same
   magic number and target position: one strategy's `flat` can close a position
   opened by another. The closing comment names the signal requesting the

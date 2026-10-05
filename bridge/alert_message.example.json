@@ -1,0 +1,1 @@
+{"symbol":"{{ticker}}","position":"{{strategy.market_position}}","time":"{{timenow}}","comment":"XPW {{interval}} {{strategy.market_position}}"}
