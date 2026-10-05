@@ -20,6 +20,7 @@ import calendar
 import hmac
 import json
 import logging
+import re
 import sys
 import threading
 import time
@@ -29,6 +30,23 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 MAX_BODY = 4096
 log = logging.getLogger("bridge")
+
+
+def signal_comment(value):
+    if not isinstance(value, str):
+        raise ValueError("comment must be a string")
+    if value == "":
+        return value
+    if not value.strip() or not re.fullmatch(r"[A-Za-z0-9_. -]{1,20}", value):
+        raise ValueError("comment must be 1-20 letters, digits, spaces, _, - or .")
+    return value
+
+
+def order_comment(value, closing=False):
+    value = signal_comment(value)
+    if not value:
+        return "tv-bridge close" if closing else "tv-bridge"
+    return f"tv:{value}" + (" close" if closing else "")
 
 
 # ---------------------------------------------------------------- config ----
@@ -85,8 +103,9 @@ class Broker:
             self.mt5.shutdown()
             self._connect()
 
-    def sync(self, symbol, target, lots, sl_dist):
+    def sync(self, symbol, target, lots, sl_dist, comment=""):
         """Make the bridge's position on `symbol` equal `target`."""
+        comment = signal_comment(comment)
         with self.lock:
             if self.mt5 is None:
                 return self._dry_sync(symbol, target, lots)
@@ -105,10 +124,10 @@ class Broker:
             actions = []
             for p in positions:
                 if p.type != want:
-                    self._close(p)
+                    self._close(p, comment)
                     actions.append(f"closed #{p.ticket}")
             if want is not None and not any(p.type == want for p in positions):
-                ticket = self._open(symbol, want, lots, sl_dist)
+                ticket = self._open(symbol, want, lots, sl_dist, comment)
                 actions.append(f"opened {target} {lots} #{ticket}")
             return actions or ["already in sync"]
 
@@ -150,7 +169,7 @@ class Broker:
             raise RuntimeError(f"no valid quote for {symbol}: {self.mt5.last_error()}")
         return tick
 
-    def _open(self, symbol, ptype, lots, sl_dist):
+    def _open(self, symbol, ptype, lots, sl_dist, comment=""):
         mt5 = self.mt5
         tick = self._tick(symbol)
         buy = ptype == mt5.POSITION_TYPE_BUY
@@ -160,7 +179,7 @@ class Broker:
             volume=float(lots),
             type=mt5.ORDER_TYPE_BUY if buy else mt5.ORDER_TYPE_SELL,
             price=price,
-            comment="tv-bridge",
+            comment=order_comment(comment),
         )
         if sl_dist:
             info = mt5.symbol_info(symbol)
@@ -169,7 +188,7 @@ class Broker:
             req["sl"] = round(price - sl_dist if buy else price + sl_dist, info.digits)
         return self._send(req).order
 
-    def _close(self, p):
+    def _close(self, p, comment=""):
         mt5 = self.mt5
         tick = self._tick(p.symbol)
         buy = p.type == mt5.POSITION_TYPE_BUY
@@ -179,7 +198,7 @@ class Broker:
             type=mt5.ORDER_TYPE_SELL if buy else mt5.ORDER_TYPE_BUY,
             position=p.ticket,
             price=tick.bid if buy else tick.ask,
-            comment="tv-bridge close",
+            comment=order_comment(comment, closing=True),
         ))
 
     def _dry_sync(self, symbol, target, lots):
@@ -195,7 +214,7 @@ class Broker:
 
 # --------------------------------------------------------------- handler ----
 def parse_alert(body, cfg):
-    """Validate an alert body. Returns (broker_symbol, target, lots, sl_dist)."""
+    """Validate an alert body; return symbol, target, lots, stop and comment."""
     msg = json.loads(body)
     if not isinstance(msg, dict):
         raise ValueError("alert must be a JSON object")
@@ -226,7 +245,8 @@ def parse_alert(body, cfg):
         if time.time() - sent > max_age:
             raise ValueError(f"alert is older than {max_age}s")
 
-    return sym_cfg.get("mt5_symbol", ticker), target, lots, sym_cfg.get("sl_distance")
+    comment = signal_comment(msg.get("comment", ""))
+    return sym_cfg.get("mt5_symbol", ticker), target, lots, sym_cfg.get("sl_distance"), comment
 
 
 def make_handler(cfg, broker):
@@ -266,7 +286,7 @@ def make_handler(cfg, broker):
             body = self.rfile.read(length)
 
             try:
-                symbol, target, lots, sl = parse_alert(body, cfg)
+                symbol, target, lots, sl, comment = parse_alert(body, cfg)
             except PermissionError:
                 log.warning("rejected %s: bad secret", ip)
                 return self.reply(403, "forbidden")
@@ -276,12 +296,13 @@ def make_handler(cfg, broker):
 
             t0 = time.perf_counter()
             try:
-                actions = broker.sync(symbol, target, lots, sl)
+                actions = broker.sync(symbol, target, lots, sl, comment)
             except Exception as e:
-                log.error("%s -> %s FAILED: %s", symbol, target, e)
+                log.error("%s -> %s FAILED: %s [source=%s]", symbol, target, e, comment or "tv-bridge")
                 return self.reply(500, "order failed")
             ms = (time.perf_counter() - t0) * 1000
-            log.info("%s -> %s: %s (%.0f ms)", symbol, target, "; ".join(actions), ms)
+            log.info("%s -> %s: %s (%.0f ms) [source=%s]", symbol, target,
+                     "; ".join(actions), ms, comment or "tv-bridge")
             self.reply(200, "ok")
 
     return Handler

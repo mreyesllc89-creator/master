@@ -5,6 +5,7 @@ import json
 import sys
 import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import ModuleType, SimpleNamespace as NS
 from unittest.mock import patch
@@ -131,6 +132,30 @@ class HTTPTests(unittest.TestCase):
                 self.assertEqual(self.alert('long', lots=lots), 400)
         self.assertEqual(self.alert('long', time=123), 400)
 
+    def test_comment_metadata(self):
+        for label in ('XPW-15S_gold.1', ' A ', 'A' * 20):
+            with self.subTest(label=label), patch.object(self.broker, 'sync', wraps=self.broker.sync) as sync:
+                with self.assertLogs('bridge', level='INFO') as logs:
+                    self.assertEqual(self.alert('long', comment=label), 200)
+                sync.assert_called_once_with('GOLD', 'long', .01, 0, label)
+                self.assertTrue(any(label in line for line in logs.output))
+
+    def test_comment_default_and_empty(self):
+        for fields in ({}, {'comment': ''}):
+            with self.subTest(fields=fields), patch.object(self.broker, 'sync', wraps=self.broker.sync) as sync:
+                self.assertEqual(self.alert('long', **fields), 200)
+                sync.assert_called_once_with('GOLD', 'long', .01, 0, '')
+        parsed = bridge.parse_alert(json.dumps({'symbol': 'XAUUSD', 'position': 'long'}), self.cfg)
+        self.assertEqual(parsed, ('GOLD', 'long', .01, 0, ''))
+
+    def test_invalid_comment(self):
+        for label in (None, True, 1, [], {}, 'A' * 21, ' ', '   ', '\n',
+                      'A\nB', 'A\rB', 'A\tB', 'A\x00B', '\u2603', 'caf\u00e9',
+                      'A/B', 'A:B', 'A"B'):
+            with self.subTest(label=label):
+                self.assertEqual(self.alert('long', comment=label), 400)
+        self.assertEqual(self.broker.dry_pos, {})
+
 
 class FakeMT5(ModuleType):
     POSITION_TYPE_BUY = ORDER_TYPE_BUY = 0
@@ -226,6 +251,7 @@ class BrokerTests(unittest.TestCase):
                 self.assertEqual(req['deviation'], self.cfg['deviation_points'])
                 self.assertEqual(req['type_time'], self.fake.ORDER_TIME_GTC)
                 self.assertEqual(req['type_filling'], self.fake.ORDER_FILLING_FOK)
+                self.assertEqual(req['comment'], 'tv-bridge')
 
     def test_no_stop(self):
         self.broker._open('GOLD', 0, .01, 0)
@@ -241,6 +267,98 @@ class BrokerTests(unittest.TestCase):
                 self.assertEqual(req['volume'], .03)
                 self.assertEqual(req['price'], price)
                 self.assertNotIn('sl', req)
+                self.assertEqual(req['comment'], 'tv-bridge close')
+
+    def test_labeled_open_and_close_both_sides(self):
+        label = 'X' * 20
+        for side, close_type in ((0, 1), (1, 0)):
+            with self.subTest(side=side):
+                self.broker._open('GOLD', side, .02, 1.123, label)
+                opened = self.fake.requests[-1]
+                self.assertEqual(opened['comment'], 'tv:' + label)
+                self.assertEqual(opened['type'], side)
+                self.assertEqual(opened['volume'], .02)
+                self.assertIn('sl', opened)
+                self.broker._close(self.position(side, ticket=123, volume=.02), label)
+                closed = self.fake.requests[-1]
+                self.assertEqual(closed['comment'], 'tv:' + label + ' close')
+                self.assertEqual(closed['type'], close_type)
+                self.assertEqual(closed['position'], 123)
+                self.assertEqual(closed['volume'], .02)
+                for req in (opened, closed):
+                    self.assertLessEqual(len(req['comment']), 31)
+                    self.assertTrue(req['comment'].isascii())
+                    self.assertEqual(req['magic'], self.cfg['magic'])
+
+    def test_labeled_reverse_and_changed_label_duplicate(self):
+        self.broker.sync('GOLD', 'long', .02, 1, 'strategy-A')
+        self.assertEqual(self.broker.sync('GOLD', 'long', .02, 1, 'strategy-B'),
+                         ['already in sync'])
+        self.assertEqual(len(self.fake.requests), 1)
+        self.broker.sync('GOLD', 'short', .02, 1, 'strategy-C')
+        self.assertEqual([r['comment'] for r in self.fake.requests],
+                         ['tv:strategy-A', 'tv:strategy-C close', 'tv:strategy-C'])
+        self.assertEqual([r['type'] for r in self.fake.requests], [0, 1, 1])
+        self.assertEqual(self.fake.requests[1]['position'], 42)
+        self.assertEqual([r['volume'] for r in self.fake.requests], [.02, .02, .02])
+        self.assertTrue(all(r['magic'] == self.cfg['magic'] for r in self.fake.requests))
+
+    def test_labels_share_position_ownership(self):
+        foreign = self.position(ticket=999, magic=999)
+        self.fake.positions = [foreign]
+        self.broker.sync('GOLD', 'long', .01, 0, 'strategy-A')
+        self.broker.sync('GOLD', 'flat', .01, 0, 'strategy-B')
+        self.assertEqual(len(self.fake.requests), 2)
+        self.assertEqual(self.fake.requests[-1]['position'], 42)
+        self.assertEqual(self.fake.requests[-1]['comment'], 'tv:strategy-B close')
+        self.assertEqual(self.fake.positions, [foreign])
+
+    def test_concurrent_http_comments_do_not_bleed(self):
+        self.cfg['symbols']['BTCUSDT'] = dict(mt5_symbol='BTCUSD', lots=.01,
+                                              max_lots=.01, sl_distance=0)
+        server = bridge.ThreadingHTTPServer(('127.0.0.1', 0),
+                                           bridge.make_handler(self.cfg, self.broker))
+        thread = threading.Thread(target=server.serve_forever,
+                                  kwargs={'poll_interval': .01}, daemon=True)
+        thread.start()
+
+        def stop():
+            server.shutdown()
+            server.server_close()
+            thread.join(2)
+            self.assertFalse(thread.is_alive())
+
+        self.addCleanup(stop)
+        barrier = threading.Barrier(2)
+        broker_sync = self.broker.sync
+
+        def together(*args):
+            barrier.wait(timeout=3)
+            return broker_sync(*args)
+
+        def request(symbol, position, label):
+            conn = http.client.HTTPConnection('127.0.0.1', server.server_port, timeout=5)
+            try:
+                body = json.dumps(dict(symbol=symbol, position=position, comment=label))
+                conn.request('POST', '/hook', body, {'Content-Type': 'application/json'})
+                response = conn.getresponse()
+                response.read()
+                return response.status
+            finally:
+                conn.close()
+
+        with patch.object(self.broker, 'sync', side_effect=together), ThreadPoolExecutor(max_workers=2) as pool:
+            futures = [pool.submit(request, 'OANDA:XAUUSD', 'long', 'gold-A'),
+                       pool.submit(request, 'BTCUSDT', 'short', 'bitcoin-B')]
+            self.assertEqual([future.result(timeout=6) for future in futures], [200, 200])
+        self.assertEqual(len(self.fake.requests), 2)
+        requests = {req['symbol']: req for req in self.fake.requests}
+        self.assertEqual(set(requests), {'GOLD', 'BTCUSD'})
+        self.assertEqual(requests['GOLD']['comment'], 'tv:gold-A')
+        self.assertEqual(requests['BTCUSD']['comment'], 'tv:bitcoin-B')
+        self.assertEqual(requests['GOLD']['type'], 0)
+        self.assertEqual(requests['BTCUSD']['type'], 1)
+        self.assertTrue(all(req['magic'] == self.cfg['magic'] for req in requests.values()))
 
     def test_sync_duplicate_reverse_flat_and_magic(self):
         foreign = self.position(ticket=999, magic=999)

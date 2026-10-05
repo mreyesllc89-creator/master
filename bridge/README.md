@@ -83,6 +83,23 @@ trades and other EAs are left alone.
 
 ## Notes
 
+- **Signal labels:** optionally add `"comment": "GOLD_XPW_M1"` to the alert
+  message. Use a different name for each strategy/chart, and keep that name
+  on both its entries and exits. Names may be empty (the old default), or
+  contain 1-20 ASCII letters, digits, spaces, `_`, `-` or `.`; a name consisting
+  only of spaces is rejected. The bridge records the source in its logs and
+  sends `tv:GOLD_XPW_M1` on an opening order and `tv:GOLD_XPW_M1 close` on a
+  closing order. Brokers may change order comments, so retain the bridge log.
+  For example:
+  ```json
+  {"symbol":"{{ticker}}","position":"{{strategy.market_position}}","time":"{{timenow}}","comment":"GOLD_XPW_M1"}
+  ```
+  Comments are labels only. All signals for a symbol still share the same
+  magic number and target position: one strategy's `flat` can close a position
+  opened by another. The closing comment names the signal requesting the
+  close. Duplicate targets send no new order and do not rename an existing
+  position. Existing alerts without `comment` retain `tv-bridge` and
+  `tv-bridge close`; config keys are unchanged.
 - **Lot size** comes from `config.json`, not from the strategy's "% of
   equity" setting. An alert may send `"lots": "0.05"` to override it, but it
   can never go above `max_lots`.
