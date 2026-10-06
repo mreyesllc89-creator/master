@@ -131,7 +131,7 @@
 //  snapshots of the inputs at creation time: after changing them, re-create
 //  the alert.
 // ============================================================================
-indicator("Directional Time Filter", "DTF", overlay=true)
+indicator("Directional Time Filter", "DTF", overlay=true, max_lines_count=500)
 
 // ======================= BEGIN DIRECTIONAL TIME FILTER =======================
 // Set true when this block lives in a script that runs in its own pane
@@ -168,12 +168,201 @@ dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
 
 dtfValue = dtfRef
 
-// ===== SIGNAL LOGIC SLOT ======================================================
-// The direction logic goes here. dtfBuySignal / dtfSellSignal must be true on
-// the bar where a BUY / SELL direction is decided; that bar's close becomes
-// the signal price. Empty until the strategy's logic is added.
-bool dtfBuySignal  = false
-bool dtfSellSignal = false
+// ===== SIGNAL LOGIC SLOT: FlashGold Continuation v5 direction =================
+// The direction logic of "FlashGold Continuation v5 - TDI Trade Zone Filter"
+// (© ghostsmartfire), as in the FlashGold v5 strategy: bid/ask model, TDI
+// direction (RSI -> SMA fast / slow, fast rising = BUY), parent + six child
+// zones alignment, burst gate, prior-drift filter, entry hold, one signal per
+// bar. Orders, exits and sizing are NOT here: this only decides direction.
+gCore = "FlashGold Core"
+spreadPoints          = input.float(25.0, "Spread pts", minval = 0.0, step = 0.1, group = gCore, tooltip = "Full spread in points (mintick units). Half of it offsets bid and ask.")
+entryDistPoints       = input.float(50.0, "Entry distance pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
+entryHoldBars         = input.int(0, "Entry hold bars", minval = 0, group = gCore)
+entryHoldMinFavPoints = input.float(5.0, "Hold min favorable pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
+oneEntryPerBar        = input.bool(true, "One signal per bar", group = gCore)
+
+gBurst = "Burst / Direction"
+DistUnit         = input.string("ATR", "Burst / entry distance / hold unit", options = ["ATR", "Points"], group = gBurst, tooltip = "ATR: the three thresholds below are multiples of ATR(14) of the chart. Points: the point inputs in the Core group are used.")
+burstAtrMult     = input.float(0.5, "Burst threshold, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
+entryDistAtrMult = input.float(0.25, "Entry distance, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
+holdFavAtrMult   = input.float(0.1, "Hold min favorable, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
+burstPointsInput = input.float(172.0, "Burst threshold pts (Points unit)", minval = 0.0, step = 0.1, group = gBurst)
+useBurstGate     = input.bool(true, "Require burst gate", group = gBurst)
+useAnyCombo      = input.bool(false, "Allow any combo", group = gBurst, tooltip = "If on, TDI parent/zone can approve direction even when burst is weaker.")
+priorDriftBars   = input.int(60, "Prior drift bars", minval = 1, group = gBurst)
+usePriorFilter   = input.bool(false, "Use prior drift filter", group = gBurst)
+
+gZone = "TDI Trade Zone Filter"
+useTdiTradeZone = input.bool(true, "Use TDI trade-zone filter", group = gZone)
+tdiParentTf     = input.timeframe("60", "Parent obedience timeframe", group = gZone, tooltip = "Calibrated with the parent = the chart timeframe. Leave it equal to the chart.")
+tdiRsiLen       = input.int(14, "TDI RSI length", minval = 2, group = gZone)
+tdiFastLen      = input.int(2, "TDI white fast length", minval = 1, group = gZone)
+tdiSlowLen      = input.int(7, "TDI slow length", minval = 1, group = gZone)
+minAlignedZones = input.int(2, "Minimum child zones aligned", minval = 0, maxval = 6, group = gZone)
+allowNeutralParent = input.bool(false, "Allow trade if parent is flat", group = gZone)
+ignoreNaZones   = input.bool(true, "Ignore zones without data", group = gZone, tooltip = "A child zone whose timeframe has no data on this bar is dropped from the active count instead of counting as MIX.")
+htfNoRepaint    = input.bool(true, "Higher-TF zones use the last CLOSED bar", group = gZone, tooltip = "A child zone on a timeframe HIGHER than the chart is read from its last closed bar, so history and realtime agree.")
+useZone1 = input.bool(true, "Use child zone 1", group = gZone)
+zoneTf1  = input.timeframe("60", "Zone 1 timeframe", group = gZone)
+useZone2 = input.bool(true, "Use child zone 2", group = gZone)
+zoneTf2  = input.timeframe("120", "Zone 2 timeframe", group = gZone)
+useZone3 = input.bool(true, "Use child zone 3", group = gZone)
+zoneTf3  = input.timeframe("240", "Zone 3 timeframe", group = gZone)
+useZone4 = input.bool(false, "Use child zone 4", group = gZone)
+zoneTf4  = input.timeframe("480", "Zone 4 timeframe", group = gZone)
+useZone5 = input.bool(false, "Use child zone 5", group = gZone)
+zoneTf5  = input.timeframe("1", "Zone 5 timeframe", group = gZone)
+useZone6 = input.bool(false, "Use child zone 6", group = gZone)
+zoneTf6  = input.timeframe("2", "Zone 6 timeframe", group = gZone)
+
+// price model
+pt = syminfo.mintick
+halfSpread = spreadPoints * pt * 0.5
+bid = close - halfSpread
+ask = close + halfSpread
+midPrice = (bid + ask) * 0.5
+
+// TDI direction
+tdiDir() =>
+    r = ta.rsi(close, tdiRsiLen)
+    f = ta.sma(r, tdiFastLen)
+    s = ta.sma(r, tdiSlowLen)
+    d = f > f[1] ? 1 : f < f[1] ? -1 : 0
+    [d, f, s]
+
+tdiDirPrev() =>
+    [d, f, s] = tdiDir()
+    [d[1], f[1], s[1]]
+
+isHigher(string tf) =>
+    timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)
+
+[parentDir, parentFast, parentSlow] = request.security(syminfo.tickerid, tdiParentTf, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z1Dir0, z1Fast, z1Slow] = request.security(syminfo.tickerid, zoneTf1, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z2Dir0, z2Fast, z2Slow] = request.security(syminfo.tickerid, zoneTf2, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z3Dir0, z3Fast, z3Slow] = request.security(syminfo.tickerid, zoneTf3, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z4Dir0, z4Fast, z4Slow] = request.security(syminfo.tickerid, zoneTf4, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z5Dir0, z5Fast, z5Slow] = request.security(syminfo.tickerid, zoneTf5, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z6Dir0, z6Fast, z6Slow] = request.security(syminfo.tickerid, zoneTf6, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z1DirP, z1FastP, z1SlowP] = request.security(syminfo.tickerid, zoneTf1, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z2DirP, z2FastP, z2SlowP] = request.security(syminfo.tickerid, zoneTf2, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z3DirP, z3FastP, z3SlowP] = request.security(syminfo.tickerid, zoneTf3, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z4DirP, z4FastP, z4SlowP] = request.security(syminfo.tickerid, zoneTf4, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z5DirP, z5FastP, z5SlowP] = request.security(syminfo.tickerid, zoneTf5, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z6DirP, z6FastP, z6SlowP] = request.security(syminfo.tickerid, zoneTf6, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+z1Dir = htfNoRepaint and isHigher(zoneTf1) ? z1DirP : z1Dir0
+z2Dir = htfNoRepaint and isHigher(zoneTf2) ? z2DirP : z2Dir0
+z3Dir = htfNoRepaint and isHigher(zoneTf3) ? z3DirP : z3Dir0
+z4Dir = htfNoRepaint and isHigher(zoneTf4) ? z4DirP : z4Dir0
+z5Dir = htfNoRepaint and isHigher(zoneTf5) ? z5DirP : z5Dir0
+z6Dir = htfNoRepaint and isHigher(zoneTf6) ? z6DirP : z6Dir0
+
+zoneOn(bool use, int dir) =>
+    use and (not ignoreNaZones or not na(dir))
+
+on1 = zoneOn(useZone1, z1Dir)
+on2 = zoneOn(useZone2, z2Dir)
+on3 = zoneOn(useZone3, z3Dir)
+on4 = zoneOn(useZone4, z4Dir)
+on5 = zoneOn(useZone5, z5Dir)
+on6 = zoneOn(useZone6, z6Dir)
+
+activeZones = (on1 ? 1 : 0) + (on2 ? 1 : 0) + (on3 ? 1 : 0) + (on4 ? 1 : 0) + (on5 ? 1 : 0) + (on6 ? 1 : 0)
+parentSide = parentDir > 0 ? 1 : parentDir < 0 ? -1 : 0
+
+alignCount(int dir, bool useZone) =>
+    useZone and parentSide != 0 and dir == parentSide ? 1 : 0
+
+alignedZones = alignCount(z1Dir, on1) + alignCount(z2Dir, on2) + alignCount(z3Dir, on3) + alignCount(z4Dir, on4) + alignCount(z5Dir, on5) + alignCount(z6Dir, on6)
+
+requiredAligned = math.min(minAlignedZones, activeZones)
+parentFlatAllowed = allowNeutralParent and parentSide == 0
+zoneReady = activeZones == 0 or alignedZones >= requiredAligned
+
+tradeZoneBuyAllowed = not useTdiTradeZone or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
+tradeZoneSellAllowed = not useTdiTradeZone or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
+
+// burst / prior drift
+atrChart = ta.atr(14)
+atrPts = atrChart / pt
+burstThrPts   = DistUnit == "ATR" ? burstAtrMult * atrPts : burstPointsInput
+entryDistPts  = DistUnit == "ATR" ? entryDistAtrMult * atrPts : entryDistPoints
+holdFavPts    = DistUnit == "ATR" ? holdFavAtrMult * atrPts : entryHoldMinFavPoints
+
+burstPts = (midPrice - midPrice[1]) / pt
+priorDriftPts = (midPrice - midPrice[priorDriftBars]) / pt
+
+burstBuy = burstPts >= burstThrPts
+burstSell = burstPts <= -burstThrPts
+
+priorBuyOk = not usePriorFilter or priorDriftPts > 0
+priorSellOk = not usePriorFilter or priorDriftPts < 0
+
+rawBuyCandidate = useAnyCombo ? (tradeZoneBuyAllowed and (not useBurstGate or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
+rawSellCandidate = useAnyCombo ? (tradeZoneSellAllowed and (not useBurstGate or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
+
+buyCandidate = rawBuyCandidate and priorBuyOk
+sellCandidate = rawSellCandidate and priorSellOk
+
+// entry hold / virtual stop
+var bool holdActive = false
+var bool holdIsBuy = false
+var int holdSignalBar = na
+var float holdSignalMid = na
+var int lastEntryBar = na
+
+float buyEntryPrice = na
+float sellEntryPrice = na
+bool buySignal = false
+bool sellSignal = false
+
+canFire = not oneEntryPerBar or na(lastEntryBar) or lastEntryBar != bar_index
+
+if buyCandidate and canFire
+    if entryHoldBars == 0
+        buyEntryPrice := ask + entryDistPts * pt
+        buySignal := true
+        lastEntryBar := bar_index
+    else if not holdActive
+        holdActive := true
+        holdIsBuy := true
+        holdSignalBar := bar_index
+        holdSignalMid := midPrice
+    else if holdIsBuy
+        elapsedBars = bar_index - holdSignalBar
+        holdMovePoints = (midPrice - holdSignalMid) / pt
+        if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+            buyEntryPrice := ask + entryDistPts * pt
+            buySignal := true
+            lastEntryBar := bar_index
+            holdActive := false
+
+if sellCandidate and canFire
+    if entryHoldBars == 0
+        sellEntryPrice := bid - entryDistPts * pt
+        sellSignal := true
+        lastEntryBar := bar_index
+    else if not holdActive
+        holdActive := true
+        holdIsBuy := false
+        holdSignalBar := bar_index
+        holdSignalMid := midPrice
+    else if not holdIsBuy
+        elapsedBars = bar_index - holdSignalBar
+        holdMovePoints = (holdSignalMid - midPrice) / pt
+        if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+            sellEntryPrice := bid - entryDistPts * pt
+            sellSignal := true
+            lastEntryBar := bar_index
+            holdActive := false
+
+if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and not tradeZoneSellAllowed))
+    holdActive := false
+    holdSignalBar := na
+    holdSignalMid := na
+
+bool dtfBuySignal  = buySignal
+bool dtfSellSignal = sellSignal
 // ===== END SIGNAL LOGIC SLOT ==================================================
 
 // ACTIVATE NOW capture: the moment and the price when the script (re)starts
