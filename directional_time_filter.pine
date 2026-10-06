@@ -1,6 +1,6 @@
 //@version=6
 // ============================================================================
-//  DIRECTIONAL TIME FILTER  -  v1.4
+//  DIRECTIONAL TIME FILTER  -  v1.5
 // ----------------------------------------------------------------------------
 //  A time-boxed direction PERMISSION you can bolt onto any script. It only
 //  answers "is a buy allowed now? is a sell allowed now?". Your script's own
@@ -13,7 +13,14 @@
 //  When the countdown reaches zero the filter closes: no new trades at all
 //  until you activate it again.
 //
-//  TWO WAYS TO ARM IT
+//  THREE WAYS TO ARM IT
+//    Direction signal  (automatic)  "Arm from signal" on: a direction signal
+//                   coded inside the block (SIGNAL LOGIC SLOT; placeholder is
+//                   an EMA cross, or an external plot) arms the filter on its
+//                   bar: window from that bar's close, level = that bar's
+//                   price, countdown runs, then closed until the next signal.
+//                   Buys allowed only above the signal price, sells only
+//                   below it. Works in backtests: committed bars only.
 //    ACTIVATE NOW   (manual, one click)  Tick it, press OK. The window opens
 //                   at that moment and the level is the price at that moment
 //                   (or a price you type, see "Level when activating").
@@ -152,7 +159,34 @@ dtfShowLv    = input.bool(true, "Draw level", inline="vis", group=GRP_DTF)
 dtfShowTbl   = input.bool(true, "Status box", inline="vis", group=GRP_DTF, tooltip="Shown while the filter is enabled. Updates on each tick (once per bar inside a strategy) and freezes when the market is closed.")
 dtfTblPos    = input.string("top_right", "Status box position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group=GRP_DTF)
 
+// ---- Direction signal: arms the filter automatically ------------------------
+GRP_SIG = "Direction signal (arms the filter)"
+dtfSigOn    = input.bool(false, "Arm from signal", group=GRP_SIG, tooltip="On: every direction signal arms the filter: the window opens on the signal bar, the level is the signal price, and the countdown runs. Buys are then allowed only above that price, sells only below it. ACTIVATE NOW (if ticked) has priority; Start time is ignored.")
+dtfSigType  = input.string("Built-in", "Signal", options=["Built-in", "External source"], group=GRP_SIG, tooltip="Built-in: the signal logic coded in this block (see dtfSigBuy / dtfSigSell). External source: a plot of another indicator, > 0 = buy, < 0 = sell, 0 = none (a signal counts when the value changes).")
+dtfSigExt   = input.source(close, "External signal", group=GRP_SIG)
+dtfSigFast  = input.int(9,  "Built-in EMA fast", minval=1, inline="ema", group=GRP_SIG)
+dtfSigSlow  = input.int(21, "slow", minval=1, inline="ema", group=GRP_SIG)
+dtfSigSide  = input.string("Buy and sell signals", "Arm on", options=["Buy and sell signals", "Buy signals only", "Sell signals only"], group=GRP_SIG)
+dtfSigRearm = input.bool(true, "New signal re-arms while open", group=GRP_SIG, tooltip="On: a new signal inside an open window restarts it at the new price and time. Off: signals are ignored until the countdown ends.")
+dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
+
 dtfValue = dtfRef
+
+// ===== SIGNAL LOGIC SLOT ======================================================
+// Replace these two lines with your own direction logic. They must be true on
+// the bar where a BUY / SELL direction is decided; the bar's close becomes the
+// signal price. Placeholder: EMA cross.
+float dtfEmaF  = ta.ema(close, dtfSigFast)
+float dtfEmaS  = ta.ema(close, dtfSigSlow)
+bool  dtfSigBuy  = ta.crossover(dtfEmaF, dtfEmaS)
+bool  dtfSigSell = ta.crossunder(dtfEmaF, dtfEmaS)
+// ===== END SIGNAL LOGIC SLOT ==================================================
+
+// External signal: a change to > 0 / < 0 is a new buy / sell signal.
+bool dtfExtBuy  = dtfSigExt > 0 and not (dtfSigExt[1] > 0)
+bool dtfExtSell = dtfSigExt < 0 and not (dtfSigExt[1] < 0)
+bool dtfBuySignal  = dtfSigType == "Built-in" ? dtfSigBuy  : dtfExtBuy
+bool dtfSellSignal = dtfSigType == "Built-in" ? dtfSigSell : dtfExtSell
 
 // ACTIVATE NOW capture: the moment and the price when the script (re)starts
 // with the switch on. varip keeps it across live updates; a recompile (any
@@ -164,14 +198,29 @@ if dtfArmNow and barstate.islast and na(dtfArmedAt) and not na(dtfValue)
     dtfArmedAt := timenow
     dtfArmedPx := dtfLvMode == "Typed price" ? dtfTyped : dtfValue
 
+// Signal arming: on a confirmed signal bar, the window starts at that bar's
+// close with the level at the signal price. Committed state only (var), so
+// backtests and live agree.
+var int   dtfSigAt  = na
+var float dtfSigPx  = na
+var int   dtfSigDir = 0
+int  dtfBarClose  = nz(time_close, time)
+bool dtfPrevEnded = na(dtfSigAt) or (dtfMinutes > 0 and dtfBarClose >= dtfSigAt + math.round(dtfMinutes * 60000))
+bool dtfSigFire   = dtfSigOn and barstate.isconfirmed and not na(dtfValue) and ((dtfBuySignal and dtfSigSide != "Sell signals only") or (dtfSellSignal and dtfSigSide != "Buy signals only")) and (dtfPrevEnded or dtfSigRearm)
+if dtfSigFire
+    dtfSigAt  := dtfBarClose
+    dtfSigPx  := dtfValue
+    dtfSigDir := dtfBuySignal ? 1 : -1
+
 // Clock. The committed value of a bar (history, and the closing update of the
 // live bar) is judged at the bar's close time, so it never repaints. Intrabar
 // ticks of the live bar use the real clock, so the window opens on the second.
 dtfClock   = barstate.isconfirmed ? nz(time_close, time) : timenow
-dtfStartAt = dtfArmNow ? dtfArmedAt : dtfStart + dtfStartSec * 1000
+dtfStartAt = dtfArmNow ? dtfArmedAt : dtfSigOn ? dtfSigAt : dtfStart + dtfStartSec * 1000
 dtfEnd     = dtfMinutes > 0 and not na(dtfStartAt) ? dtfStartAt + math.round(dtfMinutes * 60000) : na
-dtfBuyLv   = dtfArmNow ? dtfArmedPx : dtfBuyLevel
-dtfSellLv  = dtfArmNow ? dtfArmedPx : dtfSellLevel
+dtfOneLv   = dtfArmNow or dtfSigOn
+dtfBuyLv   = dtfArmNow ? dtfArmedPx : dtfSigOn ? dtfSigPx : dtfBuyLevel
+dtfSellLv  = dtfArmNow ? dtfArmedPx : dtfSigOn ? dtfSigPx : dtfSellLevel
 
 // Not armed yet (ACTIVATE NOW before the capture bar) counts as before start.
 dtfBeforeStart = na(dtfStartAt) or dtfClock < dtfStartAt
@@ -202,6 +251,8 @@ dtfPosOf(string s) =>
 
 bgcolor(dtfShowBg and dtfOn and dtfOpen ? (dtfBuyOk and dtfSellOk ? color.new(color.yellow, 85) : dtfBuyOk ? color.new(color.green, 85) : dtfSellOk ? color.new(color.red, 85) : color.new(color.gray, 88)) : na, title="DTF window", force_overlay=DTF_FORCE_OVERLAY)
 plotshape(dtfExpired, "DTF window ended", shape.xcross, location.top, color.orange, size=size.tiny, text="DTF end", textcolor=color.orange, force_overlay=DTF_FORCE_OVERLAY)
+plotshape(dtfSigMark and dtfSigFire and dtfSigDir > 0, "DTF buy signal",  shape.triangleup,   location.belowbar, color.lime, size=size.tiny, force_overlay=DTF_FORCE_OVERLAY)
+plotshape(dtfSigMark and dtfSigFire and dtfSigDir < 0, "DTF sell signal", shape.triangledown, location.abovebar, color.red,  size=size.tiny, force_overlay=DTF_FORCE_OVERLAY)
 
 // Level lines as drawings (they do not stretch the price scale). While
 // waiting they preview the last 50 bars; while open they span the window;
@@ -220,7 +271,7 @@ if dtfShowLv and dtfActive
     int dtfX1 = math.max(0, math.max(bar_index - 9000, math.min(dtfOpen ? dtfOpenFrom : bar_index, bar_index - 50)))
     line.delete(dtfBuyLn)
     line.delete(dtfSellLn)
-    if dtfArmNow
+    if dtfOneLv
         dtfBuyLn := line.new(dtfX1, dtfBuyLv, bar_index, dtfBuyLv, color=color.new(color.white, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
     else
         dtfBuyLn  := line.new(dtfX1, dtfBuyLv,  bar_index, dtfBuyLv,  color=color.new(color.green, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
@@ -236,7 +287,7 @@ if dtfShowTbl and dtfOn and barstate.islast
     bool   dOpen   = not dBefore and not dAfter
     bool   dBuy    = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
     bool   dSell   = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowSell and dtfValue < dtfSellLv)
-    string dMode   = dtfArmNow ? " (NOW)" : ""
+    string dMode   = dtfArmNow ? " (NOW)" : dtfSigOn ? (dtfSigDir > 0 ? " (SIGNAL BUY)" : dtfSigDir < 0 ? " (SIGNAL SELL)" : " (SIGNAL)") : ""
     string dState  = (dBefore ? (dtfTooShort ? "WAITING (< 1 bar)" : "WAITING") : dOpen ? "OPEN" : "ENDED") + dMode
     color  dCol    = dBefore ? color.yellow : dOpen ? color.lime : color.orange
     int    dSecs   = dOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - timenow) / 1000.0)) : 0
@@ -248,7 +299,7 @@ if dtfShowTbl and dtfOn and barstate.islast
     table.cell(dtfTable, 0, 1, "Now (exch tz)", text_color=color.white)
     table.cell(dtfTable, 1, 1, str.format_time(timenow, "MMM dd HH:mm:ss", syminfo.timezone), text_color=color.white)
     table.cell(dtfTable, 0, 2, "Start (exch tz)", text_color=color.white)
-    table.cell(dtfTable, 1, 2, dStart, text_color=dtfArmNow ? color.orange : color.white)
+    table.cell(dtfTable, 1, 2, dStart, text_color=dtfArmNow ? color.orange : dtfSigOn ? color.aqua : color.white)
     table.cell(dtfTable, 0, 3, "Countdown", text_color=color.white)
     table.cell(dtfTable, 1, 3, dLeft, text_color=color.white)
     table.cell(dtfTable, 0, 4, "Price now", text_color=color.white)
@@ -266,3 +317,4 @@ plot(dtfSellOk ? 1 : 0, "DTF sell allowed", display=display.data_window)
 plot(dtfExpired ? 1 : 0, "DTF expired", display=display.data_window)
 plot(dtfValue, "DTF price used", display=display.data_window)
 plot(dtfBuyLv, "DTF level", display=display.data_window)
+plot(dtfSigFire ? dtfSigDir : 0, "DTF signal (1 buy, -1 sell)", display=display.data_window)
