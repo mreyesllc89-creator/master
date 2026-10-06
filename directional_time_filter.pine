@@ -46,8 +46,9 @@
 //                       off.
 //    Countdown (min)    Minutes the window stays open from the start.
 //                       0 = never expires.
-//    Price source       The price compared to the level and captured by
-//                       ACTIVATE NOW. Default: close (the actual price).
+//    Actual price       The live price ("Close" = last traded price of the
+//                       current bar). ACTIVATE NOW captures it as the level
+//                       and it is compared to the level in the window.
 //    Buy only above     Manual buy level, used when ACTIVATE NOW is off.
 //    Sell only below    Manual sell level, used when ACTIVATE NOW is off.
 //    Allow buys/sells   Turn a side off completely inside the window.
@@ -134,7 +135,7 @@ dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick an
 dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Scheduled start, used when ACTIVATE NOW is off. Date and minute in the chart's time zone (the one on the time axis); add seconds below.")
 dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to Start time (useful on second charts).")
 dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start. 0 = never expires. Bars are judged at their close, so a countdown shorter than one chart bar opens for at most one bar.")
-dtfRef       = input.source(close, "Price source", group=GRP_DTF, tooltip="The price compared to the level, and the price captured by ACTIVATE NOW. Default: close (the actual price). You can pick any plotted line from another indicator instead.")
+dtfRef       = input.source(close, "Actual price", group=GRP_DTF, tooltip="The actual price: 'Close' is the last traded price of the current bar (it moves with every tick). ACTIVATE NOW captures this value as the level, and it is compared to the level while the window is open. The dropdown names are TradingView's; leave it on Close unless you want another series.")
 dtfBuyLevel  = input.float(50, "Buy only above (manual)", group=GRP_DTF, tooltip="Manual buy level, used when ACTIVATE NOW is off. Buys are allowed only while price is above it.")
 dtfSellLevel = input.float(50, "Sell only below (manual)", group=GRP_DTF, tooltip="Manual sell level, used when ACTIVATE NOW is off. Sells are allowed only while price is below it.")
 dtfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_DTF, tooltip="Turn one side off completely inside the window.")
