@@ -62,8 +62,6 @@
 //     To compare the levels to one of your script's own series instead of
 //     price, change  dtfValue = dtfRef  to  dtfValue = myLine  (myLine must
 //     be computed above the block; move the block down if needed).
-//     See xpw_orientation_tdi_v2.4_strategy.pine for a complete example
-//     (two gates added to the entry conditions, nothing else changed).
 //
 //  B) Link without editing (indicator -> strategy)
 //     Add this indicator to the chart. In your strategy add
