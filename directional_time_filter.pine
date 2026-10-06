@@ -55,8 +55,11 @@
 //    Start time         Scheduled start, chart time zone (minute precision;
 //                       "+ seconds" adds seconds). Used when ACTIVATE NOW is
 //                       off.
+//    Countdown unit     Minutes, or Candles (chart candles counted from the
+//                       candle that armed the window: 1 = that candle only).
 //    Countdown (min)    Minutes the window stays open from the start.
 //                       0 = never expires.
+//    Countdown (candles)  Candles the window stays open, in Candles mode.
 //    Actual price       The live price ("Close" = last traded price of the
 //                       current bar). ACTIVATE NOW captures it as the level
 //                       and it is compared to the level in the window.
@@ -147,7 +150,9 @@ dtfLvMode    = input.string("Actual price", "Level when activating", options=["A
 dtfTyped     = input.float(0, "Typed price", minval=0, group=GRP_DTF, tooltip="The level used by ACTIVATE NOW when 'Level when activating' is 'Typed price'. Buys allowed only above it, sells only below it.")
 dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Scheduled start, used when ACTIVATE NOW is off. Date and minute in the chart's time zone (the one on the time axis); add seconds below.")
 dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to Start time (useful on second charts).")
+dtfDurUnit   = input.string("Minutes", "Countdown unit", options=["Minutes", "Candles"], group=GRP_DTF, tooltip="Minutes: the window stays open for the minutes below. Candles: the window stays open for the number of chart candles below, counted from the candle that armed it (1 = only that candle, whose order fills on the next one).")
 dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start. 0 = never expires. Bars are judged at their close, so a countdown shorter than one chart bar opens for at most one bar.")
+dtfBars      = input.int(1, "Countdown (candles)", minval=1, group=GRP_DTF, tooltip="Chart candles the window stays open, counted from the candle that armed it.")
 dtfRef       = input.source(close, "Actual price", group=GRP_DTF, tooltip="The actual price: 'Close' is the last traded price of the current bar (it moves with every tick). ACTIVATE NOW captures this value as the level, and it is compared to the level while the window is open. The dropdown names are TradingView's; leave it on Close unless you want another series.")
 dtfBuyLevel  = input.float(50, "Buy only above (manual)", group=GRP_DTF, tooltip="Manual buy level, used when ACTIVATE NOW is off. Buys are allowed only while price is above it.")
 dtfSellLevel = input.float(50, "Sell only below (manual)", group=GRP_DTF, tooltip="Manual sell level, used when ACTIVATE NOW is off. Sells are allowed only while price is below it.")
@@ -370,24 +375,29 @@ float dtfSignalPx   = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : 
 // ACTIVATE NOW capture: the moment and the price when the script (re)starts
 // with the switch on. varip keeps it across live updates; a recompile (any
 // settings change, chart reload) captures again.
-varip int   dtfArmedAt = na
-varip float dtfArmedPx = na
+varip int   dtfArmedAt  = na
+varip float dtfArmedPx  = na
+varip int   dtfArmedBar = na
 // The capture waits for a tick where the price source has a value.
 if dtfArmNow and barstate.islast and na(dtfArmedAt) and not na(dtfValue)
-    dtfArmedAt := timenow
+    dtfArmedAt  := timenow
+    dtfArmedBar := bar_index
     dtfArmedPx := dtfLvMode == "Typed price" ? dtfTyped : dtfValue
 
 // Signal arming: on a confirmed signal bar, the window starts at that bar's
 // close with the level at the signal price. Committed state only (var), so
 // backtests and live agree.
 var int   dtfSigAt  = na
+var int   dtfSigBar = na
 var float dtfSigPx  = na
 var int   dtfSigDir = 0
+bool dtfByBars    = dtfDurUnit == "Candles"
 int  dtfBarClose  = nz(time_close, time)
-bool dtfPrevEnded = na(dtfSigAt) or (dtfMinutes > 0 and dtfBarClose >= dtfSigAt + math.round(dtfMinutes * 60000))
+bool dtfPrevEnded = na(dtfSigAt) or (dtfByBars ? bar_index >= dtfSigBar + dtfBars : (dtfMinutes > 0 and dtfBarClose >= dtfSigAt + math.round(dtfMinutes * 60000)))
 bool dtfSigFire   = dtfSigOn and barstate.isconfirmed and not na(dtfValue) and ((dtfBuySignal and dtfSigSide != "Sell signals only") or (dtfSellSignal and dtfSigSide != "Buy signals only")) and (dtfPrevEnded or dtfSigRearm)
 if dtfSigFire
     dtfSigAt  := dtfBarClose
+    dtfSigBar := bar_index
     dtfSigPx  := nz(dtfSignalPx, dtfValue)
     dtfSigDir := dtfBuySignal ? 1 : -1
 
@@ -396,15 +406,25 @@ if dtfSigFire
 // ticks of the live bar use the real clock, so the window opens on the second.
 dtfClock   = barstate.isconfirmed ? nz(time_close, time) : timenow
 dtfStartAt = dtfArmNow ? dtfArmedAt : dtfSigOn ? dtfSigAt : dtfStart + dtfStartSec * 1000
-dtfEnd     = dtfMinutes > 0 and not na(dtfStartAt) ? dtfStartAt + math.round(dtfMinutes * 60000) : na
+dtfEnd     = not dtfByBars and dtfMinutes > 0 and not na(dtfStartAt) ? dtfStartAt + math.round(dtfMinutes * 60000) : na
 dtfOneLv   = dtfArmNow or dtfSigOn
 dtfBuyLv   = dtfArmNow ? dtfArmedPx : dtfSigOn ? dtfSigPx : dtfBuyLevel
 dtfSellLv  = dtfArmNow ? dtfArmedPx : dtfSigOn ? dtfSigPx : dtfSellLevel
 
 // Not armed yet (ACTIVATE NOW before the capture bar) counts as before start.
 dtfBeforeStart = na(dtfStartAt) or dtfClock < dtfStartAt
-dtfOpen        = not dtfBeforeStart and (na(dtfEnd) or dtfClock < dtfEnd)
-dtfAfterEnd    = not na(dtfEnd) and dtfClock >= dtfEnd
+// Candle mode: the window is the N candles from the one that armed it. For a
+// scheduled start that is the first candle closing at or after Start time.
+var int dtfTimeBar = na
+if not dtfBeforeStart and na(dtfTimeBar)
+    dtfTimeBar := bar_index
+if dtfBeforeStart
+    dtfTimeBar := na
+int  dtfStartBar = dtfArmNow ? dtfArmedBar : dtfSigOn ? dtfSigBar : dtfTimeBar
+int  dtfEndBar   = na(dtfStartBar) ? na : dtfStartBar + dtfBars
+bool dtfInBars   = dtfByBars and not na(dtfEndBar) and bar_index < dtfEndBar
+dtfOpen        = not dtfBeforeStart and (dtfByBars ? dtfInBars : (na(dtfEnd) or dtfClock < dtfEnd))
+dtfAfterEnd    = dtfByBars ? (not dtfBeforeStart and not dtfInBars) : (not na(dtfEnd) and dtfClock >= dtfEnd)
 
 // Final gates: is a buy / a sell ALLOWED on this bar? (Permission only.)
 dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
@@ -414,7 +434,7 @@ dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen an
 dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1] and not barstate.isfirst
 
 // A countdown shorter than one chart bar opens for at most one bar.
-dtfTooShort = dtfOn and dtfMinutes > 0 and dtfMinutes * 60 < timeframe.in_seconds()
+dtfTooShort = dtfOn and not dtfByBars and dtfMinutes > 0 and dtfMinutes * 60 < timeframe.in_seconds()
 
 // ---- Visuals (optional: delete from here to END if you only want the gates)
 dtfPosOf(string s) =>
@@ -462,7 +482,7 @@ if dtfShowLv and dtfActive
         dtfSellLn := line.new(dtfX1, dtfSellLv, bar_index, dtfSellLv, color=color.new(color.red, 0),   width=2, force_overlay=DTF_FORCE_OVERLAY)
     if dtfOpen and na(dtfLbl)
         string dtfWhat = dtfArmNow ? "NOW" : dtfSigOn ? (dtfSigDir > 0 ? "SIGNAL BUY" : "SIGNAL SELL") : "START"
-        string dtfTxt  = dtfWhat + " @ " + str.tostring(dtfBuyLv, DTF_LEVEL_IS_PRICE ? format.mintick : "#.########") + (dtfMinutes > 0 ? "\n" + str.tostring(dtfMinutes, "#.#") + " min" : "\nno limit")
+        string dtfTxt  = dtfWhat + " @ " + str.tostring(dtfBuyLv, DTF_LEVEL_IS_PRICE ? format.mintick : "#.########") + (dtfByBars ? "\n" + str.tostring(dtfBars) + (dtfBars == 1 ? " candle" : " candles") : dtfMinutes > 0 ? "\n" + str.tostring(dtfMinutes, "#.#") + " min" : "\nno limit")
         color  dtfLbCol = dtfSigOn and dtfSigDir < 0 ? color.new(color.red, 20) : dtfSigOn and dtfSigDir > 0 ? color.new(color.lime, 20) : color.new(color.white, 20)
         dtfLbl := label.new(dtfOpenFrom, dtfBuyLv, dtfTxt, style=label.style_label_right, color=dtfLbCol, textcolor=color.black, size=size.small, force_overlay=DTF_FORCE_OVERLAY)
 else if not dtfActive
@@ -472,7 +492,7 @@ else if not dtfActive
 var table dtfTable = table.new(dtfPosOf(dtfTblPos), 2, 7, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=DTF_FORCE_OVERLAY)
 if dtfShowTbl and dtfOn and barstate.islast
     bool   dBefore = na(dtfStartAt) or timenow < dtfStartAt
-    bool   dAfter  = not na(dtfEnd) and timenow >= dtfEnd
+    bool   dAfter  = dtfByBars ? (not dBefore and not dtfInBars) : (not na(dtfEnd) and timenow >= dtfEnd)
     bool   dOpen   = not dBefore and not dAfter
     bool   dBuy    = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
     bool   dSell   = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowSell and dtfValue < dtfSellLv)
@@ -480,7 +500,7 @@ if dtfShowTbl and dtfOn and barstate.islast
     string dState  = (dBefore ? (dtfTooShort ? "WAITING (< 1 bar)" : "WAITING") : dOpen ? "OPEN" : "ENDED") + dMode
     color  dCol    = dBefore ? color.yellow : dOpen ? color.lime : color.orange
     int    dSecs   = dOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - timenow) / 1000.0)) : 0
-    string dLeft   = dOpen and not na(dtfEnd) ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : dOpen ? "no limit" : "-"
+    string dLeft   = dOpen and dtfByBars ? str.tostring(dtfEndBar - bar_index) + (dtfEndBar - bar_index == 1 ? " candle" : " candles") : dOpen and not na(dtfEnd) ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : dOpen ? "no limit" : "-"
     string dStart  = na(dtfStartAt) ? "-" : str.format_time(dtfStartAt, "MMM dd HH:mm:ss", syminfo.timezone)
     string dFmt    = DTF_LEVEL_IS_PRICE ? format.mintick : "#.########"
     table.cell(dtfTable, 0, 0, "DTF", text_color=color.white)
