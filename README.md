@@ -25,9 +25,12 @@ Every script below carries the DTF block (group "Directional time filter") and g
 | `xpw_shape_map_v0.8_strategy.pine` | XPW Shape Map v0.8 strategy | Market entries, Predict stop orders and catch-up entries. |
 | `xpw_shape_map_v0.6_strategy.pine` | XPW Shape Map v0.6 strategy | Market entries and Predict stop orders. |
 | `tdi_plus_enhanced_btcusd_strategy.pine` | TDI+ (Enhanced) strategy, BTCUSD | The two `strategy.entry` calls. |
+| `flashgold_v5_xauusd_strategy.pine` | FlashGold v5 strategy, XAUUSD (Pine v5) | The two stop-order placements. The block is the v1.4 block without its `force_overlay` arguments, since this script is Pine v5 and draws on the price chart. |
 | `xpw_shape_map_v0.6_indicator.pine` | XPW Shape Map v0.6 indicator (map only) | Nothing to gate: the block is a display layer and exports "DTF buy allowed" / "DTF sell allowed". |
 
 The block ships with the filter ON and nothing armed, so every entry is blocked until you arm it (ACTIVATE NOW or Start time) or switch "Enable filter" off. ACTIVATE NOW re-arms on every reload of the script, so use Start time for anything left running or driven by alerts.
+
+All scripts are Pine v6 except FlashGold, which is Pine v5 and carries the same block with the `force_overlay` arguments removed.
 
 Scripts that run in their own pane (the TDI and Shape Map ones) draw the filter's shading, level and status box on the price chart. Where the host already has a table in the top right corner (Breakout, Refusal Log, TDI+), the DTF status box defaults to the top left; change it under "Status box position".
 
