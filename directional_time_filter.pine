@@ -15,9 +15,9 @@
 //
 //  THREE WAYS TO ARM IT
 //    Direction signal  (automatic)  "Arm from signal" on: a direction signal
-//                   coded inside the block (SIGNAL LOGIC SLOT; placeholder is
-//                   an EMA cross, or an external plot) arms the filter on its
-//                   bar: window from that bar's close, level = that bar's
+//                   coded inside the block (SIGNAL LOGIC SLOT) arms the
+//                   filter on its bar: window from that bar's close, level
+//                   = that bar's
 //                   price, countdown runs, then closed until the next signal.
 //                   Buys allowed only above the signal price, sells only
 //                   below it. Works in backtests: committed bars only.
@@ -162,10 +162,6 @@ dtfTblPos    = input.string("top_right", "Status box position", options=["top_ri
 // ---- Direction signal: arms the filter automatically ------------------------
 GRP_SIG = "Direction signal (arms the filter)"
 dtfSigOn    = input.bool(false, "Arm from signal", group=GRP_SIG, tooltip="On: every direction signal arms the filter: the window opens on the signal bar, the level is the signal price, and the countdown runs. Buys are then allowed only above that price, sells only below it. ACTIVATE NOW (if ticked) has priority; Start time is ignored.")
-dtfSigType  = input.string("Built-in", "Signal", options=["Built-in", "External source"], group=GRP_SIG, tooltip="Built-in: the signal logic coded in this block (see dtfSigBuy / dtfSigSell). External source: a plot of another indicator, > 0 = buy, < 0 = sell, 0 = none (a signal counts when the value changes).")
-dtfSigExt   = input.source(close, "External signal", group=GRP_SIG)
-dtfSigFast  = input.int(9,  "Built-in EMA fast", minval=1, inline="ema", group=GRP_SIG)
-dtfSigSlow  = input.int(21, "slow", minval=1, inline="ema", group=GRP_SIG)
 dtfSigSide  = input.string("Buy and sell signals", "Arm on", options=["Buy and sell signals", "Buy signals only", "Sell signals only"], group=GRP_SIG)
 dtfSigRearm = input.bool(true, "New signal re-arms while open", group=GRP_SIG, tooltip="On: a new signal inside an open window restarts it at the new price and time. Off: signals are ignored until the countdown ends.")
 dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
@@ -173,20 +169,12 @@ dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
 dtfValue = dtfRef
 
 // ===== SIGNAL LOGIC SLOT ======================================================
-// Replace these two lines with your own direction logic. They must be true on
-// the bar where a BUY / SELL direction is decided; the bar's close becomes the
-// signal price. Placeholder: EMA cross.
-float dtfEmaF  = ta.ema(close, dtfSigFast)
-float dtfEmaS  = ta.ema(close, dtfSigSlow)
-bool  dtfSigBuy  = ta.crossover(dtfEmaF, dtfEmaS)
-bool  dtfSigSell = ta.crossunder(dtfEmaF, dtfEmaS)
+// The direction logic goes here. dtfBuySignal / dtfSellSignal must be true on
+// the bar where a BUY / SELL direction is decided; that bar's close becomes
+// the signal price. Empty until the strategy's logic is added.
+bool dtfBuySignal  = false
+bool dtfSellSignal = false
 // ===== END SIGNAL LOGIC SLOT ==================================================
-
-// External signal: a change to > 0 / < 0 is a new buy / sell signal.
-bool dtfExtBuy  = dtfSigExt > 0 and not (dtfSigExt[1] > 0)
-bool dtfExtSell = dtfSigExt < 0 and not (dtfSigExt[1] < 0)
-bool dtfBuySignal  = dtfSigType == "Built-in" ? dtfSigBuy  : dtfExtBuy
-bool dtfSellSignal = dtfSigType == "Built-in" ? dtfSigSell : dtfExtSell
 
 // ACTIVATE NOW capture: the moment and the price when the script (re)starts
 // with the switch on. varip keeps it across live updates; a recompile (any
