@@ -15,7 +15,8 @@
 //
 //  TWO WAYS TO ARM IT
 //    ACTIVATE NOW   (manual, one click)  Tick it, press OK. The window opens
-//                   at that moment and the level is the price at that moment.
+//                   at that moment and the level is the price at that moment
+//                   (or a price you type, see "Level when activating").
 //                   Buys are allowed only above it, sells only below it, for
 //                   the countdown. Start time and the manual levels are
 //                   ignored. Untick + OK to disarm.
@@ -41,6 +42,9 @@
 //  INPUTS (group "Directional time filter")
 //    Enable filter      Off = every signal passes, as if the filter is absent.
 //    ACTIVATE NOW       See above.
+//    Level when activating   "Actual price": the level is the live price at
+//                       the instant you press OK. "Typed price": the level
+//                       is the number in "Typed price".
 //    Start time         Scheduled start, chart time zone (minute precision;
 //                       "+ seconds" adds seconds). Used when ACTIVATE NOW is
 //                       off.
@@ -132,6 +136,8 @@ DTF_LEVEL_IS_PRICE = true
 GRP_DTF = "Directional time filter"
 dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: buys are allowed only while price > level, sells only while price < level, and only inside the time window.")
 dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick and press OK: the window opens at this moment and the level is the price at this moment. Start time and the manual levels are ignored. Untick + OK to disarm. While ticked, ANY settings change or chart reload activates it again at that moment and price (the status box shows what is armed). Not for alerts or for strategies linked through input.source: use Start time for those.")
+dtfLvMode    = input.string("Actual price", "Level when activating", options=["Actual price", "Typed price"], group=GRP_DTF, tooltip="Actual price: ACTIVATE NOW captures the live price at that instant as the level. Typed price: the level is the number below.")
+dtfTyped     = input.float(0, "Typed price", minval=0, group=GRP_DTF, tooltip="The level used by ACTIVATE NOW when 'Level when activating' is 'Typed price'. Buys allowed only above it, sells only below it.")
 dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Scheduled start, used when ACTIVATE NOW is off. Date and minute in the chart's time zone (the one on the time axis); add seconds below.")
 dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to Start time (useful on second charts).")
 dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start. 0 = never expires. Bars are judged at their close, so a countdown shorter than one chart bar opens for at most one bar.")
@@ -156,7 +162,7 @@ varip float dtfArmedPx = na
 // The capture waits for a tick where the price source has a value.
 if dtfArmNow and barstate.islast and na(dtfArmedAt) and not na(dtfValue)
     dtfArmedAt := timenow
-    dtfArmedPx := dtfValue
+    dtfArmedPx := dtfLvMode == "Typed price" ? dtfTyped : dtfValue
 
 // Clock. The committed value of a bar (history, and the closing update of the
 // live bar) is judged at the bar's close time, so it never repaints. Intrabar
