@@ -131,7 +131,7 @@
 //  snapshots of the inputs at creation time: after changing them, re-create
 //  the alert.
 // ============================================================================
-indicator("Directional Time Filter", "DTF", overlay=true, max_lines_count=500)
+indicator("Directional Time Filter", "DTF", overlay=true, max_lines_count=500, max_labels_count=500)
 
 // ======================= BEGIN DIRECTIONAL TIME FILTER =======================
 // Set true when this block lives in a script that runs in its own pane
@@ -433,28 +433,38 @@ plotshape(dtfExpired, "DTF window ended", shape.xcross, location.top, color.oran
 plotshape(dtfSigMark and dtfSigFire and dtfSigDir > 0, "DTF buy signal",  shape.triangleup,   location.belowbar, color.lime, size=size.tiny, force_overlay=DTF_FORCE_OVERLAY)
 plotshape(dtfSigMark and dtfSigFire and dtfSigDir < 0, "DTF sell signal", shape.triangledown, location.abovebar, color.red,  size=size.tiny, force_overlay=DTF_FORCE_OVERLAY)
 
-// Level lines as drawings (they do not stretch the price scale). While
-// waiting they preview the last 50 bars; while open they span the window;
-// after the end they stay as a record. Redrawn every bar so a host script's
-// own drawings never garbage-collect them. With ACTIVATE NOW both levels are
-// the same price: one white line.
+// Level lines as drawings (they do not stretch the price scale). Each window
+// keeps its own line and a label at its start, so past windows stay readable.
+// While waiting (manual / scheduled modes) the line previews the last 50 bars.
+// Redrawn every bar so a host script's own drawings never garbage-collect the
+// current one.
 dtfActive = dtfOn and (dtfBeforeStart or dtfOpen) and not na(dtfBuyLv)
-var line dtfBuyLn    = na
-var line dtfSellLn   = na
-var int  dtfOpenFrom = na
-if dtfOpen and na(dtfOpenFrom)
+var line  dtfBuyLn    = na
+var line  dtfSellLn   = na
+var label dtfLbl      = na
+var int   dtfOpenFrom = na
+bool dtfNewWindow = dtfOpen and na(dtfOpenFrom)
+if dtfNewWindow
     dtfOpenFrom := bar_index
+    // a new window: leave the previous window's drawings in place
+    dtfBuyLn  := na
+    dtfSellLn := na
+    dtfLbl    := na
 if dtfShowLv and dtfActive
-    // From the window's first bar, but always at least the last 50 bars so the
-    // line is visible from the moment it is armed; never more than 9000 back.
     int dtfX1 = math.max(0, math.max(bar_index - 9000, math.min(dtfOpen ? dtfOpenFrom : bar_index, bar_index - 50)))
     line.delete(dtfBuyLn)
     line.delete(dtfSellLn)
     if dtfOneLv
-        dtfBuyLn := line.new(dtfX1, dtfBuyLv, bar_index, dtfBuyLv, color=color.new(color.white, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
+        color dtfLnCol = dtfSigOn and dtfSigDir > 0 ? color.lime : dtfSigOn and dtfSigDir < 0 ? color.red : color.white
+        dtfBuyLn := line.new(dtfX1, dtfBuyLv, bar_index, dtfBuyLv, color=dtfLnCol, width=2, force_overlay=DTF_FORCE_OVERLAY)
     else
         dtfBuyLn  := line.new(dtfX1, dtfBuyLv,  bar_index, dtfBuyLv,  color=color.new(color.green, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
         dtfSellLn := line.new(dtfX1, dtfSellLv, bar_index, dtfSellLv, color=color.new(color.red, 0),   width=2, force_overlay=DTF_FORCE_OVERLAY)
+    if dtfOpen and na(dtfLbl)
+        string dtfWhat = dtfArmNow ? "NOW" : dtfSigOn ? (dtfSigDir > 0 ? "SIGNAL BUY" : "SIGNAL SELL") : "START"
+        string dtfTxt  = dtfWhat + " @ " + str.tostring(dtfBuyLv, DTF_LEVEL_IS_PRICE ? format.mintick : "#.########") + (dtfMinutes > 0 ? "\n" + str.tostring(dtfMinutes, "#.#") + " min" : "\nno limit")
+        color  dtfLbCol = dtfSigOn and dtfSigDir < 0 ? color.new(color.red, 20) : dtfSigOn and dtfSigDir > 0 ? color.new(color.lime, 20) : color.new(color.white, 20)
+        dtfLbl := label.new(dtfOpenFrom, dtfBuyLv, dtfTxt, style=label.style_label_right, color=dtfLbCol, textcolor=color.black, size=size.small, force_overlay=DTF_FORCE_OVERLAY)
 else if not dtfActive
     dtfOpenFrom := na
 
