@@ -581,26 +581,27 @@ calcQty() =>
 float pos = strategy.position_size
 
 // ── Market entries (square, tick, turn "At the cross" / "After hold") ──
-// Directional time filter: a side it blocks is simply not entered (the
-// "opp signal" close in the else-branches is an exit and stays as it is).
-if sigBarOK and longSig and dtfBuyOk
+// Directional time filter: only the strategy.entry calls are gated. A blocked
+// side is not entered and a blocked reversal falls through to the "opp signal"
+// close, which is an exit and stays as it is.
+if sigBarOK and longSig
     float q = calcQty()
     if pos < 0
-        if oppMode == "Reverse" and canLong and q > 0
+        if oppMode == "Reverse" and canLong and q > 0 and dtfBuyOk
             strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
         else if oppMode != "Ignore"
             strategy.close("Short", comment = "opp signal")
-    else if pos == 0 and canLong and q > 0
+    else if pos == 0 and canLong and q > 0 and dtfBuyOk
         strategy.entry("Long", strategy.long, qty = q, comment = "L " + sigMode)
 
-if sigBarOK and shortSig and dtfSellOk
+if sigBarOK and shortSig
     float q = calcQty()
     if pos > 0
-        if oppMode == "Reverse" and canShort and q > 0
+        if oppMode == "Reverse" and canShort and q > 0 and dtfSellOk
             strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
         else if oppMode != "Ignore"
             strategy.close("Long", comment = "opp signal")
-    else if pos == 0 and canShort and q > 0
+    else if pos == 0 and canShort and q > 0 and dtfSellOk
         strategy.entry("Short", strategy.short, qty = q, comment = "S " + sigMode)
 
 // ── Predict: price where fast and slow cross on the NEXT candle ──
