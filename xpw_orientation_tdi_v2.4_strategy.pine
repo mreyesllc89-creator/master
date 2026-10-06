@@ -27,6 +27,14 @@
 //  Orders are placed on the bar close where the label prints and fill on
 //  the next bar's open (TradingView default).
 //
+//  DIRECTIONAL TIME FILTER (block "BEGIN/END DIRECTIONAL TIME FILTER")
+//    A permission only. FlashGold v5's direction logic (inside the block)
+//    opens a window on its signal bar: level = FlashGold entry price,
+//    countdown in minutes or candles. In the window ENTER LONGS are taken
+//    only above the level, ENTER SHORTS only below it; outside it no ENTER
+//    is taken. Exits, trailing TP, stop loss and reversals are untouched.
+//    "Enable filter" off = the strategy as before. Visuals on the price chart.
+//
 //  AGREEMENT (group "Agreement", off by default)
 //    Every rung casts one vote from its own position and side:
 //      LONG   a first / second / mid leg while upright,
@@ -137,6 +145,388 @@ trailAct   = input.float(2.0, "Trail activation", minval=0.0, step=0.1, group="S
 trailOff   = input.float(1.0, "Trail offset", minval=0.0, step=0.1, group="Strategy", tooltip="Distance the stop trails behind the best price once armed.")
 slOn       = input.bool(false, "Use stop loss", group="Strategy")
 slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
+
+// ======================= BEGIN DIRECTIONAL TIME FILTER =======================
+// This strategy runs in its own pane, so the visuals go on the price chart.
+DTF_FORCE_OVERLAY = true
+// Set false when dtfValue is not a price (an oscillator), so the status box
+// does not round the level to the symbol's tick.
+DTF_LEVEL_IS_PRICE = true
+GRP_DTF = "Directional time filter"
+dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: closed at all times except the window a FlashGold signal opens (or ACTIVATE NOW / Start time): then buys are allowed only above the level, sells only below it.")
+dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick and press OK: the window opens at this moment and the level is the price at this moment. Start time and the manual levels are ignored. Untick + OK to disarm. While ticked, ANY settings change or chart reload activates it again at that moment and price (the status box shows what is armed). Not for alerts or for strategies linked through input.source: use Start time for those.")
+dtfLvMode    = input.string("Actual price", "Level when activating", options=["Actual price", "Typed price"], group=GRP_DTF, tooltip="Actual price: ACTIVATE NOW captures the live price at that instant as the level. Typed price: the level is the number below.")
+dtfTyped     = input.float(0, "Typed price", minval=0, group=GRP_DTF, tooltip="The level used by ACTIVATE NOW when 'Level when activating' is 'Typed price'. Buys allowed only above it, sells only below it.")
+dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Scheduled start, used when ACTIVATE NOW is off. Date and minute in the chart's time zone (the one on the time axis); add seconds below.")
+dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to Start time (useful on second charts).")
+dtfDurUnit   = input.string("Minutes", "Countdown unit", options=["Minutes", "Candles"], group=GRP_DTF, tooltip="Minutes: the window stays open for the minutes below. Candles: the window stays open for the number of chart candles below, counted from the candle that armed it (1 = only that candle, whose order fills on the next one).")
+dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start. 0 = never expires. Bars are judged at their close, so a countdown shorter than one chart bar opens for at most one bar.")
+dtfBars      = input.int(1, "Countdown (candles)", minval=1, group=GRP_DTF, tooltip="Chart candles the window stays open, counted from the candle that armed it.")
+dtfRef       = input.source(close, "Actual price", group=GRP_DTF, tooltip="The actual price: 'Close' is the last traded price of the current bar (it moves with every tick). ACTIVATE NOW captures this value as the level, and it is compared to the level while the window is open. The dropdown names are TradingView's; leave it on Close unless you want another series.")
+dtfBuyLevel  = input.float(50, "Buy only above (manual)", group=GRP_DTF, tooltip="Manual buy level, used when ACTIVATE NOW is off. Buys are allowed only while price is above it.")
+dtfSellLevel = input.float(50, "Sell only below (manual)", group=GRP_DTF, tooltip="Manual sell level, used when ACTIVATE NOW is off. Sells are allowed only while price is below it.")
+dtfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_DTF, tooltip="Turn one side off completely inside the window.")
+dtfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_DTF)
+dtfBefore    = input.string("Block", "Before start", options=["Block", "Pass"], group=GRP_DTF, tooltip="Block: nothing is allowed before the window opens. Pass: everything is allowed until the window opens.")
+dtfShowBg    = input.bool(true, "Shade window", inline="vis", group=GRP_DTF)
+dtfShowLv    = input.bool(true, "Draw level", inline="vis", group=GRP_DTF)
+dtfShowTbl   = input.bool(true, "Status box", inline="vis", group=GRP_DTF, tooltip="Shown while the filter is enabled. Updates on each tick (once per bar inside a strategy) and freezes when the market is closed.")
+dtfTblPos    = input.string("top_right", "Status box position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group=GRP_DTF)
+
+// ---- Direction signal: arms the filter automatically ------------------------
+GRP_SIG = "Direction signal (arms the filter)"
+dtfSigOn    = input.bool(true, "Arm from signal", group=GRP_SIG, tooltip="On: every direction signal arms the filter: the window opens on the signal bar, the level is the signal price, and the countdown runs. Buys are then allowed only above that price, sells only below it. ACTIVATE NOW (if ticked) has priority; Start time is ignored.")
+dtfSigSide  = input.string("Buy and sell signals", "Arm on", options=["Buy and sell signals", "Buy signals only", "Sell signals only"], group=GRP_SIG)
+dtfSigRearm = input.bool(true, "New signal re-arms while open", group=GRP_SIG, tooltip="On: a new signal inside an open window restarts it at the new price and time. Off: signals are ignored until the countdown ends.")
+dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
+
+dtfValue = dtfRef
+
+// ===== SIGNAL LOGIC SLOT: FlashGold Continuation v5 direction =================
+// The direction logic of "FlashGold Continuation v5 - TDI Trade Zone Filter"
+// (© ghostsmartfire), as in the FlashGold v5 strategy: bid/ask model, TDI
+// direction (RSI -> SMA fast / slow, fast rising = BUY), parent + six child
+// zones alignment, burst gate, prior-drift filter, entry hold, one signal per
+// bar. Orders, exits and sizing are NOT here: this only decides direction.
+gCore = "FlashGold Core"
+spreadPoints          = input.float(25.0, "Spread pts", minval = 0.0, step = 0.1, group = gCore, tooltip = "Full spread in points (mintick units). Half of it offsets bid and ask.")
+entryDistPoints       = input.float(50.0, "Entry distance pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
+entryHoldBars         = input.int(0, "Entry hold bars", minval = 0, group = gCore)
+entryHoldMinFavPoints = input.float(5.0, "Hold min favorable pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
+oneEntryPerBar        = input.bool(true, "One signal per bar", group = gCore)
+
+gBurst = "Burst / Direction"
+DistUnit         = input.string("ATR", "Burst / entry distance / hold unit", options = ["ATR", "Points"], group = gBurst, tooltip = "ATR: the three thresholds below are multiples of ATR(14) of the chart. Points: the point inputs in the Core group are used.")
+burstAtrMult     = input.float(0.5, "Burst threshold, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
+entryDistAtrMult = input.float(0.25, "Entry distance, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
+holdFavAtrMult   = input.float(0.1, "Hold min favorable, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
+burstPointsInput = input.float(172.0, "Burst threshold pts (Points unit)", minval = 0.0, step = 0.1, group = gBurst)
+useBurstGate     = input.bool(true, "Require burst gate", group = gBurst)
+useAnyCombo      = input.bool(false, "Allow any combo", group = gBurst, tooltip = "If on, TDI parent/zone can approve direction even when burst is weaker.")
+priorDriftBars   = input.int(60, "Prior drift bars", minval = 1, group = gBurst)
+usePriorFilter   = input.bool(false, "Use prior drift filter", group = gBurst)
+
+gZone = "TDI Trade Zone Filter"
+useTdiTradeZone = input.bool(true, "Use TDI trade-zone filter", group = gZone)
+tdiParentTf     = input.timeframe("60", "Parent obedience timeframe", group = gZone, tooltip = "Calibrated with the parent = the chart timeframe. Leave it equal to the chart.")
+tdiRsiLen       = input.int(14, "TDI RSI length", minval = 2, group = gZone)
+tdiFastLen      = input.int(2, "TDI white fast length", minval = 1, group = gZone)
+tdiSlowLen      = input.int(7, "TDI slow length", minval = 1, group = gZone)
+minAlignedZones = input.int(2, "Minimum child zones aligned", minval = 0, maxval = 6, group = gZone)
+allowNeutralParent = input.bool(false, "Allow trade if parent is flat", group = gZone)
+ignoreNaZones   = input.bool(true, "Ignore zones without data", group = gZone, tooltip = "A child zone whose timeframe has no data on this bar is dropped from the active count instead of counting as MIX.")
+htfNoRepaint    = input.bool(true, "Higher-TF zones use the last CLOSED bar", group = gZone, tooltip = "A child zone on a timeframe HIGHER than the chart is read from its last closed bar, so history and realtime agree.")
+useZone1 = input.bool(true, "Use child zone 1", group = gZone)
+zoneTf1  = input.timeframe("60", "Zone 1 timeframe", group = gZone)
+useZone2 = input.bool(true, "Use child zone 2", group = gZone)
+zoneTf2  = input.timeframe("120", "Zone 2 timeframe", group = gZone)
+useZone3 = input.bool(true, "Use child zone 3", group = gZone)
+zoneTf3  = input.timeframe("240", "Zone 3 timeframe", group = gZone)
+useZone4 = input.bool(false, "Use child zone 4", group = gZone)
+zoneTf4  = input.timeframe("480", "Zone 4 timeframe", group = gZone)
+useZone5 = input.bool(false, "Use child zone 5", group = gZone)
+zoneTf5  = input.timeframe("1", "Zone 5 timeframe", group = gZone)
+useZone6 = input.bool(false, "Use child zone 6", group = gZone)
+zoneTf6  = input.timeframe("2", "Zone 6 timeframe", group = gZone)
+
+// price model
+pt = syminfo.mintick
+halfSpread = spreadPoints * pt * 0.5
+bid = close - halfSpread
+ask = close + halfSpread
+midPrice = (bid + ask) * 0.5
+
+// TDI direction
+tdiDir() =>
+    r = ta.rsi(close, tdiRsiLen)
+    f = ta.sma(r, tdiFastLen)
+    s = ta.sma(r, tdiSlowLen)
+    d = f > f[1] ? 1 : f < f[1] ? -1 : 0
+    [d, f, s]
+
+tdiDirPrev() =>
+    [d, f, s] = tdiDir()
+    [d[1], f[1], s[1]]
+
+isHigher(string tf) =>
+    timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)
+
+[parentDir, parentFast, parentSlow] = request.security(syminfo.tickerid, tdiParentTf, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z1Dir0, z1Fast, z1Slow] = request.security(syminfo.tickerid, zoneTf1, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z2Dir0, z2Fast, z2Slow] = request.security(syminfo.tickerid, zoneTf2, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z3Dir0, z3Fast, z3Slow] = request.security(syminfo.tickerid, zoneTf3, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z4Dir0, z4Fast, z4Slow] = request.security(syminfo.tickerid, zoneTf4, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z5Dir0, z5Fast, z5Slow] = request.security(syminfo.tickerid, zoneTf5, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z6Dir0, z6Fast, z6Slow] = request.security(syminfo.tickerid, zoneTf6, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z1DirP, z1FastP, z1SlowP] = request.security(syminfo.tickerid, zoneTf1, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z2DirP, z2FastP, z2SlowP] = request.security(syminfo.tickerid, zoneTf2, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z3DirP, z3FastP, z3SlowP] = request.security(syminfo.tickerid, zoneTf3, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z4DirP, z4FastP, z4SlowP] = request.security(syminfo.tickerid, zoneTf4, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z5DirP, z5FastP, z5SlowP] = request.security(syminfo.tickerid, zoneTf5, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z6DirP, z6FastP, z6SlowP] = request.security(syminfo.tickerid, zoneTf6, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+z1Dir = htfNoRepaint and isHigher(zoneTf1) ? z1DirP : z1Dir0
+z2Dir = htfNoRepaint and isHigher(zoneTf2) ? z2DirP : z2Dir0
+z3Dir = htfNoRepaint and isHigher(zoneTf3) ? z3DirP : z3Dir0
+z4Dir = htfNoRepaint and isHigher(zoneTf4) ? z4DirP : z4Dir0
+z5Dir = htfNoRepaint and isHigher(zoneTf5) ? z5DirP : z5Dir0
+z6Dir = htfNoRepaint and isHigher(zoneTf6) ? z6DirP : z6Dir0
+
+zoneOn(bool use, int dir) =>
+    use and (not ignoreNaZones or not na(dir))
+
+on1 = zoneOn(useZone1, z1Dir)
+on2 = zoneOn(useZone2, z2Dir)
+on3 = zoneOn(useZone3, z3Dir)
+on4 = zoneOn(useZone4, z4Dir)
+on5 = zoneOn(useZone5, z5Dir)
+on6 = zoneOn(useZone6, z6Dir)
+
+activeZones = (on1 ? 1 : 0) + (on2 ? 1 : 0) + (on3 ? 1 : 0) + (on4 ? 1 : 0) + (on5 ? 1 : 0) + (on6 ? 1 : 0)
+parentSide = parentDir > 0 ? 1 : parentDir < 0 ? -1 : 0
+
+alignCount(int dir, bool useZone) =>
+    useZone and parentSide != 0 and dir == parentSide ? 1 : 0
+
+alignedZones = alignCount(z1Dir, on1) + alignCount(z2Dir, on2) + alignCount(z3Dir, on3) + alignCount(z4Dir, on4) + alignCount(z5Dir, on5) + alignCount(z6Dir, on6)
+
+requiredAligned = math.min(minAlignedZones, activeZones)
+parentFlatAllowed = allowNeutralParent and parentSide == 0
+zoneReady = activeZones == 0 or alignedZones >= requiredAligned
+
+tradeZoneBuyAllowed = not useTdiTradeZone or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
+tradeZoneSellAllowed = not useTdiTradeZone or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
+
+// burst / prior drift
+atrChart = ta.atr(14)
+atrPts = atrChart / pt
+burstThrPts   = DistUnit == "ATR" ? burstAtrMult * atrPts : burstPointsInput
+entryDistPts  = DistUnit == "ATR" ? entryDistAtrMult * atrPts : entryDistPoints
+holdFavPts    = DistUnit == "ATR" ? holdFavAtrMult * atrPts : entryHoldMinFavPoints
+
+burstPts = (midPrice - midPrice[1]) / pt
+priorDriftPts = (midPrice - midPrice[priorDriftBars]) / pt
+
+burstBuy = burstPts >= burstThrPts
+burstSell = burstPts <= -burstThrPts
+
+priorBuyOk = not usePriorFilter or priorDriftPts > 0
+priorSellOk = not usePriorFilter or priorDriftPts < 0
+
+rawBuyCandidate = useAnyCombo ? (tradeZoneBuyAllowed and (not useBurstGate or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
+rawSellCandidate = useAnyCombo ? (tradeZoneSellAllowed and (not useBurstGate or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
+
+buyCandidate = rawBuyCandidate and priorBuyOk
+sellCandidate = rawSellCandidate and priorSellOk
+
+// entry hold / virtual stop
+var bool holdActive = false
+var bool holdIsBuy = false
+var int holdSignalBar = na
+var float holdSignalMid = na
+var int lastEntryBar = na
+
+float buyEntryPrice = na
+float sellEntryPrice = na
+bool buySignal = false
+bool sellSignal = false
+
+canFire = not oneEntryPerBar or na(lastEntryBar) or lastEntryBar != bar_index
+
+if buyCandidate and canFire
+    if entryHoldBars == 0
+        buyEntryPrice := ask + entryDistPts * pt
+        buySignal := true
+        lastEntryBar := bar_index
+    else if not holdActive
+        holdActive := true
+        holdIsBuy := true
+        holdSignalBar := bar_index
+        holdSignalMid := midPrice
+    else if holdIsBuy
+        elapsedBars = bar_index - holdSignalBar
+        holdMovePoints = (midPrice - holdSignalMid) / pt
+        if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+            buyEntryPrice := ask + entryDistPts * pt
+            buySignal := true
+            lastEntryBar := bar_index
+            holdActive := false
+
+if sellCandidate and canFire
+    if entryHoldBars == 0
+        sellEntryPrice := bid - entryDistPts * pt
+        sellSignal := true
+        lastEntryBar := bar_index
+    else if not holdActive
+        holdActive := true
+        holdIsBuy := false
+        holdSignalBar := bar_index
+        holdSignalMid := midPrice
+    else if not holdIsBuy
+        elapsedBars = bar_index - holdSignalBar
+        holdMovePoints = (holdSignalMid - midPrice) / pt
+        if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+            sellEntryPrice := bid - entryDistPts * pt
+            sellSignal := true
+            lastEntryBar := bar_index
+            holdActive := false
+
+if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and not tradeZoneSellAllowed))
+    holdActive := false
+    holdSignalBar := na
+    holdSignalMid := na
+
+bool  dtfBuySignal  = buySignal
+bool  dtfSellSignal = sellSignal
+// The level is the strategy's entry trigger price (ask/bid +/- entry distance).
+float dtfSignalPx   = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
+// ===== END SIGNAL LOGIC SLOT ==================================================
+
+// ACTIVATE NOW capture: the moment and the price when the script (re)starts
+// with the switch on. varip keeps it across live updates; a recompile (any
+// settings change, chart reload) captures again.
+varip int   dtfArmedAt  = na
+varip float dtfArmedPx  = na
+varip int   dtfArmedBar = na
+// The capture waits for a tick where the price source has a value.
+if dtfArmNow and barstate.islast and na(dtfArmedAt) and not na(dtfValue)
+    dtfArmedAt  := timenow
+    dtfArmedBar := bar_index
+    dtfArmedPx := dtfLvMode == "Typed price" ? dtfTyped : dtfValue
+
+// Signal arming: on a confirmed signal bar, the window starts at that bar's
+// close with the level at the signal price. Committed state only (var), so
+// backtests and live agree.
+var int   dtfSigAt  = na
+var int   dtfSigBar = na
+var float dtfSigPx  = na
+var int   dtfSigDir = 0
+bool dtfByBars    = dtfDurUnit == "Candles"
+int  dtfBarClose  = nz(time_close, time)
+bool dtfPrevEnded = na(dtfSigAt) or (dtfByBars ? bar_index >= dtfSigBar + dtfBars : (dtfMinutes > 0 and dtfBarClose >= dtfSigAt + math.round(dtfMinutes * 60000)))
+bool dtfSigFire   = dtfSigOn and barstate.isconfirmed and not na(dtfValue) and ((dtfBuySignal and dtfSigSide != "Sell signals only") or (dtfSellSignal and dtfSigSide != "Buy signals only")) and (dtfPrevEnded or dtfSigRearm)
+if dtfSigFire
+    dtfSigAt  := dtfBarClose
+    dtfSigBar := bar_index
+    dtfSigPx  := nz(dtfSignalPx, dtfValue)
+    dtfSigDir := dtfBuySignal ? 1 : -1
+
+// Clock. The committed value of a bar (history, and the closing update of the
+// live bar) is judged at the bar's close time, so it never repaints. Intrabar
+// ticks of the live bar use the real clock, so the window opens on the second.
+dtfClock   = barstate.isconfirmed ? nz(time_close, time) : timenow
+dtfStartAt = dtfArmNow ? dtfArmedAt : dtfSigOn ? dtfSigAt : dtfStart + dtfStartSec * 1000
+dtfEnd     = not dtfByBars and dtfMinutes > 0 and not na(dtfStartAt) ? dtfStartAt + math.round(dtfMinutes * 60000) : na
+dtfOneLv   = dtfArmNow or dtfSigOn
+dtfBuyLv   = dtfArmNow ? dtfArmedPx : dtfSigOn ? dtfSigPx : dtfBuyLevel
+dtfSellLv  = dtfArmNow ? dtfArmedPx : dtfSigOn ? dtfSigPx : dtfSellLevel
+
+// Not armed yet (ACTIVATE NOW before the capture bar) counts as before start.
+dtfBeforeStart = na(dtfStartAt) or dtfClock < dtfStartAt
+// Candle mode: the window is the N candles from the one that armed it. For a
+// scheduled start that is the first candle closing at or after Start time.
+var int dtfTimeBar = na
+if not dtfBeforeStart and na(dtfTimeBar)
+    dtfTimeBar := bar_index
+if dtfBeforeStart
+    dtfTimeBar := na
+int  dtfStartBar = dtfArmNow ? dtfArmedBar : dtfSigOn ? dtfSigBar : dtfTimeBar
+int  dtfEndBar   = na(dtfStartBar) ? na : dtfStartBar + dtfBars
+bool dtfInBars   = dtfByBars and not na(dtfEndBar) and bar_index < dtfEndBar
+dtfOpen        = not dtfBeforeStart and (dtfByBars ? dtfInBars : (na(dtfEnd) or dtfClock < dtfEnd))
+dtfAfterEnd    = dtfByBars ? (not dtfBeforeStart and not dtfInBars) : (not na(dtfEnd) and dtfClock >= dtfEnd)
+
+// Final gates: is a buy / a sell ALLOWED on this bar? (Permission only.)
+dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
+dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowSell and dtfValue < dtfSellLv)
+
+// True on the first bar after the window has closed (chart marker / output).
+dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1] and not barstate.isfirst
+
+// A countdown shorter than one chart bar opens for at most one bar.
+dtfTooShort = dtfOn and not dtfByBars and dtfMinutes > 0 and dtfMinutes * 60 < timeframe.in_seconds()
+
+// ---- Visuals (optional: delete from here to END if you only want the gates)
+dtfPosOf(string s) =>
+    switch s
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+
+bgcolor(dtfShowBg and dtfOn and dtfOpen ? (dtfBuyOk and dtfSellOk ? color.new(color.yellow, 85) : dtfBuyOk ? color.new(color.green, 85) : dtfSellOk ? color.new(color.red, 85) : color.new(color.gray, 88)) : na, title="DTF window", force_overlay=DTF_FORCE_OVERLAY)
+plotshape(dtfExpired, "DTF window ended", shape.xcross, location.top, color.orange, size=size.tiny, text="DTF end", textcolor=color.orange, force_overlay=DTF_FORCE_OVERLAY)
+plotshape(dtfSigMark and dtfSigFire and dtfSigDir > 0, "DTF buy signal",  shape.triangleup,   location.belowbar, color.lime, size=size.tiny, force_overlay=DTF_FORCE_OVERLAY)
+plotshape(dtfSigMark and dtfSigFire and dtfSigDir < 0, "DTF sell signal", shape.triangledown, location.abovebar, color.red,  size=size.tiny, force_overlay=DTF_FORCE_OVERLAY)
+
+// Level lines as drawings (they do not stretch the price scale). Each window
+// keeps its own line and a label at its start, so past windows stay readable.
+// While waiting (manual / scheduled modes) the line previews the last 50 bars.
+// Redrawn every bar so a host script's own drawings never garbage-collect the
+// current one.
+dtfActive = dtfOn and (dtfBeforeStart or dtfOpen) and not na(dtfBuyLv)
+var line  dtfBuyLn    = na
+var line  dtfSellLn   = na
+var label dtfLbl      = na
+var int   dtfOpenFrom = na
+bool dtfNewWindow = dtfOpen and na(dtfOpenFrom)
+if dtfNewWindow
+    dtfOpenFrom := bar_index
+    // a new window: leave the previous window's drawings in place
+    dtfBuyLn  := na
+    dtfSellLn := na
+    dtfLbl    := na
+if dtfShowLv and dtfActive
+    int dtfX1 = math.max(0, math.max(bar_index - 9000, math.min(dtfOpen ? dtfOpenFrom : bar_index, bar_index - 50)))
+    line.delete(dtfBuyLn)
+    line.delete(dtfSellLn)
+    if dtfOneLv
+        color dtfLnCol = dtfSigOn and dtfSigDir > 0 ? color.lime : dtfSigOn and dtfSigDir < 0 ? color.red : color.white
+        dtfBuyLn := line.new(dtfX1, dtfBuyLv, bar_index, dtfBuyLv, color=dtfLnCol, width=2, force_overlay=DTF_FORCE_OVERLAY)
+    else
+        dtfBuyLn  := line.new(dtfX1, dtfBuyLv,  bar_index, dtfBuyLv,  color=color.new(color.green, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
+        dtfSellLn := line.new(dtfX1, dtfSellLv, bar_index, dtfSellLv, color=color.new(color.red, 0),   width=2, force_overlay=DTF_FORCE_OVERLAY)
+    if dtfOpen and na(dtfLbl)
+        string dtfWhat = dtfArmNow ? "NOW" : dtfSigOn ? (dtfSigDir > 0 ? "SIGNAL BUY" : "SIGNAL SELL") : "START"
+        string dtfTxt  = dtfWhat + " @ " + str.tostring(dtfBuyLv, DTF_LEVEL_IS_PRICE ? format.mintick : "#.########") + (dtfByBars ? "\n" + str.tostring(dtfBars) + (dtfBars == 1 ? " candle" : " candles") : dtfMinutes > 0 ? "\n" + str.tostring(dtfMinutes, "#.#") + " min" : "\nno limit")
+        color  dtfLbCol = dtfSigOn and dtfSigDir < 0 ? color.new(color.red, 20) : dtfSigOn and dtfSigDir > 0 ? color.new(color.lime, 20) : color.new(color.white, 20)
+        dtfLbl := label.new(dtfOpenFrom, dtfBuyLv, dtfTxt, style=label.style_label_right, color=dtfLbCol, textcolor=color.black, size=size.small, force_overlay=DTF_FORCE_OVERLAY)
+else if not dtfActive
+    dtfOpenFrom := na
+
+// Status box, judged by the real clock (display only; the gates never use it).
+var table dtfTable = table.new(dtfPosOf(dtfTblPos), 2, 7, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=DTF_FORCE_OVERLAY)
+if dtfShowTbl and dtfOn and barstate.islast
+    bool   dBefore = na(dtfStartAt) or timenow < dtfStartAt
+    bool   dAfter  = dtfByBars ? (not dBefore and not dtfInBars) : (not na(dtfEnd) and timenow >= dtfEnd)
+    bool   dOpen   = not dBefore and not dAfter
+    bool   dBuy    = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
+    bool   dSell   = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowSell and dtfValue < dtfSellLv)
+    string dMode   = dtfArmNow ? " (NOW)" : dtfSigOn ? (dtfSigDir > 0 ? " (SIGNAL BUY)" : dtfSigDir < 0 ? " (SIGNAL SELL)" : " (SIGNAL)") : ""
+    string dState  = (dBefore ? (dtfTooShort ? "WAITING (< 1 bar)" : "WAITING") : dOpen ? "OPEN" : "ENDED") + dMode
+    color  dCol    = dBefore ? color.yellow : dOpen ? color.lime : color.orange
+    int    dSecs   = dOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - timenow) / 1000.0)) : 0
+    string dLeft   = dOpen and dtfByBars ? str.tostring(dtfEndBar - bar_index) + (dtfEndBar - bar_index == 1 ? " candle" : " candles") : dOpen and not na(dtfEnd) ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : dOpen ? "no limit" : "-"
+    string dStart  = na(dtfStartAt) ? "-" : str.format_time(dtfStartAt, "MMM dd HH:mm:ss", syminfo.timezone)
+    string dFmt    = DTF_LEVEL_IS_PRICE ? format.mintick : "#.########"
+    table.cell(dtfTable, 0, 0, "DTF", text_color=color.white)
+    table.cell(dtfTable, 1, 0, dState, text_color=dCol)
+    table.cell(dtfTable, 0, 1, "Now (exch tz)", text_color=color.white)
+    table.cell(dtfTable, 1, 1, str.format_time(timenow, "MMM dd HH:mm:ss", syminfo.timezone), text_color=color.white)
+    table.cell(dtfTable, 0, 2, "Start (exch tz)", text_color=color.white)
+    table.cell(dtfTable, 1, 2, dStart, text_color=dtfArmNow ? color.orange : dtfSigOn ? color.aqua : color.white)
+    table.cell(dtfTable, 0, 3, "Countdown", text_color=color.white)
+    table.cell(dtfTable, 1, 3, dLeft, text_color=color.white)
+    table.cell(dtfTable, 0, 4, "Price now", text_color=color.white)
+    table.cell(dtfTable, 1, 4, na(dtfValue) ? "-" : str.tostring(dtfValue, dFmt), text_color=color.white)
+    table.cell(dtfTable, 0, 5, "Buy  > " + (na(dtfBuyLv)  ? "-" : str.tostring(dtfBuyLv,  dFmt)), text_color=color.white)
+    table.cell(dtfTable, 1, 5, dBuy ? "ALLOWED" : "BLOCKED", text_color=dBuy ? color.lime : color.red)
+    table.cell(dtfTable, 0, 6, "Sell < " + (na(dtfSellLv) ? "-" : str.tostring(dtfSellLv, dFmt)), text_color=color.white)
+    table.cell(dtfTable, 1, 6, dSell ? "ALLOWED" : "BLOCKED", text_color=dSell ? color.lime : color.red)
+// ======================== END DIRECTIONAL TIME FILTER ========================
 
 // PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
 hM   = scaleWin ? 20 : flatWin
@@ -524,8 +914,9 @@ if longSig and shortSig
 bool allowLong  = tradeDir != "Short only (sell only)"
 bool allowShort = tradeDir != "Long only (buy only)"
 
-bool goLong  = longSig  and allowLong
-bool goShort = shortSig and allowShort
+// Directional time filter: an ENTER is taken only while its side is allowed.
+bool goLong  = longSig  and allowLong  and dtfBuyOk
+bool goShort = shortSig and allowShort and dtfSellOk
 // One order per side per bar. An ENTER on the same bar as an END keeps the
 // trade (same side) or reverses it (opposite side, via strategy.entry), so
 // no separate close is sent then.
