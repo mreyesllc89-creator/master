@@ -2,7 +2,10 @@
 // ============================================================================
 //  DIRECTIONAL TIME FILTER  -  v1.1
 // ----------------------------------------------------------------------------
-//  A time-boxed direction gate you can bolt onto any script.
+//  A time-boxed direction PERMISSION you can bolt onto any script. It only
+//  answers "is a buy allowed now? is a sell allowed now?". Your script's own
+//  entry and exit logic stays as it is; a signal that is not allowed is
+//  simply not taken.
 //
 //  You say: "from THIS moment, for the next N minutes (countdown),
 //            only take BUYS while PRICE is ABOVE <buy level>
@@ -49,12 +52,8 @@
 //
 //     To compare the levels to one of your script's own series instead of
 //     price, replace the dtfRef line with  dtfRef = myLine
-//     Optional, in a strategy, to flatten when the window ends:
-//
-//         if dtfExpired
-//             strategy.close_all(comment="DTF window ended")
-//
-//     See xpw_orientation_tdi_v2.4_strategy.pine for a complete example.
+//     Exits are never gated. See xpw_orientation_tdi_v2.4_strategy.pine
+//     for a complete example (two gates added, nothing else changed).
 //
 //  B) Link without editing (indicator -> strategy)
 //     Add this indicator to the chart. In your strategy add
@@ -104,7 +103,7 @@ dtfAfterEnd    = not na(dtfEnd) and dtfClock >= dtfEnd
 dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowBuy  and dtfValue > dtfBuyLevel)
 dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowSell and dtfValue < dtfSellLevel)
 
-// True on the first bar after the window has closed (to flatten if wanted).
+// True on the first bar after the window has closed (chart marker / output).
 dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1] and not barstate.isfirst
 
 // A countdown shorter than one chart bar can never open.
