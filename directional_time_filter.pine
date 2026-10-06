@@ -141,7 +141,7 @@ DTF_FORCE_OVERLAY = false
 // does not round the level to the symbol's tick.
 DTF_LEVEL_IS_PRICE = true
 GRP_DTF = "Directional time filter"
-dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: buys are allowed only while price > level, sells only while price < level, and only inside the time window.")
+dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: closed at all times except the window a FlashGold signal opens (or ACTIVATE NOW / Start time): then buys are allowed only above the level, sells only below it.")
 dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick and press OK: the window opens at this moment and the level is the price at this moment. Start time and the manual levels are ignored. Untick + OK to disarm. While ticked, ANY settings change or chart reload activates it again at that moment and price (the status box shows what is armed). Not for alerts or for strategies linked through input.source: use Start time for those.")
 dtfLvMode    = input.string("Actual price", "Level when activating", options=["Actual price", "Typed price"], group=GRP_DTF, tooltip="Actual price: ACTIVATE NOW captures the live price at that instant as the level. Typed price: the level is the number below.")
 dtfTyped     = input.float(0, "Typed price", minval=0, group=GRP_DTF, tooltip="The level used by ACTIVATE NOW when 'Level when activating' is 'Typed price'. Buys allowed only above it, sells only below it.")
@@ -161,7 +161,7 @@ dtfTblPos    = input.string("top_right", "Status box position", options=["top_ri
 
 // ---- Direction signal: arms the filter automatically ------------------------
 GRP_SIG = "Direction signal (arms the filter)"
-dtfSigOn    = input.bool(false, "Arm from signal", group=GRP_SIG, tooltip="On: every direction signal arms the filter: the window opens on the signal bar, the level is the signal price, and the countdown runs. Buys are then allowed only above that price, sells only below it. ACTIVATE NOW (if ticked) has priority; Start time is ignored.")
+dtfSigOn    = input.bool(true, "Arm from signal", group=GRP_SIG, tooltip="On: every direction signal arms the filter: the window opens on the signal bar, the level is the signal price, and the countdown runs. Buys are then allowed only above that price, sells only below it. ACTIVATE NOW (if ticked) has priority; Start time is ignored.")
 dtfSigSide  = input.string("Buy and sell signals", "Arm on", options=["Buy and sell signals", "Buy signals only", "Sell signals only"], group=GRP_SIG)
 dtfSigRearm = input.bool(true, "New signal re-arms while open", group=GRP_SIG, tooltip="On: a new signal inside an open window restarts it at the new price and time. Off: signals are ignored until the countdown ends.")
 dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
@@ -361,8 +361,10 @@ if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and
     holdSignalBar := na
     holdSignalMid := na
 
-bool dtfBuySignal  = buySignal
-bool dtfSellSignal = sellSignal
+bool  dtfBuySignal  = buySignal
+bool  dtfSellSignal = sellSignal
+// The level is the strategy's entry trigger price (ask/bid +/- entry distance).
+float dtfSignalPx   = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
 // ===== END SIGNAL LOGIC SLOT ==================================================
 
 // ACTIVATE NOW capture: the moment and the price when the script (re)starts
@@ -386,7 +388,7 @@ bool dtfPrevEnded = na(dtfSigAt) or (dtfMinutes > 0 and dtfBarClose >= dtfSigAt 
 bool dtfSigFire   = dtfSigOn and barstate.isconfirmed and not na(dtfValue) and ((dtfBuySignal and dtfSigSide != "Sell signals only") or (dtfSellSignal and dtfSigSide != "Buy signals only")) and (dtfPrevEnded or dtfSigRearm)
 if dtfSigFire
     dtfSigAt  := dtfBarClose
-    dtfSigPx  := dtfValue
+    dtfSigPx  := nz(dtfSignalPx, dtfValue)
     dtfSigDir := dtfBuySignal ? 1 : -1
 
 // Clock. The committed value of a bar (history, and the closing update of the
