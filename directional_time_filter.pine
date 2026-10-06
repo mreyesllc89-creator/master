@@ -21,11 +21,9 @@
 //  INPUTS (group "Directional time filter")
 //    Enable filter      Off = every signal passes, as if the filter is absent.
 //    Start time         Date + minute the window opens, in the chart's time
-//                       zone. When you add the script you are asked to click
-//                       the chart (bar precision); afterwards set it in
-//                       Settings (minute precision). "+ seconds" adds seconds.
-//                       To start right now: the status box shows the current
-//                       time; type it in.
+//                       zone (Settings > Inputs, minute precision; "+ seconds"
+//                       adds seconds). To start right now: the status box
+//                       shows the current time; type it in.
 //    Countdown (min)    Minutes the window stays open from the start.
 //                       0 = never expires.
 //    Price              What is compared to the levels. Default: close.
@@ -101,7 +99,7 @@ indicator("Directional Time Filter", "DTF", overlay=true)
 DTF_FORCE_OVERLAY = false
 GRP_DTF = "Directional time filter"
 dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: buys are allowed only while price > buy level, sells only while price < sell level, and only inside the time window.")
-dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", confirm=true, group=GRP_DTF, tooltip="Date and minute the window opens, in the chart's time zone (the one on the time axis). Click the chart when adding the script, or set it here (minute resolution; add seconds below). To start right now, type the current time shown in the status box.")
+dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Date and minute the window opens, in the chart's time zone (the one on the time axis). Minute resolution; add seconds below. To start right now, type the current time shown in the status box.")
 dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to the start (useful on second charts).")
 dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start. 0 = never expires. Bars are judged at their close, so a countdown shorter than one chart bar opens for at most one bar.")
 dtfRef       = input.source(close, "Price", group=GRP_DTF, tooltip="What is compared to the levels. Default: close price. You can pick any plotted line from another indicator instead.")
@@ -164,7 +162,7 @@ var int  dtfOpenFrom = na
 if dtfOpen and na(dtfOpenFrom)
     dtfOpenFrom := bar_index
 if dtfShowLv and dtfActive
-    int dtfX1 = dtfOpen ? dtfOpenFrom : math.max(0, bar_index - 50)
+    int dtfX1 = dtfOpen ? math.max(dtfOpenFrom, bar_index - 9000) : math.max(0, bar_index - 50)
     line.delete(dtfBuyLn)
     line.delete(dtfSellLn)
     dtfBuyLn  := line.new(dtfX1, dtfBuyLevel,  bar_index, dtfBuyLevel,  color=color.new(color.green, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
