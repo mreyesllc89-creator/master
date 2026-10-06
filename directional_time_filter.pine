@@ -25,7 +25,10 @@
 //                   price: the status box shows "(NOW)" with the armed time
 //                   and level so you always see what is armed. Use it when
 //                   you are watching the chart. An alert created while it
-//                   is ticked arms its own copy at the alert's creation time.
+//                   is ticked, or a strategy that reads this indicator
+//                   through input.source (section B), runs its own copy and
+//                   arms it when IT (re)loads; the box here shows only this
+//                   copy. For those, use Start time.
 //    Start time     (scheduled)  Date + minute (+ seconds) the window opens,
 //                   with the manual price levels. Survives reloads; use it
 //                   for anything left running or driven by alerts.
@@ -89,6 +92,9 @@
 //     (== 1, not > 0: if the plot is not linked the source is still 'close'
 //     and must not count as allowed; a symbol that closes at exactly 1.0
 //     would still slip through, so check the link in the settings.)
+//     Use Start time in this setup: the strategy runs its own copy of the
+//     indicator, and ACTIVATE NOW would arm that copy whenever the strategy
+//     itself reloads, not when you press OK here.
 //
 //  TIMING
 //  The committed value of every bar is judged at the bar's CLOSE time, on
@@ -105,9 +111,11 @@
 //  exact second; those intrabar states are not kept once the bar closes.
 //  A countdown shorter than one chart bar opens for at most one bar, maybe
 //  none. On chart types without a close time (Renko, Kagi, Line Break,
-//  Point & Figure) a bar is judged at its open time. Bar Replay: committed
-//  bars are right; the forming bar and the status box follow the real
-//  clock, not the replay. Alerts and webhook/broker connections are
+//  Point & Figure) a bar is judged at its open time. Bar Replay: with Start
+//  time, committed bars are right while the forming bar and the status box
+//  follow the real clock, not the replay; ACTIVATE NOW also uses the real
+//  clock, so it cannot be rehearsed in Replay. Alerts and webhook/broker
+//  connections are
 //  snapshots of the inputs at creation time: after changing them, re-create
 //  the alert.
 // ============================================================================
@@ -117,9 +125,12 @@ indicator("Directional Time Filter", "DTF", overlay=true)
 // Set true when this block lives in a script that runs in its own pane
 // (overlay=false) so the visuals are drawn on the price chart.
 DTF_FORCE_OVERLAY = false
+// Set false when dtfValue is not a price (an oscillator), so the status box
+// does not round the level to the symbol's tick.
+DTF_LEVEL_IS_PRICE = true
 GRP_DTF = "Directional time filter"
 dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: buys are allowed only while price > level, sells only while price < level, and only inside the time window.")
-dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick and press OK: the window opens at this moment and the level is the price at this moment. Start time and the manual levels are ignored. Untick + OK to disarm. While ticked, ANY settings change or chart reload activates it again at that moment and price (the status box shows what is armed). Not for alerts: use Start time for those.")
+dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick and press OK: the window opens at this moment and the level is the price at this moment. Start time and the manual levels are ignored. Untick + OK to disarm. While ticked, ANY settings change or chart reload activates it again at that moment and price (the status box shows what is armed). Not for alerts or for strategies linked through input.source: use Start time for those.")
 dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Scheduled start, used when ACTIVATE NOW is off. Date and minute in the chart's time zone (the one on the time axis); add seconds below.")
 dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to Start time (useful on second charts).")
 dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start. 0 = never expires. Bars are judged at their close, so a countdown shorter than one chart bar opens for at most one bar.")
@@ -141,7 +152,8 @@ dtfValue = dtfRef
 // settings change, chart reload) captures again.
 varip int   dtfArmedAt = na
 varip float dtfArmedPx = na
-if dtfArmNow and barstate.islast and na(dtfArmedAt)
+// The capture waits for a tick where the price source has a value.
+if dtfArmNow and barstate.islast and na(dtfArmedAt) and not na(dtfValue)
     dtfArmedAt := timenow
     dtfArmedPx := dtfValue
 
@@ -196,7 +208,9 @@ var int  dtfOpenFrom = na
 if dtfOpen and na(dtfOpenFrom)
     dtfOpenFrom := bar_index
 if dtfShowLv and dtfActive
-    int dtfX1 = dtfOpen ? math.max(dtfOpenFrom, bar_index - 9000) : math.max(0, bar_index - 50)
+    // From the window's first bar, but always at least the last 50 bars so the
+    // line is visible from the moment it is armed; never more than 9000 back.
+    int dtfX1 = math.max(0, math.max(bar_index - 9000, math.min(dtfOpen ? dtfOpenFrom : bar_index, bar_index - 50)))
     line.delete(dtfBuyLn)
     line.delete(dtfSellLn)
     if dtfArmNow
@@ -208,7 +222,7 @@ else if not dtfActive
     dtfOpenFrom := na
 
 // Status box, judged by the real clock (display only; the gates never use it).
-var table dtfTable = table.new(dtfPosOf(dtfTblPos), 2, 6, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=DTF_FORCE_OVERLAY)
+var table dtfTable = table.new(dtfPosOf(dtfTblPos), 2, 7, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=DTF_FORCE_OVERLAY)
 if dtfShowTbl and dtfOn and barstate.islast
     bool   dBefore = na(dtfStartAt) or timenow < dtfStartAt
     bool   dAfter  = not na(dtfEnd) and timenow >= dtfEnd
@@ -221,6 +235,7 @@ if dtfShowTbl and dtfOn and barstate.islast
     int    dSecs   = dOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - timenow) / 1000.0)) : 0
     string dLeft   = dOpen and not na(dtfEnd) ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : dOpen ? "no limit" : "-"
     string dStart  = na(dtfStartAt) ? "-" : str.format_time(dtfStartAt, "MMM dd HH:mm:ss", syminfo.timezone)
+    string dFmt    = DTF_LEVEL_IS_PRICE ? format.mintick : "#.########"
     table.cell(dtfTable, 0, 0, "DTF", text_color=color.white)
     table.cell(dtfTable, 1, 0, dState, text_color=dCol)
     table.cell(dtfTable, 0, 1, "Now (exch tz)", text_color=color.white)
@@ -229,10 +244,12 @@ if dtfShowTbl and dtfOn and barstate.islast
     table.cell(dtfTable, 1, 2, dStart, text_color=dtfArmNow ? color.orange : color.white)
     table.cell(dtfTable, 0, 3, "Countdown", text_color=color.white)
     table.cell(dtfTable, 1, 3, dLeft, text_color=color.white)
-    table.cell(dtfTable, 0, 4, "Buy  > " + (na(dtfBuyLv)  ? "-" : str.tostring(dtfBuyLv,  format.mintick)), text_color=color.white)
-    table.cell(dtfTable, 1, 4, dBuy ? "ALLOWED" : "BLOCKED", text_color=dBuy ? color.lime : color.red)
-    table.cell(dtfTable, 0, 5, "Sell < " + (na(dtfSellLv) ? "-" : str.tostring(dtfSellLv, format.mintick)), text_color=color.white)
-    table.cell(dtfTable, 1, 5, dSell ? "ALLOWED" : "BLOCKED", text_color=dSell ? color.lime : color.red)
+    table.cell(dtfTable, 0, 4, "Price now", text_color=color.white)
+    table.cell(dtfTable, 1, 4, na(dtfValue) ? "-" : str.tostring(dtfValue, dFmt), text_color=color.white)
+    table.cell(dtfTable, 0, 5, "Buy  > " + (na(dtfBuyLv)  ? "-" : str.tostring(dtfBuyLv,  dFmt)), text_color=color.white)
+    table.cell(dtfTable, 1, 5, dBuy ? "ALLOWED" : "BLOCKED", text_color=dBuy ? color.lime : color.red)
+    table.cell(dtfTable, 0, 6, "Sell < " + (na(dtfSellLv) ? "-" : str.tostring(dtfSellLv, dFmt)), text_color=color.white)
+    table.cell(dtfTable, 1, 6, dSell ? "ALLOWED" : "BLOCKED", text_color=dSell ? color.lime : color.red)
 // ======================== END DIRECTIONAL TIME FILTER ========================
 
 // Exported values (Data Window + linkable as a source from other scripts).
