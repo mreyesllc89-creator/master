@@ -20,6 +20,7 @@ Every script below carries the DTF block (group "Directional time filter") and g
 | `xpw_orientation_tdi_v2.7_strategy.pine` | XPW Orientation TDI v2.7 strategy, every label | Every stacked ENTER entry of a bar. |
 | `xpw_breakout_v2.11_mtf_strategy.pine` | XPW Breakout v2.11 MTF (XAUUSD) | One more soft gate: a blocked side lifts its resting order, the arm latch survives (Stop, CloseConfirm and Retest). The table lists "dtf" under Filters. |
 | `xpw_breakout_v2.10_mtf_strategy.pine` | XPW Breakout v2.10-MTF (XAUUSD) | Same as v2.11. |
+| `xpw_breakout_v2.10_strategy.pine` | XPW Breakout v2.10 (XAUUSD), no MTF labels | Same as v2.11. |
 | `xpw_refusal_log_v0.3_strategy.pine` | XPW Refusal Log v0.3 strategy | FIRST LEG long / SECOND LEG short entries. The ENTER triangles only mark allowed signals. |
 | `xpw_shape_map_v0.8_strategy.pine` | XPW Shape Map v0.8 strategy | Market entries, Predict stop orders and catch-up entries. |
 | `xpw_shape_map_v0.6_strategy.pine` | XPW Shape Map v0.6 strategy | Market entries and Predict stop orders. |
