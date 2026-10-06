@@ -1,0 +1,532 @@
+//@version=6
+// XPW Refusal Log v0.3 Strategy
+// The v0.3 indicator turned into a strategy. Measurement is UNCHANGED from v0.3:
+// same pushes, same leg gap, same cut, same export columns.
+//
+// WHAT TRADES
+//   A label prints when a push ends (joinBars bars without a new high).
+//     FIRST LEG  (leg gap above the cut)    -> ENTER LONG
+//     SECOND LEG (leg gap at or below it)   -> ENTER SHORT
+//     UNCLASSIFIED (inside the dead band)   -> nothing
+//   Entry timing "At the push" (default): the leg is read on the candle where price first
+//   makes its new high, and the trade fills on that candle's close. Only that candle and
+//   earlier ones are used, so it is tradable live. The label prints later and may disagree;
+//   then the trade is closed ("label disagrees").
+//   Entry timing "When the push ends": the label is drawn on the push-high bar, but the push
+//   is only KNOWN to be over joinBars bars later. The strategy enters on that bar:
+//     "Signal bar close"  fills on the close of that bar (no extra bar of delay).
+//     "Label price"       rests a limit at the label's price (the push high) for N bars.
+//   Entering back on the label bar itself would use future bars and fake the backtest.
+//   Lower "bars without a new high that end the push" to shorten the gap (1 = fastest).
+//   An opposite label while in a trade reverses it (Both) or closes it (Buy only / Sell only).
+//
+// DIRECTIONAL TIME FILTER (group "Directional time filter", v1.4)
+//   A time-boxed direction PERMISSION on top of the entries. From a start moment
+//   (ACTIVATE NOW, or a scheduled Start time) and for the countdown, FIRST LEG
+//   longs are taken only while price is ABOVE the level and SECOND LEG shorts only
+//   while price is BELOW it. When the countdown ends every entry is blocked until it
+//   is armed again. A blocked signal is simply not taken: in "Both" an opposite
+//   label the filter blocks does not reverse, so the open trade stays until its own
+//   exit. The one-side closes, "label disagrees", SL / TP / trail and the time stop
+//   are never gated. The ENTER triangles only mark signals the filter allows.
+//   The block ships with the filter ON and nothing armed (WAITING): every
+//   entry is blocked until you arm it (ACTIVATE NOW or Start time) or
+//   switch "Enable filter" off. ACTIVATE NOW re-arms on every reload of
+//   the script, so use Start time for anything left running or driven
+//   by alerts.
+//
+// READ THIS BEFORE TRUSTING A RESULT
+//   legCut and legWin are still the uncalibrated divTol and divLook. Until your marks are
+//   scored, every trade here is a guess at that cut.
+//   The synthetic check on v0.3: SECOND LEG tag 83% on a divergent higher high, FIRST LEG tag
+//   55% (coin flip) and random tape leans 61% short. So the SHORT side is the only one the
+//   check supports. "Allow longs" is left on so you can see it, not because it is trusted.
+//   Tops only. No bottom-side event is ever traded here.
+//
+// EXITS (S2)
+//   Points mode: distances are in Pine's strategy.exit "points", i.e. minimum ticks.
+//   ATR mode:    stop = ATR mult x ATR, target = R multiple x stop, trail in ATR multiples.
+//                ATR is frozen on the signal bar so the stop does not move with volatility.
+//   Time stop:   closes the trade after N bars in it (0 = off).
+//
+// DATA: any timeframe. Every window is in BARS of the chart you load it on
+// (on a 1 s chart a bar is a second, on a 5 min chart it is 5 minutes).
+
+strategy("XPW Refusal Log v0.3 Strategy", shorttitle="XPW RLOG v0.3 S", overlay=true, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, margin_long=0, margin_short=0, process_orders_on_close=true)
+
+// ---------------- TDI : your panel, TDI 38/62 Precision Scalper [Refined] ----------------
+rsiLen = input.int(14, "RSI length (your panel = 14)", group="TDI")
+redLen = input.int(2, "Red line: SMA of RSI (your panel = 2)", group="TDI")
+
+// ---------------- As built : what Cycle Complete v0.2 computes today ----------------
+builtRsi = input.int(13, "As built: RSI length in Cycle Complete v0.2", group="As built")
+builtLook = input.int(20, "As built: divLook in Cycle Complete v0.2", group="As built")
+
+// ---------------- Pushes ----------------
+pushLook = input.int(20, "Push: price makes a new high over this many bars", group="Push")
+joinBars = input.int(3, "Push: bars without a new high that end the push", group="Push")
+
+// ---------------- Line windows (bars of the chart timeframe) ----------------
+w1 = input.int(20, "Line window 1", group="Line windows")
+w2 = input.int(60, "Line window 2", group="Line windows")
+w3 = input.int(180, "Line window 3", group="Line windows")
+w4 = input.int(600, "Line window 4", group="Line windows")
+corrLen = input.int(30, "Correlation window before the push", group="Line windows")
+
+// ---------------- Leg classification : PROVISIONAL until your marks are scored ----------------
+legWin = input.int(60, "Leg: window that defines the leg (this is divLook)", group="Leg")
+legCut = input.float(0.0, "Leg: cut between held and broke (this is divTol)", step=0.05, group="Leg")
+legBand = input.float(0.0, "Leg: dead band around the cut, leave 0 until the overlap is measured", step=0.05, group="Leg")
+
+// ---------------- Parent rung ----------------
+useParent = input.bool(false, "Parent: record the higher timeframe read", group="Parent")
+parentTf = input.timeframe("5", "Parent: timeframe", group="Parent")
+parentWin = input.int(20, "Parent: window on the parent rung", group="Parent")
+
+// ---------------- Display ----------------
+showLabels = input.bool(true, "Show labels", group="Display")
+showLeg = input.bool(true, "Put the leg word on the label", group="Display")
+col1 = input.color(color.aqua, "Colour: FIRST LEG", group="Display")
+col2 = input.color(color.purple, "Colour: SECOND LEG", group="Display")
+col0 = input.color(color.gray, "Colour: unclassified", group="Display")
+
+// ---------------- S1. Entries ----------------
+tradeDir = input.string("Both", "Trade direction", options=["Both", "Buy only (longs)", "Sell only (shorts)"], group="S1. Entries", tooltip="Buy only: only FIRST LEG signals open trades. Sell only: only SECOND LEG signals open trades. The synthetic check put the FIRST LEG tag at 55%, a coin flip; SECOND LEG at 83%.")
+bool allowLong = tradeDir != "Sell only (shorts)"
+bool allowShort = tradeDir != "Buy only (longs)"
+needParent = input.bool(false, "Require the parent to agree", group="S1. Entries", tooltip="Your rule: a divergence alone does not count, it has to be happening on the higher timeframe too. Needs 'Parent: record the higher timeframe read' on. Long needs parent gap above the cut, short needs it at or below.")
+oppCloses = input.bool(true, "Opposite label reverses the trade", group="S1. Entries", tooltip="Both: an opposite label reverses the trade. Buy only / Sell only: an opposite label closes the trade without opening the other side. OFF: an opposite label is ignored while a trade is open.")
+entryTiming = input.string("At the push (first new high)", "Entry timing", options=["At the push (first new high)", "When the push ends (confirmed label)"], group="S1. Entries", tooltip="At the push: reads the leg on the candle where price first makes its new high and enters on that candle's close. Nothing from later bars is used, so it is tradable live. It is a PROVISIONAL read: the label prints later and can disagree. When the push ends: waits for the label, joinBars candles later.")
+exitOnFlip = input.bool(true, "At the push: close if the label disagrees", group="S1. Entries", tooltip="When the push ends and its label calls the other leg (or unclassified), the trade that push opened is closed.")
+entryMode = input.string("Signal bar close", "Entry price", options=["Signal bar close", "Label price (limit)"], group="S1. Entries", tooltip="Signal bar close: market fill on the close of the bar the signal is confirmed. Label price: limit order at the push high the label marks. A short fills only if price comes back up to it; a long is above market so it fills at once.")
+limitBars = input.int(20, "Label price: cancel the limit after N bars", minval=1, group="S1. Entries")
+qty = input.float(1, "Order size (contracts / units)", minval=0.000001, group="S1. Entries", tooltip="Margin checks are off (margin 0), so the order fills whatever the symbol price is versus initial capital.")
+showSig = input.bool(true, "Mark entry signals under the bar", group="S1. Entries", tooltip="A triangle on every bar where a label asked for a trade. Triangles but no trades = an order problem. No triangles = no signals passed the filters.")
+
+// ---------------- S2. Exits ----------------
+exitUnit = input.string("Points", "SL / TP / trail unit", options=["Points", "ATR"], group="S2. Exits")
+slPts = input.float(5000, "Stop loss, pts (Points mode)", minval=0, group="S2. Exits", tooltip="Pine strategy.exit points = minimum ticks. 0 = no stop.")
+tpPts = input.float(50000, "Take profit, pts (Points mode)", minval=0, group="S2. Exits", tooltip="Pine strategy.exit points = minimum ticks. 0 = no target.")
+atrLen = input.int(14, "ATR length (ATR mode)", minval=1, group="S2. Exits")
+slAtr = input.float(2.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits")
+tpR = input.float(2.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="0 = no target.")
+useTrail = input.bool(true, "Trailing stop", group="S2. Exits")
+trActPts = input.float(1500, "Trail activation, pts of profit (Points mode)", minval=0, group="S2. Exits")
+trOffPts = input.float(100, "Trail distance, pts (Points mode)", minval=0, group="S2. Exits")
+trActAtr = input.float(4.0, "Trail activation, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits")
+trOffAtr = input.float(0.2, "Trail distance, ATR mult (ATR mode)", minval=0, step=0.05, group="S2. Exits")
+timeStop = input.int(0, "Time stop, bars (0 = off)", minval=0, group="S2. Exits")
+
+// ======================= BEGIN DIRECTIONAL TIME FILTER =======================
+// Directional Time Filter v1.4. A time-boxed direction PERMISSION: it only
+// answers "is a buy allowed now? is a sell allowed now?". The strategy's own
+// entry and exit logic stays as it is; an ENTER that is not allowed is
+// simply not taken. Exits are never gated.
+// Set true when this block lives in a script that runs in its own pane
+// (overlay=false) so the visuals are drawn on the price chart.
+DTF_FORCE_OVERLAY = false
+// Set false when dtfValue is not a price (an oscillator), so the status box
+// does not round the level to the symbol's tick.
+DTF_LEVEL_IS_PRICE = true
+GRP_DTF = "Directional time filter"
+dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: buys are allowed only while price > level, sells only while price < level, and only inside the time window.")
+dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick and press OK: the window opens at this moment and the level is the price at this moment. Start time and the manual levels are ignored. Untick + OK to disarm. While ticked, ANY settings change or chart reload activates it again at that moment and price (the status box shows what is armed). Not for alerts or for strategies linked through input.source: use Start time for those.")
+dtfLvMode    = input.string("Actual price", "Level when activating", options=["Actual price", "Typed price"], group=GRP_DTF, tooltip="Actual price: ACTIVATE NOW captures the live price at that instant as the level. Typed price: the level is the number below.")
+dtfTyped     = input.float(0, "Typed price", minval=0, group=GRP_DTF, tooltip="The level used by ACTIVATE NOW when 'Level when activating' is 'Typed price'. Buys allowed only above it, sells only below it.")
+dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Scheduled start, used when ACTIVATE NOW is off. Date and minute in the chart's time zone (the one on the time axis); add seconds below.")
+dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to Start time (useful on second charts).")
+dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start. 0 = never expires. Bars are judged at their close, so a countdown shorter than one chart bar opens for at most one bar.")
+dtfRef       = input.source(close, "Actual price", group=GRP_DTF, tooltip="The actual price: 'Close' is the last traded price of the current bar (it moves with every tick). ACTIVATE NOW captures this value as the level, and it is compared to the level while the window is open. The dropdown names are TradingView's; leave it on Close unless you want another series.")
+dtfBuyLevel  = input.float(50, "Buy only above (manual)", group=GRP_DTF, tooltip="Manual buy level, used when ACTIVATE NOW is off. Buys are allowed only while price is above it.")
+dtfSellLevel = input.float(50, "Sell only below (manual)", group=GRP_DTF, tooltip="Manual sell level, used when ACTIVATE NOW is off. Sells are allowed only while price is below it.")
+dtfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_DTF, tooltip="Turn one side off completely inside the window.")
+dtfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_DTF)
+dtfBefore    = input.string("Block", "Before start", options=["Block", "Pass"], group=GRP_DTF, tooltip="Block: nothing is allowed before the window opens. Pass: everything is allowed until the window opens.")
+dtfShowBg    = input.bool(true, "Shade window", inline="vis", group=GRP_DTF)
+dtfShowLv    = input.bool(true, "Draw level", inline="vis", group=GRP_DTF)
+dtfShowTbl   = input.bool(true, "Status box", inline="vis", group=GRP_DTF, tooltip="Shown while the filter is enabled. Updates on each tick (once per bar inside a strategy) and freezes when the market is closed.")
+dtfTblPos    = input.string("top_left", "Status box position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group=GRP_DTF)
+
+dtfValue = dtfRef
+
+// ACTIVATE NOW capture: the moment and the price when the script (re)starts
+// with the switch on. varip keeps it across live updates; a recompile (any
+// settings change, chart reload) captures again.
+varip int   dtfArmedAt = na
+varip float dtfArmedPx = na
+// The capture waits for a tick where the price source has a value.
+if dtfArmNow and barstate.islast and na(dtfArmedAt) and not na(dtfValue)
+    dtfArmedAt := timenow
+    dtfArmedPx := dtfLvMode == "Typed price" ? dtfTyped : dtfValue
+
+// Clock. The committed value of a bar (history, and the closing update of the
+// live bar) is judged at the bar's close time, so it never repaints. Intrabar
+// ticks of the live bar use the real clock, so the window opens on the second.
+dtfClock   = barstate.isconfirmed ? nz(time_close, time) : timenow
+dtfStartAt = dtfArmNow ? dtfArmedAt : dtfStart + dtfStartSec * 1000
+dtfEnd     = dtfMinutes > 0 and not na(dtfStartAt) ? dtfStartAt + math.round(dtfMinutes * 60000) : na
+dtfBuyLv   = dtfArmNow ? dtfArmedPx : dtfBuyLevel
+dtfSellLv  = dtfArmNow ? dtfArmedPx : dtfSellLevel
+
+// Not armed yet (ACTIVATE NOW before the capture bar) counts as before start.
+dtfBeforeStart = na(dtfStartAt) or dtfClock < dtfStartAt
+dtfOpen        = not dtfBeforeStart and (na(dtfEnd) or dtfClock < dtfEnd)
+dtfAfterEnd    = not na(dtfEnd) and dtfClock >= dtfEnd
+
+// Final gates: is a buy / a sell ALLOWED on this bar? (Permission only.)
+dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
+dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowSell and dtfValue < dtfSellLv)
+
+// True on the first bar after the window has closed (chart marker / output).
+dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1] and not barstate.isfirst
+
+// A countdown shorter than one chart bar opens for at most one bar.
+dtfTooShort = dtfOn and dtfMinutes > 0 and dtfMinutes * 60 < timeframe.in_seconds()
+
+// ---- Visuals (optional: delete from here to END if you only want the gates)
+dtfPosOf(string s) =>
+    switch s
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+
+bgcolor(dtfShowBg and dtfOn and dtfOpen ? (dtfBuyOk and dtfSellOk ? color.new(color.yellow, 85) : dtfBuyOk ? color.new(color.green, 85) : dtfSellOk ? color.new(color.red, 85) : color.new(color.gray, 88)) : na, title="DTF window", force_overlay=DTF_FORCE_OVERLAY)
+plotshape(dtfExpired, "DTF window ended", shape.xcross, location.top, color.orange, size=size.tiny, text="DTF end", textcolor=color.orange, force_overlay=DTF_FORCE_OVERLAY)
+
+// Level lines as drawings (they do not stretch the price scale). While
+// waiting they preview the last 50 bars; while open they span the window;
+// after the end they stay as a record. Redrawn every bar so a host script's
+// own drawings never garbage-collect them. With ACTIVATE NOW both levels are
+// the same price: one white line.
+dtfActive = dtfOn and (dtfBeforeStart or dtfOpen) and not na(dtfBuyLv)
+var line dtfBuyLn    = na
+var line dtfSellLn   = na
+var int  dtfOpenFrom = na
+if dtfOpen and na(dtfOpenFrom)
+    dtfOpenFrom := bar_index
+if dtfShowLv and dtfActive
+    // From the window's first bar, but always at least the last 50 bars so the
+    // line is visible from the moment it is armed; never more than 9000 back.
+    int dtfX1 = math.max(0, math.max(bar_index - 9000, math.min(dtfOpen ? dtfOpenFrom : bar_index, bar_index - 50)))
+    line.delete(dtfBuyLn)
+    line.delete(dtfSellLn)
+    if dtfArmNow
+        dtfBuyLn := line.new(dtfX1, dtfBuyLv, bar_index, dtfBuyLv, color=color.new(color.white, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
+    else
+        dtfBuyLn  := line.new(dtfX1, dtfBuyLv,  bar_index, dtfBuyLv,  color=color.new(color.green, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
+        dtfSellLn := line.new(dtfX1, dtfSellLv, bar_index, dtfSellLv, color=color.new(color.red, 0),   width=2, force_overlay=DTF_FORCE_OVERLAY)
+else if not dtfActive
+    dtfOpenFrom := na
+
+// Status box, judged by the real clock (display only; the gates never use it).
+var table dtfTable = table.new(dtfPosOf(dtfTblPos), 2, 7, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=DTF_FORCE_OVERLAY)
+if dtfShowTbl and dtfOn and barstate.islast
+    bool   dBefore = na(dtfStartAt) or timenow < dtfStartAt
+    bool   dAfter  = not na(dtfEnd) and timenow >= dtfEnd
+    bool   dOpen   = not dBefore and not dAfter
+    bool   dBuy    = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
+    bool   dSell   = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowSell and dtfValue < dtfSellLv)
+    string dMode   = dtfArmNow ? " (NOW)" : ""
+    string dState  = (dBefore ? (dtfTooShort ? "WAITING (< 1 bar)" : "WAITING") : dOpen ? "OPEN" : "ENDED") + dMode
+    color  dCol    = dBefore ? color.yellow : dOpen ? color.lime : color.orange
+    int    dSecs   = dOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - timenow) / 1000.0)) : 0
+    string dLeft   = dOpen and not na(dtfEnd) ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : dOpen ? "no limit" : "-"
+    string dStart  = na(dtfStartAt) ? "-" : str.format_time(dtfStartAt, "MMM dd HH:mm:ss", syminfo.timezone)
+    string dFmt    = DTF_LEVEL_IS_PRICE ? format.mintick : "#.########"
+    table.cell(dtfTable, 0, 0, "DTF", text_color=color.white)
+    table.cell(dtfTable, 1, 0, dState, text_color=dCol)
+    table.cell(dtfTable, 0, 1, "Now (exch tz)", text_color=color.white)
+    table.cell(dtfTable, 1, 1, str.format_time(timenow, "MMM dd HH:mm:ss", syminfo.timezone), text_color=color.white)
+    table.cell(dtfTable, 0, 2, "Start (exch tz)", text_color=color.white)
+    table.cell(dtfTable, 1, 2, dStart, text_color=dtfArmNow ? color.orange : color.white)
+    table.cell(dtfTable, 0, 3, "Countdown", text_color=color.white)
+    table.cell(dtfTable, 1, 3, dLeft, text_color=color.white)
+    table.cell(dtfTable, 0, 4, "Price now", text_color=color.white)
+    table.cell(dtfTable, 1, 4, na(dtfValue) ? "-" : str.tostring(dtfValue, dFmt), text_color=color.white)
+    table.cell(dtfTable, 0, 5, "Buy  > " + (na(dtfBuyLv)  ? "-" : str.tostring(dtfBuyLv,  dFmt)), text_color=color.white)
+    table.cell(dtfTable, 1, 5, dBuy ? "ALLOWED" : "BLOCKED", text_color=dBuy ? color.lime : color.red)
+    table.cell(dtfTable, 0, 6, "Sell < " + (na(dtfSellLv) ? "-" : str.tostring(dtfSellLv, dFmt)), text_color=color.white)
+    table.cell(dtfTable, 1, 6, dSell ? "ALLOWED" : "BLOCKED", text_color=dSell ? color.lime : color.red)
+
+// Exported values (Data Window + linkable as a source from other scripts).
+plot(dtfOn and dtfOpen ? 1 : 0, "DTF window open", display=display.data_window)
+plot(dtfBuyOk ? 1 : 0, "DTF buy allowed", display=display.data_window)
+plot(dtfSellOk ? 1 : 0, "DTF sell allowed", display=display.data_window)
+plot(dtfExpired ? 1 : 0, "DTF expired", display=display.data_window)
+plot(dtfValue, "DTF price used", display=display.data_window)
+plot(dtfBuyLv, "DTF level", display=display.data_window)
+// ======================== END DIRECTIONAL TIME FILTER ========================
+
+// ---------------- Series, evaluated on every bar ----------------
+red = ta.sma(ta.rsi(close, rsiLen), redLen)
+redBuilt = ta.sma(ta.rsi(close, builtRsi), redLen)
+top1 = ta.highest(red, w1)
+top2 = ta.highest(red, w2)
+top3 = ta.highest(red, w3)
+top4 = ta.highest(red, w4)
+topLeg = ta.highest(red, legWin)
+builtTest = redBuilt - ta.highest(redBuilt, builtLook)[1]
+newHi = high > ta.highest(high, pushLook)[1]
+corr = ta.correlation(close, red, corrLen)
+atr = ta.atr(atrLen)
+
+// Parent gap, read off the LAST COMPLETED parent bar so it does not repaint in realtime.
+parentGap() =>
+    pr = ta.sma(ta.rsi(close, rsiLen), redLen)
+    pr[1] - ta.highest(pr, parentWin)[2]
+pGap = useParent ? request.security(syminfo.tickerid, parentTf, parentGap(), lookahead=barmerge.lookahead_off) : na
+
+fmt(float v) => na(v) ? "na" : str.tostring(v, "#.##")
+
+// ---------------- Push state ----------------
+var bool inPush = false
+var int lastHiBar = 0
+var int pushBars = 0
+var float pushHigh = na
+var int pushHighBar = 0
+var int pushStartBar = 0
+var int pushHighTime = 0
+var float pushRedMax = na
+var float builtMin = na
+var float L1 = na
+var float L2 = na
+var float L3 = na
+var float L4 = na
+var float Lleg = na
+var float corrPre = na
+var float pGapPre = na
+
+float oL1 = na
+float oL2 = na
+float oL3 = na
+float oL4 = na
+float oLeg = na
+float oBuilt = na
+float oBars = na
+float oCorr = na
+float oTime = na
+float oLegId = na
+float oSide = na
+float oParent = na
+int sig = 0
+float sigPx = na
+
+// A strategy already runs once per closed bar (calc_on_every_tick off), so no confirmed-bar gate.
+if newHi
+    if not inPush
+        inPush := true
+        pushBars := 0
+        pushHigh := high
+        pushHighBar := bar_index
+        pushStartBar := bar_index
+        pushHighTime := time
+        pushRedMax := red
+        builtMin := builtTest
+        L1 := top1[1]
+        L2 := top2[1]
+        L3 := top3[1]
+        L4 := top4[1]
+        Lleg := topLeg[1]
+        corrPre := corr[1]
+        pGapPre := pGap
+    else
+        builtMin := na(builtMin) ? builtTest : math.min(builtMin, builtTest)
+        if high > pushHigh
+            pushHigh := high
+            pushHighBar := bar_index
+            pushHighTime := time
+    pushBars += 1
+    lastHiBar := bar_index
+if inPush
+    pushRedMax := na(pushRedMax) ? red : math.max(pushRedMax, red)
+    if not newHi and bar_index - lastHiBar >= joinBars
+        oL1 := pushRedMax - L1
+        oL2 := pushRedMax - L2
+        oL3 := pushRedMax - L3
+        oL4 := pushRedMax - L4
+        oLeg := pushRedMax - Lleg
+        oBuilt := builtMin
+        oBars := pushBars
+        oCorr := corrPre
+        oParent := pGapPre
+        oTime := hour(pushHighTime, syminfo.timezone) * 10000 + minute(pushHighTime, syminfo.timezone) * 100 + second(pushHighTime, syminfo.timezone)
+        int legId = 0
+        if not na(oLeg)
+            if oLeg > legCut + legBand
+                legId := 1
+            else if oLeg < legCut - legBand
+                legId := 2
+        oLegId := legId
+        oSide := legId == 1 ? 1 : legId == 2 ? -1 : 0
+        sig := legId == 1 ? 1 : legId == 2 ? -1 : 0
+        sideWord = legId == 1 ? "LONG" : legId == 2 ? "SHORT" : "NO SIDE"
+        legWord = legId == 1 ? "1st" : legId == 2 ? "2nd" : "none"
+        legLong = legId == 1 ? "FIRST LEG, the red line broke its prior top, TDI went with price, up cycle, LONG" : legId == 2 ? "SECOND LEG, price made a new high and the red line refused, down cycle, SHORT" : "UNCLASSIFIED, the leg gap sits inside the dead band"
+        legCol = legId == 1 ? col1 : legId == 2 ? col2 : col0
+        txtCol = legId == 2 ? color.white : color.black
+        id = "H " + str.format_time(pushHighTime, "HH:mm:ss", syminfo.timezone)
+        face = showLeg ? id + " · " + legWord + " · " + sideWord : id + " · " + sideWord
+        txt = id + " | " + legLong + " | leg gap (window " + str.tostring(legWin) + ", cut " + str.tostring(legCut) + ") " + fmt(oLeg) + " | parent " + parentTf + " gap " + fmt(oParent) + " | line " + str.tostring(w1) + " " + fmt(oL1) + " | line " + str.tostring(w2) + " " + fmt(oL2) + " | line " + str.tostring(w3) + " " + fmt(oL3) + " | line " + str.tostring(w4) + " " + fmt(oL4) + " | as built " + fmt(oBuilt) + " | push bars " + str.tostring(pushBars) + " | corr " + fmt(oCorr)
+        log.info(txt)
+        if showLabels
+            label.new(pushHighBar, pushHigh, face, style=label.style_label_down, color=legCol, textcolor=txtCol, size=size.tiny, tooltip=txt)
+        inPush := false
+
+// ---------------- Entries ----------------
+// Early read: on the push's first new-high candle, the leg gap so far. Uses only this bar and
+// earlier, so no look-ahead. The running red max can only rise later in the push, so a SHORT
+// read can flip to LONG by the time the label prints, never the other way.
+bool early = entryTiming == "At the push (first new high)"
+int earlySig = 0
+if inPush and newHi and pushBars == 1 and not na(pushRedMax - Lleg)
+    float g0 = pushRedMax - Lleg
+    earlySig := g0 > legCut + legBand ? 1 : g0 < legCut - legBand ? -1 : 0
+int tradeSig = early ? earlySig : sig
+float parRead = early ? pGapPre : oParent
+if early and earlySig != 0
+    sigPx := high
+// Parent agreement uses the same cut as the leg: above = with price (long), at or below = refused (short).
+bool parentLong = not needParent or (useParent and not na(parRead) and parRead > legCut)
+bool parentShort = not needParent or (useParent and not na(parRead) and parRead <= legCut)
+// Directional time filter (v1.4): a signal that is not allowed is simply not
+// taken (no entry, no reversal). The one-side closes above and every exit
+// are never gated. The ENTER triangles only mark signals the filter allows.
+bool goLong = tradeSig == 1 and allowLong and parentLong and dtfBuyOk
+bool goShort = tradeSig == -1 and allowShort and parentShort and dtfSellOk
+
+// ATR frozen on the signal bar, used for the whole trade.
+var float atrEntry = na
+
+bool flat = strategy.position_size == 0
+bool sentLong = goLong and strategy.position_size <= 0 and (flat or oppCloses)
+bool sentShort = goShort and strategy.position_size >= 0 and (flat or oppCloses)
+
+// One-side mode: the blocked side's signal closes the open trade instead of reversing it.
+if oppCloses and not allowShort and tradeSig == -1 and parentShort and strategy.position_size > 0
+    strategy.close("Long", comment="opposite label")
+if oppCloses and not allowLong and tradeSig == 1 and parentLong and strategy.position_size < 0
+    strategy.close("Short", comment="opposite label")
+bool useLimit = entryMode == "Label price (limit)"
+var int limitSentBar = na
+if sentLong
+    atrEntry := atr
+    strategy.entry("Long", strategy.long, qty=qty, limit=useLimit ? sigPx : na, comment="FIRST LEG LONG")
+    limitSentBar := useLimit ? bar_index : na
+if sentShort
+    atrEntry := atr
+    strategy.entry("Short", strategy.short, qty=qty, limit=useLimit ? sigPx : na, comment="SECOND LEG SHORT")
+    limitSentBar := useLimit ? bar_index : na
+
+// The push that opened the trade, so the flip exit only touches that trade.
+var int entPush = na
+if sentLong or sentShort
+    entPush := pushStartBar
+if early and exitOnFlip and not na(oLegId) and entPush == pushStartBar
+    if strategy.position_size > 0 and oLegId != 1
+        strategy.close("Long", comment="label disagrees")
+    if strategy.position_size < 0 and oLegId != 2
+        strategy.close("Short", comment="label disagrees")
+
+// Drop a resting label-price limit that has not filled in time.
+if useLimit and not na(limitSentBar) and not sentLong and not sentShort and bar_index - limitSentBar >= limitBars
+    strategy.cancel("Long")
+    strategy.cancel("Short")
+    limitSentBar := na
+if not na(limitSentBar) and strategy.position_size != strategy.position_size[1]
+    limitSentBar := na
+
+plotshape(showSig and goLong, "long signal", shape.triangleup, location.belowbar, col1, size=size.tiny, text="ENTER")
+plotshape(showSig and goShort, "short signal", shape.triangledown, location.abovebar, col2, size=size.tiny, text="ENTER")
+// Dotted line from the label (push high) to the bar the entry is sent on.
+if showSig and not early and (goLong or goShort)
+    line.new(pushHighBar, sigPx, bar_index, sigPx, color=goLong ? col1 : col2, style=line.style_dotted)
+
+// ---------------- Exits ----------------
+// Every distance in ticks, as strategy.exit expects for loss / profit / trail_points / trail_offset.
+toTicks(float d) => d / syminfo.mintick
+pos(float v) => v > 0 ? v : na
+
+float slT = na
+float tpT = na
+float trA = na
+float trO = na
+if exitUnit == "Points"
+    slT := pos(slPts)
+    tpT := pos(tpPts)
+    trA := useTrail ? trActPts : na
+    trO := useTrail ? pos(trOffPts) : na
+else
+    float slPx = slAtr * atrEntry
+    slT := pos(toTicks(slPx))
+    tpT := pos(toTicks(tpR * slPx))
+    trA := useTrail ? toTicks(trActAtr * atrEntry) : na
+    trO := useTrail ? pos(toTicks(trOffAtr * atrEntry)) : na
+if na(trO)
+    trA := na
+
+// Placed on the signal bar too, so the stop is live from the fill bar onward.
+if sentLong or (strategy.position_size > 0 and not sentShort)
+    strategy.exit("Long X", from_entry="Long", loss=slT, profit=tpT, trail_points=trA, trail_offset=trO, comment_loss="SL", comment_profit="TP", comment_trailing="trail")
+if sentShort or (strategy.position_size < 0 and not sentLong)
+    strategy.exit("Short X", from_entry="Short", loss=slT, profit=tpT, trail_points=trA, trail_offset=trO, comment_loss="SL", comment_profit="TP", comment_trailing="trail")
+
+// Time stop: bars since the open trade filled.
+if timeStop > 0 and strategy.position_size != 0
+    int entryBar = strategy.opentrades.entry_bar_index(strategy.opentrades - 1)
+    if bar_index - entryBar >= timeStop
+        strategy.close_all(comment="time stop")
+
+// ---------------- Diagnostics : where the chain breaks if the report is empty ----------------
+showDiag = input.bool(true, "Show diagnostics panel", group="Display")
+var int nPush = 0
+var int nLongSig = 0
+var int nShortSig = 0
+var int nSent = 0
+if not na(oLegId)
+    nPush += 1
+if sig == 1
+    nLongSig += 1
+if sig == -1
+    nShortSig += 1
+if sentLong or sentShort
+    nSent += 1
+var table diag = table.new(position.top_right, 2, 9, bgcolor=color.new(color.black, 15), border_width=1)
+if showDiag and barstate.islast
+    float cost = close * qty * syminfo.pointvalue
+    table.cell(diag, 0, 0, "pushes ended", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 0, str.tostring(nPush), text_color=color.white, text_size=size.small)
+    table.cell(diag, 0, 1, "FIRST LEG signals", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 1, str.tostring(nLongSig), text_color=color.white, text_size=size.small)
+    table.cell(diag, 0, 2, "SECOND LEG signals", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 2, str.tostring(nShortSig), text_color=color.white, text_size=size.small)
+    table.cell(diag, 0, 3, "orders sent", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 3, str.tostring(nSent), text_color=color.white, text_size=size.small)
+    table.cell(diag, 0, 4, "trades closed / open", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 4, str.tostring(strategy.closedtrades) + " / " + str.tostring(strategy.opentrades), text_color=color.white, text_size=size.small)
+    table.cell(diag, 0, 5, "1 order costs", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 5, str.tostring(cost, "#,###.##"), text_color=cost > strategy.equity ? color.orange : color.white, text_size=size.small)
+    table.cell(diag, 0, 6, "equity", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 6, str.tostring(strategy.equity, "#,###.##"), text_color=color.white, text_size=size.small)
+    table.cell(diag, 0, 7, "direction / parent", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 7, tradeDir + " / parent " + (needParent ? "REQUIRED" : "off"), text_color=color.white, text_size=size.small)
+    table.cell(diag, 0, 8, "bars on chart", text_color=color.white, text_size=size.small)
+    table.cell(diag, 1, 8, str.tostring(bar_index + 1), text_color=color.white, text_size=size.small)
+
+// ---------------- Export columns : the v0.3 set, unchanged ----------------
+plot(oL1, "line window 1", display=display.data_window)
+plot(oL2, "line window 2", display=display.data_window)
+plot(oL3, "line window 3", display=display.data_window)
+plot(oL4, "line window 4", display=display.data_window)
+plot(oBuilt, "as built", display=display.data_window)
+plot(oBars, "push bars", display=display.data_window)
+plot(oCorr, "corr before push", display=display.data_window)
+plot(oTime, "push time HHMMSS", display=display.data_window)
+plot(oLeg, "leg gap", display=display.data_window)
+plot(oLegId, "leg 1 first 2 second 0 none", display=display.data_window)
+plot(oSide, "side +1 long -1 short", display=display.data_window)
+plot(oParent, "parent gap", display=display.data_window)

@@ -1,6 +1,6 @@
 //@version=6
 // ============================================================================
-//  XPW ORIENTATION TDI  -  v2.4 STRATEGY  -  trades the v2.4 event labels
+//  XPW ORIENTATION TDI  -  v2.7 STRATEGY (EVERY LABEL, HIDEABLE LABELS)
 // ----------------------------------------------------------------------------
 //  This is the v2.4 indicator turned into a strategy. Calibration, ladder
 //  logic, rung map, agreement gate and labels are the indicator's, line for
@@ -19,13 +19,37 @@
 //                      inverted = shorts). Toggle with "Exit on END labels".
 //    Opposite signal   Both: reverses. Long only / Short only: the opposite
 //                      ENTER closes the position (toggle) but never opens one.
-//    AGREE labels      Optional extra entries on "AGREE LONG/SHORT xN".
+//    EVERY LABEL       every ENTER label is its own entry, on any chart
+//                      timeframe: chart rung, READ HERE rung and AGREE
+//                      labels (on by default). A label on the side already
+//                      held stacks a new entry (up to "Max open entries"),
+//                      each with its own trailing TP / stop.
 //    Trailing TP       Arms once price moves "activation" in your favour,
 //                      then trails "offset" behind the best price.
 //                      Units: ticks, price, or percent of entry.
 //    Stop loss         Optional fixed stop, same units.
-//  Orders are placed on the bar close where the label prints and fill on
-//  the next bar's open (TradingView default).
+//    LABELS            v2.7: every label type has its own show/hide tick box
+//                      next to its colour. Hiding is display only; the
+//                      strategy still trades every label.
+//  ENTRY FILL ("Entry fill" input)
+//    Limit at label price  a buy limit at the label's price (the
+//                          candle low) or a sell limit at the candle high,
+//                          placed when the label prints and kept for
+//                          "Limit valid (bars)". It fills only if price comes
+//                          back to that level, never before the label exists.
+//    Signal tick           (default) live: the script runs on every tick
+//                          and the market order goes in on the tick the
+//                          label appears, without waiting for the candle to
+//                          close. History has no ticks, so backtest bars
+//                          fill at the close of the label's candle.
+//                          ENTER labels show THAT price (the entry price),
+//                          not the candle low/high, so label = fill. On a
+//                          5 Min chart a 1 Min rung's signal is only known
+//                          when the 5 Min candle closes; run the chart on
+//                          the rung you trade to enter sooner.
+//    A fill at the candle's low on the label candle itself is impossible: the
+//    label is only known once that candle has closed, so a backtest that
+//    filled there would be using the future.
 //
 //  DIRECTIONAL TIME FILTER (group "Directional time filter", v1.4)
 //    A time-boxed direction PERMISSION on top of the entries above. From a
@@ -35,12 +59,15 @@
 //    every ENTER is blocked until it is armed again. Exits (END labels,
 //    opposite-ENTER closes, trailing TP, stop loss) are never gated. In
 //    "Both" mode an opposite ENTER the filter blocks does not reverse, so
-//    the open trade stays until its own exit. The block ships with the
-//    filter ON and nothing armed (WAITING, every ENTER blocked): arm it, or
-//    switch "Enable filter" off until you need it. ACTIVATE NOW re-arms on
-//    every reload of this strategy, so use Start time for anything left
-//    running or driven by alerts. Its shading, level line and status box
-//    are drawn on the price chart (force_overlay).
+//    the open trade stays until its own exit. Judged on every tick live
+//    (this strategy runs per tick), at the bar close on history.
+//    The block ships with the filter ON and nothing armed (WAITING): every
+//    entry is blocked until you arm it (ACTIVATE NOW or Start time) or
+//    switch "Enable filter" off. ACTIVATE NOW re-arms on every reload of
+//    the script, so use Start time for anything left running or driven
+//    by alerts.
+//    Its shading, level line and status box are drawn on the price chart
+//    (force_overlay).
 //
 //  AGREEMENT (group "Agreement", off by default)
 //    Every rung casts one vote from its own position and side:
@@ -96,7 +123,7 @@
 //  the map for location. Do not trade the verdict column on its own.
 // ============================================================================
 
-strategy("XPW Orientation TDI v2.4 Strategy", shorttitle="XPW-OTDI4 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+strategy("XPW Orientation TDI v2.7 Strategy", shorttitle="XPW-OTDI7 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
 
 // ---------------------------------------------------------------- INPUTS ----
 rsiLen   = input.int(13,       "RSI length",            group="TDI core")
@@ -118,18 +145,26 @@ tblPos    = input.string("middle_right", "Table position", options=["top_right",
 // LABELS
 showLbl  = input.bool(true,  "Show event labels on price", group="Labels", tooltip="Display only. The strategy trades the events whether or not their labels are shown.")
 lblRead  = input.bool(true,  "Also label the READ HERE rung", group="Labels", tooltip="Labels from the << rung are prefixed with its name, e.g. '1 Min:'. The strategy also trades the << rung's events only while this is on.")
-lblInfo  = input.bool(false, "Info labels (look for / staircase)", group="Labels")
 lblSizeS = input.string("normal", "Label size", options=["tiny","small","normal","large","huge"], group="Labels")
 lblPrice = input.bool(true,  "Show price in label + price tick", group="Labels", tooltip="Adds the signal price to the label text and draws a short line at that price beside the candle.")
 lblTick  = input.int(3, "Price tick length (bars)", minval=1, maxval=20, group="Labels")
-cL1  = input.color(#00e676, "Long  - 1st leg",         group="Labels")
-cL2  = input.color(#00897b, "Long  - 2nd leg",         group="Labels")
-cS1  = input.color(#ff1744, "Short - 1st leg",         group="Labels")
-cS2  = input.color(#ad1457, "Short - 2nd leg",         group="Labels")
-cDL  = input.color(#76ff03, "Divergence LONG zone",    group="Labels")
-cDS  = input.color(#ff9100, "Divergence SHORT zone",   group="Labels")
-cEnd = input.color(#ffd600, "End of leg / exit once",  group="Labels")
-cInf = input.color(#90a4ae, "Info (look for / stair)", group="Labels")
+// Each label type: tick = show, untick = hide. Hiding never changes trading.
+shL1  = input.bool(true,  "Long  - 1st leg",         inline="L1",  group="Labels")
+cL1   = input.color(#00e676, "",                     inline="L1",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shL2  = input.bool(true,  "Long  - 2nd leg",         inline="L2",  group="Labels")
+cL2   = input.color(#00897b, "",                     inline="L2",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shS1  = input.bool(true,  "Short - 1st leg",         inline="S1",  group="Labels")
+cS1   = input.color(#ff1744, "",                     inline="S1",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shS2  = input.bool(true,  "Short - 2nd leg",         inline="S2",  group="Labels")
+cS2   = input.color(#ad1457, "",                     inline="S2",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shDL  = input.bool(true,  "Divergence LONG zone",    inline="DL",  group="Labels")
+cDL   = input.color(#76ff03, "",                     inline="DL",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shDS  = input.bool(true,  "Divergence SHORT zone",   inline="DS",  group="Labels")
+cDS   = input.color(#ff9100, "",                     inline="DS",  group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shEnd = input.bool(true,  "End of leg / exit once",  inline="END", group="Labels")
+cEnd  = input.color(#ffd600, "",                     inline="END", group="Labels", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+lblInfo = input.bool(false, "Info (look for / stair)", inline="INF", group="Labels")
+cInf  = input.color(#90a4ae, "",                     inline="INF", group="Labels", tooltip="Off by default. Display only.")
 
 // AGREEMENT
 agreeOn    = input.bool(false, "Require rung agreement", group="Agreement", tooltip="ON: a label draws only when at least N rungs agree with its side. OFF: every event labels, as in v2.3.")
@@ -137,21 +172,27 @@ agreeN     = input.int(3, "Rungs that must agree (N)", minval=2, maxval=10, grou
 agreeMode  = input.string("domino", "Agreement mode", options=["domino","fractal"], group="Agreement", tooltip="domino: N rungs in one unbroken chain that contains the rung that fired. fractal: any N agreeing rungs inside the scope, contiguous or not.")
 agreeScope = input.string("whole ladder", "Scope", options=["whole ladder","chart rung and above","chart rung and below"], group="Agreement", tooltip="Which rungs may vote. 'chart rung and above' = the * rung and every higher timeframe. 'chart rung and below' = the * rung and every lower one. On a 1 Min chart 'below' is only the seconds rungs, so prefer the whole ladder or 'above'.")
 agreeInh   = input.string("skip (transparent)", "Inherited rungs", options=["skip (transparent)","vote with parent","no vote (breaks chain)"], group="Agreement", tooltip="A rung with no shape of its own shows its parent's position '(inh)'. skip: it neither counts nor breaks a chain. vote with parent: it repeats the parent's vote (not independent evidence, so it inflates the count). no vote: it breaks a domino chain.")
-agreeLbl   = input.bool(true, "Label the moment N rungs agree", group="Agreement", tooltip="Draws 'AGREE LONG xN' / 'AGREE SHORT xN' on the bar where the count first reaches N.")
-cAgL = input.color(#00bfa5, "Agree LONG",  group="Agreement")
-cAgS = input.color(#d500f9, "Agree SHORT", group="Agreement")
+agreeLbl   = input.bool(true, "Label the moment N rungs agree", group="Agreement", tooltip="Draws 'AGREE LONG xN' / 'AGREE SHORT xN' on the bar where the count first reaches N. Display only: with 'Also enter on AGREE labels' the strategy trades them either way.")
+shAgL = input.bool(true, "Agree LONG",  inline="AGL", group="Agreement")
+cAgL  = input.color(#00bfa5, "",        inline="AGL", group="Agreement", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shAgS = input.bool(true, "Agree SHORT", inline="AGS", group="Agreement")
+cAgS  = input.color(#d500f9, "",        inline="AGS", group="Agreement", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
 
 // STRATEGY
 tradeDir   = input.string("Both", "Trade direction", options=["Both","Long only (buy only)","Short only (sell only)"], group="Strategy", tooltip="Long only: only ENTER LONGS labels open trades. Short only: only ENTER SHORTS labels open trades.")
 exitOnEnd  = input.bool(true, "Exit on END labels (exit once, then wait)", group="Strategy", tooltip="END 1st LEG / END 2nd LEG closes the side that leg was on: upright rung = longs, inverted rung = shorts.")
 oppCloses  = input.bool(true, "Opposite ENTER closes (one-side mode)", group="Strategy", tooltip="Long only / Short only: an ENTER label on the other side closes the open trade without opening a new one. In 'Both' an opposite ENTER always reverses.")
-tradeAgree = input.bool(false, "Also enter on AGREE labels", group="Strategy", tooltip="Needs 'Require rung agreement' on. Enters on the bar 'AGREE LONG xN' / 'AGREE SHORT xN' fires.")
+tradeAgree = input.bool(true, "Also enter on AGREE labels", group="Strategy", tooltip="Needs 'Require rung agreement' on. Enters on the bar 'AGREE LONG xN' / 'AGREE SHORT xN' fires.")
 trailOn    = input.bool(true, "Use trailing take profit", group="Strategy")
 trailUnit  = input.string("price", "Trail / stop units", options=["ticks","price","percent"], group="Strategy", tooltip="ticks = minimum price moves. price = raw price distance (e.g. 2.0 on XAUUSD = $2). percent = % of the entry price.")
 trailAct   = input.float(2.0, "Trail activation", minval=0.0, step=0.1, group="Strategy", tooltip="Distance price must move in your favour before the trail arms.")
 trailOff   = input.float(1.0, "Trail offset", minval=0.0, step=0.1, group="Strategy", tooltip="Distance the stop trails behind the best price once armed.")
 slOn       = input.bool(false, "Use stop loss", group="Strategy")
 slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
+entryFill  = input.string("Signal tick", "Entry fill", options=["Signal tick","Limit at label price"], group="Strategy", tooltip="Limit at label price: buy limit at the label's price (candle low), sell limit at the candle high, filled only if price returns to it. Signal tick: live, a market fill on the tick the label appears; in the backtest, at the close of the label's candle.")
+limitBars  = input.int(5, "Limit valid (bars)", minval=1, maxval=500, group="Strategy", tooltip="An unfilled limit entry is cancelled after this many bars, or sooner when an END label or an opposite signal arrives.")
+useLimit   = entryFill == "Limit at label price"
+maxOpen    = input.int(20, "Max open entries", minval=1, maxval=100, group="Strategy", tooltip="Every ENTER label opens its own entry, stacking on an open trade of the same side, up to this many at once. Each entry has its own trailing TP / stop.")
 
 // ======================= BEGIN DIRECTIONAL TIME FILTER =======================
 // Directional Time Filter v1.4. A time-boxed direction PERMISSION: it only
@@ -582,8 +623,10 @@ lsz = switch lblSizeS
 // The signal price is the candle extreme the shape formed on: the low for a
 // long-side event, the high for a short-side event. The label sits at that
 // price, pointing left at the candle, and a short line marks the level.
-putLbl(string txt, color col, bool below) =>
-    float px = below ? low : high
+// atPx: draw at this price instead (ENTER labels in Signal tick mode use the
+// price the strategy enters at, so the label and the fill always match).
+putLbl(string txt, color col, bool below, float atPx = na) =>
+    float px = not na(atPx) ? atPx : below ? low : high
     string t = lblPrice ? txt + "\n@ " + str.tostring(px, format.mintick) : txt
     label.new(bar_index, px, t, xloc=xloc.bar_index, yloc=yloc.price, color=col, style=label.style_label_left, textcolor=color.black, size=lsz, force_overlay=true)
     if lblPrice
@@ -599,7 +642,7 @@ int SIG_EXIT_SHORT  = -2
 // Returns the rung's current position (the caller stores it as prev) and the
 // trade code of the label that fired. The event fires on exactly the
 // condition the indicator labels on; showLbl only decides whether it draws.
-rungEvents(int i, string prev, string tag) =>
+rungEvents(int i, string prev, string tag, float entryPx) =>
     string p    = array.get(posA, i)
     bool   inh  = array.get(inhA, i)
     bool   up   = array.get(orientA, i) > 0
@@ -620,21 +663,21 @@ rungEvents(int i, string prev, string tag) =>
             // Inverted: broke the low, TDI refused -> long zone (bottom).
             // Exit once: the leg that ended was on this rung's side.
             sig := up ? SIG_EXIT_LONG : SIG_EXIT_SHORT
-            if showLbl
+            if showLbl and (up ? shDS : shDL)
                 string zone = up ? "DIV SHORT ZONE" : "DIV LONG ZONE"
                 string leg  = wasSecond ? "END 2nd LEG" : "END 1st LEG"
                 putLbl(tag + zone + "\n" + leg + "\nexit once, then wait" + ag, up ? cDS : cDL, not up)
         else if p == "FIRST LEG"
             sig := up ? SIG_ENTER_LONG : SIG_ENTER_SHORT
-            if showLbl
-                putLbl(tag + "1st LEG\nENTER " + side + ag, up ? cL1 : cS1, up)
+            if showLbl and (up ? shL1 : shS1)
+                putLbl(tag + "1st LEG\nENTER " + side + ag, up ? cL1 : cS1, up, entryPx)
         else if p == "SECOND LEG"
             sig := up ? SIG_ENTER_LONG : SIG_ENTER_SHORT
-            if showLbl
-                putLbl(tag + "2nd LEG\nENTER " + side + ag, up ? cL2 : cS2, up)
+            if showLbl and (up ? shL2 : shS2)
+                putLbl(tag + "2nd LEG\nENTER " + side + ag, up ? cL2 : cS2, up, entryPx)
         else if wasSecond and (p == "STAIRCASE" or p == "MID FIRST LEG")
             sig := up ? SIG_EXIT_LONG : SIG_EXIT_SHORT
-            if showLbl
+            if showLbl and shEnd
                 putLbl(tag + "END 2nd LEG" + ag, cEnd, up)
         else if showLbl and lblInfo and p == "MID FIRST LEG"
             putLbl(tag + "look for " + side + ag, cInf, up)
@@ -646,12 +689,19 @@ var string prevChart  = ""
 var string prevRead   = ""
 var int    prevReadAt = -1
 
-[pChart, sigChart] = rungEvents(chartIdx, prevChart, "")
+// Entry price shown on ENTER labels in Signal tick mode: the price of the
+// tick the entry first fired on in this bar (varip keeps it across live
+// ticks; on history it is the candle close, where the backtest fills).
+varip float tickPx  = na
+varip int   tickBar = -1
+float entryPx = not useLimit ? (tickBar == bar_index ? tickPx : close) : na
+
+[pChart, sigChart] = rungEvents(chartIdx, prevChart, "", entryPx)
 prevChart := pChart
 int sigRead = SIG_NONE
 if lblRead and readAt != -1 and readAt != chartIdx
     string pr = readAt == prevReadAt ? prevRead : ""
-    [pRead, sR] = rungEvents(readAt, pr, array.get(tfName, readAt) + ": ")
+    [pRead, sR] = rungEvents(readAt, pr, array.get(tfName, readAt) + ": ", entryPx)
     prevRead := pRead
     sigRead  := sR
 prevReadAt := readAt
@@ -662,64 +712,122 @@ var int prevShortN = 0
 bool agreeLongNow  = agreeOn and longN  >= needN and prevLongN  < needN
 bool agreeShortNow = agreeOn and shortN >= needN and prevShortN < needN
 if showLbl and agreeOn and agreeLbl
-    if agreeLongNow
-        putLbl("AGREE LONG x" + str.tostring(longN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgL, true)
-    if agreeShortNow
-        putLbl("AGREE SHORT x" + str.tostring(shortN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgS, false)
+    if agreeLongNow and shAgL
+        putLbl("AGREE LONG x" + str.tostring(longN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgL, true, tradeAgree ? entryPx : na)
+    if agreeShortNow and shAgS
+        putLbl("AGREE SHORT x" + str.tostring(shortN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgS, false, tradeAgree ? entryPx : na)
 prevLongN  := longN
 prevShortN := shortN
 
 // -------------------------------------------------------------- STRATEGY ----
-// Signals are the label events above, from the chart rung and (when its
-// labels are on) the READ HERE rung. If the two rungs ask for opposite
-// entries on the same bar, neither entry is taken.
-bool longSig  = sigChart == SIG_ENTER_LONG  or sigRead == SIG_ENTER_LONG  or (tradeAgree and agreeLongNow)
-bool shortSig = sigChart == SIG_ENTER_SHORT or sigRead == SIG_ENTER_SHORT or (tradeAgree and agreeShortNow)
-bool exitL    = exitOnEnd and (sigChart == SIG_EXIT_LONG  or sigRead == SIG_EXIT_LONG)
-bool exitS    = exitOnEnd and (sigChart == SIG_EXIT_SHORT or sigRead == SIG_EXIT_SHORT)
-if longSig and shortSig
-    longSig  := false
-    shortSig := false
+// EVERY ENTER label is an entry: the chart rung's, the READ HERE rung's and
+// (with "Also enter on AGREE labels") each AGREE label, whatever timeframe
+// the chart is on. Each label opens its own entry with its own id, stacked
+// on an open trade of the same side, and gets its own trailing TP / stop.
+// Only the direction filter, the Directional time filter and "Max open
+// entries" hold one back. Long and short labels on the same bar cancel
+// out (a position can't be both).
+int nLong  = (sigChart == SIG_ENTER_LONG  ? 1 : 0) + (sigRead == SIG_ENTER_LONG  ? 1 : 0) + (tradeAgree and agreeLongNow  ? 1 : 0)
+int nShort = (sigChart == SIG_ENTER_SHORT ? 1 : 0) + (sigRead == SIG_ENTER_SHORT ? 1 : 0) + (tradeAgree and agreeShortNow ? 1 : 0)
+bool exitL = exitOnEnd and (sigChart == SIG_EXIT_LONG  or sigRead == SIG_EXIT_LONG)
+bool exitS = exitOnEnd and (sigChart == SIG_EXIT_SHORT or sigRead == SIG_EXIT_SHORT)
+if nLong > 0 and nShort > 0
+    nLong  := 0
+    nShort := 0
 
 bool allowLong  = tradeDir != "Short only (sell only)"
 bool allowShort = tradeDir != "Long only (buy only)"
 
-// Directional time filter: an ENTER that is not allowed is simply not taken.
-// Exits (END labels, opposite-ENTER closes, trail, stop) are never gated.
-bool goLong  = longSig  and allowLong  and dtfBuyOk
-bool goShort = shortSig and allowShort and dtfSellOk
-// One order per side per bar. An ENTER on the same bar as an END keeps the
-// trade (same side) or reverses it (opposite side, via strategy.entry), so
-// no separate close is sent then.
-bool oppL   = oppCloses and shortSig and not allowShort
-bool oppS   = oppCloses and longSig  and not allowLong
-bool closeL = strategy.position_size > 0 and not goLong  and not goShort and (exitL or oppL)
-bool closeS = strategy.position_size < 0 and not goShort and not goLong  and (exitS or oppS)
+// Live, the script runs on every tick and a label stays true for the rest of
+// its bar, so each bar's labels enter once: on the first tick they appear.
+varip int doneL = -1
+varip int doneS = -1
+// Directional time filter: an ENTER that is not allowed is simply not taken
+// (every stacked entry of that bar with it). Exits are never gated.
+bool goLong  = nLong  > 0 and allowLong  and doneL != bar_index and dtfBuyOk
+bool goShort = nShort > 0 and allowShort and doneS != bar_index and dtfSellOk
 
+if (goLong or goShort) and tickBar != bar_index
+    tickPx  := close
+    tickBar := bar_index
+
+// Closes. An opposite entry reverses the whole position by itself (market
+// mode); in limit mode the open side is closed now, because the new side
+// only opens if its limit fills.
+bool oppL   = oppCloses and nShort > 0 and not allowShort
+bool oppS   = oppCloses and nLong  > 0 and not allowLong
+bool closeL = strategy.position_size > 0 and not goLong  and (useLimit ? (exitL or oppL or goShort) : not goShort and (exitL or oppL))
+bool closeS = strategy.position_size < 0 and not goShort and (useLimit ? (exitS or oppS or goLong)  : not goLong  and (exitS or oppS))
 if closeL
-    strategy.close("Long",  comment=exitL ? "exit once" : "opp ENTER")
+    strategy.close_all(comment=exitL ? "exit once" : "opp ENTER")
 if closeS
-    strategy.close("Short", comment=exitS ? "exit once" : "opp ENTER")
+    strategy.close_all(comment=exitS ? "exit once" : "opp ENTER")
+
+// Distances in ticks from the entry. The percent unit uses this tick's price
+// (or the limit price), which is the price the entry is placed at.
+toTicks(float d, float ref) =>
+    trailUnit == "ticks" ? d : trailUnit == "price" ? d / syminfo.mintick : ref * d / 100.0 / syminfo.mintick
+
+// Pending limit entries (limit mode): id and the bar each was placed on.
+var array<string> pendId  = array.new_string()
+var array<int>    pendBar = array.new_int()
+var array<int>    pendDir = array.new_int()
+if useLimit and array.size(pendId) > 0
+    for k = array.size(pendId) - 1 to 0
+        int  d     = array.get(pendDir, k)
+        bool stale = bar_index - array.get(pendBar, k) >= limitBars
+        bool against = d > 0 ? (exitL or goShort) : (exitS or goLong)
+        if stale or against
+            strategy.cancel(array.get(pendId, k))
+            array.remove(pendId, k)
+            array.remove(pendBar, k)
+            array.remove(pendDir, k)
+
+// One entry per label. Its exit is attached to that entry id only.
+placeEntry(string id, bool isLong, float lim) =>
+    float ref = na(lim) ? close : lim
+    float trPts = trailOn ? math.max(toTicks(trailAct, ref), 0.0) : na
+    float trOff = trailOn ? math.max(toTicks(trailOff, ref), 1.0) : na
+    float slPts = slOn    ? math.max(toTicks(slDist,   ref), 1.0) : na
+    string cmt = (isLong ? "ENTER LONG" : "ENTER SHORT") + (na(lim) ? "" : " @ label")
+    strategy.entry(id, isLong ? strategy.long : strategy.short, limit=lim, comment=cmt)
+    if trailOn or slOn
+        strategy.exit("X " + id, from_entry=id, trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP", comment_loss="SL")
+
+int room = maxOpen - strategy.opentrades - array.size(pendId)
 if goLong
-    strategy.entry("Long",  strategy.long,  comment="ENTER LONG")
+    doneL := bar_index
+    for k = 1 to nLong
+        if room > 0 or strategy.position_size < 0
+            string id = "L" + str.tostring(bar_index) + "-" + str.tostring(k)
+            placeEntry(id, true, useLimit ? low : na)
+            room -= 1
+            if useLimit
+                array.push(pendId, id)
+                array.push(pendBar, bar_index)
+                array.push(pendDir, 1)
 if goShort
-    strategy.entry("Short", strategy.short, comment="ENTER SHORT")
+    doneS := bar_index
+    for k = 1 to nShort
+        if room > 0 or strategy.position_size > 0
+            string id = "S" + str.tostring(bar_index) + "-" + str.tostring(k)
+            placeEntry(id, false, useLimit ? high : na)
+            room -= 1
+            if useLimit
+                array.push(pendId, id)
+                array.push(pendBar, bar_index)
+                array.push(pendDir, -1)
 
-// Distances in ticks, measured from the entry (or this close while the entry
-// is still pending, which is only used for the percent unit).
-float refPx = strategy.position_size != 0 ? strategy.position_avg_price : close
-toTicks(float d) =>
-    trailUnit == "ticks" ? d : trailUnit == "price" ? d / syminfo.mintick : refPx * d / 100.0 / syminfo.mintick
-
-float trPts = trailOn ? math.max(toTicks(trailAct), 0.0) : na
-float trOff = trailOn ? math.max(toTicks(trailOff), 1.0) : na
-float slPts = slOn    ? math.max(toTicks(slDist),   1.0) : na
-
-if trailOn or slOn
-    if allowLong
-        strategy.exit("Long X", from_entry="Long", trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP", comment_loss="SL")
-    if allowShort
-        strategy.exit("Short X", from_entry="Short", trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP", comment_loss="SL")
+// A limit that filled is no longer pending.
+if useLimit and array.size(pendId) > 0 and strategy.opentrades > 0
+    for k = array.size(pendId) - 1 to 0
+        string id = array.get(pendId, k)
+        for t = 0 to strategy.opentrades - 1
+            if strategy.opentrades.entry_id(t) == id
+                array.remove(pendId, k)
+                array.remove(pendBar, k)
+                array.remove(pendDir, k)
+                break
 
 // ----------------------------------------------------------- CHART PANE ----
 [_rNow, fastNow, slowNow, basisNow, upNow, loNow] = tdiCore()
