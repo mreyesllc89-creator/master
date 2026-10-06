@@ -24,6 +24,9 @@
 //                      then trails "offset" behind the best price.
 //                      Units: ticks, price, or percent of entry.
 //    Stop loss         Optional fixed stop, same units.
+//    S3. Sizing        Fixed quantity, or Risk % of equity over the stop
+//                      distance (needs the stop loss on), capped by Max
+//                      quantity and rounded down to the step.
 //  Orders are placed on the bar close where the label prints and fill on
 //  the next bar's open (TradingView default).
 //
@@ -145,6 +148,13 @@ trailAct   = input.float(2.0, "Trail activation", minval=0.0, step=0.1, group="S
 trailOff   = input.float(1.0, "Trail offset", minval=0.0, step=0.1, group="Strategy", tooltip="Distance the stop trails behind the best price once armed.")
 slOn       = input.bool(false, "Use stop loss", group="Strategy")
 slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
+
+gS3 = "S3. Sizing"
+QtyMode  = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = gS3)
+fixedQty = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval = 0.0, group = gS3)
+riskPct  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0.0, step = 0.25, group = gS3, tooltip = "Quantity = equity x risk% / (stop distance x point value). Needs 'Use stop loss' on; otherwise the fixed quantity is used.")
+maxQty   = input.float(50, "Max quantity", minval = 0.0, group = gS3)
+qtyStep  = input.float(1, "Quantity step (rounds down)", minval = 0.000001, group = gS3)
 
 // ======================= BEGIN DIRECTIONAL TIME FILTER =======================
 // This strategy runs in its own pane, so the visuals go on the price chart.
@@ -925,15 +935,6 @@ bool oppS   = oppCloses and longSig  and not allowLong
 bool closeL = strategy.position_size > 0 and not goLong  and not goShort and (exitL or oppL)
 bool closeS = strategy.position_size < 0 and not goShort and not goLong  and (exitS or oppS)
 
-if closeL
-    strategy.close("Long",  comment=exitL ? "exit once" : "opp ENTER")
-if closeS
-    strategy.close("Short", comment=exitS ? "exit once" : "opp ENTER")
-if goLong
-    strategy.entry("Long",  strategy.long,  comment="ENTER LONG")
-if goShort
-    strategy.entry("Short", strategy.short, comment="ENTER SHORT")
-
 // Distances in ticks, measured from the entry (or this close while the entry
 // is still pending, which is only used for the percent unit).
 float refPx = strategy.position_size != 0 ? strategy.position_avg_price : close
@@ -943,6 +944,27 @@ toTicks(float d) =>
 float trPts = trailOn ? math.max(toTicks(trailAct), 0.0) : na
 float trOff = trailOn ? math.max(toTicks(trailOff), 1.0) : na
 float slPts = slOn    ? math.max(toTicks(slDist),   1.0) : na
+
+// S3. Sizing: fixed, or risk % of equity over the stop distance (ticks).
+calcQty(float slTicks) =>
+    float q = fixedQty
+    if QtyMode == "Risk %" and not na(slTicks) and slTicks > 0
+        riskCash = strategy.equity * riskPct / 100.0
+        stopCash = slTicks * syminfo.mintick * syminfo.pointvalue
+        q := stopCash > 0 ? riskCash / stopCash : 0.0
+    q := math.min(q, maxQty)
+    q := math.floor(q / qtyStep + 1e-9) * qtyStep
+    q
+float entryQty = calcQty(slPts)
+
+if closeL
+    strategy.close("Long",  comment=exitL ? "exit once" : "opp ENTER")
+if closeS
+    strategy.close("Short", comment=exitS ? "exit once" : "opp ENTER")
+if goLong and entryQty > 0
+    strategy.entry("Long",  strategy.long,  qty=entryQty, comment="ENTER LONG")
+if goShort and entryQty > 0
+    strategy.entry("Short", strategy.short, qty=entryQty, comment="ENTER SHORT")
 
 if trailOn or slOn
     if allowLong
