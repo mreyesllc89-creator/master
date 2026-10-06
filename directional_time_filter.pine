@@ -1,24 +1,26 @@
 //@version=6
 // ============================================================================
-//  DIRECTIONAL TIME FILTER  -  v1.0
+//  DIRECTIONAL TIME FILTER  -  v1.1
 // ----------------------------------------------------------------------------
 //  A time-boxed direction gate you can bolt onto any script.
 //
-//  You say: "from THIS second, for the next N minutes (countdown),
+//  You say: "from THIS moment, for the next N minutes (countdown),
 //            only take BUYS while PRICE is ABOVE <buy level>
 //            and only take SELLS while PRICE is BELOW <sell level>."
 //  When the countdown reaches zero the filter closes: no new trades at all
 //  until you set a new start time.
 //
-//  Example:  start = 14:30:00, countdown = 15 min, levels = 50 / 50
+//  Example:  start = 14:30, countdown = 15 min, levels = 50 / 50
 //            14:30:00 -> 14:45:00   buy signals pass only if price > 50
 //                                   sell signals pass only if price < 50
 //            after 14:45:00         every signal is blocked
 //
 //  INPUTS (group "Directional time filter")
 //    Enable filter      Off = every signal passes, as if the filter is absent.
-//    Start time         The second the window opens. Tick "confirm" in the
-//                       script settings or click the chart to pick it.
+//    Start time         Date + minute the window opens, in the chart's time
+//                       zone. When you add the script you are asked to click
+//                       the chart (bar precision); afterwards set it in
+//                       Settings (minute precision). "+ seconds" adds seconds.
 //    Countdown (min)    Minutes the window stays open from the start time.
 //                       0 = never expires.
 //    Price              What is compared to the levels. Default: close.
@@ -52,6 +54,8 @@
 //         if dtfExpired
 //             strategy.close_all(comment="DTF window ended")
 //
+//     See xpw_orientation_tdi_v2.4_strategy.pine for a complete example.
+//
 //  B) Link without editing (indicator -> strategy)
 //     Add this indicator to the chart. In your strategy add
 //         dtfBuyExt  = input.source(close, "DTF buy allowed")
@@ -61,31 +65,38 @@
 //         myBuySignal and dtfBuyExt > 0.5
 //
 //  TIMING
-//  Historical bars are judged at their close time (when a signal confirms).
-//  On the live bar the current clock (timenow) is used, so the window opens
-//  and closes on the exact second, not on the next bar.
+//  The window is tested when a bar closes: a signal passes when its bar
+//  closes inside [start, end). The same clock (the bar's close time) is used
+//  on history and on the live bar, so the gate never repaints: what you saw
+//  live is what a reload shows. Use a countdown of at least one chart bar;
+//  the status box warns otherwise. The countdown in the status box ticks
+//  with the real clock in an indicator; inside a strategy it refreshes at
+//  each bar close.
 // ============================================================================
 indicator("Directional Time Filter", "DTF", overlay=true)
 
 // ======================= BEGIN DIRECTIONAL TIME FILTER =======================
 GRP_DTF = "Directional time filter"
-dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF)
-dtfStart     = input.time(timestamp("2026-01-01T00:00:00"), "Start time", confirm=true, group=GRP_DTF, tooltip="The second the window opens (exchange time zone). Click the chart or type a date and time.")
-dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start time. 0 = never expires.")
+dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: buys pass only while price > buy level, sells only while price < sell level, and only inside the time window.")
+dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", confirm=true, group=GRP_DTF, tooltip="Date and minute the window opens, in the chart's time zone (the one on the time axis). Click the chart when adding the script, or set it here (minute resolution; add seconds below).")
+dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to the start time (useful on second charts).")
+dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start time. 0 = never expires. The window is tested at each bar close, so use at least one chart bar.")
 dtfRef       = input.source(close, "Price", group=GRP_DTF, tooltip="What is compared to the levels. Default: close price. You can pick any plotted line from another indicator instead.")
-dtfBuyLevel  = input.float(50, "Buy only above (price)", group=GRP_DTF, tooltip="Buys pass only while price is above this level.")
-dtfSellLevel = input.float(50, "Sell only below (price)", group=GRP_DTF, tooltip="Sells pass only while price is below this level.")
-dtfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_DTF)
+dtfBuyLevel  = input.float(50, "Buy only above (price)", group=GRP_DTF, tooltip="A price level on this chart. Buys pass only while price is above it.")
+dtfSellLevel = input.float(50, "Sell only below (price)", group=GRP_DTF, tooltip="A price level on this chart. Sells pass only while price is below it.")
+dtfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_DTF, tooltip="Turn one side off completely inside the window.")
 dtfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_DTF)
 dtfBefore    = input.string("Block", "Before start", options=["Block", "Pass"], group=GRP_DTF, tooltip="Block: no trades before the window opens. Pass: signals are unfiltered until the window opens.")
 
 dtfValue = dtfRef
 
-// Clock: bar close on history, real clock on the live bar.
-dtfClock = barstate.isrealtime ? timenow : nz(time_close, time)
-dtfEnd   = dtfMinutes > 0 ? dtfStart + math.round(dtfMinutes * 60000) : na
+// Clock: every bar is judged at its close time, on history and live alike,
+// so the gate never repaints. (The live bar's time_close is its scheduled close.)
+dtfClock   = nz(time_close, time)
+dtfStartAt = dtfStart + dtfStartSec * 1000
+dtfEnd     = dtfMinutes > 0 ? dtfStartAt + math.round(dtfMinutes * 60000) : na
 
-dtfBeforeStart = dtfClock < dtfStart
+dtfBeforeStart = dtfClock < dtfStartAt
 dtfOpen        = not dtfBeforeStart and (na(dtfEnd) or dtfClock < dtfEnd)
 dtfAfterEnd    = not na(dtfEnd) and dtfClock >= dtfEnd
 
@@ -94,14 +105,18 @@ dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen an
 dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowSell and dtfValue < dtfSellLevel)
 
 // True on the first bar after the window has closed (to flatten if wanted).
-dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1]
+dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1] and not barstate.isfirst
+
+// A countdown shorter than one chart bar can never open.
+dtfTooShort = dtfOn and dtfMinutes > 0 and dtfMinutes * 60 < timeframe.in_seconds()
 // ======================== END DIRECTIONAL TIME FILTER ========================
 
 // ---- Visuals ---------------------------------------------------------------
 GRP_VIS = "Visuals"
 showBg     = input.bool(true, "Shade window", group=GRP_VIS)
 showLevels = input.bool(true, "Draw levels", group=GRP_VIS)
-showTable  = input.bool(true, "Status table", group=GRP_VIS)
+showTable  = input.bool(true, "Status box", group=GRP_VIS)
+tblPos     = input.string("top_right", "Status box position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group=GRP_VIS)
 
 bgcolor(showBg and dtfOn and dtfOpen ? (dtfBuyOk ? color.new(color.green, 85) : dtfSellOk ? color.new(color.red, 85) : color.new(color.gray, 88)) : na, title="Window")
 plotshape(dtfExpired, "Window ended", shape.xcross, location.top, color.orange, size=size.tiny, text="DTF end", textcolor=color.orange)
@@ -118,11 +133,24 @@ plot(dtfSellOk ? 1 : 0, "DTF sell allowed", display=display.data_window)
 plot(dtfExpired ? 1 : 0, "DTF expired", display=display.data_window)
 plot(dtfValue, "DTF price used", display=display.data_window)
 
-var table dtfTable = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 20), border_width=1)
+posOf(string s) =>
+    switch s
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+
+var table dtfTable = table.new(posOf(tblPos), 2, 4, bgcolor=color.new(color.black, 20), border_width=1)
 if showTable and barstate.islast
-    string state = not dtfOn ? "OFF" : dtfBeforeStart ? "WAITING" : dtfOpen ? "OPEN" : "ENDED"
-    color  stCol = not dtfOn ? color.gray : dtfBeforeStart ? color.yellow : dtfOpen ? color.lime : color.orange
-    int    secs  = dtfOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - dtfClock) / 1000.0)) : 0
+    // The countdown display uses the real clock on the live bar; the gate never does.
+    int    nowMs = barstate.isrealtime ? timenow : dtfClock
+    string state = not dtfOn ? "OFF" : dtfTooShort ? "COUNTDOWN < 1 BAR" : dtfBeforeStart ? "WAITING" : dtfOpen ? "OPEN" : "ENDED"
+    color  stCol = not dtfOn ? color.gray : dtfTooShort ? color.red : dtfBeforeStart ? color.yellow : dtfOpen ? color.lime : color.orange
+    int    secs  = dtfOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - nowMs) / 1000.0)) : 0
     string left  = dtfOpen and not na(dtfEnd) ? str.tostring(math.floor(secs / 60), "00") + ":" + str.tostring(secs % 60, "00") : dtfOpen ? "no limit" : "-"
     table.cell(dtfTable, 0, 0, "DTF", text_color=color.white)
     table.cell(dtfTable, 1, 0, state, text_color=stCol)

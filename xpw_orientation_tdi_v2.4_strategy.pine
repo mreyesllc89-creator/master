@@ -28,23 +28,34 @@
 //  the next bar's open (TradingView default).
 //
 //  DIRECTIONAL TIME FILTER (group "Directional time filter", off by default)
-//    "From THIS second, for the next N minutes (countdown), only buy while
+//    "From this moment, for the next N minutes (countdown), only buy while
 //     price is ABOVE the buy level and only sell while price is BELOW the
 //     sell level. When the countdown ends, no new trades."
-//    Start time        The second the window opens. Click the chart or type it.
+//    Start time        Date + minute the window opens, in the chart's time
+//                      zone (the Settings dialog is minute resolution).
+//    + seconds         Seconds added to the start time (second charts).
 //    Countdown (min)   Minutes the window stays open. 0 = never expires.
+//    Price             What is compared to the levels. Default: close.
 //    Buy only above    ENTER LONGS pass only while price > this level.
 //    Sell only below   ENTER SHORTS pass only while price < this level.
+//    Allow buys/sells  Turn one side off inside the window. "Trade direction"
+//                      still applies on top.
 //    Before start      Block (no trades) or Pass (unfiltered) until it opens.
 //    Blocked opposite ENTER closes   In "Both" mode an opposite ENTER normally
-//                      reverses. If the filter blocks that reverse, this
+//                      reverses. When the filter blocks that reverse (by the
+//                      level, before the start, or after the countdown), this
 //                      closes the open trade instead of leaving it running.
 //    Close all when countdown ends   Flattens on the first bar after the
-//                      window closes. Off: exits (END labels, trail, SL)
-//                      still manage the open trade; only new entries stop.
-//    The filter never blocks exits. The window, the levels and a status box
-//    are drawn on the price chart. On the live bar the strategy evaluates at
-//    bar close (TradingView default), so the window is checked at that moment.
+//                      window closes. Off: only new entries stop; END labels,
+//                      trailing TP, stop loss and the option above still
+//                      manage the open trade.
+//    Shade window / Draw levels / Status box   Drawn on the price chart.
+//    The filter never blocks exits.
+//    GRANULARITY. The window is tested when a bar closes: an ENTER passes
+//    when its bar closes inside [start, end), so its fill (next bar open) is
+//    inside the window. The same clock is used on history and live, so the
+//    Strategy Tester never repaints. Use a countdown of at least one chart
+//    bar; the status box warns otherwise. The box refreshes at bar close.
 //
 //  AGREEMENT (group "Agreement", off by default)
 //    Every rung casts one vote from its own position and side:
@@ -160,27 +171,31 @@ slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group=
 // ======================= BEGIN DIRECTIONAL TIME FILTER =======================
 GRP_DTF = "Directional time filter"
 dtfOn        = input.bool(false, "Enable filter", group=GRP_DTF, tooltip="Off: the strategy trades as before. On: ENTER LONGS pass only while price > buy level, ENTER SHORTS only while price < sell level, and only inside the time window below.")
-dtfStart     = input.time(timestamp("2026-01-01T00:00:00"), "Start time", group=GRP_DTF, tooltip="The second the window opens (exchange time zone). Type a date and time, or use the chart's date picker.")
-dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start time. 0 = never expires.")
+dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Date and minute the window opens, in the chart's time zone (the one on the time axis). The dialog is minute resolution; add seconds below.")
+dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to the start time (useful on second charts).")
+dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start time. 0 = never expires. The window is tested at each bar close, so use at least one chart bar.")
 dtfRef       = input.source(close, "Price", group=GRP_DTF, tooltip="What is compared to the levels. Default: close price.")
-dtfBuyLevel  = input.float(50, "Buy only above (price)", group=GRP_DTF, tooltip="Buys pass only while price is above this level.")
-dtfSellLevel = input.float(50, "Sell only below (price)", group=GRP_DTF, tooltip="Sells pass only while price is below this level.")
-dtfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_DTF)
+dtfBuyLevel  = input.float(50, "Buy only above (price)", group=GRP_DTF, tooltip="A price level on this chart. ENTER LONGS pass only while price is above it.")
+dtfSellLevel = input.float(50, "Sell only below (price)", group=GRP_DTF, tooltip="A price level on this chart. ENTER SHORTS pass only while price is below it.")
+dtfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_DTF, tooltip="Turn one side off inside the window. 'Trade direction' (Strategy group) still applies on top.")
 dtfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_DTF)
 dtfBefore    = input.string("Block", "Before start", options=["Block", "Pass"], group=GRP_DTF, tooltip="Block: no trades before the window opens. Pass: signals are unfiltered until the window opens.")
-dtfOppClose  = input.bool(true, "Blocked opposite ENTER closes", group=GRP_DTF, tooltip="In 'Both' mode an opposite ENTER reverses the trade. If the filter blocks that reverse, close the open trade instead of leaving it running.")
-dtfCloseEnd  = input.bool(false, "Close all when countdown ends", group=GRP_DTF, tooltip="Flatten on the first bar after the window closes. Off: open trades are still managed by END labels, trailing TP and stop loss; only new entries stop.")
+dtfOppClose  = input.bool(true, "Blocked opposite ENTER closes", group=GRP_DTF, tooltip="In 'Both' mode an opposite ENTER reverses the trade. When the filter blocks that reverse (by the level, before the start in Block mode, or after the countdown ends), close the open trade instead of leaving it running.")
+dtfCloseEnd  = input.bool(false, "Close all when countdown ends", group=GRP_DTF, tooltip="Flatten on the first bar after the window closes. Off: only new entries stop; END labels, trailing TP, stop loss and 'Blocked opposite ENTER closes' still manage the open trade.")
 dtfShowBg    = input.bool(true, "Shade window", inline="vis", group=GRP_DTF)
 dtfShowLv    = input.bool(true, "Draw levels", inline="vis", group=GRP_DTF)
-dtfShowTbl   = input.bool(true, "Status box", inline="vis", group=GRP_DTF)
+dtfShowTbl   = input.bool(true, "Status box", inline="vis", group=GRP_DTF, tooltip="Price-chart visuals. The status box refreshes at each bar close (a strategy runs once per bar).")
+dtfTblPos    = input.string("top_right", "Status box position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group=GRP_DTF, tooltip="Keep it away from the rung map ('Table position' in Display).")
 
 dtfValue = dtfRef
 
-// Clock: bar close on history, real clock on the live bar.
-dtfClock = barstate.isrealtime ? timenow : nz(time_close, time)
-dtfEnd   = dtfMinutes > 0 ? dtfStart + math.round(dtfMinutes * 60000) : na
+// Clock: every bar is judged at its close time, on history and live alike,
+// so the gate never repaints. (The live bar's time_close is its scheduled close.)
+dtfClock   = nz(time_close, time)
+dtfStartAt = dtfStart + dtfStartSec * 1000
+dtfEnd     = dtfMinutes > 0 ? dtfStartAt + math.round(dtfMinutes * 60000) : na
 
-dtfBeforeStart = dtfClock < dtfStart
+dtfBeforeStart = dtfClock < dtfStartAt
 dtfOpen        = not dtfBeforeStart and (na(dtfEnd) or dtfClock < dtfEnd)
 dtfAfterEnd    = not na(dtfEnd) and dtfClock >= dtfEnd
 
@@ -189,7 +204,10 @@ dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen an
 dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowSell and dtfValue < dtfSellLevel)
 
 // True on the first bar after the window has closed.
-dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1]
+dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1] and not barstate.isfirst
+
+// A countdown shorter than one chart bar can never open.
+dtfTooShort = dtfOn and dtfMinutes > 0 and dtfMinutes * 60 < timeframe.in_seconds()
 // ======================== END DIRECTIONAL TIME FILTER ========================
 
 // PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
@@ -592,11 +610,13 @@ bool dtfBlkS = dtfOn and dtfOppClose and longSig  and allowLong  and not dtfBuyO
 bool closeL = strategy.position_size > 0 and not goLong  and not goShort and (exitL or oppL or dtfBlkL)
 bool closeS = strategy.position_size < 0 and not goShort and not goLong  and (exitS or oppS or dtfBlkS)
 
-if dtfCloseEnd and dtfExpired and strategy.position_size != 0
+// Flatten when the countdown ends; then no second close order on that bar.
+bool dtfFlat = dtfCloseEnd and dtfExpired and strategy.position_size != 0
+if dtfFlat
     strategy.close_all(comment="DTF countdown ended")
-if closeL
+if closeL and not dtfFlat
     strategy.close("Long",  comment=exitL ? "exit once" : oppL ? "opp ENTER" : "DTF blocked reverse")
-if closeS
+if closeS and not dtfFlat
     strategy.close("Short", comment=exitS ? "exit once" : oppS ? "opp ENTER" : "DTF blocked reverse")
 if goLong
     strategy.entry("Long",  strategy.long,  comment="ENTER LONG")
@@ -639,11 +659,24 @@ plot(dtfShowLv and dtfActive ? dtfBuyLevel  : na, "DTF buy above level",  color=
 plot(dtfShowLv and dtfActive ? dtfSellLevel : na, "DTF sell below level", color=color.new(color.red, 0),   style=plot.style_linebr, linewidth=2, force_overlay=true)
 plotshape(dtfExpired, "DTF window ended", shape.xcross, location.top, color.orange, size=size.tiny, text="DTF end", textcolor=color.orange, force_overlay=true)
 
-var table dtfTable = table.new(position.top_right, 2, 4, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=true)
+posOf(string s) =>
+    switch s
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+
+var table dtfTable = table.new(posOf(dtfTblPos), 2, 4, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=true)
 if dtfShowTbl and dtfOn and barstate.islast
-    string dtfState = dtfBeforeStart ? "WAITING" : dtfOpen ? "OPEN" : "ENDED"
-    color  dtfStCol = dtfBeforeStart ? color.yellow : dtfOpen ? color.lime : color.orange
-    int    dtfSecs  = dtfOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - dtfClock) / 1000.0)) : 0
+    // The countdown display uses the real clock on the live bar; the gate never does.
+    int    dtfNowMs = barstate.isrealtime ? timenow : dtfClock
+    string dtfState = dtfTooShort ? "COUNTDOWN < 1 BAR" : dtfBeforeStart ? "WAITING" : dtfOpen ? "OPEN" : "ENDED"
+    color  dtfStCol = dtfTooShort ? color.red : dtfBeforeStart ? color.yellow : dtfOpen ? color.lime : color.orange
+    int    dtfSecs  = dtfOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - dtfNowMs) / 1000.0)) : 0
     string dtfLeft  = dtfOpen and not na(dtfEnd) ? str.tostring(math.floor(dtfSecs / 60), "00") + ":" + str.tostring(dtfSecs % 60, "00") : dtfOpen ? "no limit" : "-"
     table.cell(dtfTable, 0, 0, "DTF", text_color=color.white)
     table.cell(dtfTable, 1, 0, dtfState, text_color=dtfStCol)
@@ -656,16 +689,7 @@ if dtfShowTbl and dtfOn and barstate.islast
 
 // ---------------------------------------------------------------- TABLE ----
 if showTable and barstate.islast
-    tPos = switch tblPos
-        "top_right"     => position.top_right
-        "bottom_right"  => position.bottom_right
-        "top_left"      => position.top_left
-        "middle_left"   => position.middle_left
-        "bottom_left"   => position.bottom_left
-        "top_center"    => position.top_center
-        "bottom_center" => position.bottom_center
-        => position.middle_right
-    var table t = table.new(tPos, 6, 15, border_width=1, force_overlay=true)
+    var table t = table.new(posOf(tblPos), 6, 15, border_width=1, force_overlay=true)
     int lastCol = agreeOn ? 5 : 4
     table.clear(t, 0, 0, lastCol, 14)
     sz = switch tblSize
