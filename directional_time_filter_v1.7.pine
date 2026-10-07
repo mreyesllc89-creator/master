@@ -27,8 +27,9 @@
 //                       signal line (SMA 7 of RSI 21) while it is above the
 //                       market base line (SMA 34 of RSI 21) = BUY; crosses
 //                       BELOW while below the base line = SELL. Level = the
-//                       close of the cross bar. Calibrated on the strategy's
-//                       BYBIT:BTCUSDT 2m export (2026-10-03..05): it fires on
+//                       Actual price (Close) of the cross bar. Calibrated
+//                       on the strategy's BYBIT:BTCUSDT 2m export
+//                       (2026-10-03..05): it fires on
 //                       exactly the strategy's 35 Long and 50 Short bars,
 //                       and on no other bar. (Export columns: "RSI Price
 //                       Line" = SMA 2, "Fast Line" = SMA 7 = the signal
@@ -38,10 +39,13 @@
 //                       parent + child zones, burst gate, entry hold).
 //                       Level = its entry trigger (ask/bid +/- entry
 //                       distance).
-//                   The signal candle itself allows its own side AT the
-//                   level (a buy at >= the level, a sell at <=), so the
-//                   signal that armed the window passes it; every later
-//                   candle needs price strictly beyond the level.
+//                   With TDI cross the level IS the signal candle's price,
+//                   so that candle allows its own side AT the level (a buy
+//                   at >= the level, a sell at <=) and the signal that
+//                   armed the window passes it; every later candle needs
+//                   price strictly beyond the level. FlashGold's level is
+//                   beyond the close, so its signal candle still needs
+//                   price beyond it.
 //    ACTIVATE NOW   (manual, one click)  Tick it, press OK. The window opens
 //                   at that moment and the level is the price at that moment
 //                   (or a price you type, see "Level when activating").
@@ -198,7 +202,7 @@ DTF_FORCE_OVERLAY = false
 // does not round the level to the symbol's tick.
 DTF_LEVEL_IS_PRICE = true
 GRP_DTF = "Directional time filter"
-dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: closed at all times except the window a direction signal opens (or ACTIVATE NOW / Start time): then buys are allowed only above the level, sells only below it.")
+dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: closed at all times except the window a direction signal opens (or ACTIVATE NOW / Start time): then buys are allowed only above the level, sells only below it (the candle a signal armed on also allows its own side AT the level).")
 dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick and press OK: the window opens at this moment and the level is the price at this moment. Start time and the manual levels are ignored. Untick + OK to disarm. While ticked, ANY settings change or chart reload activates it again at that moment and price (the status box shows what is armed). Not for alerts or for strategies linked through input.source: use Start time for those.")
 dtfLvMode    = input.string("Actual price", "Level when activating", options=["Actual price", "Typed price"], group=GRP_DTF, tooltip="Actual price: ACTIVATE NOW captures the live price at that instant as the level. Typed price: the level is the number below.")
 dtfTyped     = input.float(0, "Typed price", minval=0, group=GRP_DTF, tooltip="The level used by ACTIVATE NOW when 'Level when activating' is 'Typed price'. Buys allowed only above it, sells only below it.")
@@ -225,7 +229,7 @@ dtfPrjTf = input.timeframe("60", "", inline="prj", group=GRP_PRJ, tooltip="Off: 
 
 // ---- Direction signal: arms the filter automatically ------------------------
 GRP_SIG = "Direction signal (arms the filter)"
-dtfSigOn    = input.bool(true, "Arm from signal", group=GRP_SIG, tooltip="On: every direction signal arms the filter: the window opens on the signal bar, the level is the signal price, and the countdown runs. Buys are then allowed only above that price, sells only below it. ACTIVATE NOW (if ticked) has priority; Start time is ignored.")
+dtfSigOn    = input.bool(true, "Arm from signal", group=GRP_SIG, tooltip="On: every direction signal arms the filter: the window opens on the signal bar, the level is the signal price, and the countdown runs. Buys are then allowed only above that price, sells only below it; the signal candle itself also allows its own side AT that price, so the signal that armed the window passes. ACTIVATE NOW (if ticked) has priority; Start time is ignored.")
 dtfSigSide  = input.string("Buy and sell signals", "Arm on", options=["Buy and sell signals", "Buy signals only", "Sell signals only"], group=GRP_SIG)
 dtfSigRearm = input.bool(true, "New signal re-arms while open", group=GRP_SIG, tooltip="On: a new signal inside an open window restarts it at the new price and time. Off: signals are ignored until the countdown ends.")
 dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
@@ -248,7 +252,8 @@ sigLogic = input.string("TDI cross (strategy)", "Signal logic", options = ["TDI 
 // The TDI of the strategy: RSI 21 of close; price line = SMA 2 of it, signal
 // line = SMA 7, market base line = SMA 34. BUY when the price line crosses
 // above the signal line while above the base line; SELL when it crosses below
-// while below the base line. Level = the close of the cross bar.
+// while below the base line. The level is left na, so the arming uses the
+// "Actual price" of the cross bar (Close by default).
 gTdiX = "TDI cross (strategy)"
 tdiXRsiLen   = input.int(21, "RSI length", minval = 2, group = gTdiX)
 tdiXPriceLen = input.int(2, "Price line, SMA of RSI", minval = 1, group = gTdiX)
@@ -263,7 +268,7 @@ tdiCrossSignal() =>
     float xBase  = ta.sma(xRsi, tdiXBaseLen)
     bool  xBuy   = ta.crossover(xPrice, xSig) and (not tdiXUseBase or xPrice > xBase)
     bool  xSell  = ta.crossunder(xPrice, xSig) and (not tdiXUseBase or xPrice < xBase)
-    [xBuy, xSell, close]
+    [xBuy, xSell, float(na)]
 
 // ---- FlashGold Continuation v5 direction ------------------------------------
 // The direction logic of "FlashGold Continuation v5 - TDI Trade Zone Filter"
@@ -658,9 +663,9 @@ if dtfShowTbl and dtfOn and barstate.islast
     table.cell(dtfTable, 1, 3, dLeft, text_color=color.white)
     table.cell(dtfTable, 0, 4, "Price now", text_color=color.white)
     table.cell(dtfTable, 1, 4, na(dtfValue) ? "-" : str.tostring(dtfValue, dFmt), text_color=color.white)
-    table.cell(dtfTable, 0, 5, "Buy  > " + (na(dtfBuyLv)  ? "-" : str.tostring(dtfBuyLv,  dFmt)), text_color=color.white)
+    table.cell(dtfTable, 0, 5, (dtfOnSigBar and dtfSigDir > 0 ? "Buy >= " : "Buy  > ") + (na(dtfBuyLv)  ? "-" : str.tostring(dtfBuyLv,  dFmt)), text_color=color.white)
     table.cell(dtfTable, 1, 5, dBuy ? "ALLOWED" : "BLOCKED", text_color=dBuy ? color.lime : color.red)
-    table.cell(dtfTable, 0, 6, "Sell < " + (na(dtfSellLv) ? "-" : str.tostring(dtfSellLv, dFmt)), text_color=color.white)
+    table.cell(dtfTable, 0, 6, (dtfOnSigBar and dtfSigDir < 0 ? "Sell <= " : "Sell < ") + (na(dtfSellLv) ? "-" : str.tostring(dtfSellLv, dFmt)), text_color=color.white)
     table.cell(dtfTable, 1, 6, dSell ? "ALLOWED" : "BLOCKED", text_color=dSell ? color.lime : color.red)
 // ======================== END DIRECTIONAL TIME FILTER ========================
 
