@@ -30,9 +30,18 @@
 //                       close of the cross bar. Calibrated on the strategy's
 //                       BYBIT:BTCUSDT 2m export (2026-10-03..05): it fires on
 //                       exactly the strategy's 35 Long and 50 Short bars,
-//                       and on no other bar.
+//                       and on no other bar. (Export columns: "RSI Price
+//                       Line" = SMA 2, "Fast Line" = SMA 7 = the signal
+//                       line, "Middle Band" = SMA 34, "Slow Line" = the raw
+//                       RSI 21; "Long Signal" / "Short Signal".)
 //                     FlashGold v5  the v1.6 signal (RSI 14 TDI direction,
 //                       parent + child zones, burst gate, entry hold).
+//                       Level = its entry trigger (ask/bid +/- entry
+//                       distance).
+//                   The signal candle itself allows its own side AT the
+//                   level (a buy at >= the level, a sell at <=), so the
+//                   signal that armed the window passes it; every later
+//                   candle needs price strictly beyond the level.
 //    ACTIVATE NOW   (manual, one click)  Tick it, press OK. The window opens
 //                   at that moment and the level is the price at that moment
 //                   (or a price you type, see "Level when activating").
@@ -65,9 +74,9 @@
 //  the filter sees on the 1H chart (same signals, levels, windows and
 //  ALLOWED / BLOCKED). At any moment the answer is the one the 1H chart
 //  gives at that same moment:
-//    - the direction signal is computed on 1H candles (TDI, zones, burst,
-//      ATR, entry hold: all as on the 1H chart) and arms the filter when its
-//      1H candle closes, at that candle's level;
+//    - the direction signal is computed on 1H candles with the selected
+//      Signal logic (all its inputs, as on the 1H chart) and arms the
+//      filter when its 1H candle closes, at that candle's level;
 //    - a countdown in minutes runs on the clock: a 1H signal closing at
 //      14:00 with countdown 15 is open 14:00 -> 14:15 on every chart;
 //    - a countdown in candles counts 1H candles and covers the same 1H
@@ -446,8 +455,9 @@ fgSignal(int ctxSec) =>
     float signalPx = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
     [buySignal, sellSignal, signalPx]
 
-// The direction signal of the selected logic. Both logics run on every bar
-// (their state must stay continuous); only the selected one is returned.
+// The direction signal of the selected logic. Both logics are computed on
+// every bar (Pine wants ta.* calls on every bar; "Signal logic" is an input,
+// so the choice is fixed for the run); only the selected one is returned.
 dtfSignal(int ctxSec) =>
     [fgBuy, fgSell, fgPx] = fgSignal(ctxSec)
     [txBuy, txSell, txPx] = tdiCrossSignal()
@@ -554,9 +564,16 @@ bool dtfInBars   = dtfByBars and not na(dtfEndBar) and dtfIdx < dtfEndBar
 dtfOpen        = not dtfBeforeStart and (dtfByBars ? dtfInBars : (na(dtfEnd) or dtfClock < dtfEnd))
 dtfAfterEnd    = dtfByBars ? (not dtfBeforeStart and not dtfInBars) : (not na(dtfEnd) and dtfClock >= dtfEnd)
 
+// The candle that a signal armed on: its price IS the level (TDI cross), so
+// there it counts as at the level on the signal's own side, and the signal
+// that armed the window passes it. The other side still needs to be beyond.
+bool dtfOnSigBar = dtfSigOn and not dtfArmNow and not na(dtfStartBar) and dtfIdx == dtfStartBar
+bool dtfAtBuyLv  = dtfOnSigBar and dtfSigDir > 0 and dtfValue >= dtfBuyLv
+bool dtfAtSellLv = dtfOnSigBar and dtfSigDir < 0 and dtfValue <= dtfSellLv
+
 // Final gates: is a buy / a sell ALLOWED on this bar? (Permission only.)
-dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
-dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowSell and dtfValue < dtfSellLv)
+dtfBuyOk  = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowBuy  and (dtfValue > dtfBuyLv  or dtfAtBuyLv))
+dtfSellOk = not dtfOn or (dtfBeforeStart and dtfBefore == "Pass") or (dtfOpen and dtfAllowSell and (dtfValue < dtfSellLv or dtfAtSellLv))
 
 // True on the first bar after the window has closed (chart marker / output).
 dtfExpired = dtfOn and dtfAfterEnd and not dtfAfterEnd[1] and not barstate.isfirst
@@ -622,8 +639,8 @@ if dtfShowTbl and dtfOn and barstate.islast
     bool   dBefore = na(dtfStartAt) or timenow < dtfStartAt
     bool   dAfter  = dtfByBars ? (not dBefore and not dtfInBars) : (not na(dtfEnd) and timenow >= dtfEnd)
     bool   dOpen   = not dBefore and not dAfter
-    bool   dBuy    = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowBuy  and dtfValue > dtfBuyLv)
-    bool   dSell   = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowSell and dtfValue < dtfSellLv)
+    bool   dBuy    = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowBuy  and (dtfValue > dtfBuyLv  or dtfAtBuyLv))
+    bool   dSell   = (dBefore and dtfBefore == "Pass") or (dOpen and dtfAllowSell and (dtfValue < dtfSellLv or dtfAtSellLv))
     string dMode   = dtfArmNow ? " (NOW)" : dtfSigOn ? (dtfSigDir > 0 ? " (SIGNAL BUY)" : dtfSigDir < 0 ? " (SIGNAL SELL)" : " (SIGNAL)") : ""
     string dState  = (dBefore ? (dtfTooShort ? "WAITING (< 1 bar)" : "WAITING") : dOpen ? "OPEN" : "ENDED") + dMode
     color  dCol    = dBefore ? color.yellow : dOpen ? color.lime : color.orange
