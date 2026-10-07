@@ -880,6 +880,8 @@ struct FgPending
    double            dst;     // trail distance, ticks
    datetime          placed;  // open time of the signal candle
    datetime          nextTry; // no new attempt before this time (after a failure)
+   bool              triggered; // the stop was hit and the filter allowed it: retries
+                                // no longer need the price or the filter again
   };
 
 //--- the filter's answer at a moment
@@ -965,6 +967,7 @@ void PendingClear(FgPending &q)
    q.dst     = EMPTY_VALUE;
    q.placed  = 0;
    q.nextTry = 0;
+   q.triggered = false;
   }
 
 double TickSize(void)
@@ -1087,17 +1090,22 @@ bool TrailLoad(const long id, double &act, double &dst)
    return true;
   }
 
-// Deletes the trail records of closed positions: the record of an open
-// position is read on every tick, so a record unread for a day is stale.
+// Deletes the trail records of closed positions: a record unread for a day
+// whose position is no longer open (on any symbol or chart).
 void TrailCleanup(void)
   {
    string pre = "FGEA_" + IntegerToString(InpMagic) + "_";
    for(int i = GlobalVariablesTotal() - 1; i >= 0; i--)
      {
       string name = GlobalVariableName(i);
-      if(StringFind(name, pre) != 0)
+      if(StringFind(name, pre) != 0 || TimeLocal() - GlobalVariableTime(name) <= 86400)
          continue;
-      if(TimeLocal() - GlobalVariableTime(name) > 86400)
+      long id   = StringToInteger(StringSubstr(name, StringLen(pre)));   // stops at the '_'
+      bool open = false;
+      for(int j = PositionsTotal() - 1; j >= 0 && !open; j--)
+         if(PositionGetTicket(j) > 0 && PositionGetInteger(POSITION_IDENTIFIER) == id)
+            open = true;
+      if(!open)
          GlobalVariableDel(name);
      }
   }
@@ -1310,6 +1318,7 @@ void ManageTrailing(void)
    double minD = (double)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) * _Point;
    double frz  = (double)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL) * _Point;
    double gap  = MathMax(minD, frz);
+   double ts   = TickSize();
    double step = MathMax(_Point, InpTrailStepPts * g_pt);
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
@@ -1328,16 +1337,17 @@ void ManageTrailing(void)
         {
          if((bid - open) / g_pt >= act)
            {
-            nsl  = RoundDn(bid - dst * g_pt);
-            send = (sl == 0.0 || nsl >= sl + step) && bid - nsl >= gap && (sl == 0.0 || frz == 0.0 || bid - sl > frz);
+            // at the trail distance, or the closest the server allows
+            nsl  = RoundDn(MathMin(bid - dst * g_pt, bid - gap - ts));
+            send = (sl == 0.0 || nsl >= sl + step) && (sl == 0.0 || frz == 0.0 || bid - sl > frz) && (tp == 0.0 || tp - bid > gap);
            }
         }
       else
         {
          if((open - ask) / g_pt >= act)
            {
-            nsl  = RoundUp(ask + dst * g_pt);
-            send = (sl == 0.0 || nsl <= sl - step) && nsl - ask >= gap && (sl == 0.0 || frz == 0.0 || sl - ask > frz);
+            nsl  = RoundUp(MathMax(ask + dst * g_pt, ask + gap + ts));
+            send = (sl == 0.0 || nsl <= sl - step) && (sl == 0.0 || frz == 0.0 || sl - ask > frz) && (tp == 0.0 || ask - tp > gap);
            }
         }
       if(send && !g_trade.PositionModify(tk, nsl, tp))
@@ -1362,18 +1372,47 @@ void RetryCloses(void)
       g_closeS = CountPos(POSITION_TYPE_SELL) > 0 && !ClosePos(POSITION_TYPE_SELL);
   }
 
+// A position opened from a pending whose order answer was lost: give it the
+// pending's trail record and SL / TP from its fill, as OpenPos would have.
+void AdoptFill(const ENUM_POSITION_TYPE type, const FgPending &q)
+  {
+   bool buy = type == POSITION_TYPE_BUY;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk == 0 || !IsMine() || (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) != type)
+         continue;
+      if((datetime)PositionGetInteger(POSITION_TIME) < q.placed)
+         continue;
+      long   id = PositionGetInteger(POSITION_IDENTIFIER);
+      double a  = 0.0, d = 0.0;
+      if(TrailLoad(id, a, d))
+         continue;   // already recorded by OpenPos
+      if(InpUseTrail && q.act != EMPTY_VALUE && q.dst != EMPTY_VALUE)
+         TrailSave(id, q.act, q.dst);
+      double sl  = PositionGetDouble(POSITION_SL);
+      double tp  = PositionGetDouble(POSITION_TP);
+      double sl2 = 0.0, tp2 = 0.0;
+      Levels(buy, PositionGetDouble(POSITION_PRICE_OPEN), q, sl2, tp2);
+      if(sl2 != sl || tp2 != tp)
+         g_trade.PositionModify(tk, sl2, tp2);
+     }
+  }
+
 // An entry stop whose side is already in a position opened since the stop
-// was placed has filled (even if the order's answer was lost): cancel both
-// stops (OCA).
+// was placed has filled (even if the order's answer was lost): adopt that
+// position and cancel both stops (OCA).
 void ReconcilePendings(void)
   {
    if(g_pL.active && CountPos(POSITION_TYPE_BUY) > 0 && NewestPosTime(POSITION_TYPE_BUY, false) >= g_pL.placed)
      {
+      AdoptFill(POSITION_TYPE_BUY, g_pL);
       PendingClear(g_pL);
       PendingClear(g_pS);
      }
    if(g_pS.active && CountPos(POSITION_TYPE_SELL) > 0 && NewestPosTime(POSITION_TYPE_SELL, false) >= g_pS.placed)
      {
+      AdoptFill(POSITION_TYPE_SELL, g_pS);
       PendingClear(g_pS);
       PendingClear(g_pL);
      }
@@ -1428,6 +1467,7 @@ void OnCandleClose(const int k)
          g_pL.dst     = trailDstNow;
          g_pL.placed  = g_sig.tfs[g_sig.fi].t[k];
          g_pL.nextTry = 0;
+         g_pL.triggered = false;
         }
      }
 
@@ -1446,6 +1486,7 @@ void OnCandleClose(const int k)
          g_pS.dst     = trailDstNow;
          g_pS.placed  = g_sig.tfs[g_sig.fi].t[k];
          g_pS.nextTry = 0;
+         g_pS.triggered = false;
         }
      }
 
@@ -1486,12 +1527,20 @@ void CheckPendings(void)
       return;
    double   bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    datetime now = TimeCurrent();
-   if(g_pL.active && bid >= g_pL.price && now >= g_pL.nextTry && CountPos(POSITION_TYPE_BUY) == 0 && !ForeignPosition())
+   if(g_pL.active && (g_pL.triggered || bid >= g_pL.price) && now >= g_pL.nextTry && CountPos(POSITION_TYPE_BUY) == 0 && !ForeignPosition())
      {
-      FgPerm r;
-      FilterPermission(r);
-      if(r.buyOk)
+      bool ok = g_pL.triggered;
+      if(!ok)
         {
+         FgPerm r;
+         FilterPermission(r);
+         ok = r.buyOk;
+        }
+      if(ok)
+        {
+         // hit and allowed: like a filled stop, retries (after a failure) no
+         // longer wait for the price or the filter, so a reversal is completed
+         g_pL.triggered = true;
          // the long reverses an open short
          if(CountPos(POSITION_TYPE_SELL) > 0 && !ClosePos(POSITION_TYPE_SELL))
            {
@@ -1501,6 +1550,8 @@ void CheckPendings(void)
          uint rc = OpenPos(true, g_pL);
          if(rc == TRADE_RETCODE_DONE || CountPos(POSITION_TYPE_BUY) > 0)
            {
+            if(rc != TRADE_RETCODE_DONE)
+               AdoptFill(POSITION_TYPE_BUY, g_pL);
             PendingClear(g_pL);
             PendingClear(g_pS);
             return;
@@ -1508,12 +1559,18 @@ void CheckPendings(void)
          Backoff(g_pL, rc);
         }
      }
-   if(g_pS.active && bid <= g_pS.price && now >= g_pS.nextTry && CountPos(POSITION_TYPE_SELL) == 0 && !ForeignPosition())
+   if(g_pS.active && (g_pS.triggered || bid <= g_pS.price) && now >= g_pS.nextTry && CountPos(POSITION_TYPE_SELL) == 0 && !ForeignPosition())
      {
-      FgPerm r;
-      FilterPermission(r);
-      if(r.sellOk)
+      bool ok = g_pS.triggered;
+      if(!ok)
         {
+         FgPerm r;
+         FilterPermission(r);
+         ok = r.sellOk;
+        }
+      if(ok)
+        {
+         g_pS.triggered = true;
          if(CountPos(POSITION_TYPE_BUY) > 0 && !ClosePos(POSITION_TYPE_BUY))
            {
             g_pS.nextTry = now + 5;
@@ -1522,6 +1579,8 @@ void CheckPendings(void)
          uint rc = OpenPos(false, g_pS);
          if(rc == TRADE_RETCODE_DONE || CountPos(POSITION_TYPE_SELL) > 0)
            {
+            if(rc != TRADE_RETCODE_DONE)
+               AdoptFill(POSITION_TYPE_SELL, g_pS);
             PendingClear(g_pS);
             PendingClear(g_pL);
             return;
@@ -1739,17 +1798,32 @@ int OnInit()
    g_trade.SetTypeFillingBySymbol(_Symbol);
 
    // an input edit or a chart change re-initialises the EA without unloading
-   // it: keep the entry stops if the trading timeframe is the same
-   static ENUM_TIMEFRAMES s_prevTf = PERIOD_CURRENT;
+   // it: keep the entry stops for the same symbol, magic and trading
+   // timeframe, minus a side the new Direction no longer allows
+   static ENUM_TIMEFRAMES s_prevTf    = PERIOD_CURRENT;
+   static string          s_prevSym   = "";
+   static long            s_prevMagic = 0;
    int  ur   = UninitializeReason();
-   bool keep = (ur == REASON_PARAMETERS || ur == REASON_CHARTCHANGE) && s_prevTf == g_tradeTf;
+   bool keep = (ur == REASON_PARAMETERS || ur == REASON_CHARTCHANGE) && s_prevTf == g_tradeTf &&
+               s_prevSym == _Symbol && s_prevMagic == InpMagic;
    if(!keep)
      {
       PendingClear(g_pL);
       PendingClear(g_pS);
       g_lastBar = 0;
+      g_closeL  = false;
+      g_closeS  = false;
      }
-   s_prevTf = g_tradeTf;
+   else
+     {
+      if(InpDirection == FG_DIR_SHORT)
+         PendingClear(g_pL);
+      if(InpDirection == FG_DIR_LONG)
+         PendingClear(g_pS);
+     }
+   s_prevTf    = g_tradeTf;
+   s_prevSym   = _Symbol;
+   s_prevMagic = InpMagic;
 
    g_base       = TimeCurrent();
    g_sigReset   = true;
@@ -1824,13 +1898,20 @@ void OnTick()
            }
      }
 
-   if(fltReady)
+   // entries wait until the candle that closed has been processed (its
+   // order block can cancel or replace the stops)
+   bool closeDone = bar0 != 0 && bar0 == g_lastBar;
+   if(fltReady && closeDone)
       CheckPendings();
    ShowStatus(fltReady);
 
-   // the positions at the end of this tick (the state at a candle's close)
-   g_snapL  = CountPos(POSITION_TYPE_BUY) > 0;
-   g_snapS  = CountPos(POSITION_TYPE_SELL) > 0;
-   g_snapOk = true;
+   // the positions at the end of this tick (the state at a candle's close),
+   // kept from the last tick of a candle whose close is not processed yet
+   if(closeDone)
+     {
+      g_snapL  = CountPos(POSITION_TYPE_BUY) > 0;
+      g_snapS  = CountPos(POSITION_TYPE_SELL) > 0;
+      g_snapOk = true;
+     }
   }
 //+------------------------------------------------------------------+
