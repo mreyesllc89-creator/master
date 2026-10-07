@@ -1,6 +1,6 @@
 //@version=6
 // ============================================================================
-//  DIRECTIONAL TIME FILTER  -  v1.6
+//  DIRECTIONAL TIME FILTER  -  v1.7
 // ----------------------------------------------------------------------------
 //  A time-boxed direction PERMISSION you can bolt onto any script. It only
 //  answers "is a buy allowed now? is a sell allowed now?". Your script's own
@@ -21,6 +21,18 @@
 //                   price, countdown runs, then closed until the next signal.
 //                   Buys allowed only above the signal price, sells only
 //                   below it. Works in backtests: committed bars only.
+//                   "Signal logic" picks the signal:
+//                     TDI cross (strategy)  default. The strategy's signal:
+//                       TDI price line (SMA 2 of RSI 21) crosses ABOVE the
+//                       signal line (SMA 7 of RSI 21) while it is above the
+//                       market base line (SMA 34 of RSI 21) = BUY; crosses
+//                       BELOW while below the base line = SELL. Level = the
+//                       close of the cross bar. Calibrated on the strategy's
+//                       BYBIT:BTCUSDT 2m export (2026-10-03..05): it fires on
+//                       exactly the strategy's 35 Long and 50 Short bars,
+//                       and on no other bar.
+//                     FlashGold v5  the v1.6 signal (RSI 14 TDI direction,
+//                       parent + child zones, burst gate, entry hold).
 //    ACTIVATE NOW   (manual, one click)  Tick it, press OK. The window opens
 //                   at that moment and the level is the price at that moment
 //                   (or a price you type, see "Level when activating").
@@ -177,7 +189,7 @@ DTF_FORCE_OVERLAY = false
 // does not round the level to the symbol's tick.
 DTF_LEVEL_IS_PRICE = true
 GRP_DTF = "Directional time filter"
-dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: closed at all times except the window a FlashGold signal opens (or ACTIVATE NOW / Start time): then buys are allowed only above the level, sells only below it.")
+dtfOn        = input.bool(true, "Enable filter", group=GRP_DTF, tooltip="Off: every signal passes. On: closed at all times except the window a direction signal opens (or ACTIVATE NOW / Start time): then buys are allowed only above the level, sells only below it.")
 dtfArmNow    = input.bool(false, "ACTIVATE NOW", group=GRP_DTF, tooltip="Tick and press OK: the window opens at this moment and the level is the price at this moment. Start time and the manual levels are ignored. Untick + OK to disarm. While ticked, ANY settings change or chart reload activates it again at that moment and price (the status box shows what is armed). Not for alerts or for strategies linked through input.source: use Start time for those.")
 dtfLvMode    = input.string("Actual price", "Level when activating", options=["Actual price", "Typed price"], group=GRP_DTF, tooltip="Actual price: ACTIVATE NOW captures the live price at that instant as the level. Typed price: the level is the number below.")
 dtfTyped     = input.float(0, "Typed price", minval=0, group=GRP_DTF, tooltip="The level used by ACTIVATE NOW when 'Level when activating' is 'Typed price'. Buys allowed only above it, sells only below it.")
@@ -212,17 +224,44 @@ dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
 dtfValue  = dtfRef
 dtfByBars = dtfDurUnit == "Candles"
 
-// ===== SIGNAL LOGIC SLOT: FlashGold Continuation v5 direction =================
+// ===== SIGNAL LOGIC SLOT ======================================================
+// Two direction signals, picked by "Signal logic". Orders, exits and sizing
+// are NOT here: this only decides direction. It lives in dtfSignal(ctxSec),
+// which returns [buy signal, sell signal, signal price]: it runs on the
+// chart, and on the filter timeframe when that add-on is on (ctxSec = seconds
+// of the timeframe it runs on, so "the chart" in the tooltips below means
+// that timeframe). To arm from your own logic, replace the body of dtfSignal
+// and keep what it returns.
+gSig = "Signal logic"
+sigLogic = input.string("TDI cross (strategy)", "Signal logic", options = ["TDI cross (strategy)", "FlashGold v5"], group = gSig, tooltip = "TDI cross (strategy): the strategy's signal, calibrated on its export: the TDI price line crosses the signal line on the side of the market base line. FlashGold v5: the v1.6 signal (TDI direction, zones, burst gate, entry hold). Each logic only uses its own group of inputs below.")
+
+// ---- TDI cross (strategy) ---------------------------------------------------
+// The TDI of the strategy: RSI 21 of close; price line = SMA 2 of it, signal
+// line = SMA 7, market base line = SMA 34. BUY when the price line crosses
+// above the signal line while above the base line; SELL when it crosses below
+// while below the base line. Level = the close of the cross bar.
+gTdiX = "TDI cross (strategy)"
+tdiXRsiLen   = input.int(21, "RSI length", minval = 2, group = gTdiX)
+tdiXPriceLen = input.int(2, "Price line, SMA of RSI", minval = 1, group = gTdiX)
+tdiXSigLen   = input.int(7, "Signal line, SMA of RSI", minval = 1, group = gTdiX)
+tdiXBaseLen  = input.int(34, "Market base line, SMA of RSI", minval = 1, group = gTdiX)
+tdiXUseBase  = input.bool(true, "Buy only above the base line, sell only below", group = gTdiX, tooltip = "On (the strategy): a cross counts only on the side of the market base line. Off: every cross of the price line and the signal line is a signal.")
+
+tdiCrossSignal() =>
+    float xRsi   = ta.rsi(close, tdiXRsiLen)
+    float xPrice = ta.sma(xRsi, tdiXPriceLen)
+    float xSig   = ta.sma(xRsi, tdiXSigLen)
+    float xBase  = ta.sma(xRsi, tdiXBaseLen)
+    bool  xBuy   = ta.crossover(xPrice, xSig) and (not tdiXUseBase or xPrice > xBase)
+    bool  xSell  = ta.crossunder(xPrice, xSig) and (not tdiXUseBase or xPrice < xBase)
+    [xBuy, xSell, close]
+
+// ---- FlashGold Continuation v5 direction ------------------------------------
 // The direction logic of "FlashGold Continuation v5 - TDI Trade Zone Filter"
 // (© ghostsmartfire), as in the FlashGold v5 strategy: bid/ask model, TDI
 // direction (RSI -> SMA fast / slow, fast rising = BUY), parent + six child
 // zones alignment, burst gate, prior-drift filter, entry hold, one signal per
-// bar. Orders, exits and sizing are NOT here: this only decides direction.
-// It lives in dtfSignal(ctxSec), which returns [buy signal, sell signal,
-// signal price]: it runs on the chart, and on the filter timeframe when that
-// add-on is on (ctxSec = seconds of the timeframe it runs on, so "the chart"
-// in the tooltips below means that timeframe). To arm from your own logic,
-// replace the body of dtfSignal and keep what it returns.
+// bar.
 gCore = "FlashGold Core"
 spreadPoints          = input.float(25.0, "Spread pts", minval = 0.0, step = 0.1, group = gCore, tooltip = "Full spread in points (mintick units). Half of it offsets bid and ask.")
 entryDistPoints       = input.float(50.0, "Entry distance pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
@@ -289,7 +328,7 @@ zoneOn(bool use, int dir) =>
 alignCount(int dir, bool useZone, int side) =>
     useZone and side != 0 and dir == side ? 1 : 0
 
-dtfSignal(int ctxSec) =>
+fgSignal(int ctxSec) =>
     // price model
     pt = syminfo.mintick
     halfSpread = spreadPoints * pt * 0.5
@@ -406,6 +445,14 @@ dtfSignal(int ctxSec) =>
     // The level is the strategy's entry trigger price (ask/bid +/- entry distance).
     float signalPx = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
     [buySignal, sellSignal, signalPx]
+
+// The direction signal of the selected logic. Both logics run on every bar
+// (their state must stay continuous); only the selected one is returned.
+dtfSignal(int ctxSec) =>
+    [fgBuy, fgSell, fgPx] = fgSignal(ctxSec)
+    [txBuy, txSell, txPx] = tdiCrossSignal()
+    bool useFg = sigLogic == "FlashGold v5"
+    [useFg ? fgBuy : txBuy, useFg ? fgSell : txSell, useFg ? fgPx : txPx]
 
 // The chart's own direction signal.
 [dtfBuySignal, dtfSellSignal, dtfSignalPx] = dtfSignal(timeframe.in_seconds())
