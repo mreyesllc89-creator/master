@@ -27,6 +27,20 @@
 //    nothing repaints); price is compared to the level at every chart bar.
 //    "current" = the chart's own timeframe.
 //
+//  CHECK PRICE ON (when price is compared to the level)
+//    Tick (default)  The live price, on every tick: a buy is allowed the
+//                    moment price trades above the level. Closed candles keep
+//                    the answer of their last tick (their close, at their
+//                    close time).
+//    Candle open     Each candle's OPEN, at its open time. Decided on the
+//                    candle's first tick and fixed for the whole candle.
+//    Candle close    Each candle's CLOSE, at its close time. While a candle
+//                    is forming, the last closed candle's answer stays in
+//                    force; the candle gets its own answer when it closes.
+//    The signal in force is judged at the same moment: in Candle open, an H1
+//    signal counts from the first candle that opens at or after its H1 close.
+//    Candle open and Candle close never change inside a candle.
+//
 //  OUTPUT BUFFERS (Data Window, iCustom + CopyBuffer)
 //    0  FGF buy allowed    1 when a buy may be taken on this bar, else 0
 //    1  FGF sell allowed   1 when a sell may be taken on this bar, else 0
@@ -39,10 +53,14 @@
 //  USE IT IN AN EA
 //    Copy this file to MQL5\Indicators and compile it (F7). In the EA:
 //        int fgf = iCustom(_Symbol, _Period, "FlashGold_Direction_Filter");
-//    On each new bar read the last CLOSED bar (shift 1), as the TradingView
-//    strategy does at the bar close:
+//    Read the bar that matches "Check price on":
+//        Tick          shift 0, on every tick (the answer right now)
+//        Candle open   shift 0 (fixed from the candle's first tick)
+//        Candle close  shift 1 on each new bar (the candle that just closed);
+//                      shift 0 gives the same answer until the candle closes
+//        int shift = 0;   // 1 for Candle close on a new bar
 //        double b[1], s[1];
-//        if(CopyBuffer(fgf, 0, 1, 1, b) == 1 && CopyBuffer(fgf, 1, 1, 1, s) == 1)
+//        if(CopyBuffer(fgf, 0, shift, 1, b) == 1 && CopyBuffer(fgf, 1, shift, 1, s) == 1)
 //          {
 //           if(myBuySignal  && b[0] == 1.0) { /* open the buy  */ }
 //           if(mySellSignal && s[0] == 1.0) { /* open the sell */ }
@@ -116,6 +134,12 @@ enum ENUM_FGF_LASTS
    FGF_LASTS_MINUTES = 1, // Minutes
    FGF_LASTS_CANDLES = 2  // Candles
   };
+enum ENUM_FGF_CHECK
+  {
+   FGF_CHECK_TICK  = 0, // Tick
+   FGF_CHECK_OPEN  = 1, // Candle open
+   FGF_CHECK_CLOSE = 2  // Candle close
+  };
 enum ENUM_FGF_UNIT
   {
    FGF_UNIT_ATR    = 0, // ATR
@@ -141,7 +165,7 @@ input ENUM_FGF_LEVEL     InpLvMode    = FGF_LEVEL_ENTRY;   // Level
 input ENUM_FGF_LASTS     InpLast      = FGF_LASTS_NEXT;    // Permission lasts
 input int                InpMinutes   = 60;                // Minutes
 input int                InpBars      = 1;                 // Candles
-input ENUM_APPLIED_PRICE InpRef       = PRICE_CLOSE;       // Price compared
+input ENUM_FGF_CHECK     InpCheck     = FGF_CHECK_TICK;    // Check price on
 input bool               InpAllowBuy  = true;              // Allow buys
 input bool               InpAllowSell = true;              // Allow sells
 input bool               InpShowBg    = true;              // Shade
@@ -584,27 +608,6 @@ string FormatTime(const datetime x)
    return mon[d.mon - 1] + " " + StringFormat("%02d %02d:%02d", d.day, d.hour, d.min);
   }
 
-double Applied(const int i, const double &o[], const double &hi[], const double &lo[], const double &cl[])
-  {
-   switch(InpRef)
-     {
-      case PRICE_OPEN:
-         return o[i];
-      case PRICE_HIGH:
-         return hi[i];
-      case PRICE_LOW:
-         return lo[i];
-      case PRICE_MEDIAN:
-         return (hi[i] + lo[i]) / 2.0;
-      case PRICE_TYPICAL:
-         return (hi[i] + lo[i] + cl[i]) / 3.0;
-      case PRICE_WEIGHTED:
-         return (hi[i] + lo[i] + cl[i] + cl[i]) / 4.0;
-      default:
-         return cl[i];
-     }
-  }
-
 //+------------------------------------------------------------------+
 //| FLASHGOLD SIGNAL (the strategy's logic, unchanged) and arming,    |
 //| on filter candle k.                                               |
@@ -1032,7 +1035,7 @@ void UpdateTable(const datetime now)
       return;
      }
    FgBar  L      = g_last;
-   bool   dOpen  = L.isOpen && !(InpLast == FGF_LASTS_MINUTES && L.endT > 0 && now >= L.endT);
+   bool   dOpen  = L.isOpen && !(InpCheck == FGF_CHECK_TICK && InpLast == FGF_LASTS_MINUTES && L.endT > 0 && now >= L.endT);
    bool   lvOk   = L.level != EMPTY_VALUE;
    bool   dBuy   = dOpen && InpAllowBuy && ((lvOk && L.value > L.level) || L.atBuy);
    bool   dSell  = dOpen && InpAllowSell && ((lvOk && L.value < L.level) || L.atSell);
@@ -1068,7 +1071,7 @@ void UpdateTable(const datetime now)
    g_tblClr[2][0] = FGF_WHITE;
    g_tblTxt[2][1] = dLeft;
    g_tblClr[2][1] = FGF_WHITE;
-   g_tblTxt[3][0] = "Price now";
+   g_tblTxt[3][0] = InpCheck == FGF_CHECK_OPEN ? "Candle open" : (InpCheck == FGF_CHECK_CLOSE ? "Last close" : "Price now");
    g_tblClr[3][0] = FGF_WHITE;
    g_tblTxt[3][1] = DoubleToString(L.value, g_digits);
    g_tblClr[3][1] = FGF_WHITE;
@@ -1093,10 +1096,36 @@ void UpdateTable(const datetime now)
 void CalcBar(const int i, const int total, const datetime now, const datetime &time[],
              const double &op[], const double &hi[], const double &lo[], const double &cl[])
   {
-   // Clock: a closed bar is judged at its close time (never repaints); the
-   // forming bar uses the real clock.
+   // Clock and price: the moment a bar is judged ("Check price on").
+   //   Tick          a closed bar at its close time with its close; the
+   //                 forming bar at the real clock with the live price.
+   //   Candle open   every bar at its open time with its open.
+   //   Candle close  a closed bar at its close time with its close; the
+   //                 forming bar at its open time with the last close.
+   // Closed bars never repaint in any mode. The last bar counts as closed
+   // once its close time has passed (no new tick yet).
    bool     last  = i == total - 1;
-   datetime clock = last ? (now > time[i] ? now : time[i]) : BarClose(Period(), time[i]);
+   datetime close_t = BarClose(Period(), time[i]);
+   bool     live  = last && now < close_t;
+   datetime clock = close_t;
+   double   value = cl[i];
+   if(InpCheck == FGF_CHECK_OPEN)
+     {
+      clock = time[i];
+      value = op[i];
+     }
+   else
+      if(InpCheck == FGF_CHECK_CLOSE)
+        {
+         if(live)
+           {
+            clock = time[i];
+            value = cl[i - 1];
+           }
+        }
+      else
+         if(live)
+            clock = now > time[i] ? now : time[i];
 
    // The arm in force: the latest filter candle closed by this clock.
    int k = g_tf[g_fi].LastClosedBy(clock);
@@ -1124,7 +1153,6 @@ void CalcBar(const int i, const int total, const datetime now, const datetime &t
       idx    = g_tf[g_fi].tc[k] == clock ? k : k + 1;
      }
 
-   double value = Applied(i, op, hi, lo, cl);
    bool   lvOk  = level != EMPTY_VALUE;
 
    // permission window: from the signal candle's close until the next signal

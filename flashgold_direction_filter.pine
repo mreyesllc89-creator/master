@@ -51,7 +51,7 @@
 //                       minutes, or filter candles counted from the signal
 //                       candle (1 = the signal candle only); then nothing is
 //                       allowed until the next signal.
-//    Price compared     The live price ("Close"), compared to the level.
+//    Check price on     When price is compared to the level (see below).
 //    Allow buys/sells   Turn one side off completely.
 //  The "FlashGold signal" groups are the strategy's signal inputs, same
 //  defaults, same logic: bid/ask model, TDI direction (fast line rising =
@@ -87,12 +87,28 @@
 //     settings, and gate with   myBuySignal and fgfBuyExt == 1
 //     (== 1: an unlinked source is still 'close' and must not count).
 //
+//  CHECK PRICE ON  (when price is compared to the level)
+//    Tick (default)  The live price, on every tick: a buy is allowed the
+//                    moment price trades above the level. Closed candles keep
+//                    the answer of their last tick (their close, at their
+//                    close time). A Pine strategy acts on ticks only with
+//                    calc_on_every_tick = true; otherwise it reads the close.
+//    Candle open     Each candle's OPEN, at its open time. Decided on the
+//                    candle's first tick and fixed for the whole candle.
+//    Candle close    Each candle's CLOSE, at its close time. While a candle
+//                    is forming, the last closed candle's answer stays in
+//                    force; the candle gets its own answer when it closes.
+//    The signal in force is judged at the same moment: in Candle open, a 1H
+//    signal counts from the first candle that opens at or after its 1H close.
+//    Candle open and Candle close never change inside a candle.
+//
 //  TIMING
-//  Every bar is judged at its close, on history and live alike, so a strategy
-//  backtests as it runs live. While a live bar is still forming the real
-//  clock is used (shading, status box). A Minutes permission covers the
-//  chart bars whose close is in [signal candle close, + minutes). An
-//  order placed on the last allowed bar fills on the next bar's open.
+//  Every closed bar is judged at a fixed moment (its open or its close), on
+//  history and live alike, so a strategy backtests as it runs live. While a
+//  live bar is still forming, Tick uses the real clock (shading, status box,
+//  gates). A Minutes permission covers the bars whose judging moment is in
+//  [signal candle close, + minutes). An order placed on the last allowed bar
+//  fills on the next bar's open.
 // ============================================================================
 indicator("FlashGold Direction Filter", "FG-DF", overlay=true, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
@@ -108,7 +124,7 @@ fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Sig
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
 fgfMinutes   = input.int(60, "Minutes", minval=1, group=GRP_FGF)
 fgfBars      = input.int(1, "Candles", minval=1, group=GRP_FGF)
-fgfRef       = input.source(close, "Price compared", group=GRP_FGF, tooltip="The price compared to the level. 'Close' is the live price (the last traded price of the current bar).")
+fgfCheck     = input.string("Tick", "Check price on", options=["Tick", "Candle open", "Candle close"], group=GRP_FGF, tooltip="When price is compared to the level. Tick: the live price, on every tick (closed candles keep their close). Candle open: each candle's open, decided on its first tick and fixed for the whole candle. Candle close: each candle's close, decided when it closes; while a candle is forming, the last closed candle's answer stays in force.")
 fgfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_FGF)
 fgfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_FGF, tooltip="Turn one side off completely.")
 fgfShowBg    = input.bool(true, "Shade", inline="vis", group=GRP_FGF)
@@ -341,10 +357,15 @@ fgfTfText(string tf) =>
     sec < 60 ? str.tostring(sec) + "s" : sec < 3600 ? str.tostring(sec / 60, "#.##") + "m" : sec < 86400 ? str.tostring(sec / 3600, "#.##") + "H" : tf
 string fgfTfTag = fgfTfText(fgfTfEff)
 
-// Clock. The committed value of a bar (history, and the closing update of the
-// live bar) is judged at the bar's close time, so it never repaints. Intrabar
-// ticks of the live bar use the real clock.
-fgfClock = barstate.isconfirmed ? nz(time_close, time) : timenow
+// Clock: the moment a bar is judged ("Check price on").
+//   Tick          a closed bar at its close time; the live bar at the real
+//                 clock (every tick).
+//   Candle open   every bar at its open time (fixed from its first tick).
+//   Candle close  a closed bar at its close time; the live bar at its open
+//                 time, with the last closed candle's close (see fgfValue).
+// Closed bars never repaint in any mode.
+bool fgfLiveBar = not barstate.isconfirmed
+fgfClock = fgfCheck == "Candle open" or (fgfCheck == "Candle close" and fgfLiveBar) ? time : fgfLiveBar ? timenow : nz(time_close, time)
 
 // The arm in force: the latest filter candle's once it has closed by this
 // clock, else the candle before it.
@@ -362,7 +383,8 @@ int   fgfAc     = fgfDone ? fpAc  : fqAc
 // at the clock is the one judged, as on its own chart.
 int   fgfIdx    = fgfClock <= fpOpen ? fpIdx - 1 : fgfClock <= fpClose ? fpIdx : fpIdx + 1
 
-fgfValue = fgfRef
+// The price compared to the level, at that moment.
+fgfValue = fgfCheck == "Candle open" ? open : fgfCheck == "Candle close" and fgfLiveBar ? close[1] : close
 
 // Permission window: from the signal candle's close, until the next signal
 // (or the minutes / candles run out).
@@ -427,7 +449,7 @@ if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom)
 // Status box, judged by the real clock (display only; the gates never use it).
 var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 7, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
 if fgfShowTbl and fgfOn and barstate.islast
-    bool   dOpen  = fgfOpen and not (fgfLast == "Minutes" and timenow >= fgfEnd)
+    bool   dOpen  = fgfOpen and not (fgfCheck == "Tick" and fgfLast == "Minutes" and timenow >= fgfEnd)
     bool   dBuy   = dOpen and fgfAllowBuy  and (fgfValue > fgfLevel or fgfAtBuyLv)
     bool   dSell  = dOpen and fgfAllowSell and (fgfValue < fgfLevel or fgfAtSellLv)
     string dSide  = fgfSigDir > 0 ? "BUY" : "SELL"
@@ -445,7 +467,7 @@ if fgfShowTbl and fgfOn and barstate.islast
     table.cell(fgfTable, 1, 1, dSig, text_color=fgfSigDir > 0 ? color.lime : fgfSigDir < 0 ? color.red : color.white)
     table.cell(fgfTable, 0, 2, "Left", text_color=color.white)
     table.cell(fgfTable, 1, 2, dLeft, text_color=color.white)
-    table.cell(fgfTable, 0, 3, "Price now", text_color=color.white)
+    table.cell(fgfTable, 0, 3, fgfCheck == "Candle open" ? "Candle open" : fgfCheck == "Candle close" ? "Last close" : "Price now", text_color=color.white)
     table.cell(fgfTable, 1, 3, na(fgfValue) ? "-" : str.tostring(fgfValue, format.mintick), text_color=color.white)
     table.cell(fgfTable, 0, 4, (fgfOnSigBar and fgfSigDir > 0 ? "Buy >= " : "Buy  > ") + dLv, text_color=color.white)
     table.cell(fgfTable, 1, 4, dBuy ? "ALLOWED" : "BLOCKED", text_color=dBuy ? color.lime : color.red)
