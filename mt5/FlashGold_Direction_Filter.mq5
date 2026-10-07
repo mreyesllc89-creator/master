@@ -201,7 +201,7 @@ input bool          InpUseDrift     = false;        // Use prior drift filter
 
 input group "FlashGold signal: TDI trade zone"
 input bool            InpUseZones   = true;      // Use TDI trade-zone filter
-input ENUM_TIMEFRAMES InpParentTf   = PERIOD_H1; // Parent obedience timeframe
+input ENUM_TIMEFRAMES InpParentTf   = PERIOD_H1; // Parent obedience timeframe (current = filter timeframe)
 input int             InpRsiLen     = 14;        // TDI RSI length
 input int             InpFastLen    = 2;         // TDI white fast length
 input int             InpMinAligned = 2;         // Minimum child zones aligned
@@ -209,17 +209,17 @@ input bool            InpFlatParent = false;     // Allow trade if parent is fla
 input bool            InpIgnoreNa   = true;      // Ignore zones without data
 input bool            InpHtfClosed  = true;      // Higher-TF zones use the last CLOSED bar
 input bool            InpUseZ1      = true;      // Use child zone 1
-input ENUM_TIMEFRAMES InpZTf1       = PERIOD_H1; // Zone 1 timeframe
+input ENUM_TIMEFRAMES InpZTf1       = PERIOD_H1; // Zone 1 timeframe (current = filter timeframe)
 input bool            InpUseZ2      = true;      // Use child zone 2
-input ENUM_TIMEFRAMES InpZTf2       = PERIOD_H2; // Zone 2 timeframe
+input ENUM_TIMEFRAMES InpZTf2       = PERIOD_H2; // Zone 2 timeframe (current = filter timeframe)
 input bool            InpUseZ3      = true;      // Use child zone 3
-input ENUM_TIMEFRAMES InpZTf3       = PERIOD_H4; // Zone 3 timeframe
+input ENUM_TIMEFRAMES InpZTf3       = PERIOD_H4; // Zone 3 timeframe (current = filter timeframe)
 input bool            InpUseZ4      = false;     // Use child zone 4
-input ENUM_TIMEFRAMES InpZTf4       = PERIOD_H8; // Zone 4 timeframe
+input ENUM_TIMEFRAMES InpZTf4       = PERIOD_H8; // Zone 4 timeframe (current = filter timeframe)
 input bool            InpUseZ5      = false;     // Use child zone 5
-input ENUM_TIMEFRAMES InpZTf5       = PERIOD_M1; // Zone 5 timeframe
+input ENUM_TIMEFRAMES InpZTf5       = PERIOD_M1; // Zone 5 timeframe (current = filter timeframe)
 input bool            InpUseZ6      = false;     // Use child zone 6
-input ENUM_TIMEFRAMES InpZTf6       = PERIOD_M2; // Zone 6 timeframe
+input ENUM_TIMEFRAMES InpZTf6       = PERIOD_M2; // Zone 6 timeframe (current = filter timeframe)
 
 input group "MT5"
 input double InpTickSize = 0.0;   // Point size (0 = symbol point) = TradingView syminfo.mintick
@@ -284,8 +284,9 @@ public:
    double            fast[]; // ta.sma(rsi, InpFastLen)
    int               dir[];  // fast rising = 1, falling = -1, else 0
    double            atr[];  // ta.atr(14)
+   datetime          waitFrom; // first load: waiting for the history since
 
-                     CTf(void) : tf(PERIOD_CURRENT), n(0) {}
+                     CTf(void) : tf(PERIOD_CURRENT), n(0), waitFrom(0) {}
    int               Load(const datetime from, const bool reset);
    void              Calc(const int from);
    int               LastClosedBy(const datetime x) const;
@@ -323,6 +324,20 @@ int CTf::Load(const datetime from, const bool reset)
       got = CopyRates(_Symbol, tf, from, TimeCurrent(), r);
       if(got <= 0)
          return -1;
+      // accept the first load once the series is synchronized and starts
+      // near 'from' (or the broker has nothing older); stop waiting after 30 s
+      bool     synced   = SeriesInfoInteger(_Symbol, tf, SERIES_SYNCHRONIZED) != 0;
+      datetime srvFirst = (datetime)SeriesInfoInteger(_Symbol, tf, SERIES_SERVER_FIRSTDATE);
+      long     gap      = PeriodSeconds(tf) > 7 * 86400 ? (long)PeriodSeconds(tf) : (long)7 * 86400;
+      bool     starts   = (long)r[0].time <= (long)from + gap || (srvFirst > 0 && srvFirst >= r[0].time);
+      if(!synced || !starts)
+        {
+         if(waitFrom == 0)
+            waitFrom = TimeLocal();
+         if(TimeLocal() - waitFrom < 30)
+            return -1;
+        }
+      waitFrom = 0;
       first = 0;
      }
    else
@@ -1289,19 +1304,21 @@ int OnInit()
    g_fTf     = Resolve(InpTf);
    g_fSec    = PeriodSeconds(g_fTf);
    g_fi      = AddTf(g_fTf);
-   g_pi      = AddTf(Resolve(InpParentTf));
+   // "current" parent / zones = the filter timeframe (every input works as
+   // on that timeframe's own chart)
+   g_pi      = AddTf(InpParentTf == PERIOD_CURRENT ? g_fTf : InpParentTf);
    g_zUse[0] = InpUseZ1;
-   g_zTf[0]  = Resolve(InpZTf1);
+   g_zTf[0]  = InpZTf1 == PERIOD_CURRENT ? g_fTf : InpZTf1;
    g_zUse[1] = InpUseZ2;
-   g_zTf[1]  = Resolve(InpZTf2);
+   g_zTf[1]  = InpZTf2 == PERIOD_CURRENT ? g_fTf : InpZTf2;
    g_zUse[2] = InpUseZ3;
-   g_zTf[2]  = Resolve(InpZTf3);
+   g_zTf[2]  = InpZTf3 == PERIOD_CURRENT ? g_fTf : InpZTf3;
    g_zUse[3] = InpUseZ4;
-   g_zTf[3]  = Resolve(InpZTf4);
+   g_zTf[3]  = InpZTf4 == PERIOD_CURRENT ? g_fTf : InpZTf4;
    g_zUse[4] = InpUseZ5;
-   g_zTf[4]  = Resolve(InpZTf5);
+   g_zTf[4]  = InpZTf5 == PERIOD_CURRENT ? g_fTf : InpZTf5;
    g_zUse[5] = InpUseZ6;
-   g_zTf[5]  = Resolve(InpZTf6);
+   g_zTf[5]  = InpZTf6 == PERIOD_CURRENT ? g_fTf : InpZTf6;
    for(int z = 0; z < 6; z++)
       g_zi[z] = g_zUse[z] ? AddTf(g_zTf[z]) : -1;
    g_tfTag = TfText(g_fTf);

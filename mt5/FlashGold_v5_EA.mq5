@@ -39,14 +39,27 @@
 //
 //  DIFFERENCES FROM THE TRADINGVIEW STRATEGY
 //    - Fills: TradingView fills a stop at its price on the chart; here the EA
-//      opens at market when the Bid reaches the stop (slippage applies).
-//      SL / TP / trail are hit on the real side (Bid for a buy, Ask for a
-//      sell), so a sell's exits come a spread earlier than on TradingView.
+//      opens at market when the Bid reaches the stop (slippage applies), so
+//      a buy fills at the Ask, one spread above the stop. SL / TP / trail are
+//      measured from the real fill and hit on the real side (Bid for a buy,
+//      Ask for a sell), so P&L distances match the strategy; on the chart, SL
+//      comes one spread earlier and TP / trail activation one spread later
+//      than on TradingView, for both buys and sells. The trailing stop moves
+//      in steps of at least "Trail step" and respects the freeze level.
 //    - Costs: commission and slippage are your broker's. The 25-pt spread
 //      input only models the signal's bid/ask, as in the strategy.
 //    - Lots: 1 lot = the symbol's contract size (100 oz on most XAUUSD), so
 //      the strategy's 10 contracts = 0.10 lot.
-//    - Pending stops live in the EA: they are lost when the EA restarts.
+//    - Pending stops live in the EA: they survive an input or chart change
+//      but are lost when the EA or the terminal restarts.
+//    - A failed order is not resent on every tick: it waits a few seconds,
+//      or until the next candle when the server refuses it for good (money,
+//      volume, stops, market closed). A failed exit is retried each second.
+//    - One magic number per chart running the EA. On a netting account the
+//      EA does not trade into a manual or other-EA position on the symbol.
+//    - Backtest with "Every tick" modelling (real ticks if you can) and a
+//      tester period at or below the trading timeframe: with "Open prices
+//      only" stops, trailing and the Tick filter are seen only at bar opens.
 //    - Parent and zone timeframes above the signal timeframe are read from
 //      their last closed candle (TradingView history), never a forming one.
 //    - Data feed, server time (H2 / H4 candles) and point size: see the
@@ -98,7 +111,7 @@ enum ENUM_FGF_CHECK
 //--- inputs: trading (the strategy's S1..S3 groups)
 input group "S1. Entry order"
 input ENUM_TIMEFRAMES InpTradeTf      = PERIOD_CURRENT; // Trading timeframe (current = chart)
-input long            InpMagic        = 20261007;       // Magic number
+input long            InpMagic        = 20261007;       // Magic number (one per chart running this EA)
 input ENUM_FG_DIR     InpDirection    = FG_DIR_BOTH;    // Direction
 input int             InpEntryValid   = 3;              // Cancel unfilled entry after N bars (0 = keep until filled)
 input bool            InpAllowReverse = true;           // Opposite signal may reverse an open position
@@ -117,6 +130,7 @@ input double       InpTrailActPts = 150;         // Trail activation, pts of pro
 input double       InpTrailPts    = 100;         // Trail distance, pts (Points mode)
 input double       InpTrailActAtr = 1.0;         // Trail activation, ATR mult (ATR mode)
 input double       InpTrailDstAtr = 0.75;        // Trail distance, ATR mult (ATR mode)
+input double       InpTrailStepPts = 5;          // Trail step, pts (min stop move per modify; MT5 only)
 input int          InpMaxBarsHeld = 0;           // Time stop, bars (0 = off)
 
 input group "S3. Sizing"
@@ -173,7 +187,7 @@ input ENUM_TIMEFRAMES InpFTf         = PERIOD_H1;         // Filter timeframe (c
 input ENUM_FGF_LEVEL  InpFLvMode     = FGF_LEVEL_ENTRY;   // Level
 input ENUM_FGF_LASTS  InpFLast       = FGF_LASTS_NEXT;    // Permission lasts
 input int             InpFMinutes    = 60;                // Minutes
-input int             InpFBars       = 1;                 // Candles
+input int             InpFBars       = 1;                 // Candles (with Tick: N = N-1 candles after the signal candle)
 input ENUM_FGF_CHECK  InpFCheck      = FGF_CHECK_TICK;    // Check price on
 input bool            InpFAllowBuy   = true;              // Allow buys
 input bool            InpFAllowSell  = true;              // Allow sells
@@ -200,7 +214,7 @@ input bool         InpFUseDrift     = false;       // Use prior drift filter
 
 input group "Filter signal: TDI trade zone"
 input bool            InpFUseZones   = true;      // Use TDI trade-zone filter
-input ENUM_TIMEFRAMES InpFParentTf   = PERIOD_H1; // Parent obedience timeframe
+input ENUM_TIMEFRAMES InpFParentTf   = PERIOD_H1; // Parent obedience timeframe (current = filter timeframe)
 input int             InpFRsiLen     = 14;        // TDI RSI length
 input int             InpFFastLen    = 2;         // TDI white fast length
 input int             InpFMinAligned = 2;         // Minimum child zones aligned
@@ -208,17 +222,17 @@ input bool            InpFFlatParent = false;     // Allow trade if parent is fl
 input bool            InpFIgnoreNa   = true;      // Ignore zones without data
 input bool            InpFHtfClosed  = true;      // Higher-TF zones use the last CLOSED bar
 input bool            InpFUseZ1      = true;      // Use child zone 1
-input ENUM_TIMEFRAMES InpFZTf1       = PERIOD_H1; // Zone 1 timeframe
+input ENUM_TIMEFRAMES InpFZTf1       = PERIOD_H1; // Zone 1 timeframe (current = filter timeframe)
 input bool            InpFUseZ2      = true;      // Use child zone 2
-input ENUM_TIMEFRAMES InpFZTf2       = PERIOD_H2; // Zone 2 timeframe
+input ENUM_TIMEFRAMES InpFZTf2       = PERIOD_H2; // Zone 2 timeframe (current = filter timeframe)
 input bool            InpFUseZ3      = true;      // Use child zone 3
-input ENUM_TIMEFRAMES InpFZTf3       = PERIOD_H4; // Zone 3 timeframe
+input ENUM_TIMEFRAMES InpFZTf3       = PERIOD_H4; // Zone 3 timeframe (current = filter timeframe)
 input bool            InpFUseZ4      = false;     // Use child zone 4
-input ENUM_TIMEFRAMES InpFZTf4       = PERIOD_H8; // Zone 4 timeframe
+input ENUM_TIMEFRAMES InpFZTf4       = PERIOD_H8; // Zone 4 timeframe (current = filter timeframe)
 input bool            InpFUseZ5      = false;     // Use child zone 5
-input ENUM_TIMEFRAMES InpFZTf5       = PERIOD_M1; // Zone 5 timeframe
+input ENUM_TIMEFRAMES InpFZTf5       = PERIOD_M1; // Zone 5 timeframe (current = filter timeframe)
 input bool            InpFUseZ6      = false;     // Use child zone 6
-input ENUM_TIMEFRAMES InpFZTf6       = PERIOD_M2; // Zone 6 timeframe
+input ENUM_TIMEFRAMES InpFZTf6       = PERIOD_M2; // Zone 6 timeframe (current = filter timeframe)
 
 input group "MT5"
 input double InpTickSize = 0.0;  // Point size (0 = symbol point) = TradingView syminfo.mintick
@@ -266,6 +280,7 @@ public:
    int               rsiLen;
    int               fastLen;
    int               xLen;   // second ATR length (exits), 0 = none
+   datetime          waitFrom; // first load: waiting for the history since
    datetime          t[];    // open time
    datetime          tc[];   // close time
    double            h[];
@@ -279,7 +294,7 @@ public:
    double            atr[];  // ta.atr(14)
    double            xatr[]; // ta.atr(xLen)
 
-                     CTf(void) : tf(PERIOD_CURRENT), n(0), rsiLen(14), fastLen(2), xLen(0) {}
+                     CTf(void) : tf(PERIOD_CURRENT), n(0), rsiLen(14), fastLen(2), xLen(0), waitFrom(0) {}
    int               Load(const datetime from, const bool reset);
    void              Calc(const int from);
    int               LastClosedBy(const datetime x) const;
@@ -320,6 +335,20 @@ int CTf::Load(const datetime from, const bool reset)
       got = CopyRates(_Symbol, tf, from, TimeCurrent(), r);
       if(got <= 0)
          return -1;
+      // accept the first load once the series is synchronized and starts
+      // near 'from' (or the broker has nothing older); stop waiting after 30 s
+      bool     synced   = SeriesInfoInteger(_Symbol, tf, SERIES_SYNCHRONIZED) != 0;
+      datetime srvFirst = (datetime)SeriesInfoInteger(_Symbol, tf, SERIES_SERVER_FIRSTDATE);
+      long     gap      = PeriodSeconds(tf) > 7 * 86400 ? (long)PeriodSeconds(tf) : (long)7 * 86400;
+      bool     starts   = (long)r[0].time <= (long)from + gap || (srvFirst > 0 && srvFirst >= r[0].time);
+      if(!synced || !starts)
+        {
+         if(waitFrom == 0)
+            waitFrom = TimeLocal();
+         if(TimeLocal() - waitFrom < 30)
+            return -1;
+        }
+      waitFrom = 0;
       first = 0;
      }
    else
@@ -850,6 +879,7 @@ struct FgPending
    double            act;     // trail activation, ticks
    double            dst;     // trail distance, ticks
    datetime          placed;  // open time of the signal candle
+   datetime          nextTry; // no new attempt before this time (after a failure)
   };
 
 //--- the filter's answer at a moment
@@ -874,17 +904,31 @@ struct FgPerm
 
 //--- globals
 CTrade          g_trade;
-CFlashGold      g_sig;              // the strategy's signal (trading timeframe)
-CFlashGold      g_flt;              // the direction filter (filter timeframe)
+CFlashGold      g_sig;               // the strategy's signal (trading timeframe)
+CFlashGold      g_flt;               // the direction filter (filter timeframe)
 ENUM_TIMEFRAMES g_tradeTf;
 double          g_pt = 0.0;
-datetime        g_base = 0;         // history is counted back from here
+datetime        g_base = 0;          // history is counted back from here
 bool            g_sigReset = true;
 bool            g_fltReset = true;
+datetime        g_fltBar = 0;        // filter candle the filter was last refreshed on
 datetime        g_lastBar = 0;
 FgPending       g_pL;
 FgPending       g_pS;
+bool            g_hedging = true;
+bool            g_closeL = false;    // an exit of the longs is still owed (retried)
+bool            g_closeS = false;
+bool            g_snapOk = false;    // positions at the end of the last tick
+bool            g_snapL = false;
+bool            g_snapS = false;
+datetime        g_trailNextTry = 0;
+bool            g_foreignWarned = false;
 string          g_lvlName = "";
+bool            g_lvlDrawn = false;
+double          g_lvlPx = 0.0;
+color           g_lvlCol = clrNONE;
+int             g_lvlStyle = -1;
+string          g_lastComment = "";
 
 ENUM_TIMEFRAMES Resolve(const ENUM_TIMEFRAMES tf, const ENUM_TIMEFRAMES current) { return tf == PERIOD_CURRENT ? current : tf; }
 
@@ -912,14 +956,34 @@ string FormatTime(const datetime x)
 
 void PendingClear(FgPending &q)
   {
-   q.active = false;
-   q.price  = 0.0;
-   q.lots   = 0.0;
-   q.sl     = EMPTY_VALUE;
-   q.tp     = EMPTY_VALUE;
-   q.act    = EMPTY_VALUE;
-   q.dst    = EMPTY_VALUE;
-   q.placed = 0;
+   q.active  = false;
+   q.price   = 0.0;
+   q.lots    = 0.0;
+   q.sl      = EMPTY_VALUE;
+   q.tp      = EMPTY_VALUE;
+   q.act     = EMPTY_VALUE;
+   q.dst     = EMPTY_VALUE;
+   q.placed  = 0;
+   q.nextTry = 0;
+  }
+
+double TickSize(void)
+  {
+   double ts = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+   return ts > 0.0 ? ts : _Point;
+  }
+
+// Prices on the symbol's tick grid, rounded away from the market.
+double RoundDn(const double price)
+  {
+   double ts = TickSize();
+   return NormalizeDouble(MathFloor(price / ts + 1e-9) * ts, _Digits);
+  }
+
+double RoundUp(const double price)
+  {
+   double ts = TickSize();
+   return NormalizeDouble(MathCeil(price / ts - 1e-9) * ts, _Digits);
   }
 
 //+------------------------------------------------------------------+
@@ -944,26 +1008,17 @@ int CountPos(const ENUM_POSITION_TYPE type)
    return cnt;
   }
 
-void ClosePos(const ENUM_POSITION_TYPE type)
-  {
-   for(int i = PositionsTotal() - 1; i >= 0; i--)
-     {
-      ulong tk = PositionGetTicket(i);
-      if(tk == 0 || !IsMine())
-         continue;
-      if((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) == type)
-         g_trade.PositionClose(tk);
-     }
-  }
-
-// Open time of the latest open position of this EA (0 if none).
-datetime LatestOpenTime(void)
+// Open time of the newest position of this EA on that side, or of any side
+// (0 if none).
+datetime NewestPosTime(const ENUM_POSITION_TYPE type, const bool anySide)
   {
    datetime latest = 0;
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
       ulong tk = PositionGetTicket(i);
       if(tk == 0 || !IsMine())
+         continue;
+      if(!anySide && (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) != type)
          continue;
       datetime ot = (datetime)PositionGetInteger(POSITION_TIME);
       if(ot > latest)
@@ -972,8 +1027,49 @@ datetime LatestOpenTime(void)
    return latest;
   }
 
+// Closes this EA's positions on one side. True when all of them were closed
+// (or there was none).
+bool ClosePos(const ENUM_POSITION_TYPE type)
+  {
+   bool ok = true;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      ulong tk = PositionGetTicket(i);
+      if(tk == 0 || !IsMine())
+         continue;
+      if((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) != type)
+         continue;
+      bool sent = g_trade.PositionClose(tk);
+      uint rc   = g_trade.ResultRetcode();
+      if(!sent || (rc != TRADE_RETCODE_DONE && rc != TRADE_RETCODE_PLACED))
+        {
+         ok = false;
+         PrintFormat("FlashGold EA: close failed, retcode %u (%s)", rc, g_trade.ResultRetcodeDescription());
+        }
+     }
+   return ok;
+  }
+
+// On a netting account one position holds every trade of the symbol: a
+// manual or other-EA position there must not be traded into.
+bool ForeignPosition(void)
+  {
+   if(g_hedging || !PositionSelect(_Symbol))
+      return false;
+   bool foreign = PositionGetInteger(POSITION_MAGIC) != InpMagic;
+   if(foreign && !g_foreignWarned)
+     {
+      Print("FlashGold EA: netting account with a position of another magic number on ", _Symbol, ": entries wait until it is closed.");
+      g_foreignWarned = true;
+     }
+   if(!foreign)
+      g_foreignWarned = false;
+   return foreign;
+  }
+
 // Trailing parameters of a position, kept in terminal global variables so
-// they survive an EA restart.
+// they survive an EA restart. Keyed by POSITION_IDENTIFIER (the ticket of the
+// order that opened the position).
 string TrailKey(const long id, const string what) { return "FGEA_" + IntegerToString(InpMagic) + "_" + IntegerToString(id) + "_" + what; }
 
 void TrailSave(const long id, const double act, const double dst)
@@ -989,6 +1085,21 @@ bool TrailLoad(const long id, double &act, double &dst)
    act = GlobalVariableGet(TrailKey(id, "a"));
    dst = GlobalVariableGet(TrailKey(id, "d"));
    return true;
+  }
+
+// Deletes the trail records of closed positions: the record of an open
+// position is read on every tick, so a record unread for a day is stale.
+void TrailCleanup(void)
+  {
+   string pre = "FGEA_" + IntegerToString(InpMagic) + "_";
+   for(int i = GlobalVariablesTotal() - 1; i >= 0; i--)
+     {
+      string name = GlobalVariableName(i);
+      if(StringFind(name, pre) != 0)
+         continue;
+      if(TimeLocal() - GlobalVariableTime(name) > 86400)
+         GlobalVariableDel(name);
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -1112,67 +1223,94 @@ void FilterPermission(FgPerm &r)
 //+------------------------------------------------------------------+
 //| Orders                                                            |
 //+------------------------------------------------------------------+
-// Opens at market with the pending's locked SL / TP (ticks from the fill).
-bool OpenPos(const bool buy, const FgPending &q)
+// SL / TP of a position entered at 'ref': the locked distances from the
+// entry, pushed out where needed to clear the stops level from the price the
+// server checks them against (Bid for a buy, Ask for a sell), on the tick grid.
+void Levels(const bool buy, const double ref, const FgPending &q, double &sl, double &tp)
   {
-   double ask  = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double bid  = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   double px   = buy ? ask : bid;
+   double ask  = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+   double ts   = TickSize();
    double minD = (double)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) * _Point;
-   double sl   = 0.0;
-   double tp   = 0.0;
+   sl = 0.0;
+   tp = 0.0;
    if(q.sl != EMPTY_VALUE && q.sl > 0.0)
-     {
-      double d = MathMax(q.sl * g_pt, minD);
-      sl = NormalizeDouble(buy ? px - d : px + d, _Digits);
-     }
+      sl = buy ? RoundDn(MathMin(ref - q.sl * g_pt, bid - minD - ts)) : RoundUp(MathMax(ref + q.sl * g_pt, ask + minD + ts));
    if(q.tp != EMPTY_VALUE && q.tp > 0.0)
-     {
-      double d = MathMax(q.tp * g_pt, minD);
-      tp = NormalizeDouble(buy ? px + d : px - d, _Digits);
-     }
-   bool ok = buy ? g_trade.Buy(q.lots, _Symbol, 0.0, sl, tp, "FG buy stop")
-             : g_trade.Sell(q.lots, _Symbol, 0.0, sl, tp, "FG sell stop");
+      tp = buy ? RoundUp(MathMax(ref + q.tp * g_pt, bid + minD + ts)) : RoundDn(MathMin(ref - q.tp * g_pt, ask - minD - ts));
+  }
+
+// Opens at market with the pending's locked SL / TP. Returns the trade
+// server's return code (TRADE_RETCODE_DONE when the position is open).
+uint OpenPos(const bool buy, const FgPending &q)
+  {
+   double px = buy ? SymbolInfoDouble(_Symbol, SYMBOL_ASK) : SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   double sl = 0.0, tp = 0.0;
+   Levels(buy, px, q, sl, tp);
+   bool sent = buy ? g_trade.Buy(q.lots, _Symbol, 0.0, sl, tp, "FG buy stop")
+               : g_trade.Sell(q.lots, _Symbol, 0.0, sl, tp, "FG sell stop");
    uint rc = g_trade.ResultRetcode();
-   if(!ok || (rc != TRADE_RETCODE_DONE && rc != TRADE_RETCODE_DONE_PARTIAL && rc != TRADE_RETCODE_PLACED))
+   if(!sent || (rc != TRADE_RETCODE_DONE && rc != TRADE_RETCODE_DONE_PARTIAL && rc != TRADE_RETCODE_PLACED))
      {
       PrintFormat("FlashGold EA: %s failed, retcode %u (%s)", buy ? "buy" : "sell", rc, g_trade.ResultRetcodeDescription());
-      return false;
+      return rc == 0 ? (uint)TRADE_RETCODE_ERROR : rc;
      }
-   // keep the trail parameters with the new position
-   if(InpUseTrail && q.act != EMPTY_VALUE && q.dst != EMPTY_VALUE)
+   // the position's identifier is the ticket of the order that opened it
+   // (no need to find it in the position list, which can lag)
+   long id = (long)g_trade.ResultOrder();
+   if(id <= 0)
      {
-      long     id     = 0;
-      datetime latest = 0;
-      for(int i = PositionsTotal() - 1; i >= 0; i--)
-        {
-         ulong tk = PositionGetTicket(i);
-         if(tk == 0 || !IsMine())
-            continue;
-         if((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) != (buy ? POSITION_TYPE_BUY : POSITION_TYPE_SELL))
-            continue;
-         datetime ot = (datetime)PositionGetInteger(POSITION_TIME);
-         if(ot >= latest)
-           {
-            latest = ot;
-            id     = PositionGetInteger(POSITION_IDENTIFIER);
-           }
-        }
-      if(id != 0)
-         TrailSave(id, q.act, q.dst);
+      ulong deal = g_trade.ResultDeal();
+      if(deal > 0 && HistoryDealSelect(deal))
+         id = HistoryDealGetInteger(deal, DEAL_POSITION_ID);
      }
-   return true;
+   if(id <= 0)
+     {
+      Print("FlashGold EA: the new position's id is unknown; its trailing stop is not stored.");
+      return (uint)TRADE_RETCODE_DONE;
+     }
+   if(InpUseTrail && q.act != EMPTY_VALUE && q.dst != EMPTY_VALUE)
+      TrailSave(id, q.act, q.dst);
+   // SL / TP from the actual fill, as the strategy measures them from the
+   // entry price (the order carried them from the quote, so it is never
+   // left unprotected)
+   if(PositionSelectByTicket((ulong)id))
+     {
+      double fill = PositionGetDouble(POSITION_PRICE_OPEN);
+      if(MathAbs(fill - px) >= _Point * 0.5)
+        {
+         double sl2 = 0.0, tp2 = 0.0;
+         Levels(buy, fill, q, sl2, tp2);
+         if(sl2 != sl || tp2 != tp)
+            g_trade.PositionModify((ulong)id, sl2, tp2);
+        }
+     }
+   return (uint)TRADE_RETCODE_DONE;
+  }
+
+// After a failed attempt: try again in a few seconds, or at the next candle
+// when the server's answer will not change by itself.
+void Backoff(FgPending &q, const uint rc)
+  {
+   bool hard = rc == TRADE_RETCODE_NO_MONEY || rc == TRADE_RETCODE_INVALID_VOLUME || rc == TRADE_RETCODE_TRADE_DISABLED ||
+               rc == TRADE_RETCODE_MARKET_CLOSED || rc == TRADE_RETCODE_INVALID_STOPS || rc == TRADE_RETCODE_LIMIT_POSITIONS ||
+               rc == TRADE_RETCODE_LIMIT_VOLUME;
+   q.nextTry = hard ? iTime(_Symbol, g_tradeTf, 0) + PeriodSeconds(g_tradeTf) : TimeCurrent() + 5;
   }
 
 // Trailing stop (strategy.exit trail_points / trail_offset): once the profit
-// reaches 'act' ticks, the stop follows 'dst' ticks behind the best price.
+// reaches 'act' ticks, the stop follows 'dst' ticks behind the best price. It
+// moves in steps of at least "Trail step" and respects the freeze level.
 void ManageTrailing(void)
   {
-   if(!InpUseTrail)
+   if(!InpUseTrail || TimeCurrent() < g_trailNextTry)
       return;
    double bid  = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    double ask  = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
    double minD = (double)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) * _Point;
+   double frz  = (double)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_FREEZE_LEVEL) * _Point;
+   double gap  = MathMax(minD, frz);
+   double step = MathMax(_Point, InpTrailStepPts * g_pt);
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
       ulong tk = PositionGetTicket(i);
@@ -1184,24 +1322,60 @@ void ManageTrailing(void)
       double open = PositionGetDouble(POSITION_PRICE_OPEN);
       double sl   = PositionGetDouble(POSITION_SL);
       double tp   = PositionGetDouble(POSITION_TP);
+      bool   send = false;
+      double nsl  = 0.0;
       if((ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
         {
          if((bid - open) / g_pt >= act)
            {
-            double nsl = NormalizeDouble(bid - dst * g_pt, _Digits);
-            if((sl == 0.0 || nsl > sl + _Point * 0.5) && bid - nsl >= minD)
-               g_trade.PositionModify(tk, nsl, tp);
+            nsl  = RoundDn(bid - dst * g_pt);
+            send = (sl == 0.0 || nsl >= sl + step) && bid - nsl >= gap && (sl == 0.0 || frz == 0.0 || bid - sl > frz);
            }
         }
       else
         {
          if((open - ask) / g_pt >= act)
            {
-            double nsl = NormalizeDouble(ask + dst * g_pt, _Digits);
-            if((sl == 0.0 || nsl < sl - _Point * 0.5) && nsl - ask >= minD)
-               g_trade.PositionModify(tk, nsl, tp);
+            nsl  = RoundUp(ask + dst * g_pt);
+            send = (sl == 0.0 || nsl <= sl - step) && nsl - ask >= gap && (sl == 0.0 || frz == 0.0 || sl - ask > frz);
            }
         }
+      if(send && !g_trade.PositionModify(tk, nsl, tp))
+         g_trailNextTry = TimeCurrent() + 2;
+     }
+  }
+
+// Retries an exit that failed (close on the opposite signal, time stop), at
+// most once a second, until that side is flat.
+void RetryCloses(void)
+  {
+   static datetime lastTry = 0;
+   if(!g_closeL && !g_closeS)
+      return;
+   datetime now = TimeCurrent();
+   if(now == lastTry)
+      return;
+   lastTry = now;
+   if(g_closeL)
+      g_closeL = CountPos(POSITION_TYPE_BUY) > 0 && !ClosePos(POSITION_TYPE_BUY);
+   if(g_closeS)
+      g_closeS = CountPos(POSITION_TYPE_SELL) > 0 && !ClosePos(POSITION_TYPE_SELL);
+  }
+
+// An entry stop whose side is already in a position opened since the stop
+// was placed has filled (even if the order's answer was lost): cancel both
+// stops (OCA).
+void ReconcilePendings(void)
+  {
+   if(g_pL.active && CountPos(POSITION_TYPE_BUY) > 0 && NewestPosTime(POSITION_TYPE_BUY, false) >= g_pL.placed)
+     {
+      PendingClear(g_pL);
+      PendingClear(g_pS);
+     }
+   if(g_pS.active && CountPos(POSITION_TYPE_SELL) > 0 && NewestPosTime(POSITION_TYPE_SELL, false) >= g_pS.placed)
+     {
+      PendingClear(g_pS);
+      PendingClear(g_pL);
      }
   }
 
@@ -1209,6 +1383,7 @@ void ManageTrailing(void)
 // tick of the next candle, where TradingView would fill these orders).
 void OnCandleClose(const int k)
   {
+   ReconcilePendings();
    bool   buySignal      = g_sig.buySig[k];
    bool   sellSignal     = g_sig.sellSig[k];
    double buyEntryPrice  = g_sig.buyPx[k];
@@ -1224,17 +1399,19 @@ void OnCandleClose(const int k)
    double trailActNow = pointsMode ? InpTrailActPts : (atrPts != EMPTY_VALUE ? InpTrailActAtr * atrPts : EMPTY_VALUE);
    double trailDstNow = pointsMode ? InpTrailPts : (atrPts != EMPTY_VALUE ? MathMax(InpTrailDstAtr * atrPts, 1.0) : EMPTY_VALUE);
 
+   // the position at the candle's close: as seen on its last tick (a stop
+   // hit on the first tick of this candle happened after that close)
    bool allowL  = InpDirection != FG_DIR_SHORT;
    bool allowS  = InpDirection != FG_DIR_LONG;
-   bool inLong  = CountPos(POSITION_TYPE_BUY) > 0;
-   bool inShort = CountPos(POSITION_TYPE_SELL) > 0;
+   bool inLong  = g_snapOk ? g_snapL : CountPos(POSITION_TYPE_BUY) > 0;
+   bool inShort = g_snapOk ? g_snapS : CountPos(POSITION_TYPE_SELL) > 0;
    bool flat    = !inLong && !inShort;
 
-   // opposite-signal handling on an open position
-   if(InpExitOnOpp && sellSignal && inLong)
-      ClosePos(POSITION_TYPE_BUY);
-   if(InpExitOnOpp && buySignal && inShort)
-      ClosePos(POSITION_TYPE_SELL);
+   // opposite-signal handling on an open position (retried if it fails)
+   if(InpExitOnOpp && sellSignal && inLong && !ClosePos(POSITION_TYPE_BUY))
+      g_closeL = true;
+   if(InpExitOnOpp && buySignal && inShort && !ClosePos(POSITION_TYPE_SELL))
+      g_closeS = true;
 
    // long entry: stop at the signal's entry price
    if(buySignal && allowL && !inLong && (flat || InpAllowReverse || InpExitOnOpp))
@@ -1242,14 +1419,15 @@ void OnCandleClose(const int k)
       double qL = CalcLots(slTicksNow);
       if(qL > 0.0 && buyEntryPrice != EMPTY_VALUE)
         {
-         g_pL.active = true;
-         g_pL.price  = buyEntryPrice;
-         g_pL.lots   = qL;
-         g_pL.sl     = slTicksNow;
-         g_pL.tp     = tpTicksNow;
-         g_pL.act    = trailActNow;
-         g_pL.dst    = trailDstNow;
-         g_pL.placed = g_sig.tfs[g_sig.fi].t[k];
+         g_pL.active  = true;
+         g_pL.price   = buyEntryPrice;
+         g_pL.lots    = qL;
+         g_pL.sl      = slTicksNow;
+         g_pL.tp      = tpTicksNow;
+         g_pL.act     = trailActNow;
+         g_pL.dst     = trailDstNow;
+         g_pL.placed  = g_sig.tfs[g_sig.fi].t[k];
+         g_pL.nextTry = 0;
         }
      }
 
@@ -1259,14 +1437,15 @@ void OnCandleClose(const int k)
       double qS = CalcLots(slTicksNow);
       if(qS > 0.0 && sellEntryPrice != EMPTY_VALUE)
         {
-         g_pS.active = true;
-         g_pS.price  = sellEntryPrice;
-         g_pS.lots   = qS;
-         g_pS.sl     = slTicksNow;
-         g_pS.tp     = tpTicksNow;
-         g_pS.act    = trailActNow;
-         g_pS.dst    = trailDstNow;
-         g_pS.placed = g_sig.tfs[g_sig.fi].t[k];
+         g_pS.active  = true;
+         g_pS.price   = sellEntryPrice;
+         g_pS.lots    = qS;
+         g_pS.sl      = slTicksNow;
+         g_pS.tp      = tpTicksNow;
+         g_pS.act     = trailActNow;
+         g_pS.dst     = trailDstNow;
+         g_pS.placed  = g_sig.tfs[g_sig.fi].t[k];
+         g_pS.nextTry = 0;
         }
      }
 
@@ -1279,82 +1458,123 @@ void OnCandleClose(const int k)
          PendingClear(g_pS);
      }
 
-   // time stop
+   // time stop (entry candle of the newest open position; retried if a
+   // close fails)
    if(InpMaxBarsHeld > 0 && !flat)
      {
-      int eb = g_sig.tfs[g_sig.fi].LastOpenBy(LatestOpenTime());
+      datetime ot = NewestPosTime(POSITION_TYPE_BUY, true);
+      int      eb = ot > 0 ? g_sig.tfs[g_sig.fi].LastOpenBy(ot) : -1;
       if(eb >= 0 && k - eb >= InpMaxBarsHeld)
         {
-         ClosePos(POSITION_TYPE_BUY);
-         ClosePos(POSITION_TYPE_SELL);
+         if(!ClosePos(POSITION_TYPE_BUY))
+            g_closeL = true;
+         if(!ClosePos(POSITION_TYPE_SELL))
+            g_closeS = true;
         }
      }
+   TrailCleanup();
   }
 
 // Triggers the EA-held stops when the chart price (Bid) reaches them and the
 // direction filter allows that side at this moment. A blocked stop stays
-// pending; when one side opens, the other side's stop is cancelled (OCA).
+// pending; when one side opens, the other side's stop is cancelled (OCA). A
+// failed attempt waits (Backoff) instead of resending on every tick.
 void CheckPendings(void)
   {
+   ReconcilePendings();
    if(!g_pL.active && !g_pS.active)
       return;
-   double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   if(g_pL.active && bid >= g_pL.price && CountPos(POSITION_TYPE_BUY) == 0)
+   double   bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
+   datetime now = TimeCurrent();
+   if(g_pL.active && bid >= g_pL.price && now >= g_pL.nextTry && CountPos(POSITION_TYPE_BUY) == 0 && !ForeignPosition())
      {
       FgPerm r;
       FilterPermission(r);
       if(r.buyOk)
         {
          // the long reverses an open short
-         if(CountPos(POSITION_TYPE_SELL) > 0)
-            ClosePos(POSITION_TYPE_SELL);
-         if(CountPos(POSITION_TYPE_SELL) == 0 && OpenPos(true, g_pL))
+         if(CountPos(POSITION_TYPE_SELL) > 0 && !ClosePos(POSITION_TYPE_SELL))
+           {
+            g_pL.nextTry = now + 5;
+            return;
+           }
+         uint rc = OpenPos(true, g_pL);
+         if(rc == TRADE_RETCODE_DONE || CountPos(POSITION_TYPE_BUY) > 0)
            {
             PendingClear(g_pL);
             PendingClear(g_pS);
             return;
            }
+         Backoff(g_pL, rc);
         }
      }
-   if(g_pS.active && bid <= g_pS.price && CountPos(POSITION_TYPE_SELL) == 0)
+   if(g_pS.active && bid <= g_pS.price && now >= g_pS.nextTry && CountPos(POSITION_TYPE_SELL) == 0 && !ForeignPosition())
      {
       FgPerm r;
       FilterPermission(r);
       if(r.sellOk)
         {
-         if(CountPos(POSITION_TYPE_BUY) > 0)
-            ClosePos(POSITION_TYPE_BUY);
-         if(CountPos(POSITION_TYPE_BUY) == 0 && OpenPos(false, g_pS))
+         if(CountPos(POSITION_TYPE_BUY) > 0 && !ClosePos(POSITION_TYPE_BUY))
+           {
+            g_pS.nextTry = now + 5;
+            return;
+           }
+         uint rc = OpenPos(false, g_pS);
+         if(rc == TRADE_RETCODE_DONE || CountPos(POSITION_TYPE_SELL) > 0)
            {
             PendingClear(g_pS);
             PendingClear(g_pL);
+            return;
            }
+         Backoff(g_pS, rc);
         }
      }
   }
 
 //+------------------------------------------------------------------+
-//| Status text and the filter level on the chart                     |
+//| Status text and the filter level on the chart (skipped in         |
+//| non-visual tests; objects only touched when something changes)    |
 //+------------------------------------------------------------------+
-void ShowStatus(void)
+void LevelLineHide(void)
   {
+   if(g_lvlDrawn)
+      ObjectDelete(0, g_lvlName);
+   g_lvlDrawn = false;
+  }
+
+void ShowStatus(const bool fltReady)
+  {
+   if(MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE))
+      return;
    FgPerm r;
    FilterPermission(r);
-   if(InpFDrawLevel && InpFOn && r.level != EMPTY_VALUE && r.armed)
+   if(InpFDrawLevel && InpFOn && fltReady && r.level != EMPTY_VALUE && r.armed)
      {
-      if(ObjectFind(0, g_lvlName) < 0)
+      color col   = r.sigDir > 0 ? FG_LIME : FG_RED;
+      int   style = r.isOpen ? STYLE_SOLID : STYLE_DOT;
+      if(!g_lvlDrawn || ObjectFind(0, g_lvlName) < 0)
         {
          ObjectCreate(0, g_lvlName, OBJ_HLINE, 0, 0, r.level);
          ObjectSetInteger(0, g_lvlName, OBJPROP_WIDTH, 2);
          ObjectSetInteger(0, g_lvlName, OBJPROP_SELECTABLE, false);
          ObjectSetInteger(0, g_lvlName, OBJPROP_HIDDEN, true);
+         g_lvlDrawn = true;
+         g_lvlPx    = 0.0;
+         g_lvlCol   = clrNONE;
+         g_lvlStyle = -1;
         }
-      ObjectSetDouble(0, g_lvlName, OBJPROP_PRICE, 0, r.level);
-      ObjectSetInteger(0, g_lvlName, OBJPROP_COLOR, r.sigDir > 0 ? FG_LIME : FG_RED);
-      ObjectSetInteger(0, g_lvlName, OBJPROP_STYLE, r.isOpen ? STYLE_SOLID : STYLE_DOT);
+      if(r.level != g_lvlPx)
+         ObjectSetDouble(0, g_lvlName, OBJPROP_PRICE, 0, r.level);
+      if(col != g_lvlCol)
+         ObjectSetInteger(0, g_lvlName, OBJPROP_COLOR, col);
+      if(style != g_lvlStyle)
+         ObjectSetInteger(0, g_lvlName, OBJPROP_STYLE, style);
+      g_lvlPx    = r.level;
+      g_lvlCol   = col;
+      g_lvlStyle = style;
      }
    else
-      ObjectDelete(0, g_lvlName);
+      LevelLineHide();
    if(!InpShowStatus)
       return;
 
@@ -1363,27 +1583,35 @@ void ShowStatus(void)
    if(!InpFOn)
       txt += "Direction filter: OFF (every entry allowed)\n";
    else
-     {
-      string side  = r.sigDir > 0 ? "BUY" : "SELL";
-      string state = !r.armed ? "WAITING FOR SIGNAL" : (r.isOpen ? "ACTIVE - " : "ENDED - ") + side + " signal";
-      string lv    = r.level != EMPTY_VALUE ? DoubleToString(r.level, _Digits) : "-";
-      string chk   = InpFCheck == FGF_CHECK_OPEN ? "candle open" : (InpFCheck == FGF_CHECK_CLOSE ? "last close" : "tick");
-      txt += "Filter " + tag + ": " + state;
-      if(r.sigAt > 0)
-         txt += "  (" + FormatTime(r.sigAt) + " server)";
-      txt += "\n";
-      txt += "  Buy  > " + lv + "  " + (r.buyOk ? "ALLOWED" : "BLOCKED") + "   |   Sell < " + lv + "  " + (r.sellOk ? "ALLOWED" : "BLOCKED") +
-             "   (" + chk + " " + (r.value != EMPTY_VALUE ? DoubleToString(r.value, _Digits) : "-") + ")\n";
-      string dPar = r.par == FG_NA ? "-" : (r.par > 0 ? "BUY" : (r.par < 0 ? "SELL" : "FLAT"));
-      string dZn  = r.ac == FG_NA ? "-" : IntegerToString(r.al) + "/" + IntegerToString(r.ac);
-      txt += "  Last " + tag + " parent / zones: " + dPar + " / " + dZn + " aligned\n";
-     }
+      if(!fltReady)
+         txt += "Filter " + tag + ": loading its history... (entries wait)\n";
+      else
+        {
+         string side  = r.sigDir > 0 ? "BUY" : "SELL";
+         string state = !r.armed ? "WAITING FOR SIGNAL" : (r.isOpen ? "ACTIVE - " : "ENDED - ") + side + " signal";
+         string lv    = r.level != EMPTY_VALUE ? DoubleToString(r.level, _Digits) : "-";
+         string chk   = InpFCheck == FGF_CHECK_OPEN ? "candle open" : (InpFCheck == FGF_CHECK_CLOSE ? "last close" : "tick");
+         txt += "Filter " + tag + ": " + state;
+         if(r.sigAt > 0)
+            txt += "  (" + FormatTime(r.sigAt) + " server)";
+         txt += "\n";
+         txt += "  " + (r.onSigBar && r.sigDir > 0 ? "Buy >= " : "Buy  > ") + lv + "  " + (r.buyOk ? "ALLOWED" : "BLOCKED") +
+                "   |   " + (r.onSigBar && r.sigDir < 0 ? "Sell <= " : "Sell < ") + lv + "  " + (r.sellOk ? "ALLOWED" : "BLOCKED") +
+                "   (" + chk + " " + (r.value != EMPTY_VALUE ? DoubleToString(r.value, _Digits) : "-") + ")\n";
+         string dPar = r.par == FG_NA ? "-" : (r.par > 0 ? "BUY" : (r.par < 0 ? "SELL" : "FLAT"));
+         string dZn  = r.ac == FG_NA ? "-" : IntegerToString(r.al) + "/" + IntegerToString(r.ac);
+         txt += "  Last " + tag + " parent / zones: " + dPar + " / " + dZn + " aligned\n";
+        }
    txt += "Pending: BUY STOP " + (g_pL.active ? DoubleToString(g_pL.price, _Digits) + " (" + DoubleToString(g_pL.lots, 2) + " lot)" : "-") +
           "   SELL STOP " + (g_pS.active ? DoubleToString(g_pS.price, _Digits) + " (" + DoubleToString(g_pS.lots, 2) + " lot)" : "-") + "\n";
    int nL = CountPos(POSITION_TYPE_BUY);
    int nS = CountPos(POSITION_TYPE_SELL);
    txt += "Position: " + (nL > 0 ? "LONG" : (nS > 0 ? "SHORT" : "flat"));
-   Comment(txt);
+   if(txt != g_lastComment)
+     {
+      Comment(txt);
+      g_lastComment = txt;
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -1407,7 +1635,7 @@ void StrategyParams(FgParams &p)
    p.driftBars    = InpSDriftBars;
    p.useDrift     = InpSUseDrift;
    p.useZones     = InpSUseZones;
-   p.parentTf     = Resolve(InpSParentTf, g_tradeTf);
+   p.parentTf     = Resolve(InpSParentTf, p.tf);
    p.rsiLen       = InpSRsiLen;
    p.fastLen      = InpSFastLen;
    p.minAligned   = InpSMinAligned;
@@ -1415,20 +1643,22 @@ void StrategyParams(FgParams &p)
    p.ignoreNa     = InpSIgnoreNa;
    p.htfClosed    = InpSHtfClosed;
    p.useZ[0] = InpSUseZ1;
-   p.zTf[0]  = Resolve(InpSZTf1, g_tradeTf);
+   p.zTf[0]  = Resolve(InpSZTf1, p.tf);
    p.useZ[1] = InpSUseZ2;
-   p.zTf[1]  = Resolve(InpSZTf2, g_tradeTf);
+   p.zTf[1]  = Resolve(InpSZTf2, p.tf);
    p.useZ[2] = InpSUseZ3;
-   p.zTf[2]  = Resolve(InpSZTf3, g_tradeTf);
+   p.zTf[2]  = Resolve(InpSZTf3, p.tf);
    p.useZ[3] = InpSUseZ4;
-   p.zTf[3]  = Resolve(InpSZTf4, g_tradeTf);
+   p.zTf[3]  = Resolve(InpSZTf4, p.tf);
    p.useZ[4] = InpSUseZ5;
-   p.zTf[4]  = Resolve(InpSZTf5, g_tradeTf);
+   p.zTf[4]  = Resolve(InpSZTf5, p.tf);
    p.useZ[5] = InpSUseZ6;
-   p.zTf[5]  = Resolve(InpSZTf6, g_tradeTf);
+   p.zTf[5]  = Resolve(InpSZTf6, p.tf);
    p.levelMode = FGF_LEVEL_ENTRY;
   }
 
+// "current" parent / zone timeframes of the filter = the filter timeframe
+// (every filter input works as on that timeframe's own chart).
 void FilterParams(FgParams &p)
   {
    p.tf           = Resolve(InpFTf, g_tradeTf);
@@ -1447,7 +1677,7 @@ void FilterParams(FgParams &p)
    p.driftBars    = InpFDriftBars;
    p.useDrift     = InpFUseDrift;
    p.useZones     = InpFUseZones;
-   p.parentTf     = Resolve(InpFParentTf, g_tradeTf);
+   p.parentTf     = Resolve(InpFParentTf, p.tf);
    p.rsiLen       = InpFRsiLen;
    p.fastLen      = InpFFastLen;
    p.minAligned   = InpFMinAligned;
@@ -1455,17 +1685,17 @@ void FilterParams(FgParams &p)
    p.ignoreNa     = InpFIgnoreNa;
    p.htfClosed    = InpFHtfClosed;
    p.useZ[0] = InpFUseZ1;
-   p.zTf[0]  = Resolve(InpFZTf1, g_tradeTf);
+   p.zTf[0]  = Resolve(InpFZTf1, p.tf);
    p.useZ[1] = InpFUseZ2;
-   p.zTf[1]  = Resolve(InpFZTf2, g_tradeTf);
+   p.zTf[1]  = Resolve(InpFZTf2, p.tf);
    p.useZ[2] = InpFUseZ3;
-   p.zTf[2]  = Resolve(InpFZTf3, g_tradeTf);
+   p.zTf[2]  = Resolve(InpFZTf3, p.tf);
    p.useZ[3] = InpFUseZ4;
-   p.zTf[3]  = Resolve(InpFZTf4, g_tradeTf);
+   p.zTf[3]  = Resolve(InpFZTf4, p.tf);
    p.useZ[4] = InpFUseZ5;
-   p.zTf[4]  = Resolve(InpFZTf5, g_tradeTf);
+   p.zTf[4]  = Resolve(InpFZTf5, p.tf);
    p.useZ[5] = InpFUseZ6;
-   p.zTf[5]  = Resolve(InpFZTf6, g_tradeTf);
+   p.zTf[5]  = Resolve(InpFZTf6, p.tf);
    p.levelMode = InpFLvMode;
   }
 
@@ -1473,10 +1703,14 @@ void FilterParams(FgParams &p)
 int OnInit()
   {
    if(InpEntryValid < 0 || InpMaxBarsHeld < 0 || InpAtrLen < 1 || InpSlAtrMult < 0.1 || InpTpR < 0.0 || InpTrailDstAtr < 0.05 ||
-      InpTrailPts < 1.0 || InpSlPoints < 0.0 || InpTpPoints < 0.0 || InpTrailActPts < 0.0 || InpTrailActAtr < 0.0 ||
+      InpTrailPts < 1.0 || InpSlPoints < 0.0 || InpTpPoints < 0.0 || InpTrailActPts < 0.0 || InpTrailActAtr < 0.0 || InpTrailStepPts < 0.0 ||
       InpFixedLots < 0.0 || InpRiskPct < 0.0 || InpMaxLots < 0.0 || InpSlippage < 0 ||
       InpSRsiLen < 2 || InpSFastLen < 1 || InpSMinAligned < 0 || InpSMinAligned > 6 || InpSDriftBars < 1 || InpSHoldBars < 0 ||
+      InpSSpreadPts < 0.0 || InpSEntryDistPts < 0.0 || InpSHoldFavPts < 0.0 || InpSBurstAtr < 0.0 || InpSEntryDistAtr < 0.0 ||
+      InpSHoldFavAtr < 0.0 || InpSBurstPts < 0.0 ||
       InpFRsiLen < 2 || InpFFastLen < 1 || InpFMinAligned < 0 || InpFMinAligned > 6 || InpFDriftBars < 1 || InpFHoldBars < 0 ||
+      InpFSpreadPts < 0.0 || InpFEntryDistPts < 0.0 || InpFHoldFavPts < 0.0 || InpFBurstAtr < 0.0 || InpFEntryDistAtr < 0.0 ||
+      InpFHoldFavAtr < 0.0 || InpFBurstPts < 0.0 ||
       InpFMinutes < 1 || InpFBars < 1 || InpTickSize < 0.0 || InpWarmup < 1)
      {
       Print("FlashGold EA: an input is out of range (see the TradingView minimums).");
@@ -1484,6 +1718,14 @@ int OnInit()
      }
    g_tradeTf = Resolve(InpTradeTf, Period());
    g_pt      = InpTickSize > 0.0 ? InpTickSize : _Point;
+   g_hedging = AccountInfoInteger(ACCOUNT_MARGIN_MODE) == ACCOUNT_MARGIN_MODE_RETAIL_HEDGING;
+
+   if(InpFOn && InpFCheck == FGF_CHECK_TICK && InpFLast == FGF_LASTS_CANDLES && InpFBars == 1)
+      Print("FlashGold EA: warning - Check price on = Tick with Permission lasts = Candles 1 never allows an entry ",
+            "(the signal candle has closed when its signal is known). Use Candles >= 2, or Candle open / Candle close.");
+   if(MQLInfoInteger(MQL_TESTER) && PeriodSeconds(Period()) > PeriodSeconds(g_tradeTf))
+      Print("FlashGold EA: warning - the tester's period is above the trading timeframe; use 'Every tick' modelling ",
+            "with a period at or below ", TfText(g_tradeTf), " so every trading candle and stop is seen.");
 
    FgParams sp;
    StrategyParams(sp);
@@ -1496,13 +1738,27 @@ int OnInit()
    g_trade.SetDeviationInPoints((ulong)InpSlippage);
    g_trade.SetTypeFillingBySymbol(_Symbol);
 
-   PendingClear(g_pL);
-   PendingClear(g_pS);
-   g_base     = TimeCurrent();
-   g_sigReset = true;
-   g_fltReset = true;
-   g_lastBar  = 0;
-   g_lvlName  = "FGEA_" + IntegerToString(InpMagic) + "_level";
+   // an input edit or a chart change re-initialises the EA without unloading
+   // it: keep the entry stops if the trading timeframe is the same
+   static ENUM_TIMEFRAMES s_prevTf = PERIOD_CURRENT;
+   int  ur   = UninitializeReason();
+   bool keep = (ur == REASON_PARAMETERS || ur == REASON_CHARTCHANGE) && s_prevTf == g_tradeTf;
+   if(!keep)
+     {
+      PendingClear(g_pL);
+      PendingClear(g_pS);
+      g_lastBar = 0;
+     }
+   s_prevTf = g_tradeTf;
+
+   g_base       = TimeCurrent();
+   g_sigReset   = true;
+   g_fltReset   = true;
+   g_fltBar     = 0;
+   g_snapOk     = false;
+   g_lvlName    = "FGEA_" + IntegerToString(InpMagic) + "_level";
+   g_lvlDrawn   = false;
+   g_lastComment = "";
    return INIT_SUCCEEDED;
   }
 
@@ -1510,57 +1766,71 @@ void OnDeinit(const int reason)
   {
    Comment("");
    ObjectDelete(0, g_lvlName);
+   g_lvlDrawn = false;
   }
 
 void OnTick()
   {
-   // the direction filter follows every tick (its last closed candle)
+   // exits first: they never wait for history or the filter
+   ManageTrailing();
+   RetryCloses();
+
+   // the direction filter: refreshed on each new filter candle (its closed
+   // candles do not change in between); entries wait while it is not ready
+   bool fltReady = !InpFOn;
    if(InpFOn)
      {
-      int rf = g_flt.Update(g_base, InpWarmup, g_fltReset);
-      if(rf == -2)
+      datetime fb = iTime(_Symbol, g_flt.p.tf, 0);
+      if(fb != 0 && (g_fltReset || fb != g_fltBar))
         {
-         g_fltReset = true;
-         return;
+         int rf = g_flt.Update(g_base, InpWarmup, g_fltReset);
+         if(rf == 0)
+           {
+            g_fltReset = false;
+            g_fltBar   = fb;
+           }
+         else
+            if(rf == -2)
+              {
+               g_fltReset = true;
+               g_fltBar   = 0;
+              }
         }
-      if(rf == -1)
-        {
-         if(InpShowStatus)
-            Comment("FlashGold v5 EA: loading the filter's history...");
-         return;
-        }
-      g_fltReset = false;
+      fltReady = fb != 0 && !g_fltReset && fb == g_fltBar && g_flt.stN > 0;
      }
 
-   // the strategy acts once per trading candle, at its close
+   // the strategy: once per trading candle, at its close
    datetime bar0 = iTime(_Symbol, g_tradeTf, 0);
-   if(bar0 == 0)
-      return;
-   if(bar0 != g_lastBar)
+   if(bar0 != 0 && bar0 != g_lastBar)
      {
       int rs = g_sig.Update(g_base, InpWarmup, g_sigReset);
       if(rs == -2)
-        {
          g_sigReset = true;
-         return;
-        }
-      if(rs == -1)
-        {
-         if(InpShowStatus)
-            Comment("FlashGold v5 EA: loading the strategy's history...");
-         return;
-        }
-      g_sigReset = false;
-      // the candle that just closed; not on the first tick after start (its
-      // signal is history, the EA was not running when it closed)
-      int k = g_sig.tfs[g_sig.fi].LastOpenBy(bar0 - 1);
-      if(g_lastBar != 0 && k >= 0 && k < g_sig.stN)
-         OnCandleClose(k);
-      g_lastBar = bar0;
+      else
+         if(rs == 0)
+           {
+            g_sigReset = false;
+            // the candle that just closed; not on the first tick after start
+            // (its signal is history, the EA was not running when it closed)
+            int k = g_sig.tfs[g_sig.fi].LastOpenBy(bar0 - 1);
+            if(g_lastBar != 0 && k >= 0 && k < g_sig.stN)
+              {
+               int kPrev = g_sig.tfs[g_sig.fi].LastOpenBy(g_lastBar);
+               if(kPrev >= 0 && k - kPrev > 0)
+                  PrintFormat("FlashGold EA: %d trading candle(s) closed without being processed (no ticks or no data)", k - kPrev);
+               OnCandleClose(k);
+              }
+            g_lastBar = bar0;
+           }
      }
 
-   ManageTrailing();
-   CheckPendings();
-   ShowStatus();
+   if(fltReady)
+      CheckPendings();
+   ShowStatus(fltReady);
+
+   // the positions at the end of this tick (the state at a candle's close)
+   g_snapL  = CountPos(POSITION_TYPE_BUY) > 0;
+   g_snapS  = CountPos(POSITION_TYPE_SELL) > 0;
+   g_snapOk = true;
   }
 //+------------------------------------------------------------------+
