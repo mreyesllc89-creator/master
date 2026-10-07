@@ -35,8 +35,12 @@
 //    Candle open     Each candle's OPEN, at its open time. Decided on the
 //                    candle's first tick and fixed for the whole candle.
 //    Candle close    Each candle's CLOSE, at its close time. While a candle
-//                    is forming, the last closed candle's answer stays in
-//                    force; the candle gets its own answer when it closes.
+//                    is forming it is judged at its open with the last
+//                    closed candle's close: on a continuous chart that is the
+//                    last closed candle's answer (after a gap or session
+//                    break, signals and Minutes windows are judged at the
+//                    new candle's open). The candle gets its own answer when
+//                    it closes.
 //    The signal in force is judged at the same moment: in Candle open, an H1
 //    signal counts from the first candle that opens at or after its H1 close.
 //    Candle open and Candle close never change inside a candle.
@@ -489,6 +493,7 @@ struct FgState
 //--- last chart bar, for the status box
 struct FgBar
   {
+   datetime          clock;
    bool              armed;
    bool              isOpen;
    datetime          endT;
@@ -533,6 +538,8 @@ string          g_pfx = "";
 string          g_tfTag = "";
 bool            g_reset = false;
 bool            g_waiting = false;  // data of a timeframe still loading
+int             g_fPend = INT_MAX;  // first filter candle still to recompute
+datetime        g_lastTick = 0;     // time of the symbol's last tick
 int             g_first = 0;
 FgState         g_st[];
 int             g_stN = 0;
@@ -854,10 +861,20 @@ void ShadeBar(const int i, const int s, const datetime &time[])
 // levels stay readable; the line grows while the permission is in force.
 void LevelLine(const int i, const bool newSig, const bool armed, const bool isOpen, const double level, const int sigDir, const datetime &time[])
   {
-   int from = i > g_first ? g_from[i - 1] : -1;
+   int prev = i > g_first ? g_from[i - 1] : -1;
+   int from = prev;
    if(newSig || (from < 0 && armed))
       from = i;
    g_from[i] = from;
+   // a new signal on a recomputed bar: the previous signal's line may have
+   // been extended to this bar on earlier ticks; end it at the previous bar
+   // (Pine rolls the bar back)
+   if(newSig && prev >= 0 && prev != i)
+     {
+      string pln = g_pfx + "LN" + IntegerToString((long)time[prev]);
+      if(ObjectFind(0, pln) >= 0 && (datetime)ObjectGetInteger(0, pln, OBJPROP_TIME, 1) >= time[i])
+         ObjectSetInteger(0, pln, OBJPROP_TIME, 1, (long)time[i - 1]);
+     }
    if(from < 0)
       return;
    string ln = g_pfx + "LN" + IntegerToString((long)time[from]);
@@ -881,20 +898,23 @@ void LevelLine(const int i, const bool newSig, const bool armed, const bool isOp
          ObjectSetDouble(0, ln, OBJPROP_PRICE, 1, level);
         }
       ObjectSetInteger(0, ln, OBJPROP_COLOR, clr);
+      string lasts = InpLast == FGF_LASTS_MINUTES ? IntegerToString(InpMinutes) + " min" :
+                     (InpLast == FGF_LASTS_CANDLES ? IntegerToString(InpBars) + (InpBars == 1 ? " candle " : " candles ") + g_tfTag : "until next signal");
+      string txt = (sigDir > 0 ? "BUY" : "SELL") + " signal " + g_tfTag + " @ " + DoubleToString(level, g_digits) + " | " + lasts;
       if(ObjectFind(0, lb) < 0)
         {
-         string lasts = InpLast == FGF_LASTS_MINUTES ? IntegerToString(InpMinutes) + " min" :
-                        (InpLast == FGF_LASTS_CANDLES ? IntegerToString(InpBars) + (InpBars == 1 ? " candle " : " candles ") + g_tfTag : "until next signal");
-         string txt = (sigDir > 0 ? "BUY" : "SELL") + " signal " + g_tfTag + " @ " + DoubleToString(level, g_digits) + " | " + lasts;
          ObjectCreate(0, lb, OBJ_TEXT, 0, time[from], level);
-         ObjectSetString(0, lb, OBJPROP_TEXT, txt);
          ObjectSetString(0, lb, OBJPROP_FONT, FGF_FONT);
          ObjectSetInteger(0, lb, OBJPROP_FONTSIZE, 8);
-         ObjectSetInteger(0, lb, OBJPROP_COLOR, clr);
          ObjectSetInteger(0, lb, OBJPROP_ANCHOR, ANCHOR_RIGHT);
          ObjectSetInteger(0, lb, OBJPROP_SELECTABLE, false);
          ObjectSetInteger(0, lb, OBJPROP_HIDDEN, true);
         }
+      // refreshed every time: a second signal inside the same forming bar
+      // reuses this label
+      ObjectSetString(0, lb, OBJPROP_TEXT, txt);
+      ObjectSetInteger(0, lb, OBJPROP_COLOR, clr);
+      ObjectSetDouble(0, lb, OBJPROP_PRICE, 0, level);
      }
    else
       if(ObjectFind(0, ln) >= 0 && (datetime)ObjectGetInteger(0, ln, OBJPROP_TIME, 1) >= time[i])
@@ -1024,8 +1044,9 @@ void RenderTable()
      }
   }
 
-// Status box contents, judged by the real clock (display only; the gates
-// never use it).
+// Status box contents (display only; the gates never use it). Judged like
+// the gates, at the bar's clock; Tick + Minutes also ends it by the real
+// clock.
 void UpdateTable(const datetime now)
   {
    g_tblOn = InpShowTbl && InpOn;
@@ -1042,7 +1063,7 @@ void UpdateTable(const datetime now)
    string dSide  = L.sigDir > 0 ? "BUY" : "SELL";
    string dState = !L.armed ? "WAITING FOR SIGNAL" : (dOpen ? "ACTIVE - " : "ENDED - ") + dSide + " signal";
    color  dCol   = !L.armed ? FGF_YELLOW : (dOpen ? FGF_LIME : FGF_ORANGE);
-   int    dSecs  = (dOpen && L.endT > 0) ? IMax(0, (int)(L.endT - now)) : 0;
+   int    dSecs  = (dOpen && L.endT > 0) ? IMax(0, (int)(L.endT - (InpCheck == FGF_CHECK_TICK ? now : L.clock))) : 0;
    string dLeft  = "-";
    if(dOpen)
      {
@@ -1102,11 +1123,14 @@ void CalcBar(const int i, const int total, const datetime now, const datetime &t
    //   Candle open   every bar at its open time with its open.
    //   Candle close  a closed bar at its close time with its close; the
    //                 forming bar at its open time with the last close.
-   // Closed bars never repaint in any mode. The last bar counts as closed
-   // once its close time has passed (no new tick yet).
+   // Closed bars never repaint in any mode. The last bar stays live while its
+   // ticks can still arrive: it counts as closed when it is recalculated
+   // (next tick, or a refresh) after its close time, with no tick of it for
+   // 60 s (clock skew, latency). With the market closed, a bar computed live
+   // keeps that answer until then, as on TradingView.
    bool     last  = i == total - 1;
    datetime close_t = BarClose(Period(), time[i]);
-   bool     live  = last && now < close_t;
+   bool     live  = last && (now < close_t || (g_lastTick < close_t && now - g_lastTick < 60));
    datetime clock = close_t;
    double   value = cl[i];
    if(InpCheck == FGF_CHECK_OPEN)
@@ -1125,7 +1149,13 @@ void CalcBar(const int i, const int total, const datetime now, const datetime &t
         }
       else
          if(live)
+           {
+            // the real clock, kept inside the bar: a filter candle closing
+            // with this bar is not read before the bar has closed
             clock = now > time[i] ? now : time[i];
+            if(clock >= close_t)
+               clock = close_t - 1;
+           }
 
    // The arm in force: the latest filter candle closed by this clock.
    int k = g_tf[g_fi].LastClosedBy(clock);
@@ -1195,6 +1225,7 @@ void CalcBar(const int i, const int total, const datetime now, const datetime &t
 
    if(last)
      {
+      g_last.clock    = clock;
       g_last.armed    = armed;
       g_last.isOpen   = isOpen;
       g_last.endT     = endT;
@@ -1318,15 +1349,17 @@ int OnCalculate(const int rates_total,
       SetColors();
       g_first = InpMaxBars > 0 ? IMax(0, rates_total - InpMaxBars) : 0;
       g_stN   = 0;
+      g_fPend = INT_MAX;
       for(int t = 0; t < g_tfCount; t++)
          g_tf[t].n = 0;
      }
 
    // 1. candles of every timeframe used (filter, parent, zones)
-   int fChanged = 0;
    for(int t = 0; t < g_tfCount; t++)
      {
-      long fromL = (long)time[g_first] - (long)InpWarmup * PeriodSeconds(g_tf[t].tf);
+      // every timeframe covers the filter warm-up, plus its own warm-up
+      long back  = (long)InpWarmup * g_fSec + (t == g_fi ? 0 : (long)InpWarmup * PeriodSeconds(g_tf[t].tf));
+      long fromL = (long)time[g_first] - back;
       if(fromL < 0)
          fromL = 0;
       int ch = g_tf[t].Load((datetime)fromL, full);
@@ -1346,8 +1379,10 @@ int OnCalculate(const int rates_total,
          return full ? 0 : prev_calculated;
         }
       g_tf[t].Calc(ch);
+      // the filter is loaded first: remember its changed candles even if a
+      // later timeframe is not ready and this pass stops early
       if(t == g_fi)
-         fChanged = ch;
+         g_fPend = IMin(g_fPend, ch);
      }
 
    g_waiting = false;
@@ -1356,10 +1391,11 @@ int OnCalculate(const int rates_total,
    int fn = g_tf[g_fi].n;
    if(ArraySize(g_st) < fn)
       ArrayResize(g_st, fn, 1000);
-   int fFrom = full ? 0 : IMin(fChanged, g_stN);
+   int fFrom = full ? 0 : IMin(g_fPend, g_stN);
    for(int k = fFrom; k < fn; k++)
       CalcCandle(k);
-   g_stN = fn;
+   g_stN   = fn;
+   g_fPend = INT_MAX;
 
    // 3. chart bars
    ArrayResize(g_sigId, rates_total, 1000);
@@ -1373,6 +1409,7 @@ int OnCalculate(const int rates_total,
    datetime now = TimeTradeServer();
    if(now < TimeCurrent())
       now = TimeCurrent();
+   g_lastTick = (datetime)SymbolInfoInteger(_Symbol, SYMBOL_TIME);
    int start = full ? g_first : IMax(g_first, prev_calculated - 1);
    for(int i = start; i < rates_total; i++)
       CalcBar(i, rates_total, now, time, open, high, low, close);

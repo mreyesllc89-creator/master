@@ -31,10 +31,13 @@
 //    it shows, and allows / blocks, what the 1H chart shows at that moment.
 //      - A 1H signal counts when its 1H candle closes, at that candle's
 //        level. Only closed 1H candles are read, so nothing repaints: the
-//        signal mark sits on the chart candle that closes with its 1H candle
-//        (on a higher chart, on the candle that contains it).
-//      - Price is compared to the level as it moves: a 1m strategy gets the
-//        1H filter's answer at every 1m close.
+//        signal mark sits on the first chart candle judged at or after that
+//        close (Tick / Candle close: the candle that closes with it, or on a
+//        higher chart the candle that contains it; Candle open: the candle
+//        that opens at it).
+//      - Price is compared to the level at every chart candle: a 1m strategy
+//        gets the 1H filter's answer at every 1m tick, open or close (see
+//        CHECK PRICE ON).
 //      - "Candles" counts 1H candles; "Minutes" runs on the clock.
 //    "Chart" in the dropdown runs it on the chart's own candles. On a lower
 //    chart the 1H history starts where the chart's history starts: the first
@@ -96,8 +99,12 @@
 //    Candle open     Each candle's OPEN, at its open time. Decided on the
 //                    candle's first tick and fixed for the whole candle.
 //    Candle close    Each candle's CLOSE, at its close time. While a candle
-//                    is forming, the last closed candle's answer stays in
-//                    force; the candle gets its own answer when it closes.
+//                    is forming it is judged at its open with the last
+//                    closed candle's close: on a continuous chart that is the
+//                    last closed candle's answer (after a gap or session
+//                    break, signals and Minutes windows are judged at the
+//                    new candle's open). The candle gets its own answer when
+//                    it closes.
 //    The signal in force is judged at the same moment: in Candle open, a 1H
 //    signal counts from the first candle that opens at or after its 1H close.
 //    Candle open and Candle close never change inside a candle.
@@ -124,7 +131,7 @@ fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Sig
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
 fgfMinutes   = input.int(60, "Minutes", minval=1, group=GRP_FGF)
 fgfBars      = input.int(1, "Candles", minval=1, group=GRP_FGF)
-fgfCheck     = input.string("Tick", "Check price on", options=["Tick", "Candle open", "Candle close"], group=GRP_FGF, tooltip="When price is compared to the level. Tick: the live price, on every tick (closed candles keep their close). Candle open: each candle's open, decided on its first tick and fixed for the whole candle. Candle close: each candle's close, decided when it closes; while a candle is forming, the last closed candle's answer stays in force.")
+fgfCheck     = input.string("Tick", "Check price on", options=["Tick", "Candle open", "Candle close"], group=GRP_FGF, tooltip="When price is compared to the level. Tick: the live price, on every tick (closed candles keep their close). Candle open: each candle's open, decided on its first tick and fixed for the whole candle. Candle close: each candle's close, decided when it closes; while a candle is forming it is judged at its open with the last closed candle's close.")
 fgfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_FGF)
 fgfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_FGF, tooltip="Turn one side off completely.")
 fgfShowBg    = input.bool(true, "Shade", inline="vis", group=GRP_FGF)
@@ -154,13 +161,13 @@ fgfUseDrift     = input.bool(false, "Use prior drift filter", group=GRP_FGB)
 
 GRP_FGZ = "FlashGold signal: TDI trade zone"
 fgfUseZones   = input.bool(true, "Use TDI trade-zone filter", group=GRP_FGZ)
-fgfParentTf   = input.timeframe("60", "Parent obedience timeframe", group=GRP_FGZ, tooltip="Calibrated with the parent = the timeframe the signal runs on. Keep it equal to Filter timeframe.")
+fgfParentTf   = input.timeframe("60", "Parent obedience timeframe", group=GRP_FGZ, tooltip="Calibrated with the parent = the timeframe the signal runs on. Keep it equal to Filter timeframe: a parent above it reads its forming bar live, so it repaints.")
 fgfRsiLen     = input.int(14, "TDI RSI length", minval=2, group=GRP_FGZ)
 fgfFastLen    = input.int(2, "TDI white fast length", minval=1, group=GRP_FGZ)
 fgfMinAligned = input.int(2, "Minimum child zones aligned", minval=0, maxval=6, group=GRP_FGZ)
 fgfFlatParent = input.bool(false, "Allow trade if parent is flat", group=GRP_FGZ)
 fgfIgnoreNa   = input.bool(true, "Ignore zones without data", group=GRP_FGZ, tooltip="A child zone whose timeframe has no data on this candle is dropped from the active count instead of counting as MIX.")
-fgfHtfClosed  = input.bool(true, "Higher-TF zones use the last CLOSED bar", group=GRP_FGZ, tooltip="A child zone on a timeframe HIGHER than the filter timeframe is read from its last closed bar, so history and live agree.")
+fgfHtfClosed  = input.bool(true, "Higher-TF zones use the last CLOSED bar", group=GRP_FGZ, tooltip="A child zone on a timeframe HIGHER than the filter timeframe is read from its last closed bar, so history and live agree. Off: such a zone reads its forming bar live, so it repaints.")
 fgfUseZ1 = input.bool(true, "Use child zone 1", group=GRP_FGZ)
 fgfZTf1  = input.timeframe("60", "Zone 1 timeframe", group=GRP_FGZ)
 fgfUseZ2 = input.bool(true, "Use child zone 2", group=GRP_FGZ)
@@ -211,9 +218,9 @@ fgfSignal(int ctxSec) =>
     // price model
     float pt         = syminfo.mintick
     float halfSpread = fgfSpreadPts * pt * 0.5
-    float bid        = close - halfSpread
-    float ask        = close + halfSpread
-    float midPrice   = (bid + ask) * 0.5
+    float bidPx      = close - halfSpread
+    float askPx      = close + halfSpread
+    float midPrice   = (bidPx + askPx) * 0.5
 
     // TDI trade zone
     int parentDir = request.security(syminfo.tickerid, fgfParentTf, fgfTdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
@@ -279,7 +286,7 @@ fgfSignal(int ctxSec) =>
 
     if buyCandidate and canFire
         if fgfHoldBars == 0
-            buyEntryPrice := ask + entryDistPts * pt
+            buyEntryPrice := askPx + entryDistPts * pt
             buySignal     := true
             lastEntryBar  := bar_index
         else if not holdActive
@@ -291,14 +298,14 @@ fgfSignal(int ctxSec) =>
             int   elapsedBars    = bar_index - holdSignalBar
             float holdMovePoints = (midPrice - holdSignalMid) / pt
             if elapsedBars >= fgfHoldBars and holdMovePoints >= holdFavPts
-                buyEntryPrice := ask + entryDistPts * pt
+                buyEntryPrice := askPx + entryDistPts * pt
                 buySignal     := true
                 lastEntryBar  := bar_index
                 holdActive    := false
 
     if sellCandidate and canFire
         if fgfHoldBars == 0
-            sellEntryPrice := bid - entryDistPts * pt
+            sellEntryPrice := bidPx - entryDistPts * pt
             sellSignal     := true
             lastEntryBar   := bar_index
         else if not holdActive
@@ -310,7 +317,7 @@ fgfSignal(int ctxSec) =>
             int   elapsedBars    = bar_index - holdSignalBar
             float holdMovePoints = (holdSignalMid - midPrice) / pt
             if elapsedBars >= fgfHoldBars and holdMovePoints >= holdFavPts
-                sellEntryPrice := bid - entryDistPts * pt
+                sellEntryPrice := bidPx - entryDistPts * pt
                 sellSignal     := true
                 lastEntryBar   := bar_index
                 holdActive     := false
@@ -342,15 +349,15 @@ fgfArm(bool sBuy, bool sSell, float sPx) =>
     [aAt, aBar, aPx, aDir, aId]
 
 // Each filter candle sends its arm, its conditions, its index, open and close
-// time, and the arm and conditions of the candle before it. An arm is used
-// only once the candle that made it has closed by this chart's clock, so the
-// forming filter candle is never read and nothing repaints.
+// time, and the arm, conditions and close time of the candle before it. An
+// arm is used only once the candle that made it has closed by this chart's
+// clock, so the forming filter candle is never read and nothing repaints.
 fgfRead() =>
     [sBuy, sSell, sPx, sPar, sAl, sAc] = fgfSignal(fgfTfSec)
     [aAt, aBar, aPx, aDir, aId] = fgfArm(sBuy, sSell, sPx)
-    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1]]
+    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1])]
 
-[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
+[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
 
 fgfTfText(string tf) =>
     int sec = timeframe.in_seconds(tf)
@@ -359,29 +366,50 @@ string fgfTfTag = fgfTfText(fgfTfEff)
 
 // Clock: the moment a bar is judged ("Check price on").
 //   Tick          a closed bar at its close time; the live bar at the real
-//                 clock (every tick).
+//                 clock (every tick), kept inside the bar.
 //   Candle open   every bar at its open time (fixed from its first tick).
 //   Candle close  a closed bar at its close time; the live bar at its open
 //                 time, with the last closed candle's close (see fgfValue).
 // Closed bars never repaint in any mode.
 bool fgfLiveBar = not barstate.isconfirmed
-fgfClock = fgfCheck == "Candle open" or (fgfCheck == "Candle close" and fgfLiveBar) ? time : fgfLiveBar ? timenow : nz(time_close, time)
+bool fgfAtOpen  = fgfCheck == "Candle open" or (fgfCheck == "Candle close" and fgfLiveBar)
+// The close-time clock (Tick, and closed bars in Candle close). A live bar's
+// real clock never reaches the bar's close, so a filter candle closing with
+// it is not read before the bar has closed (delayed data, late ticks).
+int  fgfClockC  = fgfLiveBar ? math.max(time, math.min(timenow, nz(time_close, timenow + 1) - 1)) : nz(time_close, time)
+fgfClock = fgfAtOpen ? time : fgfClockC
 
-// The arm in force: the latest filter candle's once it has closed by this
-// clock, else the candle before it.
-bool  fgfDone   = fgfClock >= fpClose
-int   fgfSigAt  = fgfDone ? fpAt  : fqAt
-int   fgfSigBar = fgfDone ? fpBar : fqBar
-float fgfLevel  = fgfDone ? fpPx  : fqPx
-int   fgfSigDir = nz(fgfDone ? fpDir : fqDir)
-int   fgfSigId  = nz(fgfDone ? fpId : fqId)
+// The arm in force = the latest filter candle closed by the clock:
+//   1  the latest filter candle (fp), once it has closed by the clock
+//   2  the candle before it (fq), once that one has closed
+//   0  neither (a chart candle longer than the filter candle, judged at its
+//      open): the previous chart bar's close-time pick, as its close is this
+//      bar's open
+int fgfSelC = fgfClockC >= fpClose ? 1 : 2
+int fgfSel  = fgfAtOpen ? (fpClose <= time ? 1 : fqClose <= time ? 2 : 0) : fgfSelC
+// the close-time pick of every bar, kept for the next bar's open (fgfSel 0)
+int   fgfCAt  = fgfSelC == 1 ? fpAt  : fqAt
+int   fgfCBar = fgfSelC == 1 ? fpBar : fqBar
+float fgfCPx  = fgfSelC == 1 ? fpPx  : fqPx
+int   fgfCDir = fgfSelC == 1 ? fpDir : fqDir
+int   fgfCId  = fgfSelC == 1 ? fpId  : fqId
+int   fgfCPar = fgfSelC == 1 ? fpPar : fqPar
+int   fgfCAl  = fgfSelC == 1 ? fpAl  : fqAl
+int   fgfCAc  = fgfSelC == 1 ? fpAc  : fqAc
+// The filter candle the clock falls in (Candles mode): the picked candle when
+// it closes exactly at the clock, else the one after it.
+int   fgfCIdx = fgfSelC == 1 ? (fgfClockC == fpClose ? fpIdx : fpIdx + 1) : (fgfClockC == fqClose ? fpIdx - 1 : fpIdx)
+
+int   fgfSigAt  = fgfSel == 1 ? fpAt  : fgfSel == 2 ? fqAt  : fgfCAt[1]
+int   fgfSigBar = fgfSel == 1 ? fpBar : fgfSel == 2 ? fqBar : fgfCBar[1]
+float fgfLevel  = fgfSel == 1 ? fpPx  : fgfSel == 2 ? fqPx  : fgfCPx[1]
+int   fgfSigDir = nz(fgfSel == 1 ? fpDir : fgfSel == 2 ? fqDir : fgfCDir[1])
+int   fgfSigId  = nz(fgfSel == 1 ? fpId  : fgfSel == 2 ? fqId  : fgfCId[1])
 // The conditions of the last closed filter candle (status box).
-int   fgfPar    = fgfDone ? fpPar : fqPar
-int   fgfAl     = fgfDone ? fpAl  : fqAl
-int   fgfAc     = fgfDone ? fpAc  : fqAc
-// The filter candle this clock falls in (Candles mode); one closing exactly
-// at the clock is the one judged, as on its own chart.
-int   fgfIdx    = fgfClock <= fpOpen ? fpIdx - 1 : fgfClock <= fpClose ? fpIdx : fpIdx + 1
+int   fgfPar    = fgfSel == 1 ? fpPar : fgfSel == 2 ? fqPar : fgfCPar[1]
+int   fgfAl     = fgfSel == 1 ? fpAl  : fgfSel == 2 ? fqAl  : fgfCAl[1]
+int   fgfAc     = fgfSel == 1 ? fpAc  : fgfSel == 2 ? fqAc  : fgfCAc[1]
+int   fgfIdx    = not fgfAtOpen ? fgfCIdx : fgfSel == 1 ? (time == fpClose ? fpIdx : fpIdx + 1) : fgfSel == 2 ? (time == fqClose ? fpIdx - 1 : fpIdx) : fgfCIdx[1]
 
 // The price compared to the level, at that moment.
 fgfValue = fgfCheck == "Candle open" ? open : fgfCheck == "Candle close" and fgfLiveBar ? close[1] : close
@@ -446,7 +474,8 @@ if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom)
         string fgfTxt     = (fgfSigDir > 0 ? "BUY" : "SELL") + " signal " + fgfTfTag + " @ " + str.tostring(fgfLevel, format.mintick) + "\n" + fgfLastTxt
         fgfLbl := label.new(fgfX1, fgfLevel, fgfTxt, style=label.style_label_right, color=color.new(fgfCol, 20), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
 
-// Status box, judged by the real clock (display only; the gates never use it).
+// Status box (display only; the gates never use it). Judged like the gates,
+// at the bar's clock; Tick + Minutes also ends it by the real clock.
 var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 7, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
 if fgfShowTbl and fgfOn and barstate.islast
     bool   dOpen  = fgfOpen and not (fgfCheck == "Tick" and fgfLast == "Minutes" and timenow >= fgfEnd)
@@ -455,7 +484,7 @@ if fgfShowTbl and fgfOn and barstate.islast
     string dSide  = fgfSigDir > 0 ? "BUY" : "SELL"
     string dState = not fgfArmed ? "WAITING FOR SIGNAL" : (dOpen ? "ACTIVE - " : "ENDED - ") + dSide + " signal"
     color  dCol   = not fgfArmed ? color.yellow : dOpen ? color.lime : color.orange
-    int    dSecs  = dOpen and not na(fgfEnd) ? math.max(0, math.floor((fgfEnd - timenow) / 1000.0)) : 0
+    int    dSecs  = dOpen and not na(fgfEnd) ? math.max(0, math.floor((fgfEnd - (fgfCheck == "Tick" ? timenow : fgfClock)) / 1000.0)) : 0
     string dLeft  = not dOpen ? "-" : fgfLast == "Minutes" ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : fgfLast == "Candles" ? str.tostring(fgfEndBar - fgfIdx) + (fgfEndBar - fgfIdx == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
     string dLv    = na(fgfLevel) ? "-" : str.tostring(fgfLevel, format.mintick)
     string dSig   = na(fgfSigAt) ? "-" : dSide + " " + str.format_time(fgfSigAt, "MMM dd HH:mm", syminfo.timezone)
