@@ -33,8 +33,8 @@
 //        level. Only closed 1H candles are read, so nothing repaints: the
 //        signal mark sits on the first chart candle judged at or after that
 //        close (Tick / Candle close: the candle that closes with it, or on a
-//        higher chart the candle that contains it; Candle open: the candle
-//        that opens at it).
+//        higher chart the candle that contains it; Candle open: the first
+//        candle that opens at or after it).
 //      - Price is compared to the level at every chart candle: a 1m strategy
 //        gets the 1H filter's answer at every 1m tick, open or close (see
 //        CHECK PRICE ON).
@@ -92,10 +92,12 @@
 //
 //  CHECK PRICE ON  (when price is compared to the level)
 //    Tick (default)  The live price, on every tick: a buy is allowed the
-//                    moment price trades above the level. Closed candles keep
-//                    the answer of their last tick (their close, at their
-//                    close time). A Pine strategy acts on ticks only with
-//                    calc_on_every_tick = true; otherwise it reads the close.
+//                    moment price trades above the level. Closed candles are
+//                    judged at their close time with their close; this can
+//                    differ from their last tick when a filter candle or a
+//                    Minutes window ends with the candle. A Pine strategy
+//                    acts on ticks only with calc_on_every_tick = true;
+//                    otherwise it reads the close.
 //    Candle open     Each candle's OPEN, at its open time. Decided on the
 //                    candle's first tick and fixed for the whole candle.
 //    Candle close    Each candle's CLOSE, at its close time. While a candle
@@ -374,17 +376,20 @@ string fgfTfTag = fgfTfText(fgfTfEff)
 bool fgfLiveBar = not barstate.isconfirmed
 bool fgfAtOpen  = fgfCheck == "Candle open" or (fgfCheck == "Candle close" and fgfLiveBar)
 // The close-time clock (Tick, and closed bars in Candle close). A live bar's
-// real clock never reaches the bar's close, so a filter candle closing with
-// it is not read before the bar has closed (delayed data, late ticks).
-int  fgfClockC  = fgfLiveBar ? math.max(time, math.min(timenow, nz(time_close, timenow + 1) - 1)) : nz(time_close, time)
+// real clock never reaches the bar's close, nor the close of the filter
+// candle still forming (fp on a live bar), so a filter candle is never read
+// before its data has closed (delayed data, late ticks).
+int  fgfClockC  = fgfLiveBar ? math.max(time, math.min(timenow, nz(time_close, timenow + 1) - 1, nz(fpClose, timenow + 1) - 1)) : nz(time_close, time)
 fgfClock = fgfAtOpen ? time : fgfClockC
 
 // The arm in force = the latest filter candle closed by the clock:
 //   1  the latest filter candle (fp), once it has closed by the clock
 //   2  the candle before it (fq), once that one has closed
 //   0  neither (a chart candle longer than the filter candle, judged at its
-//      open): the previous chart bar's close-time pick, as its close is this
-//      bar's open
+//      open): the previous chart bar's close-time pick, the latest filter
+//      candle closed by this bar's open, as none closes between the two;
+//      its index is judged at this bar's open (after a session gap, the
+//      next candle)
 int fgfSelC = fgfClockC >= fpClose ? 1 : 2
 int fgfSel  = fgfAtOpen ? (fpClose <= time ? 1 : fqClose <= time ? 2 : 0) : fgfSelC
 // the close-time pick of every bar, kept for the next bar's open (fgfSel 0)
@@ -399,6 +404,9 @@ int   fgfCAc  = fgfSelC == 1 ? fpAc  : fqAc
 // The filter candle the clock falls in (Candles mode): the picked candle when
 // it closes exactly at the clock, else the one after it.
 int   fgfCIdx = fgfSelC == 1 ? (fgfClockC == fpClose ? fpIdx : fpIdx + 1) : (fgfClockC == fqClose ? fpIdx - 1 : fpIdx)
+// the picked candle itself and its close, for the next bar's open (fgfSel 0)
+int   fgfCK      = fgfSelC == 1 ? fpIdx : fpIdx - 1
+int   fgfCKClose = fgfSelC == 1 ? fpClose : fqClose
 
 int   fgfSigAt  = fgfSel == 1 ? fpAt  : fgfSel == 2 ? fqAt  : fgfCAt[1]
 int   fgfSigBar = fgfSel == 1 ? fpBar : fgfSel == 2 ? fqBar : fgfCBar[1]
@@ -409,7 +417,7 @@ int   fgfSigId  = nz(fgfSel == 1 ? fpId  : fgfSel == 2 ? fqId  : fgfCId[1])
 int   fgfPar    = fgfSel == 1 ? fpPar : fgfSel == 2 ? fqPar : fgfCPar[1]
 int   fgfAl     = fgfSel == 1 ? fpAl  : fgfSel == 2 ? fqAl  : fgfCAl[1]
 int   fgfAc     = fgfSel == 1 ? fpAc  : fgfSel == 2 ? fqAc  : fgfCAc[1]
-int   fgfIdx    = not fgfAtOpen ? fgfCIdx : fgfSel == 1 ? (time == fpClose ? fpIdx : fpIdx + 1) : fgfSel == 2 ? (time == fqClose ? fpIdx - 1 : fpIdx) : fgfCIdx[1]
+int   fgfIdx    = not fgfAtOpen ? fgfCIdx : fgfSel == 1 ? (time == fpClose ? fpIdx : fpIdx + 1) : fgfSel == 2 ? (time == fqClose ? fpIdx - 1 : fpIdx) : (time == fgfCKClose[1] ? fgfCK[1] : fgfCK[1] + 1)
 
 // The price compared to the level, at that moment.
 fgfValue = fgfCheck == "Candle open" ? open : fgfCheck == "Candle close" and fgfLiveBar ? close[1] : close

@@ -1052,6 +1052,7 @@ void FilterPermission(FgPerm &r)
       now = TimeCurrent();
    datetime clock  = bar0;
    double   value  = 0.0;
+   bool     rtTick = false;   // the clock comes from the real clock (Tick)
    if(InpFCheck == FGF_CHECK_OPEN)
       value = iOpen(_Symbol, g_tradeTf, 0);
    else
@@ -1060,9 +1061,17 @@ void FilterPermission(FgPerm &r)
       else
         {
          // the real clock, kept inside the candle
-         clock = now > bar0 ? now : bar0;
+         rtTick = now >= bar0;
+         clock  = now > bar0 ? now : bar0;
          if(clock >= close0)
             clock = close0 - 1;
+         // nor past the newest filter candle while it can still get ticks
+         // (the tick being handled is stamped before its close)
+         int      fl       = g_flt.tfs[g_flt.fi].n - 1;
+         datetime fEnd     = fl >= 0 ? g_flt.tfs[g_flt.fi].tc[fl] : 0;
+         datetime lastTick = (datetime)SymbolInfoInteger(_Symbol, SYMBOL_TIME);
+         if(fl >= 0 && clock >= fEnd && lastTick < fEnd)
+            clock = fEnd - 1;
          value = SymbolInfoDouble(_Symbol, SYMBOL_BID);
         }
    r.value = value;
@@ -1081,8 +1090,9 @@ void FilterPermission(FgPerm &r)
    r.ac     = g_flt.st[k].ac;
    int sigBar = g_flt.st[k].aBar;
    // the filter candle this clock falls in; one closing exactly at the
-   // clock is the one judged, as on its own chart
-   r.idx = g_flt.tfs[g_flt.fi].tc[k] == clock ? k : k + 1;
+   // clock is the one judged, as on its own chart (a real-clock tick in the
+   // second a filter candle closes is already after it, as on TradingView)
+   r.idx = g_flt.tfs[g_flt.fi].tc[k] == clock && !rtTick ? k : k + 1;
 
    bool lvOk = r.level != EMPTY_VALUE;
    r.armed   = r.sigAt > 0 && clock >= r.sigAt;

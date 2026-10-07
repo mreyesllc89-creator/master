@@ -29,9 +29,10 @@
 //
 //  CHECK PRICE ON (when price is compared to the level)
 //    Tick (default)  The live price, on every tick: a buy is allowed the
-//                    moment price trades above the level. Closed candles keep
-//                    the answer of their last tick (their close, at their
-//                    close time).
+//                    moment price trades above the level. Closed candles are
+//                    judged at their close time with their close; this can
+//                    differ from their last tick when a filter candle or a
+//                    Minutes window ends with the candle.
 //    Candle open     Each candle's OPEN, at its open time. Decided on the
 //                    candle's first tick and fixed for the whole candle.
 //    Candle close    Each candle's CLOSE, at its close time. While a candle
@@ -61,7 +62,9 @@
 //        Tick          shift 0, on every tick (the answer right now)
 //        Candle open   shift 0 (fixed from the candle's first tick)
 //        Candle close  shift 1 on each new bar (the candle that just closed);
-//                      shift 0 gives the same answer until the candle closes
+//                      shift 0 gives the same answer on a continuous chart;
+//                      after a gap or session break it is judged at the new
+//                      candle's open (see CHECK PRICE ON)
 //        int shift = 0;   // 1 for Candle close on a new bar
 //        double b[1], s[1];
 //        if(CopyBuffer(fgf, 0, shift, 1, b) == 1 && CopyBuffer(fgf, 1, shift, 1, s) == 1)
@@ -540,6 +543,7 @@ bool            g_reset = false;
 bool            g_waiting = false;  // data of a timeframe still loading
 int             g_fPend = INT_MAX;  // first filter candle still to recompute
 datetime        g_lastTick = 0;     // time of the symbol's last tick
+bool            g_freshTick = false; // this pass was started by a new tick
 int             g_first = 0;
 FgState         g_st[];
 int             g_stN = 0;
@@ -1130,7 +1134,8 @@ void CalcBar(const int i, const int total, const datetime now, const datetime &t
    // keeps that answer until then, as on TradingView.
    bool     last  = i == total - 1;
    datetime close_t = BarClose(Period(), time[i]);
-   bool     live  = last && (now < close_t || (g_lastTick < close_t && now - g_lastTick < 60));
+   bool     live  = last && (now < close_t || (g_lastTick < close_t && (g_freshTick || now - g_lastTick < 60)));
+   bool     rtTick = false;   // the clock comes from the real clock (Tick, live)
    datetime clock = close_t;
    double   value = cl[i];
    if(InpCheck == FGF_CHECK_OPEN)
@@ -1152,9 +1157,16 @@ void CalcBar(const int i, const int total, const datetime now, const datetime &t
            {
             // the real clock, kept inside the bar: a filter candle closing
             // with this bar is not read before the bar has closed
-            clock = now > time[i] ? now : time[i];
+            rtTick = now >= time[i];
+            clock  = now > time[i] ? now : time[i];
             if(clock >= close_t)
                clock = close_t - 1;
+            // nor the newest filter candle while it can still get ticks
+            // (its close has passed by the local clock, not by its data)
+            int      fl   = g_tf[g_fi].n - 1;
+            datetime fEnd = fl >= 0 ? g_tf[g_fi].tc[fl] : 0;
+            if(fl >= 0 && clock >= fEnd && g_lastTick < fEnd && (g_freshTick || now - g_lastTick < 60))
+               clock = fEnd - 1;
            }
 
    // The arm in force: the latest filter candle closed by this clock.
@@ -1179,8 +1191,10 @@ void CalcBar(const int i, const int total, const datetime now, const datetime &t
       al     = g_st[k].al;
       ac     = g_st[k].ac;
       // the filter candle this clock falls in; one closing exactly at the
-      // clock is the one judged, as on its own chart
-      idx    = g_tf[g_fi].tc[k] == clock ? k : k + 1;
+      // clock is the one judged, as on its own chart. The real clock is
+      // whole seconds here and milliseconds on TradingView: a tick in the
+      // second a filter candle closes is already after it.
+      idx    = g_tf[g_fi].tc[k] == clock && !rtTick ? k : k + 1;
      }
 
    bool   lvOk  = level != EMPTY_VALUE;
@@ -1410,6 +1424,11 @@ int OnCalculate(const int rates_total,
    if(now < TimeCurrent())
       now = TimeCurrent();
    g_lastTick = (datetime)SymbolInfoInteger(_Symbol, SYMBOL_TIME);
+   // a new tick of the symbol since the last pass (a refresh or reload does
+   // not count): proof, in server time, that the last bar is still live
+   static datetime s_prevTick = 0;
+   g_freshTick = !full && g_lastTick != s_prevTick;
+   s_prevTick  = g_lastTick;
    int start = full ? g_first : IMax(g_first, prev_calculated - 1);
    for(int i = start; i < rates_total; i++)
       CalcBar(i, rates_total, now, time, open, high, low, close);
