@@ -1,6 +1,6 @@
 //@version=6
 // ============================================================================
-//  DIRECTIONAL TIME FILTER  -  v1.5
+//  DIRECTIONAL TIME FILTER  -  v1.6
 // ----------------------------------------------------------------------------
 //  A time-boxed direction PERMISSION you can bolt onto any script. It only
 //  answers "is a buy allowed now? is a sell allowed now?". Your script's own
@@ -46,6 +46,34 @@
 //                                   sell signals pass only if price < 58.40
 //            after 14:45:00         every signal is blocked
 //
+//  FILTER TIMEFRAME  (add-on, group "Filter timeframe (add-on)", off by
+//  default)  Tick "Run the filter on" and pick a timeframe, say 1 hour: the
+//  filter then runs on 1H candles whatever chart you look at. Set it up on
+//  the 1H chart, switch the chart to 5m, 15m, 4H...: you keep seeing what
+//  the filter sees on the 1H chart (same signals, levels, windows and
+//  ALLOWED / BLOCKED). At any moment the answer is the one the 1H chart
+//  gives at that same moment:
+//    - the direction signal is computed on 1H candles (TDI, zones, burst,
+//      ATR, entry hold: all as on the 1H chart) and arms the filter when its
+//      1H candle closes, at that candle's level;
+//    - a countdown in minutes runs on the clock: a 1H signal closing at
+//      14:00 with countdown 15 is open 14:00 -> 14:15 on every chart;
+//    - a countdown in candles counts 1H candles and covers the same 1H
+//      candles as on the 1H chart (1 = only the signal candle, so on a 5m
+//      chart only the 5m candle that closes with it: use minutes there);
+//    - price is compared to the level as it moves, so a 5m chart judges
+//      every 5m close: the 1H filter's verdict at that moment.
+//  Only closed 1H candles are read, so nothing repaints: a 1H signal shows
+//  on the chart candle that closes together with its 1H candle (on a higher
+//  chart, on the candle that contains it). ACTIVATE NOW and Start time are
+//  clock based and work as before; in Candles mode they count 1H candles
+//  too. The status box title and the window labels show the timeframe in
+//  use ("DTF 1H"). On the 1H chart itself the add-on changes nothing, and
+//  unticked the filter runs on the chart's own candles exactly as v1.5.
+//  On a lower chart the 1H history only starts where the chart's history
+//  starts, so its first 1H candles are a warm-up (TDI, ATR) and can differ
+//  from the 1H chart; later candles match it.
+//
 //  INPUTS (group "Directional time filter")
 //    Enable filter      Off = every signal passes, as if the filter is absent.
 //    ACTIVATE NOW       See above.
@@ -56,7 +84,8 @@
 //                       "+ seconds" adds seconds). Used when ACTIVATE NOW is
 //                       off.
 //    Countdown unit     Minutes, or Candles (chart candles counted from the
-//                       candle that armed the window: 1 = that candle only).
+//                       candle that armed the window: 1 = that candle only;
+//                       filter-timeframe candles when that add-on is on).
 //    Countdown (min)    Minutes the window stays open from the start.
 //                       0 = never expires.
 //    Countdown (candles)  Candles the window stays open, in Candles mode.
@@ -69,6 +98,10 @@
 //    Before start       What happens before the window opens:
 //                       "Block" (no trades) or "Pass" (filter not active yet).
 //    Shade window / Draw levels / Status box   Chart visuals.
+//  INPUTS (group "Filter timeframe (add-on)")
+//    Run the filter on  Off = the filter runs on this chart's candles. On =
+//                       it runs on the timeframe next to it and this chart
+//                       shows what it sees there. See FILTER TIMEFRAME.
 //
 //  OUTPUTS (Data Window / "Source" dropdown of another script)
 //    DTF window open    1 while the window is open, 0 otherwise.
@@ -150,9 +183,9 @@ dtfLvMode    = input.string("Actual price", "Level when activating", options=["A
 dtfTyped     = input.float(0, "Typed price", minval=0, group=GRP_DTF, tooltip="The level used by ACTIVATE NOW when 'Level when activating' is 'Typed price'. Buys allowed only above it, sells only below it.")
 dtfStart     = input.time(timestamp("2030-01-01T00:00:00+0000"), "Start time", group=GRP_DTF, tooltip="Scheduled start, used when ACTIVATE NOW is off. Date and minute in the chart's time zone (the one on the time axis); add seconds below.")
 dtfStartSec  = input.int(0, "+ seconds", minval=0, maxval=59, group=GRP_DTF, tooltip="Seconds added to Start time (useful on second charts).")
-dtfDurUnit   = input.string("Minutes", "Countdown unit", options=["Minutes", "Candles"], group=GRP_DTF, tooltip="Minutes: the window stays open for the minutes below. Candles: the window stays open for the number of chart candles below, counted from the candle that armed it (1 = only that candle, whose order fills on the next one).")
+dtfDurUnit   = input.string("Minutes", "Countdown unit", options=["Minutes", "Candles"], group=GRP_DTF, tooltip="Minutes: the window stays open for the minutes below. Candles: the window stays open for the number of chart candles below, counted from the candle that armed it (1 = only that candle, whose order fills on the next one). With the Filter timeframe add-on on, the candles are that timeframe's.")
 dtfMinutes   = input.float(15, "Countdown (minutes)", minval=0, step=1, group=GRP_DTF, tooltip="Minutes the window stays open from the start. 0 = never expires. Bars are judged at their close, so a countdown shorter than one chart bar opens for at most one bar.")
-dtfBars      = input.int(1, "Countdown (candles)", minval=1, group=GRP_DTF, tooltip="Chart candles the window stays open, counted from the candle that armed it.")
+dtfBars      = input.int(1, "Countdown (candles)", minval=1, group=GRP_DTF, tooltip="Chart candles the window stays open, counted from the candle that armed it (filter-timeframe candles when that add-on is on).")
 dtfRef       = input.source(close, "Actual price", group=GRP_DTF, tooltip="The actual price: 'Close' is the last traded price of the current bar (it moves with every tick). ACTIVATE NOW captures this value as the level, and it is compared to the level while the window is open. The dropdown names are TradingView's; leave it on Close unless you want another series.")
 dtfBuyLevel  = input.float(50, "Buy only above (manual)", group=GRP_DTF, tooltip="Manual buy level, used when ACTIVATE NOW is off. Buys are allowed only while price is above it.")
 dtfSellLevel = input.float(50, "Sell only below (manual)", group=GRP_DTF, tooltip="Manual sell level, used when ACTIVATE NOW is off. Sells are allowed only while price is below it.")
@@ -164,6 +197,11 @@ dtfShowLv    = input.bool(true, "Draw level", inline="vis", group=GRP_DTF)
 dtfShowTbl   = input.bool(true, "Status box", inline="vis", group=GRP_DTF, tooltip="Shown while the filter is enabled. Updates on each tick (once per bar inside a strategy) and freezes when the market is closed.")
 dtfTblPos    = input.string("top_right", "Status box position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group=GRP_DTF)
 
+// ---- Filter timeframe (add-on): run the filter on another timeframe ---------
+GRP_PRJ  = "Filter timeframe (add-on)"
+dtfPrjOn = input.bool(false, "Run the filter on", inline="prj", group=GRP_PRJ)
+dtfPrjTf = input.timeframe("60", "", inline="prj", group=GRP_PRJ, tooltip="Off: the filter runs on this chart's candles. On: it runs on this timeframe and any chart shows what it sees there: the same signals, levels, windows and ALLOWED / BLOCKED as the filter on that timeframe's own chart, at the same moment. Set it on 1 hour, switch the chart to 5m or 4H, and you keep the 1H view. Only closed candles of that timeframe are read, so nothing repaints. On that timeframe's own chart it changes nothing.")
+
 // ---- Direction signal: arms the filter automatically ------------------------
 GRP_SIG = "Direction signal (arms the filter)"
 dtfSigOn    = input.bool(true, "Arm from signal", group=GRP_SIG, tooltip="On: every direction signal arms the filter: the window opens on the signal bar, the level is the signal price, and the countdown runs. Buys are then allowed only above that price, sells only below it. ACTIVATE NOW (if ticked) has priority; Start time is ignored.")
@@ -171,7 +209,8 @@ dtfSigSide  = input.string("Buy and sell signals", "Arm on", options=["Buy and s
 dtfSigRearm = input.bool(true, "New signal re-arms while open", group=GRP_SIG, tooltip="On: a new signal inside an open window restarts it at the new price and time. Off: signals are ignored until the countdown ends.")
 dtfSigMark  = input.bool(true, "Mark signal bars", group=GRP_SIG)
 
-dtfValue = dtfRef
+dtfValue  = dtfRef
+dtfByBars = dtfDurUnit == "Candles"
 
 // ===== SIGNAL LOGIC SLOT: FlashGold Continuation v5 direction =================
 // The direction logic of "FlashGold Continuation v5 - TDI Trade Zone Filter"
@@ -179,6 +218,11 @@ dtfValue = dtfRef
 // direction (RSI -> SMA fast / slow, fast rising = BUY), parent + six child
 // zones alignment, burst gate, prior-drift filter, entry hold, one signal per
 // bar. Orders, exits and sizing are NOT here: this only decides direction.
+// It lives in dtfSignal(ctxSec), which returns [buy signal, sell signal,
+// signal price]: it runs on the chart, and on the filter timeframe when that
+// add-on is on (ctxSec = seconds of the timeframe it runs on, so "the chart"
+// in the tooltips below means that timeframe). To arm from your own logic,
+// replace the body of dtfSignal and keep what it returns.
 gCore = "FlashGold Core"
 spreadPoints          = input.float(25.0, "Spread pts", minval = 0.0, step = 0.1, group = gCore, tooltip = "Full spread in points (mintick units). Half of it offsets bid and ask.")
 entryDistPoints       = input.float(50.0, "Entry distance pts (Points unit)", minval = 0.0, step = 0.1, group = gCore)
@@ -220,13 +264,6 @@ zoneTf5  = input.timeframe("1", "Zone 5 timeframe", group = gZone)
 useZone6 = input.bool(false, "Use child zone 6", group = gZone)
 zoneTf6  = input.timeframe("2", "Zone 6 timeframe", group = gZone)
 
-// price model
-pt = syminfo.mintick
-halfSpread = spreadPoints * pt * 0.5
-bid = close - halfSpread
-ask = close + halfSpread
-midPrice = (bid + ask) * 0.5
-
 // TDI direction
 tdiDir() =>
     r = ta.rsi(close, tdiRsiLen)
@@ -239,138 +276,203 @@ tdiDirPrev() =>
     [d, f, s] = tdiDir()
     [d[1], f[1], s[1]]
 
-isHigher(string tf) =>
-    timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)
-
-[parentDir, parentFast, parentSlow] = request.security(syminfo.tickerid, tdiParentTf, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z1Dir0, z1Fast, z1Slow] = request.security(syminfo.tickerid, zoneTf1, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z2Dir0, z2Fast, z2Slow] = request.security(syminfo.tickerid, zoneTf2, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z3Dir0, z3Fast, z3Slow] = request.security(syminfo.tickerid, zoneTf3, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z4Dir0, z4Fast, z4Slow] = request.security(syminfo.tickerid, zoneTf4, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z5Dir0, z5Fast, z5Slow] = request.security(syminfo.tickerid, zoneTf5, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z6Dir0, z6Fast, z6Slow] = request.security(syminfo.tickerid, zoneTf6, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z1DirP, z1FastP, z1SlowP] = request.security(syminfo.tickerid, zoneTf1, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z2DirP, z2FastP, z2SlowP] = request.security(syminfo.tickerid, zoneTf2, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z3DirP, z3FastP, z3SlowP] = request.security(syminfo.tickerid, zoneTf3, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z4DirP, z4FastP, z4SlowP] = request.security(syminfo.tickerid, zoneTf4, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z5DirP, z5FastP, z5SlowP] = request.security(syminfo.tickerid, zoneTf5, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z6DirP, z6FastP, z6SlowP] = request.security(syminfo.tickerid, zoneTf6, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-z1Dir = htfNoRepaint and isHigher(zoneTf1) ? z1DirP : z1Dir0
-z2Dir = htfNoRepaint and isHigher(zoneTf2) ? z2DirP : z2Dir0
-z3Dir = htfNoRepaint and isHigher(zoneTf3) ? z3DirP : z3Dir0
-z4Dir = htfNoRepaint and isHigher(zoneTf4) ? z4DirP : z4Dir0
-z5Dir = htfNoRepaint and isHigher(zoneTf5) ? z5DirP : z5Dir0
-z6Dir = htfNoRepaint and isHigher(zoneTf6) ? z6DirP : z6Dir0
+// Direction of a child zone. A zone on a timeframe HIGHER than the one the
+// signal runs on (ctxSec) is read from its last closed bar (htfNoRepaint).
+zoneDir(string tf, int ctxSec) =>
+    [zD0, zF0, zS0] = request.security(syminfo.tickerid, tf, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    [zDP, zFP, zSP] = request.security(syminfo.tickerid, tf, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+    htfNoRepaint and timeframe.in_seconds(tf) > ctxSec ? zDP : zD0
 
 zoneOn(bool use, int dir) =>
     use and (not ignoreNaZones or not na(dir))
 
-on1 = zoneOn(useZone1, z1Dir)
-on2 = zoneOn(useZone2, z2Dir)
-on3 = zoneOn(useZone3, z3Dir)
-on4 = zoneOn(useZone4, z4Dir)
-on5 = zoneOn(useZone5, z5Dir)
-on6 = zoneOn(useZone6, z6Dir)
+alignCount(int dir, bool useZone, int side) =>
+    useZone and side != 0 and dir == side ? 1 : 0
 
-activeZones = (on1 ? 1 : 0) + (on2 ? 1 : 0) + (on3 ? 1 : 0) + (on4 ? 1 : 0) + (on5 ? 1 : 0) + (on6 ? 1 : 0)
-parentSide = parentDir > 0 ? 1 : parentDir < 0 ? -1 : 0
+dtfSignal(int ctxSec) =>
+    // price model
+    pt = syminfo.mintick
+    halfSpread = spreadPoints * pt * 0.5
+    bid = close - halfSpread
+    ask = close + halfSpread
+    midPrice = (bid + ask) * 0.5
 
-alignCount(int dir, bool useZone) =>
-    useZone and parentSide != 0 and dir == parentSide ? 1 : 0
+    [parentDir, parentFast, parentSlow] = request.security(syminfo.tickerid, tdiParentTf, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    z1Dir = zoneDir(zoneTf1, ctxSec)
+    z2Dir = zoneDir(zoneTf2, ctxSec)
+    z3Dir = zoneDir(zoneTf3, ctxSec)
+    z4Dir = zoneDir(zoneTf4, ctxSec)
+    z5Dir = zoneDir(zoneTf5, ctxSec)
+    z6Dir = zoneDir(zoneTf6, ctxSec)
 
-alignedZones = alignCount(z1Dir, on1) + alignCount(z2Dir, on2) + alignCount(z3Dir, on3) + alignCount(z4Dir, on4) + alignCount(z5Dir, on5) + alignCount(z6Dir, on6)
+    on1 = zoneOn(useZone1, z1Dir)
+    on2 = zoneOn(useZone2, z2Dir)
+    on3 = zoneOn(useZone3, z3Dir)
+    on4 = zoneOn(useZone4, z4Dir)
+    on5 = zoneOn(useZone5, z5Dir)
+    on6 = zoneOn(useZone6, z6Dir)
 
-requiredAligned = math.min(minAlignedZones, activeZones)
-parentFlatAllowed = allowNeutralParent and parentSide == 0
-zoneReady = activeZones == 0 or alignedZones >= requiredAligned
+    activeZones = (on1 ? 1 : 0) + (on2 ? 1 : 0) + (on3 ? 1 : 0) + (on4 ? 1 : 0) + (on5 ? 1 : 0) + (on6 ? 1 : 0)
+    parentSide = parentDir > 0 ? 1 : parentDir < 0 ? -1 : 0
 
-tradeZoneBuyAllowed = not useTdiTradeZone or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
-tradeZoneSellAllowed = not useTdiTradeZone or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
+    alignedZones = alignCount(z1Dir, on1, parentSide) + alignCount(z2Dir, on2, parentSide) + alignCount(z3Dir, on3, parentSide) + alignCount(z4Dir, on4, parentSide) + alignCount(z5Dir, on5, parentSide) + alignCount(z6Dir, on6, parentSide)
 
-// burst / prior drift
-atrChart = ta.atr(14)
-atrPts = atrChart / pt
-burstThrPts   = DistUnit == "ATR" ? burstAtrMult * atrPts : burstPointsInput
-entryDistPts  = DistUnit == "ATR" ? entryDistAtrMult * atrPts : entryDistPoints
-holdFavPts    = DistUnit == "ATR" ? holdFavAtrMult * atrPts : entryHoldMinFavPoints
+    requiredAligned = math.min(minAlignedZones, activeZones)
+    parentFlatAllowed = allowNeutralParent and parentSide == 0
+    zoneReady = activeZones == 0 or alignedZones >= requiredAligned
 
-burstPts = (midPrice - midPrice[1]) / pt
-priorDriftPts = (midPrice - midPrice[priorDriftBars]) / pt
+    tradeZoneBuyAllowed = not useTdiTradeZone or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
+    tradeZoneSellAllowed = not useTdiTradeZone or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
 
-burstBuy = burstPts >= burstThrPts
-burstSell = burstPts <= -burstThrPts
+    // burst / prior drift
+    atrChart = ta.atr(14)
+    atrPts = atrChart / pt
+    burstThrPts   = DistUnit == "ATR" ? burstAtrMult * atrPts : burstPointsInput
+    entryDistPts  = DistUnit == "ATR" ? entryDistAtrMult * atrPts : entryDistPoints
+    holdFavPts    = DistUnit == "ATR" ? holdFavAtrMult * atrPts : entryHoldMinFavPoints
 
-priorBuyOk = not usePriorFilter or priorDriftPts > 0
-priorSellOk = not usePriorFilter or priorDriftPts < 0
+    burstPts = (midPrice - midPrice[1]) / pt
+    priorDriftPts = (midPrice - midPrice[priorDriftBars]) / pt
 
-rawBuyCandidate = useAnyCombo ? (tradeZoneBuyAllowed and (not useBurstGate or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
-rawSellCandidate = useAnyCombo ? (tradeZoneSellAllowed and (not useBurstGate or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
+    burstBuy = burstPts >= burstThrPts
+    burstSell = burstPts <= -burstThrPts
 
-buyCandidate = rawBuyCandidate and priorBuyOk
-sellCandidate = rawSellCandidate and priorSellOk
+    priorBuyOk = not usePriorFilter or priorDriftPts > 0
+    priorSellOk = not usePriorFilter or priorDriftPts < 0
 
-// entry hold / virtual stop
-var bool holdActive = false
-var bool holdIsBuy = false
-var int holdSignalBar = na
-var float holdSignalMid = na
-var int lastEntryBar = na
+    rawBuyCandidate = useAnyCombo ? (tradeZoneBuyAllowed and (not useBurstGate or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
+    rawSellCandidate = useAnyCombo ? (tradeZoneSellAllowed and (not useBurstGate or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
 
-float buyEntryPrice = na
-float sellEntryPrice = na
-bool buySignal = false
-bool sellSignal = false
+    buyCandidate = rawBuyCandidate and priorBuyOk
+    sellCandidate = rawSellCandidate and priorSellOk
 
-canFire = not oneEntryPerBar or na(lastEntryBar) or lastEntryBar != bar_index
+    // entry hold / virtual stop
+    var bool holdActive = false
+    var bool holdIsBuy = false
+    var int holdSignalBar = na
+    var float holdSignalMid = na
+    var int lastEntryBar = na
 
-if buyCandidate and canFire
-    if entryHoldBars == 0
-        buyEntryPrice := ask + entryDistPts * pt
-        buySignal := true
-        lastEntryBar := bar_index
-    else if not holdActive
-        holdActive := true
-        holdIsBuy := true
-        holdSignalBar := bar_index
-        holdSignalMid := midPrice
-    else if holdIsBuy
-        elapsedBars = bar_index - holdSignalBar
-        holdMovePoints = (midPrice - holdSignalMid) / pt
-        if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+    float buyEntryPrice = na
+    float sellEntryPrice = na
+    bool buySignal = false
+    bool sellSignal = false
+
+    canFire = not oneEntryPerBar or na(lastEntryBar) or lastEntryBar != bar_index
+
+    if buyCandidate and canFire
+        if entryHoldBars == 0
             buyEntryPrice := ask + entryDistPts * pt
             buySignal := true
             lastEntryBar := bar_index
-            holdActive := false
+        else if not holdActive
+            holdActive := true
+            holdIsBuy := true
+            holdSignalBar := bar_index
+            holdSignalMid := midPrice
+        else if holdIsBuy
+            elapsedBars = bar_index - holdSignalBar
+            holdMovePoints = (midPrice - holdSignalMid) / pt
+            if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+                buyEntryPrice := ask + entryDistPts * pt
+                buySignal := true
+                lastEntryBar := bar_index
+                holdActive := false
 
-if sellCandidate and canFire
-    if entryHoldBars == 0
-        sellEntryPrice := bid - entryDistPts * pt
-        sellSignal := true
-        lastEntryBar := bar_index
-    else if not holdActive
-        holdActive := true
-        holdIsBuy := false
-        holdSignalBar := bar_index
-        holdSignalMid := midPrice
-    else if not holdIsBuy
-        elapsedBars = bar_index - holdSignalBar
-        holdMovePoints = (holdSignalMid - midPrice) / pt
-        if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+    if sellCandidate and canFire
+        if entryHoldBars == 0
             sellEntryPrice := bid - entryDistPts * pt
             sellSignal := true
             lastEntryBar := bar_index
-            holdActive := false
+        else if not holdActive
+            holdActive := true
+            holdIsBuy := false
+            holdSignalBar := bar_index
+            holdSignalMid := midPrice
+        else if not holdIsBuy
+            elapsedBars = bar_index - holdSignalBar
+            holdMovePoints = (holdSignalMid - midPrice) / pt
+            if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+                sellEntryPrice := bid - entryDistPts * pt
+                sellSignal := true
+                lastEntryBar := bar_index
+                holdActive := false
 
-if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and not tradeZoneSellAllowed))
-    holdActive := false
-    holdSignalBar := na
-    holdSignalMid := na
+    if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and not tradeZoneSellAllowed))
+        holdActive := false
+        holdSignalBar := na
+        holdSignalMid := na
 
-bool  dtfBuySignal  = buySignal
-bool  dtfSellSignal = sellSignal
-// The level is the strategy's entry trigger price (ask/bid +/- entry distance).
-float dtfSignalPx   = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
+    // The level is the strategy's entry trigger price (ask/bid +/- entry distance).
+    float signalPx = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
+    [buySignal, sellSignal, signalPx]
+
+// The chart's own direction signal.
+[dtfBuySignal, dtfSellSignal, dtfSignalPx] = dtfSignal(timeframe.in_seconds())
 // ===== END SIGNAL LOGIC SLOT ==================================================
+
+// Signal arming, on the timeframe it runs on: a confirmed signal bar arms
+// the window at that bar's close with the level at the signal price.
+// Committed state only (var), so backtests and live agree. 'confirmed' is
+// barstate.isconfirmed on the chart; true on the filter timeframe, where only
+// closed candles are ever read. aId counts the arms.
+dtfArm(bool sBuy, bool sSell, float sPx, float px, bool confirmed) =>
+    var int   aAt  = na
+    var int   aBar = na
+    var float aPx  = na
+    var int   aDir = 0
+    var int   aId  = 0
+    int  aClose = nz(time_close, time)
+    bool aEnded = na(aAt) or (dtfByBars ? bar_index >= aBar + dtfBars : (dtfMinutes > 0 and aClose >= aAt + math.round(dtfMinutes * 60000)))
+    bool aFire  = dtfSigOn and confirmed and not na(px) and ((sBuy and dtfSigSide != "Sell signals only") or (sSell and dtfSigSide != "Buy signals only")) and (aEnded or dtfSigRearm)
+    if aFire
+        aAt  := aClose
+        aBar := bar_index
+        aPx  := nz(sPx, px)
+        aDir := sBuy ? 1 : -1
+        aId  += 1
+    [aFire, aAt, aBar, aPx, aDir, aId]
+
+[dtfSigFire0, dtfSigAt0, dtfSigBar0, dtfSigPx0, dtfSigDir0, dtfSigId0] = dtfArm(dtfBuySignal, dtfSellSignal, dtfSignalPx, dtfValue, barstate.isconfirmed)
+
+// Filter timeframe (add-on): the signal and its arming run on that
+// timeframe. Each of its candles sends its arm, the arm of the candle before
+// it, and its index, open and close time. An arm is used only once the
+// candle that made it has closed by this chart's clock, so the forming
+// filter candle is never read and nothing repaints.
+dtfPrjRead() =>
+    [pBuy, pSell, pSigPx] = dtfSignal(timeframe.in_seconds(dtfPrjTf))
+    [pFire, pAt, pBar, pPx, pDir, pId] = dtfArm(pBuy, pSell, pSigPx, close, true)
+    [pAt, pBar, pPx, pDir, pId, bar_index, time, nz(time_close, time), pAt[1], pBar[1], pPx[1], pDir[1], pId[1]]
+
+bool dtfPrj = dtfPrjOn and timeframe.in_seconds(dtfPrjTf) != timeframe.in_seconds()
+[dpAt, dpBar, dpPx, dpDir, dpId, dpIdx, dpOpen, dpClose, dqAt, dqBar, dqPx, dqDir, dqId] = request.security(syminfo.tickerid, dtfPrjTf, dtfPrjRead(), barmerge.gaps_off, barmerge.lookahead_off)
+
+dtfTfText(string tf) =>
+    int sec = timeframe.in_seconds(tf)
+    sec < 60 ? str.tostring(sec) + "s" : sec < 3600 ? str.tostring(sec / 60, "#.##") + "m" : sec < 86400 ? str.tostring(sec / 3600, "#.##") + "H" : tf
+string dtfTfTag = dtfPrj ? " " + dtfTfText(dtfPrjTf) : ""
+
+// Clock. The committed value of a bar (history, and the closing update of the
+// live bar) is judged at the bar's close time, so it never repaints. Intrabar
+// ticks of the live bar use the real clock, so the window opens on the second.
+dtfClock = barstate.isconfirmed ? nz(time_close, time) : timenow
+
+// The arm in force: the chart's own, or (add-on) the latest filter candle's
+// once it has closed by this clock, else the candle before it.
+bool  dtfPrjDone = dtfClock >= dpClose
+int   dtfSigAt   = dtfPrj ? (dtfPrjDone ? dpAt  : dqAt)  : dtfSigAt0
+int   dtfSigBar  = dtfPrj ? (dtfPrjDone ? dpBar : dqBar) : dtfSigBar0
+float dtfSigPx   = dtfPrj ? (dtfPrjDone ? dpPx  : dqPx)  : dtfSigPx0
+int   dtfSigDir  = dtfPrj ? nz(dtfPrjDone ? dpDir : dqDir) : dtfSigDir0
+int   dtfSigId   = dtfPrj ? (dtfPrjDone ? dpId  : dqId)  : dtfSigId0
+// Add-on: a new arm shows on the chart candle where it becomes known (on a
+// higher chart, one mark for all the filter candles it contains).
+bool  dtfSigFire = dtfPrj ? (not na(dtfSigId[1]) and nz(dtfSigId) > dtfSigId[1]) : dtfSigFire0
+// The candle being judged, for Candles mode: the chart candle, or (add-on)
+// the filter candle this clock falls in; one closing exactly at the clock is
+// the one judged, as on its own chart, where a candle is judged at its close.
+int   dtfIdx     = not dtfPrj ? bar_index : dtfClock <= dpOpen ? dpIdx - 1 : dtfClock <= dpClose ? dpIdx : dpIdx + 1
 
 // ACTIVATE NOW capture: the moment and the price when the script (re)starts
 // with the switch on. varip keeps it across live updates; a recompile (any
@@ -381,30 +483,9 @@ varip int   dtfArmedBar = na
 // The capture waits for a tick where the price source has a value.
 if dtfArmNow and barstate.islast and na(dtfArmedAt) and not na(dtfValue)
     dtfArmedAt  := timenow
-    dtfArmedBar := bar_index
+    dtfArmedBar := dtfIdx
     dtfArmedPx := dtfLvMode == "Typed price" ? dtfTyped : dtfValue
 
-// Signal arming: on a confirmed signal bar, the window starts at that bar's
-// close with the level at the signal price. Committed state only (var), so
-// backtests and live agree.
-var int   dtfSigAt  = na
-var int   dtfSigBar = na
-var float dtfSigPx  = na
-var int   dtfSigDir = 0
-bool dtfByBars    = dtfDurUnit == "Candles"
-int  dtfBarClose  = nz(time_close, time)
-bool dtfPrevEnded = na(dtfSigAt) or (dtfByBars ? bar_index >= dtfSigBar + dtfBars : (dtfMinutes > 0 and dtfBarClose >= dtfSigAt + math.round(dtfMinutes * 60000)))
-bool dtfSigFire   = dtfSigOn and barstate.isconfirmed and not na(dtfValue) and ((dtfBuySignal and dtfSigSide != "Sell signals only") or (dtfSellSignal and dtfSigSide != "Buy signals only")) and (dtfPrevEnded or dtfSigRearm)
-if dtfSigFire
-    dtfSigAt  := dtfBarClose
-    dtfSigBar := bar_index
-    dtfSigPx  := nz(dtfSignalPx, dtfValue)
-    dtfSigDir := dtfBuySignal ? 1 : -1
-
-// Clock. The committed value of a bar (history, and the closing update of the
-// live bar) is judged at the bar's close time, so it never repaints. Intrabar
-// ticks of the live bar use the real clock, so the window opens on the second.
-dtfClock   = barstate.isconfirmed ? nz(time_close, time) : timenow
 dtfStartAt = dtfArmNow ? dtfArmedAt : dtfSigOn ? dtfSigAt : dtfStart + dtfStartSec * 1000
 dtfEnd     = not dtfByBars and dtfMinutes > 0 and not na(dtfStartAt) ? dtfStartAt + math.round(dtfMinutes * 60000) : na
 dtfOneLv   = dtfArmNow or dtfSigOn
@@ -417,12 +498,12 @@ dtfBeforeStart = na(dtfStartAt) or dtfClock < dtfStartAt
 // scheduled start that is the first candle closing at or after Start time.
 var int dtfTimeBar = na
 if not dtfBeforeStart and na(dtfTimeBar)
-    dtfTimeBar := bar_index
+    dtfTimeBar := dtfIdx
 if dtfBeforeStart
     dtfTimeBar := na
 int  dtfStartBar = dtfArmNow ? dtfArmedBar : dtfSigOn ? dtfSigBar : dtfTimeBar
 int  dtfEndBar   = na(dtfStartBar) ? na : dtfStartBar + dtfBars
-bool dtfInBars   = dtfByBars and not na(dtfEndBar) and bar_index < dtfEndBar
+bool dtfInBars   = dtfByBars and not na(dtfEndBar) and dtfIdx < dtfEndBar
 dtfOpen        = not dtfBeforeStart and (dtfByBars ? dtfInBars : (na(dtfEnd) or dtfClock < dtfEnd))
 dtfAfterEnd    = dtfByBars ? (not dtfBeforeStart and not dtfInBars) : (not na(dtfEnd) and dtfClock >= dtfEnd)
 
@@ -481,8 +562,8 @@ if dtfShowLv and dtfActive
         dtfBuyLn  := line.new(dtfX1, dtfBuyLv,  bar_index, dtfBuyLv,  color=color.new(color.green, 0), width=2, force_overlay=DTF_FORCE_OVERLAY)
         dtfSellLn := line.new(dtfX1, dtfSellLv, bar_index, dtfSellLv, color=color.new(color.red, 0),   width=2, force_overlay=DTF_FORCE_OVERLAY)
     if dtfOpen and na(dtfLbl)
-        string dtfWhat = dtfArmNow ? "NOW" : dtfSigOn ? (dtfSigDir > 0 ? "SIGNAL BUY" : "SIGNAL SELL") : "START"
-        string dtfTxt  = dtfWhat + " @ " + str.tostring(dtfBuyLv, DTF_LEVEL_IS_PRICE ? format.mintick : "#.########") + (dtfByBars ? "\n" + str.tostring(dtfBars) + (dtfBars == 1 ? " candle" : " candles") : dtfMinutes > 0 ? "\n" + str.tostring(dtfMinutes, "#.#") + " min" : "\nno limit")
+        string dtfWhat = dtfArmNow ? "NOW" : dtfSigOn ? (dtfSigDir > 0 ? "SIGNAL BUY" : "SIGNAL SELL") + dtfTfTag : "START"
+        string dtfTxt  = dtfWhat + " @ " + str.tostring(dtfBuyLv, DTF_LEVEL_IS_PRICE ? format.mintick : "#.########") + (dtfByBars ? "\n" + str.tostring(dtfBars) + (dtfBars == 1 ? " candle" : " candles") + dtfTfTag : dtfMinutes > 0 ? "\n" + str.tostring(dtfMinutes, "#.#") + " min" : "\nno limit")
         color  dtfLbCol = dtfSigOn and dtfSigDir < 0 ? color.new(color.red, 20) : dtfSigOn and dtfSigDir > 0 ? color.new(color.lime, 20) : color.new(color.white, 20)
         dtfLbl := label.new(dtfOpenFrom, dtfBuyLv, dtfTxt, style=label.style_label_right, color=dtfLbCol, textcolor=color.black, size=size.small, force_overlay=DTF_FORCE_OVERLAY)
 else if not dtfActive
@@ -500,10 +581,10 @@ if dtfShowTbl and dtfOn and barstate.islast
     string dState  = (dBefore ? (dtfTooShort ? "WAITING (< 1 bar)" : "WAITING") : dOpen ? "OPEN" : "ENDED") + dMode
     color  dCol    = dBefore ? color.yellow : dOpen ? color.lime : color.orange
     int    dSecs   = dOpen and not na(dtfEnd) ? math.max(0, math.floor((dtfEnd - timenow) / 1000.0)) : 0
-    string dLeft   = dOpen and dtfByBars ? str.tostring(dtfEndBar - bar_index) + (dtfEndBar - bar_index == 1 ? " candle" : " candles") : dOpen and not na(dtfEnd) ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : dOpen ? "no limit" : "-"
+    string dLeft   = dOpen and dtfByBars ? str.tostring(dtfEndBar - dtfIdx) + (dtfEndBar - dtfIdx == 1 ? " candle" : " candles") + dtfTfTag : dOpen and not na(dtfEnd) ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : dOpen ? "no limit" : "-"
     string dStart  = na(dtfStartAt) ? "-" : str.format_time(dtfStartAt, "MMM dd HH:mm:ss", syminfo.timezone)
     string dFmt    = DTF_LEVEL_IS_PRICE ? format.mintick : "#.########"
-    table.cell(dtfTable, 0, 0, "DTF", text_color=color.white)
+    table.cell(dtfTable, 0, 0, "DTF" + dtfTfTag, text_color=color.white)
     table.cell(dtfTable, 1, 0, dState, text_color=dCol)
     table.cell(dtfTable, 0, 1, "Now (exch tz)", text_color=color.white)
     table.cell(dtfTable, 1, 1, str.format_time(timenow, "MMM dd HH:mm:ss", syminfo.timezone), text_color=color.white)
