@@ -1,0 +1,464 @@
+//@version=6
+// ============================================================================
+//  FLASHGOLD DIRECTION FILTER  -  v1.0
+// ----------------------------------------------------------------------------
+//  The entry signal of "FlashGold v5 Strategy (XAUUSD)" used as a direction
+//  PERMISSION for your other strategies. It never opens, closes or manages a
+//  trade: the strategy's entry stop order, stop loss, take profit, trailing
+//  stop, time stop and sizing are all gone. It only answers, on every bar:
+//  "is a BUY allowed now? is a SELL allowed now?". Your strategy keeps its
+//  own entries and exits; an entry the filter does not allow is not taken.
+//
+//  THE RULE
+//    Each FlashGold signal (BUY or SELL) sets the LEVEL = the signal price.
+//      BUYS  are allowed only while price is ABOVE the level.
+//      SELLS are allowed only while price is BELOW the level.
+//    One level for both sides, whichever signal set it. The next signal
+//    (buy or sell) replaces it. Before the first signal nothing is allowed.
+//    Example: SELL signal at 2650.00 -> sells pass while price < 2650.00,
+//             buys pass while price > 2650.00, until the next signal.
+//    "Level" = Entry price (default): the FlashGold entry price of the
+//    signal, where the strategy put its stop order: ask + entry distance for
+//    a BUY, bid - entry distance for a SELL. Right after a BUY signal price
+//    is still below that level, so buys wait for the break above it and
+//    sells are allowed below it (the mirror after a SELL). "Signal close"
+//    uses the close of the signal candle instead.
+//
+//  FILTER TIMEFRAME  (default 1 hour)
+//    The signal runs on the candles of "Filter timeframe", every FlashGold
+//    input working as on that timeframe's own chart. Put the filter on a 1m
+//    chart, or paste it into a 1m strategy, with Filter timeframe = 1 hour:
+//    it shows, and allows / blocks, what the 1H chart shows at that moment.
+//      - A 1H signal counts when its 1H candle closes, at that candle's
+//        level. Only closed 1H candles are read, so nothing repaints: the
+//        signal mark sits on the chart candle that closes with its 1H candle
+//        (on a higher chart, on the candle that contains it).
+//      - Price is compared to the level as it moves: a 1m strategy gets the
+//        1H filter's answer at every 1m close.
+//      - "Candles" counts 1H candles; "Minutes" runs on the clock.
+//    "Chart" in the dropdown runs it on the chart's own candles. On a lower
+//    chart the 1H history starts where the chart's history starts: the first
+//    1H candles are a warm-up (RSI, ATR) and can differ from the 1H chart;
+//    later candles match it.
+//
+//  INPUTS (group "Direction filter")
+//    Enable filter      Off = buys and sells always allowed.
+//    Filter timeframe   The timeframe the signal runs on (see above).
+//    Level              Entry price (default) or Signal close (see above).
+//    Permission lasts   Until next signal (default): the level stays in
+//                       force until the next signal replaces it.
+//                       Minutes / Candles: it also ends after that many
+//                       minutes, or filter candles counted from the signal
+//                       candle (1 = the signal candle only); then nothing is
+//                       allowed until the next signal.
+//    Price compared     The live price ("Close"), compared to the level.
+//    Allow buys/sells   Turn one side off completely.
+//  The "FlashGold signal" groups are the strategy's signal inputs, same
+//  defaults, same logic: bid/ask model, TDI direction (fast line rising =
+//  BUY), parent + six child zones, burst gate, prior drift, entry hold, one
+//  signal per bar. ("TDI slow length" is left out: the direction never used
+//  it.)
+//
+//  OUTPUTS (Data Window / "Source" dropdown of another script)
+//    FGF buy allowed    1 when a buy may be taken on this bar, else 0.
+//    FGF sell allowed   1 when a sell may be taken on this bar, else 0.
+//    FGF active         1 while a signal's permission is in force.
+//    FGF level          The level in force.
+//    FGF signal         1 / -1 on the bar a BUY / SELL signal becomes known.
+//    FGF ended          1 on the bar a Minutes / Candles permission ends.
+//
+//  HOW TO USE IT
+//  A) Paste into your strategy (recommended)
+//     Copy everything between BEGIN and END below into your strategy, under
+//     its own inputs, and gate your entries:
+//         if myBuySignal and fgfBuyOk
+//             strategy.entry("L", strategy.long)
+//         if mySellSignal and fgfSellOk
+//             strategy.entry("S", strategy.short)
+//     Exits are never gated. Every name starts with "fgf", so nothing clashes
+//     with your script (the FlashGold strategy included). If your script
+//     runs in its own pane, set FGF_FORCE_OVERLAY = true. The block makes 14
+//     request.security calls; a script may make 40 in total.
+//  B) Link without editing
+//     Add this indicator to the chart. In your strategy add
+//         fgfBuyExt  = input.source(close, "FG filter buy allowed")
+//         fgfSellExt = input.source(close, "FG filter sell allowed")
+//     pick the "FGF buy allowed" / "FGF sell allowed" plots in the strategy's
+//     settings, and gate with   myBuySignal and fgfBuyExt == 1
+//     (== 1: an unlinked source is still 'close' and must not count).
+//
+//  TIMING
+//  Every bar is judged at its close, on history and live alike, so a strategy
+//  backtests as it runs live. While a live bar is still forming the real
+//  clock is used (shading, status box). A Minutes permission covers the
+//  chart bars whose close is in [signal candle close, + minutes). An
+//  order placed on the last allowed bar fills on the next bar's open.
+// ============================================================================
+indicator("FlashGold Direction Filter", "FG-DF", overlay=true, max_lines_count=500, max_labels_count=500, max_bars_back=500)
+
+// ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
+// Set true when this block lives in a script that runs in its own pane
+// (overlay=false) so the visuals are drawn on the price chart.
+FGF_FORCE_OVERLAY = false
+
+GRP_FGF = "Direction filter"
+fgfOn        = input.bool(true, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level; buys are allowed only above it, sells only below it. Nothing is allowed before the first signal.")
+fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
+fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
+fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
+fgfMinutes   = input.int(60, "Minutes", minval=1, group=GRP_FGF)
+fgfBars      = input.int(1, "Candles", minval=1, group=GRP_FGF)
+fgfRef       = input.source(close, "Price compared", group=GRP_FGF, tooltip="The price compared to the level. 'Close' is the live price (the last traded price of the current bar).")
+fgfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_FGF)
+fgfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_FGF, tooltip="Turn one side off completely.")
+fgfShowBg    = input.bool(true, "Shade", inline="vis", group=GRP_FGF)
+fgfShowLv    = input.bool(true, "Level line", inline="vis", group=GRP_FGF)
+fgfSigMark   = input.bool(true, "Signal marks", inline="vis", group=GRP_FGF, tooltip="Shade: green = buys allowed, red = sells allowed, gray = neither (price at the level, or that side turned off).")
+fgfShowTbl   = input.bool(true, "Status box", inline="tbl", group=GRP_FGF)
+fgfTblPos    = input.string("top_right", "", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], inline="tbl", group=GRP_FGF)
+
+// ---- FlashGold signal inputs (the strategy's, same defaults) ----------------
+GRP_FGC = "FlashGold signal: core"
+fgfSpreadPts    = input.float(25.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")
+fgfEntryDistPts = input.float(50.0, "Entry distance pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGC)
+fgfHoldBars     = input.int(0, "Entry hold bars", minval=0, group=GRP_FGC)
+fgfHoldFavPts   = input.float(5.0, "Hold min favorable pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGC)
+fgfOnePerBar    = input.bool(true, "One signal per bar", group=GRP_FGC)
+
+GRP_FGB = "FlashGold signal: burst / direction"
+fgfDistUnit     = input.string("ATR", "Burst / entry distance / hold unit", options=["ATR", "Points"], group=GRP_FGB, tooltip="ATR: the three thresholds below are multiples of ATR(14) of the filter timeframe. Points: the point inputs in the core group are used.")
+fgfBurstAtr     = input.float(0.5, "Burst threshold, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfEntryDistAtr = input.float(0.25, "Entry distance, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfHoldFavAtr   = input.float(0.1, "Hold min favorable, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfBurstPts     = input.float(172.0, "Burst threshold pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGB)
+fgfUseBurst     = input.bool(true, "Require burst gate", group=GRP_FGB)
+fgfAnyCombo     = input.bool(false, "Allow any combo", group=GRP_FGB, tooltip="If on, TDI parent/zone can approve direction even when burst is weaker.")
+fgfDriftBars    = input.int(60, "Prior drift bars", minval=1, group=GRP_FGB)
+fgfUseDrift     = input.bool(false, "Use prior drift filter", group=GRP_FGB)
+
+GRP_FGZ = "FlashGold signal: TDI trade zone"
+fgfUseZones   = input.bool(true, "Use TDI trade-zone filter", group=GRP_FGZ)
+fgfParentTf   = input.timeframe("60", "Parent obedience timeframe", group=GRP_FGZ, tooltip="Calibrated with the parent = the timeframe the signal runs on. Keep it equal to Filter timeframe.")
+fgfRsiLen     = input.int(14, "TDI RSI length", minval=2, group=GRP_FGZ)
+fgfFastLen    = input.int(2, "TDI white fast length", minval=1, group=GRP_FGZ)
+fgfMinAligned = input.int(2, "Minimum child zones aligned", minval=0, maxval=6, group=GRP_FGZ)
+fgfFlatParent = input.bool(false, "Allow trade if parent is flat", group=GRP_FGZ)
+fgfIgnoreNa   = input.bool(true, "Ignore zones without data", group=GRP_FGZ, tooltip="A child zone whose timeframe has no data on this candle is dropped from the active count instead of counting as MIX.")
+fgfHtfClosed  = input.bool(true, "Higher-TF zones use the last CLOSED bar", group=GRP_FGZ, tooltip="A child zone on a timeframe HIGHER than the filter timeframe is read from its last closed bar, so history and live agree.")
+fgfUseZ1 = input.bool(true, "Use child zone 1", group=GRP_FGZ)
+fgfZTf1  = input.timeframe("60", "Zone 1 timeframe", group=GRP_FGZ)
+fgfUseZ2 = input.bool(true, "Use child zone 2", group=GRP_FGZ)
+fgfZTf2  = input.timeframe("120", "Zone 2 timeframe", group=GRP_FGZ)
+fgfUseZ3 = input.bool(true, "Use child zone 3", group=GRP_FGZ)
+fgfZTf3  = input.timeframe("240", "Zone 3 timeframe", group=GRP_FGZ)
+fgfUseZ4 = input.bool(false, "Use child zone 4", group=GRP_FGZ)
+fgfZTf4  = input.timeframe("480", "Zone 4 timeframe", group=GRP_FGZ)
+fgfUseZ5 = input.bool(false, "Use child zone 5", group=GRP_FGZ)
+fgfZTf5  = input.timeframe("1", "Zone 5 timeframe", group=GRP_FGZ)
+fgfUseZ6 = input.bool(false, "Use child zone 6", group=GRP_FGZ)
+fgfZTf6  = input.timeframe("2", "Zone 6 timeframe", group=GRP_FGZ)
+
+// The timeframe the signal runs on ("Chart" = the chart's own).
+string fgfTfEff = fgfTf == "" ? timeframe.period : fgfTf
+int    fgfTfSec = timeframe.in_seconds(fgfTfEff)
+
+// ===== FLASHGOLD SIGNAL =======================================================
+// The strategy's signal logic, unchanged. It runs on the filter timeframe
+// (ctxSec = its seconds, used where the strategy compared to the chart).
+
+// TDI direction: fast line (SMA of RSI) rising = 1, falling = -1, flat = 0.
+fgfTdiDir() =>
+    float r = ta.rsi(close, fgfRsiLen)
+    float f = ta.sma(r, fgfFastLen)
+    f > f[1] ? 1 : f < f[1] ? -1 : 0
+
+fgfTdiDirPrev() =>
+    int d = fgfTdiDir()
+    d[1]
+
+// Direction of a child zone. A zone on a timeframe HIGHER than the one the
+// signal runs on is read from its last closed bar (fgfHtfClosed).
+fgfZoneDir(string tf, int ctxSec) =>
+    int dNow  = request.security(syminfo.tickerid, tf, fgfTdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    int dPrev = request.security(syminfo.tickerid, tf, fgfTdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+    fgfHtfClosed and timeframe.in_seconds(tf) > ctxSec ? dPrev : dNow
+
+fgfZoneOn(bool use, int dir) =>
+    use and (not fgfIgnoreNa or not na(dir))
+
+fgfAlign(int dir, bool on, int side) =>
+    on and side != 0 and dir == side ? 1 : 0
+
+// Returns [buy signal, sell signal, signal (entry) price, parent side,
+// aligned zones, active zones].
+fgfSignal(int ctxSec) =>
+    // price model
+    float pt         = syminfo.mintick
+    float halfSpread = fgfSpreadPts * pt * 0.5
+    float bid        = close - halfSpread
+    float ask        = close + halfSpread
+    float midPrice   = (bid + ask) * 0.5
+
+    // TDI trade zone
+    int parentDir = request.security(syminfo.tickerid, fgfParentTf, fgfTdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    int z1Dir = fgfZoneDir(fgfZTf1, ctxSec)
+    int z2Dir = fgfZoneDir(fgfZTf2, ctxSec)
+    int z3Dir = fgfZoneDir(fgfZTf3, ctxSec)
+    int z4Dir = fgfZoneDir(fgfZTf4, ctxSec)
+    int z5Dir = fgfZoneDir(fgfZTf5, ctxSec)
+    int z6Dir = fgfZoneDir(fgfZTf6, ctxSec)
+
+    bool on1 = fgfZoneOn(fgfUseZ1, z1Dir)
+    bool on2 = fgfZoneOn(fgfUseZ2, z2Dir)
+    bool on3 = fgfZoneOn(fgfUseZ3, z3Dir)
+    bool on4 = fgfZoneOn(fgfUseZ4, z4Dir)
+    bool on5 = fgfZoneOn(fgfUseZ5, z5Dir)
+    bool on6 = fgfZoneOn(fgfUseZ6, z6Dir)
+
+    int activeZones  = (on1 ? 1 : 0) + (on2 ? 1 : 0) + (on3 ? 1 : 0) + (on4 ? 1 : 0) + (on5 ? 1 : 0) + (on6 ? 1 : 0)
+    int parentSide   = parentDir > 0 ? 1 : parentDir < 0 ? -1 : 0
+    int alignedZones = fgfAlign(z1Dir, on1, parentSide) + fgfAlign(z2Dir, on2, parentSide) + fgfAlign(z3Dir, on3, parentSide) + fgfAlign(z4Dir, on4, parentSide) + fgfAlign(z5Dir, on5, parentSide) + fgfAlign(z6Dir, on6, parentSide)
+
+    int  requiredAligned   = math.min(fgfMinAligned, activeZones)
+    bool parentFlatAllowed = fgfFlatParent and parentSide == 0
+    bool zoneReady         = activeZones == 0 or alignedZones >= requiredAligned
+
+    bool tradeZoneBuyAllowed  = not fgfUseZones or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
+    bool tradeZoneSellAllowed = not fgfUseZones or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
+
+    // burst / prior drift
+    float atrPts       = ta.atr(14) / pt
+    float burstThrPts  = fgfDistUnit == "ATR" ? fgfBurstAtr * atrPts : fgfBurstPts
+    float entryDistPts = fgfDistUnit == "ATR" ? fgfEntryDistAtr * atrPts : fgfEntryDistPts
+    float holdFavPts   = fgfDistUnit == "ATR" ? fgfHoldFavAtr * atrPts : fgfHoldFavPts
+
+    float burstPts      = (midPrice - midPrice[1]) / pt
+    float priorDriftPts = (midPrice - midPrice[fgfDriftBars]) / pt
+
+    bool burstBuy  = burstPts >= burstThrPts
+    bool burstSell = burstPts <= -burstThrPts
+
+    bool priorBuyOk  = not fgfUseDrift or priorDriftPts > 0
+    bool priorSellOk = not fgfUseDrift or priorDriftPts < 0
+
+    bool rawBuyCandidate  = fgfAnyCombo ? (tradeZoneBuyAllowed and (not fgfUseBurst or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
+    bool rawSellCandidate = fgfAnyCombo ? (tradeZoneSellAllowed and (not fgfUseBurst or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
+
+    bool buyCandidate  = rawBuyCandidate and priorBuyOk
+    bool sellCandidate = rawSellCandidate and priorSellOk
+
+    // entry hold / virtual stop
+    var bool  holdActive    = false
+    var bool  holdIsBuy     = false
+    var int   holdSignalBar = na
+    var float holdSignalMid = na
+    var int   lastEntryBar  = na
+
+    float buyEntryPrice  = na
+    float sellEntryPrice = na
+    bool  buySignal      = false
+    bool  sellSignal     = false
+
+    bool canFire = not fgfOnePerBar or na(lastEntryBar) or lastEntryBar != bar_index
+
+    if buyCandidate and canFire
+        if fgfHoldBars == 0
+            buyEntryPrice := ask + entryDistPts * pt
+            buySignal     := true
+            lastEntryBar  := bar_index
+        else if not holdActive
+            holdActive    := true
+            holdIsBuy     := true
+            holdSignalBar := bar_index
+            holdSignalMid := midPrice
+        else if holdIsBuy
+            int   elapsedBars    = bar_index - holdSignalBar
+            float holdMovePoints = (midPrice - holdSignalMid) / pt
+            if elapsedBars >= fgfHoldBars and holdMovePoints >= holdFavPts
+                buyEntryPrice := ask + entryDistPts * pt
+                buySignal     := true
+                lastEntryBar  := bar_index
+                holdActive    := false
+
+    if sellCandidate and canFire
+        if fgfHoldBars == 0
+            sellEntryPrice := bid - entryDistPts * pt
+            sellSignal     := true
+            lastEntryBar   := bar_index
+        else if not holdActive
+            holdActive    := true
+            holdIsBuy     := false
+            holdSignalBar := bar_index
+            holdSignalMid := midPrice
+        else if not holdIsBuy
+            int   elapsedBars    = bar_index - holdSignalBar
+            float holdMovePoints = (holdSignalMid - midPrice) / pt
+            if elapsedBars >= fgfHoldBars and holdMovePoints >= holdFavPts
+                sellEntryPrice := bid - entryDistPts * pt
+                sellSignal     := true
+                lastEntryBar   := bar_index
+                holdActive     := false
+
+    if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and not tradeZoneSellAllowed))
+        holdActive    := false
+        holdSignalBar := na
+        holdSignalMid := na
+
+    float signalPx = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
+    [buySignal, sellSignal, signalPx, parentSide, alignedZones, activeZones]
+// ===== END FLASHGOLD SIGNAL ===================================================
+
+// Arming, on the filter timeframe: a signal candle sets the level at its
+// close. Committed state only (var), so backtests and live agree. aId counts
+// the signals.
+fgfArm(bool sBuy, bool sSell, float sPx) =>
+    var int   aAt  = na
+    var int   aBar = na
+    var float aPx  = na
+    var int   aDir = 0
+    var int   aId  = 0
+    if sBuy or sSell
+        aAt  := nz(time_close, time)
+        aBar := bar_index
+        aPx  := fgfLvMode == "Entry price" ? nz(sPx, close) : close
+        aDir := sBuy ? 1 : -1
+        aId  += 1
+    [aAt, aBar, aPx, aDir, aId]
+
+// Each filter candle sends its arm, its conditions, its index, open and close
+// time, and the arm and conditions of the candle before it. An arm is used
+// only once the candle that made it has closed by this chart's clock, so the
+// forming filter candle is never read and nothing repaints.
+fgfRead() =>
+    [sBuy, sSell, sPx, sPar, sAl, sAc] = fgfSignal(fgfTfSec)
+    [aAt, aBar, aPx, aDir, aId] = fgfArm(sBuy, sSell, sPx)
+    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1]]
+
+[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
+
+fgfTfText(string tf) =>
+    int sec = timeframe.in_seconds(tf)
+    sec < 60 ? str.tostring(sec) + "s" : sec < 3600 ? str.tostring(sec / 60, "#.##") + "m" : sec < 86400 ? str.tostring(sec / 3600, "#.##") + "H" : tf
+string fgfTfTag = fgfTfText(fgfTfEff)
+
+// Clock. The committed value of a bar (history, and the closing update of the
+// live bar) is judged at the bar's close time, so it never repaints. Intrabar
+// ticks of the live bar use the real clock.
+fgfClock = barstate.isconfirmed ? nz(time_close, time) : timenow
+
+// The arm in force: the latest filter candle's once it has closed by this
+// clock, else the candle before it.
+bool  fgfDone   = fgfClock >= fpClose
+int   fgfSigAt  = fgfDone ? fpAt  : fqAt
+int   fgfSigBar = fgfDone ? fpBar : fqBar
+float fgfLevel  = fgfDone ? fpPx  : fqPx
+int   fgfSigDir = nz(fgfDone ? fpDir : fqDir)
+int   fgfSigId  = nz(fgfDone ? fpId : fqId)
+// The conditions of the last closed filter candle (status box).
+int   fgfPar    = fgfDone ? fpPar : fqPar
+int   fgfAl     = fgfDone ? fpAl  : fqAl
+int   fgfAc     = fgfDone ? fpAc  : fqAc
+// The filter candle this clock falls in (Candles mode); one closing exactly
+// at the clock is the one judged, as on its own chart.
+int   fgfIdx    = fgfClock <= fpOpen ? fpIdx - 1 : fgfClock <= fpClose ? fpIdx : fpIdx + 1
+
+fgfValue = fgfRef
+
+// Permission window: from the signal candle's close, until the next signal
+// (or the minutes / candles run out).
+bool fgfArmed  = not na(fgfSigAt) and fgfClock >= fgfSigAt
+int  fgfEnd    = fgfLast == "Minutes" and fgfArmed ? fgfSigAt + fgfMinutes * 60000 : na
+int  fgfEndBar = fgfLast == "Candles" and fgfArmed ? fgfSigBar + fgfBars : na
+bool fgfOpen   = fgfArmed and (fgfLast == "Minutes" ? fgfClock < fgfEnd : fgfLast == "Candles" ? fgfIdx < fgfEndBar : true)
+
+// On the signal candle itself price can sit exactly at the level ("Signal
+// close"): there the signal's own side counts as allowed AT the level.
+bool fgfOnSigBar = fgfArmed and fgfIdx == fgfSigBar
+bool fgfAtBuyLv  = fgfOnSigBar and fgfSigDir > 0 and fgfValue >= fgfLevel
+bool fgfAtSellLv = fgfOnSigBar and fgfSigDir < 0 and fgfValue <= fgfLevel
+
+// Final gates: is a buy / a sell ALLOWED on this bar? (Permission only.)
+fgfBuyOk  = not fgfOn or (fgfOpen and fgfAllowBuy  and (fgfValue > fgfLevel or fgfAtBuyLv))
+fgfSellOk = not fgfOn or (fgfOpen and fgfAllowSell and (fgfValue < fgfLevel or fgfAtSellLv))
+
+// A new signal became known on this bar; a Minutes / Candles permission ended.
+bool fgfNewSig  = fgfSigId > fgfSigId[1]
+bool fgfEnded   = fgfArmed and not fgfOpen
+bool fgfExpired = fgfOn and fgfEnded and not fgfEnded[1] and not barstate.isfirst
+
+// ---- Visuals (optional: delete from here to END if you only want the gates)
+fgfPosOf(string s) =>
+    switch s
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+
+bgcolor(fgfShowBg and fgfOn and fgfOpen ? (fgfBuyOk ? color.new(color.green, 85) : fgfSellOk ? color.new(color.red, 85) : color.new(color.gray, 88)) : na, title="FGF permission", force_overlay=FGF_FORCE_OVERLAY)
+plotshape(fgfSigMark and fgfOn and fgfNewSig and fgfSigDir > 0, "FGF buy signal",  shape.triangleup,   location.belowbar, color.lime, size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
+plotshape(fgfSigMark and fgfOn and fgfNewSig and fgfSigDir < 0, "FGF sell signal", shape.triangledown, location.abovebar, color.red,  size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
+plotshape(fgfExpired, "FGF permission ended", shape.xcross, location.top, color.orange, size=size.tiny, text="FGF end", textcolor=color.orange, force_overlay=FGF_FORCE_OVERLAY)
+
+// Level line as a drawing (it does not stretch the price scale). Each signal
+// keeps its own line and label, so past levels stay readable. Redrawn every
+// bar so a host script's own drawings never garbage-collect the current one.
+var line  fgfLn   = na
+var label fgfLbl  = na
+var int   fgfFrom = na
+if fgfNewSig or (na(fgfFrom) and fgfArmed)
+    // a new signal: leave the previous signal's drawings where they ended
+    fgfLn   := na
+    fgfLbl  := na
+    fgfFrom := bar_index
+if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom)
+    int   fgfX1  = math.max(fgfFrom, bar_index - 9000)
+    color fgfCol = fgfSigDir > 0 ? color.lime : color.red
+    line.delete(fgfLn)
+    fgfLn := line.new(fgfX1, fgfLevel, bar_index, fgfLevel, color=fgfCol, width=2, force_overlay=FGF_FORCE_OVERLAY)
+    if na(fgfLbl)
+        string fgfLastTxt = fgfLast == "Minutes" ? str.tostring(fgfMinutes) + " min" : fgfLast == "Candles" ? str.tostring(fgfBars) + (fgfBars == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
+        string fgfTxt     = (fgfSigDir > 0 ? "BUY" : "SELL") + " signal " + fgfTfTag + " @ " + str.tostring(fgfLevel, format.mintick) + "\n" + fgfLastTxt
+        fgfLbl := label.new(fgfX1, fgfLevel, fgfTxt, style=label.style_label_right, color=color.new(fgfCol, 20), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+
+// Status box, judged by the real clock (display only; the gates never use it).
+var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 7, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
+if fgfShowTbl and fgfOn and barstate.islast
+    bool   dOpen  = fgfOpen and not (fgfLast == "Minutes" and timenow >= fgfEnd)
+    bool   dBuy   = dOpen and fgfAllowBuy  and (fgfValue > fgfLevel or fgfAtBuyLv)
+    bool   dSell  = dOpen and fgfAllowSell and (fgfValue < fgfLevel or fgfAtSellLv)
+    string dSide  = fgfSigDir > 0 ? "BUY" : "SELL"
+    string dState = not fgfArmed ? "WAITING FOR SIGNAL" : (dOpen ? "ACTIVE - " : "ENDED - ") + dSide + " signal"
+    color  dCol   = not fgfArmed ? color.yellow : dOpen ? color.lime : color.orange
+    int    dSecs  = dOpen and not na(fgfEnd) ? math.max(0, math.floor((fgfEnd - timenow) / 1000.0)) : 0
+    string dLeft  = not dOpen ? "-" : fgfLast == "Minutes" ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : fgfLast == "Candles" ? str.tostring(fgfEndBar - fgfIdx) + (fgfEndBar - fgfIdx == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
+    string dLv    = na(fgfLevel) ? "-" : str.tostring(fgfLevel, format.mintick)
+    string dSig   = na(fgfSigAt) ? "-" : dSide + " " + str.format_time(fgfSigAt, "MMM dd HH:mm", syminfo.timezone)
+    string dPar   = na(fgfPar) ? "-" : fgfPar > 0 ? "BUY" : fgfPar < 0 ? "SELL" : "FLAT"
+    string dZones = na(fgfAc) ? "-" : str.tostring(fgfAl) + "/" + str.tostring(fgfAc)
+    table.cell(fgfTable, 0, 0, "FG filter " + fgfTfTag, text_color=color.white)
+    table.cell(fgfTable, 1, 0, dState, text_color=dCol)
+    table.cell(fgfTable, 0, 1, "Signal (exch tz)", text_color=color.white)
+    table.cell(fgfTable, 1, 1, dSig, text_color=fgfSigDir > 0 ? color.lime : fgfSigDir < 0 ? color.red : color.white)
+    table.cell(fgfTable, 0, 2, "Left", text_color=color.white)
+    table.cell(fgfTable, 1, 2, dLeft, text_color=color.white)
+    table.cell(fgfTable, 0, 3, "Price now", text_color=color.white)
+    table.cell(fgfTable, 1, 3, na(fgfValue) ? "-" : str.tostring(fgfValue, format.mintick), text_color=color.white)
+    table.cell(fgfTable, 0, 4, (fgfOnSigBar and fgfSigDir > 0 ? "Buy >= " : "Buy  > ") + dLv, text_color=color.white)
+    table.cell(fgfTable, 1, 4, dBuy ? "ALLOWED" : "BLOCKED", text_color=dBuy ? color.lime : color.red)
+    table.cell(fgfTable, 0, 5, (fgfOnSigBar and fgfSigDir < 0 ? "Sell <= " : "Sell < ") + dLv, text_color=color.white)
+    table.cell(fgfTable, 1, 5, dSell ? "ALLOWED" : "BLOCKED", text_color=dSell ? color.lime : color.red)
+    table.cell(fgfTable, 0, 6, "Last " + fgfTfTag + " parent / zones", text_color=color.white)
+    table.cell(fgfTable, 1, 6, dPar + " / " + dZones + " aligned", text_color=dPar == "BUY" ? color.lime : dPar == "SELL" ? color.red : color.white)
+// ====================== END FLASHGOLD DIRECTION FILTER =======================
+
+// Exported values (Data Window + linkable as a source from other scripts).
+plot(fgfOn and fgfOpen ? 1 : 0, "FGF active", display=display.data_window)
+plot(fgfBuyOk ? 1 : 0, "FGF buy allowed", display=display.data_window)
+plot(fgfSellOk ? 1 : 0, "FGF sell allowed", display=display.data_window)
+plot(fgfLevel, "FGF level", display=display.data_window)
+plot(fgfNewSig ? fgfSigDir : 0, "FGF signal (1 buy, -1 sell)", display=display.data_window)
+plot(fgfExpired ? 1 : 0, "FGF ended", display=display.data_window)
