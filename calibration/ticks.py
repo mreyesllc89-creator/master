@@ -18,7 +18,7 @@ def load_ticks(path):
     df = df[df['ask'] >= df['bid']]
     return df.reset_index(drop=True)
 
-def build(df, rule):
+def build(df, rule, rsiLen=14, fastLen=2, slowLen=7, turnMax=12, turnHold=2):
     """Bid OHLC bars (only periods that have ticks, like MT5) + per-tick bar id."""
     key = df['ts'].dt.floor(rule)
     g = df.groupby(key, sort=True)['bid']
@@ -27,7 +27,7 @@ def build(df, rule):
     D = dict(t=[str(x) for x in bars.index], o=bars['o'].values, h=bars['h'].values, l=bars['l'].values, c=bars['c'].values)
     n = len(D['c'])
     D.update(fastx=np.full(n, np.nan), slowx=np.full(n, np.nan), xpx=np.full(n, np.nan))
-    D = signals(indicators(D))
+    D = signals(indicators(D, rsiLen, fastLen, slowLen), turnMax=turnMax, turnHold=turnHold)
     return D, bid_.astype(np.int64)
 
 @njit(cache=True)
@@ -103,7 +103,7 @@ def engine(bid, ask, bar, wantL, wantS, xpx, fast, slow, atr, tick, slA, tpR, ac
         out_ret[nt] = g / ep * 100; out_pnl[nt] = g; out_bar[nt] = eb; out_kind[nt] = 6; nt += 1
     return out_ret[:nt], out_pnl[:nt], out_bar[:nt], out_kind[:nt]
 
-def run(df, D, barid, slA, tpR, actA, disA, comm, tick, spread=True, start=60):
+def run(df, D, barid, slA, tpR, actA, disA, comm, tick, spread=True, start=60, turnHold=2, failExit=True):
     bid = df['bid'].values; ask = df['ask'].values if spread else bid
     return engine(bid, ask, barid, D['wantL'], D['wantS'], D['xpxc'], D['fast'], D['slow'], D['atr'], tick,
-                  slA, tpR, actA, disA, comm, 2, True, start)
+                  slA, tpR, actA, disA, comm, turnHold, failExit, start)
