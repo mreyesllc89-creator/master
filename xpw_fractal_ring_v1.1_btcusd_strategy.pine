@@ -95,9 +95,10 @@
 //                      ATR mode: SL = mult x ATR, TP = R x SL, trail in ATR
 //                      multiples; the signal bar's ATR is kept for the trade.
 //                      "Trail starts after X candles" (0 = from entry): the
-//                      trailing stop joins the exit order at the close of
-//                      candle X after the fill and works from the next one;
-//                      until then only the SL and TP protect the trade.
+//                      fill candle is candle 1; once X candles of the trade
+//                      have closed, the trailing stop joins the exit order
+//                      and works from the next candle (X = 1: from the 2nd
+//                      candle). Until then only the SL and TP protect it.
 //      Time stop       optional (S2), in bars.
 //    Sizing (S3): a fixed quantity, or Risk % of equity divided by the stop
 //    distance in money, capped at Max quantity and rounded down to the step.
@@ -343,7 +344,7 @@ exAtrLen = input.int(14,      "ATR length (ATR mode)", minval = 1, group = GRP_X
 slAtrM   = input.float(2.0,   "Stop loss, ATR mult (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
 tpR      = input.float(2.0,   "Take profit, R multiple of SL (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
 trailOn  = input.bool(true,   "Trailing stop", group = GRP_X)
-trailBars = input.int(0,      "Trail starts after, candles (0 = from entry)", minval = 0, group = GRP_X, tooltip = "Counted from the candle the entry filled on. Until then the trade has only its stop loss and take profit. At the close of candle X the trailing stop is added and works from the next candle; it still waits for the trail activation profit (set the activation to 0 to start trailing at once).")
+trailBars = input.int(0,      "Trail starts after, candles (0 = from entry)", minval = 0, group = GRP_X, tooltip = "The candle the entry fills on is candle 1. Until X candles of the trade have closed, it has only its stop loss and take profit; from the next candle the trailing stop works (X = 1: from the trade's 2nd candle). It still waits for the trail activation profit; set the activation to 0 to trail at once.")
 trActPts = input.float(4500,  "Trail activation, pts of profit (Points mode)", minval = 0, group = GRP_X)
 trDisPts = input.float(1000,  "Trail distance, pts (Points mode)", minval = 0, group = GRP_X)
 trActAtr = input.float(4.0,   "Trail activation, ATR mult (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
@@ -459,11 +460,12 @@ isBelow(string tf) =>
     tf != "" and timeframe.in_seconds(tf) < timeframe.in_seconds(timeframe.period)
 // A higher node lines up when it is a whole multiple of the chart timeframe;
 // month-based nodes line up with intraday and daily charts. A lower node
-// lines up when it divides the chart timeframe.
+// lines up when it divides the chart timeframe; on a month-based chart every
+// node of a day or less lines up with the month bars.
 isWhole(string tf) =>
     tf == "" or (str.endswith(tf, "M") and timeframe.in_seconds(timeframe.period) <= 86400) or timeframe.in_seconds(tf) % timeframe.in_seconds(timeframe.period) == 0
 isDivisor(string tf) =>
-    tf == "" or timeframe.in_seconds(timeframe.period) % timeframe.in_seconds(tf) == 0
+    tf == "" or (str.endswith(timeframe.period, "M") and timeframe.in_seconds(tf) <= 86400) or timeframe.in_seconds(timeframe.period) % timeframe.in_seconds(tf) == 0
 
 pickI(bool hi, int a, int b) =>
     hi ? b : a
@@ -761,9 +763,11 @@ if shortEntry and allowShort and dtfSellOk and flat and not na(slTkNow)
         strategy.entry("Short", strategy.short, qty = q, comment = "FR short")
 
 // SL / TP / trailing stop, in ticks from the entry price. The trail joins
-// the exit order only once the trade has been open trailBars candles.
+// the exit order once trailBars candles of the trade have closed (the fill
+// candle is candle 1). barsIn (0 on the fill candle) drives the time stop.
 int  barsIn     = strategy.position_size != 0 and strategy.opentrades > 0 ? bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) : 0
-bool trailReady = trailBars == 0 or barsIn >= trailBars
+int  candlesIn  = strategy.position_size != 0 and strategy.opentrades > 0 ? barsIn + 1 : 0
+bool trailReady = trailBars == 0 or candlesIn >= trailBars
 float xlSl = posOrNa(lSl)
 float xlTp = posOrNa(lTp)
 float xlTa = trailOn and trailReady and nz(lTd, 0) > 0 ? lTa : na

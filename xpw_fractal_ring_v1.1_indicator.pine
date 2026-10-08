@@ -262,11 +262,12 @@ isBelow(string tf) =>
     tf != "" and timeframe.in_seconds(tf) < timeframe.in_seconds(timeframe.period)
 // A higher node lines up when it is a whole multiple of the chart timeframe;
 // month-based nodes line up with intraday and daily charts. A lower node
-// lines up when it divides the chart timeframe.
+// lines up when it divides the chart timeframe; on a month-based chart every
+// node of a day or less lines up with the month bars.
 isWhole(string tf) =>
     tf == "" or (str.endswith(tf, "M") and timeframe.in_seconds(timeframe.period) <= 86400) or timeframe.in_seconds(tf) % timeframe.in_seconds(timeframe.period) == 0
 isDivisor(string tf) =>
-    tf == "" or timeframe.in_seconds(timeframe.period) % timeframe.in_seconds(tf) == 0
+    tf == "" or (str.endswith(timeframe.period, "M") and timeframe.in_seconds(tf) <= 86400) or timeframe.in_seconds(timeframe.period) % timeframe.in_seconds(tf) == 0
 
 pickI(bool hi, int a, int b) =>
     hi ? b : a
