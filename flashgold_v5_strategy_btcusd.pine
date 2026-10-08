@@ -38,6 +38,11 @@
 //    timeframe. Below 60m was NOT tested (no data): there a 0.1 ATR stop shrinks to a
 //    few dollars while the 0.02% fee stays ~$32 per BTC round trip, so expect losses
 //    on 1m to 15m unless the fee is near zero.
+//  - Take profit style (60m, same costs, stop-first fills): a fixed TP closes the
+//    whole trade at the target and misses the long runs. Partial + runner (30% at
+//    TP 2R, stop to breakeven, rest trailed 1.5 ATR from the TP level) +56k vs +43k
+//    for a fixed 5R, PF 2.9, max DD 5.0k, both halves positive. 0% partial (all
+//    runner, trail 2 ATR) +69k but only ~11% winning trades and DD 7.5k.
 //  - One month of data: re-check on new data, and with Bar Magnifier, before
 //    trading. A 0.1 ATR stop lives inside the chart bar.
 //
@@ -131,13 +136,18 @@ slPoints        = input.float(3900, "Stop loss, pts (Points mode)", minval = 0.0
 tpPoints        = input.float(19500, "Take profit, pts (Points mode)", minval = 0.0, step = 1.0, group = gS2, tooltip = "0 = no target. 19500 = 5 x the 3900 stop.")
 atrLen          = input.int(14, "ATR length (ATR mode)", minval = 1, group = gS2)
 slAtrMult       = input.float(0.1, "Stop loss, ATR mult (ATR mode)", minval = 0.01, step = 0.01, group = gS2, tooltip = "Calibrated: 0.1. Tested range 0.08 to 0.12, all positive.")
-tpR             = input.float(5.0, "Take profit, R multiple of SL (ATR mode)", minval = 0.0, step = 0.25, group = gS2, tooltip = "Calibrated: 5. 10 = more profit, about 60% more drawdown. 3 to 4 = steadier curve.")
+tpR             = input.float(2.0, "Take profit, R multiple of SL (ATR mode)", minval = 0.0, step = 0.25, group = gS2, tooltip = "Calibrated: 2 with Partial + runner (30% here, rest trailed). With the Fixed style use 5.")
 useTrail        = input.bool(false, "Trailing stop", group = gS2, tooltip = "Off in the calibration: no tested trail improved the worst-case result.")
 trailActPoints  = input.float(4500, "Trail activation, pts of profit (Points mode)", minval = 0.0, step = 1.0, group = gS2)
 trailPoints     = input.float(1000, "Trail distance, pts (Points mode)", minval = 1.0, step = 1.0, group = gS2)
 trailActAtr     = input.float(1.0, "Trail activation, ATR mult (ATR mode)", minval = 0.0, step = 0.05, group = gS2)
 trailDstAtr     = input.float(0.25, "Trail distance, ATR mult (ATR mode)", minval = 0.005, step = 0.005, group = gS2)
 maxBarsHeld     = input.int(0, "Time stop, bars (0 = off)", minval = 0, group = gS2)
+TpStyle         = input.string("Partial + runner", "Take profit style", options = ["Fixed", "Partial + runner"], group = gS2, tooltip = "Fixed: the whole position closes at the take profit (uses the trailing stop inputs above if on). Partial + runner: part of the position closes at the take profit, the rest (runner) moves its stop to breakeven and follows price with an ATR trail, so long moves are not cut at the target. The trailing stop inputs above are ignored in this mode.")
+partPct         = input.float(30, "Partial: % closed at the take profit", minval = 0.0, maxval = 100.0, step = 5.0, group = gS2, tooltip = "Calibrated: 30. 0 = no partial, the whole position becomes a runner once the take profit level is reached. 100 = same as Fixed.")
+runBE           = input.bool(true, "Runner: stop to breakeven after the take profit", group = gS2, tooltip = "Applied from the close of the bar that reached the take profit level.")
+runTrailAtr     = input.float(1.5, "Runner: trail distance, ATR mult (ATR mode)", minval = 0.05, step = 0.05, group = gS2, tooltip = "Calibrated: 1.5 (1.5 to 2 tested best). The trail starts at the take profit level.")
+runTrailPts     = input.float(58000, "Runner: trail distance, pts (Points mode)", minval = 1.0, step = 1.0, group = gS2)
 
 gS3 = "S3. Sizing"
 QtyMode         = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = gS3)
@@ -326,6 +336,9 @@ var float lockActS = na
 var float lockDstS = na
 trailActNow = ExitMode == "Points" ? trailActPoints : trailActAtr * atrPts
 trailDstNow = ExitMode == "Points" ? trailPoints : math.max(trailDstAtr * atrPts, 1.0)
+runDstNow   = ExitMode == "Points" ? runTrailPts : math.max(runTrailAtr * atrV / pt, 1.0)
+var float lockRunL = na
+var float lockRunS = na
 
 calcQty(float slTicks) =>
     float q = fixedQty
@@ -361,6 +374,7 @@ if buySignal and allowL and not inLong and (flat or allowReverse or exitOnOpposi
         lockTpL := tpTicksNow
         lockActL := trailActNow
         lockDstL := trailDstNow
+        lockRunL := runDstNow
         strategy.entry("Long", strategy.long, qty = qL, stop = buyEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG buy stop")
         placedBarL := bar_index
 
@@ -372,6 +386,7 @@ if sellSignal and allowS and not inShort and (flat or allowReverse or exitOnOppo
         lockTpS := tpTicksNow
         lockActS := trailActNow
         lockDstS := trailDstNow
+        lockRunS := runDstNow
         strategy.entry("Short", strategy.short, qty = qS, stop = sellEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG sell stop")
         placedBarS := bar_index
 
@@ -389,12 +404,44 @@ slL = na(lockSlL) or lockSlL <= 0 ? na : lockSlL
 tpL = na(lockTpL) or lockTpL <= 0 ? na : lockTpL
 slS = na(lockSlS) or lockSlS <= 0 ? na : lockSlS
 tpS = na(lockTpS) or lockTpS <= 0 ? na : lockTpS
-if useTrail
-    strategy.exit("XL", "Long",  loss = slL, profit = tpL, trail_points = lockActL, trail_offset = lockDstL, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
-    strategy.exit("XS", "Short", loss = slS, profit = tpS, trail_points = lockActS, trail_offset = lockDstS, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+// breakeven flag for the runner: set at the close of the bar that reached the take profit level, reset on each new trade
+var float tradeIdL = na
+var float tradeIdS = na
+var bool tpHitL = false
+var bool tpHitS = false
+curEntryTime = strategy.opentrades > 0 ? float(strategy.opentrades.entry_time(strategy.opentrades - 1)) : na
+if not inLong or na(tradeIdL) or curEntryTime != tradeIdL
+    tpHitL := false
+    tradeIdL := inLong ? curEntryTime : na
+if not inShort or na(tradeIdS) or curEntryTime != tradeIdS
+    tpHitS := false
+    tradeIdS := inShort ? curEntryTime : na
+if inLong and not na(tpL) and high >= strategy.position_avg_price + tpL * pt
+    tpHitL := true
+if inShort and not na(tpS) and low <= strategy.position_avg_price - tpS * pt
+    tpHitS := true
+
+if TpStyle == "Partial + runner" and partPct < 100
+    // part 1: partial at the take profit (with the normal stop)
+    if partPct > 0
+        strategy.exit("XL1", "Long",  qty_percent = partPct, loss = slL, profit = tpL, comment_loss = "SL", comment_profit = "TP part")
+        strategy.exit("XS1", "Short", qty_percent = partPct, loss = slS, profit = tpS, comment_loss = "SL", comment_profit = "TP part")
+    // part 2: the runner. Stop = SL, then breakeven once the TP level was reached; ATR trail starts at the TP level
+    if runBE and tpHitL
+        strategy.exit("XL2", "Long",  qty_percent = 100, stop = strategy.position_avg_price, trail_points = tpL, trail_offset = lockRunL, comment_loss = "BE", comment_trailing = "runner")
+    else
+        strategy.exit("XL2", "Long",  qty_percent = 100, loss = slL, trail_points = tpL, trail_offset = lockRunL, comment_loss = "SL", comment_trailing = "runner")
+    if runBE and tpHitS
+        strategy.exit("XS2", "Short", qty_percent = 100, stop = strategy.position_avg_price, trail_points = tpS, trail_offset = lockRunS, comment_loss = "BE", comment_trailing = "runner")
+    else
+        strategy.exit("XS2", "Short", qty_percent = 100, loss = slS, trail_points = tpS, trail_offset = lockRunS, comment_loss = "SL", comment_trailing = "runner")
 else
-    strategy.exit("XL", "Long",  loss = slL, profit = tpL, comment_loss = "SL", comment_profit = "TP")
-    strategy.exit("XS", "Short", loss = slS, profit = tpS, comment_loss = "SL", comment_profit = "TP")
+    if useTrail
+        strategy.exit("XL", "Long",  loss = slL, profit = tpL, trail_points = lockActL, trail_offset = lockDstL, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+        strategy.exit("XS", "Short", loss = slS, profit = tpS, trail_points = lockActS, trail_offset = lockDstS, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+    else
+        strategy.exit("XL", "Long",  loss = slL, profit = tpL, comment_loss = "SL", comment_profit = "TP")
+        strategy.exit("XS", "Short", loss = slS, profit = tpS, comment_loss = "SL", comment_profit = "TP")
 
 // time stop
 if maxBarsHeld > 0 and not flat and strategy.opentrades > 0
