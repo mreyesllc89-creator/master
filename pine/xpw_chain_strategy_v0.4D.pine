@@ -66,7 +66,7 @@
 // GHOST CANDLES: an indicator cannot make the chart's own candles transparent. Turn "Ghost candles"
 // on, then hide the originals: right-click chart > Settings > Symbol > untick Body, Borders, Wick.
 
-strategy("XPW Chain Strategy v0.4D Look-Down Forest", overlay = true, calc_on_every_tick = false, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.percent_of_equity, default_qty_value = 10, commission_type = strategy.commission.percent, commission_value = 0.1, slippage = 50, max_labels_count = 500, max_lines_count = 500, max_bars_back = 500)
+strategy("XPW Chain Strategy v0.4D Look-Down Forest", overlay = true, calc_on_every_tick = false, process_orders_on_close = true, initial_capital = 10000, commission_type = strategy.commission.percent, commission_value = 0.1, slippage = 50, max_labels_count = 500, max_lines_count = 500, max_bars_back = 500)
 
 // ------------- TDI (keep identical to Shape Map v0.7) -------------
 grpT = "TDI (keep identical to Shape Map v0.7)"
@@ -174,21 +174,39 @@ pUpCol    = input.color(color.new(color.teal, 40), "Parent UP cell",   group = g
 pDnCol    = input.color(color.new(color.red, 40),  "Parent DOWN cell", group = grpF)
 
 // ------------- STRATEGY -------------
-grpS = "Strategy"
+grpS = "S1. Entries"
 modePull     = input.bool(true,  "Trade PULLBACKS (chain WITH the parent resolves)", group = grpS)
 modeRev      = input.bool(true,  "Trade REVERSALS (chain AGAINST the parent BREAKS structure)", group = grpS)
 entryLvl     = input.int(3, "Chain must reach level >=", minval = 1, maxval = 5, group = grpS)
 needAllAgree = input.bool(false, "Pullback needs all five rungs (L5 OK)", group = grpS)
-stopBufAtr   = input.float(0.5, "Stop buffer beyond the key level (x rung-5 ATR)", minval = 0.0, step = 0.05, group = grpS)
-revStopAtr   = input.float(1.5,  "Reversal stop beyond the chain start (x rung-5 ATR)", minval = 0.1, step = 0.1, group = grpS)
-rr           = input.float(2.0,  "Take profit (R multiple of the risk)", minval = 0.5, step = 0.5, group = grpS)
-maxRiskAtr   = input.float(4.0,  "Skip the entry if risk > (x rung-5 ATR)", minval = 0.5, step = 0.5, group = grpS)
-maxBars      = input.int(24, "Time stop (chart bars, 0 = off)", minval = 0, group = grpS)
-trailKey     = input.bool(true, "Trail the stop with the parent's key level", group = grpS)
 exitFlip     = input.bool(true, "Exit when the parent flips", group = grpS)
 skipDiv      = input.bool(true, "No pullback entries during a divergence warning", group = grpS)
 revNeedDiv   = input.bool(false, "Reversal entries need a divergence warning", group = grpS)
 hurstMin     = input.float(0.0, "Pullback needs Hurst >= (0 = off)", minval = 0.0, maxval = 1.0, step = 0.05, group = grpS)
+maxRiskAtr   = input.float(4.0,  "Skip the entry if risk > (x chart ATR)", minval = 0.5, step = 0.5, group = grpS)
+
+grpE = "S2. Exits"
+exitUnit     = input.string("ATR", "SL / TP / trail unit", options = ["Points", "ATR", "Structure"], group = grpE, tooltip = "Points: fixed distances in ticks (BTC tick 0.01 -> 30000 pts = $300). ATR: multiples of the chart-timeframe ATR. Structure: the Fractal rules - stop beyond the parent's key level (pullback) or the chain start (reversal), trailing with the key level.")
+slPts        = input.int(30000, "Stop loss, pts (Points mode)", minval = 1, group = grpE, tooltip = "In ticks. 30000 x 0.01 = $300 on BTCUSD.")
+tpPts        = input.int(60000, "Take profit, pts (Points mode)", minval = 1, group = grpE, tooltip = "In ticks. 60000 x 0.01 = $600 on BTCUSD.")
+atrLenX      = input.int(14, "ATR length (ATR mode, chart timeframe)", minval = 1, group = grpE)
+slAtr        = input.float(1.5, "Stop loss, ATR mult (ATR mode)", minval = 0.1, step = 0.1, group = grpE)
+tpR          = input.float(2.0, "Take profit, R multiple of SL (ATR & Structure modes)", minval = 0.5, step = 0.5, group = grpE)
+stopBufAtr   = input.float(0.5, "Structure: stop buffer beyond the key level (x ATR)", minval = 0.0, step = 0.05, group = grpE)
+revStopAtr   = input.float(1.5, "Structure: reversal stop beyond the chain start (x ATR)", minval = 0.1, step = 0.1, group = grpE)
+useTrail     = input.bool(true, "Trailing stop", group = grpE, tooltip = "Points / ATR modes: activates after the profit below, then follows price at the distance below. Structure mode: the stop follows the parent's key level.")
+trActPts     = input.int(25000, "Trail activation, pts of profit (Points mode)", minval = 0, group = grpE)
+trDistPts    = input.int(10000, "Trail distance, pts (Points mode)", minval = 1, group = grpE)
+trActAtr     = input.float(1.5, "Trail activation, ATR mult (ATR mode)", minval = 0.0, step = 0.1, group = grpE)
+trDistAtr    = input.float(0.5, "Trail distance, ATR mult (ATR mode)", minval = 0.05, step = 0.05, group = grpE)
+maxBars      = input.int(0, "Time stop, bars (0 = off)", minval = 0, group = grpE)
+
+grpQ = "S3. Sizing"
+qtyMode      = input.string("Risk %", "Quantity", options = ["Fixed", "Risk %"], group = grpQ)
+qtyFixed     = input.float(0.05, "Fixed quantity (BTC)", minval = 0.0001, step = 0.001, group = grpQ)
+riskPct      = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0.01, step = 0.1, group = grpQ, tooltip = "Quantity = equity x risk% / distance to the stop.")
+qtyMax       = input.float(1.0, "Max quantity (BTC)", minval = 0.0001, step = 0.01, group = grpQ)
+qtyStep      = input.float(0.001, "Quantity step (rounds down)", minval = 0.00001, step = 0.001, group = grpQ)
 
 tblSize = tblSizeIn == "Tiny" ? size.tiny : tblSizeIn == "Small" ? size.small : tblSizeIn == "Normal" ? size.normal : size.large
 
@@ -900,35 +918,69 @@ alertcondition(divergeWarn and not divergeWarn[1], "XPW divergence warning", "XP
 // ------------- ORDERS (bar close) -------------
 var float curStop  = na
 var float curTp    = na
+var float entryPx  = na
 var int   entryBar = na
-bool flat    = strategy.position_size == 0
-bool hurstOK = hurstMin <= 0 or (not na(H) and H >= hurstMin)
+var bool  trailOn  = false
+bool  flat    = strategy.position_size == 0
+bool  hurstOK = hurstMin <= 0 or (not na(H) and H >= hurstMin)
+float atrX    = ta.atr(atrLenX)          // chart-timeframe ATR for exits
+float tick    = syminfo.mintick
 
+// distances in price for the chosen unit
+float slDist  = exitUnit == "Points" ? slPts * tick : slAtr * atrX
+float trAct   = exitUnit == "Points" ? trActPts * tick : trActAtr * atrX
+float trDist  = exitUnit == "Points" ? trDistPts * tick : trDistAtr * atrX
+
+// candidate entry this bar
 int    eDir  = 0
 float  eStop = na
 string eId   = ""
 if modePull and sig.dirPull != 0 and hurstOK and not (skipDiv and divergeWarn)
     eDir  := sig.dirPull
-    eStop := eDir > 0 ? sig.keyPull - stopBufAtr * atr5 : sig.keyPull + stopBufAtr * atr5
+    eStop := exitUnit == "Structure" ? (eDir > 0 ? sig.keyPull - stopBufAtr * atrX : sig.keyPull + stopBufAtr * atrX) : (eDir > 0 ? close - slDist : close + slDist)
     eId   := "pull"
 if eDir == 0 and modeRev and sig.dirRev != 0 and (not revNeedDiv or divergeWarn)
     eDir  := sig.dirRev
-    eStop := eDir > 0 ? sig.p0Rev - revStopAtr * atr5 : sig.p0Rev + revStopAtr * atr5
+    eStop := exitUnit == "Structure" ? (eDir > 0 ? sig.p0Rev - revStopAtr * atrX : sig.p0Rev + revStopAtr * atrX) : (eDir > 0 ? close - slDist : close + slDist)
     eId   := "rev"
-if eDir != 0 and flat and not na(atr5) and not na(eStop)
+
+// quantity
+qtyFor(float risk) =>
+    float q = qtyMode == "Fixed" ? qtyFixed : (strategy.equity * riskPct / 100.0) / risk
+    q := math.min(q, qtyMax)
+    q := math.floor(q / qtyStep) * qtyStep
+    q
+
+if eDir != 0 and flat and not na(atrX) and not na(eStop)
     float risk = eDir > 0 ? close - eStop : eStop - close
-    if risk > 0 and risk <= maxRiskAtr * atr5
-        curStop  := eStop
-        curTp    := eDir > 0 ? close + rr * risk : close - rr * risk
-        entryBar := bar_index
-        strategy.entry(eId, eDir > 0 ? strategy.long : strategy.short, comment = (eDir > 0 ? "L " : "S ") + eId + " L" + str.tostring(eId == "pull" ? sig.lvlPull : sig.lvlRev))
-        strategy.exit("x", stop = curStop, limit = curTp)
+    if risk > 0 and risk <= maxRiskAtr * atrX
+        float q = qtyFor(risk)
+        if q > 0
+            curStop  := eStop
+            curTp    := exitUnit == "Points" ? (eDir > 0 ? close + tpPts * tick : close - tpPts * tick) : (eDir > 0 ? close + tpR * risk : close - tpR * risk)
+            entryPx  := close
+            entryBar := bar_index
+            trailOn  := false
+            strategy.entry(eId, eDir > 0 ? strategy.long : strategy.short, qty = q, comment = (eDir > 0 ? "L " : "S ") + eId + " L" + str.tostring(eId == "pull" ? sig.lvlPull : sig.lvlRev))
+            strategy.exit("x", stop = curStop, limit = curTp)
+
+// manage the open position
 if not flat
     int pdir = strategy.position_size > 0 ? 1 : -1
-    if trailKey and not na(parentKey) and parentDir == pdir
-        float ns = pdir > 0 ? parentKey - stopBufAtr * atr5 : parentKey + stopBufAtr * atr5
-        if pdir > 0 ? ns > curStop : ns < curStop
-            curStop := ns
+    if useTrail
+        if exitUnit == "Structure"
+            if not na(parentKey) and parentDir == pdir
+                float ns = pdir > 0 ? parentKey - stopBufAtr * atrX : parentKey + stopBufAtr * atrX
+                if pdir > 0 ? ns > curStop : ns < curStop
+                    curStop := ns
+        else
+            float profit = pdir > 0 ? high - entryPx : entryPx - low
+            if profit >= trAct
+                trailOn := true
+            if trailOn
+                float ns = pdir > 0 ? high - trDist : low + trDist
+                if pdir > 0 ? ns > curStop : ns < curStop
+                    curStop := ns
     strategy.exit("x", stop = curStop, limit = curTp)
     if exitFlip and parentDir == -pdir
         strategy.close_all(comment = "parent flipped")
