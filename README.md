@@ -34,9 +34,16 @@ All scripts are Pine v6 except FlashGold, which is Pine v5 and carries the same 
 
 Scripts that run in their own pane (the TDI and Shape Map ones) draw the filter's shading, level and status box on the price chart. Where the host already has a table in the top right corner (Breakout, Refusal Log, TDI+), the DTF status box defaults to the top left; change it under "Status box position".
 
-## XPW Fractal Ring (new idea)
+## XPW Fractal Ring
 
-`xpw_fractal_ring_v1.0_indicator.pine` combines the "eight nodes on a circle" animation with the Fractal Direction Framework. The eight nodes are eight timeframes. Each node measures its own trend (higher low / lower high and its break), its TDI sub-trend, divergence, Hurst h(2), a spectrum-width proxy h(1) - h(2), and memory (lag-1 autocorrelation). The ring phase follows the video: ORDER (straight spokes), DIVERGENCE (the first bend), FRACTAL (the bend spreads), FLIP (full interference), BREAK (the parent's guard breaks), NEW REGIME (the rings unwind). Signals follow the framework: trade with the parent, enter when the chart pullback ends, exit on the parent's break. Outputs are exported for a strategy to read through `input.source`.
+Combines the "eight nodes on a circle" animation with the Fractal Direction Framework. The eight nodes are eight timeframes. Each node measures its own trend (higher low / lower high and its break), its TDI sub-trend, divergence, Hurst h(2), a spectrum-width proxy h(1) - h(2), and memory (lag-1 autocorrelation). The ring phase follows the video: ORDER (straight spokes), DIVERGENCE (the first bend), FRACTAL (the bend spreads), FLIP (full interference), BREAK (the parent's guard breaks), NEW REGIME (the rings unwind). Bigger scales weigh more, so a flip of the smallest scale is roughness, not a warning. Signals follow the framework: trade with the parent, enter when the chart pullback ends, exit on the parent's break.
+
+| File | What it is |
+| --- | --- |
+| `xpw_fractal_ring_v1.1_indicator.pine` | The indicator (gold intraday defaults). Outputs are exported for strategies through `input.source`. |
+| `xpw_fractal_ring_v1.1_btcusd_strategy.pine` | The strategy, BTCUSD defaults: 15-minute chart, parent 4 hours, stop beyond the pullback extreme, exit on the parent's break, 1% risk sizing, 0.055% commission. Includes the Directional Time Filter, switched off by default. Not calibrated. |
+
+Both files are generated from the same core, so the ring, phases and entry rule are identical.
 
 ## Adding the Directional Time Filter to another strategy
 
