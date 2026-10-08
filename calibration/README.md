@@ -16,7 +16,7 @@ Data: TradingView CSV exports of MEXC:BTCUSDT, 1m / 15m / 30m / 60m / 2h / 3h /
 ## Costs modelled (per fill)
 | | value | note |
 |---|---|---|
-| Commission | 0.05% | MEXC spot taker (futures taker 0.02% tested too) |
+| Commission | 0.02% | MEXC USDT-M futures taker (strategy default). Calibration selection ran at 0.05% spot and 0.02% futures: same winner. Funding not modelled. |
 | Slippage | $5 | stop / market fills only, not TP limits |
 | Spread | $1 (half = $0.50 per fill) | folded into TradingView `slippage = 550` ticks |
 
@@ -30,7 +30,7 @@ Data: TradingView CSV exports of MEXC:BTCUSDT, 1m / 15m / 30m / 60m / 2h / 3h /
 Grid over SL / TP / trail activation / trail distance in ATR(14) multiples of the
 signal candle; score = sum over 2h–1W of min(first 60%, last 40%) net / ATR%.
 Winner: **SL 6×ATR, trail activation 3×ATR, trail distance 1.5×ATR, no TP**
-(TP 2–6×SL changed nothing).
+(TP 2–6×SL changed nothing). Re-running the selection at 0.02% gives the same rule.
 
 ## Result (chosen rule, `pess`, MEXC spot costs, % per trade at 1x summed)
 | TF | trades | no costs | with costs | PF | futures fees | $20 slip |
