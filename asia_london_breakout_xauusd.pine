@@ -1,6 +1,6 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // Asia London Breakout (XAUUSD PRESET) - TradingView strategy version of mt5/AsiaLondonBreakout.mq5
-// PRESET: 10 oz (= 0.10 lot), commission 0.002% per side (VT ECN: $0.11 spread + $3/lot). Use on a gold chart, M15. Tested (MT5, VT ticks Jul 20 - Oct 8 2026): +$4,056, PF 2.43, 38 trades.
+// PRESET: 10 oz (= 0.10 lot), commission 0.002% per side (VT ECN: $0.11 spread + $3/lot). Use on a gold chart, M15. Tested (MT5, VT ticks Jul 1 - Oct 8 2026, Mon-Fri): +$4,277, PF 1.72, 56 trades; Fridays lost (Friday off: +$5,805, PF 2.87).
 //
 // RULE (default times in UTC = VT Markets server 03:00 / 10:00 / 19:00):
 //  1. Asia range = high / low of the bars from 00:00 to 07:00 UTC.
@@ -9,9 +9,10 @@
 //  3. Stop loss = range size from the fill (opposite side), or half the range (midpoint mode).
 //  4. Exit at 16:00 UTC (or at the take profit if set). Unfilled orders are cancelled then. Monday-Friday.
 //
-// TESTED (MT5 version, VT Markets ticks Jul 13 - Oct 8 2026, real spreads, tick by tick, 0.10 lot):
-//  XAUUSD +$4,056, PF 2.43, 38 trades; BTCUSD +$1,241, PF 1.83, 55 trades. Every range / exit hour
-//  combination 1-2 h around the defaults was profitable on both symbols. See mt5/presets/README.md.
+// TESTED (MT5 version, VT Markets ticks Jul 1 - Oct 8 2026, real spreads, tick by tick, 0.10 lot, Mon-Fri):
+//  XAUUSD +$4,277, PF 1.72, 56 trades (Fridays lost; Friday off: +$5,805, PF 2.87); BTCUSD +$1,388, PF 1.65,
+//  65 trades. Every range / exit hour combination 1-2 h around the defaults was profitable on both symbols.
+//  See mt5/presets/README.md.
 //
 // TRADINGVIEW NOTES
 //  - Use a chart timeframe of 1 hour or lower that divides the session hours (M5 / M15 / M30 / H1).

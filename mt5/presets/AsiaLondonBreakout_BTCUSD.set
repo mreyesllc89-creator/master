@@ -1,4 +1,4 @@
-; BTCUSD.c, any chart timeframe. VT Markets ticks Jul 13 - Oct 8 2026 ($17 fixed spread), tick by tick: +$1,241 on 0.10 lot, PF 1.83, 55 trades, Jul-Aug +$637 / Sep-Oct +$603. 27/27 hour combinations profitable, 25/27 in both halves.
+; BTCUSD.c, any chart timeframe. VT Markets ticks Jul 1 - Oct 8 2026 ($17 fixed spread), tick by tick, Mon-Fri: +$1,388 on 0.10 lot, PF 1.65, 65 trades, max DD $649. 27/27 range/exit hour combinations profitable.
 ; Times are VT Markets SERVER time (GMT+3). If your broker's server is on another offset, shift the hours so the range is 00:00-07:00 UTC and the exit 16:00 UTC.
 ; DEMO-TEST FIRST. Load in MT5: EA properties > Inputs > Load.
 InpRangeStartHour=3

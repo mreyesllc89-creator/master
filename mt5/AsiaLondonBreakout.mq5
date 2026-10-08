@@ -15,7 +15,7 @@
 //|     deleted at ExitTime.                                         |
 //|  5. Monday to Friday only.                                       |
 //|                                                                  |
-//| Tested tick by tick on VT Markets ticks, Jul 13 - Oct 8 2026     |
+//| Tested tick by tick on VT Markets ticks, Jul 1 - Oct 8 2026      |
 //| (real bid/ask, real spreads): see presets/README.md. Every       |
 //| range/exit hour combination from 02-04 / 09-11 / 17-21 was       |
 //| profitable on both symbols. Demo-test before live trading.       |
