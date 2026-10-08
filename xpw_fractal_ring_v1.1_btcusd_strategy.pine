@@ -94,6 +94,10 @@
 //                      on a 0.1-tick feed (the table shows the SL in price).
 //                      ATR mode: SL = mult x ATR, TP = R x SL, trail in ATR
 //                      multiples; the signal bar's ATR is kept for the trade.
+//                      "Trail starts after X candles" (0 = from entry): the
+//                      trailing stop joins the exit order at the close of
+//                      candle X after the fill and works from the next one;
+//                      until then only the SL and TP protect the trade.
 //      Time stop       optional (S2), in bars.
 //    Sizing (S3): a fixed quantity, or Risk % of equity divided by the stop
 //    distance in money, capped at Max quantity and rounded down to the step.
@@ -339,6 +343,7 @@ exAtrLen = input.int(14,      "ATR length (ATR mode)", minval = 1, group = GRP_X
 slAtrM   = input.float(2.0,   "Stop loss, ATR mult (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
 tpR      = input.float(2.0,   "Take profit, R multiple of SL (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
 trailOn  = input.bool(true,   "Trailing stop", group = GRP_X)
+trailBars = input.int(0,      "Trail starts after, candles (0 = from entry)", minval = 0, group = GRP_X, tooltip = "Counted from the candle the entry filled on. Until then the trade has only its stop loss and take profit. At the close of candle X the trailing stop is added and works from the next candle; it still waits for the trail activation profit (set the activation to 0 to start trailing at once).")
 trActPts = input.float(4500,  "Trail activation, pts of profit (Points mode)", minval = 0, group = GRP_X)
 trDisPts = input.float(1000,  "Trail distance, pts (Points mode)", minval = 0, group = GRP_X)
 trActAtr = input.float(4.0,   "Trail activation, ATR mult (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
@@ -744,15 +749,18 @@ if shortEntry and allowShort and dtfSellOk and flat and not na(slTkNow)
         sTd := tdTkNow
         strategy.entry("Short", strategy.short, qty = q, comment = "FR short")
 
-// SL / TP / trailing stop, in ticks from the entry price.
+// SL / TP / trailing stop, in ticks from the entry price. The trail joins
+// the exit order only once the trade has been open trailBars candles.
+int  barsIn     = strategy.position_size != 0 and strategy.opentrades > 0 ? bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) : 0
+bool trailReady = trailBars == 0 or barsIn >= trailBars
 float xlSl = posOrNa(lSl)
 float xlTp = posOrNa(lTp)
-float xlTa = trailOn and nz(lTd, 0) > 0 ? lTa : na
-float xlTd = trailOn and nz(lTd, 0) > 0 ? lTd : na
+float xlTa = trailOn and trailReady and nz(lTd, 0) > 0 ? lTa : na
+float xlTd = trailOn and trailReady and nz(lTd, 0) > 0 ? lTd : na
 float xsSl = posOrNa(sSl)
 float xsTp = posOrNa(sTp)
-float xsTa = trailOn and nz(sTd, 0) > 0 ? sTa : na
-float xsTd = trailOn and nz(sTd, 0) > 0 ? sTd : na
+float xsTa = trailOn and trailReady and nz(sTd, 0) > 0 ? sTa : na
+float xsTd = trailOn and trailReady and nz(sTd, 0) > 0 ? sTd : na
 if not na(xlSl) or not na(xlTp) or not na(xlTd)
     strategy.exit("XL", from_entry = "Long", loss = xlSl, profit = xlTp, trail_points = xlTa, trail_offset = xlTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
 if not na(xsSl) or not na(xsTp) or not na(xsTd)
@@ -764,9 +772,8 @@ if strategy.position_size > 0 and ((exitOnBreak and brkP and parentT == -1) or (
 if strategy.position_size < 0 and ((exitOnBreak and brkP and parentT == 1) or (exitOnFlip and phase == PH_FLIP))
     strategy.close("Short", comment = brkP ? "parent break" : "FLIP")
 
-if timeStop > 0 and strategy.position_size != 0 and strategy.opentrades > 0
-    if bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= timeStop
-        strategy.close_all(comment = "time stop")
+if timeStop > 0 and strategy.position_size != 0 and strategy.opentrades > 0 and barsIn >= timeStop
+    strategy.close_all(comment = "time stop")
 
 float avgPx = strategy.position_avg_price
 plot(strategy.position_size > 0 and not na(xlSl) ? avgPx - xlSl * tk : strategy.position_size < 0 and not na(xsSl) ? avgPx + xsSl * tk : na, "Stop", color = color.new(color.red, 0), style = plot.style_linebr, force_overlay = true)

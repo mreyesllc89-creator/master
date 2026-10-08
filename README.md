@@ -41,7 +41,7 @@ Combines the "eight nodes on a circle" animation with the Fractal Direction Fram
 | File | What it is |
 | --- | --- |
 | `xpw_fractal_ring_v1.1_indicator.pine` | The indicator (gold intraday defaults). Outputs are exported for strategies through `input.source`. |
-| `xpw_fractal_ring_v1.1_btcusd_strategy.pine` | The strategy, BTCUSD defaults: 15-minute chart, parent 4 hours, exit on the parent's break, 0.055% commission. Its S2 Exits and S3 Sizing groups are the same panel as the other XPW strategies (SL / TP / trail in Points or ATR; fixed quantity or Risk %). Includes the Directional Time Filter, switched off by default. Not calibrated. The default fixed quantity of 10 means 10 BTC per trade; lower it for a realistic test. |
+| `xpw_fractal_ring_v1.1_btcusd_strategy.pine` | The strategy, BTCUSD defaults: 15-minute chart, parent 4 hours, exit on the parent's break, 0.055% commission. Its S2 Exits and S3 Sizing groups are the same panel as the other XPW strategies (SL / TP / trail in Points or ATR, with an option to start the trailing stop only after X candles; fixed quantity or Risk %). Includes the Directional Time Filter, switched off by default. Not calibrated. The default fixed quantity of 10 means 10 BTC per trade; lower it for a realistic test. |
 
 Both files are generated from the same core, so the ring, phases and entry rule are identical.
 
