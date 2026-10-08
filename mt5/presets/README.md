@@ -2,7 +2,16 @@
 
 ## Asia London Breakout (recommended for demo testing)
 
-EA: `mt5/AsiaLondonBreakout.mq5`. Presets: `AsiaLondonBreakout_XAUUSD.set`, `AsiaLondonBreakout_BTCUSD.set`.
+EA: `mt5/AsiaLondonBreakout.mq5`. Presets:
+
+| Preset | Symbol | Days | Magic | TradingView script |
+|---|---|---|---|---|
+| `AsiaLondonBreakout_XAUUSD.set` | XAUUSD-ECN | Mon-Fri | 60601 | `asia_london_breakout_xauusd.pine` |
+| `AsiaLondonBreakout_XAUUSD_FridayOff.set` | XAUUSD-ECN | Mon-Thu | 60603 | `asia_london_breakout_xauusd_fridayoff.pine` |
+| `AsiaLondonBreakout_BTCUSD.set` | BTCUSD.c | Mon-Fri | 60602 | `asia_london_breakout_btcusd.pine` |
+
+The two gold presets have different magic numbers, so both can run side by side (e.g. two demo accounts, or
+two charts on one account) and their trades stay separate.
 
 **Rule (VT Markets server time, GMT+3):** Asia range = bid high/low 03:00-10:00. At 10:00 place a buy stop at
 the range high and a sell stop at the range low; the first fill cancels the other (one trade per day). Stop =

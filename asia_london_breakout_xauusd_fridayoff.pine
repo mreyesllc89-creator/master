@@ -1,0 +1,157 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// Asia London Breakout (XAUUSD PRESET, FRIDAY OFF) - TradingView strategy version of mt5/AsiaLondonBreakout.mq5
+// PRESET: 10 oz (= 0.10 lot), commission 0.002% per side (VT ECN: $0.11 spread + $3/lot). Use on a gold chart, M15. Tested (MT5, VT ticks Jul 1 - Oct 8 2026, Mon-Fri): +$4,277, PF 1.72, 56 trades; Fridays lost, so this preset trades Mon-Thu: +$5,805, PF 2.87, 45 trades, max DD $740 (found on the same data).
+//
+// RULE (default times in UTC = VT Markets server 03:00 / 10:00 / 19:00):
+//  1. Asia range = high / low of the bars from 00:00 to 07:00 UTC.
+//  2. At 07:00 UTC (London open): buy stop at the range high, sell stop at the range low (+ optional buffer).
+//     The first fill cancels the other (one trade per day).
+//  3. Stop loss = range size from the fill (opposite side), or half the range (midpoint mode).
+//  4. Exit at 16:00 UTC (or at the take profit if set). Unfilled orders are cancelled then. Monday-Friday.
+//
+// TESTED (MT5 version, VT Markets ticks Jul 1 - Oct 8 2026, real spreads, tick by tick, 0.10 lot, Mon-Fri):
+//  XAUUSD +$4,277, PF 1.72, 56 trades (Fridays lost; Friday off: +$5,805, PF 2.87); BTCUSD +$1,388, PF 1.65,
+//  65 trades. Every range / exit hour combination 1-2 h around the defaults was profitable on both symbols.
+//  See mt5/presets/README.md.
+//
+// TRADINGVIEW NOTES
+//  - Use a chart timeframe of 1 hour or lower that divides the session hours (M5 / M15 / M30 / H1).
+//  - TradingView has no spread: the commission below stands in for spread + commission.
+//    Defaults: gold 0.002% per side (VT ECN: $0.11 spread + $3/lot). For BTC set Properties > Commission
+//    to 0.011% (VT BTCUSD.c: $17 spread on ~$80k).
+//  - Prices differ a little between data feeds (OANDA, FOREX.com, Pepperstone, Binance ...), so the range
+//    and results will not match VT Markets exactly.
+//  - The stop sits at the far side of the range, so intrabar fill order matters less than for tight stops;
+//    Bar Magnifier (Premium) still gives the most accurate backtest.
+//@version=5
+strategy("Asia London Breakout (XAUUSD, Friday off)", "ALB XAUUSD noFri", overlay = true, pyramiding = 0, initial_capital = 10000,
+     default_qty_type = strategy.fixed, default_qty_value = 10,
+     commission_type = strategy.commission.percent, commission_value = 0.002, slippage = 0,
+     process_orders_on_close = true, calc_on_every_tick = false, max_boxes_count = 500, max_lines_count = 500)
+
+// ============================== INPUTS ==============================
+gS = "Session"
+tz        = input.string("UTC", "Time zone of the hours below", options = ["UTC", "GMT+3", "Europe/London", "Europe/Athens", "America/New_York"], group = gS,
+     tooltip = "UTC: range 00-07, exit 16 (default). GMT+3 = VT Markets server time: use 03 / 10 / 19 instead.")
+rStartH   = input.int(0, "Asia range start, hour", minval = 0, maxval = 23, group = gS)
+rEndH     = input.int(7, "Asia range end = breakout start (London open), hour", minval = 0, maxval = 23, group = gS)
+exitH     = input.int(16, "Exit time (close trade, cancel orders), hour", minval = 0, maxval = 23, group = gS)
+tMon      = input.bool(true, "Monday", inline = "d", group = gS)
+tTue      = input.bool(true, "Tue", inline = "d", group = gS)
+tWed      = input.bool(true, "Wed", inline = "d", group = gS)
+tThu      = input.bool(true, "Thu", inline = "d", group = gS)
+tFri      = input.bool(false, "Fri", inline = "d", group = gS)
+
+gE = "Entry / exit"
+bufPct    = input.float(0.0, "Entry buffer beyond the range, % of range", minval = 0.0, step = 5.0, group = gE)
+stopMode  = input.string("Opposite side", "Stop loss", options = ["Opposite side", "Range midpoint"], group = gE)
+tpR       = input.float(0.0, "Take profit, R multiple of the stop (0 = exit at exit time)", minval = 0.0, step = 0.5, group = gE)
+rngFilter = input.string("None", "Range-size filter", options = ["None", "Skip wide (> 2x 10-day median)", "Skip narrow (< 0.5x 10-day median)"], group = gE)
+minRange  = input.float(0.0, "Minimum range size, price (0 = off)", minval = 0.0, group = gE)
+maxRange  = input.float(0.0, "Maximum range size, price (0 = off)", minval = 0.0, group = gE)
+
+gQ = "Sizing"
+qtyMode   = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = gQ)
+fixedQty  = input.float(10, "Fixed quantity (gold: oz, 10 = 0.10 lot; BTC: coins, 0.1 = 0.10 lot)", minval = 0.0, group = gQ)
+riskPct   = input.float(0.5, "Risk % of equity per trade (Risk mode)", minval = 0.0, step = 0.25, group = gQ)
+qtyStep   = input.float(0.01, "Quantity step (rounds down)", minval = 0.000001, group = gQ)
+
+gV = "Visuals"
+showBox   = input.bool(true, "Draw the Asia range", group = gV)
+
+// ============================== TIME ==============================
+minOfDay(t) => hour(t, tz) * 60 + minute(t, tz)
+mStart = rStartH * 60
+mEnd   = rEndH * 60
+mExit  = exitH * 60
+barM   = minOfDay(time)
+closeM = minOfDay(time_close)
+sameDay = dayofmonth(time, tz) == dayofmonth(time_close - 1, tz)
+closeMe = sameDay ? closeM : 1440            // a bar closing at midnight ends at minute 1440
+
+inRange  = barM >= mStart and barM < mEnd
+rangeEnd = barM < mEnd and closeMe >= mEnd and barM >= mStart      // last bar of the Asia range (orders placed at its close)
+exitBar  = barM < mExit and closeMe >= mExit                       // last bar of the trading window
+
+dow = dayofweek(time, tz)
+dayOk = (dow == dayofweek.monday and tMon) or (dow == dayofweek.tuesday and tTue) or (dow == dayofweek.wednesday and tWed) or (dow == dayofweek.thursday and tThu) or (dow == dayofweek.friday and tFri)
+
+// ============================== RANGE ==============================
+var float rH = na
+var float rL = na
+var int   rStartBar = na
+var float slDist = na
+var float tpDist = na
+var ranges = array.new_float()
+
+if inRange and (na(rStartBar) or not inRange[1])
+    rH := high
+    rL := low
+    rStartBar := bar_index
+else if inRange
+    rH := math.max(rH, high)
+    rL := math.min(rL, low)
+
+median10() =>
+    n = array.size(ranges)
+    float m = na
+    if n >= 5
+        last = array.slice(ranges, math.max(0, n - 10), n)
+        m := array.median(last)
+    m
+
+calcQty(float sd) =>
+    float q = fixedQty
+    if qtyMode == "Risk %"
+        q := sd > 0 ? strategy.equity * riskPct / 100.0 / (sd * syminfo.pointvalue) : 0.0
+    math.floor(q / qtyStep + 1e-9) * qtyStep
+
+// ============================== ORDERS ==============================
+if rangeEnd and not na(rH)
+    R = rH - rL
+    med = median10()
+    array.push(ranges, R)
+    filterOk = rngFilter == "None" or na(med) or (rngFilter == "Skip wide (> 2x 10-day median)" and R <= 2 * med) or (rngFilter == "Skip narrow (< 0.5x 10-day median)" and R >= 0.5 * med)
+    sizeOk = R > 0 and (minRange <= 0 or R >= minRange) and (maxRange <= 0 or R <= maxRange)
+    if showBox
+        box.new(rStartBar, rH, bar_index, rL, border_color = color.new(color.blue, 40), bgcolor = color.new(color.blue, 88))
+    if dayOk and filterOk and sizeOk and strategy.position_size == 0
+        buf = R * bufPct / 100.0
+        bs = rH + buf
+        ss = rL - buf
+        slDist := stopMode == "Opposite side" ? (bs - ss) : (R / 2.0 + buf)
+        tpDist := tpR > 0 ? slDist * tpR : na
+        q = calcQty(slDist)
+        if q > 0
+            strategy.entry("Long",  strategy.long,  qty = q, stop = bs, oca_name = "ALB", oca_type = strategy.oca.cancel, comment = "ALB buy")
+            strategy.entry("Short", strategy.short, qty = q, stop = ss, oca_name = "ALB", oca_type = strategy.oca.cancel, comment = "ALB sell")
+
+// stop / target in ticks from the real fill price (also covers a fill on the same bar)
+if not na(slDist)
+    lossT = slDist / syminfo.mintick
+    profT = na(tpDist) ? na : tpDist / syminfo.mintick
+    strategy.exit("XL", "Long",  loss = lossT, profit = profT, comment_loss = "SL", comment_profit = "TP")
+    strategy.exit("XS", "Short", loss = lossT, profit = profT, comment_loss = "SL", comment_profit = "TP")
+
+// time exit: close the trade and cancel unfilled orders at the end of the window
+if exitBar
+    strategy.close_all(comment = "time exit")
+    strategy.cancel_all()
+
+// ============================== VISUALS ==============================
+inWindow = barM >= mEnd and barM < mExit
+plot(inWindow ? rH : na, "Range high", color = color.new(color.lime, 0), style = plot.style_linebr)
+plot(inWindow ? rL : na, "Range low", color = color.new(color.red, 0), style = plot.style_linebr)
+bgcolor(inRange ? color.new(color.blue, 94) : na, title = "Asia range session")
+
+var table tb = table.new(position.top_right, 2, 4, border_width = 1)
+if barstate.islast
+    wr = strategy.closedtrades > 0 ? strategy.wintrades * 100.0 / strategy.closedtrades : na
+    table.cell(tb, 0, 0, "Asia London Breakout", text_color = color.white, text_size = size.small)
+    table.cell(tb, 1, 0, tz, text_color = color.gray, text_size = size.small)
+    table.cell(tb, 0, 1, "Range / exit", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 1, str.format("{0}-{1}h / {2}h", rStartH, rEndH, exitH), text_color = color.white, text_size = size.tiny)
+    table.cell(tb, 0, 2, "Last range", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 2, str.tostring(rH - rL, format.mintick), text_color = color.white, text_size = size.tiny)
+    table.cell(tb, 0, 3, "Trades / win% / net", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 3, str.tostring(strategy.closedtrades) + " / " + str.tostring(wr, "#") + "% / " + str.tostring(strategy.netprofit, "#.##"), text_color = strategy.netprofit >= 0 ? color.lime : color.red, text_size = size.tiny)
