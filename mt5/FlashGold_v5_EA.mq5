@@ -119,17 +119,17 @@ input bool            InpExitOnOpp    = false;          // Close at market on th
 input int             InpSlippage     = 10;             // Max slippage at market (points)
 
 input group "S2. Exits"
-input ENUM_FG_UNIT InpExitMode    = FG_UNIT_ATR; // SL / TP / trail unit
-input double       InpSlPoints    = 150;         // Stop loss, pts (Points mode)
-input double       InpTpPoints    = 300;         // Take profit, pts (Points mode)
+input ENUM_FG_UNIT InpExitMode    = FG_UNIT_POINTS; // SL / TP / trail unit
+input double       InpSlPoints    = 5000;        // Stop loss, pts (Points mode)
+input double       InpTpPoints    = 50000;       // Take profit, pts (Points mode)
 input int          InpAtrLen      = 14;          // ATR length (ATR mode)
 input double       InpSlAtrMult   = 2.0;         // Stop loss, ATR mult (ATR mode)
 input double       InpTpR         = 2.0;         // Take profit, R multiple of SL (ATR mode)
 input bool         InpUseTrail    = true;        // Trailing stop
-input double       InpTrailActPts = 150;         // Trail activation, pts of profit (Points mode)
-input double       InpTrailPts    = 100;         // Trail distance, pts (Points mode)
-input double       InpTrailActAtr = 1.0;         // Trail activation, ATR mult (ATR mode)
-input double       InpTrailDstAtr = 0.75;        // Trail distance, ATR mult (ATR mode)
+input double       InpTrailActPts = 4500;        // Trail activation, pts of profit (Points mode)
+input double       InpTrailPts    = 1000;        // Trail distance, pts (Points mode)
+input double       InpTrailActAtr = 4.0;         // Trail activation, ATR mult (ATR mode)
+input double       InpTrailDstAtr = 0.2;         // Trail distance, ATR mult (ATR mode)
 input double       InpTrailStepPts = 5;          // Trail step, pts (min stop move per modify; MT5 only)
 input int          InpMaxBarsHeld = 0;           // Time stop, bars (0 = off)
 
