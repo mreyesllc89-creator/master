@@ -42,9 +42,18 @@ Caveats: about 3 months of one market phase, 45-65 trades; gold was positive in 
 losing weeks are normal. Demo-test before live trading. If your broker's server is not GMT+3, shift the hours so the
 range is 00:00-07:00 UTC and the exit 16:00 UTC.
 
-## FlashGold v5 (not recommended)
+## FlashGold v5
 
-The FlashGold v5 EA (`FlashGoldV5_*.mq5`) and its earlier presets were tested on the same VT Markets ticks
-(Jul 13 - Oct 8 2026, M1 to H4, exits, entries, inverted signal, market-phase filter). No version held up on
-unseen weeks: every setting that looked profitable on one period lost on a later one. Its presets were
-removed. The EA is kept for reference only.
+EA: `mt5/FlashGoldV5_XAUUSD.mq5` + `mt5/FlashGoldV5_Core.mqh` (both in `MQL5/Experts/`). Preset:
+`FlashGoldV5_XAUUSD_H1.set` (= the EA's built-in gold defaults), XAUUSD-ECN H1 chart.
+
+VT Markets ticks Jul 1 - Oct 8 2026, tick by tick, 0.10 lot:
+
+| FlashGold v5 settings | XAUUSD | BTCUSD |
+|---|---|---|
+| Current default (gold: H1, SL 80 pips, 30% at TP 5R, runner 315 pips, min 3) | +$2,186, PF 1.39, max DD $1,858 | H4 version: -$192, PF 0.93 |
+| Original (gold: ATR SL 2, TP 2R, trail 1.0/0.75 ATR; BTC: $50 SL, $10 trail) | +$1,851, PF 1.12, max DD $1,769 | -$427, PF 0.68 |
+| Pip calibration (tight stops) | -$916, PF 0.69 | -$472, PF 0.62 |
+
+Use FlashGold v5 on gold only. On BTCUSD every version lost (VT's $17 spread). Exit and entry re-calibrations
+on single periods did not hold up on later weeks, so keep the defaults and judge on demo.
