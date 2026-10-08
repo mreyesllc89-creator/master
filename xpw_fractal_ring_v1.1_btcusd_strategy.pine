@@ -142,7 +142,7 @@ tf4 = input.timeframe("60", "Node 4", group = GRP_R)
 tf5 = input.timeframe("120", "Node 5", group = GRP_R)
 tf6 = input.timeframe("240", "Node 6", group = GRP_R)
 tf7 = input.timeframe("D", "Node 7", group = GRP_R)
-tf8 = input.timeframe("W", "Node 8", group = GRP_R, tooltip = "List the scales from the smallest to the largest: a node's weight is its position (node 1 weighs 1, node 8 weighs 8). Use timeframes that are whole multiples of the chart's; the table marks any that is not with ~. A timeframe below the chart follows its own forming bar while the chart bar forms and is final at the chart bar's close.")
+tf8 = input.timeframe("W", "Node 8", group = GRP_R, tooltip = "List the scales from the smallest to the largest: a node's weight is its position (node 1 weighs 1, node 8 weighs 8). Use timeframes that line up with the chart's bars: above the chart a whole multiple of it (months count as lined up on intraday and daily charts), below the chart a divisor of it. The table and the ring mark any node that does not line up with ~. A timeframe below the chart follows its own forming bar while the chart bar forms.")
 parentNode = input.int(6, "Parent node (1-8)", minval = 1, maxval = 8, group = GRP_R, tooltip = "The scale whose trend is the regime. Its guard (last higher low / lower high) is the break test, and entries follow its direction. Keep it at or above the chart timeframe.")
 scopeIn = input.string("Parent and smaller nodes", "Nodes that set the phase", options = ["Parent and smaller nodes", "All eight nodes"], group = GRP_R, tooltip = "Parent and smaller nodes: the framework's conditional structure, sub-trends inside the parent. Nodes above the parent are drawn faded and do not change the phase. All eight nodes: every scale counts, as in the video.")
 
@@ -457,8 +457,13 @@ isHigher(string tf) =>
     tf != "" and timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)
 isBelow(string tf) =>
     tf != "" and timeframe.in_seconds(tf) < timeframe.in_seconds(timeframe.period)
+// A higher node lines up when it is a whole multiple of the chart timeframe;
+// month-based nodes line up with intraday and daily charts. A lower node
+// lines up when it divides the chart timeframe.
 isWhole(string tf) =>
-    tf == "" or timeframe.in_seconds(tf) % timeframe.in_seconds(timeframe.period) == 0
+    tf == "" or (str.endswith(tf, "M") and timeframe.in_seconds(timeframe.period) <= 86400) or timeframe.in_seconds(tf) % timeframe.in_seconds(timeframe.period) == 0
+isDivisor(string tf) =>
+    tf == "" or timeframe.in_seconds(timeframe.period) % timeframe.in_seconds(tf) == 0
 
 pickI(bool hi, int a, int b) =>
     hi ? b : a
@@ -498,7 +503,7 @@ array<float> hA = array.from(pickF(hi1, h1a, h1b), pickF(hi2, h2a, h2b), pickF(h
 array<float> wpA = array.from(pickF(hi1, wp1a, wp1b), pickF(hi2, wp2a, wp2b), pickF(hi3, wp3a, wp3b), pickF(hi4, wp4a, wp4b), pickF(hi5, wp5a, wp5b), pickF(hi6, wp6a, wp6b), pickF(hi7, wp7a, wp7b), pickF(hi8, wp8a, wp8b))
 array<float> apA = array.from(pickF(hi1, ap1a, ap1b), pickF(hi2, ap2a, ap2b), pickF(hi3, ap3a, ap3b), pickF(hi4, ap4a, ap4b), pickF(hi5, ap5a, ap5b), pickF(hi6, ap6a, ap6b), pickF(hi7, ap7a, ap7b), pickF(hi8, ap8a, ap8b))
 array<string> tfA    = array.from(tf1, tf2, tf3, tf4, tf5, tf6, tf7, tf8)
-array<bool>   oddA   = array.from(hi1 and not isWhole(tf1), hi2 and not isWhole(tf2), hi3 and not isWhole(tf3), hi4 and not isWhole(tf4), hi5 and not isWhole(tf5), hi6 and not isWhole(tf6), hi7 and not isWhole(tf7), hi8 and not isWhole(tf8))
+array<bool>   oddA   = array.from((hi1 and not isWhole(tf1)) or (isBelow(tf1) and not isDivisor(tf1)), (hi2 and not isWhole(tf2)) or (isBelow(tf2) and not isDivisor(tf2)), (hi3 and not isWhole(tf3)) or (isBelow(tf3) and not isDivisor(tf3)), (hi4 and not isWhole(tf4)) or (isBelow(tf4) and not isDivisor(tf4)), (hi5 and not isWhole(tf5)) or (isBelow(tf5) and not isDivisor(tf5)), (hi6 and not isWhole(tf6)) or (isBelow(tf6) and not isDivisor(tf6)), (hi7 and not isWhole(tf7)) or (isBelow(tf7) and not isDivisor(tf7)), (hi8 and not isWhole(tf8)) or (isBelow(tf8) and not isDivisor(tf8)))
 array<bool>   belowA = array.from(isBelow(tf1), isBelow(tf2), isBelow(tf3), isBelow(tf4), isBelow(tf5), isBelow(tf6), isBelow(tf7), isBelow(tf8))
 
 // --------------------------------------------------------------- PHASE ----
@@ -539,6 +544,12 @@ bool  wide    = nz(wPctP, 0) >= widePct
 bool  slowing = nz(aPctP, 0) >= slowPct
 bool  clean   = opShare < divPct and dvShare < divPct and not slowing
 
+// NEW REGIME is remembered on its own: set by a parent break, cleared when
+// the ring is clean again (or the parent loses its trend). A FLIP shows on
+// top of it and NEW REGIME resumes after the FLIP until the ring is clean.
+var bool inReset = false
+inReset := parentT == 0 ? false : brkP ? true : clean ? false : inReset
+
 var int phase = PH_WAIT
 int nextPh = phase
 if parentT == 0 or wTot == 0
@@ -547,7 +558,7 @@ else if brkP
     nextPh := PH_BREAK
 else if opShare >= flipPct or (wide and opShare >= fracPct)
     nextPh := PH_FLIP
-else if (phase == PH_BREAK or phase == PH_RESET) and not clean
+else if inReset and not clean
     nextPh := PH_RESET
 else if opShare >= fracPct
     nextPh := PH_FRACT
