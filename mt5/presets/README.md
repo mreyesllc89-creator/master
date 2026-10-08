@@ -9,6 +9,9 @@ EA: `mt5/AsiaLondonBreakout.mq5`. Presets:
 | `AsiaLondonBreakout_XAUUSD.set` | XAUUSD-ECN(c) | Mon-Fri | 60601 | `asia_london_breakout_xauusd.pine` |
 | `AsiaLondonBreakout_XAUUSD_FridayOff.set` | XAUUSD-ECN(c) | Mon-Thu | 60603 | `asia_london_breakout_xauusd_fridayoff.pine` |
 | `AsiaLondonBreakout_BTCUSD.set` | BTCUSD.c | Mon-Fri | 60602 | `asia_london_breakout_btcusd.pine` |
+| `AsiaLondonBreakout_BTCUSD_Candidate.set` (midpoint stop) | BTCUSD.c | Mon-Fri | 60606 | - |
+| `AsiaLondonBreakout_XAUUSD_Candidate.set` (midpoint stop, Monday off) | XAUUSD-ECN(c) | Tue-Fri | 60604 | - |
+| `AsiaLondonBreakout_XAUUSD_Candidate_Trail.set` (+ trailing) | XAUUSD-ECN(c) | Tue-Fri | 60605 | - |
 
 The two gold presets have different magic numbers, so both can run side by side (e.g. two demo accounts, or
 two charts on one account) and their trades stay separate.
@@ -80,6 +83,17 @@ gave +3.8% vs +2.9%, DD 2.6%, win 70%.
 The midpoint stop halves the stop, so at 1% risk the position is twice as large and the fixed commission weighs
 half as much. Monday was also the weakest day in the 9-month MT5 test. Found on 3 months: verify with
 `AsiaLondonBreakout_XAUUSD_OPTIMIZE.set` (MT5 optimizer, 576 runs, forward test 1/3) before using it.
+
+## BTCUSD.c: MT5 tester (9 months) and calibration
+
+VT BTCUSD.c: 1 lot = 0.01 BTC, no commission (~$17 spread). Your tester run (Dec 29 2025 - Sep 30 2026, 192 trades,
+61% real ticks) hit the old 5-lot cap on every trade (~$53 risk instead of $500). Scaled to 1% risk with each
+trade's real stop: +21.3%, max DD 6.7%, PF 1.31. By month: Feb +4.5, Apr -2.1, May -4.3, Aug +11.4, Sep +6.8;
+by weekday: Mon +4.6, Tue +1.9, Wed -1.1, Thu +4.5, Fri +11.4. BTC presets now use MaxLots 1000.
+
+270 BTC settings on VT ticks (Jul 1 - Oct 8), 1% risk: 96% profitable. Best: stop at the range MIDPOINT, Mon-Fri,
+exit 19:00, no trail, no TP: +37.0% (halves +15.9% / +21.1%), DD 7.2% vs +16.3% for the current preset
+(`AsiaLondonBreakout_BTCUSD_Candidate.set`). Verify on 9 months with `AsiaLondonBreakout_BTCUSD_OPTIMIZE.set`.
 
 ## Position sizing: 1% risk per trade (all presets)
 

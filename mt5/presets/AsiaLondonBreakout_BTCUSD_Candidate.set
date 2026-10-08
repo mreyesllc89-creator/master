@@ -1,0 +1,30 @@
+; Asia London Breakout - BTCUSD.c CANDIDATE: stop at the range MIDPOINT, Mon-Fri, exit 19:00, no trail, 1% risk, MaxLots 1000.
+; VT ticks Jul 1 - Oct 8 2026 at 1% risk: +37.0% (both halves +15.9% / +21.1%), max DD 7.2%, win 38% (current BTC preset: +16.3%).
+; Found on 3 months (270 settings, 96% profitable): verify with AsiaLondonBreakout_BTCUSD_OPTIMIZE.set on 9 months before using.
+InpRangeStartHour=3
+InpRangeStartMin=0
+InpRangeEndHour=10
+InpRangeEndMin=0
+InpExitHour=19
+InpExitMin=0
+InpMon=true
+InpTue=true
+InpWed=true
+InpThu=true
+InpFri=true
+InpBufferPct=0.0
+InpStopMode=1
+InpTpR=0.0
+InpRangeFilter=0
+InpMinRange=0.0
+InpMaxRange=0.0
+InpTrailStartR=0.0
+InpTrailDistR=0.25
+InpQtyMode=1
+InpLots=0.1
+InpRiskPct=1.0
+InpMaxLots=1000.0
+InpDrawRange=true
+InpShowPanel=true
+InpMaxSpread=40.0
+InpMagic=60606

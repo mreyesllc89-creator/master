@@ -1,0 +1,32 @@
+; BTC OPTIMIZATION file for the MT5 Strategy Tester (Optimization = Slow complete algorithm, Forward = 1/3,
+; Modelling = Every tick based on real ticks, Symbol BTCUSD.c, M15, dates 2025.12.29 - 2026.09.30). 576 runs.
+; Tests: stop (opposite / midpoint), exit hour (17/19/21), TP (none/1R/2R/3R), Wednesday and Friday on/off,
+; trailing (off / start 1x / 2x the stop; distance 0.25x / 1.0x). 1% risk, MaxLots 1000 (1 lot = 0.01 BTC).
+; Load in the Inputs tab (right-click > Load). Then send the Optimization AND Forward results (right-click > Export to XML).
+InpRangeStartHour=3
+InpRangeStartMin=0
+InpRangeEndHour=10
+InpRangeEndMin=0
+InpExitHour=19||17||2||21||Y
+InpExitMin=0
+InpMon=true
+InpTue=true
+InpWed=true||false||0||true||Y
+InpThu=true
+InpFri=true||false||0||true||Y
+InpBufferPct=0.0
+InpStopMode=0||0||1||1||Y
+InpTpR=0.0||0.0||1.0||3.0||Y
+InpRangeFilter=0
+InpMinRange=0.0
+InpMaxRange=0.0
+InpTrailStartR=0.0||0.0||1.0||2.0||Y
+InpTrailDistR=0.25||0.25||0.75||1.0||Y
+InpQtyMode=1
+InpLots=0.1
+InpRiskPct=1.0
+InpMaxLots=1000.0
+InpDrawRange=true
+InpShowPanel=true
+InpMaxSpread=40.0
+InpMagic=60602
