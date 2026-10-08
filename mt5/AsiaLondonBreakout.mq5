@@ -14,6 +14,9 @@
 //|     profit (R multiple of the stop) if set. Unfilled orders are  |
 //|     deleted at ExitTime.                                         |
 //|  5. Monday to Friday only.                                       |
+//|  6. Optional trailing stop (off by default): starts after the    |
+//|     price moves InpTrailStartR x the stop, trails InpTrailDistR  |
+//|     x the stop behind the best price.                            |
 //|                                                                  |
 //| Tested tick by tick on VT Markets ticks, Jul 1 - Oct 8 2026      |
 //| (real bid/ask, real spreads): see presets/README.md. Every       |
@@ -58,6 +61,10 @@ input ENUM_ALB_FILTER InpRangeFilter = ALB_FLT_NONE; // Range-size filter
 input double InpMinRange       = 0.0;   // Minimum range size, price units (0 = off)
 input double InpMaxRange       = 0.0;   // Maximum range size, price units (0 = off)
 
+input group "Trailing stop (optional)"
+input double InpTrailStartR    = 0.0;   // Start trailing after the price moves this many x the stop (0 = off)
+input double InpTrailDistR     = 0.25;  // Trail distance behind the best price, x the stop
+
 input group "Spread"
 input double InpMaxSpread      = 0.50;  // Max spread when placing the orders, price units (0 = off; waits until it narrows)
 
@@ -76,6 +83,7 @@ CTrade   trade;
 datetime g_dayDone = 0;      // server date whose orders were already placed
 datetime g_dayFilled = 0;    // server date that already got its one trade
 double   g_rangeHigh = 0, g_rangeLow = 0, g_slDist = 0;
+double   g_best = 0;            // best price since the fill (trailing stop)
 string   g_status = "waiting for the range";
 
 //------------------------------------------------------------------ helpers
@@ -280,11 +288,42 @@ void OnFill(datetime day)
       if(g_slDist <= 0) return;
       bool isBuy = PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY;
       double op = PositionGetDouble(POSITION_PRICE_OPEN);
+      g_best = op;
       double tpD = InpTpR > 0 ? g_slDist * InpTpR : 0;
       double sl = NormPrice(isBuy ? op - g_slDist : op + g_slDist);
       double tp = tpD > 0 ? NormPrice(isBuy ? op + tpD : op - tpD) : 0;
       trade.PositionModify(tk, sl, tp);
       g_status = StringFormat("%s filled at %.2f, SL %.2f%s", isBuy ? "BUY" : "SELL", op, sl, tp > 0 ? StringFormat(", TP %.2f", tp) : ", exit at exit time");
+      return;
+   }
+}
+
+// optional trailing stop: once the price has moved InpTrailStartR x the stop in favour, keep the stop
+// InpTrailDistR x the stop behind the best price (bid for longs, ask for shorts); the stop only moves forward
+void ManageTrail()
+{
+   if(InpTrailStartR <= 0 || g_slDist <= 0) return;
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+   {
+      ulong tk = PositionGetTicket(i);
+      if(tk == 0 || !PositionSelectByTicket(tk)) continue;
+      if(PositionGetString(POSITION_SYMBOL) != _Symbol || PositionGetInteger(POSITION_MAGIC) != InpMagic) continue;
+      bool isBuy = PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY;
+      double s = isBuy ? 1.0 : -1.0;
+      double op = PositionGetDouble(POSITION_PRICE_OPEN), curSL = PositionGetDouble(POSITION_SL), curTP = PositionGetDouble(POSITION_TP);
+      double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID), ask = SymbolInfoDouble(_Symbol, SYMBOL_ASK);
+      double px = isBuy ? bid : ask;
+      if(g_best == 0) g_best = op;
+      if((px - g_best) * s > 0) g_best = px;
+      if((g_best - op) * s < InpTrailStartR * g_slDist) return;
+      double lvl = NormPrice(g_best - s * InpTrailDistR * g_slDist);
+      double stops = (double)SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) * _Point;
+      bool better = curSL == 0 || (lvl - curSL) * s >= _Point;
+      bool valid = isBuy ? (bid - lvl > stops) : (lvl - ask > stops);
+      if(better && valid)
+      {
+         if(trade.PositionModify(tk, lvl, curTP)) g_status = StringFormat("trailing stop %.2f", lvl);
+      }
       return;
    }
 }
@@ -318,7 +357,7 @@ void OnTick()
    else if(now >= re && g_dayDone != day && g_dayFilled != day && DayAllowed(now))
       PlaceOrders(day);
 
-   if(CountPositions() > 0) OnFill(day);
+   if(CountPositions() > 0) { OnFill(day); ManageTrail(); }
 
    if(InpShowPanel)
       Comment(StringFormat("Asia London Breakout  |  %s\nRange %02d:%02d-%02d:%02d  exit %02d:%02d (server)\nToday's range: %.2f - %.2f (%.2f)\nSpread: %.2f (max %.2f)\nStatus: %s",

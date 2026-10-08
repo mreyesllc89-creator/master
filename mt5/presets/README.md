@@ -72,6 +72,11 @@ All presets use InpMaxLots = 200 so the 1% risk is not capped on 1-oz contracts.
 | Stop at range MIDPOINT, Mon-Thu, exit 19:00 | +11.2% | +23.3% | 6.5% |
 | Stop at range MIDPOINT, Tue-Fri (Monday off), exit 19:00 = `AsiaLondonBreakout_XAUUSD_Candidate.set` | +11.0% | +23.5% | 5.9% |
 
+Trailing stop (EA inputs InpTrailStartR / InpTrailDistR, off by default), 60 settings tested on the candidate: none
+beat no trailing (+11.0%); starting after +2x the stop with a 0.25x trail gave +9.9% with max DD 4.0% instead of 5.9%
+(`AsiaLondonBreakout_XAUUSD_Candidate_Trail.set`). On the current preset an early tight trail (start 0.5x, 0.25x)
+gave +3.8% vs +2.9%, DD 2.6%, win 70%.
+
 The midpoint stop halves the stop, so at 1% risk the position is twice as large and the fixed commission weighs
 half as much. Monday was also the weakest day in the 9-month MT5 test. Found on 3 months: verify with
 `AsiaLondonBreakout_XAUUSD_OPTIMIZE.set` (MT5 optimizer, 576 runs, forward test 1/3) before using it.

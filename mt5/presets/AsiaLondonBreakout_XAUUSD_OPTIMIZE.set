@@ -1,5 +1,7 @@
-; OPTIMIZATION file for the MT5 Strategy Tester (Settings: Optimization = Slow complete algorithm, Forward = 1/3,
-; Modelling = Every tick based on real ticks, Symbol XAUUSD-ECNc, M15, dates 2025.12.29 - 2026.09.30). 576 runs.
+; OPTIMIZATION file for the MT5 Strategy Tester (Optimization = Slow complete algorithm, Forward = 1/3,
+; Modelling = Every tick based on real ticks, Symbol XAUUSD-ECNc, M15, dates 2025.12.29 - 2026.09.30). 864 runs.
+; Tests: stop (opposite / midpoint), exit hour (17/19/21), take profit (none/1R/2R/3R), Monday and Friday on/off,
+; trailing stop (off / start 1x / start 2x the stop; distance 0.25x / 0.75x / 1.25x). Buffer 0 and no range filter (both tested worse).
 ; Load in the Inputs tab (right-click > Load). Then send the Optimization AND Forward results (right-click > Export to XML).
 InpRangeStartHour=3
 InpRangeStartMin=0
@@ -12,12 +14,14 @@ InpTue=true
 InpWed=true
 InpThu=true
 InpFri=true||false||0||true||Y
-InpBufferPct=0.0||0.0||10.0||10.0||Y
+InpBufferPct=0.0
 InpStopMode=0||0||1||1||Y
 InpTpR=0.0||0.0||1.0||3.0||Y
-InpRangeFilter=0||0||1||2||Y
+InpRangeFilter=0
 InpMinRange=0.0
 InpMaxRange=0.0
+InpTrailStartR=0.0||0.0||1.0||2.0||Y
+InpTrailDistR=0.25||0.25||0.5||1.25||Y
 InpQtyMode=1
 InpLots=0.1
 InpRiskPct=1.0
