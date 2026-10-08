@@ -62,6 +62,20 @@ account (~$0.25/oz spread) the 1%-risk result stays around +25%. Check Market Wa
 
 All presets use InpMaxLots = 200 so the 1% risk is not capped on 1-oz contracts.
 
+## Calibration for XAUUSD-ECNc costs (candidate, to verify)
+
+432 settings tested on VT gold ticks (Jul 1 - Oct 8), 1% risk, with the $6/oz XAUUSD-ECNc commission:
+
+| Settings | XAUUSD-ECNc | Low-cost account | Max DD |
+|---|---|---|---|
+| Current preset (stop opposite side, Mon-Fri, exit 19:00) | +2.9% | +10.6% | 7.5% |
+| Stop at range MIDPOINT, Mon-Thu, exit 19:00 | +11.2% | +23.3% | 6.5% |
+| Stop at range MIDPOINT, Tue-Fri (Monday off), exit 19:00 = `AsiaLondonBreakout_XAUUSD_Candidate.set` | +11.0% | +23.5% | 5.9% |
+
+The midpoint stop halves the stop, so at 1% risk the position is twice as large and the fixed commission weighs
+half as much. Monday was also the weakest day in the 9-month MT5 test. Found on 3 months: verify with
+`AsiaLondonBreakout_XAUUSD_OPTIMIZE.set` (MT5 optimizer, 576 runs, forward test 1/3) before using it.
+
 ## Position sizing: 1% risk per trade (all presets)
 
 All presets use `Risk %` = 1.0: the lot size is set so that the stop loss costs 1% of equity (breakout: stop =
