@@ -115,7 +115,8 @@ tblRel      = input.string("All", "Level rows count chains that are", options = 
 
 // ------------- LABELS & VISUALS -------------
 grpL = "Labels & visuals"
-lblBoost    = input.int(2, "Label size boost (0 = original)", minval = 0, maxval = 4, group = grpL, tooltip = "Every chain label starts this many sizes bigger.")
+lblBase     = input.int(20, "Label font size at L1 (points)", minval = 8, maxval = 72, group = grpL, tooltip = "Chain labels use a font size in points. They grow by the step below at every rung.")
+lblStep     = input.int(5,  "Font size step per level (points)", minval = 0, maxval = 20, group = grpL)
 showDot     = input.bool(true, "Dots at the exact ticks (time + price)", group = grpL, tooltip = "Hover a dot to see the exact price and time of that tick.")
 showEnd     = input.bool(true, "End label (where the last rung fired)", group = grpL)
 showLink    = input.bool(true, "Link start -> end", group = grpL)
@@ -424,9 +425,8 @@ graceMs(int rung) => graceBars * array.get(tfSec, rung) * 1000
 tolMs(int rung)   => tolBars   * array.get(tfSec, rung) * 1000
 
 // label size ladder, shifted up by the boost
-lvlSize(int lvl) =>
-    int s = math.min(5, math.max(1, lvl) + lblBoost)
-    s <= 1 ? size.tiny : s == 2 ? size.small : s == 3 ? size.normal : s == 4 ? size.large : size.huge
+// font size in points: base at L1, one step per rung; level 6 = the "all agree" bonus size
+lvlSize(int lvl) => lblBase + (math.max(1, lvl) - 1) * lblStep
 
 chainCol(int dir, int tr) => color.new(dir > 0 ? longCol : shortCol, tr)
 chainTxt(int dir)         => dir > 0 ? longTxt : shortTxt
@@ -517,7 +517,7 @@ resolveChain(Chain c, bool allAgree, int verdictT) =>
             label.set_text(c.lb, lblText(c))
             label.set_color(c.lb, col)
             if allAgree
-                label.set_size(c.lb, size.huge)
+                label.set_size(c.lb, lvlSize(6))
         if not na(c.dotS)
             label.set_color(c.dotS, col)
         syncLines(c, col)
@@ -531,7 +531,7 @@ resolveChain(Chain c, bool allAgree, int verdictT) =>
                 if showDot
                     c.dotE := label.new(c.lastT, c.lastP, "", xloc = xloc.bar_time, style = label.style_circle, color = col, size = size.tiny, tooltip = "END L" + str.tostring(c.level) + " " + array.get(rungName, c.level) + "\nprice " + fmtP(c.lastP) + "\n" + fmtT(c.lastT))
                 if showEnd
-                    c.lbE := label.new(c.lastT, c.lastP, "END  L" + str.tostring(c.level) + c.verd + relTag(c) + "  " + fmtP(c.lastP), xloc = xloc.bar_time, style = label.style_label_left, color = col, textcolor = chainTxt(c.dir), size = allAgree ? size.huge : lvlSize(c.level))
+                    c.lbE := label.new(c.lastT, c.lastP, "END  L" + str.tostring(c.level) + c.verd + relTag(c) + "  " + fmtP(c.lastP), xloc = xloc.bar_time, style = label.style_label_left, color = col, textcolor = chainTxt(c.dir), size = allAgree ? lvlSize(6) : lvlSize(c.level))
     c.finalLevel := c.level
 
 // structure outcome known: refresh the start label and the key line
