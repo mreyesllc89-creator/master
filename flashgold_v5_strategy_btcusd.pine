@@ -31,8 +31,15 @@
 //    +44k / +37k; with a 0.02% fee per side about +43k (PF 2.8). The area
 //    SL 0.08..0.12 ATR x TP 3..10R is positive in all cases. Trailing stops did
 //    not help in any tested combination.
-//  - One month of 60m data: re-check on new data, and with Bar Magnifier, before
-//    trading. A 0.1 ATR stop (~$39) lives inside the 60m bar.
+//  - Timeframes (same month resampled, 0.02% fee, worst case, zones = chart / 2x / 4x
+//    via "Auto timeframes"): SL 0.1 ATR + TP 5R is positive on all three tested:
+//    60m +43k (PF 2.8), 120m +72k (PF 5.4), 240m +38k (PF 3.7), both halves positive.
+//    TP 3R is the steadier pick on 240m (PF 9.5). Wide stops (1-2 ATR) lose on every
+//    timeframe. Below 60m was NOT tested (no data): there a 0.1 ATR stop shrinks to a
+//    few dollars while the 0.02% fee stays ~$32 per BTC round trip, so expect losses
+//    on 1m to 15m unless the fee is near zero.
+//  - One month of data: re-check on new data, and with Bar Magnifier, before
+//    trading. A 0.1 ATR stop lives inside the chart bar.
 //
 // Data notes:
 //  - Child zones on seconds timeframes need seconds bars on your plan; where
@@ -72,7 +79,7 @@ usePriorFilter   = input.bool(false, "Use prior drift filter", group = gBurst)
 
 gZone = "TDI Trade Zone Filter"
 useTdiTradeZone = input.bool(true, "Use TDI trade-zone filter", group = gZone)
-tdiParentTf     = input.timeframe("60", "Parent obedience timeframe", group = gZone, tooltip = "Calibrated with the parent = the chart timeframe. Leave it equal to the chart.")
+tdiParentTf     = input.timeframe("60", "Parent obedience timeframe", group = gZone, tooltip = "Used only when Auto timeframes is off. Calibrated with the parent = the chart timeframe.")
 tdiRsiLen       = input.int(14, "TDI RSI length", minval = 2, group = gZone)
 tdiFastLen      = input.int(2, "TDI white fast length", minval = 1, group = gZone)
 tdiSlowLen      = input.int(7, "TDI slow length", minval = 1, group = gZone)
@@ -94,6 +101,14 @@ useZone5 = input.bool(false, "Use child zone 5", group = gZone)
 zoneTf5  = input.timeframe("1", "Zone 5 timeframe", group = gZone)
 useZone6 = input.bool(false, "Use child zone 6", group = gZone)
 zoneTf6  = input.timeframe("2", "Zone 6 timeframe", group = gZone)
+autoTf   = input.bool(true, "Auto timeframes (follow the chart)", group = gZone, tooltip = "STRATEGY ADDITION. On: the parent = the chart timeframe and child zones 1 / 2 / 3 = the chart, 2x and 4x the chart (the calibrated set), so the strategy works on any chart timeframe without editing. The parent and zone 1-3 timeframe inputs above are then ignored. Off: the inputs above are used as typed.")
+
+// effective timeframes (auto = chart, 2x, 4x)
+chartSec    = timeframe.in_seconds(timeframe.period)
+parentTfEff = autoTf ? timeframe.period : tdiParentTf
+zoneTf1Eff  = autoTf ? timeframe.period : zoneTf1
+zoneTf2Eff  = autoTf ? timeframe.from_seconds(chartSec * 2) : zoneTf2
+zoneTf3Eff  = autoTf ? timeframe.from_seconds(chartSec * 4) : zoneTf3
 
 gVisual = "Visuals"
 showEntryLabels = input.bool(false, "Show entry labels", group = gVisual)
@@ -154,22 +169,22 @@ isHigher(string tf) =>
     timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)
 
 // plain (indicator) request and the last-closed-bar request; the higher-TF zones pick the second when htfNoRepaint is on
-[parentDir, parentFast, parentSlow] = request.security(syminfo.tickerid, tdiParentTf, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z1Dir0, z1Fast, z1Slow] = request.security(syminfo.tickerid, zoneTf1, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z2Dir0, z2Fast, z2Slow] = request.security(syminfo.tickerid, zoneTf2, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z3Dir0, z3Fast, z3Slow] = request.security(syminfo.tickerid, zoneTf3, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[parentDir, parentFast, parentSlow] = request.security(syminfo.tickerid, parentTfEff, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z1Dir0, z1Fast, z1Slow] = request.security(syminfo.tickerid, zoneTf1Eff, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z2Dir0, z2Fast, z2Slow] = request.security(syminfo.tickerid, zoneTf2Eff, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z3Dir0, z3Fast, z3Slow] = request.security(syminfo.tickerid, zoneTf3Eff, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
 [z4Dir0, z4Fast, z4Slow] = request.security(syminfo.tickerid, zoneTf4, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
 [z5Dir0, z5Fast, z5Slow] = request.security(syminfo.tickerid, zoneTf5, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
 [z6Dir0, z6Fast, z6Slow] = request.security(syminfo.tickerid, zoneTf6, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z1DirP, z1FastP, z1SlowP] = request.security(syminfo.tickerid, zoneTf1, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z2DirP, z2FastP, z2SlowP] = request.security(syminfo.tickerid, zoneTf2, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z3DirP, z3FastP, z3SlowP] = request.security(syminfo.tickerid, zoneTf3, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z1DirP, z1FastP, z1SlowP] = request.security(syminfo.tickerid, zoneTf1Eff, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z2DirP, z2FastP, z2SlowP] = request.security(syminfo.tickerid, zoneTf2Eff, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z3DirP, z3FastP, z3SlowP] = request.security(syminfo.tickerid, zoneTf3Eff, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
 [z4DirP, z4FastP, z4SlowP] = request.security(syminfo.tickerid, zoneTf4, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
 [z5DirP, z5FastP, z5SlowP] = request.security(syminfo.tickerid, zoneTf5, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
 [z6DirP, z6FastP, z6SlowP] = request.security(syminfo.tickerid, zoneTf6, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-z1Dir = htfNoRepaint and isHigher(zoneTf1) ? z1DirP : z1Dir0
-z2Dir = htfNoRepaint and isHigher(zoneTf2) ? z2DirP : z2Dir0
-z3Dir = htfNoRepaint and isHigher(zoneTf3) ? z3DirP : z3Dir0
+z1Dir = htfNoRepaint and isHigher(zoneTf1Eff) ? z1DirP : z1Dir0
+z2Dir = htfNoRepaint and isHigher(zoneTf2Eff) ? z2DirP : z2Dir0
+z3Dir = htfNoRepaint and isHigher(zoneTf3Eff) ? z3DirP : z3Dir0
 z4Dir = htfNoRepaint and isHigher(zoneTf4) ? z4DirP : z4Dir0
 z5Dir = htfNoRepaint and isHigher(zoneTf5) ? z5DirP : z5Dir0
 z6Dir = htfNoRepaint and isHigher(zoneTf6) ? z6DirP : z6Dir0
