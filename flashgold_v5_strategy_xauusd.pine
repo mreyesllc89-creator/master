@@ -29,6 +29,10 @@
 //  the old exits above (SL 2 ATR, TP 2R, trail) lost -3.3k in this window. New defaults: SL 0.1 ATR, Partial +
 //  runner = 30% at TP 1.5R, stop to breakeven, rest trailed 1.5 ATR from the TP level: +1,030, PF 5.3, max DD 126,
 //  both halves positive (fixed TP 1.5R: +504). Still positive at 3x the costs. Small sample: re-check on longer data.
+// PIPS calibration (default unit; 1 pip = $0.10): same window and costs. SL 15 pips ($1.50), 30% at TP 3R
+//  (45 pips), runner trail 160 pips ($16), breakeven after TP: +1,220, PF 5.6, DD 99, halves +539 / +681
+//  (ATR version +1,030). Still +1,047 at 3x the costs. Equivalent ATR: SL 0.1, runner 1.0 ATR. Fixed pips fit
+//  THIS window's volatility (ATR $15.7 on 60m); switch to ATR if gold's range changes a lot.
 //  "Auto timeframes" (default on) sets exactly this zone set (parent = chart, zones = chart / 2x / 4x) on any chart timeframe.
 //
 // Data notes:
@@ -120,7 +124,13 @@ allowReverse    = input.bool(true, "Opposite signal may reverse an open position
 exitOnOpposite  = input.bool(false, "Close at market on the opposite signal", group = gS1, tooltip = "On: the open position is closed at the close of the bar that prints the opposite signal, before any reversal order.")
 
 gS2 = "S2. Exits"
-ExitMode        = input.string("ATR", "SL / TP / trail unit", options = ["ATR", "Points"], group = gS2)
+ExitMode        = input.string("Pips", "SL / TP / trail unit", options = ["Pips", "ATR", "Points"], group = gS2, tooltip = "Pips: fixed distances in pips (calibrated, see the Pips inputs). ATR: distances scale with volatility (more robust when volatility changes a lot). Points: mintick units.")
+pipSize         = input.float(0.1, "Pip size, price units (Pips mode)", minval = 0.000001, group = gS2, tooltip = "Gold: 1 pip = $0.10 per oz (MT4/MT5 standard). Set to your broker's pip if different.")
+slPips          = input.float(15, "Stop loss, pips (Pips mode)", minval = 0.0, step = 1.0, group = gS2, tooltip = "Calibrated: 15 pips. 0 = no stop loss (not recommended).")
+tpRPips         = input.float(3, "Take profit, R multiple of SL (Pips mode)", minval = 0.0, step = 0.25, group = gS2, tooltip = "Calibrated: 3 (with Partial + runner, 30% here).")
+runTrailPips    = input.float(160, "Runner: trail distance, pips (Pips mode)", minval = 1.0, step = 1.0, group = gS2, tooltip = "Calibrated: 160 pips. The trail starts at the take profit level.")
+trailActPips    = input.float(45, "Trail activation, pips of profit (Pips mode, Fixed style)", minval = 0.0, step = 1.0, group = gS2)
+trailPips       = input.float(160, "Trail distance, pips (Pips mode, Fixed style)", minval = 1.0, step = 1.0, group = gS2)
 slPoints        = input.float(150, "Stop loss, pts (Points mode)", minval = 0.0, step = 1.0, group = gS2, tooltip = "0 = no stop loss (not recommended).")
 tpPoints        = input.float(300, "Take profit, pts (Points mode)", minval = 0.0, step = 1.0, group = gS2, tooltip = "0 = no target.")
 atrLen          = input.int(14, "ATR length (ATR mode)", minval = 1, group = gS2)
@@ -312,8 +322,9 @@ if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and
 // ============================== STRATEGY: EXIT GEOMETRY ==============================
 atrV = ta.atr(atrLen)
 // distances in ticks (points) for strategy.exit
-slTicksNow = ExitMode == "Points" ? slPoints : (na(atrV) ? na : slAtrMult * atrV / pt)
-tpTicksNow = ExitMode == "Points" ? tpPoints : (na(slTicksNow) ? na : slTicksNow * tpR)
+pipTicks = pipSize / pt
+slTicksNow = ExitMode == "Points" ? slPoints : ExitMode == "Pips" ? slPips * pipTicks : (na(atrV) ? na : slAtrMult * atrV / pt)
+tpTicksNow = ExitMode == "Points" ? tpPoints : na(slTicksNow) ? na : slTicksNow * (ExitMode == "Pips" ? tpRPips : tpR)
 
 var float lockSlL = na   // locked per pending / open trade, so the ATR at signal time is used for the whole trade
 var float lockTpL = na
@@ -323,9 +334,9 @@ var float lockActL = na
 var float lockDstL = na
 var float lockActS = na
 var float lockDstS = na
-trailActNow = ExitMode == "Points" ? trailActPoints : trailActAtr * atrPts
-trailDstNow = ExitMode == "Points" ? trailPoints : math.max(trailDstAtr * atrPts, 1.0)
-runDstNow   = ExitMode == "Points" ? runTrailPts : math.max(runTrailAtr * atrV / pt, 1.0)
+trailActNow = ExitMode == "Points" ? trailActPoints : ExitMode == "Pips" ? trailActPips * pipTicks : trailActAtr * atrPts
+trailDstNow = ExitMode == "Points" ? trailPoints : ExitMode == "Pips" ? math.max(trailPips * pipTicks, 1.0) : math.max(trailDstAtr * atrPts, 1.0)
+runDstNow   = ExitMode == "Points" ? runTrailPts : ExitMode == "Pips" ? math.max(runTrailPips * pipTicks, 1.0) : math.max(runTrailAtr * atrV / pt, 1.0)
 var float lockRunL = na
 var float lockRunS = na
 
