@@ -1,6 +1,6 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 // Asia London Breakout (BTCUSD PRESET) - TradingView strategy version of mt5/AsiaLondonBreakout.mq5
-// PRESET: 0.1 BTC (= 0.10 lot), commission 0.011% per side (VT BTCUSD.c: $17 spread). Use on a BTCUSD chart, M15. Tested (MT5, VT ticks Jul 1 - Oct 8 2026, Mon-Fri): +$1,388, PF 1.65, 65 trades.
+// PRESET (1% RISK PER TRADE by default; Fixed quantity below is used only if Quantity = Fixed): 0.1 BTC (= 0.10 lot), commission 0.011% per side (VT BTCUSD.c: $17 spread). Use on a BTCUSD chart, M15. Tested (MT5, VT ticks Jul 1 - Oct 8 2026, Mon-Fri): +$1,388, PF 1.65, 65 trades.
 //
 // RULE (default times in UTC = VT Markets server 03:00 / 10:00 / 19:00):
 //  1. Asia range = high / low of the bars from 00:00 to 07:00 UTC.
@@ -51,9 +51,9 @@ minRange  = input.float(0.0, "Minimum range size, price (0 = off)", minval = 0.0
 maxRange  = input.float(0.0, "Maximum range size, price (0 = off)", minval = 0.0, group = gE)
 
 gQ = "Sizing"
-qtyMode   = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = gQ)
+qtyMode   = input.string("Risk %", "Quantity", options = ["Fixed", "Risk %"], group = gQ)
 fixedQty  = input.float(0.1, "Fixed quantity (gold: oz, 10 = 0.10 lot; BTC: coins, 0.1 = 0.10 lot)", minval = 0.0, group = gQ)
-riskPct   = input.float(0.5, "Risk % of equity per trade (Risk mode)", minval = 0.0, step = 0.25, group = gQ)
+riskPct   = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0.0, step = 0.25, group = gQ)
 qtyStep   = input.float(0.001, "Quantity step (rounds down)", minval = 0.000001, group = gQ)
 
 gV = "Visuals"

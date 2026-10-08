@@ -1,6 +1,6 @@
-; BTCUSD.c, any chart timeframe. VT Markets ticks Jul 1 - Oct 8 2026 ($17 fixed spread), tick by tick, Mon-Fri: +$1,388 on 0.10 lot, PF 1.65, 65 trades, max DD $649. 27/27 range/exit hour combinations profitable.
-; Times are VT Markets SERVER time (GMT+3). If your broker's server is on another offset, shift the hours so the range is 00:00-07:00 UTC and the exit 16:00 UTC.
-; DEMO-TEST FIRST. Load in MT5: EA properties > Inputs > Load.
+; Asia London Breakout - BTCUSD.c, Mon-Fri, 1% RISK PER TRADE (stop = Asia range size = 1% of equity).
+; VT Markets ticks Jul 1 - Oct 8 2026 ($17 spread), tick by tick: +16.3% (65 trades, avg +0.25%/trade), max drawdown 5.9%, losing streaks up to 6.
+; Times = VT Markets server time (GMT+3). Needs equity >= ~$1,500 so 1% covers 0.01 lot (0.01 BTC). Demo-test first.
 InpRangeStartHour=3
 InpRangeStartMin=0
 InpRangeEndHour=10
@@ -18,9 +18,9 @@ InpTpR=0.0
 InpRangeFilter=0
 InpMinRange=0.0
 InpMaxRange=0.0
-InpQtyMode=0
+InpQtyMode=1
 InpLots=0.1
-InpRiskPct=0.5
+InpRiskPct=1.0
 InpMaxLots=5.0
 InpDrawRange=true
 InpShowPanel=true

@@ -1,6 +1,6 @@
-; XAUUSD-ECN, any chart timeframe (M15 recommended to see the range). VT Markets ticks Jul 1 - Oct 8 2026, tick by tick, Mon-Fri: +$4,277 on 0.10 lot, PF 1.72, 56 trades, max DD $1,878 (Fridays lost: InpFri=false gave +$5,805, PF 2.87, max DD $740). All 27 range/exit hour combinations (02-04 / 09-11 / 17-21) profitable.
-; Times are VT Markets SERVER time (GMT+3). If your broker's server is on another offset, shift the hours so the range is 00:00-07:00 UTC and the exit 16:00 UTC.
-; DEMO-TEST FIRST. Load in MT5: EA properties > Inputs > Load.
+; Asia London Breakout - XAUUSD-ECN, Mon-Fri, 1% RISK PER TRADE (lots sized so the stop = 1% of equity; stop = Asia range size).
+; VT Markets ticks Jul 1 - Oct 8 2026, tick by tick: +10.6% (56 trades, avg +0.19%/trade), max drawdown 3.8%. Fridays lost (see the Friday-off preset).
+; Times = VT Markets server time (GMT+3). Needs equity >= ~$6,000 so 1% covers 0.01 lot on a wide range. Demo-test first.
 InpRangeStartHour=3
 InpRangeStartMin=0
 InpRangeEndHour=10
@@ -18,9 +18,9 @@ InpTpR=0.0
 InpRangeFilter=0
 InpMinRange=0.0
 InpMaxRange=0.0
-InpQtyMode=0
+InpQtyMode=1
 InpLots=0.1
-InpRiskPct=0.5
+InpRiskPct=1.0
 InpMaxLots=5.0
 InpDrawRange=true
 InpShowPanel=true

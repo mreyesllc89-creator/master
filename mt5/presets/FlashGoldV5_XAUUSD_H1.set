@@ -1,7 +1,6 @@
-; FlashGold v5 EA - XAUUSD-ECN, H1 chart. Settings = the EA's built-in XAUUSD defaults (Pips exits, partial + runner).
-; VT Markets ticks Jul 1 - Oct 8 2026, simulated tick by tick (real spread, $3/lot/side commission), 0.10 lot:
-; +$2,186, PF 1.39, win 28%, 76 trades, max drawdown $1,858, 10/15 weeks positive (Jul -$1,046, Aug +$1,104, Sep +$1,953).
-; Do NOT use on BTCUSD (every FlashGold version lost there). Demo-test first. Load in MT5: EA properties > Inputs > Load.
+; FlashGold v5 EA - XAUUSD-ECN, H1 chart, 1% RISK PER TRADE (stop 80 pips = $8/oz; lots sized so a stop-out = 1% of equity).
+; VT Markets ticks Jul 1 - Oct 8 2026, tick by tick: +40.9% (75 trades, avg +0.55%/trade, win 28%), max drawdown 9.7%; at 0.10 lot +$3,273, PF 1.72.
+; Do NOT use on BTCUSD (every FlashGold version lost there). Needs equity >= ~$800 so 1% covers 0.01 lot. Demo-test first.
 InpSpreadMode=0
 InpModelSpread=0.25
 InpSpreadToSL=true
@@ -52,7 +51,7 @@ InpRunnerBE=true
 InpBEAtBarClose=true
 InpUseTrail=false
 InpMaxBarsHeld=0
-InpQtyMode=0
+InpQtyMode=1
 InpFixedLots=0.1
 InpRiskPct=1.0
 InpMaxLots=50.0
