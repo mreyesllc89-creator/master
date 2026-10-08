@@ -86,19 +86,24 @@
 //    on the side already held is ignored. Orders are placed at the bar close
 //    and fill on the next bar's open.
 //    Exits, whichever comes first:
-//      Parent break   the framework's exit (on by default).
-//      Stop loss      "Pullback extreme" (default): beyond the lowest low of
-//                     the pullback that just ended (the new higher low), plus
-//                     a buffer, clamped between a minimum and a maximum ATR
-//                     distance. Or a fixed ATR multiple, or a fixed $ amount.
-//      Take profit    an R multiple of the stop distance; off by default,
-//                     since the framework holds until the parent breaks.
-//      Trailing stop  in R (multiples of the stop distance); off by default.
-//      FLIP           optional: close while the phase is FLIP.
-//      Time stop      optional, in bars.
-//    Sizing: Risk % of equity divided by the stop distance (default 1%), or a
-//    fixed quantity, capped at Max quantity and at equity x Max leverage, in
-//    BTC, rounded down to the quantity step.
+//      Parent break    the framework's exit (S1, on by default).
+//      FLIP            optional (S1): close while the phase is FLIP.
+//      SL / TP / trail (S2) in Points or ATR, measured from the fill. Points
+//                      = minimum ticks, so their price value depends on the
+//                      feed: 5000 pts is $50 on a 0.01-tick BTC feed and $500
+//                      on a 0.1-tick feed (the table shows the SL in price).
+//                      ATR mode: SL = mult x ATR, TP = R x SL, trail in ATR
+//                      multiples; the signal bar's ATR is kept for the trade.
+//      Time stop       optional (S2), in bars.
+//    Sizing (S3): a fixed quantity, or Risk % of equity divided by the stop
+//    distance in money, capped at Max quantity and rounded down to the step.
+//    S2 and S3 are the exits / sizing panel of the other XPW strategies,
+//    with the same labels and the user's values as defaults.
+//    SIZE WARNING: the default fixed quantity is 10 contracts = 10 BTC per
+//    trade (about $850k at $85k) with margin checks off, on a $10,000
+//    account. The backtest accepts it, so results look about 85 times the
+//    account. For a realistic test lower it (e.g. 0.01 with a step of
+//    0.001), or use Risk % with a step of 0.001.
 //
 //  BTCUSD DEFAULTS (starting values, NOT calibrated: no BTC data was
 //  available when this was written; run the Strategy Tester before trusting
@@ -325,28 +330,27 @@ GRP_T = "S1. Trades"
 tradeDir    = input.string("Both", "Trade direction", options = ["Both", "Long only", "Short only"], group = GRP_T)
 exitOnBreak = input.bool(true, "Exit on the parent's break", group = GRP_T, tooltip = "The framework's exit: the parent's last higher low (lower high) broke on close.")
 exitOnFlip  = input.bool(false, "Also exit while the phase is FLIP", group = GRP_T)
-timeStop    = input.int(0, "Time stop, bars (0 = off)", minval = 0, group = GRP_T)
 
-GRP_X = "S2. Stop / target"
-slMode    = input.string("Pullback extreme", "Stop loss", options = ["Pullback extreme", "ATR", "Price ($)"], group = GRP_X, tooltip = "Pullback extreme: beyond the lowest low (long) or highest high (short) of the pullback that just ended, plus the buffer, clamped to the min / max ATR distance. ATR: a fixed ATR multiple. Price ($): a fixed distance in price.")
-atrLen    = input.int(14, "ATR length", minval = 1, group = GRP_X)
-slBufAtr  = input.float(0.2, "Pullback extreme: buffer, ATR mult", minval = 0, step = 0.05, group = GRP_X)
-slMinAtr  = input.float(0.5, "Pullback extreme: distance at least, ATR mult", minval = 0, step = 0.1, group = GRP_X)
-slMaxAtr  = input.float(4.0, "Pullback extreme: distance at most, ATR mult (0 = no cap)", minval = 0, step = 0.1, group = GRP_X)
-slAtrMult = input.float(2.0, "ATR: stop distance, ATR mult", minval = 0.1, step = 0.1, group = GRP_X)
-slPrice   = input.float(500, "Price ($): stop distance", minval = 0.01, group = GRP_X)
-tpR       = input.float(0, "Take profit, R multiple of the stop (0 = off)", minval = 0, step = 0.25, group = GRP_X, tooltip = "Off by default: the framework holds until the parent breaks.")
-useTrail  = input.bool(false, "Trailing stop", group = GRP_X)
-trailActR = input.float(1.0, "Trail starts after, R", minval = 0, step = 0.25, group = GRP_X)
-trailOffR = input.float(0.5, "Trail distance, R", minval = 0.05, step = 0.05, group = GRP_X)
+GRP_X = "S2. Exits"
+exitUnit = input.string("Points", "SL / TP / trail unit", options = ["Points", "ATR"], group = GRP_X)
+slPts    = input.float(5000,  "Stop loss, pts (Points mode)",   minval = 0, group = GRP_X, tooltip = "1 pt = 1 minimum tick. 0 = no stop loss.")
+tpPts    = input.float(50000, "Take profit, pts (Points mode)", minval = 0, group = GRP_X, tooltip = "1 pt = 1 minimum tick. 0 = no take profit.")
+exAtrLen = input.int(14,      "ATR length (ATR mode)", minval = 1, group = GRP_X)
+slAtrM   = input.float(2.0,   "Stop loss, ATR mult (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
+tpR      = input.float(2.0,   "Take profit, R multiple of SL (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
+trailOn  = input.bool(true,   "Trailing stop", group = GRP_X)
+trActPts = input.float(4500,  "Trail activation, pts of profit (Points mode)", minval = 0, group = GRP_X)
+trDisPts = input.float(1000,  "Trail distance, pts (Points mode)", minval = 0, group = GRP_X)
+trActAtr = input.float(4.0,   "Trail activation, ATR mult (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
+trDisAtr = input.float(0.2,   "Trail distance, ATR mult (ATR mode)", minval = 0, step = 0.1, group = GRP_X)
+timeStop = input.int(0,       "Time stop, bars (0 = off)", minval = 0, group = GRP_X)
 
 GRP_Q = "S3. Sizing"
-qtyMode  = input.string("Risk %", "Quantity", options = ["Risk %", "Fixed"], group = GRP_Q)
-riskPct  = input.float(1.0, "Risk % of equity per trade", minval = 0, step = 0.25, group = GRP_Q, tooltip = "Quantity = equity x risk % / (stop distance x point value).")
-fixedQty = input.float(0.01, "Fixed quantity (BTC)", minval = 0, step = 0.001, group = GRP_Q)
-maxQty   = input.float(1.0, "Max quantity (BTC)", minval = 0, step = 0.001, group = GRP_Q)
-qtyStep  = input.float(0.001, "Quantity step (BTC, rounds down)", minval = 0, step = 0.001, group = GRP_Q)
-leverage = input.float(1.0, "Max leverage (x equity)", minval = 0.01, step = 0.5, group = GRP_Q, tooltip = "Position value is capped at equity x leverage, so an order is never rejected for lack of funds. 1 = no leverage.")
+qtyMode  = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = GRP_Q)
+qtyFixed = input.float(10,  "Fixed quantity (contracts = oz, 100 = 1 lot)", minval = 0, group = GRP_Q)
+riskPct  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0, step = 0.1, group = GRP_Q, tooltip = "Quantity = equity x risk % / stop-loss distance. Needs a stop loss above 0.")
+qtyMax   = input.float(50,  "Max quantity", minval = 0, group = GRP_Q)
+qtyStep  = input.float(1,   "Quantity step (rounds down)", minval = 0.0001, group = GRP_Q)
 
 // ------------------------------------------------------------- CONSTANTS ----
 int PH_WAIT  = 0
@@ -687,71 +691,72 @@ if showRing and barstate.islast
     array.push(ringLbls, label.new(cx, cy, phaseName(phase), style = label.style_label_center, color = phaseColor(phase, 0), textcolor = color.black, size = size.normal))
 
 // ------------------------------------------------------------- STRATEGY ----
-float atr = ta.atr(atrLen)
+// Exit distances in ticks (1 pt = 1 minimum tick), measured from the fill.
+// They are locked at the signal, so in ATR mode the ATR of the signal bar is
+// used for the whole trade.
+float exAtr   = ta.atr(exAtrLen)
+float tk      = syminfo.mintick
+float slTkNow = exitUnit == "Points" ? slPts    : slAtrM * exAtr / tk
+float tpTkNow = exitUnit == "Points" ? tpPts    : tpR * slTkNow
+float taTkNow = exitUnit == "Points" ? trActPts : trActAtr * exAtr / tk
+float tdTkNow = exitUnit == "Points" ? trDisPts : trDisAtr * exAtr / tk
 
-// The pullback extreme, tracked from the chart's TDI sub-trend: the lowest
-// low while the fast line is below the slow line (the long side's pullback),
-// the highest high while it is above (the short side's bounce).
-var float pbLow  = na
-var float pbHigh = na
-if sC < 0
-    pbLow := nz(sC[1], 0) < 0 ? math.min(nz(pbLow, low), low) : low
-if sC > 0
-    pbHigh := nz(sC[1], 0) > 0 ? math.max(nz(pbHigh, high), high) : high
-
-clampDist(float d) =>
-    float x = math.max(d, slMinAtr * atr)
-    slMaxAtr > 0 ? math.min(x, slMaxAtr * atr) : x
-
-float longDist  = slMode == "ATR" ? slAtrMult * atr : slMode == "Price ($)" ? slPrice : clampDist(close - (math.min(nz(pbLow, low), low) - slBufAtr * atr))
-float shortDist = slMode == "ATR" ? slAtrMult * atr : slMode == "Price ($)" ? slPrice : clampDist((math.max(nz(pbHigh, high), high) + slBufAtr * atr) - close)
-
-calcQty(float dist) =>
-    float q = fixedQty
+calcQty(float slTicks) =>
+    float q = qtyFixed
     if qtyMode == "Risk %"
-        q := dist > 0 ? strategy.equity * riskPct / 100.0 / (dist * syminfo.pointvalue) : 0.0
-    float afford = strategy.equity * leverage * 0.98 / (close * syminfo.pointvalue)
-    q := math.min(q, maxQty, afford)
-    qtyStep > 0 ? math.floor(q / qtyStep) * qtyStep : q
+        float slCash = slTicks * syminfo.mintick * syminfo.pointvalue
+        q := slCash > 0 ? strategy.equity * riskPct / 100.0 / slCash : 0.0
+    q := math.min(q, qtyMax)
+    math.max(math.floor(q / qtyStep) * qtyStep, 0.0)
+
+posOrNa(float v) =>
+    v > 0 ? v : na
 
 bool allowLong  = tradeDir != "Short only"
 bool allowShort = tradeDir != "Long only"
 bool flat       = strategy.position_size == 0
 
 // Stop, target and trail locked at the signal, one set per side.
-var float lStop = na
-var float lTp   = na
-var float lTrA  = na
-var float lTrO  = na
-var float sStop = na
-var float sTp   = na
-var float sTrA  = na
-var float sTrO  = na
+var float lSl = na
+var float lTp = na
+var float lTa = na
+var float lTd = na
+var float sSl = na
+var float sTp = na
+var float sTa = na
+var float sTd = na
 
 // Directional time filter: a side it blocks is simply not entered.
-if longEntry and allowLong and dtfBuyOk and flat and not na(longDist) and longDist > 0
-    float q = calcQty(longDist)
+if longEntry and allowLong and dtfBuyOk and flat and not na(slTkNow)
+    float q = calcQty(slTkNow)
     if q > 0
-        lStop := close - longDist
-        lTp   := tpR > 0 ? close + tpR * longDist : na
-        lTrA  := useTrail ? trailActR * longDist / syminfo.mintick : na
-        lTrO  := useTrail ? math.max(trailOffR * longDist / syminfo.mintick, 1) : na
+        lSl := slTkNow
+        lTp := tpTkNow
+        lTa := taTkNow
+        lTd := tdTkNow
         strategy.entry("Long", strategy.long, qty = q, comment = "FR long")
-if shortEntry and allowShort and dtfSellOk and flat and not na(shortDist) and shortDist > 0
-    float q = calcQty(shortDist)
+if shortEntry and allowShort and dtfSellOk and flat and not na(slTkNow)
+    float q = calcQty(slTkNow)
     if q > 0
-        sStop := close + shortDist
-        sTp   := tpR > 0 ? close - tpR * shortDist : na
-        sTrA  := useTrail ? trailActR * shortDist / syminfo.mintick : na
-        sTrO  := useTrail ? math.max(trailOffR * shortDist / syminfo.mintick, 1) : na
+        sSl := slTkNow
+        sTp := tpTkNow
+        sTa := taTkNow
+        sTd := tdTkNow
         strategy.entry("Short", strategy.short, qty = q, comment = "FR short")
 
-// Protective exits, attached to each entry (they also cover a fill on the
-// next bar's open, since the entry is placed at this bar's close).
-if not na(lStop)
-    strategy.exit("XL", from_entry = "Long", stop = lStop, limit = lTp, trail_points = lTrA, trail_offset = lTrO, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
-if not na(sStop)
-    strategy.exit("XS", from_entry = "Short", stop = sStop, limit = sTp, trail_points = sTrA, trail_offset = sTrO, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+// SL / TP / trailing stop, in ticks from the entry price.
+float xlSl = posOrNa(lSl)
+float xlTp = posOrNa(lTp)
+float xlTa = trailOn and nz(lTd, 0) > 0 ? lTa : na
+float xlTd = trailOn and nz(lTd, 0) > 0 ? lTd : na
+float xsSl = posOrNa(sSl)
+float xsTp = posOrNa(sTp)
+float xsTa = trailOn and nz(sTd, 0) > 0 ? sTa : na
+float xsTd = trailOn and nz(sTd, 0) > 0 ? sTd : na
+if not na(xlSl) or not na(xlTp) or not na(xlTd)
+    strategy.exit("XL", from_entry = "Long", loss = xlSl, profit = xlTp, trail_points = xlTa, trail_offset = xlTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
+if not na(xsSl) or not na(xsTp) or not na(xsTd)
+    strategy.exit("XS", from_entry = "Short", loss = xsSl, profit = xsTp, trail_points = xsTa, trail_offset = xsTd, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
 
 // The framework's exit: the parent broke against the side (optionally FLIP).
 if strategy.position_size > 0 and ((exitOnBreak and brkP and parentT == -1) or (exitOnFlip and phase == PH_FLIP))
@@ -763,8 +768,9 @@ if timeStop > 0 and strategy.position_size != 0 and strategy.opentrades > 0
     if bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= timeStop
         strategy.close_all(comment = "time stop")
 
-plot(strategy.position_size > 0 ? lStop : strategy.position_size < 0 ? sStop : na, "Stop", color = color.new(color.red, 0), style = plot.style_linebr, force_overlay = true)
-plot(strategy.position_size > 0 ? lTp : strategy.position_size < 0 ? sTp : na, "Target", color = color.new(color.lime, 0), style = plot.style_linebr, force_overlay = true)
+float avgPx = strategy.position_avg_price
+plot(strategy.position_size > 0 and not na(xlSl) ? avgPx - xlSl * tk : strategy.position_size < 0 and not na(xsSl) ? avgPx + xsSl * tk : na, "Stop", color = color.new(color.red, 0), style = plot.style_linebr, force_overlay = true)
+plot(strategy.position_size > 0 and not na(xlTp) ? avgPx + xlTp * tk : strategy.position_size < 0 and not na(xsTp) ? avgPx - xsTp * tk : na, "Target", color = color.new(color.lime, 0), style = plot.style_linebr, force_overlay = true)
 
 var label symWarn = na
 if barstate.islast and syminfo.basecurrency != "BTC" and syminfo.basecurrency != "XBT"
@@ -772,9 +778,9 @@ if barstate.islast and syminfo.basecurrency != "BTC" and syminfo.basecurrency !=
     symWarn := label.new(bar_index, close, "This copy is set up for BTCUSD.\nChart symbol: " + syminfo.ticker, style = label.style_label_left, color = color.orange, textcolor = color.black, size = size.normal, force_overlay = true)
 
 float wr    = strategy.closedtrades > 0 ? 100.0 * strategy.wintrades / strategy.closedtrades : na
-float nextQ = calcQty(parentT < 0 ? shortDist : longDist)
+float nextQ = calcQty(slTkNow)
 string extraRowTitle = "Strategy"
-string extraRowTxt   = (strategy.position_size > 0 ? "LONG " + str.tostring(strategy.position_size, "0.000") : strategy.position_size < 0 ? "SHORT " + str.tostring(-strategy.position_size, "0.000") : "flat") + "  |  trades " + str.tostring(strategy.closedtrades) + ", win " + (na(wr) ? "-" : str.tostring(wr, "0")) + "%, net " + str.tostring(strategy.netprofit, "0.00") + "  |  next qty " + (na(nextQ) ? "-" : str.tostring(nextQ, "0.000")) + " BTC" + (dtfOn ? "  |  time filter ON" : "")
+string extraRowTxt   = (strategy.position_size > 0 ? "LONG " + str.tostring(strategy.position_size) : strategy.position_size < 0 ? "SHORT " + str.tostring(-strategy.position_size) : "flat") + "  |  trades " + str.tostring(strategy.closedtrades) + ", win " + (na(wr) ? "-" : str.tostring(wr, "0")) + "%, net " + str.tostring(strategy.netprofit, "0.00") + "  |  next qty " + (na(nextQ) ? "-" : str.tostring(nextQ)) + "  |  SL " + (na(slTkNow) ? "-" : str.tostring(slTkNow * tk, format.mintick)) + " in price" + (dtfOn ? "  |  time filter ON" : "")
 
 // ---------------------------------------------------------------- TABLE ----
 posOf(string s) =>
