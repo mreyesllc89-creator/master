@@ -73,7 +73,7 @@ input bool   InpUseTdiZone           = true;   // Use TDI trade-zone filter
 input int    InpParentMult           = 1;      // Parent timeframe = chart x (1 = chart)
 input int    InpRsiLen               = 14;     // TDI RSI length
 input int    InpFastLen              = 2;      // TDI white fast length
-input int    InpMinAligned           = 2;      // Minimum child zones aligned
+input int    InpMinAligned           = FG_MIN_ALIGNED; // Minimum child zones aligned
 input bool   InpAllowNeutralParent   = false;  // Allow trade if parent is flat
 input bool   InpIgnoreNaZones        = true;   // Ignore zones without data
 input bool   InpHtfNoRepaint         = true;   // Higher-TF zones use the last CLOSED bar
