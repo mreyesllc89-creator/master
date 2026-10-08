@@ -1,26 +1,35 @@
-# FlashGold v5 EA presets
+# MT5 presets
 
-Spread-aware simulation of the EA logic: live bid/ask (BTC spread $12, gold $0.25),
-stop widened by the spread at fill, partial closed on the bid/ask, breakeven at bar
-close, slippage on stops ($3 BTC, $0.03 gold), gold commission $0.035/oz/side.
-Every setting was scored under two intrabar fill models:
+## Asia London Breakout (recommended for demo testing)
 
-- **4-tick** (TradingView: open-high-low-close), and
-- **pessimistic** (if the stop is inside the fill bar, the stop is hit first).
+EA: `mt5/AsiaLondonBreakout.mq5`. Presets: `AsiaLondonBreakout_XAUUSD.set`, `AsiaLondonBreakout_BTCUSD.set`.
 
-Only settings profitable under **both** are kept. Check on real data: gold 60m trades
-replayed on the real 15m path (Oct 5-8) matched the 4-tick model for wide stops
-(SL 50-80 pips) but **lost with tight stops** (10-20 pips: +711 model vs -105 real).
+**Rule (VT Markets server time, GMT+3):** Asia range = bid high/low 03:00-10:00. At 10:00 place a buy stop at
+the range high and a sell stop at the range low; the first fill cancels the other (one trade per day). Stop =
+range size from the fill (opposite side). Exit at 19:00 (or a take profit if set). Monday-Friday.
 
-| Symbol | TF | Result | Preset |
-|---|---|---|---|
-| BTCUSD | 1h, 2h | no setting profitable under both models | - |
-| BTCUSD | **4h** | win 24-33%, PF 1.04-1.52, 30 trades | `FlashGoldV5_BTCUSD_H4.set` |
-| XAUUSD | 5m, 15m | no setting profitable under both models | - |
-| XAUUSD | **30m** | win 21-37%, PF 1.12-2.42, 19 trades | `FlashGoldV5_XAUUSD_M30.set` |
-| XAUUSD | **1h** | win 22%, PF 1.89 (both models, real 15m path confirms), 18 trades | `FlashGoldV5_XAUUSD_H1.set` |
-| XAUUSD | 2h, 4h | no setting profitable under both models | - |
+**Test:** VT Markets tick data (real bid/ask, real spreads; gold commission $3/lot/side assumed), simulated
+tick by tick, 0.10 lot:
 
-Data: MEXC BTCUSDT 60m Sep 6 - Oct 8 2026 (2h/4h resampled); OANDA XAUUSD 60m Sep 21 - Oct 8,
-15m Oct 5-8, 5m Oct 7-8 (30m/2h/4h resampled). Small samples: confirm in the MT5 Strategy
-Tester ("Every tick based on real ticks") and on demo before live trading.
+| | XAUUSD-ECN | BTCUSD.c |
+|---|---|---|
+| Period | Jul 20 - Oct 8 2026 | Jul 13 - Oct 8 2026 |
+| Net | +$4,056 | +$1,241 |
+| Profit factor | 2.43 | 1.83 |
+| Trades | 38 | 55 |
+| Jul-Aug / Sep-Oct | +$2,242 / +$1,815 | +$637 / +$603 |
+| Range/exit hours shifted +-1-2 h (27 combinations) | 27/27 profitable, 27/27 in both halves | 27/27 profitable, 25/27 in both halves |
+
+Out-of-sample checks: a setup picked on Jul-Aug made money on Sep-Oct and the reverse, on both symbols;
+the week-by-week walk-forward was positive (gold +$2,214, BTC +$468).
+
+Caveats: 12 weeks of one market phase, 38-55 trades; gold was positive in 6-7 of 12 weeks, so losing weeks
+are normal. Demo-test before live trading. If your broker's server is not GMT+3, shift the hours so the
+range is 00:00-07:00 UTC and the exit 16:00 UTC.
+
+## FlashGold v5 (not recommended)
+
+The FlashGold v5 EA (`FlashGoldV5_*.mq5`) and its earlier presets were tested on the same VT Markets ticks
+(Jul 13 - Oct 8 2026, M1 to H4, exits, entries, inverted signal, market-phase filter). No version held up on
+unseen weeks: every setting that looked profitable on one period lost on a later one. Its presets were
+removed. The EA is kept for reference only.
