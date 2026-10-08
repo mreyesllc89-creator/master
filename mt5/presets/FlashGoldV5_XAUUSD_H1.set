@@ -1,6 +1,7 @@
 ; FlashGold v5 EA - XAUUSD-ECN, H1 chart, 1% RISK PER TRADE (stop 80 pips = $8/oz; lots sized so a stop-out = 1% of equity).
 ; VT Markets ticks Jul 1 - Oct 8 2026, tick by tick: +40.9% (75 trades, avg +0.55%/trade, win 28%), max drawdown 9.7%; at 0.10 lot +$3,273, PF 1.72.
 ; Do NOT use on BTCUSD (every FlashGold version lost there). Needs equity >= ~$800 so 1% covers 0.01 lot. Demo-test first.
+; MaxLots 200: on 1-oz contracts (VT XAUUSD-ECNc: 1 lot = 1 oz) 1% risk needs ~3-41 lots per $100k; the risk % sets the size, MaxLots is only a safety cap.
 InpSpreadMode=0
 InpModelSpread=0.25
 InpSpreadToSL=true
@@ -54,7 +55,7 @@ InpMaxBarsHeld=0
 InpQtyMode=1
 InpFixedLots=0.1
 InpRiskPct=1.0
-InpMaxLots=50.0
+InpMaxLots=200.0
 InpShowPanel=true
 InpDrawSignals=true
 InpMagic=50502

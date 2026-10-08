@@ -6,8 +6,8 @@ EA: `mt5/AsiaLondonBreakout.mq5`. Presets:
 
 | Preset | Symbol | Days | Magic | TradingView script |
 |---|---|---|---|---|
-| `AsiaLondonBreakout_XAUUSD.set` | XAUUSD-ECN | Mon-Fri | 60601 | `asia_london_breakout_xauusd.pine` |
-| `AsiaLondonBreakout_XAUUSD_FridayOff.set` | XAUUSD-ECN | Mon-Thu | 60603 | `asia_london_breakout_xauusd_fridayoff.pine` |
+| `AsiaLondonBreakout_XAUUSD.set` | XAUUSD-ECN(c) | Mon-Fri | 60601 | `asia_london_breakout_xauusd.pine` |
+| `AsiaLondonBreakout_XAUUSD_FridayOff.set` | XAUUSD-ECN(c) | Mon-Thu | 60603 | `asia_london_breakout_xauusd_fridayoff.pine` |
 | `AsiaLondonBreakout_BTCUSD.set` | BTCUSD.c | Mon-Fri | 60602 | `asia_london_breakout_btcusd.pine` |
 
 The two gold presets have different magic numbers, so both can run side by side (e.g. two demo accounts, or
@@ -41,6 +41,26 @@ corrected result.
 Caveats: about 3 months of one market phase, 45-65 trades; gold was positive in about 10 of 15 weeks, so
 losing weeks are normal. Demo-test before live trading. If your broker's server is not GMT+3, shift the hours so the
 range is 00:00-07:00 UTC and the exit 16:00 UTC.
+
+## MT5 Strategy Tester check (VT Markets, XAUUSD-ECNc, 9 months)
+
+Your tester run (Dec 29 2025 - Sep 30 2026, every tick based on real ticks, Mon-Fri, fixed 0.1 lot) matches this
+simulation trade by trade (51 shared days: same direction 51/51, correlation 0.995). Results:
+
+| XAUUSD-ECNc, 178 trades | Before commission | After commission ($3/lot/side) |
+|---|---|---|
+| Per 1 oz traded | +$1,254, PF 1.51 | +$186 |
+| At 1% risk per trade | +25.6%, max DD 4.5% | +4.0%, max DD 8.1% |
+
+By month before commission ($/oz): Jan +251, Feb -206, Mar +143, Apr +183, May +174, Jun +95, Jul +135, Aug +244,
+Sep +138. By weekday: Mon -207, Tue +244, Wed +473, Thu +569, Fri +175 (Friday-off does not hold over 9 months).
+
+**Costs decide the result.** On XAUUSD-ECNc 1 lot = 1 oz and the $3/lot/side commission is $6 per oz per round
+trip, about 85% of the average trade (+$7.04/oz). With a 100-oz contract at $3/lot (~$0.06/oz) or a commission-free
+account (~$0.25/oz spread) the 1%-risk result stays around +25%. Check Market Watch > XAUUSD-ECNc > Specification
+(contract size, commission) and ask VT Markets for the lowest-cost gold symbol / account type.
+
+All presets use InpMaxLots = 200 so the 1% risk is not capped on 1-oz contracts.
 
 ## Position sizing: 1% risk per trade (all presets)
 

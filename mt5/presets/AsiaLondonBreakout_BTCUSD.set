@@ -1,6 +1,7 @@
 ; Asia London Breakout - BTCUSD.c, Mon-Fri, 1% RISK PER TRADE (stop = Asia range size = 1% of equity).
 ; VT Markets ticks Jul 1 - Oct 8 2026 ($17 spread), tick by tick: +16.3% (65 trades, avg +0.25%/trade), max drawdown 5.9%, losing streaks up to 6.
 ; Times = VT Markets server time (GMT+3). Needs equity >= ~$1,500 so 1% covers 0.01 lot (0.01 BTC). Demo-test first.
+; MaxLots 200: on 1-oz contracts (VT XAUUSD-ECNc: 1 lot = 1 oz) 1% risk needs ~3-41 lots per $100k; the risk % sets the size, MaxLots is only a safety cap.
 InpRangeStartHour=3
 InpRangeStartMin=0
 InpRangeEndHour=10
@@ -21,7 +22,7 @@ InpMaxRange=0.0
 InpQtyMode=1
 InpLots=0.1
 InpRiskPct=1.0
-InpMaxLots=5.0
+InpMaxLots=200.0
 InpDrawRange=true
 InpShowPanel=true
 InpMaxSpread=40.0
