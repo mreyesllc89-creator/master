@@ -46,18 +46,23 @@
 //              parent turned up (a sell, a bounce from the latest low). The
 //              FlashGold burst that follows is the sub-trend's completion.
 //   PERSISTENCE The generalized Hurst exponent h(q) from the structure
-//              functions K_q(tau) = mean |x(t) - x(t - tau)|^q, x = log close,
-//              tau = 2, 4, 8, 16, over "Hurst window" structure candles:
-//              h(q) = slope of log K_q^(1/q) against log tau. H = h(2) above
-//              0.5 = persistent (up follows up): entries need H >= "Minimum
-//              Hurst". The spectrum width h(-2) - h(2) (wide = the flip,
-//              maximum disorder) can block entries too (off by default).
+//              functions K_q(tau) = mean |dx - mean dx|^q, dx = x(t) -
+//              x(t - tau), x = log close, tau = 2, 4, 8, 16, over "Hurst
+//              window" structure candles: h(q) = slope of log K_q^(1/q)
+//              against log tau. The drift is removed, so H = h(2) above 0.5
+//              = memory, persistent (up follows up): entries need H >=
+//              "Minimum Hurst". The spectrum width h(-2) - h(2) (wide = the
+//              flip, maximum disorder) can block entries too (off by default).
 // The framework only adds conditions to the strategy's own entries and one
 // exit (the parent's break); FlashGold's signal, stops, targets, trailing and
 // sizing are unchanged. "Use the Fractal Direction Framework" off = the
 // original strategy, bar for bar.
 // CALIBRATION of the framework: none yet - its defaults come from the PDF
 // (H > 0.5 = persistence, q from -2 to 2, the higher-low / lower-high test).
+// On a 128-candle window a memoryless market reads H about 0.47 +- 0.08 and a
+// persistent one (AR 0.3) about 0.54, so a 0.5 minimum still passes about a
+// third of random windows: the minimum is the first setting to calibrate
+// (e.g. 0.55). The width reads about 0.04 +- 0.08 on a monofractal series.
 // The PDF itself warns that reliable spectra need thousands of points, so the
 // rolling estimate (default 128 candles) is a rough persistence read and the
 // width gate stays off. Calibrate it on TradingView exports before trading it:
@@ -185,17 +190,17 @@ qtyStep         = input.float(1, "Quantity step (rounds down)", minval = 0.00000
 gF = "F. Fractal Direction Framework"
 fdOn        = input.bool(true, "Use the Fractal Direction Framework", group = gF, tooltip = "Off: the original FlashGold v5 strategy, bar for bar. On: entries also need the parent, the divergence, the fractal (pullback) and the persistence conditions below, and trades against a broken parent are closed.")
 fdTf        = input.timeframe("60", "Parent structure timeframe", group = gF, tooltip = "The scale the parent trend is read on (its swing pivots, divergence and Hurst exponent), from its last CLOSED candle when it is above the chart: no repaint. One scale above the trading candles is the PDF's parent / sub-trend pair. Uncalibrated default.")
-fdPivL      = input.int(5, "Swing pivot left bars", minval = 1, group = gF, tooltip = "A swing high / low is the highest high / lowest low of this many candles on its left...")
-fdPivR      = input.int(3, "Swing pivot right bars (confirmation)", minval = 1, group = gF, tooltip = "...and this many on its right. A swing is known only this many structure candles after it formed.")
+fdPivL      = input.int(5, "Swing pivot left bars", minval = 1, maxval = 200, group = gF, tooltip = "A swing high / low is the highest high / lowest low of this many candles on its left...")
+fdPivR      = input.int(3, "Swing pivot right bars (confirmation)", minval = 1, maxval = 100, group = gF, tooltip = "...and this many on its right. A swing is known only this many structure candles after it formed.")
 fdTrade     = input.bool(true, "Trade only with the parent", group = gF, tooltip = "Buys only while the parent is up (holding its higher lows), sells only while it is down (holding its lower highs). Nothing while the first parent is forming.")
 fdExitBreak = input.bool(true, "Exit on the parent's break", group = gF, tooltip = "When the parent breaks (close below the last higher low / above the last lower high), close the trade on the old side at the next bar's open and cancel its pending entry stop.")
 fdDivOn     = input.bool(true, "Divergence warning blocks entries with the parent", group = gF, tooltip = "Uptrend: a higher high in price with a lower high in the TDI fast line. Downtrend: a lower low with a higher low in the TDI. While the warning lasts, no new entry with the parent.")
 fdDivBars   = input.int(10, "Divergence lasts, structure candles", minval = 1, group = gF)
 fdPullOn    = input.bool(true, "Enter on a sub-trend (pullback) only", group = gF, tooltip = "A buy needs a pullback of at least the depth below from the latest high since the parent turned up (a sell, a bounce from the latest low). The FlashGold burst after it is the sub-trend's completion.")
 fdPullAtr   = input.float(0.5, "Pullback depth, ATR(14) mult", minval = 0.0, step = 0.05, group = gF)
-fdHurstOn   = input.bool(true, "Hurst persistence gate", group = gF, tooltip = "Entries need the parent's generalized Hurst exponent H = h(2) at or above the minimum: above 0.5 the moves persist (up follows up); below 0.5 they mean-revert.")
+fdHurstOn   = input.bool(true, "Hurst persistence gate", group = gF, tooltip = "Entries need the parent's generalized Hurst exponent H = h(2) (drift removed) at or above the minimum: above 0.5 the moves persist (up follows up); below 0.5 they mean-revert. On a 128-candle window a memoryless market reads about 0.47 +- 0.08 and a persistent one about 0.54, so 0.5 passes about a third of random windows: set the minimum in calibration (e.g. 0.55).")
 fdHurstMin  = input.float(0.5, "Minimum Hurst H", minval = 0.0, maxval = 1.0, step = 0.01, group = gF)
-fdHurstWin  = input.int(128, "Hurst window, structure candles", minval = 64, maxval = 400, group = gF, tooltip = "Candles used for h(q), with tau = 2, 4, 8, 16. Longer = steadier but slower.")
+fdHurstWin  = input.int(128, "Hurst window, structure candles", minval = 64, maxval = 400, group = gF, tooltip = "Candles used for h(q), with tau = 2, 4, 8, 16. Longer = steadier but slower to react.")
 fdWidthOn   = input.bool(false, "Spectrum-width gate (the flip = maximum disorder)", group = gF, tooltip = "Blocks entries while the multifractal width h(-2) - h(2) is above the maximum: the moment the old structure breaks and the new one has not formed. Off by default: the rolling window is far shorter than the thousands of points the PDF asks for reliable spectra.")
 fdWidthMax  = input.float(0.5, "Max spectrum width h(-2) - h(2)", minval = 0.0, step = 0.05, group = gF)
 fdShow      = input.bool(true, "Show the parent levels, breaks and divergences", group = gF)
@@ -366,30 +371,45 @@ if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and
 
 // ============================== FRACTAL DIRECTION FRAMEWORK ==============================
 // Generalized Hurst exponent h(q) of the timeframe it runs on: structure
-// functions K_q(tau) = mean |x(t) - x(t - tau)|^q over the window, x = log
-// close, tau = 2, 4, 8, 16; h(q) = least-squares slope of log K_q^(1/q)
-// against log tau (F_q(tau) ~ tau^h(q) in the PDF). One tick is added to every
-// move so a flat move cannot blow up the negative q. na until the window is full.
-fdHq(float q) =>
-    float x   = math.log(close)
-    float eps = syminfo.mintick / close
-    float sx  = 0.0
-    float sy  = 0.0
-    float sxx = 0.0
-    float sxy = 0.0
-    int   tau = 1
-    for k = 1 to 4
-        tau := tau * 2
-        float acc = 0.0
-        for i = 0 to fdHurstWin - 1
-            acc += math.pow(math.abs(x[i] - x[i + tau]) + eps, q)
-        float lx = math.log(tau)
-        float ly = math.log(math.pow(acc / fdHurstWin, 1.0 / q))
-        sx  += lx
-        sy  += ly
-        sxx += lx * lx
-        sxy += lx * ly
+// functions K_q(tau) = mean |dx - mean(dx)|^q over the window, dx = x(t) -
+// x(t - tau), x = log close, tau = 2, 4, 8, 16; h(q) = least-squares slope of
+// log K_q^(1/q) against log tau (F_q(tau) ~ tau^h(q) in the PDF). The mean
+// move (drift) is removed, so H measures memory (up following up), not a
+// steady trend. Negative q gets a floor of a quarter of the mean move on every
+// move: a negative moment of increments is otherwise set by the single
+// smallest move. Rolling sums (cost independent of the window); na until the
+// window is full.
+// K_2: the variance of the tau-moves (drift removed exactly).
+fdK2(float x, int tau) =>
+    float dx = x - x[tau]
+    float m  = ta.sma(dx, fdHurstWin)
+    math.max(ta.sma(dx * dx, fdHurstWin) - m * m, 1e-20)
+
+// K_-2: the -2 moment of the tau-moves around their mean, with the floor.
+fdKm2(float x, int tau) =>
+    float dx = x - x[tau]
+    float d  = math.abs(dx - ta.sma(dx, fdHurstWin))
+    float fl = 0.25 * ta.sma(d, fdHurstWin)
+    ta.sma(math.pow(d + fl, -2.0), fdHurstWin)
+
+// least-squares slope of y against log tau, tau = 2, 4, 8, 16
+fdSlope(float y1, float y2, float y3, float y4) =>
+    float l1  = math.log(2.0)
+    float l2  = math.log(4.0)
+    float l3  = math.log(8.0)
+    float l4  = math.log(16.0)
+    float sx  = l1 + l2 + l3 + l4
+    float sxx = l1 * l1 + l2 * l2 + l3 * l3 + l4 * l4
+    float sy  = y1 + y2 + y3 + y4
+    float sxy = l1 * y1 + l2 * y2 + l3 * y3 + l4 * y4
     (4.0 * sxy - sx * sy) / (4.0 * sxx - sx * sx)
+
+// [H = h(2), spectrum width h(-2) - h(2)]
+fdHurst() =>
+    float x   = math.log(close)
+    float h2  = fdSlope(math.log(fdK2(x, 2)) / 2.0, math.log(fdK2(x, 4)) / 2.0, math.log(fdK2(x, 8)) / 2.0, math.log(fdK2(x, 16)) / 2.0)
+    float hm2 = fdSlope(math.log(fdKm2(x, 2)) / -2.0, math.log(fdKm2(x, 4)) / -2.0, math.log(fdKm2(x, 8)) / -2.0, math.log(fdKm2(x, 16)) / -2.0)
+    [h2, hm2 - h2]
 
 // The parent on the timeframe it runs on: swing pivots, the protected level
 // (last higher low in an uptrend, last lower high in a downtrend), the break,
@@ -400,6 +420,14 @@ fdStructure() =>
     float ph  = ta.pivothigh(high, fdPivL, fdPivR)
     float pl  = ta.pivotlow(low, fdPivL, fdPivR)
     float mom = ta.sma(ta.rsi(close, tdiRsiLen), tdiFastLen)   // the TDI fast line
+    // the leg's real extreme, confirmed as a pivot or not: the lowest low
+    // since the last pivot high, the highest high since the last pivot low
+    float loPiv = ta.lowest(low, fdPivR + 1)
+    float hiPiv = ta.highest(high, fdPivR + 1)
+    var float loSinceH = na
+    var float hiSinceL = na
+    loSinceH := na(loSinceH) ? low : math.min(loSinceH, low)
+    hiSinceL := na(hiSinceL) ? high : math.max(hiSinceL, high)
     var float lastH  = na
     var float prevH  = na
     var float lastHM = na
@@ -419,10 +447,11 @@ fdStructure() =>
         prevHM := lastHM
         lastH  := ph
         lastHM := mom[fdPivR]
+        loSinceH := loPiv
         if not na(prevH) and lastH > prevH
-            // a higher high: momentum refusing it is the warning, momentum
-            // confirming it clears an earlier warning
-            if not na(prevHM) and lastHM < prevHM
+            // a higher high: momentum refusing it is the warning (used in an
+            // uptrend), momentum confirming it clears an earlier warning
+            if not na(prevHM) and lastHM < prevHM and dir != -1
                 divDir := -1
                 divAge := 0
             else if divDir == -1
@@ -435,8 +464,9 @@ fdStructure() =>
         prevLM := lastLM
         lastL  := pl
         lastLM := mom[fdPivR]
+        hiSinceL := hiPiv
         if not na(prevL) and lastL < prevL
-            if not na(prevLM) and lastLM > prevLM
+            if not na(prevLM) and lastLM > prevLM and dir != 1
                 divDir := 1
                 divAge := 0
             else if divDir == 1
@@ -445,30 +475,32 @@ fdStructure() =>
         if dir == 1 and (na(protL) or pl > protL)
             protL := pl
     // the break: the sub-trend exceeds the parent and closes through its last
-    // higher low / lower high; the old parent is dead, the new one starts
+    // higher low / lower high; the old parent is dead, the new one starts from
+    // the leg's real extreme (its last lower high / higher low)
     if dir == 1 and not na(protL) and close < protL
         dir    := -1
-        protH  := lastH
+        protH  := na(hiSinceL) ? lastH : hiSinceL
         protL  := na
         divDir := 0
     else if dir == -1 and not na(protH) and close > protH
         dir    := 1
-        protL  := lastL
+        protL  := na(loSinceH) ? lastL : loSinceH
         protH  := na
         divDir := 0
     else if dir == 0
         // the first parent: the first close beyond the last swing
         if not na(lastH) and close > lastH
             dir   := 1
-            protL := lastL
+            protL := na(loSinceH) ? lastL : loSinceH
         else if not na(lastL) and close < lastL
             dir   := -1
-            protH := lastH
-    bool  warnUp = dir == 1 and divDir == -1 and divAge <= fdDivBars
-    bool  warnDn = dir == -1 and divDir == 1 and divAge <= fdDivBars
-    float h2     = fdHq(2.0)
-    float hm2    = fdHq(-2.0)
-    [dir, protL, protH, warnUp, warnDn, h2, hm2 - h2]
+            protH := na(hiSinceL) ? lastH : hiSinceL
+    // the warning lasts fdDivBars structure candles, the divergence candle
+    // being the first
+    bool  warnUp = dir == 1 and divDir == -1 and divAge < fdDivBars
+    bool  warnDn = dir == -1 and divDir == 1 and divAge < fdDivBars
+    [h2, width] = fdHurst()
+    [dir, protL, protH, warnUp, warnDn, h2, width]
 
 fdStructurePrev() =>
     [d, pL, pH, wU, wD, h2, w] = fdStructure()
@@ -503,16 +535,18 @@ if fdDir != nz(fdDir[1])
     fdCtr := na
 float fdDepth = na(fdExt) or na(fdCtr) ? 0.0 : math.abs(fdExt - fdCtr)
 bool  fdPullOk = fdDepth >= fdPullAtr * atrChart
+// (a new extreme restarts the counter move at that candle's close, the only
+// price of the candle known to come after its high / low)
 if fdDir == 1
     if na(fdExt) or high > fdExt
         fdExt := high
-        fdCtr := low
+        fdCtr := close
     else
         fdCtr := math.min(fdCtr, low)
 else if fdDir == -1
     if na(fdExt) or low < fdExt
         fdExt := low
-        fdCtr := high
+        fdCtr := close
     else
         fdCtr := math.max(fdCtr, high)
 
