@@ -34,6 +34,10 @@ All scripts are Pine v6 except FlashGold, which is Pine v5 and carries the same 
 
 Scripts that run in their own pane (the TDI and Shape Map ones) draw the filter's shading, level and status box on the price chart. Where the host already has a table in the top right corner (Breakout, Refusal Log, TDI+), the DTF status box defaults to the top left; change it under "Status box position".
 
+## XPW Fractal Ring (new idea)
+
+`xpw_fractal_ring_v1.0_indicator.pine` combines the "eight nodes on a circle" animation with the Fractal Direction Framework. The eight nodes are eight timeframes. Each node measures its own trend (higher low / lower high and its break), its TDI sub-trend, divergence, Hurst h(2), a spectrum-width proxy h(1) - h(2), and memory (lag-1 autocorrelation). The ring phase follows the video: ORDER (straight spokes), DIVERGENCE (the first bend), FRACTAL (the bend spreads), FLIP (full interference), BREAK (the parent's guard breaks), NEW REGIME (the rings unwind). Signals follow the framework: trade with the parent, enter when the chart pullback ends, exit on the parent's break. Outputs are exported for a strategy to read through `input.source`.
+
 ## Adding the Directional Time Filter to another strategy
 
 1. Open `dtf_block_v1.4.pine` and copy everything between the `BEGIN DIRECTIONAL TIME FILTER` and `END DIRECTIONAL TIME FILTER` markers.

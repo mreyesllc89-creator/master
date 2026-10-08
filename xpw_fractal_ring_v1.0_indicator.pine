@@ -1,0 +1,518 @@
+//@version=6
+// ============================================================================
+//  XPW FRACTAL RING  -  v1.0  (indicator)
+// ----------------------------------------------------------------------------
+//  Combines two ideas into one map:
+//   1. The video: eight nodes on a circle joined by straight spokes. One
+//      spoke bends first, the bend spreads from node to node, every node
+//      starts emitting rings until the whole circle is one interference
+//      lattice, then the rings unwind and the spokes straighten again.
+//   2. The Fractal Direction Framework: the divergence (the warning), the
+//      fractal (the work), the break (the result). A sub-trend lives inside
+//      its parent and the parent dies when its last higher low (or lower
+//      high) breaks. The flip is the moment of maximum disorder, when the
+//      spectrum is widest. After the break the system restarts from a
+//      shifted zero.
+//  Here the eight nodes are eight timeframes of the same symbol. Each node
+//  measures its own structure, momentum and scaling. The ring shows how the
+//  scales interfere, and the PHASE says where the regime transition stands.
+//
+//  PER NODE (computed on the node's own timeframe; a timeframe above the
+//  chart is read from its last CLOSED bar, so history does not repaint)
+//    Trend      the framework's parent test. UP while every pullback holds
+//               above the last swing low (the higher low), DOWN while every
+//               bounce holds below the last swing high (the lower high). A
+//               close through that guard is the BREAK: the trend flips and
+//               the last opposite swing becomes the new guard.
+//    TDI side   fast (SMA of RSI) above or below slow: the sub-trend.
+//    Divergence price makes a new N-bar extreme with the trend and the fast
+//               TDI line refuses to make its own. Active for M bars.
+//    H          generalized Hurst h(2) from how |log-price moves| scale
+//               between 1 and k bars: h(q) = log(S_q(k) / S_q(1)) / (q log k).
+//               0.5 = random, above = persistent, below = mean reverting.
+//               Checked on synthetic series before release: it recovers H
+//               to about 0.01 on average, with a spread of about 0.07 on a
+//               100-bar window, so read it as a tendency, not a number.
+//    Width      h(1) - h(2), a two-point proxy of the multifractal spectrum
+//               width (about 0 for a monofractal series, positive when fat
+//               tails and volatility clusters dominate). Used as a
+//               percentile of the node's own history.
+//    Memory     lag-1 autocorrelation of returns, as a percentile. Rising
+//               memory = correlation length growing = critical slowing down.
+//
+//  RING PHASE (the video's sequence; judged on the nodes in scope, by
+//  default the parent and every smaller node)
+//    ORDER       straight spokes. The scales agree with the parent, nothing
+//                diverges, memory is not rising.
+//    DIVERGENCE  the first bend: one scale disagrees or diverges, or the
+//                parent's memory is rising. The warning.
+//    FRACTAL     the bend spreads: a quarter or more of the scales oppose
+//                the parent, or two or more diverge. Sub-trends are testing
+//                whether the parent can absorb them.
+//    FLIP        the full lattice: 40% or more oppose the parent, or a
+//                quarter oppose while the parent's spectrum is at its
+//                widest. Maximum disorder.
+//    BREAK       the parent's guard broke on close. The old parent is dead;
+//                the move that broke it is the new parent.
+//    NEW REGIME  the rings unwind while the scales re-align with the new
+//                parent. Becomes ORDER once 75% agree.
+//  The framework predicts the SHAPE of the next move, not its timing. Nothing
+//  here says when the next divergence comes.
+//
+//  SIGNALS (the framework's practical rule: trade with the parent, enter on
+//  the sub-trend's completion, exit on the parent's break)
+//    ENTER LONG   parent UP, and on the chart the TDI fast line crosses back
+//                 above the slow line (the pullback ended), in an allowed
+//                 phase.
+//    ENTER SHORT  the mirror.
+//    EXIT         the parent broke against the side (optionally also when
+//                 the phase reaches FLIP).
+//  Signals on the forming bar can still change until it closes; set alerts
+//  to "Once per bar close" for the final value.
+//
+//  OUTPUTS (Data Window, and the "Source" list of another script)
+//    FR phase        0 wait, 1 order, 2 divergence, 3 fractal, 4 flip,
+//                    5 break, 6 new regime
+//    FR long allowed / FR short allowed   1 when that side may be entered
+//    FR enter long / FR enter short / FR exit long / FR exit short
+//    FR parent trend +1 / -1 / 0
+//  A strategy can read them with input.source and gate on "== 1".
+//
+//  THE RING DRAWING sits to the right of the last bar (scroll the chart
+//  right, or raise the right margin, to see it). It is drawn in the pane's
+//  0-100 scale, so its shape follows your zoom.
+// ============================================================================
+indicator("XPW Fractal Ring v1.0", "XPW Fractal Ring", overlay = false, max_labels_count = 500, max_lines_count = 500, max_polylines_count = 100, max_bars_back = 1000)
+
+// ---------------------------------------------------------------- INPUTS ----
+GRP_R = "Ring: eight scales (smallest first)"
+tf1 = input.timeframe("1",   "Node 1", group = GRP_R)
+tf2 = input.timeframe("3",   "Node 2", group = GRP_R)
+tf3 = input.timeframe("5",   "Node 3", group = GRP_R)
+tf4 = input.timeframe("15",  "Node 4", group = GRP_R)
+tf5 = input.timeframe("30",  "Node 5", group = GRP_R)
+tf6 = input.timeframe("60",  "Node 6", group = GRP_R)
+tf7 = input.timeframe("240", "Node 7", group = GRP_R)
+tf8 = input.timeframe("D",   "Node 8", group = GRP_R, tooltip = "List the scales from the smallest to the largest. A timeframe above the chart is read from its last closed bar. A timeframe below the chart gives the last completed lower bar inside each chart bar.")
+parentNode = input.int(6, "Parent node (1-8)", minval = 1, maxval = 8, group = GRP_R, tooltip = "The scale whose trend is the regime. Its guard (last higher low / lower high) is the break test, and entries follow its direction.")
+scopeIn = input.string("Parent and smaller nodes", "Nodes that set the phase", options = ["Parent and smaller nodes", "All eight nodes"], group = GRP_R, tooltip = "Parent and smaller nodes: the framework's conditional structure, sub-trends inside the parent. Nodes above the parent are drawn but do not change the phase. All eight nodes: every scale counts, as in the video.")
+
+GRP_N = "Node measures"
+swingLen = input.int(3, "Swing pivot bars (each side)", minval = 1, group = GRP_N, tooltip = "A swing high / low needs this many bars on each side, so it is confirmed that many bars late.")
+rsiLen   = input.int(14, "TDI RSI length", minval = 2, group = GRP_N)
+fastLen  = input.int(2, "TDI fast (SMA of RSI)", minval = 1, group = GRP_N)
+slowLen  = input.int(7, "TDI slow (SMA of RSI)", minval = 1, group = GRP_N)
+divLen   = input.int(20, "Divergence: new extreme over (bars)", minval = 2, group = GRP_N)
+divHold  = input.int(5, "Divergence stays active (bars)", minval = 0, group = GRP_N)
+hK       = input.int(8, "Hurst: long lag k (bars)", minval = 2, group = GRP_N)
+hWin     = input.int(100, "Hurst / width window (bars)", minval = 20, group = GRP_N)
+acWin    = input.int(50, "Memory window (bars)", minval = 10, group = GRP_N)
+pctLen   = input.int(200, "Percentile lookback (bars)", minval = 20, group = GRP_N)
+
+GRP_P = "Phase thresholds"
+orderPct = input.float(75, "ORDER: aligned with the parent at least (%)", minval = 0, maxval = 100, group = GRP_P)
+fracPct  = input.float(25, "FRACTAL: opposed to the parent at least (%)", minval = 0, maxval = 100, group = GRP_P)
+flipPct  = input.float(40, "FLIP: opposed to the parent at least (%)", minval = 0, maxval = 100, group = GRP_P)
+widePct  = input.float(80, "Wide spectrum: parent width percentile at least", minval = 0, maxval = 100, group = GRP_P)
+slowPct  = input.float(80, "Memory rising: parent memory percentile at least", minval = 0, maxval = 100, group = GRP_P)
+
+GRP_S = "Signals"
+entryPhases = input.string("ORDER + NEW REGIME", "Entries allowed in", options = ["ORDER + NEW REGIME", "ORDER only", "Any phase except FLIP", "Any phase"], group = GRP_S, tooltip = "ORDER + NEW REGIME: the parent is clean, or it has just been replaced (the first pullback of a new parent). The warning phases (DIVERGENCE, FRACTAL, FLIP) give no new entries.")
+needH      = input.bool(false, "Require parent H above", inline = "h", group = GRP_S)
+hMin       = input.float(0.5, "", step = 0.01, inline = "h", group = GRP_S, tooltip = "The framework: a trend born from a break should be persistent (H above 0.5). H on a short window is noisy, so this is off by default.")
+exitOnFlip = input.bool(false, "Also exit when the phase reaches FLIP", group = GRP_S)
+showSig    = input.bool(true, "Mark entries / exits on price", group = GRP_S)
+showPhLbl  = input.bool(true, "Label phase changes on price", group = GRP_S)
+
+GRP_V = "Display"
+showRing  = input.bool(true, "Draw the ring", group = GRP_V)
+ringGap   = input.int(8, "Ring: gap after the last bar (bars)", minval = 0, maxval = 300, group = GRP_V)
+ringRx    = input.int(30, "Ring: radius (bars)", minval = 8, maxval = 90, group = GRP_V)
+showAl    = input.bool(true, "Plot: aligned %", inline = "p1", group = GRP_V)
+showOp    = input.bool(true, "opposed %", inline = "p1", group = GRP_V)
+showH     = input.bool(true, "Plot: parent H x100", inline = "p2", group = GRP_V)
+showW     = input.bool(true, "width pct", inline = "p2", group = GRP_V)
+showMem   = input.bool(false, "memory pct", inline = "p2", group = GRP_V)
+showBg    = input.bool(true, "Shade the phase", group = GRP_V)
+showTable = input.bool(true, "Node table", inline = "tb", group = GRP_V)
+tblPos    = input.string("top_left", "", options = ["top_left", "top_center", "top_right", "middle_left", "bottom_left", "bottom_center", "bottom_right"], inline = "tb", group = GRP_V)
+
+// ------------------------------------------------------------- CONSTANTS ----
+int PH_WAIT  = 0
+int PH_ORDER = 1
+int PH_DIV   = 2
+int PH_FRACT = 3
+int PH_FLIP  = 4
+int PH_BREAK = 5
+int PH_RESET = 6
+
+// ------------------------------------------------------------ NODE CALC ----
+// Runs on the node's own timeframe. Returns
+// [trend, guard, TDI side, divergence active, h(2), width, width pct, memory pct]
+nodeCalc() =>
+    float lp   = math.log(close)
+    float ph   = ta.pivothigh(high, swingLen, swingLen)
+    float pl   = ta.pivotlow(low, swingLen, swingLen)
+    float r    = ta.rsi(close, rsiLen)
+    float f    = ta.sma(r, fastLen)
+    float s    = ta.sma(r, slowLen)
+    float hiP  = ta.highest(high, divLen)[1]
+    float loP  = ta.lowest(low, divLen)[1]
+    float fHiP = ta.highest(f, divLen)[1]
+    float fLoP = ta.lowest(f, divLen)[1]
+    float d1   = math.abs(lp - lp[1])
+    float dk   = math.abs(lp - lp[hK])
+    float m11  = ta.sma(d1, hWin)
+    float mk1  = ta.sma(dk, hWin)
+    float m12  = ta.sma(d1 * d1, hWin)
+    float mk2  = ta.sma(dk * dk, hWin)
+    float ret  = lp - lp[1]
+    float ac1  = ta.correlation(ret, ret[1], acWin)
+    // Structure: the parent test (higher low / lower high) and its break.
+    var float lastPH = na
+    var float lastPL = na
+    var float prevPH = na
+    var float prevPL = na
+    var int   trend  = 0
+    var float guard  = na
+    if not na(ph)
+        prevPH := lastPH
+        lastPH := ph
+    if not na(pl)
+        prevPL := lastPL
+        lastPL := pl
+    if trend == 0
+        if not na(prevPH) and not na(prevPL)
+            if lastPH > prevPH and lastPL > prevPL
+                trend := 1
+                guard := lastPL
+            else if lastPH < prevPH and lastPL < prevPL
+                trend := -1
+                guard := lastPH
+    else if trend == 1
+        if close < guard
+            trend := -1
+            guard := nz(lastPH, high)
+        else if not na(pl) and pl > guard
+            guard := pl
+    else
+        if close > guard
+            trend := 1
+            guard := nz(lastPL, low)
+        else if not na(ph) and ph < guard
+            guard := ph
+    // Divergence: a new extreme with the trend that the fast TDI line refuses.
+    bool divEvt = (trend == 1 and high > hiP and f < fHiP) or (trend == -1 and low < loP and f > fLoP)
+    int  since  = ta.barssince(divEvt)
+    int  divAct = nz(since, 100000) <= divHold ? 1 : 0
+    // Scaling: h(q) = log(S_q(k) / S_q(1)) / (q log k), for q = 1 and q = 2.
+    float h2   = m12 > 0 and mk2 > 0 ? math.log(mk2 / m12) / (2.0 * math.log(hK)) : na
+    float h1   = m11 > 0 and mk1 > 0 ? math.log(mk1 / m11) / math.log(hK) : na
+    float wid  = h1 - h2
+    float wPct = ta.percentrank(wid, pctLen)
+    float aPct = ta.percentrank(ac1, pctLen)
+    int   side = f > s ? 1 : f < s ? -1 : 0
+    [trend, guard, side, divAct, h2, wid, wPct, aPct]
+
+// The same values one bar back: with lookahead_on this is the last CLOSED
+// bar of a higher timeframe (no repainting, no look into the future).
+nodePrev() =>
+    [t, g, sd, dv, h, w, wp, ap] = nodeCalc()
+    [t[1], g[1], sd[1], dv[1], h[1], w[1], wp[1], ap[1]]
+
+isHigher(string tf) =>
+    tf != "" and timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)
+
+pickI(bool hi, int a, int b) =>
+    hi ? b : a
+pickF(bool hi, float a, float b) =>
+    hi ? b : a
+
+// ----------------------------------------------------------- NODE FETCH ----
+[t1a, g1a, s1a, d1a, h1a, w1a, wp1a, ap1a] = request.security(syminfo.tickerid, tf1, nodeCalc(), lookahead = barmerge.lookahead_off)
+[t1b, g1b, s1b, d1b, h1b, w1b, wp1b, ap1b] = request.security(syminfo.tickerid, tf1, nodePrev(), lookahead = barmerge.lookahead_on)
+[t2a, g2a, s2a, d2a, h2a, w2a, wp2a, ap2a] = request.security(syminfo.tickerid, tf2, nodeCalc(), lookahead = barmerge.lookahead_off)
+[t2b, g2b, s2b, d2b, h2b, w2b, wp2b, ap2b] = request.security(syminfo.tickerid, tf2, nodePrev(), lookahead = barmerge.lookahead_on)
+[t3a, g3a, s3a, d3a, h3a, w3a, wp3a, ap3a] = request.security(syminfo.tickerid, tf3, nodeCalc(), lookahead = barmerge.lookahead_off)
+[t3b, g3b, s3b, d3b, h3b, w3b, wp3b, ap3b] = request.security(syminfo.tickerid, tf3, nodePrev(), lookahead = barmerge.lookahead_on)
+[t4a, g4a, s4a, d4a, h4a, w4a, wp4a, ap4a] = request.security(syminfo.tickerid, tf4, nodeCalc(), lookahead = barmerge.lookahead_off)
+[t4b, g4b, s4b, d4b, h4b, w4b, wp4b, ap4b] = request.security(syminfo.tickerid, tf4, nodePrev(), lookahead = barmerge.lookahead_on)
+[t5a, g5a, s5a, d5a, h5a, w5a, wp5a, ap5a] = request.security(syminfo.tickerid, tf5, nodeCalc(), lookahead = barmerge.lookahead_off)
+[t5b, g5b, s5b, d5b, h5b, w5b, wp5b, ap5b] = request.security(syminfo.tickerid, tf5, nodePrev(), lookahead = barmerge.lookahead_on)
+[t6a, g6a, s6a, d6a, h6a, w6a, wp6a, ap6a] = request.security(syminfo.tickerid, tf6, nodeCalc(), lookahead = barmerge.lookahead_off)
+[t6b, g6b, s6b, d6b, h6b, w6b, wp6b, ap6b] = request.security(syminfo.tickerid, tf6, nodePrev(), lookahead = barmerge.lookahead_on)
+[t7a, g7a, s7a, d7a, h7a, w7a, wp7a, ap7a] = request.security(syminfo.tickerid, tf7, nodeCalc(), lookahead = barmerge.lookahead_off)
+[t7b, g7b, s7b, d7b, h7b, w7b, wp7b, ap7b] = request.security(syminfo.tickerid, tf7, nodePrev(), lookahead = barmerge.lookahead_on)
+[t8a, g8a, s8a, d8a, h8a, w8a, wp8a, ap8a] = request.security(syminfo.tickerid, tf8, nodeCalc(), lookahead = barmerge.lookahead_off)
+[t8b, g8b, s8b, d8b, h8b, w8b, wp8b, ap8b] = request.security(syminfo.tickerid, tf8, nodePrev(), lookahead = barmerge.lookahead_on)
+bool hi1 = isHigher(tf1)
+bool hi2 = isHigher(tf2)
+bool hi3 = isHigher(tf3)
+bool hi4 = isHigher(tf4)
+bool hi5 = isHigher(tf5)
+bool hi6 = isHigher(tf6)
+bool hi7 = isHigher(tf7)
+bool hi8 = isHigher(tf8)
+
+array<int> tA = array.from(pickI(hi1, t1a, t1b), pickI(hi2, t2a, t2b), pickI(hi3, t3a, t3b), pickI(hi4, t4a, t4b), pickI(hi5, t5a, t5b), pickI(hi6, t6a, t6b), pickI(hi7, t7a, t7b), pickI(hi8, t8a, t8b))
+array<float> gA = array.from(pickF(hi1, g1a, g1b), pickF(hi2, g2a, g2b), pickF(hi3, g3a, g3b), pickF(hi4, g4a, g4b), pickF(hi5, g5a, g5b), pickF(hi6, g6a, g6b), pickF(hi7, g7a, g7b), pickF(hi8, g8a, g8b))
+array<int> sA = array.from(pickI(hi1, s1a, s1b), pickI(hi2, s2a, s2b), pickI(hi3, s3a, s3b), pickI(hi4, s4a, s4b), pickI(hi5, s5a, s5b), pickI(hi6, s6a, s6b), pickI(hi7, s7a, s7b), pickI(hi8, s8a, s8b))
+array<int> dA = array.from(pickI(hi1, d1a, d1b), pickI(hi2, d2a, d2b), pickI(hi3, d3a, d3b), pickI(hi4, d4a, d4b), pickI(hi5, d5a, d5b), pickI(hi6, d6a, d6b), pickI(hi7, d7a, d7b), pickI(hi8, d8a, d8b))
+array<float> hA = array.from(pickF(hi1, h1a, h1b), pickF(hi2, h2a, h2b), pickF(hi3, h3a, h3b), pickF(hi4, h4a, h4b), pickF(hi5, h5a, h5b), pickF(hi6, h6a, h6b), pickF(hi7, h7a, h7b), pickF(hi8, h8a, h8b))
+array<float> wA = array.from(pickF(hi1, w1a, w1b), pickF(hi2, w2a, w2b), pickF(hi3, w3a, w3b), pickF(hi4, w4a, w4b), pickF(hi5, w5a, w5b), pickF(hi6, w6a, w6b), pickF(hi7, w7a, w7b), pickF(hi8, w8a, w8b))
+array<float> wpA = array.from(pickF(hi1, wp1a, wp1b), pickF(hi2, wp2a, wp2b), pickF(hi3, wp3a, wp3b), pickF(hi4, wp4a, wp4b), pickF(hi5, wp5a, wp5b), pickF(hi6, wp6a, wp6b), pickF(hi7, wp7a, wp7b), pickF(hi8, wp8a, wp8b))
+array<float> apA = array.from(pickF(hi1, ap1a, ap1b), pickF(hi2, ap2a, ap2b), pickF(hi3, ap3a, ap3b), pickF(hi4, ap4a, ap4b), pickF(hi5, ap5a, ap5b), pickF(hi6, ap6a, ap6b), pickF(hi7, ap7a, ap7b), pickF(hi8, ap8a, ap8b))
+array<string> tfA = array.from(tf1, tf2, tf3, tf4, tf5, tf6, tf7, tf8)
+
+// --------------------------------------------------------------- PHASE ----
+int  pIdx     = parentNode - 1
+bool scopeAll = scopeIn == "All eight nodes"
+int  parentT  = nz(array.get(tA, pIdx), 0)
+int  parentT1 = nz(parentT[1], 0)
+bool brkP     = parentT != 0 and parentT1 != 0 and parentT != parentT1
+
+int nIn = 0
+int nAl = 0
+int nOp = 0
+int nDv = 0
+for i = 0 to 7
+    int  ti  = array.get(tA, i)
+    bool inS = scopeAll or i <= pIdx
+    if inS and not na(ti)
+        nIn += 1
+        if parentT != 0 and ti == parentT
+            nAl += 1
+        else if parentT != 0 and ti == -parentT
+            nOp += 1
+        if nz(array.get(dA, i), 0) == 1
+            nDv += 1
+float alShare = nIn > 0 ? 100.0 * nAl / nIn : 0.0
+float opShare = nIn > 0 ? 100.0 * nOp / nIn : 0.0
+
+float hP      = array.get(hA, pIdx)
+float wPctP   = array.get(wpA, pIdx)
+float aPctP   = array.get(apA, pIdx)
+bool  wide    = nz(wPctP, 0) >= widePct
+bool  slowing = nz(aPctP, 0) >= slowPct
+
+var int phase = PH_WAIT
+int nextPh = phase
+if parentT == 0
+    nextPh := PH_WAIT
+else if brkP
+    nextPh := PH_BREAK
+else if (phase == PH_BREAK or phase == PH_RESET) and alShare < orderPct
+    nextPh := PH_RESET
+else if opShare >= flipPct or (wide and opShare >= fracPct)
+    nextPh := PH_FLIP
+else if opShare >= fracPct or nDv >= 2
+    nextPh := PH_FRACT
+else if nOp >= 1 or nDv >= 1 or slowing
+    nextPh := PH_DIV
+else if alShare >= orderPct
+    nextPh := PH_ORDER
+else
+    nextPh := PH_RESET
+bool phaseChanged = nextPh != phase
+phase := nextPh
+
+phaseName(int p) =>
+    switch p
+        1 => "ORDER"
+        2 => "DIVERGENCE"
+        3 => "FRACTAL"
+        4 => "FLIP"
+        5 => "BREAK"
+        6 => "NEW REGIME"
+        => "WAIT"
+
+phaseColor(int p, int transp) =>
+    color c = switch p
+        1 => color.lime
+        2 => color.yellow
+        3 => color.orange
+        4 => color.fuchsia
+        5 => color.white
+        6 => color.aqua
+        => color.gray
+    color.new(c, transp)
+
+// -------------------------------------------------------------- SIGNALS ----
+// The chart's own sub-trend: the TDI fast line crossing back over the slow line.
+[tC, gC, sC, dC, hC, wC, wpC, apC] = nodeCalc()
+bool pullbackEndUp = sC == 1 and nz(sC[1], 0) < 0
+bool pullbackEndDn = sC == -1 and nz(sC[1], 0) > 0
+
+bool phaseOk = switch entryPhases
+    "ORDER only"            => phase == PH_ORDER
+    "ORDER + NEW REGIME"    => phase == PH_ORDER or phase == PH_RESET or phase == PH_BREAK
+    "Any phase except FLIP" => phase != PH_FLIP and phase != PH_WAIT
+    => phase != PH_WAIT
+bool hOk = not needH or (not na(hP) and hP > hMin)
+
+bool longOk     = parentT == 1 and phaseOk and hOk
+bool shortOk    = parentT == -1 and phaseOk and hOk
+bool longEntry  = longOk and pullbackEndUp
+bool shortEntry = shortOk and pullbackEndDn
+bool flipNow    = exitOnFlip and phaseChanged and phase == PH_FLIP
+bool exitLong   = (brkP and parentT == -1) or (flipNow and parentT == 1)
+bool exitShort  = (brkP and parentT == 1) or (flipNow and parentT == -1)
+
+// ---------------------------------------------------------------- PLOTS ----
+hline(100, "Scale top", color = color.new(color.gray, 100))
+hline(0, "Scale bottom", color = color.new(color.gray, 100))
+hline(50, "H = 0.5", color = color.new(color.gray, 60), linestyle = hline.style_dotted)
+plot(showAl ? alShare : na, "Aligned with parent %", color = parentT > 0 ? color.lime : parentT < 0 ? color.red : color.gray, linewidth = 2)
+plot(showOp ? opShare : na, "Opposed to parent %", color = color.new(color.orange, 40), style = plot.style_area)
+plot(showH and not na(hP) ? hP * 100 : na, "Parent H x100", color = color.aqua)
+plot(showW ? wPctP : na, "Parent width percentile", color = color.new(color.purple, 0))
+plot(showMem ? aPctP : na, "Parent memory percentile", color = color.new(color.yellow, 0))
+bgcolor(showBg ? phaseColor(phase, 88) : na, title = "Phase")
+
+plot(phase, "FR phase", display = display.data_window)
+plot(longOk ? 1 : 0, "FR long allowed", display = display.data_window)
+plot(shortOk ? 1 : 0, "FR short allowed", display = display.data_window)
+plot(longEntry ? 1 : 0, "FR enter long", display = display.data_window)
+plot(shortEntry ? 1 : 0, "FR enter short", display = display.data_window)
+plot(exitLong ? 1 : 0, "FR exit long", display = display.data_window)
+plot(exitShort ? 1 : 0, "FR exit short", display = display.data_window)
+plot(parentT, "FR parent trend", display = display.data_window)
+
+plotshape(showSig and longEntry, "Enter long", shape.triangleup, location.belowbar, color.lime, size = size.small, force_overlay = true)
+plotshape(showSig and shortEntry, "Enter short", shape.triangledown, location.abovebar, color.red, size = size.small, force_overlay = true)
+plotshape(showSig and exitLong, "Exit long", shape.xcross, location.abovebar, color.orange, size = size.tiny, text = "EXIT", textcolor = color.orange, force_overlay = true)
+plotshape(showSig and exitShort, "Exit short", shape.xcross, location.belowbar, color.orange, size = size.tiny, text = "EXIT", textcolor = color.orange, force_overlay = true)
+
+if showPhLbl and phaseChanged and barstate.isconfirmed and phase != PH_WAIT
+    string txt = phase == PH_BREAK ? "BREAK: new parent " + (parentT > 0 ? "UP" : "DOWN") : phaseName(phase)
+    label.new(bar_index, parentT < 0 ? low : high, txt, style = parentT < 0 ? label.style_label_up : label.style_label_down, color = phaseColor(phase, 10), textcolor = color.black, size = size.tiny, force_overlay = true)
+
+alertcondition(longEntry, "FR enter long", "Fractal Ring: enter long (pullback ended in the parent's direction) on {{ticker}} {{interval}}")
+alertcondition(shortEntry, "FR enter short", "Fractal Ring: enter short (bounce ended in the parent's direction) on {{ticker}} {{interval}}")
+alertcondition(exitLong, "FR exit long", "Fractal Ring: exit long (parent broke) on {{ticker}} {{interval}}")
+alertcondition(exitShort, "FR exit short", "Fractal Ring: exit short (parent broke) on {{ticker}} {{interval}}")
+alertcondition(phaseChanged and phase == PH_DIV, "FR divergence warning", "Fractal Ring: DIVERGENCE warning on {{ticker}} {{interval}}")
+alertcondition(phaseChanged and phase == PH_FLIP, "FR flip", "Fractal Ring: FLIP (maximum disorder) on {{ticker}} {{interval}}")
+alertcondition(brkP, "FR parent break", "Fractal Ring: the parent broke, new regime on {{ticker}} {{interval}}")
+
+// ----------------------------------------------------------------- RING ----
+// The video, drawn: straight spokes in ORDER, a bent spoke for every scale
+// that diverges or opposes the parent, and rings around the nodes that grow
+// with the phase until FLIP / BREAK fill the circle with an interference
+// lattice. NEW REGIME keeps one ring on the scales that have not re-aligned.
+ellipsePts(int cx, float cy, float rx, float ry, int n) =>
+    array<chart.point> pts = array.new<chart.point>()
+    for k = 0 to n - 1
+        float a = 2.0 * math.pi * k / n
+        array.push(pts, chart.point.from_index(cx + int(math.round(rx * math.cos(a))), cy + ry * math.sin(a)))
+    pts
+
+nodeState(int i) =>
+    int ti = array.get(tA, i)
+    int di = nz(array.get(dA, i), 0)
+    na(ti) ? "no data" : ti == 0 ? "forming" : di == 1 ? "DIVERGING" : parentT != 0 and ti == parentT ? "ALIGNED" : parentT != 0 and ti == -parentT ? "OPPOSED" : "-"
+
+nodeColor(string st, int ti) =>
+    st == "DIVERGING" ? color.yellow : st == "OPPOSED" ? color.orange : st == "ALIGNED" ? (ti > 0 ? color.lime : color.red) : color.gray
+
+var array<polyline> ringPolys = array.new<polyline>()
+var array<label>    ringLbls  = array.new<label>()
+if showRing and barstate.islast
+    for p in ringPolys
+        polyline.delete(p)
+    array.clear(ringPolys)
+    for l in ringLbls
+        label.delete(l)
+    array.clear(ringLbls)
+    int   cx    = bar_index + ringGap + ringRx
+    float cy    = 50.0
+    float ry    = 40.0
+    float rx    = float(ringRx)
+    float nodeR = 0.6
+    color ink   = color.new(color.white, 40)
+    array.push(ringPolys, polyline.new(ellipsePts(cx, cy, rx, ry, 64), curved = true, closed = true, line_color = ink))
+    array.push(ringPolys, polyline.new(ellipsePts(cx, cy, rx * nodeR, ry * nodeR, 48), curved = true, closed = true, line_color = color.new(color.white, 65)))
+    array<bool> bentA = array.new<bool>(8, false)
+    for i = 0 to 7
+        string st = nodeState(i)
+        array.set(bentA, i, st == "DIVERGING" or st == "OPPOSED")
+    for i = 0 to 7
+        string st    = nodeState(i)
+        int    ti    = nz(array.get(tA, i), 0)
+        bool   inS   = scopeAll or i <= pIdx
+        bool   bent  = array.get(bentA, i)
+        bool   near  = array.get(bentA, (i + 7) % 8) or array.get(bentA, (i + 1) % 8)
+        color  col   = color.new(nodeColor(st, ti), inS ? 0 : 55)
+        float  ang   = math.pi / 2 - i * math.pi / 4
+        float  ux    = math.cos(ang)
+        float  uy    = math.sin(ang)
+        int    nx    = cx + int(math.round(rx * nodeR * ux))
+        float  ny    = cy + ry * nodeR * uy
+        // spoke: straight when the scale agrees, an S-bend when it does not
+        array<chart.point> sp = array.new<chart.point>()
+        array.push(sp, chart.point.from_index(cx, cy))
+        if bent
+            float b = 0.16
+            array.push(sp, chart.point.from_index(cx + int(math.round(rx * (0.3 * ux - b * uy))), cy + ry * (0.3 * uy + b * ux)))
+            array.push(sp, chart.point.from_index(nx, ny))
+            array.push(sp, chart.point.from_index(cx + int(math.round(rx * (0.82 * ux + b * uy))), cy + ry * (0.82 * uy - b * ux)))
+        else
+            array.push(sp, chart.point.from_index(nx, ny))
+        array.push(sp, chart.point.from_index(cx + int(math.round(rx * ux)), cy + ry * uy))
+        array.push(ringPolys, polyline.new(sp, curved = bent, closed = false, line_color = bent ? col : color.new(color.white, inS ? 45 : 75), line_width = bent ? 2 : 1))
+        // rings: how far the interference has spread at this node
+        int nR = phase == PH_DIV ? (bent ? 1 : 0) : phase == PH_FRACT ? (bent ? 2 : near ? 1 : 0) : phase == PH_FLIP ? (bent ? 4 : 3) : phase == PH_BREAK ? 4 : phase == PH_RESET ? (st == "ALIGNED" ? 0 : 1) : 0
+        nR := inS ? nR : math.min(nR, 1)
+        if nR > 0
+            for k = 1 to nR
+                float rr = 0.09 * k
+                array.push(ringPolys, polyline.new(ellipsePts(nx, ny, rx * rr, ry * rr, 24), curved = true, closed = true, line_color = color.new(col, math.min(30 + 12 * k, 85))))
+        // node and its name
+        array.push(ringLbls, label.new(nx, ny, "", style = label.style_circle, color = col, size = i == pIdx ? size.small : size.tiny))
+        string name = array.get(tfA, i) + (i == pIdx ? " PARENT" : "") + "\n" + st
+        array.push(ringLbls, label.new(cx + int(math.round(rx * 1.14 * ux)), cy + ry * 1.14 * uy, name, style = label.style_none, textcolor = col, size = size.tiny))
+    array.push(ringLbls, label.new(cx, cy - ry - 5, phaseName(phase), style = label.style_label_up, color = phaseColor(phase, 0), textcolor = color.black, size = size.normal))
+
+// ---------------------------------------------------------------- TABLE ----
+posOf(string s) =>
+    switch s
+        "top_center"    => position.top_center
+        "top_right"     => position.top_right
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "bottom_center" => position.bottom_center
+        "bottom_right"  => position.bottom_right
+        => position.top_left
+
+var table tb = table.new(posOf(tblPos), 6, 11, bgcolor = color.new(color.black, 20), border_width = 1)
+if showTable and barstate.islast
+    table.clear(tb, 0, 0, 5, 10)
+    color hd = color.new(#263238, 0)
+    table.cell(tb, 0, 0, "Node", text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    table.cell(tb, 1, 0, "TF", text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    table.cell(tb, 2, 0, "Trend", text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    table.cell(tb, 3, 0, "State", text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    table.cell(tb, 4, 0, "H", text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    table.cell(tb, 5, 0, "Width / memory pct", text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    for i = 0 to 7
+        int    ti  = nz(array.get(tA, i), 0)
+        string st  = nodeState(i)
+        float  hi  = array.get(hA, i)
+        float  wpi = array.get(wpA, i)
+        float  api = array.get(apA, i)
+        bool   inS = scopeAll or i <= pIdx
+        color  tc  = inS ? color.white : color.gray
+        table.cell(tb, 0, i + 1, str.tostring(i + 1) + (i == pIdx ? " P" : ""), text_color = tc, text_size = size.tiny)
+        table.cell(tb, 1, i + 1, array.get(tfA, i), text_color = tc, text_size = size.tiny)
+        table.cell(tb, 2, i + 1, ti > 0 ? "UP" : ti < 0 ? "DOWN" : "-", text_color = ti > 0 ? color.lime : ti < 0 ? color.red : color.gray, text_size = size.tiny)
+        table.cell(tb, 3, i + 1, st, text_color = nodeColor(st, ti), text_size = size.tiny)
+        table.cell(tb, 4, i + 1, na(hi) ? "-" : str.tostring(hi, "0.00"), text_color = na(hi) ? color.gray : hi > 0.5 ? color.lime : color.orange, text_size = size.tiny)
+        table.cell(tb, 5, i + 1, (na(wpi) ? "-" : str.tostring(wpi, "0")) + " / " + (na(api) ? "-" : str.tostring(api, "0")), text_color = tc, text_size = size.tiny)
+    string side = parentT > 0 ? "longs" : "shorts"
+    string nextTxt = parentT == 0 ? "wait: the parent has no trend yet" : phaseOk ? "trade " + side + ": enter when the chart pullback ends" : "warning phase: no new " + side + ", hold or exit on the parent's break"
+    table.cell(tb, 0, 9, "Phase", text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    table.cell(tb, 1, 9, phaseName(phase) + "   aligned " + str.tostring(alShare, "0") + "%  opposed " + str.tostring(opShare, "0") + "%  diverging " + str.tostring(nDv), text_color = phaseColor(phase, 0), bgcolor = hd, text_size = size.tiny)
+    table.merge_cells(tb, 1, 9, 5, 9)
+    table.cell(tb, 0, 10, "Next", text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    table.cell(tb, 1, 10, nextTxt, text_color = color.white, bgcolor = hd, text_size = size.tiny)
+    table.merge_cells(tb, 1, 10, 5, 10)
