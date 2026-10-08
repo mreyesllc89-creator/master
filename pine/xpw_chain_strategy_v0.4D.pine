@@ -1,4 +1,8 @@
 //@version=6
+// DEFAULTS CALIBRATED FOR BTCUSD: exchange spot feed (COINBASE:BTCUSD, BITSTAMP:BTCUSD or BINANCE:BTCUSDT,
+// not the composite index), 15m chart, rungs 1s / 10s / 1m / 3m / 5m. Whole-dollar prices, 30-minute
+// travel horizon, 1.5 x 5m-ATR target so a hit clears fees, 2-day Hurst window, L1/L2 lines hidden and
+// verdict labels kept from L3 up so the 1-second forest stays readable. Leave these as they are on BTC.
 // XPW Chain STRATEGY v0.4D - the Look-Down Forest monitor turned into a backtestable strategy.
 //
 // Two trades, straight from the Fractal Direction Framework:
@@ -62,7 +66,7 @@
 // GHOST CANDLES: an indicator cannot make the chart's own candles transparent. Turn "Ghost candles"
 // on, then hide the originals: right-click chart > Settings > Symbol > untick Body, Borders, Wick.
 
-strategy("XPW Chain Strategy v0.4D Look-Down Forest", overlay = true, calc_on_every_tick = false, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.percent_of_equity, default_qty_value = 10, commission_type = strategy.commission.percent, commission_value = 0.05, slippage = 2, max_labels_count = 500, max_lines_count = 500, max_bars_back = 500)
+strategy("XPW Chain Strategy v0.4D Look-Down Forest", overlay = true, calc_on_every_tick = false, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.percent_of_equity, default_qty_value = 10, commission_type = strategy.commission.percent, commission_value = 0.1, slippage = 50, max_labels_count = 500, max_lines_count = 500, max_bars_back = 500)
 
 // ------------- TDI (keep identical to Shape Map v0.7) -------------
 grpT = "TDI (keep identical to Shape Map v0.7)"
@@ -114,14 +118,14 @@ grpC = "Chain"
 agreeBars   = input.int(5, "Agreement window (bars of the HIGHER rung)", minval = 1, group = grpC)
 graceBars   = input.int(2, "Late grace (extra bars of the HIGHER rung)", minval = 0, group = grpC)
 tolBars     = input.int(1, "Higher rung may already have fired (its bars)", minval = 0, group = grpC)
-horizonBars = input.int(4, "Measure travel for (bars of RUNG 5, after the verdict)", minval = 1, group = grpC)
+horizonBars = input.int(6, "Measure travel for (bars of RUNG 5, after the verdict)", minval = 1, group = grpC)
 atrLen      = input.int(14, "ATR length (rung 5)", minval = 2, group = grpC)
-tgtAtr      = input.float(1.0, "Target travel (x rung-5 ATR)", minval = 0.1, step = 0.1, group = grpC)
+tgtAtr      = input.float(1.5, "Target travel (x rung-5 ATR)", minval = 0.1, step = 0.1, group = grpC)
 alertLvl    = input.int(3, "Alert when a chain resolves at level >=", minval = 1, maxval = 5, group = grpC)
-maxChains   = input.int(60, "Max chains alive (forest cap)", minval = 5, maxval = 200, group = grpC)
+maxChains   = input.int(80, "Max chains alive (forest cap)", minval = 5, maxval = 200, group = grpC)
 reachLen    = input.int(20, "Reach gauge: last N chains", minval = 3, maxval = 200, group = grpC)
 showLabels  = input.bool(true, "Growing chain labels", group = grpC)
-minLabelLvl = input.int(1, "Keep verdict labels only for level >=", minval = 1, maxval = 5, group = grpC, tooltip = "Chains that resolve below this level have their drawings removed. 5 = only chains that reach all five stay on the chart.")
+minLabelLvl = input.int(3, "Keep verdict labels only for level >=", minval = 1, maxval = 5, group = grpC, tooltip = "Chains that resolve below this level have their drawings removed. 5 = only chains that reach all five stay on the chart.")
 showTable   = input.bool(true, "Show table", group = grpC)
 tblPos      = input.string("Top right", "Table position", options = ["Top right", "Middle right", "Bottom right", "Top left"], group = grpC)
 tblSizeIn   = input.string("Normal", "Table text size", options = ["Tiny", "Small", "Normal", "Large"], group = grpC)
@@ -145,15 +149,15 @@ ghostDn     = input.color(color.red,  "Ghost down", group = grpL)
 
 // ------------- PRICE ACCURACY -------------
 grpX = "Price accuracy"
-priceDec   = input.int(-1, "Price decimals (-1 = symbol tick size)", minval = -1, maxval = 10, group = grpX, tooltip = "How many decimals every label shows. -1 uses the symbol's own tick size.")
+priceDec   = input.int(0, "Price decimals (-1 = symbol tick size)", minval = -1, maxval = 10, group = grpX, tooltip = "How many decimals every label shows. -1 uses the symbol's own tick size.")
 showRungPx = input.bool(false, "Show the price at EVERY rung in the label", group = grpX, tooltip = "1s 1.2345 > 10s 1.2350 > ... instead of only the start price.")
 showMark   = input.bool(true, "Price marker across the candle (exact tick price)", group = grpX, tooltip = "Thin horizontal line across the chart candle that contains the tick, at its exact price. Start and end.")
 markWidth  = input.int(2, "Price marker width", minval = 1, maxval = 5, group = grpX)
 
 // ------------- LINE VISIBILITY PER LEVEL -------------
 grpV = "Lines per chain level (link + price markers + key level)"
-lineL1 = input.bool(true, "Lines for L1 chains (only rung 1 fired)", group = grpV)
-lineL2 = input.bool(true, "Lines for L2 chains", group = grpV)
+lineL1 = input.bool(false, "Lines for L1 chains (only rung 1 fired)", group = grpV)
+lineL2 = input.bool(false, "Lines for L2 chains", group = grpV)
 lineL3 = input.bool(true, "Lines for L3 chains", group = grpV)
 lineL4 = input.bool(true, "Lines for L4 chains", group = grpV)
 lineL5 = input.bool(true, "Lines for L5 chains (all agree)", group = grpV)
@@ -164,8 +168,8 @@ pivLen    = input.int(5,  "Parent pivot strength (chart bars each side)", minval
 structWin = input.int(12, "Structure window (chart bars after the verdict)", minval = 1, group = grpF, tooltip = "How long after a chain resolves the script watches whether a bar closes through the parent's key level.")
 showKey   = input.bool(true, "Key level line (parent's last higher low / lower high)", group = grpF)
 presLen   = input.int(10, "Divergence pressure EMA (chart bars)", minval = 1, group = grpF)
-presWarn  = input.float(3.0, "Divergence warning when pressure >=", minval = 0.5, step = 0.5, group = grpF)
-hurstLen  = input.int(128, "Hurst window (chart bars)", minval = 32, maxval = 480, group = grpF, tooltip = "Rescaled range at N/8, N/4, N/2 and N, slope of log(R/S) vs log(n). Needs this many bars loaded.")
+presWarn  = input.float(4.0, "Divergence warning when pressure >=", minval = 0.5, step = 0.5, group = grpF)
+hurstLen  = input.int(192, "Hurst window (chart bars)", minval = 32, maxval = 480, group = grpF, tooltip = "Rescaled range at N/8, N/4, N/2 and N, slope of log(R/S) vs log(n). Needs this many bars loaded.")
 pUpCol    = input.color(color.new(color.teal, 40), "Parent UP cell",   group = grpF)
 pDnCol    = input.color(color.new(color.red, 40),  "Parent DOWN cell", group = grpF)
 
@@ -175,10 +179,10 @@ modePull     = input.bool(true,  "Trade PULLBACKS (chain WITH the parent resolve
 modeRev      = input.bool(true,  "Trade REVERSALS (chain AGAINST the parent BREAKS structure)", group = grpS)
 entryLvl     = input.int(3, "Chain must reach level >=", minval = 1, maxval = 5, group = grpS)
 needAllAgree = input.bool(false, "Pullback needs all five rungs (L5 OK)", group = grpS)
-stopBufAtr   = input.float(0.25, "Stop buffer beyond the key level (x rung-5 ATR)", minval = 0.0, step = 0.05, group = grpS)
-revStopAtr   = input.float(1.0,  "Reversal stop beyond the chain start (x rung-5 ATR)", minval = 0.1, step = 0.1, group = grpS)
+stopBufAtr   = input.float(0.5, "Stop buffer beyond the key level (x rung-5 ATR)", minval = 0.0, step = 0.05, group = grpS)
+revStopAtr   = input.float(1.5,  "Reversal stop beyond the chain start (x rung-5 ATR)", minval = 0.1, step = 0.1, group = grpS)
 rr           = input.float(2.0,  "Take profit (R multiple of the risk)", minval = 0.5, step = 0.5, group = grpS)
-maxRiskAtr   = input.float(3.0,  "Skip the entry if risk > (x rung-5 ATR)", minval = 0.5, step = 0.5, group = grpS)
+maxRiskAtr   = input.float(4.0,  "Skip the entry if risk > (x rung-5 ATR)", minval = 0.5, step = 0.5, group = grpS)
 maxBars      = input.int(24, "Time stop (chart bars, 0 = off)", minval = 0, group = grpS)
 trailKey     = input.bool(true, "Trail the stop with the parent's key level", group = grpS)
 exitFlip     = input.bool(true, "Exit when the parent flips", group = grpS)
