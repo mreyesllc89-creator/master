@@ -50,3 +50,33 @@ every timeframe (e.g. 1D -5.3%, 1W -39.3%), despite PF 5–11 under `tv`.
 
 Caveats: 1m–60m samples cover only 1–5 weeks; 1W has 15 trades and a deep
 drawdown (2018–2022). Treat 3h / 4h / 1D as the evidence, the rest as hints.
+
+---
+
+# VT Markets (MT5 ticks): XAUUSD-ECNc and BTCUSD.c
+
+Script: `xpw_shape_map_v0.6_strategy_vtmarkets.pine`.
+
+`ticks.py` replays MT5 tick exports (`<DATE> <TIME> <BID> <ASK> ...`, tab separated):
+bars are built from BID, buy stops trigger on ASK, sell stops on BID, long exits on BID,
+short exits on ASK, and every stop / market order fills on the next tick. TP fills at its
+limit price. Commission is charged per unit per side.
+
+    python3 -I calibration/tick_merge.py  calibration <dir with MT5 csvs>   # -> <SYMBOL>.pkl
+    python3 -I calibration/tick_calib.py  <SYMBOL>.pkl <tick> <comm/unit/side>
+    python3 -I calibration/tick_robust.py <SYMBOL>.pkl <comm> 30min 3 0 1 1.5
+
+Data: XAUUSD-ECNc 2026-07-01..08-07 (8.8M ticks, Jul 15-17 missing), BTCUSD.c
+2026-07-01..08-13 (4.8M ticks). Measured spread: XAU median $0.12, BTC median $17.03
+(0.027%). Commission assumed RAW ECN $6/lot round turn: $0.03/oz/side for gold,
+$3/BTC/side for BTC (not confirmed for BTC).
+
+| Symbol / TF | SL / act / dist (ATR) | trades | net | PF | train / test | neighbours positive |
+|---|---|---|---|---|---|---|
+| XAU 30m | 3 / 1 / 1.5 | 72 | +5.10% (+$206/oz) | 1.83 | +2.78 / +2.32 | 27 / 27 |
+| BTC 2h | 3 / 0.5 / 1.5 | 30 | +2.53% (+$1592/BTC) | 1.28 | +1.02 / +1.51 | 23 / 27 |
+| BTC 30m | 4 / 1 / 2, TP 2R | 144 | +2.65% | 1.14 | +1.45 / +1.20 | 5 / 27 (rejected) |
+
+Best settings that still lost (or weren't robust): XAU 1m (+2.4%, PF 1.04, 1% of grid
+positive), 5m, 15m, 60m; BTC 1m (-137%), 5m (-21%), 15m (-6%), 60m (-6%).
+The MEXC rule (6 / 3 / 1.5) lost on both VT symbols at 30m-2h.
