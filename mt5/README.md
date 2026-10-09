@@ -138,3 +138,15 @@ the data merged (~14 weeks):
 | BTC M30 | 260 | 59% | 1.36 | +7.9% / 2.6% | 1.43 / 1.89 / 1.08 / 0.94 | Oct lost |
 | Gold M15 | 403 | 60% | 1.18 | +9.4% / 4.2% | 1.47 / 0.88 / 1.36 / 1.11 | Aug lost |
 | Gold M15 time | 431 | 55% | 1.12 | +7.5% / 8.2% | 1.34 / 0.85 / 1.25 / 1.21 | Aug lost |
+
+## EA v1.30: two gold presets from the sweep on all Jul–Oct data
+
+| Preset (EA value) | Settings | Trades | Win | PF | PF by month (Jul / Aug / Sep / Oct) | Return / max DD |
+|---|---|---|---|---|---|---|
+| Gold M5 swing (10) | M5, RSI 14 / 3 / 7, wait 6, no cross-fail; SL behind 5-bar swing, trail from entry 2 × ATR | 521 | 31% | 1.46 | 1.42 / 2.02 / **0.46** / 2.43 | 0.10%: +16% / 3.8% · **0.25%: +42% / 10.8%** · 0.50%: +96% / 21.4% |
+| Gold H1 swing v2 (11) | H1, RSI 14 / 3 / 7, wait 6, cross-fail on; SL behind 20-bar swing, trail from entry 1.5 × ATR | 46 | 33% | 2.24 | **0.65** / 2.42 / 8.40 / 1.34 | 0.25%: +4.0% / 1.0% · 0.50%: +8.6% / 1.8% |
+
+Both were profitable in all four sweep blocks, but the calendar months show one losing month each,
+so they are marked experimental. Gold M5 swing has a tight stop, so risk-% sizing takes large
+positions: run it at 0.25% or less. The EA now prints a warning (and shows "suggested max" on
+the chart) when the risk input is above a preset's suggestion.

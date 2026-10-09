@@ -5,8 +5,8 @@
 //| ECN commission). See mt5/README.md for the numbers.              |
 //+------------------------------------------------------------------+
 #property copyright "XPW"
-#property version   "1.21"
-#property description "XPW Shape Map v0.6 Turn-Predict EA. 9 presets for XAUUSD / BTCUSD, swept on 9 weeks of VT Markets ticks."
+#property version   "1.30"
+#property description "XPW Shape Map v0.6 Turn-Predict EA. 11 presets for XAUUSD / BTCUSD, swept on 9 weeks of VT Markets ticks."
 
 #include <Trade/Trade.mqh>
 
@@ -43,7 +43,9 @@ enum EPreset
    PRESET_BTC_M15        = 6, // * BTC M15 time stop 24 - PF 1.51, every month >= 1.11
    PRESET_BTC_M30_ATR50  = 7, // * BTC M30 ATR(50) - PF 1.50, every month >= 1.04
    PRESET_GOLD_H1_SWING  = 8, // Gold H1 swing-20 stop - PF 1.68, Jul 0.38, 58 trades
-   PRESET_BTC_H1_RANGE   = 9  // * BTC H1 average-range - PF 2.20, every month >= 1.26, 52 trades
+   PRESET_BTC_H1_RANGE   = 9, // * BTC H1 average-range - PF 2.20, every month >= 1.26, 52 trades
+   PRESET_GOLD_M5_SWING  = 10, // Gold M5 swing-5 stop - PF 1.46, 521 trades, Sep 0.46 (experimental, use 0.25% risk)
+   PRESET_GOLD_H1_SWING2 = 11  // Gold H1 swing-20 v2 - PF 2.24, 46 trades, Jul 0.65 (experimental)
   };
 
 enum EUnit
@@ -112,6 +114,7 @@ struct SParams
    EUnit  unit;
    ESlMode slMode;
    int    swingN, timeStop;
+   double riskHint;      // suggested max risk % per trade for this preset
    string name;
   };
 SParams P;
@@ -129,7 +132,7 @@ bool     g_tfOK      = true;
 //+------------------------------------------------------------------+
 void LoadPreset()
   {
-   P.unit = UNIT_ATR14; P.slMode = SL_UNIT; P.swingN = 5; P.timeStop = 0;
+   P.unit = UNIT_ATR14; P.slMode = SL_UNIT; P.swingN = 5; P.timeStop = 0; P.riskHint = 0.5;
    switch(InpPreset)
      {
       case PRESET_GOLD_M30:
@@ -166,6 +169,16 @@ void LoadPreset()
          P.tf = PERIOD_H1; P.rsiLen = 14; P.fastLen = 2; P.slowLen = 10; P.turnMax = 6; P.turnHold = 1;
          P.failExit = false; P.unit = UNIT_RANGE14; P.slAtr = 1.0; P.tpR = 0.0; P.actAtr = 1.0; P.disAtr = 2.0;
          P.maxSpread = 25.0; P.name = "BTC H1 range"; break;
+      case PRESET_GOLD_M5_SWING:   // swept on all Jul-Oct ticks; tight swing stop -> big positions, 21% DD at 0.5% risk
+         P.tf = PERIOD_M5; P.rsiLen = 14; P.fastLen = 3; P.slowLen = 7; P.turnMax = 6; P.turnHold = 1;
+         P.failExit = false; P.slMode = SL_SWING; P.swingN = 5; P.slAtr = 0; P.tpR = 0.0;
+         P.actAtr = 0.0; P.disAtr = 2.0; P.maxSpread = 0.30; P.riskHint = 0.25;
+         P.name = "Gold M5 swing"; break;
+      case PRESET_GOLD_H1_SWING2:  // swept on all Jul-Oct ticks
+         P.tf = PERIOD_H1; P.rsiLen = 14; P.fastLen = 3; P.slowLen = 7; P.turnMax = 6; P.turnHold = 1;
+         P.failExit = true;  P.slMode = SL_SWING; P.swingN = 20; P.slAtr = 0; P.tpR = 0.0;
+         P.actAtr = 0.0; P.disAtr = 1.5; P.maxSpread = 0.30;
+         P.name = "Gold H1 swing v2"; break;
       case PRESET_BTC_M30_ATR50:
          P.tf = PERIOD_M30; P.rsiLen = 21; P.fastLen = 2; P.slowLen = 5; P.turnMax = 6; P.turnHold = 1;
          P.failExit = false; P.unit = UNIT_ATR50; P.slAtr = 4.0; P.tpR = 0.0; P.actAtr = 2.0; P.disAtr = 0.5;
@@ -193,12 +206,15 @@ int OnInit()
                   P.name, EnumToString(P.tf), EnumToString((ENUM_TIMEFRAMES)_Period));
    string sym = _Symbol;
    StringToUpper(sym);
-   bool goldPreset = InpPreset == PRESET_GOLD_M30 || InpPreset == PRESET_GOLD_M15 || InpPreset == PRESET_GOLD_M30_SWING || InpPreset == PRESET_GOLD_M15_TIME || InpPreset == PRESET_GOLD_H1_SWING;
+   bool goldPreset = InpPreset == PRESET_GOLD_M30 || InpPreset == PRESET_GOLD_M15 || InpPreset == PRESET_GOLD_M30_SWING || InpPreset == PRESET_GOLD_M15_TIME || InpPreset == PRESET_GOLD_H1_SWING
+                     || InpPreset == PRESET_GOLD_M5_SWING || InpPreset == PRESET_GOLD_H1_SWING2;
    bool btcPreset  = InpPreset == PRESET_BTC_M30 || InpPreset == PRESET_BTC_M15 || InpPreset == PRESET_BTC_M30_ATR50 || InpPreset == PRESET_BTC_H1_RANGE;
    if(goldPreset && StringFind(sym, "XAU") < 0)
       PrintFormat("XPW: warning - gold preset on %s", _Symbol);
    if(btcPreset && StringFind(sym, "BTC") < 0)
       PrintFormat("XPW: warning - BTC preset on %s", _Symbol);
+   if(InpFixedLots <= 0 && InpRiskPct > P.riskHint)
+      PrintFormat("XPW: risk %.2f%% is above the %.2f%% suggested for preset %s (deeper drawdowns expected)", InpRiskPct, P.riskHint, P.name);
    g_lastBar = 0;
    return(INIT_SUCCEEDED);
   }
@@ -576,12 +592,12 @@ void OnTick()
    ManageTrail();
    string unitName = P.unit == UNIT_ATR50 ? "ATR50" : P.unit == UNIT_RANGE14 ? "Range14" : P.unit == UNIT_DONCH20 ? "Donch20" : "ATR14";
    string slTxt = P.slMode == SL_SWING ? StringFormat("swing %d bars", P.swingN) : StringFormat("%.1f x %s", P.slAtr, unitName);
-   Comment(StringFormat("XPW Shape Map EA  |  %s %s\nTF %s   spread %.2f (max %.2f)\nArmed  BOT %s  TOP %s\nStop  %s %.2f\nRisk %.2f%%  SL %s  trail %.1f / %.2f x %s  cross-failed %s  time stop %d",
+   Comment(StringFormat("XPW Shape Map EA  |  %s %s\nTF %s   spread %.2f (max %.2f)\nArmed  BOT %s  TOP %s\nStop  %s %.2f\nRisk %.2f%% (suggested max %.2f%%)  SL %s  trail %.1f / %.2f x %s  cross-failed %s  time stop %d",
                         P.name, g_tfOK ? "" : "(WRONG TIMEFRAME - not trading)",
                         EnumToString((ENUM_TIMEFRAMES)_Period), spread, P.maxSpread,
                         g_botArmed ? "yes" : "no", g_topArmed ? "yes" : "no",
                         g_pendDir == 1 ? "BUY at" : g_pendDir == -1 ? "SELL at" : "none", g_pendDir != 0 ? g_pendPx : 0.0,
-                        InpRiskPct, slTxt, P.actAtr, P.disAtr, P.slMode == SL_SWING ? "ATR14" : unitName, P.failExit ? "on" : "off", P.timeStop));
+                        InpRiskPct, P.riskHint, slTxt, P.actAtr, P.disAtr, P.slMode == SL_SWING ? "ATR14" : unitName, P.failExit ? "on" : "off", P.timeStop));
   }
 
 void OnTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest &req, const MqlTradeResult &res)
