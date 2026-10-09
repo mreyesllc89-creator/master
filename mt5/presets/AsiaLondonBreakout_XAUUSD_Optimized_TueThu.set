@@ -1,0 +1,30 @@
+; Asia London Breakout - XAUUSD-ECNc OPTIMIZED #2 (MT5 optimizer pass 409): stop at range MIDPOINT, Tue-Thu (Monday and Friday off), exit 19:00, no TP, skip narrow ranges, 1% risk.
+; Optimization (first ~6 months, commission included): +8.3%, PF 1.25, DD 7.1%, rank 11 of 576. VT ticks Jul 1 - Oct 8 (not used by the optimizer): +15.4%, PF 2.00, DD 5.0%.
+; Runner-up to AsiaLondonBreakout_XAUUSD_Optimized.set (same rule, Monday on). Demo-test before live.
+InpRangeStartHour=3
+InpRangeStartMin=0
+InpRangeEndHour=10
+InpRangeEndMin=0
+InpExitHour=19
+InpExitMin=0
+InpMon=false
+InpTue=true
+InpWed=true
+InpThu=true
+InpFri=false
+InpBufferPct=0.0
+InpStopMode=1
+InpTpR=0.0
+InpRangeFilter=2
+InpMinRange=0.0
+InpMaxRange=0.0
+InpTrailStartR=0.0
+InpTrailDistR=0.25
+InpQtyMode=1
+InpLots=0.1
+InpRiskPct=1.0
+InpMaxLots=200.0
+InpDrawRange=true
+InpShowPanel=true
+InpMaxSpread=0.5
+InpMagic=60610

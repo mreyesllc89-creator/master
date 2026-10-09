@@ -13,6 +13,7 @@ EA: `mt5/AsiaLondonBreakout.mq5`. Presets:
 | `AsiaLondonBreakout_BTCUSD_Optimized_Exit19.set` (runner-up: same, exit 19:00) | BTCUSD.c | Tue-Fri | 60609 | - |
 | `AsiaLondonBreakout_BTCUSD_Candidate.set` (midpoint stop) | BTCUSD.c | Mon-Fri | 60606 | - |
 | **`AsiaLondonBreakout_XAUUSD_Optimized.set`** (optimizer: midpoint stop, Friday off, skip narrow ranges) | XAUUSD-ECN(c) | Mon-Thu | 60607 | - |
+| `AsiaLondonBreakout_XAUUSD_Optimized_TueThu.set` (runner-up: same, Monday off too) | XAUUSD-ECN(c) | Tue-Thu | 60610 | - |
 | `AsiaLondonBreakout_XAUUSD_Candidate.set` (superseded: midpoint stop, Monday off) | XAUUSD-ECN(c) | Tue-Fri | 60604 | - |
 | `AsiaLondonBreakout_XAUUSD_Candidate_Trail.set` (+ trailing) | XAUUSD-ECN(c) | Tue-Fri | 60605 | - |
 
@@ -78,6 +79,10 @@ real ticks, commission included, first ~6 months as the optimization period):
 |---|---|---|---|
 | First ~6 months (MT5 optimizer) | +11.9%, PF 1.29, DD 7.7% | +0.1% | -4.4% |
 | Jul 1 - Sep 30 forward (not used by the optimizer) | +11.6%, DD 6.5% | +4.7% | +11.3% |
+
+Runner-up (`AsiaLondonBreakout_XAUUSD_Optimized_TueThu.set`, pass 409, Monday also off): first ~6 months +8.3%, PF 1.25,
+DD 7.1% (rank 11); VT ticks Jul 1 - Oct 8 +15.4%, PF 2.00, DD 5.0% (pass 412 on the same ticks: +11.2%, PF 1.53, DD 6.3%).
+These two were the best of the optimizer's top 80 when each is ranked by its weaker period.
 
 Of the optimizer's top-40 settings, 39 were also profitable in the forward months (average +5.3%). Average effect over
 all 576 runs: skip-narrow filter +1.7% vs none -2.9%; exit 19:00 +0.3% vs 17:00 -5.3%; Friday off -0.3% vs on -3.9%.
