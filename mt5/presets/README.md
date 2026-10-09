@@ -10,7 +10,8 @@ EA: `mt5/AsiaLondonBreakout.mq5`. Presets:
 | `AsiaLondonBreakout_XAUUSD_FridayOff.set` | XAUUSD-ECN(c) | Mon-Thu | 60603 | `asia_london_breakout_xauusd_fridayoff.pine` |
 | `AsiaLondonBreakout_BTCUSD.set` | BTCUSD.c | Mon-Fri | 60602 | `asia_london_breakout_btcusd.pine` |
 | `AsiaLondonBreakout_BTCUSD_Candidate.set` (midpoint stop) | BTCUSD.c | Mon-Fri | 60606 | - |
-| `AsiaLondonBreakout_XAUUSD_Candidate.set` (midpoint stop, Monday off) | XAUUSD-ECN(c) | Tue-Fri | 60604 | - |
+| **`AsiaLondonBreakout_XAUUSD_Optimized.set`** (optimizer: midpoint stop, Friday off, skip narrow ranges) | XAUUSD-ECN(c) | Mon-Thu | 60607 | - |
+| `AsiaLondonBreakout_XAUUSD_Candidate.set` (superseded: midpoint stop, Monday off) | XAUUSD-ECN(c) | Tue-Fri | 60604 | - |
 | `AsiaLondonBreakout_XAUUSD_Candidate_Trail.set` (+ trailing) | XAUUSD-ECN(c) | Tue-Fri | 60605 | - |
 
 The two gold presets have different magic numbers, so both can run side by side (e.g. two demo accounts, or
@@ -64,6 +65,22 @@ account (~$0.25/oz spread) the 1%-risk result stays around +25%. Check Market Wa
 (contract size, commission) and ask VT Markets for the lowest-cost gold symbol / account type.
 
 All presets use InpMaxLots = 200 so the 1% risk is not capped on 1-oz contracts.
+
+## XAUUSD: MT5 optimizer result (recommended gold preset)
+
+`AsiaLondonBreakout_XAUUSD_Optimized.set` (magic 60607): stop at the range MIDPOINT, Friday OFF, exit 19:00, no TP, no
+buffer, SKIP NARROW RANGES (< 0.5x the 10-day median), 1% risk. From your MT5 optimization (576 runs, XAUUSD-ECNc,
+real ticks, commission included, first ~6 months as the optimization period):
+
+| Period | Optimized preset | Current preset | Old candidate (midpoint, Monday off) |
+|---|---|---|---|
+| First ~6 months (MT5 optimizer) | +11.9%, PF 1.29, DD 7.7% | +0.1% | -4.4% |
+| Jul 1 - Sep 30 forward (not used by the optimizer) | +11.6%, DD 6.5% | +4.7% | +11.3% |
+
+Of the optimizer's top-40 settings, 39 were also profitable in the forward months (average +5.3%). Average effect over
+all 576 runs: skip-narrow filter +1.7% vs none -2.9%; exit 19:00 +0.3% vs 17:00 -5.3%; Friday off -0.3% vs on -3.9%.
+With the midpoint stop, narrow ranges give tiny stops, so the $6/oz commission is a large share of 1R; skipping them
+removes those trades. The old candidate failed the first 6 months, so it is superseded.
 
 ## Calibration for XAUUSD-ECNc costs (candidate, to verify)
 
