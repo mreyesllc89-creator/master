@@ -150,3 +150,16 @@ Both were profitable in all four sweep blocks, but the calendar months show one 
 so they are marked experimental. Gold M5 swing has a tight stop, so risk-% sizing takes large
 positions: run it at 0.25% or less. The EA now prints a warning (and shows "suggested max" on
 the chart) when the risk input is above a preset's suggestion.
+
+## BTC sweep on all Jul–Oct data: no preset change
+
+Best new BTC settings per timeframe (5m and 2h lose or are near flat):
+
+| Setup | Trades | PF | PF by month (Jul / Aug / Sep / Oct) | 0.5% return / DD |
+|---|---|---|---|---|
+| BTC M30, SL 1.5 ATR, exit on opposite TDI cross | 100 | 1.70 | 1.10 / 4.94 / **0.59** / 1.37 | +12.6% / 4.6% |
+| BTC H1, swing-20 SL, trail 1 / 2 ATR | 53 | 1.90 | 2.15 / **0.63** / 1.43 / 24.15 | +7.9% / 3.2% |
+| BTC M15 time (current preset 6) | 198 | 1.51 | 1.35 / 1.57 / 1.11 / 3.40 (blocks: one 0.75) | +9.9% / 2.8% |
+
+Each new one has a losing month, while the current BTC M30 ATR50 (PF 1.50) and BTC H1 range
+(PF 2.20) presets were profitable in every month, so they stay the top two.
