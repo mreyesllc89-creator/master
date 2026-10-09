@@ -5,7 +5,7 @@
 //| ECN commission). See mt5/README.md for the numbers.              |
 //+------------------------------------------------------------------+
 #property copyright "XPW"
-#property version   "1.20"
+#property version   "1.21"
 #property description "XPW Shape Map v0.6 Turn-Predict EA. 9 presets for XAUUSD / BTCUSD, swept on 9 weeks of VT Markets ticks."
 
 #include <Trade/Trade.mqh>
@@ -33,17 +33,17 @@
 
 enum EPreset
   {
-   // PF = profit factor on 9 weeks of VT Markets ticks (Jul-Oct 2026), blocks = 4 time blocks
-   PRESET_GOLD_M30 = 0,   // Gold M30 - PF 1.37, lost one block (not recommended)
-   PRESET_GOLD_M15 = 1,   // * Gold M15 - PF 1.35, all 4 blocks 1.25-1.44 (recommended)
-   PRESET_BTC_M30  = 2,   // BTC M30 - PF 1.24, lost one block (not recommended)
+   // PF = profit factor on all VT Markets ticks Jul 1 - Oct 8 2026 (~14 weeks); "*" = profitable every month
+   PRESET_GOLD_M30 = 0,   // Gold M30 - PF 1.47, Sep 0.87
+   PRESET_GOLD_M15 = 1,   // Gold M15 - PF 1.18, Aug 0.88
+   PRESET_BTC_M30  = 2,   // BTC M30 - PF 1.36, Oct 0.94
    PRESET_CUSTOM   = 3,   // Custom (inputs below)
-   PRESET_GOLD_M30_SWING = 4, // * Gold M30 swing stop - PF 1.71, all blocks > 1.2
-   PRESET_GOLD_M15_TIME  = 5, // * Gold M15 time stop 24 - PF 1.29, all blocks 1.25-1.31
-   PRESET_BTC_M15        = 6, // BTC M15 time stop 24 - PF 1.46, one block 0.98 (experimental)
-   PRESET_BTC_M30_ATR50  = 7, // * BTC M30 ATR(50) - PF 1.38, all blocks > 1.07
-   PRESET_GOLD_H1_SWING  = 8, // Gold H1 swing-20 stop - PF 3.31, 33 trades (experimental)
-   PRESET_BTC_H1_RANGE   = 9  // * BTC H1 average-range - PF 2.28, all blocks > 1.45, 50 trades
+   PRESET_GOLD_M30_SWING = 4, // * Gold M30 swing stop - PF 1.43, every month >= 1.05
+   PRESET_GOLD_M15_TIME  = 5, // Gold M15 time stop 24 - PF 1.12, Aug 0.85
+   PRESET_BTC_M15        = 6, // * BTC M15 time stop 24 - PF 1.51, every month >= 1.11
+   PRESET_BTC_M30_ATR50  = 7, // * BTC M30 ATR(50) - PF 1.50, every month >= 1.04
+   PRESET_GOLD_H1_SWING  = 8, // Gold H1 swing-20 stop - PF 1.68, Jul 0.38, 58 trades
+   PRESET_BTC_H1_RANGE   = 9  // * BTC H1 average-range - PF 2.20, every month >= 1.26, 52 trades
   };
 
 enum EUnit
@@ -68,7 +68,7 @@ enum EDir
   };
 
 input group "Preset & risk"
-input EPreset InpPreset      = PRESET_GOLD_M15; // Preset
+input EPreset InpPreset      = PRESET_GOLD_M30_SWING; // Preset
 input double  InpRiskPct     = 0.5;             // Risk % of equity per trade (distance to SL)
 input double  InpFixedLots   = 0.0;             // Fixed lots (>0 overrides risk %)
 input double  InpMaxLots     = 5.0;             // Max lots per trade

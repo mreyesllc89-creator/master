@@ -118,3 +118,23 @@ BTC preset still positive.
 Preset 6 used to be "BTC M15 range", which failed out of sample (PF 0.77) and is replaced.
 Losing everywhere: gold 5m, BTC 5m, BTC 2h. All numbers come from the data they were tuned on,
 so expect lower results live; forward-test on demo first.
+
+## Full-period check, all data Jul 1 – Oct 8 (EA v1.21)
+
+New ticks for gold Aug 10–31 and BTC Aug 13–20 were not in the sweep. On them alone the
+recommended gold presets lost (Gold M15 PF 0.96, Gold M30 swing 0.79, Gold M15 time 0.89,
+Gold H1 swing 0.64), while Gold M30 made PF 1.72; BTC had only one new week (all presets positive
+except BTC H1 range, 2 trades). `calibration/full_period.py` then runs every preset over all
+the data merged (~14 weeks):
+
+| Preset | Trades | Win | PF | 0.5% return / DD | PF by month (Jul / Aug / Sep / Oct) | Verdict |
+|---|---|---|---|---|---|---|
+| **BTC H1 range** | 52 | 44% | **2.20** | +14.2% / 3.6% | 1.73 / 1.26 / 2.74 / no loss | every month positive (small sample) |
+| **BTC M15 time** | 198 | 44% | **1.51** | +9.9% / 2.8% | 1.35 / 1.57 / 1.11 / 3.40 | every month positive |
+| **BTC M30 ATR50** | 247 | 57% | **1.50** | +8.1% / 1.8% | 1.52 / 2.00 / 1.04 / 1.78 | every month positive |
+| **Gold M30 swing** (default) | 141 | 31% | **1.43** | +13.3% / 5.8% | 1.65 / 1.05 / 1.05 / 4.15 | every month positive |
+| Gold H1 swing | 58 | 33% | 1.68 | +6.8% / 3.0% | 0.38 / 2.23 / 2.13 / 1.33 | July lost |
+| Gold M30 | 168 | 36% | 1.47 | +4.1% / 0.9% | 1.32 / 1.90 / 0.87 / 2.06 | Sep lost |
+| BTC M30 | 260 | 59% | 1.36 | +7.9% / 2.6% | 1.43 / 1.89 / 1.08 / 0.94 | Oct lost |
+| Gold M15 | 403 | 60% | 1.18 | +9.4% / 4.2% | 1.47 / 0.88 / 1.36 / 1.11 | Aug lost |
+| Gold M15 time | 431 | 55% | 1.12 | +7.5% / 8.2% | 1.34 / 0.85 / 1.25 / 1.21 | Aug lost |
