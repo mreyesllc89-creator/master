@@ -163,3 +163,19 @@ Best new BTC settings per timeframe (5m and 2h lose or are near flat):
 
 Each new one has a losing month, while the current BTC M30 ATR50 (PF 1.50) and BTC H1 range
 (PF 2.20) presets were profitable in every month, so they stay the top two.
+
+## Set files for the top picks (EA v1.31)
+
+`mt5/sets/` has one MT5 set file per top preset. Each has its own magic number and order comment,
+so all four can run on one account.
+
+| File | Chart | Preset | Risk | Magic |
+|---|---|---|---|---|
+| `XPW_TOP1_GOLD_XAUUSD_M30_swing.set` | XAUUSD M30 | Gold M30 swing (4) | 0.5% | 26060401 |
+| `XPW_TOP2_GOLD_XAUUSD_M5_swing.set` | XAUUSD M5 | Gold M5 swing (10) | 0.25% | 26060410 |
+| `XPW_TOP1_BTC_BTCUSD_M30_ATR50.set` | BTCUSD M30 | BTC M30 ATR50 (7) | 0.5% | 26060407 |
+| `XPW_TOP2_BTC_BTCUSD_H1_range.set` | BTCUSD H1 | BTC H1 range (9) | 0.5% | 26060409 |
+
+Install: copy the files to `MQL5/Presets/` (File → Open Data Folder), attach the EA to the chart
+in the table, then **Inputs → Load** and pick the file. In the Strategy Tester use **Load** on the
+Inputs tab. Combined, the four can have up to 1.75% of equity at risk at once.

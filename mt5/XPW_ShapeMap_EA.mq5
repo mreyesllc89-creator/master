@@ -5,8 +5,8 @@
 //| ECN commission). See mt5/README.md for the numbers.              |
 //+------------------------------------------------------------------+
 #property copyright "XPW"
-#property version   "1.30"
-#property description "XPW Shape Map v0.6 Turn-Predict EA. 11 presets for XAUUSD / BTCUSD, swept on 9 weeks of VT Markets ticks."
+#property version   "1.31"
+#property description "XPW Shape Map v0.6 Turn-Predict EA. 11 presets for XAUUSD / BTCUSD, tick-calibrated on VT Markets Jul-Oct 2026. Top picks: sets/*.set"
 
 #include <Trade/Trade.mqh>
 
@@ -38,13 +38,13 @@ enum EPreset
    PRESET_GOLD_M15 = 1,   // Gold M15 - PF 1.18, Aug 0.88
    PRESET_BTC_M30  = 2,   // BTC M30 - PF 1.36, Oct 0.94
    PRESET_CUSTOM   = 3,   // Custom (inputs below)
-   PRESET_GOLD_M30_SWING = 4, // * Gold M30 swing stop - PF 1.43, every month >= 1.05
+   PRESET_GOLD_M30_SWING = 4, // TOP-1 GOLD: Gold M30 swing stop - PF 1.43, every month >= 1.05
    PRESET_GOLD_M15_TIME  = 5, // Gold M15 time stop 24 - PF 1.12, Aug 0.85
    PRESET_BTC_M15        = 6, // * BTC M15 time stop 24 - PF 1.51, every month >= 1.11
-   PRESET_BTC_M30_ATR50  = 7, // * BTC M30 ATR(50) - PF 1.50, every month >= 1.04
+   PRESET_BTC_M30_ATR50  = 7, // TOP-1 BTC: BTC M30 ATR(50) - PF 1.50, every month >= 1.04
    PRESET_GOLD_H1_SWING  = 8, // Gold H1 swing-20 stop - PF 1.68, Jul 0.38, 58 trades
-   PRESET_BTC_H1_RANGE   = 9, // * BTC H1 average-range - PF 2.20, every month >= 1.26, 52 trades
-   PRESET_GOLD_M5_SWING  = 10, // Gold M5 swing-5 stop - PF 1.46, 521 trades, Sep 0.46 (experimental, use 0.25% risk)
+   PRESET_BTC_H1_RANGE   = 9, // TOP-2 BTC: BTC H1 average-range - PF 2.20, every month >= 1.26, 52 trades
+   PRESET_GOLD_M5_SWING  = 10, // TOP-2 GOLD: Gold M5 swing-5 stop - PF 1.46, 521 trades, Sep 0.46 (experimental, use 0.25% risk)
    PRESET_GOLD_H1_SWING2 = 11  // Gold H1 swing-20 v2 - PF 2.24, 46 trades, Jul 0.65 (experimental)
   };
 
