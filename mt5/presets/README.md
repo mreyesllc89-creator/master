@@ -10,6 +10,7 @@ EA: `mt5/AsiaLondonBreakout.mq5`. Presets:
 | `AsiaLondonBreakout_XAUUSD_FridayOff.set` | XAUUSD-ECN(c) | Mon-Thu | 60603 | `asia_london_breakout_xauusd_fridayoff.pine` |
 | `AsiaLondonBreakout_BTCUSD.set` | BTCUSD.c | Mon-Fri | 60602 | `asia_london_breakout_btcusd.pine` |
 | **`AsiaLondonBreakout_BTCUSD_Optimized.set`** (optimizer: midpoint stop, Monday off, exit 21:00) | BTCUSD.c | Tue-Fri | 60608 | - |
+| `AsiaLondonBreakout_BTCUSD_Optimized_Exit19.set` (runner-up: same, exit 19:00) | BTCUSD.c | Tue-Fri | 60609 | - |
 | `AsiaLondonBreakout_BTCUSD_Candidate.set` (midpoint stop) | BTCUSD.c | Mon-Fri | 60606 | - |
 | **`AsiaLondonBreakout_XAUUSD_Optimized.set`** (optimizer: midpoint stop, Friday off, skip narrow ranges) | XAUUSD-ECN(c) | Mon-Thu | 60607 | - |
 | `AsiaLondonBreakout_XAUUSD_Candidate.set` (superseded: midpoint stop, Monday off) | XAUUSD-ECN(c) | Tue-Fri | 60604 | - |
@@ -125,7 +126,8 @@ forward test (top 256 settings, last ~3 months). Your run used a very small lot,
 | Same with exit 19:00 (pass 31) | 1.33 | 2.47 | 17 |
 | Old candidate (pass 34: midpoint, Mon-Fri, exit 19) | 1.17 | 2.32 | 63 |
 
-Pass 32 had the highest optimization profit and was also the best setting when ranked by its weaker period. 254 of the 256 forward settings were
+VT ticks Jul 1 - Oct 8 at 1% risk: pass 32 +26.4%, PF 1.83, DD 7.0%; pass 31 (`AsiaLondonBreakout_BTCUSD_Optimized_Exit19.set`)
++32.4%, PF 2.01, DD 7.1%. Pass 32 had the highest optimization profit and was also the best setting when ranked by its weaker period. 254 of the 256 forward settings were
 profitable, but optimization and forward profit correlate only 0.12, so the ranking within the top is noisy. Average
 effects held in both periods: midpoint stop better than opposite side, Friday on better than off, exit 19/21 better
 than 17, no TP best in the forward months.
