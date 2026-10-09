@@ -1,0 +1,30 @@
+; Asia London Breakout - BTCUSD.c OPTIMIZED (MT5 optimizer pass 32): stop at range MIDPOINT, Tue-Fri (Monday off), exit 21:00, no TP, no buffer, no filter, 1% risk.
+; Optimization period (first ~6 months): PF 1.43, rank 1 of 576 (also best by the weaker period). Forward (last ~3 months, not used to pick): PF 2.42.
+; Close alternative: same with exit 19:00 (pass 31). Demo-test before live.
+InpRangeStartHour=3
+InpRangeStartMin=0
+InpRangeEndHour=10
+InpRangeEndMin=0
+InpExitHour=21
+InpExitMin=0
+InpMon=false
+InpTue=true
+InpWed=true
+InpThu=true
+InpFri=true
+InpBufferPct=0.0
+InpStopMode=1
+InpTpR=0.0
+InpRangeFilter=0
+InpMinRange=0.0
+InpMaxRange=0.0
+InpTrailStartR=0.0
+InpTrailDistR=0.25
+InpQtyMode=1
+InpLots=0.1
+InpRiskPct=1.0
+InpMaxLots=1000.0
+InpDrawRange=true
+InpShowPanel=true
+InpMaxSpread=40.0
+InpMagic=60608

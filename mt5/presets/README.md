@@ -9,6 +9,7 @@ EA: `mt5/AsiaLondonBreakout.mq5`. Presets:
 | `AsiaLondonBreakout_XAUUSD.set` | XAUUSD-ECN(c) | Mon-Fri | 60601 | `asia_london_breakout_xauusd.pine` |
 | `AsiaLondonBreakout_XAUUSD_FridayOff.set` | XAUUSD-ECN(c) | Mon-Thu | 60603 | `asia_london_breakout_xauusd_fridayoff.pine` |
 | `AsiaLondonBreakout_BTCUSD.set` | BTCUSD.c | Mon-Fri | 60602 | `asia_london_breakout_btcusd.pine` |
+| **`AsiaLondonBreakout_BTCUSD_Optimized.set`** (optimizer: midpoint stop, Monday off, exit 21:00) | BTCUSD.c | Tue-Fri | 60608 | - |
 | `AsiaLondonBreakout_BTCUSD_Candidate.set` (midpoint stop) | BTCUSD.c | Mon-Fri | 60606 | - |
 | **`AsiaLondonBreakout_XAUUSD_Optimized.set`** (optimizer: midpoint stop, Friday off, skip narrow ranges) | XAUUSD-ECN(c) | Mon-Thu | 60607 | - |
 | `AsiaLondonBreakout_XAUUSD_Candidate.set` (superseded: midpoint stop, Monday off) | XAUUSD-ECN(c) | Tue-Fri | 60604 | - |
@@ -111,6 +112,23 @@ by weekday: Mon +4.6, Tue +1.9, Wed -1.1, Thu +4.5, Fri +11.4. BTC presets now u
 270 BTC settings on VT ticks (Jul 1 - Oct 8), 1% risk: 96% profitable. Best: stop at the range MIDPOINT, Mon-Fri,
 exit 19:00, no trail, no TP: +37.0% (halves +15.9% / +21.1%), DD 7.2% vs +16.3% for the current preset
 (`AsiaLondonBreakout_BTCUSD_Candidate.set`). Verify on 9 months with `AsiaLondonBreakout_BTCUSD_OPTIMIZE.set`.
+
+## BTCUSD: MT5 optimizer result (recommended BTC preset)
+
+`AsiaLondonBreakout_BTCUSD_Optimized.set` (magic 60608): stop at the range MIDPOINT, Monday OFF, Friday ON, exit 21:00,
+no TP, no buffer, no range filter, 1% risk. From your MT5 optimization (576 runs, BTCUSD.c, first ~6 months) and its
+forward test (top 256 settings, last ~3 months). Your run used a very small lot, so compare profit factor and rank:
+
+| Setting | Optimization PF | Forward PF | Opt. rank (of 576) |
+|---|---|---|---|
+| Optimized (pass 32: midpoint, Tue-Fri, exit 21) | 1.43 | 2.42 | 1 |
+| Same with exit 19:00 (pass 31) | 1.33 | 2.47 | 17 |
+| Old candidate (pass 34: midpoint, Mon-Fri, exit 19) | 1.17 | 2.32 | 63 |
+
+Pass 32 had the highest optimization profit and was also the best setting when ranked by its weaker period. 254 of the 256 forward settings were
+profitable, but optimization and forward profit correlate only 0.12, so the ranking within the top is noisy. Average
+effects held in both periods: midpoint stop better than opposite side, Friday on better than off, exit 19/21 better
+than 17, no TP best in the forward months.
 
 ## Position sizing: 1% risk per trade (all presets)
 
