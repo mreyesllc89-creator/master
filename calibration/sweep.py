@@ -8,7 +8,7 @@ sys.path.insert(0, __file__.rsplit('/', 1)[0])
 from ticks import build, engine2
 from xpw import indicators, signals, rma
 SYM, COMM, STEP, OUT, PKLS = sys.argv[1], float(sys.argv[2]), float(sys.argv[3]), sys.argv[4], sys.argv[5:]
-BLOCKS = [('2026-07-01', '2026-07-22'), ('2026-07-22', '2026-08-31'), ('2026-09-01', '2026-09-20'), ('2026-09-20', '2026-10-31')]
+BLOCKS = [('2026-07-01', '2026-07-24'), ('2026-07-24', '2026-08-17'), ('2026-08-17', '2026-09-14'), ('2026-09-14', '2026-10-31')]
 BT0 = np.array([np.datetime64(a) for a, b in BLOCKS]); BT1 = np.array([np.datetime64(b) for a, b in BLOCKS])
 
 def segments(df):
@@ -107,10 +107,12 @@ def detail(lab, s, mode, g):
 CURRENT = {'XAUUSD-ECNc': [('30m', (14, 2, 7, 12, 2, True), ('unit', 'ATR14'), (3, 1, 1.5), 'Gold M30'),
                            ('15m', (21, 2, 5, 6, 2, False), ('unit', 'ATR14'), (2, 1, 0.5), 'Gold M15'),
                            ('30m', (10, 2, 10, 12, 2, True), ('swing', 5), (2, 2), 'Gold M30 swing'),
-                           ('15m', (21, 2, 5, 6, 1, False), ('time', 24), (1.5, 1, 0.75), 'Gold M15 time')],
+                           ('15m', (21, 2, 5, 6, 1, False), ('time', 24), (1.5, 1, 0.75), 'Gold M15 time'),
+                           ('1h', (14, 3, 7, 24, 2, True), ('swing', 20), (0, 1.5), 'Gold H1 swing')],
            'BTCUSD.c':    [('30m', (21, 2, 5, 6, 2, False), ('unit', 'ATR14'), (3, 1.5, 0.75), 'BTC M30'),
-                           ('15m', (10, 3, 7, 6, 1, False), ('unit', 'Range14'), (4, 2, 0.5), 'BTC M15 range'),
-                           ('30m', (21, 2, 5, 6, 1, False), ('unit', 'ATR50'), (4, 2, 0.5), 'BTC M30 ATR50')]}
+                           ('15m', (21, 2, 10, 6, 1, False), ('time', 24), (4, 99, 0.75), 'BTC M15 time'),
+                           ('30m', (21, 2, 5, 6, 1, False), ('unit', 'ATR50'), (4, 2, 0.5), 'BTC M30 ATR50'),
+                           ('1h', (14, 2, 10, 6, 1, False), ('unit', 'Range14'), (1, 1, 2), 'BTC H1 range')]}
 
 def fmt(d):
     return 'n=%d win %.0f%% PF %.2f | block PF %s | exp %+.3fR | 0.5%%: %+.1f%% DD %.1f%%' % (
