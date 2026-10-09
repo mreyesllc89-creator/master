@@ -5,8 +5,8 @@
 //| ECN commission). See mt5/README.md for the numbers.              |
 //+------------------------------------------------------------------+
 #property copyright "XPW"
-#property version   "1.00"
-#property description "XPW Shape Map v0.6 Turn-Predict EA. Presets: Gold M30, Gold M15, BTC M30 (VT Markets tick calibration)."
+#property version   "1.10"
+#property description "XPW Shape Map v0.6 Turn-Predict EA. 7 presets for XAUUSD / BTCUSD calibrated on VT Markets ticks."
 
 #include <Trade/Trade.mqh>
 
@@ -19,9 +19,13 @@
 //    next bar, and holds a virtual stop there. The first tick that reaches it
 //    (Ask for buys, Bid for sells) sends a market order. An open opposite
 //    position is closed first (reverse).
-// 4. Exits: broker-side SL = slAtr x ATR of the signal bar. Trailing stop
-//    starts when price has moved actAtr x ATR in favour and then follows the
-//    best price at disAtr x ATR (server SL is moved). Optional TP = tpR x SL.
+// 4. Exits: broker-side SL = slAtr x distance unit of the signal bar, or
+//    (swing mode) just beyond the lowest low / highest high of the last N
+//    bars. Units: ATR(14), ATR(50), average high-low range(14) or Donchian(20)
+//    width, rescaled to the median ATR(14) so multipliers stay comparable.
+//    Trailing stop starts when price has moved actAtr x unit in favour and
+//    then follows the best price at disAtr x unit (server SL is moved).
+//    Optional TP = tpR x SL. Optional time stop: close after N bars.
 //    "Cross failed" (optional): if within turnHold bars of entry the bar
 //    closes with the lines back on the wrong side, close at market.
 // Virtual stops (not broker pending orders) are used so behaviour is the same
@@ -32,7 +36,25 @@ enum EPreset
    PRESET_GOLD_M30 = 0,   // Gold M30 - steady (6/6 weeks positive)
    PRESET_GOLD_M15 = 1,   // Gold M15 - higher return (experimental)
    PRESET_BTC_M30  = 2,   // BTC M30 - experimental
-   PRESET_CUSTOM   = 3    // Custom (inputs below)
+   PRESET_CUSTOM   = 3,   // Custom (inputs below)
+   PRESET_GOLD_M30_SWING = 4, // Gold M30 - swing stop (PF 1.55, 85% of neighbours positive)
+   PRESET_GOLD_M15_TIME  = 5, // Gold M15 - time stop 24 bars (PF 1.36)
+   PRESET_BTC_M15        = 6, // BTC M15 - average-range unit (PF 1.52)
+   PRESET_BTC_M30_ATR50  = 7  // BTC M30 - slow ATR(50) unit (PF 1.49)
+  };
+
+enum EUnit
+  {
+   UNIT_ATR14    = 0,   // ATR(14)
+   UNIT_ATR50    = 1,   // ATR(50) - slow
+   UNIT_RANGE14  = 2,   // Average high-low range (14)
+   UNIT_DONCH20  = 3    // Donchian(20) width
+  };
+
+enum ESlMode
+  {
+   SL_UNIT  = 0,   // SL = multiple of the distance unit
+   SL_SWING = 1    // SL behind the swing low / high of the last N bars
   };
 
 enum EDir
@@ -61,10 +83,14 @@ input int    InpCSlowLen     = 7;               // Slow MA length
 input int    InpCTurnMax     = 12;              // Max bars to wait after a square
 input int    InpCTurnHold    = 2;               // Bars the cross must hold
 input bool   InpCFailExit    = true;            // Exit if the cross fails to hold
-input double InpCSlAtr       = 3.0;             // Stop loss, ATR multiple
+input EUnit  InpCUnit        = UNIT_ATR14;      // Distance unit for SL / trail
+input ESlMode InpCSlMode     = SL_UNIT;         // Stop-loss placement
+input int    InpCSwingN      = 5;               // Swing SL: bars to look back
+input int    InpCTimeStop    = 0;               // Time stop, bars (0 = off)
+input double InpCSlAtr       = 3.0;             // Stop loss, unit multiple
 input double InpCTpR         = 0.0;             // Take profit, R multiple of SL (0 = off)
-input double InpCActAtr      = 1.0;             // Trail activation, ATR multiple
-input double InpCDisAtr      = 1.5;             // Trail distance, ATR multiple (0 = no trail)
+input double InpCActAtr      = 1.0;             // Trail activation, unit multiple
+input double InpCDisAtr      = 1.5;             // Trail distance, unit multiple (0 = no trail)
 input double InpCMaxSpread   = 0.30;            // Max spread in price
 
 input group "Detection (same defaults as the Pine script)"
@@ -80,6 +106,9 @@ struct SParams
    int    rsiLen, fastLen, slowLen, turnMax, turnHold;
    bool   failExit;
    double slAtr, tpR, actAtr, disAtr, maxSpread;
+   EUnit  unit;
+   ESlMode slMode;
+   int    swingN, timeStop;
    string name;
   };
 SParams P;
@@ -88,7 +117,8 @@ CTrade  trade;
 datetime g_lastBar   = 0;
 int      g_pendDir   = 0;      // virtual stop: +1 buy, -1 sell, 0 none
 double   g_pendPx    = 0.0;
-double   g_pendAtr   = 0.0;
+double   g_pendAtr   = 0.0;      // trail unit of the signal bar
+double   g_pendSl    = 0.0;      // SL distance of the signal bar
 double   g_lastFast  = 0.0, g_lastSlow = 0.0;
 bool     g_botArmed  = false, g_topArmed = false;
 bool     g_tfOK      = true;
@@ -96,6 +126,7 @@ bool     g_tfOK      = true;
 //+------------------------------------------------------------------+
 void LoadPreset()
   {
+   P.unit = UNIT_ATR14; P.slMode = SL_UNIT; P.swingN = 5; P.timeStop = 0;
    switch(InpPreset)
      {
       case PRESET_GOLD_M30:
@@ -110,11 +141,29 @@ void LoadPreset()
          P.tf = PERIOD_M30; P.rsiLen = 21; P.fastLen = 2; P.slowLen = 5; P.turnMax = 6; P.turnHold = 2;
          P.failExit = false; P.slAtr = 3.0; P.tpR = 0.0; P.actAtr = 1.5; P.disAtr = 0.75; P.maxSpread = 25.0;
          P.name = "BTC M30"; break;
+      case PRESET_GOLD_M30_SWING:
+         P.tf = PERIOD_M30; P.rsiLen = 10; P.fastLen = 2; P.slowLen = 10; P.turnMax = 12; P.turnHold = 2;
+         P.failExit = true;  P.slMode = SL_SWING; P.swingN = 5; P.slAtr = 0; P.tpR = 0.0;
+         P.actAtr = 2.0; P.disAtr = 2.0; P.maxSpread = 0.30;
+         P.name = "Gold M30 swing"; break;
+      case PRESET_GOLD_M15_TIME:
+         P.tf = PERIOD_M15; P.rsiLen = 21; P.fastLen = 2; P.slowLen = 5; P.turnMax = 6; P.turnHold = 1;
+         P.failExit = false; P.slAtr = 1.5; P.tpR = 0.0; P.actAtr = 1.0; P.disAtr = 0.75; P.timeStop = 24;
+         P.maxSpread = 0.30; P.name = "Gold M15 time"; break;
+      case PRESET_BTC_M15:
+         P.tf = PERIOD_M15; P.rsiLen = 10; P.fastLen = 3; P.slowLen = 7; P.turnMax = 6; P.turnHold = 1;
+         P.failExit = false; P.unit = UNIT_RANGE14; P.slAtr = 4.0; P.tpR = 0.0; P.actAtr = 2.0; P.disAtr = 0.5;
+         P.maxSpread = 25.0; P.name = "BTC M15 range"; break;
+      case PRESET_BTC_M30_ATR50:
+         P.tf = PERIOD_M30; P.rsiLen = 21; P.fastLen = 2; P.slowLen = 5; P.turnMax = 6; P.turnHold = 1;
+         P.failExit = false; P.unit = UNIT_ATR50; P.slAtr = 4.0; P.tpR = 0.0; P.actAtr = 2.0; P.disAtr = 0.5;
+         P.maxSpread = 25.0; P.name = "BTC M30 ATR50"; break;
       default:
          P.tf = InpCTF; P.rsiLen = InpCRsiLen; P.fastLen = InpCFastLen; P.slowLen = InpCSlowLen;
          P.turnMax = InpCTurnMax; P.turnHold = InpCTurnHold; P.failExit = InpCFailExit;
          P.slAtr = InpCSlAtr; P.tpR = InpCTpR; P.actAtr = InpCActAtr; P.disAtr = InpCDisAtr;
-         P.maxSpread = InpCMaxSpread; P.name = "Custom"; break;
+         P.maxSpread = InpCMaxSpread; P.unit = InpCUnit; P.slMode = InpCSlMode;
+         P.swingN = MathMax(InpCSwingN, 1); P.timeStop = InpCTimeStop; P.name = "Custom"; break;
      }
    if(InpMaxSpread > 0) P.maxSpread = InpMaxSpread;
   }
@@ -132,9 +181,11 @@ int OnInit()
                   P.name, EnumToString(P.tf), EnumToString((ENUM_TIMEFRAMES)_Period));
    string sym = _Symbol;
    StringToUpper(sym);
-   if((InpPreset == PRESET_GOLD_M30 || InpPreset == PRESET_GOLD_M15) && StringFind(sym, "XAU") < 0)
+   bool goldPreset = InpPreset == PRESET_GOLD_M30 || InpPreset == PRESET_GOLD_M15 || InpPreset == PRESET_GOLD_M30_SWING || InpPreset == PRESET_GOLD_M15_TIME;
+   bool btcPreset  = InpPreset == PRESET_BTC_M30 || InpPreset == PRESET_BTC_M15 || InpPreset == PRESET_BTC_M30_ATR50;
+   if(goldPreset && StringFind(sym, "XAU") < 0)
       PrintFormat("XPW: warning - gold preset on %s", _Symbol);
-   if(InpPreset == PRESET_BTC_M30 && StringFind(sym, "BTC") < 0)
+   if(btcPreset && StringFind(sym, "BTC") < 0)
       PrintFormat("XPW: warning - BTC preset on %s", _Symbol);
    g_lastBar = 0;
    return(INIT_SUCCEEDED);
@@ -151,7 +202,20 @@ struct SSignal
    bool   ok;
    bool   wantL, wantS;
    double xPx, fast, slow, atr;
+   double unit;          // trail unit (price) of this bar
+   double slL, slS;      // SL distance for a long / short placed now
   };
+
+double Median(const double &src[], int from, int n)
+  {
+   double v[]; int m = 0;
+   ArrayResize(v, n);
+   for(int i = from; i < n; i++) if(src[i] != EMPTY_VALUE && src[i] > 0) v[m++] = src[i];
+   if(m == 0) return 0;
+   ArrayResize(v, m);
+   ArraySort(v);
+   return m % 2 == 1 ? v[m / 2] : 0.5 * (v[m / 2 - 1] + v[m / 2]);
+  }
 
 void Rma(const double &src[], double &dst[], int len, int n)
   {
@@ -211,7 +275,8 @@ bool CrossDn(const double &f[], const double &s[], int i)   { return i >= 1 && V
 void Compute(SSignal &out)
   {
    out.ok = false; out.wantL = false; out.wantS = false; out.xPx = 0; out.fast = 0; out.slow = 0; out.atr = 0;
-   int n = MathMin(Bars(_Symbol, _Period) - 1, 800);
+   out.unit = 0; out.slL = 0; out.slS = 0;
+   int n = MathMin(Bars(_Symbol, _Period) - 1, 1500);
    if(n < 100) return;
    MqlRates rt[];
    ArraySetAsSeries(rt, false);
@@ -290,6 +355,50 @@ void Compute(SSignal &out)
    out.xPx   = px;
    out.wantL = havePx && bA && fast[L] < slow[L];
    out.wantS = havePx && tA && fast[L] > slow[L];
+
+   // distance unit, rescaled to the same median as ATR(14) over the window,
+   // so multipliers mean "x typical ATR" (as in the calibration)
+   double u[];
+   ArrayResize(u, n);
+   ArrayInitialize(u, EMPTY_VALUE);
+   if(P.unit == UNIT_ATR50)
+      Rma(tr, u, 50, n);
+   else if(P.unit == UNIT_RANGE14)
+     {
+      double hl[]; ArrayResize(hl, n);
+      for(int i = 0; i < n; i++) hl[i] = rt[i].high - rt[i].low;
+      Sma(hl, u, 14, n);
+     }
+   else if(P.unit == UNIT_DONCH20)
+     {
+      for(int i = 19; i < n; i++)
+        {
+         double hh = rt[i].high, ll = rt[i].low;
+         for(int k = 1; k < 20; k++) { hh = MathMax(hh, rt[i - k].high); ll = MathMin(ll, rt[i - k].low); }
+         u[i] = hh - ll;
+        }
+     }
+   double unitVal = atr[L];
+   if(P.unit != UNIT_ATR14 && u[L] != EMPTY_VALUE)
+     {
+      double mA = Median(atr, 0, n), mU = Median(u, 0, n);
+      if(mA > 0 && mU > 0) unitVal = u[L] * mA / mU;
+     }
+   if(P.slMode == SL_SWING)
+     {
+      double ll = rt[L].low, hh = rt[L].high;
+      for(int k = 1; k < P.swingN && L - k >= 0; k++) { ll = MathMin(ll, rt[L - k].low); hh = MathMax(hh, rt[L - k].high); }
+      double x = havePx ? px : c[L];
+      out.slL  = MathMax(x - ll + 0.1 * atr[L], 0.3 * atr[L]);
+      out.slS  = MathMax(hh - x + 0.1 * atr[L], 0.3 * atr[L]);
+      out.unit = atr[L];
+     }
+   else
+     {
+      out.slL  = P.slAtr * unitVal;
+      out.slS  = out.slL;
+      out.unit = unitVal;
+     }
   }
 
 //+------------------------------------------------------------------+
@@ -351,14 +460,13 @@ double CalcLots(double slDist)
   }
 
 //+------------------------------------------------------------------+
-void Enter(int dir, double atrSig)
+void Enter(int dir, double slDist, double atrSig)
   {
    ulong t; int pos = PosDir(t);
    if(pos == dir) return;
    if(pos != 0) CloseAll();                       // reverse
    MqlTick tk; if(!SymbolInfoTick(_Symbol, tk)) return;
    double px = dir == 1 ? tk.ask : tk.bid;
-   double slDist = P.slAtr * atrSig;
    double minDist = (SymbolInfoInteger(_Symbol, SYMBOL_TRADE_STOPS_LEVEL) + 1) * _Point;
    slDist = MathMax(slDist, minDist);
    double lots = CalcLots(slDist);
@@ -423,17 +531,17 @@ void OnNewBar()
    bool canL = g_tfOK && InpDirection != DIR_SHORT;
    bool canS = g_tfOK && InpDirection != DIR_LONG;
    // Pine order: set the stop with the position as of the close, then "cross failed".
-   if(s.wantL && canL && pos <= 0)      { g_pendDir = 1;  g_pendPx = MathCeil(s.xPx / ts) * ts;  g_pendAtr = s.atr; }
-   else if(s.wantS && canS && pos >= 0) { g_pendDir = -1; g_pendPx = MathFloor(s.xPx / ts) * ts; g_pendAtr = s.atr; }
-   if(P.failExit && pos != 0 && PositionSelectByTicket(t))
+   if(s.wantL && canL && pos <= 0)      { g_pendDir = 1;  g_pendPx = MathCeil(s.xPx / ts) * ts;  g_pendAtr = s.unit; g_pendSl = s.slL; }
+   else if(s.wantS && canS && pos >= 0) { g_pendDir = -1; g_pendPx = MathFloor(s.xPx / ts) * ts; g_pendAtr = s.unit; g_pendSl = s.slS; }
+   if(pos != 0 && PositionSelectByTicket(t))
      {
       int entryShift = iBarShift(_Symbol, _Period, (datetime)PositionGetInteger(POSITION_TIME));
       int held = entryShift - 1;               // bars from the entry bar to the bar that just closed
-      if(held >= 0 && held <= P.turnHold)
-        {
-         if((pos == 1 && s.fast <= s.slow) || (pos == -1 && s.fast >= s.slow))
-            trade.PositionClose(t);
-        }
+      bool closeIt = false;
+      if(P.failExit && held >= 0 && held <= P.turnHold)
+         if((pos == 1 && s.fast <= s.slow) || (pos == -1 && s.fast >= s.slow)) closeIt = true;
+      if(!closeIt && P.timeStop > 0 && held >= 0 && held + 1 >= P.timeStop) closeIt = true;
+      if(closeIt) trade.PositionClose(t);
      }
   }
 
@@ -450,16 +558,18 @@ void OnTick()
    double spread = tk.ask - tk.bid;
    if(g_pendDir != 0 && spread <= P.maxSpread)
      {
-      if(g_pendDir == 1 && tk.ask >= g_pendPx)       { int d = g_pendDir; g_pendDir = 0; Enter(d, g_pendAtr); }
-      else if(g_pendDir == -1 && tk.bid <= g_pendPx) { int d = g_pendDir; g_pendDir = 0; Enter(d, g_pendAtr); }
+      if(g_pendDir == 1 && tk.ask >= g_pendPx)       { int d = g_pendDir; g_pendDir = 0; Enter(d, g_pendSl, g_pendAtr); }
+      else if(g_pendDir == -1 && tk.bid <= g_pendPx) { int d = g_pendDir; g_pendDir = 0; Enter(d, g_pendSl, g_pendAtr); }
      }
    ManageTrail();
-   Comment(StringFormat("XPW Shape Map EA  |  %s %s\nTF %s   spread %.2f (max %.2f)\nArmed  BOT %s  TOP %s\nStop  %s %.2f\nRisk %.2f%%  SL %.1f ATR  trail %.1f / %.2f ATR  cross-failed %s",
+   string unitName = P.unit == UNIT_ATR50 ? "ATR50" : P.unit == UNIT_RANGE14 ? "Range14" : P.unit == UNIT_DONCH20 ? "Donch20" : "ATR14";
+   string slTxt = P.slMode == SL_SWING ? StringFormat("swing %d bars", P.swingN) : StringFormat("%.1f x %s", P.slAtr, unitName);
+   Comment(StringFormat("XPW Shape Map EA  |  %s %s\nTF %s   spread %.2f (max %.2f)\nArmed  BOT %s  TOP %s\nStop  %s %.2f\nRisk %.2f%%  SL %s  trail %.1f / %.2f x %s  cross-failed %s  time stop %d",
                         P.name, g_tfOK ? "" : "(WRONG TIMEFRAME - not trading)",
                         EnumToString((ENUM_TIMEFRAMES)_Period), spread, P.maxSpread,
                         g_botArmed ? "yes" : "no", g_topArmed ? "yes" : "no",
                         g_pendDir == 1 ? "BUY at" : g_pendDir == -1 ? "SELL at" : "none", g_pendDir != 0 ? g_pendPx : 0.0,
-                        InpRiskPct, P.slAtr, P.actAtr, P.disAtr, P.failExit ? "on" : "off"));
+                        InpRiskPct, slTxt, P.actAtr, P.disAtr, P.slMode == SL_SWING ? "ATR14" : unitName, P.failExit ? "on" : "off", P.timeStop));
   }
 
 void OnTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest &req, const MqlTradeResult &res)

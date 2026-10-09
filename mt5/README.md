@@ -22,7 +22,23 @@ Train / test = first 60% / last 40%.
 | Gold M15 | M15 | 21 / 2 / 5 | 6 bars | off | 2 × ATR | 1 / 0.5 × ATR | $0.30 |
 | BTC M30 | M30 | 21 / 2 / 5 | 6 bars | off | 3 × ATR | 1.5 / 0.75 × ATR | $25 |
 
-No take-profit on any preset. ATR = ATR(14) of the signal bar.
+| Gold M30 swing | M30 | 10 / 2 / 10 | 12 bars | on (2 bars) | swing low/high of last 5 bars + 0.1 ATR | 2 / 2 × ATR | $0.30 |
+| Gold M15 time | M15 | 21 / 2 / 5 | 6 bars | off | 1.5 × ATR, **time stop 24 bars** | 1 / 0.75 × ATR | $0.30 |
+| BTC M15 range | M15 | 10 / 3 / 7 | 6 bars | off | 4 × average range(14) | 2 / 0.5 × range | $25 |
+| BTC M30 ATR50 | M30 | 21 / 2 / 5 | 6 bars | off | 4 × ATR(50) | 2 / 0.5 × ATR(50) | $25 |
+
+No take-profit on any preset. ATR = ATR(14) of the signal bar. Alternative units (ATR50, average
+range, Donchian width) are rescaled to the median ATR(14) of the last 1500 bars, so "4 ×" means
+four typical ATRs.
+
+The last four presets come from the multi-method calibration (`calibration/MULTI_RESULTS.md`):
+
+| Preset | Trades | Win | PF | PF train / test | Expectancy | 0.5% risk return / DD | Neighbours + |
+|---|---|---|---|---|---|---|---|
+| Gold M30 swing | 68 | 31% | 1.55 | 1.82 / 1.37 | +0.233R | +7.8% / 5.6% | 85% |
+| Gold M15 time | 206 | 56% | 1.36 | 1.29 / 1.49 | +0.112R | +10.4% / 3.0% | 58% |
+| BTC M15 range | 127 | 65% | 1.52 | 1.31 / 1.81 | +0.100R | +6.1% / 2.3% | 54% |
+| BTC M30 ATR50 | 140 | 56% | 1.49 | 1.35 / 1.73 | +0.070R | +4.5% / 1.8% | 47% |
 
 ### Results (each trade in R = multiples of the SL distance)
 
