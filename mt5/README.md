@@ -76,3 +76,22 @@ Longest losing streaks: Gold M30 8, Gold M15 4, BTC M30 5. The worst single trad
 * Use one magic number per chart. Turn off "Only trade on the preset's timeframe" only for testing.
 
 Not modelled: swaps, weekend gaps beyond the data, and broker requotes.
+
+## Out-of-sample check (new ticks, never used in calibration)
+
+Data: XAUUSD-ECNc and BTCUSD.c, 2026-09-01 → 09-15 and 09-28 → 10-08 (`calibration/oos_test.py`,
+each block run separately). Same costs, $10k at 0.5% risk, lots rounded down.
+
+| Preset | Calibration PF | **Out-of-sample PF** | Trades | Win | Expectancy | 0.5% return / DD | Weeks + |
+|---|---|---|---|---|---|---|---|
+| Gold M30 swing | 1.55 | **1.83** | 35 | 37% | +0.40R | +6.6% / 2.3% | 3 / 5 |
+| Gold M15 | 1.44 | **1.33** | 120 | 60% | +0.08R | +3.9% / 1.2% | 4 / 5 |
+| Gold M15 time | 1.36 | **1.31** | 129 | 56% | +0.09R | +5.2% / 2.0% | 4 / 5 |
+| BTC M30 ATR50 | 1.49 | **1.22** | 88 | 53% | +0.03R | +1.2% / 1.3% | 3 / 5 |
+| Gold M30 | 1.78 | 1.14 | 55 | 36% | +0.02R | +0.1% / 0.9% | 3 / 5 |
+| BTC M30 | 1.39 | 1.03 | 94 | 54% | +0.01R | −0.1% / 1.9% | 3 / 5 |
+| BTC M15 range | 1.52 | **0.77** | 66 | 55% | −0.07R | −2.1% / 3.2% | 1 / 5 |
+
+Held up: all four gold presets made money, the two M15 gold presets kept PF ≈ 1.3 with 4 / 5
+positive weeks. BTC M15 range failed (do not use); BTC M30 is breakeven; BTC M30 ATR50 is the only
+BTC preset still positive.
