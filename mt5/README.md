@@ -95,3 +95,26 @@ each block run separately). Same costs, $10k at 0.5% risk, lots rounded down.
 Held up: all four gold presets made money, the two M15 gold presets kept PF ≈ 1.3 with 4 / 5
 positive weeks. BTC M15 range failed (do not use); BTC M30 is breakeven; BTC M30 ATR50 is the only
 BTC preset still positive.
+
+## Swept calibration on all data (EA v1.20)
+
+`calibration/sweep.py`: all ticks Jul 1 – Oct 8 (≈ 9 weeks per symbol), timeframes 5m–2h,
+216 entry settings, 7 distance units, swing stops, time stops and exit rules. Scored on
+4 time blocks (early Jul / late Jul–Aug / early Sep / late Sep–Oct): 0.5 × worst block +
+0.5 × average block, smoothed over neighbouring settings.
+
+| Preset (EA value) | Settings | Trades | Win | PF | PF per block | 0.5% return / DD | Status |
+|---|---|---|---|---|---|---|---|
+| **BTC H1 range (9)** — new | RSI 14/2/10, wait 6, no cross-fail; SL 1 × avg range, trail 1 / 2 | 50 | 46% | **2.28** | 1.87 / 1.45 / 2.74 / no loss | +14.4% / 3.7% | recommended |
+| **Gold M15 (1)** — new default | unchanged | 301 | 60% | 1.35 | 1.32 / 1.39 / 1.25 / 1.44 | +10.9% / 2.4% | recommended |
+| **Gold M30 swing (4)** | unchanged | 102 | 33% | 1.71 | 6.56 / 1.22 / 1.20 / 3.03 | +15.2% / 5.8% | recommended |
+| **Gold M15 time (5)** | unchanged | 324 | 56% | 1.29 | 1.25 / 1.29 / 1.30 / 1.31 | +12.9% / 3.9% | recommended |
+| **BTC M30 ATR50 (7)** | unchanged | 228 | 55% | 1.38 | 1.22 / 1.81 / 1.07 / 1.52 | +5.9% / 1.8% | recommended |
+| Gold H1 swing (8) — new | RSI 14/3/7, wait 24, cross-fail on; SL swing 20 bars, trail 0 / 1.5 ATR | 33 | 39% | 3.31 | 0.67 / 5.33 / 8.72 / 1.33 | +9.8% / 1.8% | experimental |
+| BTC M15 time (6) — replaced | RSI 21/2/10, wait 6; SL 4 ATR, no trail, time stop 24 | 191 | 43% | 1.46 | 1.14 / 1.57 / 0.98 / 2.94 | +8.7% / 2.7% | experimental |
+| Gold M30 (0) | unchanged | 126 | 33% | 1.37 | 1.24 / 1.80 / 0.63 / 2.50 | +2.0% / 0.9% | not recommended |
+| BTC M30 (2) | unchanged | 240 | 57% | 1.24 | 1.07 / 1.82 / 1.11 / 0.91 | +5.0% / 2.6% | not recommended |
+
+Preset 6 used to be "BTC M15 range", which failed out of sample (PF 0.77) and is replaced.
+Losing everywhere: gold 5m, BTC 5m, BTC 2h. All numbers come from the data they were tuned on,
+so expect lower results live; forward-test on demo first.

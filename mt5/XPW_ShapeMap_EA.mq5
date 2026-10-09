@@ -5,8 +5,8 @@
 //| ECN commission). See mt5/README.md for the numbers.              |
 //+------------------------------------------------------------------+
 #property copyright "XPW"
-#property version   "1.10"
-#property description "XPW Shape Map v0.6 Turn-Predict EA. 7 presets for XAUUSD / BTCUSD calibrated on VT Markets ticks."
+#property version   "1.20"
+#property description "XPW Shape Map v0.6 Turn-Predict EA. 9 presets for XAUUSD / BTCUSD, swept on 9 weeks of VT Markets ticks."
 
 #include <Trade/Trade.mqh>
 
@@ -33,14 +33,17 @@
 
 enum EPreset
   {
-   PRESET_GOLD_M30 = 0,   // Gold M30 - steady (6/6 weeks positive)
-   PRESET_GOLD_M15 = 1,   // Gold M15 - higher return (experimental)
-   PRESET_BTC_M30  = 2,   // BTC M30 - experimental
+   // PF = profit factor on 9 weeks of VT Markets ticks (Jul-Oct 2026), blocks = 4 time blocks
+   PRESET_GOLD_M30 = 0,   // Gold M30 - PF 1.37, lost one block (not recommended)
+   PRESET_GOLD_M15 = 1,   // * Gold M15 - PF 1.35, all 4 blocks 1.25-1.44 (recommended)
+   PRESET_BTC_M30  = 2,   // BTC M30 - PF 1.24, lost one block (not recommended)
    PRESET_CUSTOM   = 3,   // Custom (inputs below)
-   PRESET_GOLD_M30_SWING = 4, // Gold M30 - swing stop (PF 1.55, 85% of neighbours positive)
-   PRESET_GOLD_M15_TIME  = 5, // Gold M15 - time stop 24 bars (PF 1.36)
-   PRESET_BTC_M15        = 6, // BTC M15 - average-range unit (PF 1.52)
-   PRESET_BTC_M30_ATR50  = 7  // BTC M30 - slow ATR(50) unit (PF 1.49)
+   PRESET_GOLD_M30_SWING = 4, // * Gold M30 swing stop - PF 1.71, all blocks > 1.2
+   PRESET_GOLD_M15_TIME  = 5, // * Gold M15 time stop 24 - PF 1.29, all blocks 1.25-1.31
+   PRESET_BTC_M15        = 6, // BTC M15 time stop 24 - PF 1.46, one block 0.98 (experimental)
+   PRESET_BTC_M30_ATR50  = 7, // * BTC M30 ATR(50) - PF 1.38, all blocks > 1.07
+   PRESET_GOLD_H1_SWING  = 8, // Gold H1 swing-20 stop - PF 3.31, 33 trades (experimental)
+   PRESET_BTC_H1_RANGE   = 9  // * BTC H1 average-range - PF 2.28, all blocks > 1.45, 50 trades
   };
 
 enum EUnit
@@ -65,7 +68,7 @@ enum EDir
   };
 
 input group "Preset & risk"
-input EPreset InpPreset      = PRESET_GOLD_M30; // Preset
+input EPreset InpPreset      = PRESET_GOLD_M15; // Preset
 input double  InpRiskPct     = 0.5;             // Risk % of equity per trade (distance to SL)
 input double  InpFixedLots   = 0.0;             // Fixed lots (>0 overrides risk %)
 input double  InpMaxLots     = 5.0;             // Max lots per trade
@@ -150,10 +153,19 @@ void LoadPreset()
          P.tf = PERIOD_M15; P.rsiLen = 21; P.fastLen = 2; P.slowLen = 5; P.turnMax = 6; P.turnHold = 1;
          P.failExit = false; P.slAtr = 1.5; P.tpR = 0.0; P.actAtr = 1.0; P.disAtr = 0.75; P.timeStop = 24;
          P.maxSpread = 0.30; P.name = "Gold M15 time"; break;
-      case PRESET_BTC_M15:
-         P.tf = PERIOD_M15; P.rsiLen = 10; P.fastLen = 3; P.slowLen = 7; P.turnMax = 6; P.turnHold = 1;
-         P.failExit = false; P.unit = UNIT_RANGE14; P.slAtr = 4.0; P.tpR = 0.0; P.actAtr = 2.0; P.disAtr = 0.5;
-         P.maxSpread = 25.0; P.name = "BTC M15 range"; break;
+      case PRESET_BTC_M15:   // swept on Jul-Oct ticks (replaces the M15 range preset, which failed out of sample)
+         P.tf = PERIOD_M15; P.rsiLen = 21; P.fastLen = 2; P.slowLen = 10; P.turnMax = 6; P.turnHold = 1;
+         P.failExit = false; P.slAtr = 4.0; P.tpR = 0.0; P.actAtr = 0.0; P.disAtr = 0.0; P.timeStop = 24;
+         P.maxSpread = 25.0; P.name = "BTC M15 time"; break;
+      case PRESET_GOLD_H1_SWING:
+         P.tf = PERIOD_H1; P.rsiLen = 14; P.fastLen = 3; P.slowLen = 7; P.turnMax = 24; P.turnHold = 2;
+         P.failExit = true;  P.slMode = SL_SWING; P.swingN = 20; P.slAtr = 0; P.tpR = 0.0;
+         P.actAtr = 0.0; P.disAtr = 1.5; P.maxSpread = 0.30;
+         P.name = "Gold H1 swing"; break;
+      case PRESET_BTC_H1_RANGE:
+         P.tf = PERIOD_H1; P.rsiLen = 14; P.fastLen = 2; P.slowLen = 10; P.turnMax = 6; P.turnHold = 1;
+         P.failExit = false; P.unit = UNIT_RANGE14; P.slAtr = 1.0; P.tpR = 0.0; P.actAtr = 1.0; P.disAtr = 2.0;
+         P.maxSpread = 25.0; P.name = "BTC H1 range"; break;
       case PRESET_BTC_M30_ATR50:
          P.tf = PERIOD_M30; P.rsiLen = 21; P.fastLen = 2; P.slowLen = 5; P.turnMax = 6; P.turnHold = 1;
          P.failExit = false; P.unit = UNIT_ATR50; P.slAtr = 4.0; P.tpR = 0.0; P.actAtr = 2.0; P.disAtr = 0.5;
@@ -181,8 +193,8 @@ int OnInit()
                   P.name, EnumToString(P.tf), EnumToString((ENUM_TIMEFRAMES)_Period));
    string sym = _Symbol;
    StringToUpper(sym);
-   bool goldPreset = InpPreset == PRESET_GOLD_M30 || InpPreset == PRESET_GOLD_M15 || InpPreset == PRESET_GOLD_M30_SWING || InpPreset == PRESET_GOLD_M15_TIME;
-   bool btcPreset  = InpPreset == PRESET_BTC_M30 || InpPreset == PRESET_BTC_M15 || InpPreset == PRESET_BTC_M30_ATR50;
+   bool goldPreset = InpPreset == PRESET_GOLD_M30 || InpPreset == PRESET_GOLD_M15 || InpPreset == PRESET_GOLD_M30_SWING || InpPreset == PRESET_GOLD_M15_TIME || InpPreset == PRESET_GOLD_H1_SWING;
+   bool btcPreset  = InpPreset == PRESET_BTC_M30 || InpPreset == PRESET_BTC_M15 || InpPreset == PRESET_BTC_M30_ATR50 || InpPreset == PRESET_BTC_H1_RANGE;
    if(goldPreset && StringFind(sym, "XAU") < 0)
       PrintFormat("XPW: warning - gold preset on %s", _Symbol);
    if(btcPreset && StringFind(sym, "BTC") < 0)
