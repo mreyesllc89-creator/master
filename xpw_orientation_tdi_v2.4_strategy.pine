@@ -81,7 +81,12 @@
 //  the map for location. Do not trade the verdict column on its own.
 // ============================================================================
 
-strategy("XPW Orientation TDI v2.4 Strategy", shorttitle="XPW-OTDI4 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10)
+strategy("XPW Orientation TDI v2.4 Strategy", shorttitle="XPW-OTDI4 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=0, initial_capital=10000,
+     commission_type=strategy.commission.percent,
+     commission_value=0.06,    // Bitget BTCUSD: 0.06 % per side (taker)
+     slippage=1000,            // ticks per side, Bitget BTCUSD
+     default_qty_type=strategy.fixed,
+     default_qty_value=0.1)    // contracts (BTC). strategy.entry passes no qty here, so this is the size of every trade
 
 // ---------------------------------------------------------------- INPUTS ----
 rsiLen   = input.int(13,       "RSI length",            group="TDI core")
