@@ -204,9 +204,11 @@ strategy("XPW Breakout v2.11 MTF (XAUUSD)", overlay=true,
      calc_on_every_tick=true,
      calc_on_order_fills=false,
      process_orders_on_close=false,
-     commission_type=strategy.commission.cash_per_contract,
-     commission_value=0.10,    // USD per OZ per side = CFD raw: $0.03 commission ($6/lot RT) + $0.07 half of a ~$0.15 spread. CFD std (no commission): ~0.15 = half of a $0.30 spread. VERIFY from an MT5 statement
-     slippage=5,               // ticks per side. mintick 0.01 -> $0.05/oz pure execution slip. Must equal SlipUSD / syminfo.mintick (table prints it)
+     commission_type=strategy.commission.percent,
+     commission_value=0.06,    // Bitget BTCUSD: 0.06 % per side (taker). Must equal CommPct when the type is percent
+     slippage=1000,            // ticks per side, Bitget BTCUSD. Must equal SlipUSD / syminfo.mintick (table prints it)
+     default_qty_type=strategy.fixed,
+     default_qty_value=0.1,    // contracts (BTC). Every strategy.entry passes qty=calcQty(); with UseRiskSize off that is FixedQty, which must equal this
      margin_long=0, margin_short=0,
      max_bars_back=500,
      max_labels_count=500)     // MTF confluence labels (M3); default 50 would drop older ones
@@ -230,10 +232,10 @@ SizeNetOfCost = input.bool(true, "Reserve round-trip cost in risk sizing", group
 
 grpS = "3. Sizing"
 RiskPercent = input.float(1.0, "Risk percent of equity per trade", minval=0.0, step=0.25, group=grpS)
-UseRiskSize = input.bool(true, "Risk-based sizing (off = FixedQty)", group=grpS)
-FixedQty    = input.float(10.0, "FixedQty fallback (contracts = oz, 100 = 1 lot)", minval=0.0, step=1.0, group=grpS)
+UseRiskSize = input.bool(false, "Risk-based sizing (off = FixedQty)", group=grpS)
+FixedQty    = input.float(0.1, "FixedQty fallback (contracts = oz, 100 = 1 lot)", minval=0.0, step=1.0, group=grpS)
 MaxQtyHard  = input.float(50.0, "HARD qty cap (contracts = oz)", minval=0.0001, step=1.0, group=grpS, tooltip="50 oz = 0.5 lot, about 2x notional at $4k gold on 100k. Also fed to strategy.risk.max_position_size. The cap binding is a misconfiguration signal, not a feature.")
-QtyStep     = input.float(1.0, "Qty step (rounds down; 1 oz = 0.01 lot)", minval=0.000001, group=grpS)
+QtyStep     = input.float(0.001, "Qty step (rounds down; 1 oz = 0.01 lot)", minval=0.000001, group=grpS)
 
 grpG = "4. Geometry"
 GeoMode     = input.string("ATR", "Geometry", options=["ATR", "Pct"], group=grpG, tooltip="ATR: SL = k*ATR, TP = R*SL, locked per trade at arm time. Pct: v2.01 percent-of-price, re-derived from the fill.")
