@@ -35,7 +35,7 @@
 // Fees decide this strategy: a round trip is ~$95 per BTC, larger than the
 // average gross trade on 1m / 5m / 15m. Only 60m stayed profitable after fees.
 
-strategy("XPW Shape Map v0.6 Strategy", shorttitle = "XPW-SM6 S", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 10, margin_long = 1, margin_short = 1, commission_type = strategy.commission.percent, commission_value = 0.055, use_bar_magnifier = true)
+strategy("XPW Shape Map v0.6 Strategy", shorttitle = "XPW-SM6 S", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 0.1, margin_long = 1, margin_short = 1, commission_type = strategy.commission.percent, commission_value = 0.06, slippage = 1000, use_bar_magnifier = true)
 
 // ───────────────────────── S1. ENTRY ─────────────────────────
 grpE = "S1. Entry"
