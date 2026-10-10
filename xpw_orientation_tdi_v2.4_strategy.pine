@@ -20,10 +20,15 @@
 //    Opposite signal   Both: reverses. Long only / Short only: the opposite
 //                      ENTER closes the position (toggle) but never opens one.
 //    AGREE labels      Optional extra entries on "AGREE LONG/SHORT xN".
-//    Trailing TP       Arms once price moves "activation" in your favour,
-//                      then trails "offset" behind the best price.
-//                      Units: ticks, price, or percent of entry.
-//    Stop loss         Optional fixed stop, same units.
+//    Exits (group "Strategy exits")
+//      Unit            Points (1 point = 1 tick = syminfo.mintick) or ATR
+//                      (distances = ATR mult, TP = R multiple of the SL).
+//      Stop loss / TP  Fixed bracket from the fill. 0 = that leg is off.
+//      Trailing stop   Arms once price is "activation" in your favour,
+//                      then trails "distance" behind the best price.
+//      Time stop       Closes after N bars in the trade (0 = off).
+//    ATR-mode distances are locked on the signal bar so the bracket does
+//    not move with the ATR while the trade is open.
 //  Orders are placed on the bar close where the label prints and fill on
 //  the next bar's open (TradingView default).
 //
@@ -136,12 +141,21 @@ tradeDir   = input.string("Both", "Trade direction", options=["Both","Long only 
 exitOnEnd  = input.bool(true, "Exit on END labels (exit once, then wait)", group="Strategy", tooltip="END 1st LEG / END 2nd LEG closes the side that leg was on: upright rung = longs, inverted rung = shorts.")
 oppCloses  = input.bool(true, "Opposite ENTER closes (one-side mode)", group="Strategy", tooltip="Long only / Short only: an ENTER label on the other side closes the open trade without opening a new one. In 'Both' an opposite ENTER always reverses.")
 tradeAgree = input.bool(false, "Also enter on AGREE labels", group="Strategy", tooltip="Needs 'Require rung agreement' on. Enters on the bar 'AGREE LONG xN' / 'AGREE SHORT xN' fires.")
-trailOn    = input.bool(true, "Use trailing take profit", group="Strategy")
-trailUnit  = input.string("price", "Trail / stop units", options=["ticks","price","percent"], group="Strategy", tooltip="ticks = minimum price moves. price = raw price distance (e.g. 2.0 on XAUUSD = $2). percent = % of the entry price.")
-trailAct   = input.float(2.0, "Trail activation", minval=0.0, step=0.1, group="Strategy", tooltip="Distance price must move in your favour before the trail arms.")
-trailOff   = input.float(1.0, "Trail offset", minval=0.0, step=0.1, group="Strategy", tooltip="Distance the stop trails behind the best price once armed.")
-slOn       = input.bool(false, "Use stop loss", group="Strategy")
-slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
+
+// STRATEGY EXITS
+grpXt     = "Strategy exits"
+exitUnit  = input.string("Points", "SL / TP / trail unit", options=["Points","ATR"], group=grpXt, tooltip="Points: 1 point = 1 tick (syminfo.mintick; 0.1 USD on Bitget BTCUSD perpetual). ATR: distances as ATR multiples, locked on the signal bar.")
+slPtsIn   = input.float(5000, "Stop loss, pts (Points mode)", minval=0.0, step=100, group=grpXt, tooltip="0 = no fixed stop.")
+tpPtsIn   = input.float(300000, "Take profit, pts (Points mode)", minval=0.0, step=1000, group=grpXt, tooltip="0 = no fixed target.")
+atrLenX   = input.int(14, "ATR length (ATR mode)", minval=1, group=grpXt)
+slAtrX    = input.float(2.0, "Stop loss, ATR mult (ATR mode)", minval=0.0, step=0.25, group=grpXt)
+tpRX      = input.float(2.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=grpXt)
+trailOn   = input.bool(true, "Trailing stop", group=grpXt)
+trActPts  = input.float(15000, "Trail activation, pts of profit (Points mode)", minval=0.0, step=500, group=grpXt, tooltip="Profit in points before the trail arms.")
+trDstPts  = input.float(10000, "Trail distance, pts (Points mode)", minval=1.0, step=500, group=grpXt, tooltip="The stop follows the best price at this distance once armed.")
+trActAtr  = input.float(1.0, "Trail activation, ATR mult (ATR mode)", minval=0.0, step=0.1, group=grpXt)
+trDstAtr  = input.float(0.75, "Trail distance, ATR mult (ATR mode)", minval=0.1, step=0.05, group=grpXt)
+maxBarsX  = input.int(0, "Time stop, bars (0 = off)", minval=0, group=grpXt)
 
 // PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
 hM   = scaleWin ? 20 : flatWin
@@ -548,21 +562,44 @@ if goLong
 if goShort
     strategy.entry("Short", strategy.short, comment="ENTER SHORT")
 
-// Distances in ticks, measured from the entry (or this close while the entry
-// is still pending, which is only used for the percent unit).
-float refPx = strategy.position_size != 0 ? strategy.position_avg_price : close
-toTicks(float d) =>
-    trailUnit == "ticks" ? d : trailUnit == "price" ? d / syminfo.mintick : refPx * d / 100.0 / syminfo.mintick
+// Bracket distances in TICKS from the fill (strategy.exit loss / profit /
+// trail_points / trail_offset all take ticks). Points mode: the input is the
+// tick count. ATR mode: ATR multiples converted to ticks and LOCKED on the
+// signal bar (the order is placed there and fills on the next open), so the
+// bracket does not drift with the ATR while the trade is open.
+atrX = ta.atr(atrLenX)
+pxTicks(float d) => d / syminfo.mintick
+float slNowT = exitUnit == "Points" ? slPtsIn  : pxTicks(atrX * slAtrX)
+float tpNowT = exitUnit == "Points" ? tpPtsIn  : pxTicks(atrX * slAtrX * tpRX)
+float trANowT = exitUnit == "Points" ? trActPts : pxTicks(atrX * trActAtr)
+float trDNowT = exitUnit == "Points" ? trDstPts : pxTicks(atrX * trDstAtr)
+var float slLockT  = na
+var float tpLockT  = na
+var float trALockT = na
+var float trDLockT = na
+if goLong or goShort or na(slLockT)
+    slLockT  := slNowT
+    tpLockT  := tpNowT
+    trALockT := trANowT
+    trDLockT := trDNowT
 
-float trPts = trailOn ? math.max(toTicks(trailAct), 0.0) : na
-float trOff = trailOn ? math.max(toTicks(trailOff), 1.0) : na
-float slPts = slOn    ? math.max(toTicks(slDist),   1.0) : na
+float slLeg = slLockT > 0 ? math.max(math.round(slLockT), 1) : na
+float tpLeg = tpLockT > 0 ? math.max(math.round(tpLockT), 1) : na
+float trAct = trailOn ? math.max(math.round(trALockT), 0) : na
+float trDst = trailOn ? math.max(math.round(trDLockT), 1) : na
 
-if trailOn or slOn
+if trailOn or not na(slLeg) or not na(tpLeg)
     if allowLong
-        strategy.exit("Long X", from_entry="Long", trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP", comment_loss="SL")
+        strategy.exit("Long X", from_entry="Long", loss=slLeg, profit=tpLeg, trail_points=trAct, trail_offset=trDst, comment_loss="SL", comment_profit="TP", comment_trailing="trail")
     if allowShort
-        strategy.exit("Short X", from_entry="Short", trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP", comment_loss="SL")
+        strategy.exit("Short X", from_entry="Short", loss=slLeg, profit=tpLeg, trail_points=trAct, trail_offset=trDst, comment_loss="SL", comment_profit="TP", comment_trailing="trail")
+
+// Time stop: close after N bars in the trade, on the bar close.
+if maxBarsX > 0 and strategy.opentrades > 0 and bar_index - strategy.opentrades.entry_bar_index(0) >= maxBarsX
+    if strategy.position_size > 0
+        strategy.close("Long", comment="Time")
+    if strategy.position_size < 0
+        strategy.close("Short", comment="Time")
 
 // ----------------------------------------------------------- CHART PANE ----
 [_rNow, fastNow, slowNow, basisNow, upNow, loNow] = tdiCore()

@@ -131,3 +131,8 @@ For the TDI file the equivalent of part zero is: add `commission_type=strategy.c
 `commission_value=0.06`, `slippage=1000`, change `default_qty_type` to `strategy.fixed` and `default_qty_value`
 to 0.1, and, before any exit sweep, move `trailUnit` to "percent" (or rescale `trailAct` / `trailOff` to BTC
 prices), otherwise every sweep result will be dominated by the $1 trail.
+
+Update: the TDI v2.4 file has since received both the part-zero declaration fix and a new exit block
+(group "Strategy exits": Points or ATR unit, stop 5000 pts, target 300000 pts, trailing stop armed at 15000 pts
+of profit trailing 10000 pts behind, ATR-mode alternatives 2 / 2 R / 1 / 0.75, time stop off). The raw-price
+$2 / $1 trail described above no longer exists.
