@@ -17,7 +17,10 @@ This folder holds the calibration behind the presets in `flashgold_v5_fdf_strate
   is a whole number of days.
 - Parity check against a TradingView export (BITGET:BTCUSDT 1H, 446 candles, parent 4H): every BUY / SELL, entry
   price (within 0.1), protected level, break and divergence matches after the indicators' warm-up.
-- Fills: along the 1-minute path inside each candle (TradingView's bar magnifier), 0.05% fee per side.
+- Fills: along the 1-minute path inside each candle (the 1m chart: the candle itself), 0.05% fee per side, no
+  slippage. TradingView's bar magnifier (on in the script, Premium plans) uses coarser intrabars - 2-minute candles on
+  15m, 5m on 30m, 10m on 1H-2H, 30m on 4H-8H, 1H on 1D - and only the last 200,000 of them; `tv_check.py` re-runs
+  the presets on those intrabars (results below).
 
 ## Method (`pipe2.py`, then `reselect.py`)
 
@@ -59,6 +62,16 @@ as it was before this calibration (framework with the PDF gates, parent 4 x the 
 What held up out of sample: **15m (PF 1.39), 4H (1.22), 1D (1.52)**, weakly 1H (1.06) and 2H (1.11).
 What did not: 30m, 8H, and 1m / 5m, where the 0.1% round-trip fee is 2.3 x (1m) and 0.8 x (5m) the median ATR.
 
+## Limits
+
+- One market (BTC/USD, Bitstamp), one regime split. 30m, 8H, 5m and 1m did not hold up out of sample; 1H and 2H only
+  weakly. Treat the presets as a starting point, not a promise.
+- Multi-day zones (2D, 4D on a 1D chart) are binned from 2023-01-01 here; TradingView may anchor them differently. The
+  1D preset does not depend on them (parent = chart, 1 zone of 3 aligned, and zone 1 is the chart itself).
+- Intraday intervals that do not divide the day (e.g. 960 = 16H) restart at 00:00 UTC, as TradingView builds them on
+  a 24/7 symbol.
+- The strategy header's costs are XAUUSD's ($0.13 per contract, 5 ticks): set the commission in percent for BTC.
+
 ## Re-running
 
 ```
@@ -67,5 +80,6 @@ python pipe2.py 60          # one timeframe in minutes; writes results3/{F,B,C}_
 python reselect.py 60       # exits by total return
 python report.py results3   # print every preset
 python gen_pine_presets.py results3   # the Pine preset table
+python tv_check.py          # the presets on TradingView's bar-magnifier intrabars
 ```
 Needs numpy, pandas, pyarrow and numba.
