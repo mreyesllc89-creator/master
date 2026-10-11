@@ -17,9 +17,17 @@
 //| Decisions are evaluated ONCE PER NEW BAR on fully closed bars.   |
 //| A bar that opens before the broker accepts orders is evaluated   |
 //| at the first tick of its trade session.                          |
+//|                                                                  |
+//| v1.50 adds switchable entry / exit / trailing improvements (all  |
+//| off by default, so defaults reproduce v1.49 exactly):            |
+//|   Entry : spread cap, min ER, prior-state filter, late entry /   |
+//|           re-entry into a young leg, ATR stop, SL distance cap.  |
+//|   Exit  : raw SuperTrend flip, ER weakening, time stop, Friday.  |
+//|   Trail : tight SuperTrend / Chandelier / ATR-close sources,     |
+//|           activation in R, R lock-in stage, partial close.       |
 //+------------------------------------------------------------------+
 #property copyright "MQL5-Foundry"
-#property version   "1.49"
+#property version   "1.50"
 #property strict
 #property icon      "xpworx.ico"
 #property description "Mechanical companion EA for RegimeTrend. Features dynamic % risk lot sizing, SuperTrend trailing stops, Break-Even protection, and H4 Macro Trend confluence."
@@ -54,6 +62,23 @@ enum ENUM_TRADE_DIRECTION
    TRADE_BOTH       = 0, // Long and short
    TRADE_LONG_ONLY  = 1, // Long only
    TRADE_SHORT_ONLY = 2  // Short only
+  };
+
+//--- Where the trailing stop candidate comes from (v1.50)
+enum ENUM_TRAIL_SOURCE
+  {
+   TRAIL_SRC_SUPERTREND       = 0, // SuperTrend line (indicator buffer 0)
+   TRAIL_SRC_SUPERTREND_TIGHT = 1, // Second SuperTrend with its own ATR multiplier
+   TRAIL_SRC_CHANDELIER       = 2, // Highest high / lowest low since entry -/+ K x ATR
+   TRAIL_SRC_ATR_CLOSE        = 3  // Last closed bar close -/+ K x ATR
+  };
+
+//--- Which state the regime must come from on the entry bar (v1.50)
+enum ENUM_ENTRY_PREV_STATE
+  {
+   ENTRY_PREV_ANY     = 0, // Any (Choppy or Neutral)
+   ENTRY_PREV_NEUTRAL = 1, // Only Neutral -> Trending
+   ENTRY_PREV_CHOPPY  = 2  // Only Choppy -> Trending
   };
 
 //--- Broker server daylight-saving convention (used only in the tester,
@@ -117,6 +142,31 @@ input int              InpEndHourGMT       = 18;          // Session end hour (G
 input int              InpTesterGMTOffset  = 2;           // Tester only: broker server GMT offset in winter (hours)
 input ENUM_SERVER_DST  InpTesterDst        = SERVER_DST_US; // Tester only: broker DST convention
 
+input group            "Entry improvements (v1.50, 0/false = original behaviour)"
+input int              InpMaxSpreadPoints  = 0;           // Skip entries when spread > N points (0 = off)
+input double           InpMinErEntry       = 0.0;         // Min Efficiency Ratio on the entry bar (0 = off)
+input ENUM_ENTRY_PREV_STATE InpEntryPrevState = ENTRY_PREV_ANY; // Required state before Trending
+input int              InpLateEntryBars    = 0;           // Also enter up to N bars after the transition (0 = off)
+input bool             InpReentryAfterStop = false;       // Late entry may re-enter a leg after a stop-out
+input double           InpSlAtrMult        = 0.0;         // Initial SL = entry -/+ N x ATR instead of SuperTrend (0 = off)
+input double           InpMaxStopAtr       = 0.0;         // Cap initial SL distance at N x ATR (0 = off)
+
+input group            "Exit improvements (v1.50, 0/false = original behaviour)"
+input bool             InpExitOnStFlip     = false;       // Exit when the raw SuperTrend flips against the trade
+input double           InpErExit           = 0.0;         // Exit when ER drops below this level (0 = off)
+input int              InpMaxBarsInTrade   = 0;           // Time stop: close after N chart bars (0 = off)
+input int              InpCloseFridayHour  = 0;           // Close open trades on Friday from this GMT hour (0 = off)
+
+input group            "Trailing improvements (v1.50, defaults = original behaviour)"
+input ENUM_TRAIL_SOURCE InpTrailSource     = TRAIL_SRC_SUPERTREND; // Trailing stop source
+input double           InpTrailAtrMult     = 2.0;         // Tight SuperTrend ATR multiplier (source 1)
+input double           InpTrailAtrK        = 3.0;         // ATR multiple K for Chandelier / ATR-close trailing
+input double           InpTrailActivateR   = 0.0;         // Start trailing only after N x Initial Risk (0 = at once)
+input double           InpLockTriggerR     = 0.0;         // Lock-in stage: when profit >= N x R ... (0 = off)
+input double           InpLockR            = 0.0;         // ... move SL to entry + N x R (must be < trigger)
+input double           InpPartialR         = 0.0;         // Partial close at N x R (0 = off)
+input double           InpPartialPercent   = 50.0;        // Partial close % of the original volume
+
 input group            "Chart Gauge"
 input bool             InpShowGauge        = true;        // Show XPWorx regime gauge
 input ENUM_BASE_CORNER InpGaugeCorner      = CORNER_LEFT_LOWER; // Gauge corner (indicator's gauge uses top-right)
@@ -127,8 +177,16 @@ input int              InpGaugeSize        = 220;         // Gauge width (px)
 CTrade   g_trade;
 CXPMoneyManager g_money;
 int      g_handle         = INVALID_HANDLE;
+int      g_trail_handle   = INVALID_HANDLE; // second SuperTrend for TRAIL_SRC_SUPERTREND_TIGHT
 int      g_atr_handle     = INVALID_HANDLE;
 datetime g_last_bar_time  = 0;
+//--- v1.50 leg tracking for late entries / re-entries. A "leg" is one
+//--- uninterrupted Trending state in one direction; it is identified by
+//--- the open time of the bar on which it started (dwell == 1).
+datetime g_leg_traded_time  = 0;  // leg in which the EA last opened a trade
+datetime g_leg_stopped_time = 0;  // leg whose trade ended without an EA exit signal (SL/TP)
+bool     g_had_pos          = false;
+bool     g_signal_exit      = false;
 ulong    g_exit_ticket    = 0; // position whose exit signal has been committed
 ulong    g_exit_order     = 0; // accepted close order awaiting a final server state
 datetime g_exit_last_try  = 0;
@@ -479,12 +537,54 @@ int OnInit(void)
       return(INIT_PARAMETERS_INCORRECT);
      }
 
-   if(InpMinStopAtr > 0.0)
+   if(InpMinStopAtr > 0.0 || InpMaxStopAtr > 0.0 || InpSlAtrMult > 0.0 ||
+      InpTrailSource == TRAIL_SRC_CHANDELIER || InpTrailSource == TRAIL_SRC_ATR_CLOSE)
      {
       g_atr_handle = iATR(_Symbol,_Period,InpAtrPeriod);
       if(g_atr_handle == INVALID_HANDLE)
         {
          PrintFormat("RegimeTrend_EA: iATR failed, error %d.",GetLastError());
+         return(INIT_FAILED);
+        }
+     }
+
+   //--- v1.50 validation of the new inputs
+   if(InpLockTriggerR > 0.0 && InpLockR >= InpLockTriggerR)
+     {
+      Print("RegimeTrend_EA: InpLockR must be smaller than InpLockTriggerR.");
+      return(INIT_PARAMETERS_INCORRECT);
+     }
+   if(InpPartialR > 0.0 && (InpPartialPercent <= 0.0 || InpPartialPercent >= 100.0))
+     {
+      Print("RegimeTrend_EA: InpPartialPercent must be between 0 and 100 (exclusive).");
+      return(INIT_PARAMETERS_INCORRECT);
+     }
+   if(InpTrailSource == TRAIL_SRC_SUPERTREND_TIGHT)
+     {
+      if(InpTrailAtrMult <= 0.0)
+        {
+         Print("RegimeTrend_EA: InpTrailAtrMult must be > 0 for the tight SuperTrend trailing source.");
+         return(INIT_PARAMETERS_INCORRECT);
+        }
+      //--- same indicator, same inputs, only the ATR multiplier differs
+      g_trail_handle = iCustom(_Symbol,_Period,REGIME_INDICATOR_RESOURCE,
+                               InpRegimeTF,InpErPeriod,InpEnterTrend,InpExitTrend,
+                               InpAtrPeriod,InpTrailAtrMult,
+                               InpMinDwell,InpShockMult,InpUseClosedBars,false,
+                               InpMacroTF,InpMacroEmaPeriod,InpMacroSlopeBars,
+                               InpMacroDeadbandPct,InpMacroMinDwell,
+                               false);
+      if(g_trail_handle == INVALID_HANDLE)
+         g_trail_handle = iCustom(_Symbol,_Period,"Foundry\\RegimeTrend",
+                                  InpRegimeTF,InpErPeriod,InpEnterTrend,InpExitTrend,
+                                  InpAtrPeriod,InpTrailAtrMult,
+                                  InpMinDwell,InpShockMult,InpUseClosedBars,false,
+                                  InpMacroTF,InpMacroEmaPeriod,InpMacroSlopeBars,
+                                  InpMacroDeadbandPct,InpMacroMinDwell,
+                                  false);
+      if(g_trail_handle == INVALID_HANDLE)
+        {
+         PrintFormat("RegimeTrend_EA: iCustom for the tight trailing SuperTrend failed, error %d.",GetLastError());
          return(INIT_FAILED);
         }
      }
@@ -500,6 +600,9 @@ int OnInit(void)
    mm.deviation_points=InpSlippagePoints;
    mm.trail_mode=InpTrailSuperTrend ? XPMM_TRAIL_EXTERNAL : XPMM_TRAIL_OFF;
    mm.trail_step_points=InpTrailStepPoints;
+   //--- v1.50: optional trailing activation threshold in R multiples
+   mm.trail_trigger_unit=XPMM_R;
+   mm.trail_trigger=InpTrailActivateR > 0.0 ? InpTrailActivateR : 0.0;
    if(!g_money.Configure(mm))
      {
       Print("RegimeTrend_EA: money manager: ",g_money.Reason());
@@ -511,6 +614,28 @@ int OnInit(void)
       be.unit=XPMM_R; be.trigger=InpBreakEvenR; be.lock_points=InpBreakEvenBuffer;
       if(!g_money.AddBreakEven(be))
          return INIT_PARAMETERS_INCORRECT;
+     }
+   //--- v1.50: R-multiple lock-in stage and partial close, both handled by
+   //--- the money manager alongside break-even and the trailing stop.
+   if(InpLockTriggerR > 0.0)
+     {
+      XPMM_R_STAGE lock; ZeroMemory(lock);
+      lock.trigger_r=InpLockTriggerR; lock.lock_r=InpLockR;
+      if(!g_money.AddRTrail(lock))
+        {
+         Print("RegimeTrend_EA: money manager: ",g_money.Reason());
+         return INIT_PARAMETERS_INCORRECT;
+        }
+     }
+   if(InpPartialR > 0.0)
+     {
+      XPMM_PARTIAL_STAGE part; ZeroMemory(part);
+      part.unit=XPMM_R; part.trigger=InpPartialR; part.percent_original=InpPartialPercent;
+      if(!g_money.AddPartial(part))
+        {
+         Print("RegimeTrend_EA: money manager: ",g_money.Reason());
+         return INIT_PARAMETERS_INCORRECT;
+        }
      }
 
    g_trade.SetExpertMagicNumber(InpMagic);
@@ -542,6 +667,8 @@ void OnDeinit(const int reason)
    g_ea_gauge.Destroy();
    if(g_handle != INVALID_HANDLE)
       IndicatorRelease(g_handle);
+   if(g_trail_handle != INVALID_HANDLE)
+      IndicatorRelease(g_trail_handle);
    if(g_atr_handle != INVALID_HANDLE)
       IndicatorRelease(g_atr_handle);
   }
@@ -646,6 +773,42 @@ void OnTick(void)
       have_macro = true;
      }
 
+//--- v1.50 extra readings (all shift 1 = last closed bar)
+   double er_buf[], dwell_buf[], rawdir_buf[], atr_buf[], st_tight[];
+   double er_now = -1.0, atr_now = 0.0, st_tight_now = 0.0;
+   int    dwell_now = 0, rawdir_now = 0;
+   bool   need_er = (InpMinErEntry > 0.0 || InpErExit > 0.0);
+   if(need_er)
+     {
+      if(CopyBuffer(g_handle,2,1,1,er_buf) != 1)
+         return;
+      er_now = er_buf[0];
+     }
+   if(InpLateEntryBars > 0)
+     {
+      if(CopyBuffer(g_handle,4,1,1,dwell_buf) != 1)
+         return;
+      dwell_now = (int)dwell_buf[0];
+     }
+   if(InpExitOnStFlip)
+     {
+      if(CopyBuffer(g_handle,12,1,1,rawdir_buf) != 1)
+         return;
+      rawdir_now = (rawdir_buf[0] > 0.0) ? 1 : -1;
+     }
+   if(g_atr_handle != INVALID_HANDLE)
+     {
+      if(CopyBuffer(g_atr_handle,0,1,1,atr_buf) != 1)
+         return;
+      atr_now = atr_buf[0];
+     }
+   if(g_trail_handle != INVALID_HANDLE)
+     {
+      if(CopyBuffer(g_trail_handle,0,1,1,st_tight) != 1)
+         return;
+      st_tight_now = (st_tight[0] != EMPTY_VALUE && st_tight[0] > 0.0) ? st_tight[0] : 0.0;
+     }
+
    g_money.Refresh();
    datetime prev_bar_time = g_last_bar_time;
    g_last_bar_time = t0[0];
@@ -661,6 +824,12 @@ void OnTick(void)
    double open_price, current_sl, current_tp;
    bool   have_pos = FindOwnPosition(ticket,open_side,open_price,current_sl,current_tp);
 
+//--- v1.50: a position that vanished without an EA exit signal was closed
+//--- by its SL/TP - remember the leg so a late re-entry can be allowed.
+   if(g_had_pos && !have_pos && !g_signal_exit)
+      g_leg_stopped_time = g_leg_traded_time;
+   g_had_pos = have_pos;
+
 //--- 1. MANAGE OPEN POSITION
    if(have_pos)
      {
@@ -668,7 +837,43 @@ void OnTick(void)
       if(PositionSelectByTicket(ticket))
         {
          ulong identifier=(ulong)PositionGetInteger(POSITION_IDENTIFIER);
-         g_money.SetContext(identifier,0.0,InpTrailSuperTrend && have_st ? st[0] : 0.0);
+         //--- v1.50: trailing candidate from the selected source; the money
+         //--- manager still applies the step, validity and "never loosen" rules.
+         double trail_candidate = 0.0;
+         if(InpTrailSuperTrend)
+           {
+            int bars_held = iBarShift(_Symbol,_Period,(datetime)PositionGetInteger(POSITION_TIME),false);
+            if(bars_held < 1) bars_held = 1;
+            switch(InpTrailSource)
+              {
+               case TRAIL_SRC_SUPERTREND_TIGHT:
+                  trail_candidate = st_tight_now;
+                  break;
+               case TRAIL_SRC_CHANDELIER:
+                  if(atr_now > 0.0)
+                    {
+                     if(open_side == 1)
+                       {
+                        int hi = iHighest(_Symbol,_Period,MODE_HIGH,bars_held,1);
+                        if(hi >= 0) trail_candidate = iHigh(_Symbol,_Period,hi) - InpTrailAtrK * atr_now;
+                       }
+                     else
+                       {
+                        int lo = iLowest(_Symbol,_Period,MODE_LOW,bars_held,1);
+                        if(lo >= 0) trail_candidate = iLow(_Symbol,_Period,lo) + InpTrailAtrK * atr_now;
+                       }
+                    }
+                  break;
+               case TRAIL_SRC_ATR_CLOSE:
+                  if(atr_now > 0.0)
+                     trail_candidate = (open_side == 1) ? iClose(_Symbol,_Period,1) - InpTrailAtrK * atr_now
+                                                        : iClose(_Symbol,_Period,1) + InpTrailAtrK * atr_now;
+                  break;
+               default:
+                  trail_candidate = have_st ? st[0] : 0.0;
+              }
+           }
+         g_money.SetContext(identifier,0.0,trail_candidate);
          g_money.Manage();
         }
 
@@ -703,6 +908,37 @@ void OnTick(void)
            }
         }
 
+      //--- v1.50 additional exits, evaluated in this fixed order
+      if(!exit_signal && InpExitOnStFlip && rawdir_now != 0 && rawdir_now != open_side)
+        {
+         exit_signal = true;
+         exit_reason = "raw SuperTrend flipped";
+        }
+      if(!exit_signal && InpErExit > 0.0 && er_now >= 0.0 && er_now < InpErExit)
+        {
+         exit_signal = true;
+         exit_reason = StringFormat("ER %.2f below exit level %.2f",er_now,InpErExit);
+        }
+      if(!exit_signal && InpMaxBarsInTrade > 0 && PositionSelectByTicket(ticket))
+        {
+         int bars_held = iBarShift(_Symbol,_Period,(datetime)PositionGetInteger(POSITION_TIME),false);
+         if(bars_held >= InpMaxBarsInTrade)
+           {
+            exit_signal = true;
+            exit_reason = StringFormat("time stop after %d bars",bars_held);
+           }
+        }
+      if(!exit_signal && InpCloseFridayHour > 0)
+        {
+         MqlDateTime fdt;
+         TimeToStruct(SessionClockGMT(),fdt);
+         if(fdt.day_of_week == 5 && fdt.hour >= InpCloseFridayHour)
+           {
+            exit_signal = true;
+            exit_reason = "Friday close";
+           }
+        }
+
       if(exit_signal)
         {
          PrintFormat("RegimeTrend_EA: closing %s @ %s - regime=%d direction=%d (%s).",
@@ -710,16 +946,43 @@ void OnTick(void)
                      TimeToString(t0[0],TIME_DATE|TIME_MINUTES),
                      reg_now,dir_now,exit_reason);
          g_exit_ticket = ticket;
+         g_signal_exit = true;
          ManagePendingExit();
         }
       return;   // One decision per bar: don't also open on the exit bar
      }
 
 //--- 2. OPEN NEW POSITION WHEN FLAT
-//--- Enter only on the transition bar into Trending, never chasing
-   if(reg_now == REGIME_LEVEL_TRENDING && reg_prev != REGIME_LEVEL_TRENDING &&
-      (dir_now == 1 || dir_now == -1))
+//--- Enter only on the transition bar into Trending, never chasing...
+   bool transition = (reg_now == REGIME_LEVEL_TRENDING && reg_prev != REGIME_LEVEL_TRENDING &&
+                      (dir_now == 1 || dir_now == -1));
+//--- ...unless v1.50 late entry allows the first N bars of a leg that the
+//--- EA has not traded yet (or was stopped out of, with InpReentryAfterStop).
+   bool     late_entry = false;
+   datetime leg_time   = 0;
+   if(!transition && InpLateEntryBars > 0 && reg_now == REGIME_LEVEL_TRENDING &&
+      (dir_now == 1 || dir_now == -1) && dwell_now >= 2 && dwell_now - 1 <= InpLateEntryBars)
      {
+      leg_time = iTime(_Symbol,_Period,dwell_now);   // bar on which this leg started
+      if(leg_time != 0)
+        {
+         if(leg_time != g_leg_traded_time)
+            late_entry = true;
+         else if(InpReentryAfterStop && g_leg_stopped_time == leg_time)
+            late_entry = true;
+        }
+     }
+   if(transition)
+      leg_time = t0[0] == 0 ? 0 : iTime(_Symbol,_Period,1);
+
+   if(transition || late_entry)
+     {
+      //--- v1.50: required state before the transition
+      if(transition && InpEntryPrevState == ENTRY_PREV_NEUTRAL && reg_prev != REGIME_LEVEL_NEUTRAL)
+         return;
+      if(transition && InpEntryPrevState == ENTRY_PREV_CHOPPY && reg_prev != REGIME_LEVEL_CHOPPY)
+         return;
+
       //--- Direction filter (open positions are still managed and exited)
       if((InpTradeDirection == TRADE_LONG_ONLY && dir_now != 1) ||
          (InpTradeDirection == TRADE_SHORT_ONLY && dir_now != -1))
@@ -795,21 +1058,45 @@ void OnTick(void)
          return;
         }
 
+      //--- v1.50 spread and signal-strength filters
+      if(InpMaxSpreadPoints > 0 && (ask - bid) / _Point > (double)InpMaxSpreadPoints + 1e-9)
+        {
+         PrintFormat("RegimeTrend_EA: entry skipped - spread %.0f points above %d.",(ask - bid) / _Point,InpMaxSpreadPoints);
+         return;
+        }
+      if(InpMinErEntry > 0.0 && er_now < InpMinErEntry)
+        {
+         PrintFormat("RegimeTrend_EA: entry skipped - ER %.2f below InpMinErEntry %.2f.",er_now,InpMinErEntry);
+         return;
+        }
+
       //--- Stop floor: never size off a stop tighter than the broker minimum,
       //--- InpMinStopPoints, or InpMinStopAtr x ATR of the last closed bar.
       double floor_d = MathMax(min_d,(double)InpMinStopPoints * _Point);
-      if(InpMinStopAtr > 0.0)
+      bool need_atr = (InpMinStopAtr > 0.0 || InpMaxStopAtr > 0.0 || InpSlAtrMult > 0.0);
+      if(need_atr && atr_now <= 0.0)
         {
-         double atr[];
-         if(CopyBuffer(g_atr_handle,0,1,1,atr) != 1 || atr[0] <= 0.0)
-           {
-            Print("RegimeTrend_EA: ATR not available for the stop floor. Entry skipped.");
-            return;
-           }
-         floor_d = MathMax(floor_d,InpMinStopAtr * atr[0]);
+         Print("RegimeTrend_EA: ATR not available for the stop calculation. Entry skipped.");
+         return;
         }
+      if(InpMinStopAtr > 0.0)
+         floor_d = MathMax(floor_d,InpMinStopAtr * atr_now);
 
-      if(InpUseSuperTrendSL && have_st)
+      if(InpSlAtrMult > 0.0)
+        {
+         //--- v1.50 ATR-based initial stop (SuperTrend is then only used for trailing)
+         if(dir_now == 1)
+           {
+            double stop_price = MathMin(bid - InpSlAtrMult * atr_now,bid - floor_d);
+            sl = NormalizeDouble(MathFloor(stop_price / tick_size + 1e-9) * tick_size,_Digits);
+           }
+         else
+           {
+            double stop_price = MathMax(ask + InpSlAtrMult * atr_now,ask + floor_d);
+            sl = NormalizeDouble(MathCeil(stop_price / tick_size - 1e-9) * tick_size,_Digits);
+           }
+        }
+      else if(InpUseSuperTrendSL && have_st)
         {
          double candidate_sl = st[0];
          if(dir_now == 1) // BUY
@@ -817,6 +1104,9 @@ void OnTick(void)
             if(candidate_sl < bid)
               {
                double stop_price = MathMin(candidate_sl,bid - floor_d);
+               //--- v1.50: cap the distance so a far SuperTrend does not shrink R
+               if(InpMaxStopAtr > 0.0)
+                  stop_price = MathMax(stop_price,bid - InpMaxStopAtr * atr_now);
                sl = NormalizeDouble(MathFloor(stop_price / tick_size + 1e-9) * tick_size,_Digits);
               }
             else
@@ -830,6 +1120,8 @@ void OnTick(void)
             if(candidate_sl > ask)
               {
                double stop_price = MathMax(candidate_sl,ask + floor_d);
+               if(InpMaxStopAtr > 0.0)
+                  stop_price = MathMin(stop_price,ask + InpMaxStopAtr * atr_now);
                sl = NormalizeDouble(MathCeil(stop_price / tick_size - 1e-9) * tick_size,_Digits);
               }
             else
@@ -870,10 +1162,18 @@ void OnTick(void)
                           : g_trade.Sell(lots,_Symbol,0.0,sl,tp,"RegimeTrend"),
                           "open");
 
-      PrintFormat("RegimeTrend_EA: %s %s %.2f lots @ %s - regime just became Trending (dir=%d, macro=%d, SL=%.2f, TP=%.2f).",
+      PrintFormat("RegimeTrend_EA: %s %s %.2f lots @ %s - %s (dir=%d, macro=%d, SL=%.2f, TP=%.2f).",
                   ok ? "opened" : "FAILED to open",
                   (dir_now == 1 ? "BUY" : "SELL"),
-                  ok ? g_trade.ResultVolume() : lots,TimeToString(t0[0],TIME_DATE|TIME_MINUTES),dir_now,macro_now,sl,tp);
+                  ok ? g_trade.ResultVolume() : lots,TimeToString(t0[0],TIME_DATE|TIME_MINUTES),
+                  transition ? "regime just became Trending" : StringFormat("late entry, %d bars into the leg",dwell_now - 1),
+                  dir_now,macro_now,sl,tp);
+      if(ok)
+        {
+         g_leg_traded_time = leg_time;
+         g_signal_exit     = false;
+         g_had_pos         = true;
+        }
 
       //--- The session table said open but the server still refused (e.g. a
       //--- holiday schedule): keep this bar's signal and retry it in a minute,
