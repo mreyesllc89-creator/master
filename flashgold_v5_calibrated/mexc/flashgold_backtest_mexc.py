@@ -22,8 +22,8 @@ RESULTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results"
 
 # costs per side: (commission cash per contract, slippage in price units); spread in price units (full)
 COSTS = {
-    "xau": dict(comm=0.13, slip=0.05, spread=0.25),
-    "spx": dict(comm=0.25, slip=0.10, spread=0.50),
+    "xau": dict(comm=0.0, comm_pct=0.0002, slip=0.05, spread=0.25),  # MEXC taker 0.02% per side; spread/slip kept from VT
+    "spx": dict(comm=0.0, comm_pct=0.0002, slip=0.10, spread=0.50),  # MEXC taker 0.02% per side; spread/slip kept from VT
     "btc": dict(comm=0.0, comm_pct=0.0002, slip=2.0, spread=1.0),   # MEXC USDT perp: taker 0.02% per side, ~$1 spread, $2 slip
 }
 TF_MIN = {"xau5": 5, "xau10": 10, "xau15": 15, "xau30": 30, "xau60": 60,

@@ -1,4 +1,4 @@
-# FlashGold v5 BTC builds for MEXC: percent commission, MEXC slippage, 0.1 % equity risk
+# FlashGold v5 builds for MEXC: percent commission, 0.1 % equity risk
 
 The four BTC exports were re-swept with MEXC USDT-M perpetual costs instead of the VT Markets
 header: taker 0.02 % of traded value per side, $1 spread, $2 slippage per side
@@ -28,3 +28,29 @@ CRYPTO:BTCUSD exports of 1 to 4 weeks, 5m is MEXC:BTCUSDT 7.8 days. Treat every 
 bound. 5m stays weak: only 20 % of the grid is positive at MEXC costs.
 
 `results/` holds the full MEXC sweep per timeframe and the top 10 per timeframe.
+
+## XAUUSD and SPX500
+
+Re-swept with the MEXC taker fee, 0.02 % of traded value per side. There is no MEXC spread or
+slippage figure for these symbols, so the VT Markets values are kept (gold $0.25 spread and
+5 ticks slippage, SPX 0.5 point spread and 10 ticks). Round trip rises from about $0.36 to about
+$2.1 per oz on gold and from about 0.7 to about 3.7 points on SPX.
+
+Header: `commission_type = strategy.commission.percent, commission_value = 0.02`. Sizing:
+`Risk %` 0.1 of equity, gold max 25 oz step 0.1, SPX max 13 contracts step 0.1 (caps keep the
+notional near the 100k equity so 100 % margin does not reject orders).
+
+| File | Zones | Signal | Dist ATR | Hold | SL ATR | TP R | Trail | Close opp | Trades | Win | Net | PF | PF h1 / h2 | Max DD | Grid positive |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| FlashGold_v5_MEXC_XAUUSD_15m.pine | chart, 2x, 4x, 8x (3 aligned) | burst 1.0 | 0.25 | 0 | 3.0 | 1.0 | off | off | 43 | 65% | +313 per oz | 1.90 | 1.74 / 2.14 | 67 | 13% |
+| FlashGold_v5_MEXC_XAUUSD_30m.pine | chart only | any combo | 0.25 | 3 | 2.0 | 3.0 | off | on | 31 | 55% | +398 per oz | 2.34 | 2.52 / 2.21 | 76 | 30% |
+| FlashGold_v5_MEXC_XAUUSD_60m.pine | chart, 2x, 4x (2 aligned) | burst 0.5 | 0.1 | 0 | 3.0 | 3.0 | off | off | 52 | 40% | +590 per oz | 1.85 | 1.76 / 1.96 | 290 | 36% |
+| FlashGold_v5_MEXC_SPX500_15m.pine | chart only | burst 0.5 | 0.25 | 3 | 3.0 | 1.5 | on | off | 46 | 78% | +228 per contract | 1.60 | 1.51 / 1.70 | 146 | 12% |
+| FlashGold_v5_MEXC_SPX500_30m.pine | chart only | burst 0.5 | 0.25 | 3 | 1.5 | 0.5 | on | off | 51 | 78% | +314 per contract | 2.11 | 2.06 / 2.16 | 69 | 26% |
+| FlashGold_v5_MEXC_SPX500_60m.pine | chart, 2x, 4x, 8x (3 aligned) | burst 0.25 | 0.25 | 3 | 2.0 | 1.5 | on | off | 43 | 81% | +1,274 per contract | 4.39 | 4.82 / 4.14 | 145 | 45% |
+
+Not shipped at MEXC costs:
+
+- XAUUSD 5m: no setting is positive in both halves (6 % of the grid positive, best PF 0.78 with 30+ trades).
+- XAUUSD 10m: best PF 1.13 with only 2 % of the grid positive, a data-mining fluke.
+- SPX500 1m: best PF 1.18 with 0 % of the grid positive, the fee is larger than the 1m move.
