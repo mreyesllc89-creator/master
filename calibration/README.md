@@ -118,8 +118,9 @@ Balanced accuracy, mean of 1, 3 and 10 candles later, in-sample 2023-01..2025-06
 - Signal-level quality gates (TDI fast line bounds, parent line, volatility, Hurst, the framework) that were right
   54-58% in sample fell back to about 50% out of sample; a fitted 0-100 score separated real from end-of-move signals
   no better than chance out of sample (AUC 0.48-0.55).
-- The filter (v1.1) shows these three rules' live scores on any symbol and timeframe, and can use any of them as its
-  permission ("Direction rule").
+- The filter (v1.2) is a map of what is allowed - BUY ZONE above the level, SELL ZONE below it, NO TRADE in a band
+  of +- 0.25 ATR around it - and says whether the signal's direction is confirmed. The three readings' live scores
+  are available in its status box (off by default; information only).
 
 ## Limits
 
