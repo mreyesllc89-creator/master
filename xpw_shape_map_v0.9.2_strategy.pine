@@ -105,8 +105,11 @@
 //     close on history (on tick live). Best with a signal timeframe that
 //     divides the chart timeframe (5 on 15, 15 on 60...). "10" on a 15 min
 //     chart works, but the 10 min candles straddle the 15 min ones, so a
-//     signal can show up one chart candle late. TradingView keeps a limited
-//     intrabar history, so such backtests reach less far back.
+//     signal can show up one chart candle late. Lower timeframes go through
+//     request.security_lower_tf(), which TradingView limits to roughly the
+//     last 100k intrabars: 5 min signals on a 1H chart cover about 8000 chart
+//     candles (~1 year), 1 min signals on a 1H chart about 1600 (~2 months).
+//     Older chart candles get no signals at all.
 //   * Labels are drawn on the chart candle where the signal arrives (the
 //     square box / turn mark are shifted back by the signal's "bars" scaled to
 //     chart candles). Settings in "bars" that belong to the SIGNAL (context,
@@ -583,7 +586,132 @@ shapeMap() =>
     float xPx  = crossPrice(upR, dnR, sumF, sumS)
     [fast, slow, isRed, posW, inLow, inHigh, botT, botW, botHH, botLL, topT, topW, topHH, topLL, turnUpT, turnUpY, botGap, turnDnT, turnDnY, topGap, botCrossT, topCrossT, crossUpT, crossDnT, armL, armS, botTickT, topTickT, contUpT, contUpA, contUpY, contUpHi, contDnT, contDnA, contDnY, contDnLo, xPx]
 
-[fast, slow, isRed, posW, inLow, inHigh, botT, botWid, botHH, botLL, topT, topWid, topHH, topLL, turnUpT, turnUpY, lastBotGap, turnDnT, turnDnY, lastTopGap, botCrossT, topCrossT, crossUpT, crossDnT, armL, armS, botTickT, topTickT, contUpT, contUpAge, contUpY, contUpHi, contDnT, contDnAge, contDnY, contDnLo, xPx] = request.security(syminfo.tickerid, tfSel, shapeMap())
+// Same or higher signal timeframe: request.security() (one value per chart candle,
+// a higher-timeframe candle repeats until the next one closes). Lower signal
+// timeframe: request.security_lower_tf() returns every intrabar of the chart
+// candle; the last intrabar carries the most recent state and signal times.
+bool sigLower = tfSec < chartSec
+lastF(array<float> a) =>
+    array.size(a) > 0 ? array.last(a) : na
+lastI(array<int> a) =>
+    array.size(a) > 0 ? array.last(a) : na
+lastB(array<bool> a) =>
+    array.size(a) > 0 ? array.last(a) : false
+float fast = na
+float slow = na
+bool  isRed = false
+float posW = na
+bool  inLow = false
+bool  inHigh = false
+int   botT = na
+int   botWid = na
+float botHH = na
+float botLL = na
+int   topT = na
+int   topWid = na
+float topHH = na
+float topLL = na
+int   turnUpT = na
+float turnUpY = na
+int   lastBotGap = na
+int   turnDnT = na
+float turnDnY = na
+int   lastTopGap = na
+int   botCrossT = na
+int   topCrossT = na
+int   crossUpT = na
+int   crossDnT = na
+bool  armL = false
+bool  armS = false
+int   botTickT = na
+int   topTickT = na
+int   contUpT = na
+int   contUpAge = na
+float contUpY = na
+float contUpHi = na
+int   contDnT = na
+int   contDnAge = na
+float contDnY = na
+float contDnLo = na
+float xPx = na
+if sigLower
+    [a_fast, a_slow, a_isRed, a_posW, a_inLow, a_inHigh, a_botT, a_botWid, a_botHH, a_botLL, a_topT, a_topWid, a_topHH, a_topLL, a_turnUpT, a_turnUpY, a_lastBotGap, a_turnDnT, a_turnDnY, a_lastTopGap, a_botCrossT, a_topCrossT, a_crossUpT, a_crossDnT, a_armL, a_armS, a_botTickT, a_topTickT, a_contUpT, a_contUpAge, a_contUpY, a_contUpHi, a_contDnT, a_contDnAge, a_contDnY, a_contDnLo, a_xPx] = request.security_lower_tf(syminfo.tickerid, tfSel, shapeMap())
+    fast := lastF(a_fast)
+    slow := lastF(a_slow)
+    isRed := lastB(a_isRed)
+    posW := lastF(a_posW)
+    inLow := lastB(a_inLow)
+    inHigh := lastB(a_inHigh)
+    botT := lastI(a_botT)
+    botWid := lastI(a_botWid)
+    botHH := lastF(a_botHH)
+    botLL := lastF(a_botLL)
+    topT := lastI(a_topT)
+    topWid := lastI(a_topWid)
+    topHH := lastF(a_topHH)
+    topLL := lastF(a_topLL)
+    turnUpT := lastI(a_turnUpT)
+    turnUpY := lastF(a_turnUpY)
+    lastBotGap := lastI(a_lastBotGap)
+    turnDnT := lastI(a_turnDnT)
+    turnDnY := lastF(a_turnDnY)
+    lastTopGap := lastI(a_lastTopGap)
+    botCrossT := lastI(a_botCrossT)
+    topCrossT := lastI(a_topCrossT)
+    crossUpT := lastI(a_crossUpT)
+    crossDnT := lastI(a_crossDnT)
+    armL := lastB(a_armL)
+    armS := lastB(a_armS)
+    botTickT := lastI(a_botTickT)
+    topTickT := lastI(a_topTickT)
+    contUpT := lastI(a_contUpT)
+    contUpAge := lastI(a_contUpAge)
+    contUpY := lastF(a_contUpY)
+    contUpHi := lastF(a_contUpHi)
+    contDnT := lastI(a_contDnT)
+    contDnAge := lastI(a_contDnAge)
+    contDnY := lastF(a_contDnY)
+    contDnLo := lastF(a_contDnLo)
+    xPx := lastF(a_xPx)
+else
+    [v_fast, v_slow, v_isRed, v_posW, v_inLow, v_inHigh, v_botT, v_botWid, v_botHH, v_botLL, v_topT, v_topWid, v_topHH, v_topLL, v_turnUpT, v_turnUpY, v_lastBotGap, v_turnDnT, v_turnDnY, v_lastTopGap, v_botCrossT, v_topCrossT, v_crossUpT, v_crossDnT, v_armL, v_armS, v_botTickT, v_topTickT, v_contUpT, v_contUpAge, v_contUpY, v_contUpHi, v_contDnT, v_contDnAge, v_contDnY, v_contDnLo, v_xPx] = request.security(syminfo.tickerid, tfSel, shapeMap())
+    fast := v_fast
+    slow := v_slow
+    isRed := v_isRed
+    posW := v_posW
+    inLow := v_inLow
+    inHigh := v_inHigh
+    botT := v_botT
+    botWid := v_botWid
+    botHH := v_botHH
+    botLL := v_botLL
+    topT := v_topT
+    topWid := v_topWid
+    topHH := v_topHH
+    topLL := v_topLL
+    turnUpT := v_turnUpT
+    turnUpY := v_turnUpY
+    lastBotGap := v_lastBotGap
+    turnDnT := v_turnDnT
+    turnDnY := v_turnDnY
+    lastTopGap := v_lastTopGap
+    botCrossT := v_botCrossT
+    topCrossT := v_topCrossT
+    crossUpT := v_crossUpT
+    crossDnT := v_crossDnT
+    armL := v_armL
+    armS := v_armS
+    botTickT := v_botTickT
+    topTickT := v_topTickT
+    contUpT := v_contUpT
+    contUpAge := v_contUpAge
+    contUpY := v_contUpY
+    contUpHi := v_contUpHi
+    contDnT := v_contDnT
+    contDnAge := v_contDnAge
+    contDnY := v_contDnY
+    contDnLo := v_contDnLo
+    xPx := v_xPx
 
 // A signal time that the chart has not seen yet = the signal fires now, once.
 // A higher-timeframe signal repeats its time on every chart candle it covers;
