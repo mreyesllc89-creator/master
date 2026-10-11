@@ -53,6 +53,30 @@ Bars can be a TradingView export (`time,open,high,low,close,...`) or an MT5 expo
 
 Costs in `calibrate.py` are a flat spread per unit (XAUUSD 0.25, BTCUSD 20) and no commission. Edit `SYMBOLS` to match your broker.
 
+Exit model in the replay is conservative: stop and target levels are checked against the level set by previous bars, a bar that opens beyond a level fills at the open, the trailing level only moves after the bar's exit checks, and any data gap over 3 hours (weekend, missing days) closes the position at the last close before it.
+
+### Presets
+
+`presets.py` writes the best 10 input sets per file as MT5 `.set` files (tester: Inputs tab > Load). Each candidate needs 15+ trades and a positive result on both halves of the data; ranking is net return minus 1.5 x max drawdown, at most 3 presets per entry mode.
+
+| Folder | Data |
+|---|---|
+| `calibration/presets_BTCUSD/` | BITGET BTCUSDT M30, 4 Sep to 11 Oct 2026, spread $20 |
+| `calibration/presets_XAUUSD_M15/`, `_M30/`, `_H1/` | VT Markets XAUUSD-ECNc ticks 1 to 14 Jul, 20 to 29 Jul, 30 Jul to 7 Aug 2026, built into bars; spread 0.12 + 0.07 commission |
+
+Best preset per file (1% risk, $10k):
+
+| File | Mode | Dir | SL $ | Trail act / dist $ | Trades | Win | PF | Net | Max DD | Half 1 / 2 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| BTCUSD M30 | CONT stop 0.8/1.5/4 | long | 500 | 800 / 10 | 42 | 57% | 1.85 | 12.4% | 3.2% | 9.6% / 2.9% |
+| XAUUSD M15 | Square | both | 5 | 20 / 5 | 143 | 44% | 1.50 | 50.1% | 10.7% | 30.1% / 20.0% |
+| XAUUSD M15 | CONT at close | both | 12 | 5 / 2 | 79 | 76% | 2.52 | 22.1% | 3.7% | 12.4% / 9.7% |
+| XAUUSD M30 | Turn after hold | both | 5 | 20 / 5 | 37 | 32% | 2.02 | 32.7% | 9.0% | 18.3% / 14.4% |
+| XAUUSD M30 | Turn after hold | long | 12 | 8 / 5 | 21 | 86% | 8.06 | 17.4% | 1.0% | 11.3% / 6.1% |
+| XAUUSD H1 | CONT stop 0.8/1.5/4 | both | 5 | 20 / 5 | 23 | 61% | 5.36 | 80.7% | 4.2% | 35.1% / 45.6% |
+
+The gold sample is five trading weeks that include a $230 rally in the last week, so the H1 CONT result is partly that trend. The $5 stop on gold is below the M30 average bar range ($11): it works with 1% risk only because the trail cuts winners short, and it will be sensitive to VT's execution. Verify every preset in the MT5 tester on tick data before using it.
+
 ### BTCUSD 30m (BITGET BTCUSDT, 4 Sep to 11 Oct 2026, 1798 bars)
 
 Full report: `calibration/BTCUSD_30m_report.md`. Best exits per entry mode, 1% risk per trade, $10k account:
@@ -73,4 +97,4 @@ Caveats: 37 days of one market, one timeframe, and a long-biased period, so "lon
 
 ### XAUUSD
 
-Not run yet: no XAUUSD bars were available in the calibration environment. Export 30m (or 15m / 1H) bars from MT5 as above and run the XAUUSD command.
+Bars built from VT Markets tick exports with `ticks2bars.py` (usage: `python3 ticks2bars.py <folder of unzipped tick csv folders> <out dir>`) (bid prices, server time). Reports: `calibration/XAUUSD_M15_report.md`, `XAUUSD_M30_report.md`, `XAUUSD_H1_report.md`. Bars used are in `calibration/bars_XAUUSD/`.

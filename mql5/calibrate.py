@@ -17,8 +17,9 @@ import csv, sys, math, argparse, itertools
 # ───────────────────────── symbol settings ─────────────────────────
 SYMBOLS = {
     # point = MT5 _Point, contract = units per lot, spread/commission in price units per unit round-trip
-    "XAUUSD": dict(point=0.01, contract=100.0, spread=0.25, comm_pct=0.0,
-                   sl_usd=[3, 5, 7, 10, 15], act_usd=[2, 4, 6, 10], dis_usd=[0.5, 1, 2, 3], tp_usd=[0]),
+    # VT Markets XAUUSD-ECNc ticks (Jul-Aug 2026): median spread 0.12, plus ~0.07 ECN commission per oz round trip
+    "XAUUSD": dict(point=0.01, contract=100.0, spread=0.19, comm_pct=0.0,
+                   sl_usd=[5, 8, 12, 16, 24, 35], act_usd=[3, 5, 8, 12, 20], dis_usd=[1, 2, 3, 5], tp_usd=[0]),
     "BTCUSD": dict(point=0.01, contract=1.0, spread=20.0, comm_pct=0.0,
                    sl_usd=[300, 500, 700, 1000, 1500], act_usd=[100, 200, 400, 800], dis_usd=[10, 30, 60, 120], tp_usd=[0]),
 }
@@ -45,6 +46,12 @@ def load(path):
                 if len(r) <= ix["CLOSE"]: continue
                 t = r[di] + (" " + r[ti] if ti is not None else "")
                 rows.append(dict(t=t, o=float(r[ix["OPEN"]]), h=float(r[ix["HIGH"]]), l=float(r[ix["LOW"]]), c=float(r[ix["CLOSE"]]), fast=None, slow=None))
+    import datetime as _dt
+    for r in rows:
+        t = r["t"].replace("T", " ").replace(".", "-")
+        t = t[:19]
+        try: r["ts"] = _dt.datetime.strptime(t, "%Y-%m-%d %H:%M:%S").timestamp()
+        except ValueError: r["ts"] = _dt.datetime.strptime(t[:16], "%Y-%m-%d %H:%M").timestamp()
     return rows
 
 # ───────────────────────── indicator port ─────────────────────────
@@ -204,28 +211,26 @@ def backtest(rows, ind, S, sym, mode, sl, tp, act, dis, risk=1.0, opp="reverse",
             if (d > 0 and h[i] >= px) or (d < 0 and l[i] <= px):
                 fill = max(px, o[i]) if d > 0 else min(px, o[i]); pending = None; open_trade(d, fill, i)
             elif i >= xb: pending = None
-        # 2. manage open position inside this bar
+        # 1b. data gap (missing days, weekend): flat out at the last close before it, no pending orders
+        if i > 0 and rows[i]["ts"] - rows[i - 1]["ts"] > 3 * 3600 + 60:
+            if pos != 0: close_trade(c[i - 1], i - 1, "gap")
+            pending = None
+        # 2. manage open position inside this bar. Conservative: stops are checked against
+        #    the level set by PREVIOUS bars, a gap through a level fills at the open, and
+        #    the trailing level only moves after this bar's exit checks.
         if pos != 0 and i > ebar:
             if pos > 0:
-                if l[i] <= stop: close_trade(stop, i, "SL/trail")
+                if l[i] <= stop: close_trade(min(stop, o[i]), i, "SL/trail")
+                elif h[i] >= take: close_trade(max(take, o[i]), i, "TP")
                 else:
                     hh = max(hh, h[i])
-                    if dis > 0 and hh - entry >= act:
-                        ns = hh - dis
-                        if ns > stop:
-                            stop = ns
-                            if c[i] < stop: close_trade(stop, i, "trail")
-                    if pos != 0 and h[i] >= take: close_trade(take, i, "TP")
+                    if dis > 0 and hh - entry >= act: stop = max(stop, hh - dis)
             else:
-                if h[i] >= stop: close_trade(stop, i, "SL/trail")
+                if h[i] >= stop: close_trade(max(stop, o[i]), i, "SL/trail")
+                elif l[i] <= take: close_trade(min(take, o[i]), i, "TP")
                 else:
                     ll = min(ll, l[i])
-                    if dis > 0 and entry - ll >= act:
-                        ns = ll + dis
-                        if ns < stop:
-                            stop = ns
-                            if c[i] > stop: close_trade(stop, i, "trail")
-                    if pos != 0 and l[i] <= take: close_trade(take, i, "TP")
+                    if dis > 0 and entry - ll >= act: stop = min(stop, ll + dis)
         # 3. signals at this bar's close
         if i >= n - 1: break
         if mode == "turn_predict":
