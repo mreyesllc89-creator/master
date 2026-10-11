@@ -1,0 +1,24 @@
+{
+ "ind": {
+  "chart_tf": "M30",
+  "regime_tf": "H1",
+  "er_period": 20,
+  "enter": 0.3,
+  "exit": 0.1,
+  "atr_period": 10,
+  "atr_mult": 2.0,
+  "min_dwell": 10,
+  "shock_mult": 5.0,
+  "macro_tf": "H4",
+  "macro_ema": 50,
+  "macro_slope": 3,
+  "macro_deadband": 0.05,
+  "macro_min_dwell": 2,
+  "trail_atr_mult": 0.0
+ },
+ "ea": {
+  "min_stop_atr": 1.5,
+  "use_be": 1,
+  "be_r": 1.5
+ }
+}

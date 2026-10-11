@@ -1,0 +1,14 @@
+{
+ "default_M15": {"ind": {"chart_tf": "M15"}, "ea": {}},
+ "default_H1":  {"ind": {"chart_tf": "H1"}, "ea": {}},
+ "H1_A": {"ind": {"chart_tf": "H1", "er_period": 10, "enter": 0.42, "exit": 0.10, "atr_period": 14, "atr_mult": 3.0, "min_dwell": 10, "shock_mult": 2.5},
+          "ea": {"lock_trigger_r": 2.0, "lock_r": 1.0}},
+ "H1_A_session": {"ind": {"chart_tf": "H1", "er_period": 10, "enter": 0.42, "exit": 0.10, "atr_period": 14, "atr_mult": 3.0, "min_dwell": 10, "shock_mult": 2.5},
+          "ea": {"lock_trigger_r": 2.0, "lock_r": 1.0, "use_session": 1, "start_hour": 7, "end_hour": 18, "trail_step_pts": 0}},
+ "M30_C": {"ind": {"chart_tf": "M30", "er_period": 20, "enter": 0.30, "exit": 0.10, "atr_period": 10, "atr_mult": 2.0, "min_dwell": 10, "shock_mult": 5.0},
+           "ea": {"min_stop_atr": 1.5, "use_be": 1, "be_r": 1.5}},
+ "M15_D": {"ind": {"chart_tf": "M15", "er_period": 20, "enter": 0.55, "exit": 0.10, "atr_period": 20, "atr_mult": 3.0, "min_dwell": 2, "shock_mult": 5.0},
+           "ea": {"use_session": 1, "start_hour": 7, "end_hour": 18, "trail_step_pts": 0, "lock_trigger_r": 2.0, "lock_r": 1.0}},
+ "M5_E": {"ind": {"chart_tf": "M5", "er_period": 30, "enter": 0.30, "exit": 0.28, "atr_period": 14, "atr_mult": 5.0, "min_dwell": 6, "shock_mult": 5.0},
+          "ea": {"use_session": 1, "start_hour": 7, "end_hour": 18, "strict_shorts": 0, "trail_step_pts": 0, "lock_trigger_r": 2.0, "lock_r": 1.0, "min_stop_atr": 1.5}}
+}

@@ -16,6 +16,8 @@ configs = json.load(open(cfg_path))
 m1 = rt.load_m1(sweep.DATA, sweep.YEARS)
 mkt = rt.Market(m1)
 bt = rt.Backtester(mkt)
+m1_2026 = rt.load_m1(sweep.DATA, [2026]) if os.path.exists(os.path.join(sweep.DATA, "xauusd_m1_2026.npz")) else None
+bt_2026 = rt.Backtester(rt.Market(m1_2026)) if m1_2026 is not None else None
 
 YEAR_WINDOWS = {str(y): (f"{y}-01-01", f"{y+1}-01-01") for y in range(2011, 2019)}
 WINDOWS = dict(sweep.DEFAULT_WINDOWS)
@@ -56,6 +58,12 @@ for name, c in configs.items():
         e2 = dict(ea_over); e2.update(extra)
         s, _, _ = run(ind, e2, *WINDOWS["all"])
         row = dict(config=name, window=label); row.update(s); summary_rows.append(row)
+    # broker tick data July-August 2026 (XAUUSD-ECNc), a separate recent sanity window
+    if m1_2026 is not None:
+        ea = rt.ea_params(**ea_over)
+        st, tr, eq = bt_2026.run(ind, ea)
+        s = rt.summarize(st, tr, eq, ea[rt.EA_IDX["start_balance"]], (m1_2026["t"][-1] - m1_2026["t"][0]) / 86400 / 365.25)
+        row = dict(config=name, window="broker_2026_JulAug"); row.update(s); summary_rows.append(row)
     setfile.write_set(os.path.join(out_dir, f"RegimeTrend_EA_{name}.set"), ind, ea_over, comment=name)
     json.dump(dict(ind=ind, ea=ea_over), open(os.path.join(out_dir, f"config_{name}.json"), "w"), indent=1)
 
