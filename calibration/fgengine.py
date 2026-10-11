@@ -7,8 +7,9 @@ TradingView's historical request.security semantics:
   [1] + lookahead_on (last CLOSED bar) -> the bar before the one containing the chart bar's open
 Order fills: stop entries / market orders from the bar after the signal, exits (SL, TP, trailing)
 evaluated along an intrabar price path: every 1-minute bar inside the chart bar with TradingView's
-4-point rule (open -> nearer extreme -> other extreme -> close), i.e. the bar-magnifier view, or the
-chart bar itself (magnifier off).
+4-point rule (open -> nearer extreme -> other extreme -> close), or the chart bar itself (magnifier off).
+(TradingView's own bar magnifier uses coarser intrabars from 15m charts up: 15m -> 2m, 30m -> 5m,
+1H / 2H -> 10m, 4H / 8H -> 30m, 1D -> 60m, at most 200,000 of them.)
 """
 import numpy as np
 import numba as nb
@@ -560,6 +561,10 @@ def simulate(t_open, ch_o, ch_h, ch_l, ch_c, m_o, m_h, m_l, m_c, m_start, m_end,
                             x_sl = mk_lock[0]; x_tp = mk_lock[1]; x_act = mk_lock[2]; x_dst = mk_lock[3]
                             tr_on = False
                             best = epx
+                            pl_on = False     # OCA: the fill cancels the pending entry stops
+                            ps_on = False
+                            pl_bar = NA
+                            ps_bar = NA
                         mk_enter = 0
                 # walk from prev_px to target; on the first point of a 1m bar the move is a gap:
                 # anything crossed fills at the target price

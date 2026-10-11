@@ -108,7 +108,7 @@ def trade_metrics(tr, atr_e, t_e):
 
 def base_params(tf, entry, filt):
     return R.params(parent_tf=tf * entry["pm"], zones=zones_for(tf, entry.get("zk", 0)), min_aligned=entry["ma"],
-                    burst_atr=0.5, fd_tf=tf * entry.get("fm", 1), fd_trade=bool(filt.get("parent", 0)),
+                    burst_atr=max(0.5, float(filt.get("burst", 0.5))), fd_tf=tf * entry.get("fm", 1), fd_trade=bool(filt.get("parent", 0)),
                     fd_div_on=False, fd_pull_on=False, fd_hurst_on=False, exit_mode="ATR", fee_pct=FEE, slip_ticks=0.0)
 
 
@@ -147,14 +147,25 @@ def select_exits(tf, C, top_n=60):
     if len(Cn) < top_n:
         Cn = C[C.is_n >= NMIN_C[tf]]
     top = Cn.sort_values("is_t", ascending=False).head(top_n)
-    ex = {}
-    for k in KEYS_C:
-        v = top[k].mode().iloc[0]
-        ex[k] = bool(v) if k in ("xopp", "xbrk") else (int(v) if k in ("rm", "rmax") else float(v))
-    if ex["act"] == 0:
-        ex["dst"] = 1.0
+    ex = pick_exits(top)
     if ex["rm"] == 0:
         ex["rmax"] = 0
+    return ex
+
+
+def pick_exits(top):
+    """Modal value of each exit setting among the top sets; the re-entry limit is voted among the sets that use
+    the chosen re-entry mode (rm = 0 rows carry rmax = 0 = 'no limit', which must not win for rm > 0)."""
+    ex = {}
+    for k in KEYS_C:
+        if k in ("rm", "rmax"):
+            continue
+        v = top[k].mode().iloc[0]
+        ex[k] = bool(v) if k in ("xopp", "xbrk") else float(v)
+    ex["rm"] = int(top["rm"].mode().iloc[0])
+    ex["rmax"] = int(top.loc[top["rm"] == ex["rm"], "rmax"].mode().iloc[0]) if ex["rm"] else 0
+    if ex["act"] == 0:
+        ex["dst"] = 1.0
     return ex
 
 

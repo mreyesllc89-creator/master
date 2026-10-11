@@ -22,10 +22,10 @@
   "tpr": 0.0,
   "act": 1.0,
   "dst": 1.0,
-  "rm": 1,
-  "rmax": 2,
   "xopp": false,
-  "xbrk": false
+  "xbrk": false,
+  "rm": 1,
+  "rmax": 2
  },
  "signal": {
   "is_n": 249.0,
@@ -232,10 +232,10 @@
   "tpr": 0.0,
   "act": 1.0,
   "dst": 1.0,
-  "rm": 1,
-  "rmax": 2,
   "xopp": false,
-  "xbrk": false
+  "xbrk": false,
+  "rm": 1,
+  "rmax": 2
  },
  "results_t_ranked_preset": {
   "is_n": 138.0,

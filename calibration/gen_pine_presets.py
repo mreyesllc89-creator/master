@@ -32,6 +32,7 @@ def main(path="presets.json"):
         else:   # not calibrated: neutral values (the strategy's own defaults)
             e = dict(pm=4, ma=2, fm=1); f = dict(parent=1, hurst=0, bmin=0, bmax=100, smin=0, smax=100, pbmin=0, psmax=100, areg=0)
             x = dict(sl=2.0, tpr=2.0, act=4.0, dst=0.2, rm=0, rmax=0, xopp=False, xbrk=True)
+        assert (x["rm"], x["rmax"]) in {(0, 0), (1, 2), (1, 5), (2, 2), (2, 5)}, (tf, x)   # only simulated pairs
         res = P[k]["results"]["preset"] if k in P and "results" in P[k] else {}
         rows.append((e, f, x, res))
     i = lambda v: str(int(v))

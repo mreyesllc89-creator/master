@@ -15,12 +15,7 @@ def select_exits_sum(tf, C, top_n=60):
     if len(Cn) < top_n:
         Cn = C[C.is_n >= P.NMIN_C[tf]]
     top = Cn.sort_values("is_sum", ascending=False).head(top_n)
-    ex = {}
-    for k in P.KEYS_C:
-        v = top[k].mode().iloc[0]
-        ex[k] = bool(v) if k in ("xopp", "xbrk") else (int(v) if k in ("rm", "rmax") else float(v))
-    if ex["act"] == 0:
-        ex["dst"] = 1.0
+    ex = P.pick_exits(top)
     if ex["act"] == 0 and ex["tpr"] == 0:
         ex["rm"] = 0          # nothing to re-enter after: no trailing stop, no target
     if ex["rm"] == 0:
@@ -34,7 +29,7 @@ if __name__ == "__main__":
     for tf in [int(x) for x in sys.argv[1:]]:
         f = f"{OUT}/preset_{tf}.json"
         old = json.load(open(f))
-        if not os.path.exists(f"{OUT}/preset_t_{tf}.json"):
+        if "exits_t_ranked" not in old:          # fresh pipe2 output: keep it as the t-ranked preset
             shutil.copy(f, f"{OUT}/preset_t_{tf}.json")
             old_t = old
         else:

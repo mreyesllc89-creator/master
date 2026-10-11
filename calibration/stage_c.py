@@ -8,7 +8,7 @@ from calib import zones_for, IS_END
 
 import os
 FEE = 0.0005      # per side, fraction of price (0.05%)
-MAG = os.environ.get("MAG") == "1"   # 1-minute intrabar paths (TradingView bar magnifier)
+MAG = os.environ.get("MAG") == "1"   # 1-minute intrabar paths
 MIN_TRADES = 80
 
 

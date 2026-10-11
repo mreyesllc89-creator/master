@@ -48,12 +48,24 @@ best sets (a plateau rather than a single peak). The out-of-sample period is onl
 | 1m | x1 (2 zones) / x4, H<0.5, burst 2 ATR | fast 50-100, parent>=0 / fast 30-40, parent<=100 / - | SL 3 ATR, no trail | off | 7612, -2.18, 0.60 | 4043, -2.83, 0.54 | 0.39 | 0.11 |
 | 5m | x1 (1 zone) / x4, H<0.5, burst 0.5 ATR | fast 50-100, parent>=50 / fast 30-40, parent<=50 / ATR ratio>=0.8 | SL 3 ATR, no trail | off | 3009, +0.01, 1.01 | 1637, -0.43, 0.82 | 0.43 | 0.18 |
 | 15m | x1 (1 zone) / x4, H<0.5, burst 0.5 ATR | fast 50-80, parent>=50 / fast 0-50, parent<=50 / ATR ratio>=1.2 | SL 3 ATR, no trail, exit on break | off | 721, +0.43, 1.24 | 379, +0.66, 1.39 | 0.63 | 0.20 |
-| 30m | x8 (1 zone) / x4, with parent, H<0.5, burst 0.5 ATR | fast 50-80, parent>=50 / fast 0-40, parent<=50 / ATR ratio>=1.2 | SL 1.5 ATR, trail 2/2 ATR | market (max 5) | 359, +0.30, 1.36 | 192, -0.15, 0.84 | 0.82 | 0.22 |
+| 30m | x8 (1 zone) / x4, with parent, H<0.5, burst 0.5 ATR | fast 50-80, parent>=50 / fast 0-40, parent<=50 / ATR ratio>=1.2 | SL 1.5 ATR, trail 2/2 ATR | market (max 2) | 359, +0.30, 1.36 | 192, -0.16, 0.84 | 0.83 | 0.22 |
 | 1H | x1 (1 zone) / x4, burst 0.5 ATR | fast 0-100, parent>=0 / fast 0-40, parent<=50 / - | SL 3 ATR, no trail, exit on break | off | 720, +0.28, 1.23 | 392, +0.07, 1.06 | 0.94 | 0.33 |
 | 2H | x4 (1 zone) / x4, with parent, H<0.5, burst 0.5 ATR | fast 50-80, parent>=50 / fast 0-40, parent<=50 / - | SL 2 ATR, TP 4R, trail 4/2 ATR, exit on break | stop (max 2) | 133, +0.68, 1.60 | 77, +0.14, 1.11 | 1.13 | 0.79 |
 | 4H | x1 (1 zone) / x1, burst 0.5 ATR | fast 0-100, parent>=0 / fast 30-40, parent<=50 / - | SL 3 ATR, no trail, exit on break | off | 203, +0.96, 1.89 | 134, +0.25, 1.22 | 1.13 | 0.26 |
 | 8H | x1 (1 zone) / x4, with parent, H<0.5, burst 0.5 ATR | fast 0-100, parent>=0 / fast 30-50, parent<=50 / - | SL 3 ATR, TP 8R, no trail, exit on opposite | stop (max 2) | 79, +0.39, 1.57 | 56, -0.23, 0.68 | 1.06 | 0.96 |
 | 1D | x1 (1 zone) / x1, burst 0.5 ATR | fast 0-100, parent>=0 / fast 30-100, parent<=100 / - | SL 3 ATR, trail 1/1 ATR | market (max 2) | 138, +0.25, 1.50 | 66, +0.23, 1.52 | 1.37 | 1.05 |
+
+On TradingView's bar-magnifier intrabars (`tv_check.py`, whole history magnified):
+
+| Chart | Intrabar | PF in-sample, 1m paths / TradingView | PF out-of-sample, 1m paths / TradingView |
+|---|---|---|---|
+| 15m | 2m | 1.24 / 1.23 | 1.39 / 1.37 |
+| 30m | 5m | 1.36 / 1.34 | 0.84 / 0.84 |
+| 1H | 10m | 1.23 / 1.24 | 1.06 / 1.06 |
+| 2H | 10m | 1.60 / 1.60 | 1.11 / 1.11 |
+| 4H | 30m | 1.89 / 1.89 | 1.22 / 1.22 |
+| 8H | 30m | 1.57 / 1.57 | 0.68 / 0.68 |
+| 1D | 60m | 1.50 / 1.50 | 1.52 / 1.52 |
 
 Average per trade and drawdowns are in ATR(14) of the entry candle, after fees. "Your previous settings" = the strategy
 as it was before this calibration (framework with the PDF gates, parent 4 x the chart, Points exits 5000 / 50000 /

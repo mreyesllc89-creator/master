@@ -55,8 +55,11 @@
 //              flip, maximum disorder) can block entries too (off by default).
 // The framework only adds conditions to the strategy's own entries and one
 // exit (the parent's break); FlashGold's signal, stops, targets, trailing and
-// sizing are unchanged. "Use the Fractal Direction Framework" off = the
-// original strategy, bar for bar.
+// sizing are unchanged. "Use the Fractal Direction Framework" off, with the
+// calibrated preset off (group "P"), the quality filter off and the re-entry
+// off = the original strategy, bar for bar, except two reads that no longer
+// repaint or overfill: a parent timeframe higher than the chart is read from
+// its last closed candle, and fills use the bar magnifier.
 // CALIBRATION of the framework and of the whole strategy: see CALIBRATED
 // PRESETS below. On BTC/USD the PDF's Hurst reading did not hold (signals taken
 // while H was BELOW 0.5 did better), and the divergence and pullback gates did
@@ -78,8 +81,11 @@
 //     gate, and the SIGNAL-QUALITY filter (group "Q") - ranked by how far
 //     price went in the signal's direction over the next 20 candles (in ATR).
 //  2. The exits and the re-entry, simulated along the 1-minute path inside
-//     every candle (what TradingView's bar magnifier does) with a 0.05% fee
-//     per side, ranked by total return in ATR. (A first pass ranked by the
+//     every candle with a 0.05% fee per side, ranked by total return in ATR.
+//     (TradingView's bar magnifier uses a coarser path - 2-minute candles on
+//     15m, 5m on 30m, 10m on 1H-2H, 30m on 4H-8H, 1H on 1D - and only for
+//     the last 200,000 of them; with these presets the profit factor moves by
+//     about 0.02.) (A first pass ranked by the
 //     t-statistic picked tight trails with many small wins; on 4H that pick
 //     lost out of sample while holding won - both are in the calibration log.)
 // Results of each preset (trades, average per trade in ATR, profit factor;
@@ -87,7 +93,7 @@
 //   1m   7612 / -2.18 / 0.60  | 4043 / -2.83 / 0.54   fees > the move: do not trade
 //   5m   3009 / +0.01 / 1.01  | 1637 / -0.43 / 0.82   no edge after fees
 //   15m   721 / +0.43 / 1.24  |  379 / +0.66 / 1.39   held up
-//   30m   359 / +0.30 / 1.36  |  192 / -0.15 / 0.84   did not hold up
+//   30m   359 / +0.30 / 1.36  |  192 / -0.16 / 0.84   did not hold up
 //   1H    720 / +0.28 / 1.23  |  392 / +0.07 / 1.06   weak
 //   2H    133 / +0.68 / 1.60  |   77 / +0.14 / 1.11   weak, few trades
 //   4H    203 / +0.96 / 1.89  |  134 / +0.25 / 1.22   held up
@@ -130,8 +136,9 @@
 //    15m or above, or the direction filter of a higher timeframe to time 1m
 //    entries by hand.
 // Set Properties > Commission to your exchange's fee in percent (e.g. 0.05%)
-// and turn on the bar magnifier (Premium) when testing BTC, or the backtest
-// will look better than the calibration.
+// when testing BTC (the header's cost is XAUUSD's), or the backtest will look
+// better than the calibration. The bar magnifier is on in the script (it needs
+// a Premium plan).
 // (The core calibration below - XAUUSD exports, CALIBRATION.md section 17 -
 // is the original FlashGold sweep; the BTC presets above replace it while
 // the preset is on.)
@@ -170,11 +177,11 @@ strategy("FlashGold v5 Strategy (XAUUSD) + FDF", "FlashGold v5 FDF (XAUUSD)", ov
      commission_type = strategy.commission.cash_per_contract, commission_value = 0.13,  // USD per oz per side: half of a 2.5 pip ($0.25) spread + $0.6/lot commission (VT Markets)
      slippage = 5,                                                                      // ticks per side. mintick 0.01 -> $0.05/oz
      calc_on_every_tick = false, process_orders_on_close = false, calc_on_order_fills = false, max_bars_back = 500,
-     use_bar_magnifier = true)                                                          // fills along the lower-timeframe path (Premium plans); without it a tight trail looks far better than it trades
+     use_bar_magnifier = true)                                                          // fills along a lower-timeframe path inside each candle (Premium plans; TradingView picks that timeframe, the calibration used 1-minute paths); without it a tight trail looks far better than it trades
 
 // ============================== INPUTS (calibrated preset) ==============================
 gP = "P. Calibrated preset (BTC/USD)"
-presetOn = input.bool(true, "Use the calibrated preset of this chart timeframe", group = gP, tooltip = "On: the settings calibrated on BTC/USD for the chart's timeframe (1m, 5m, 15m, 30m, 1H, 2H, 4H, 8H, 1D; other charts use the nearest one) replace these inputs: the burst / entry distance / hold (ATR unit), the TDI parent and child zones (chart x1, x2, x4), the parent and zone reads (last closed bar), the framework (structure timeframe, trade with the parent, Hurst gate, exit on the break; divergence and pullback gates off), the exits (ATR unit: stop loss, target, trailing stop), the opposite-signal exit, the entry-stop lifetime (3 bars), the signal-quality filter and the re-entry. Direction, sizing, spread and the visuals stay yours. Off: every input below is used as set. The table shows the preset in force.")
+presetOn = input.bool(true, "Use the calibrated preset of this chart timeframe", group = gP, tooltip = "On: the settings calibrated on BTC/USD for the chart's timeframe (1m, 5m, 15m, 30m, 1H, 2H, 4H, 8H, 1D; other charts use the nearest one, seconds charts none) replace these inputs: the burst / entry distance / hold (ATR unit), the TDI parent and child zones (chart x1, x2, x4), the parent and zone reads (last closed bar), the framework (structure timeframe, trade with the parent, Hurst gate, exit on the break; divergence and pullback gates off), the exits (ATR unit: stop loss, target, trailing stop), the opposite-signal exit, the entry-stop lifetime (3 bars), the signal-quality filter and the re-entry. Direction, sizing, spread and the visuals stay yours. Off: every input below is used as set. The table shows the preset in force and its tested profit factor. The calibration paid 0.05% per side: set Properties > Commission to your exchange's percentage fee when testing BTC (the header's $0.13 per contract is for XAUUSD).")
 
 // ============================== INPUTS (indicator, unchanged) ==============================
 gCore = "FlashGold Core"
@@ -197,7 +204,7 @@ usePriorFilter   = input.bool(false, "Use prior drift filter", group = gBurst)
 
 gZone = "TDI Trade Zone Filter"
 useTdiTradeZone = input.bool(true, "Use TDI trade-zone filter", group = gZone)
-tdiParentTf     = input.timeframe("60", "Parent obedience timeframe", group = gZone, tooltip = "Calibrated with the parent = the chart timeframe. Leave it equal to the chart.")
+tdiParentTf     = input.timeframe("60", "Parent obedience timeframe", group = gZone, tooltip = "Used with the preset off. The XAUUSD calibration used the parent = the chart timeframe; the BTC presets use 1 x the chart on most timeframes, 4 x on 2H and 8 x on 30m.")
 tdiRsiLen       = input.int(14, "TDI RSI length", minval = 2, group = gZone)
 tdiFastLen      = input.int(2, "TDI white fast length", minval = 1, group = gZone)
 tdiSlowLen      = input.int(7, "TDI slow length", minval = 1, group = gZone)
@@ -259,7 +266,7 @@ qtyStep         = input.float(1, "Quantity step (rounds down)", minval = 0.00000
 
 // ============================== INPUTS (Fractal Direction Framework) ==============================
 gF = "F. Fractal Direction Framework"
-fdOn        = input.bool(true, "Use the Fractal Direction Framework", group = gF, tooltip = "Off: the original FlashGold v5 strategy, bar for bar. On: entries also need the parent, the divergence, the fractal (pullback) and the persistence conditions below, and trades against a broken parent are closed.")
+fdOn        = input.bool(true, "Use the Fractal Direction Framework", group = gF, tooltip = "Off (with the preset off): the original FlashGold v5 strategy, apart from the closed-candle parent read and the bar magnifier. The preset turns the framework on. On: entries also need the parent, the divergence, the fractal (pullback) and the persistence conditions below, and trades against a broken parent are closed.")
 fdTf        = input.timeframe("60", "Parent structure timeframe", group = gF, tooltip = "The scale the parent trend is read on (its swing pivots, divergence and Hurst exponent), from its last CLOSED candle when it is above the chart: no repaint. One scale above the trading candles is the PDF's parent / sub-trend pair. Uncalibrated default.")
 fdPivL      = input.int(5, "Swing pivot left bars", minval = 1, maxval = 200, group = gF, tooltip = "A swing high / low is the highest high / lowest low of this many candles on its left...")
 fdPivR      = input.int(3, "Swing pivot right bars (confirmation)", minval = 1, maxval = 100, group = gF, tooltip = "...and this many on its right. A swing is known only this many structure candles after it formed.")
@@ -321,7 +328,7 @@ float pTpR = pTf == 1 ? 0.0 : pTf == 5 ? 0.0 : pTf == 15 ? 0.0 : pTf == 30 ? 0.0
 float pTrailAct = pTf == 1 ? 0.0 : pTf == 5 ? 0.0 : pTf == 15 ? 0.0 : pTf == 30 ? 2.0 : pTf == 60 ? 0.0 : pTf == 120 ? 4.0 : pTf == 240 ? 0.0 : pTf == 480 ? 0.0 : 1.0
 float pTrailDst = pTf == 1 ? 1.0 : pTf == 5 ? 1.0 : pTf == 15 ? 1.0 : pTf == 30 ? 2.0 : pTf == 60 ? 1.0 : pTf == 120 ? 2.0 : pTf == 240 ? 1.0 : pTf == 480 ? 1.0 : 1.0
 int pReMode = pTf == 1 ? 0 : pTf == 5 ? 0 : pTf == 15 ? 0 : pTf == 30 ? 1 : pTf == 60 ? 0 : pTf == 120 ? 2 : pTf == 240 ? 0 : pTf == 480 ? 2 : 1
-int pReMax = pTf == 1 ? 0 : pTf == 5 ? 0 : pTf == 15 ? 0 : pTf == 30 ? 5 : pTf == 60 ? 0 : pTf == 120 ? 2 : pTf == 240 ? 0 : pTf == 480 ? 2 : 2
+int pReMax = pTf == 1 ? 0 : pTf == 5 ? 0 : pTf == 15 ? 0 : pTf == 30 ? 2 : pTf == 60 ? 0 : pTf == 120 ? 2 : pTf == 240 ? 0 : pTf == 480 ? 2 : 2
 bool pExitOpp = pTf == 1 ? false : pTf == 5 ? false : pTf == 15 ? false : pTf == 30 ? false : pTf == 60 ? false : pTf == 120 ? false : pTf == 240 ? false : pTf == 480 ? true : false
 bool pExitBreak = pTf == 1 ? false : pTf == 5 ? false : pTf == 15 ? true : pTf == 30 ? false : pTf == 60 ? true : pTf == 120 ? true : pTf == 240 ? true : pTf == 480 ? false : false
 // the preset's test results, 1-minute intrabar fills, 0.05% fee per side: profit factor in-sample (2023-01..2025-06) and out-of-sample (2025-07..2026-10)
@@ -329,12 +336,14 @@ float pIsPf = pTf == 1 ? 0.6 : pTf == 5 ? 1.01 : pTf == 15 ? 1.24 : pTf == 30 ? 
 float pOosPf = pTf == 1 ? 0.54 : pTf == 5 ? 0.82 : pTf == 15 ? 1.39 : pTf == 30 ? 0.84 : pTf == 60 ? 1.06 : pTf == 120 ? 1.11 : pTf == 240 ? 1.22 : pTf == 480 ? 0.68 : 1.52
 
 // a multiple of the chart timeframe as a timeframe string (above a day: the nearest whole number of days)
+// (x1 = the chart's own timeframe string, so it is never mistaken for a higher one; weekly / monthly charts
+// multiply their weeks / months)
 fgTf(int mult) =>
     int m = fgChartMin * mult
-    m < 1440 ? str.tostring(m) : m == 1440 ? "1D" : str.tostring(math.round(m / 1440.0)) + "D"
+    mult == 1 ? timeframe.period : timeframe.isweekly ? str.tostring(timeframe.multiplier * mult) + "W" : timeframe.ismonthly ? str.tostring(timeframe.multiplier * mult) + "M" : m < 1440 ? str.tostring(m) : m == 1440 ? "1D" : str.tostring(math.round(m / 1440.0)) + "D"
 
 // every setting the preset can replace, as used below (the preset's value, or your input when it is off)
-bool   ePre           = presetOn
+bool   ePre           = presetOn and not timeframe.isseconds   // no calibration below 1 minute
 string eDistUnit      = ePre ? "ATR" : DistUnit
 float  eBurstAtr      = ePre ? pBurst : burstAtrMult
 float  eEntryDistAtr  = ePre ? 0.25 : entryDistAtrMult
@@ -885,7 +894,7 @@ if eReMode != RE_OFF and flat and reSide != 0 and (eReMax == 0 or reCount < eReM
             lockActL := trailActNow
             lockDstL := trailDstNow
             if eReMode == RE_MKT
-                strategy.entry("Long", strategy.long, qty = qR, comment = "FG re-entry")
+                strategy.entry("Long", strategy.long, qty = qR, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG re-entry")
             else
                 strategy.entry("Long", strategy.long, qty = qR, stop = close + reDist, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG re-entry")
                 placedBarL := bar_index
@@ -899,7 +908,7 @@ if eReMode != RE_OFF and flat and reSide != 0 and (eReMax == 0 or reCount < eReM
             lockActS := trailActNow
             lockDstS := trailDstNow
             if eReMode == RE_MKT
-                strategy.entry("Short", strategy.short, qty = qR, comment = "FG re-entry")
+                strategy.entry("Short", strategy.short, qty = qR, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG re-entry")
             else
                 strategy.entry("Short", strategy.short, qty = qR, stop = close - reDist, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG re-entry")
                 placedBarS := bar_index
