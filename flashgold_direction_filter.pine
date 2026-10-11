@@ -44,8 +44,9 @@
 //    above it, SELL ZONE one tick below the lower edge.
 //    "No-trade band": +- this many ATR(14) of the filter timeframe, taken at
 //    the signal candle (0 = no band, the level alone).
-//    SIGNAL DIRECTION: a BUY signal is CONFIRMED while price is in the BUY
-//    ZONE - trade it; while price is in the band or below, it is NOT
+//    SIGNAL DIRECTION: a BUY signal is CONFIRMED while price is above the
+//    band (level + band) - buy, if Allow buys is on; while price is in the
+//    band or below, it is NOT
 //    confirmed - do not buy (the mirror for a SELL; with that side switched
 //    off the box says so). Below a BUY signal's
 //    level the SELL ZONE still allows sells, against the signal; turn
@@ -135,8 +136,9 @@
 //    Check price on     When price is compared to the level (see below).
 //    No-trade band      +- ATR mult around the level where nothing is
 //                       allowed (see ZONES; 0 = off).
-//    Allow trading against the signal  On: below a BUY level sells are
-//                       allowed (and above a SELL level buys). Off: only the
+//    Allow trading against the signal  On: below a BUY level (- the band)
+//                       sells are allowed (and above a SELL level (+ the
+//                       band) buys). Off: only the
 //                       signal's direction, once confirmed.
 //    Allow buys/sells   Turn one side off completely.
 //  Group "Direction score": show it, its window (filter candles, 0 = all
@@ -157,7 +159,10 @@
 //    FGF zone           1 BUY ZONE / -1 SELL ZONE / 0 NO TRADE, 2 when the
 //                       filter is off (buys and sells allowed): what the
 //                       buy / sell allowed outputs say, as one number.
-//    FGF signal confirmed  1 while price confirms the signal's direction.
+//    FGF signal confirmed  1 while the permission is in force and price is
+//                       past the band on the signal's side (price only: the
+//                       Allow buys / sells switches are not applied; 0 when
+//                       the filter is off or the permission has ended).
 //    FGF score          The level rule's live direction score, next candle
 //                       (0-1), when the score is on.
 //
@@ -183,8 +188,9 @@
 //
 //  CHECK PRICE ON  (when price is compared to the level)
 //    Tick (default)  The live price, on every tick: a buy is allowed the
-//                    moment price trades above the BUY ZONE edge (the level
-//                    with no band). Closed candles are
+//                    moment price trades past the BUY ZONE edge (level +
+//                    band on the tick grid; the level itself with no band).
+//                    Closed candles are
 //                    judged at their close time with their close; this can
 //                    differ from their last tick when a filter candle or a
 //                    Minutes window ends with the candle. A Pine strategy
@@ -208,7 +214,12 @@
 //  history and live alike, so a strategy backtests as it runs live. While a
 //  live bar is still forming, Tick uses the real clock (shading, status box,
 //  gates). A Minutes permission covers the bars whose judging moment is in
-//  [signal candle close, + minutes). An order placed on the last allowed bar
+//  [signal candle close, + minutes). With Tick + Minutes the status box and
+//  the zone names at the last candle also end the permission by the real
+//  clock (a closed market, delayed data); the shading, the lines, the gates
+//  and the outputs keep the candle's own clock, so a last candle judged
+//  inside the window stays shaded and its outputs keep their values while
+//  the box says the permission ended. An order placed on the last allowed bar
 //  fills on the next bar's open.
 // ============================================================================
 indicator("FlashGold Direction Filter", "FG-DF", overlay=true, max_lines_count=500, max_labels_count=500, max_bars_back=500)
@@ -610,8 +621,8 @@ float fgfBand  = fgfBandAtr * nz(fgfSigAtr)
 float fgfMt    = syminfo.mintick
 float fgfUpLv  = fgfBand > 0 ? math.ceil((fgfLevel + fgfBand) / fgfMt - 1e-9) * fgfMt : fgfLevel
 float fgfDnLv  = fgfBand > 0 ? math.floor((fgfLevel - fgfBand) / fgfMt + 1e-9) * fgfMt : fgfLevel
-bool  fgfInUp  = fgfValue > fgfUpLv or (fgfBand == 0 and fgfAtBuyLv)
-bool  fgfInDn  = fgfValue < fgfDnLv or (fgfBand == 0 and fgfAtSellLv)
+bool  fgfInUp  = fgfBand > 0 ? fgfValue > fgfUpLv + fgfMt / 2 : (fgfValue > fgfLevel or fgfAtBuyLv)
+bool  fgfInDn  = fgfBand > 0 ? fgfValue < fgfDnLv - fgfMt / 2 : (fgfValue < fgfLevel or fgfAtSellLv)
 // the signal's direction is confirmed while price is in its own zone
 bool  fgfSigOk = fgfArmed and (fgfSigDir > 0 ? fgfInUp : fgfSigDir < 0 ? fgfInDn : false)
 // a zone allows its side unless it is against the signal and that is off
@@ -667,9 +678,20 @@ if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom)
         string fgfTxt     = (fgfSigDir > 0 ? "BUY" : "SELL") + " signal " + fgfTfTag + " @ " + str.tostring(fgfLevel, format.mintick) + "\n" + fgfLastTxt
         fgfLbl := label.new(fgfX1, fgfLevel, fgfTxt, style=label.style_label_right, color=color.new(fgfCol, 20), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
 
-// The permission as the last candle shows it: Tick + Minutes also ends it by
-// the real clock.
+// The permission as the status box and the zone names show it: Tick + Minutes
+// also ends it by the real clock (the gates, shading and outputs keep the
+// candle's clock, see TIMING).
 bool fgfDOpen = fgfOpen and not (fgfCheck == "Tick" and fgfLast == "Minutes" and timenow >= fgfEnd)
+
+// The edge of a zone as text: with a band, the band edge (the last NO TRADE
+// tick); with no band, the level rounded to the last tick that is not
+// allowed, or on the signal candle the first tick that is (">=" / "<=").
+fgfEdgeTx(bool up) =>
+    bool  incl = fgfBand == 0 and fgfOnSigBar and (up ? fgfSigDir > 0 : fgfSigDir < 0)
+    float edge = up ? fgfUpLv : fgfDnLv
+    float k    = edge / fgfMt
+    float tk   = fgfBand > 0 ? edge : (up != incl ? math.floor(k + 1e-9) : math.ceil(k - 1e-9)) * fgfMt
+    (up ? (incl ? ">= " : "> ") : (incl ? "<= " : "< ")) + str.tostring(tk, format.mintick)
 
 // The band's edges (dashed) and the zone names at the last candle.
 var line  fgfLnUp = na
@@ -693,8 +715,8 @@ if barstate.islast
     if fgfShowLv and fgfOn and fgfDOpen and not na(fgfLevel)
         bool upAllowed = fgfAllowBuy and (fgfAgainst or fgfSigDir > 0)
         bool dnAllowed = fgfAllowSell and (fgfAgainst or fgfSigDir < 0)
-        fgfZUp  := label.new(bar_index + 3, fgfUpLv, upAllowed ? "BUY ZONE above " + str.tostring(fgfUpLv, format.mintick) : "NO TRADE above " + str.tostring(fgfUpLv, format.mintick), style=label.style_label_lower_left, color=color.new(upAllowed ? color.lime : color.gray, 30), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
-        fgfZDn  := label.new(bar_index + 3, fgfDnLv, dnAllowed ? "SELL ZONE below " + str.tostring(fgfDnLv, format.mintick) : "NO TRADE below " + str.tostring(fgfDnLv, format.mintick), style=label.style_label_upper_left, color=color.new(dnAllowed ? color.red : color.gray, 30), textcolor=color.white, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+        fgfZUp  := label.new(bar_index + 3, fgfUpLv, (upAllowed ? "BUY ZONE " : "NO TRADE ") + fgfEdgeTx(true), style=label.style_label_lower_left, color=color.new(upAllowed ? color.lime : color.gray, 30), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+        fgfZDn  := label.new(bar_index + 3, fgfDnLv, (dnAllowed ? "SELL ZONE " : "NO TRADE ") + fgfEdgeTx(false), style=label.style_label_upper_left, color=color.new(dnAllowed ? color.red : color.gray, 30), textcolor=color.white, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
         if fgfBand > 0
             fgfZMid := label.new(bar_index + 3, fgfLevel, "NO TRADE (band)", style=label.style_label_left, color=color.new(color.gray, 30), textcolor=color.white, size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
 
@@ -740,14 +762,14 @@ if fgfShowTbl and fgfOn and barstate.islast
     color  dCol   = dBuy ? color.lime : dSell ? color.red : color.orange
     bool   dConf  = dOpen and fgfSigOk
     bool   dSideOn = fgfSigDir > 0 ? fgfAllowBuy : fgfAllowSell
-    string dSigTx = not fgfArmed ? "-" : dConf ? (dSideOn ? "CONFIRMED - " + dDo + "s allowed" : "CONFIRMED - but " + dDo + "s are switched off") : "NOT CONFIRMED - do not " + dDo
+    string dSigTx = not fgfArmed ? "-" : not dOpen ? "- (permission ended)" : dConf ? (dSideOn ? "CONFIRMED - " + dDo + "s allowed" : "CONFIRMED - but " + dDo + "s are switched off") : "NOT CONFIRMED - do not " + dDo
     int    dSecs  = dOpen and not na(fgfEnd) ? math.max(0, math.floor((fgfEnd - (fgfCheck == "Tick" ? timenow : fgfClock)) / 1000.0)) : 0
     string dLeft  = not dOpen ? "-" : fgfLast == "Minutes" ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : fgfLast == "Candles" ? str.tostring(fgfEndBar - fgfIdx) + (fgfEndBar - fgfIdx == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
     string dSig   = na(fgfSigAt) ? "-" : dSide + " " + str.format_time(fgfSigAt, "MMM dd HH:mm", syminfo.timezone) + " @ " + (na(fgfLevel) ? "-" : str.tostring(fgfLevel, format.mintick))
     string dPar   = na(fgfPar) ? "-" : fgfPar > 0 ? "BUY" : fgfPar < 0 ? "SELL" : "FLAT"
     string dZones = na(fgfAc) ? "-" : str.tostring(fgfAl) + "/" + str.tostring(fgfAc)
-    string dUp    = na(fgfLevel) ? "-" : (fgfOnSigBar and fgfSigDir > 0 and fgfBand == 0 ? ">= " : "> ") + str.tostring(fgfUpLv, format.mintick)
-    string dDn    = na(fgfLevel) ? "-" : (fgfOnSigBar and fgfSigDir < 0 and fgfBand == 0 ? "<= " : "< ") + str.tostring(fgfDnLv, format.mintick)
+    string dUp    = na(fgfLevel) ? "-" : fgfEdgeTx(true)
+    string dDn    = na(fgfLevel) ? "-" : fgfEdgeTx(false)
     table.cell(fgfTable, 0, 0, "FG filter " + fgfTfTag, text_color=color.white)
     table.cell(fgfTable, 1, 0, dState, text_color=dCol)
     table.cell(fgfTable, 0, 1, "Signal (exch tz)", text_color=color.white)
@@ -762,7 +784,7 @@ if fgfShowTbl and fgfOn and barstate.islast
     table.cell(fgfTable, 0, 4, "SELL ZONE " + dDn, text_color=color.white)
     table.cell(fgfTable, 1, 4, dSell ? "ALLOWED (now)" : dDnOk ? "allowed there" : dOff, text_color=dSell ? color.red : dDnOk ? color.gray : color.orange)
     table.cell(fgfTable, 0, 5, "NO TRADE band", text_color=color.white)
-    table.cell(fgfTable, 1, 5, fgfBand > 0 and not na(fgfLevel) ? str.tostring(fgfDnLv, format.mintick) + " - " + str.tostring(fgfUpLv, format.mintick) : fgfBandAtr > 0 and fgfArmed and na(fgfSigAtr) ? "off (no ATR yet at the signal)" : "off", text_color=color.white)
+    table.cell(fgfTable, 1, 5, na(fgfLevel) ? "-" : fgfBand > 0 ? str.tostring(fgfDnLv, format.mintick) + " - " + str.tostring(fgfUpLv, format.mintick) : fgfBandAtr > 0 and fgfArmed and na(fgfSigAtr) ? "off (no ATR yet at the signal)" : "off", text_color=color.white)
     table.cell(fgfTable, 0, 6, fgfCheck == "Candle open" ? "Candle open" : fgfCheck == "Candle close" ? "Last close" : "Price now", text_color=color.white)
     table.cell(fgfTable, 1, 6, na(fgfValue) ? "-" : str.tostring(fgfValue, format.mintick), text_color=color.white)
     table.cell(fgfTable, 0, 7, "Left", text_color=color.white)
