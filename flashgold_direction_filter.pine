@@ -1,6 +1,6 @@
 //@version=6
 // ============================================================================
-//  FLASHGOLD DIRECTION FILTER  -  v1.0
+//  FLASHGOLD DIRECTION FILTER  -  v1.1 (direction rule + direction score)
 // ----------------------------------------------------------------------------
 //  The entry signal of "FlashGold v5 Strategy (XAUUSD)" used as a direction
 //  PERMISSION for your other strategies. It never opens, closes or manages a
@@ -23,6 +23,49 @@
 //    is still below that level, so buys wait for the break above it and
 //    sells are allowed below it (the mirror after a SELL). "Signal close"
 //    uses the close of the signal candle instead.
+//
+//  DIRECTION RULE  (input "Direction rule"; the default is the rule above)
+//    Level side        The rule above: UP (buys allowed) above the level,
+//                      DOWN (sells allowed) below it.
+//    Signal direction  The last signal's direction, held until the next
+//                      signal: after a BUY only buys, after a SELL only sells.
+//    Signal reversed   The opposite: the signal read as the END of a move -
+//                      after a BUY (an up burst) only sells, after a SELL
+//                      only buys.
+//
+//  DIRECTION SCORE  (group "Direction score", status box)
+//    How often each rule's direction was right, measured live on the filter
+//    timeframe's own candles: UP is right when the close 1 (and H) filter
+//    candles later is higher, DOWN when it is lower. Buys and sells are
+//    averaged, so a market that just drifts up does not count as accuracy:
+//    50% = a coin flip. Over the last N filter candles (or all history), the
+//    rule in force marked. It scores "until next signal" (Minutes / Candles
+//    windows are not scored).
+//    BTC/USD 2023-01 .. 2026-10 (Bitstamp 1-minute data, parent = filter
+//    timeframe, 2 zones), tested out of sample on 2025-07 .. 2026-10, next
+//    candle / 10 candles later:
+//      1m   level side 50% / 50%,  signal direction 50% / 49%,  reversed 50% / 51%
+//      5m   level side 51% / 51%,  signal direction 49% / 49%,  reversed 51% / 51%
+//      15m  level side 51% / 51%,  signal direction 48% / 48%,  reversed 52% / 52%
+//      30m  level side 50% / 52%,  signal direction 49% / 48%,  reversed 51% / 52%
+//      1H   level side 50% / 49%,  signal direction 48% / 50%,  reversed 52% / 50%
+//      2H   level side 50% / 52%,  signal direction 49% / 48%,  reversed 51% / 52%
+//      4H   level side 49% / 52%,  signal direction 49% / 48%,  reversed 51% / 52%
+//      8H   level side 51% / 48%,  signal direction 48% / 51%,  reversed 52% / 49%
+//      1D   level side 50% / 57%,  signal direction 53% / 43%,  reversed 47% / 57%
+//    On BTC the signal's own direction, averaged over 1, 3 and 10 candles,
+//    is right a little LESS than half the time on every timeframe from 5m to
+//    4H, in and out of sample (1m: 50%): the burst that makes a FlashGold
+//    signal more often ends a short move than starts one, so its reverse
+//    scores a little more than half. Used as a held direction, the TDI
+//    parent, the zone permission and the Fractal Direction Framework trend
+//    average 48-49% too. Quality conditions on the signal (TDI lines,
+//    volatility, Hurst, the framework) that were right 54-58% of the time in
+//    sample fell back to about 50% out of sample. The best out-of-sample
+//    scores, 52-55%, came on 2H-1D with few signals; only "Signal reversed"
+//    with the parent at 8 x the filter timeframe on 2H and 4H was also above
+//    51% in sample. Check the score on your own symbol and timeframe before
+//    relying on any rule.
 //
 //  FILTER TIMEFRAME  (default 1 hour)
 //    The signal runs on the candles of "Filter timeframe", every FlashGold
@@ -55,7 +98,11 @@
 //                       candle (1 = the signal candle only); then nothing is
 //                       allowed until the next signal.
 //    Check price on     When price is compared to the level (see below).
+//    Direction rule     Level side (default), Signal direction, Signal
+//                       reversed (see DIRECTION RULE).
 //    Allow buys/sells   Turn one side off completely.
+//  Group "Direction score": show it, its window (filter candles, 0 = all
+//  history) and its longer horizon H (filter candles).
 //  The "FlashGold signal" groups are the strategy's signal inputs, same
 //  defaults, same logic: bid/ask model, TDI direction (fast line rising =
 //  BUY), parent + six child zones, burst gate, prior drift, entry hold, one
@@ -69,6 +116,9 @@
 //    FGF level          The level in force.
 //    FGF signal         1 / -1 on the bar a BUY / SELL signal becomes known.
 //    FGF ended          1 on the bar a Minutes / Candles permission ends.
+//    FGF direction      1 UP / -1 DOWN / 0 none, by the rule in force
+//                       (before the Allow buys / sells switches).
+//    FGF score          The rule in force's live score, next candle (0-1).
 //
 //  HOW TO USE IT
 //  A) Paste into your strategy (recommended)
@@ -134,6 +184,7 @@ fgfLast      = input.string("Until next signal", "Permission lasts", options=["U
 fgfMinutes   = input.int(60, "Minutes", minval=1, group=GRP_FGF)
 fgfBars      = input.int(1, "Candles", minval=1, group=GRP_FGF)
 fgfCheck     = input.string("Tick", "Check price on", options=["Tick", "Candle open", "Candle close"], group=GRP_FGF, tooltip="When price is compared to the level. Tick: the live price, on every tick (closed candles keep their close). Candle open: each candle's open, decided on its first tick and fixed for the whole candle. Candle close: each candle's close, decided when it closes; while a candle is forming it is judged at its open with the last closed candle's close.")
+fgfRule      = input.string("Level side", "Direction rule", options=["Level side", "Signal direction", "Signal reversed"], group=GRP_FGF, tooltip="Level side: buys above the level, sells below it (the filter's rule). Signal direction: the last signal's side, held until the next signal. Signal reversed: the opposite side, the signal read as the end of a move. The status box scores all three.")
 fgfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_FGF)
 fgfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_FGF, tooltip="Turn one side off completely.")
 fgfShowBg    = input.bool(true, "Shade", inline="vis", group=GRP_FGF)
@@ -141,6 +192,11 @@ fgfShowLv    = input.bool(true, "Level line", inline="vis", group=GRP_FGF)
 fgfSigMark   = input.bool(true, "Signal marks", inline="vis", group=GRP_FGF, tooltip="Shade: green = buys allowed, red = sells allowed, gray = neither (price at the level, or that side turned off).")
 fgfShowTbl   = input.bool(true, "Status box", inline="tbl", group=GRP_FGF)
 fgfTblPos    = input.string("top_right", "", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], inline="tbl", group=GRP_FGF)
+
+GRP_FGS = "Direction score"
+fgsShow = input.bool(true, "Show the direction score", group=GRP_FGS, tooltip="In the status box: how often each direction rule was right on the filter timeframe's candles, 1 and H candles later, buys and sells averaged (50% = a coin flip).")
+fgsWin  = input.int(500, "Window, filter candles (0 = all history)", minval=0, maxval=500, group=GRP_FGS)
+fgsH    = input.int(10, "Longer horizon H, filter candles", minval=2, maxval=100, group=GRP_FGS)
 
 // ---- FlashGold signal inputs (the strategy's, same defaults) ----------------
 GRP_FGC = "FlashGold signal: core"
@@ -350,6 +406,46 @@ fgfArm(bool sBuy, bool sSell, float sPx) =>
         aId  += 1
     [aAt, aBar, aPx, aDir, aId]
 
+// Direction score, on the filter timeframe: a rule's direction d at a candle
+// is right h candles later when the close has moved that way. Returns the
+// balanced share right (mean of the UP and DOWN shares; na until both
+// exist) and the number of scored calls, over the window.
+fgfHits(int d, int h) =>
+    float mv   = close - close[h]
+    int   pd   = nz(d[h])
+    float upN  = pd == 1 and mv != 0 ? 1.0 : 0.0
+    float upH  = pd == 1 and mv > 0 ? 1.0 : 0.0
+    float dnN  = pd == -1 and mv != 0 ? 1.0 : 0.0
+    float dnH  = pd == -1 and mv < 0 ? 1.0 : 0.0
+    int   w    = math.max(fgsWin, 1)
+    float wUpN = math.sum(upN, w)
+    float wUpH = math.sum(upH, w)
+    float wDnN = math.sum(dnN, w)
+    float wDnH = math.sum(dnH, w)
+    float cUpN = ta.cum(upN)
+    float cUpH = ta.cum(upH)
+    float cDnN = ta.cum(dnN)
+    float cDnH = ta.cum(dnH)
+    float sUpN = fgsWin > 0 ? nz(wUpN) : cUpN
+    float sUpH = fgsWin > 0 ? nz(wUpH) : cUpH
+    float sDnN = fgsWin > 0 ? nz(wDnN) : cDnN
+    float sDnH = fgsWin > 0 ? nz(wDnH) : cDnH
+    float acc  = sUpN > 0 and sDnN > 0 ? 0.5 * (sUpH / sUpN + sDnH / sDnN) : na
+    [acc, sUpN + sDnN]
+
+// The three rules at this filter candle's close, scored 1 and H candles later.
+fgfScore(float aPx, int aDir) =>
+    int dL = na(aPx) ? 0 : close > aPx ? 1 : close < aPx ? -1 : 0
+    int dS = nz(aDir)
+    int dR = -nz(aDir)
+    [l1, ln] = fgfHits(dL, 1)
+    [lh, lhn] = fgfHits(dL, fgsH)
+    [s1, sn] = fgfHits(dS, 1)
+    [sh, shn] = fgfHits(dS, fgsH)
+    [r1, rn] = fgfHits(dR, 1)
+    [rh, rhn] = fgfHits(dR, fgsH)
+    [l1, lh, s1, sh, r1, rh, ln]
+
 // Each filter candle sends its arm, its conditions, its index, open and close
 // time, and the arm, conditions and close time of the candle before it. An
 // arm is used only once the candle that made it has closed by this chart's
@@ -357,9 +453,10 @@ fgfArm(bool sBuy, bool sSell, float sPx) =>
 fgfRead() =>
     [sBuy, sSell, sPx, sPar, sAl, sAc] = fgfSignal(fgfTfSec)
     [aAt, aBar, aPx, aDir, aId] = fgfArm(sBuy, sSell, sPx)
-    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1])]
+    [cL1, cLh, cS1, cSh, cR1, cRh, cN] = fgfScore(aPx, aDir)
+    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1]]
 
-[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
+[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
 
 fgfTfText(string tf) =>
     int sec = timeframe.in_seconds(tf)
@@ -417,6 +514,25 @@ int   fgfSigId  = nz(fgfSel == 1 ? fpId  : fgfSel == 2 ? fqId  : fgfCId[1])
 int   fgfPar    = fgfSel == 1 ? fpPar : fgfSel == 2 ? fqPar : fgfCPar[1]
 int   fgfAl     = fgfSel == 1 ? fpAl  : fgfSel == 2 ? fqAl  : fgfCAl[1]
 int   fgfAc     = fgfSel == 1 ? fpAc  : fgfSel == 2 ? fqAc  : fgfCAc[1]
+// The direction score of the last closed filter candle (status box, output).
+fgfPickC(float p, float q) =>
+    fgfSelC == 1 ? p : q
+fgfPick(float p, float q, float cPrev) =>
+    fgfSel == 1 ? p : fgfSel == 2 ? q : cPrev
+float fgsCL1 = fgfPickC(fpL1, fqL1)
+float fgsCLh = fgfPickC(fpLh, fqLh)
+float fgsCS1 = fgfPickC(fpS1, fqS1)
+float fgsCSh = fgfPickC(fpSh, fqSh)
+float fgsCR1 = fgfPickC(fpR1, fqR1)
+float fgsCRh = fgfPickC(fpRh, fqRh)
+float fgsCN  = fgfPickC(fpN, fqN)
+float fgsL1  = fgfPick(fpL1, fqL1, fgsCL1[1])
+float fgsLh  = fgfPick(fpLh, fqLh, fgsCLh[1])
+float fgsS1  = fgfPick(fpS1, fqS1, fgsCS1[1])
+float fgsSh  = fgfPick(fpSh, fqSh, fgsCSh[1])
+float fgsR1  = fgfPick(fpR1, fqR1, fgsCR1[1])
+float fgsRh  = fgfPick(fpRh, fqRh, fgsCRh[1])
+float fgsN   = fgfPick(fpN, fqN, fgsCN[1])
 int   fgfIdx    = not fgfAtOpen ? fgfCIdx : fgfSel == 1 ? (time == fpClose ? fpIdx : fpIdx + 1) : fgfSel == 2 ? (time == fqClose ? fpIdx - 1 : fpIdx) : (time == fgfCKClose[1] ? fgfCK[1] : fgfCK[1] + 1)
 
 // The price compared to the level, at that moment.
@@ -435,9 +551,13 @@ bool fgfOnSigBar = fgfArmed and fgfIdx == fgfSigBar
 bool fgfAtBuyLv  = fgfOnSigBar and fgfSigDir > 0 and fgfValue >= fgfLevel
 bool fgfAtSellLv = fgfOnSigBar and fgfSigDir < 0 and fgfValue <= fgfLevel
 
+// The direction of the rule in force (Direction rule).
+bool fgfUpNow = fgfRule == "Level side" ? (fgfValue > fgfLevel or fgfAtBuyLv) : fgfRule == "Signal direction" ? fgfSigDir > 0 : fgfSigDir < 0
+bool fgfDnNow = fgfRule == "Level side" ? (fgfValue < fgfLevel or fgfAtSellLv) : fgfRule == "Signal direction" ? fgfSigDir < 0 : fgfSigDir > 0
+
 // Final gates: is a buy / a sell ALLOWED on this bar? (Permission only.)
-fgfBuyOk  = not fgfOn or (fgfOpen and fgfAllowBuy  and (fgfValue > fgfLevel or fgfAtBuyLv))
-fgfSellOk = not fgfOn or (fgfOpen and fgfAllowSell and (fgfValue < fgfLevel or fgfAtSellLv))
+fgfBuyOk  = not fgfOn or (fgfOpen and fgfAllowBuy  and fgfUpNow)
+fgfSellOk = not fgfOn or (fgfOpen and fgfAllowSell and fgfDnNow)
 
 // A new signal became known on this bar; a Minutes / Candles permission ended.
 bool fgfNewSig  = fgfSigId > fgfSigId[1]
@@ -484,11 +604,38 @@ if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom)
 
 // Status box (display only; the gates never use it). Judged like the gates,
 // at the bar's clock; Tick + Minutes also ends it by the real clock.
-var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 7, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
+var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 12, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
+
+// the BTC/USD reference scores (out of sample 2025-07 .. 2026-10) of the filter timeframe's bucket
+fgsRefTxt(int sec) =>
+    int m = math.round(sec / 60.0)
+    if m >= 1 and m <= 2
+        "level 50/50  signal 50/49  reversed 50/51"
+    else if m >= 3 and m <= 10
+        "level 51/51  signal 49/49  reversed 51/51"
+    else if m >= 11 and m <= 22
+        "level 51/51  signal 48/48  reversed 52/52"
+    else if m >= 23 and m <= 45
+        "level 50/52  signal 49/48  reversed 51/52"
+    else if m >= 46 and m <= 90
+        "level 50/49  signal 48/50  reversed 52/50"
+    else if m >= 91 and m <= 180
+        "level 50/52  signal 49/48  reversed 51/52"
+    else if m >= 181 and m <= 360
+        "level 49/52  signal 49/48  reversed 51/52"
+    else if m >= 361 and m <= 720
+        "level 51/48  signal 48/51  reversed 52/49"
+    else if m >= 1080 and m <= 2880
+        "level 50/57  signal 53/43  reversed 47/57"
+    else
+        "-"
+
+fgsPct(float v) =>
+    na(v) ? "-" : str.tostring(v * 100, "#") + "%"
 if fgfShowTbl and fgfOn and barstate.islast
     bool   dOpen  = fgfOpen and not (fgfCheck == "Tick" and fgfLast == "Minutes" and timenow >= fgfEnd)
-    bool   dBuy   = dOpen and fgfAllowBuy  and (fgfValue > fgfLevel or fgfAtBuyLv)
-    bool   dSell  = dOpen and fgfAllowSell and (fgfValue < fgfLevel or fgfAtSellLv)
+    bool   dBuy   = dOpen and fgfAllowBuy  and fgfUpNow
+    bool   dSell  = dOpen and fgfAllowSell and fgfDnNow
     string dSide  = fgfSigDir > 0 ? "BUY" : "SELL"
     string dState = not fgfArmed ? "WAITING FOR SIGNAL" : (dOpen ? "ACTIVE - " : "ENDED - ") + dSide + " signal"
     color  dCol   = not fgfArmed ? color.yellow : dOpen ? color.lime : color.orange
@@ -506,12 +653,25 @@ if fgfShowTbl and fgfOn and barstate.islast
     table.cell(fgfTable, 1, 2, dLeft, text_color=color.white)
     table.cell(fgfTable, 0, 3, fgfCheck == "Candle open" ? "Candle open" : fgfCheck == "Candle close" ? "Last close" : "Price now", text_color=color.white)
     table.cell(fgfTable, 1, 3, na(fgfValue) ? "-" : str.tostring(fgfValue, format.mintick), text_color=color.white)
-    table.cell(fgfTable, 0, 4, (fgfOnSigBar and fgfSigDir > 0 ? "Buy >= " : "Buy  > ") + dLv, text_color=color.white)
+    table.cell(fgfTable, 0, 4, fgfRule == "Level side" ? (fgfOnSigBar and fgfSigDir > 0 ? "Buy >= " : "Buy  > ") + dLv : fgfRule == "Signal direction" ? "Buy (after a BUY)" : "Buy (after a SELL)", text_color=color.white)
     table.cell(fgfTable, 1, 4, dBuy ? "ALLOWED" : "BLOCKED", text_color=dBuy ? color.lime : color.red)
-    table.cell(fgfTable, 0, 5, (fgfOnSigBar and fgfSigDir < 0 ? "Sell <= " : "Sell < ") + dLv, text_color=color.white)
+    table.cell(fgfTable, 0, 5, fgfRule == "Level side" ? (fgfOnSigBar and fgfSigDir < 0 ? "Sell <= " : "Sell < ") + dLv : fgfRule == "Signal direction" ? "Sell (after a SELL)" : "Sell (after a BUY)", text_color=color.white)
     table.cell(fgfTable, 1, 5, dSell ? "ALLOWED" : "BLOCKED", text_color=dSell ? color.lime : color.red)
     table.cell(fgfTable, 0, 6, "Last " + fgfTfTag + " parent / zones", text_color=color.white)
     table.cell(fgfTable, 1, 6, dPar + " / " + dZones + " aligned", text_color=dPar == "BUY" ? color.lime : dPar == "SELL" ? color.red : color.white)
+    if fgsShow
+        string hTxt = "next 1 / " + str.tostring(fgsH) + " " + fgfTfTag
+        string wTxt = fgsWin > 0 ? "last " + str.tostring(fgsWin) : "all"
+        table.cell(fgfTable, 0, 7, "Direction score (" + wTxt + ", " + str.tostring(fgsN, "#") + " calls)", text_color=color.white)
+        table.cell(fgfTable, 1, 7, hTxt + "  (50% = coin flip)", text_color=color.white)
+        table.cell(fgfTable, 0, 8, (fgfRule == "Level side" ? "> " : "") + "Level side", text_color=fgfRule == "Level side" ? color.aqua : color.gray)
+        table.cell(fgfTable, 1, 8, fgsPct(fgsL1) + " / " + fgsPct(fgsLh), text_color=fgfRule == "Level side" ? color.aqua : color.gray)
+        table.cell(fgfTable, 0, 9, (fgfRule == "Signal direction" ? "> " : "") + "Signal direction", text_color=fgfRule == "Signal direction" ? color.aqua : color.gray)
+        table.cell(fgfTable, 1, 9, fgsPct(fgsS1) + " / " + fgsPct(fgsSh), text_color=fgfRule == "Signal direction" ? color.aqua : color.gray)
+        table.cell(fgfTable, 0, 10, (fgfRule == "Signal reversed" ? "> " : "") + "Signal reversed", text_color=fgfRule == "Signal reversed" ? color.aqua : color.gray)
+        table.cell(fgfTable, 1, 10, fgsPct(fgsR1) + " / " + fgsPct(fgsRh), text_color=fgfRule == "Signal reversed" ? color.aqua : color.gray)
+        table.cell(fgfTable, 0, 11, "BTC test 2025-26 (1/10)", text_color=color.gray)
+        table.cell(fgfTable, 1, 11, fgsRefTxt(fgfTfSec), text_color=color.gray)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
 // Exported values (Data Window + linkable as a source from other scripts).
@@ -521,3 +681,5 @@ plot(fgfSellOk ? 1 : 0, "FGF sell allowed", display=display.data_window)
 plot(fgfLevel, "FGF level", display=display.data_window)
 plot(fgfNewSig ? fgfSigDir : 0, "FGF signal (1 buy, -1 sell)", display=display.data_window)
 plot(fgfExpired ? 1 : 0, "FGF ended", display=display.data_window)
+plot(fgfOn and fgfOpen ? (fgfUpNow ? 1 : fgfDnNow ? -1 : 0) : 0, "FGF direction (1 up, -1 down)", display=display.data_window)
+plot(fgfRule == "Level side" ? fgsL1 : fgfRule == "Signal direction" ? fgsS1 : fgsR1, "FGF score (next candle)", display=display.data_window)

@@ -74,6 +74,43 @@ as it was before this calibration (framework with the PDF gates, parent 4 x the 
 What held up out of sample: **15m (PF 1.39), 4H (1.22), 1D (1.52)**, weakly 1H (1.06) and 2H (1.11).
 What did not: 30m, 8H, and 1m / 5m, where the 0.1% round-trip fee is 2.3 x (1m) and 0.8 x (5m) the median ATR.
 
+## Direction accuracy (the FlashGold Direction Filter)
+
+The filter does not trade: it holds a direction (buys allowed / sells allowed). Here the question is only how often
+that direction is right, with no fees, stops or targets. A direction held at a candle's close is right H candles later
+when the close has moved that way. **Balanced** = the mean of the share right when UP and the share right when DOWN,
+so BTC's rise from $16k to $84k does not count as accuracy: 50% = a coin flip.
+
+Scripts: `dir_stage1.py` (each signal: right after 5 / 20 candles, for every entry-logic and quality-gate set),
+`dir_stage2.py` (held direction under each hold rule, for the best gates of stage 1), `dir_sources.py` (every part
+of the entry logic as a held direction). Results: `direction/direction_sources.csv`, `direction/score_ref.json`.
+
+Balanced accuracy, mean of 1, 3 and 10 candles later, in-sample 2023-01..2025-06 / out-of-sample 2025-07..2026-10
+(parent = the timeframe itself, 2 zones of x1 / x2 / x4; FDF on the timeframe itself):
+
+| Chart | Signal direction (held) | Signal reversed | Level side (filter rule) | TDI parent direction | Zone permission | FDF trend (x1) |
+|---|---|---|---|---|---|---|
+| 1m | 49.5 / 49.6 | 50.5 / 50.4 | 50.4 / 50.3 | 49.8 / 50.2 | 49.5 / 49.8 | 48.9 / 49.1 |
+| 5m | 48.2 / 48.7 | 51.8 / 51.3 | 51.2 / 50.8 | 48.8 / 49.1 | 47.9 / 48.3 | 48.1 / 48.1 |
+| 15m | 47.7 / 48.1 | 52.3 / 51.9 | 51.6 / 51.0 | 48.3 / 48.5 | 47.1 / 47.5 | 47.4 / 48.0 |
+| 30m | 47.3 / 48.1 | 52.7 / 51.9 | 51.7 / 51.0 | 47.9 / 48.8 | 46.4 / 48.1 | 47.9 / 48.1 |
+| 1H | 48.9 / 49.0 | 51.1 / 51.0 | 50.6 / 49.7 | 47.8 / 48.4 | 46.8 / 47.1 | 47.4 / 48.6 |
+| 2H | 48.0 / 48.5 | 52.0 / 51.5 | 51.4 / 51.1 | 47.7 / 48.5 | 46.6 / 48.7 | 47.7 / 48.4 |
+| 4H | 49.0 / 49.0 | 51.0 / 51.0 | 50.4 / 51.1 | 48.6 / 48.8 | 47.7 / 48.8 | 49.5 / 48.9 |
+| 8H | 47.2 / 49.3 | 52.8 / 50.7 | 52.1 / 49.7 | 47.7 / 49.5 | 47.5 / 47.9 | 49.7 / 51.2 |
+| 1D | 49.3 / 48.9 | 50.7 / 51.1 | 50.4 / 52.6 | 48.2 / 46.1 | 47.0 / 46.1 | 49.0 / 46.5 |
+
+- The FlashGold signal's own direction is right a little less than half the time from 5m to 4H, in and out of
+  sample. The burst that makes the signal more often ends a short move than starts one; read the other way
+  ("Signal reversed") it is right 51-53% on 5m to 4H.
+- The filter's own rule (above the level UP, below it DOWN) scores 49.7-52.6%.
+- The TDI parent, the zone permission and the Fractal Direction Framework trend, held as a direction, score 46-51%.
+- Signal-level quality gates (TDI fast line bounds, parent line, volatility, Hurst, the framework) that were right
+  54-58% in sample fell back to about 50% out of sample; a fitted 0-100 score separated real from end-of-move signals
+  no better than chance out of sample (AUC 0.48-0.55).
+- The filter (v1.1) shows these three rules' live scores on any symbol and timeframe, and can use any of them as its
+  permission ("Direction rule").
+
 ## Limits
 
 - One market (BTC/USD, Bitstamp), one regime split. 30m, 8H, 5m and 1m did not hold up out of sample; 1H and 2H only
