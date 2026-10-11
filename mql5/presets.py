@@ -13,7 +13,7 @@ EA_DEFAULTS = dict(
     ExitUnit=0, SlPts=7000, TpPts=50000, ExAtrLen=14, SlAtrM=2.0, TpR=2.0, TrailOn="true",
     TrActPts=1000, TrDisPts=100, TrActAtr=4.0, TrDisAtr=0.2, TimeStop=0,
     QtyMode=1, LotsFixed=0.10, RiskPct=1.0, LotsMax=5.0, MarginCap="true",
-    IndicatorName="XPW_ShapeMap", Magic=90907, SlippagePts=30, ShowMap="true",
+    IndicatorName="XPW_ShapeMap", Magic=90907, SlippagePts=30, ShowMap="true", Diagnostics="true",
     RsiLen=14, FastLen=2, SlowLen=7, InvertFill="true", AreaLook=20, LoFrac=0.20, HiFrac=0.67,
     AllOn="true", AllCtx=1, BotOn="true", BotMinW=1, BotMaxW=3, BotCtxIn=2, BotNeedLow="true", BotSepIn=5,
     TopOn="true", TopMinW=1, TopMaxW=2, TopCtxIn=3, TopNeedHigh="true", TopSepIn=5,

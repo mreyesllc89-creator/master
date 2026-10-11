@@ -74,6 +74,7 @@ input string          IndicatorName = "XPW_ShapeMap"; // Indicator file name (in
 input long            Magic       = 90907;           // Magic number
 input int             SlippagePts = 30;              // Max slippage, pts
 input bool            ShowMap     = true;            // Draw the map (boxes, arrows) in the tester
+input bool            Diagnostics = true;            // Print signal counts and skipped-entry reasons to the Experts log
 //--- indicator inputs, SAME ORDER as in XPW_ShapeMap.mq5
 input group "TDI"
 input int    RsiLen      = 14;
@@ -303,8 +304,11 @@ double CalcLots(const double slDist)
      {
       double tv = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE_LOSS);
       if(tv <= 0) tv = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
+      if(tv <= 0) tv = g_tick * SymbolInfoDouble(_Symbol, SYMBOL_TRADE_CONTRACT_SIZE);   // USD-quoted fallback
       double lossPerLot = (g_tick > 0 && slDist > 0) ? slDist / g_tick * tv : 0;
       lots = lossPerLot > 0 ? AccountInfoDouble(ACCOUNT_EQUITY) * RiskPct / 100.0 / lossPerLot : 0;
+      if(lots <= 0 && Diagnostics)
+         Print("XPW EA sizing: lots=0  equity=", AccountInfoDouble(ACCOUNT_EQUITY), " slDist=", slDist, " tickValue=", tv, " tickSize=", g_tick);
      }
    lots = MathMin(lots, LotsMax);
    if(MarginCap)
@@ -318,7 +322,11 @@ double CalcLots(const double slDist)
    double vmax = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
    if(step > 0) lots = MathFloor(lots / step) * step;
    lots = MathMin(lots, vmax);
-   if(lots < vmin) return 0.0;
+   if(lots < vmin)
+     {
+      if(Diagnostics) Print("XPW EA sizing: lots ", lots, " below min volume ", vmin, " (risk ", RiskPct, "%, slDist ", slDist, ", margin cap ", MarginCap, ")");
+      return 0.0;
+     }
    return NormalizeDouble(lots, 8);
   }
 //+------------------------------------------------------------------+
@@ -438,8 +446,10 @@ void PredictLogic()
    double stopS = valid ? MathFloor((px - PredBuf * g_point) / g_tick) * g_tick : 0;
    bool wantL = armL && f < s && canLong && valid && pos <= 0 && (pos == 0 || OppMode == OPP_REVERSE);
    bool wantS = armS && f > s && canShort && valid && pos >= 0 && (pos == 0 || OppMode == OPP_REVERSE);
-   if(wantL) StopEnter(true, stopL, "L predict"); else DeletePending(ORDER_TYPE_BUY_STOP);
-   if(wantS) StopEnter(false, stopS, "S predict"); else DeletePending(ORDER_TYPE_SELL_STOP);
+   if(wantL) { if(!StopEnter(true, stopL, "L predict") && Diagnostics) Print("XPW EA predict: buy stop at ", DoubleToString(stopL, g_digits), " not placed"); }
+   else DeletePending(ORDER_TYPE_BUY_STOP);
+   if(wantS) { if(!StopEnter(false, stopS, "S predict") && Diagnostics) Print("XPW EA predict: sell stop at ", DoubleToString(stopS, g_digits), " not placed"); }
+   else DeletePending(ORDER_TYPE_SELL_STOP);
    // catch-up: the lines crossed at this close but no stop filled -> enter now
    bool enteredThisBar = (g_lastEntryBar == iTime(_Symbol, _Period, 1)) || (g_lastEntryBar == iTime(_Symbol, _Period, 0));
    if(CatchUp && !enteredThisBar)
@@ -491,11 +501,50 @@ void ContStopLogic()
      }
   }
 //+------------------------------------------------------------------+
+//| diagnostics: once, count every signal the indicator holds        |
+//+------------------------------------------------------------------+
+void SelfTest()
+  {
+   static bool done = false;
+   if(done) return;
+   int bars = Bars(_Symbol, _Period);
+   double a[];
+   int got = CopyBuffer(hMap, B_FAST, 0, bars, a);
+   if(got <= 0)
+     {
+      Print("XPW EA self-test: CopyBuffer from ", IndicatorName, " FAILED, error ", GetLastError(), ". Is the indicator compiled and in MQL5\\Indicators? Will retry next tick.");
+      return;
+     }
+   done = true;
+   string names[8] = {"BOT sq", "TOP sq", "Turn up", "Turn dn", "BOT tick", "TOP tick", "CONT up", "CONT dn"};
+   string txt = "XPW EA self-test on " + _Symbol + " " + EnumToString(_Period) + ", " + (string)bars + " bars, point " + DoubleToString(g_point, g_digits) + ", tick value " + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE), 4) + ", min lot " + DoubleToString(SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN), 2) + ": ";
+   for(int b = 0; b < 8; b++)
+     {
+      int n = 0;
+      if(CopyBuffer(hMap, B_BOTSQ + b, 0, bars, a) > 0) for(int i = 0; i < ArraySize(a); i++) if(a[i] > 0.5) n++;
+      txt += names[b] + " " + (string)n + (b < 7 ? ", " : "");
+     }
+   Print(txt);
+   Print("XPW EA mode: SigMode=", EnumToString(SigMode), " TurnEntry=", EnumToString(TurnEntry), " TradeDir=", EnumToString(TradeDir), " EnterOnTick=", EnterOnTick, " SL pts=", SlPts, " (", DoubleToString(SlPts * g_point, g_digits), " price)  lots now=", CalcLots(SlDist()));
+  }
+void DiagBar()
+  {
+   if(!Diagnostics) return;
+   bool any = false;
+   for(int b = 0; b < 8; b++) if(BufOn(B_BOTSQ + b, 1)) any = true;
+   if(!any && !BufOn(B_CROSSUP, 1) && !BufOn(B_CROSSDN, 1)) return;
+   Print("XPW EA bar ", TimeToString(iTime(_Symbol, _Period, 1)), " sig: BOTsq=", BufOn(B_BOTSQ, 1), " TOPsq=", BufOn(B_TOPSQ, 1), " turnUp=", BufOn(B_TURNUP, 1), " turnDn=", BufOn(B_TURNDN, 1),
+         " contUp=", BufOn(B_CONTUP, 1), " contDn=", BufOn(B_CONTDN, 1), " crossUp=", BufOn(B_CROSSUP, 1), " crossDn=", BufOn(B_CROSSDN, 1), " armL=", BufOn(B_ARML, 1), " armS=", BufOn(B_ARMS, 1),
+         " pos=", Pos(), " pending=", FindPending(-1) != 0, " predict=", DoubleToString(Buf(B_PREDICT, 1), g_digits));
+  }
+//+------------------------------------------------------------------+
 void OnTick()
   {
    datetime t0 = iTime(_Symbol, _Period, 0);
    bool newBar = (t0 != g_lastBar);
    if(newBar) g_lastBar = t0;
+   if(Diagnostics) SelfTest();
+   if(newBar) DiagBar();
    ReconcileHedge();
    ManageExits(newBar);
 
