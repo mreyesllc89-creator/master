@@ -50,9 +50,13 @@
 //              x(t - tau), x = log close, tau = 2, 4, 8, 16, over "Hurst
 //              window" structure candles: h(q) = slope of log K_q^(1/q)
 //              against log tau. The drift is removed, so H = h(2) above 0.5
-//              = memory, persistent (up follows up): entries need H >=
-//              "Minimum Hurst". The spectrum width h(-2) - h(2) (wide = the
-//              flip, maximum disorder) can block entries too (off by default).
+//              = memory, persistent (up follows up). The "Hurst gate" lets
+//              entries through with H at or above "Minimum Hurst H" (the
+//              PDF's reading, the default with the preset off), with H below
+//              it (the BTC presets on 1m-30m, 2H and 8H, minimum 0.5), or
+//              always (off: the 1H, 4H and 1D presets). The spectrum width
+//              h(-2) - h(2) (wide = the flip, maximum disorder) can block
+//              entries too (off by default).
 // The framework only adds conditions to the strategy's own entries and one
 // exit (the parent's break); FlashGold's signal, stops, targets, trailing and
 // sizing are unchanged. "Use the Fractal Direction Framework" off, with the
@@ -63,31 +67,44 @@
 // CALIBRATION of the framework and of the whole strategy: see CALIBRATED
 // PRESETS below. On BTC/USD the PDF's Hurst reading did not hold (signals taken
 // while H was BELOW 0.5 did better), and the divergence and pullback gates did
-// not improve the presets consistently (each helped in sample on 3-4 of the 9
-// timeframes, and in and out of sample only where the presets lose anyway:
-// 1m-5m, 30m), so the presets leave them off. On a
-// 128-candle window a memoryless market reads H about 0.47 +- 0.08 and a
+// not improve the presets consistently: by total return in ATR (the measure
+// the exits are ranked by) each helped in sample on 3-4 of the 9 timeframes,
+// and in and out of sample only where the presets lose anyway (1m-5m, 30m).
+// By average and profit factor the 0.5 ATR pullback gate also helped 4H (PF
+// 2.35 vs 1.89 in sample, 1.23 vs 1.22 out of sample) but took fewer trades
+// for less total out of sample (30.9 vs 33.0 ATR), so the presets leave both
+// off. On a 128-candle window a memoryless market reads H about 0.47 +- 0.08 and a
 // persistent one (AR 0.3) about 0.54; the width reads about 0.04 +- 0.08 on a
 // monofractal series and its gate stays off.
 //
 // CALIBRATED PRESETS (group "P", on by default) - BTC/USD, Bitstamp 1-minute
 // data 2023-01-01 .. 2026-10-11, one preset per chart timeframe (1m, 5m, 15m,
-// 30m, 1H, 2H, 4H, 8H, 1D; other charts take the nearest). Every choice was
-// made on 2023-01 .. 2025-06 only, with each of those years positive and the
-// most common value among the 60 best sets (a plateau, not a single peak),
-// then tested on 2025-07 .. 2026-10, data the choice never saw:
+// 30m, 1H, 2H, 4H, 8H, 1D; other charts take the nearest). Every setting was
+// picked on 2023-01 .. 2025-06 only: the most common value among the 60 best
+// sets (a plateau, not a single peak), taken from the sets with each of those
+// years (2023, 2024, 2025 H1) positive - except the exits on 1m, 5m, 1H and
+// 8H, where fewer than 60 sets met that and all sets with enough trades were
+// used (the 1m, 5m and 8H presets lose in at least one in-sample year). Then
+// it was tested on 2025-07 .. 2026-10. The signal and the quality filter
+// never saw that period; the exits did, in part: their ranking rule (step 2)
+// was chosen after the first pass's out-of-sample results.
 //  1. The signal: parent and zones (chart x1 / x2 / x4, parent x1 / x4 / x8),
 //     aligned zones, burst, framework timeframe, trade-with-the-parent, Hurst
-//     gate, and the SIGNAL-QUALITY filter (group "Q") - ranked by how far
-//     price went in the signal's direction over the next 20 candles (in ATR).
+//     gate, and the SIGNAL-QUALITY filter (group "Q") - ranked by the
+//     t-statistic of the move in the signal's direction over the next 20
+//     candles (in ATR). 1m used a reduced grid (parent x1 / x4, 2 aligned
+//     zones, no buy cap, no parent-TDI bounds).
 //  2. The exits and the re-entry, simulated along the 1-minute path inside
 //     every candle with a 0.05% fee per side, ranked by total return in ATR.
 //     (TradingView's bar magnifier uses a coarser path - 2-minute candles on
 //     15m, 5m on 30m, 10m on 1H-2H, 30m on 4H-8H, 1H on 1D - and only for
 //     the last 200,000 of them; with these presets the profit factor moves by
-//     about 0.02.) (A first pass ranked by the
-//     t-statistic picked tight trails with many small wins; on 4H that pick
-//     lost out of sample while holding won - both are in the calibration log.)
+//     about 0.02.) A first pass ranked the exits by the t-statistic; it chose
+//     a different stop, target or trail only on 30m, 4H and 8H, and on 4H a
+//     tight trail (1/1 ATR, target 4 R: 417 trades, 69% wins) that lost out
+//     of sample (PF 0.84) while holding won (1.22). The ranking was switched
+//     to total return after that result was seen; the t-ranked presets are in
+//     calibration/presets/preset_t_*.json.
 // Results of each preset (trades, average per trade in ATR, profit factor;
 // in-sample 2023-01..2025-06 | out-of-sample 2025-07..2026-10):
 //   1m   7612 / -2.18 / 0.60  | 4043 / -2.83 / 0.54   fees > the move: do not trade
@@ -102,27 +119,37 @@
 // The table's "Preset" row shows the in-sample / out-of-sample profit factor of
 // the preset in force.
 // What the calibration found:
-//  - REAL MOVE vs END OF MOVE: the quality filter is the part that carries over
-//    to new data. A buy needs the chart's TDI fast line at 50 or above (1m-30m,
-//    2H) and not stretched above 80 (15m, 30m, 2H), and the parent's at 50 or
-//    above (5m-30m, 2H); a sell needs the chart's fast line at 40-50 or below
-//    (all but 1D) but not already under 30 (1m, 5m, 4H, 8H, 1D: the move is
-//    spent), and the parent's at 50 or below (5m-8H); on 5m-30m also ATR(14)
-//    at least 0.8-1.2 x its 100-candle average (a quiet market's signals
-//    fail). Without the filter every timeframe from 1m to 1H loses; with it
-//    15m, 1H, 2H, 4H and 1D stay positive out of sample.
+//  - REAL MOVE vs END OF MOVE: the quality filter carried over to new data on
+//    1m-1H, 4H and 1D, not everywhere. A buy needs the chart's TDI fast line
+//    at 50 or above (1m-30m, 2H) and not stretched above 80 (15m, 30m, 2H),
+//    and the parent's at 50 or above (5m-30m, 2H); a sell needs the chart's
+//    fast line at 40-50 or below (all but 1D) but not already under 30 (1m,
+//    5m, 4H, 8H, 1D: the move is spent), and the parent's at 50 or below
+//    (5m-8H); on 5m-30m also ATR(14) at least 0.8-1.2 x its 100-candle
+//    average (a quiet market's signals fail). Without it every timeframe
+//    from 1m to 1H loses; with it 15m and 1H turn positive out of sample (PF
+//    1.39 / 1.06 vs 0.63 / 0.94 without) and 4H and 1D improve (1.22 / 1.52
+//    vs 1.13 / 1.37). It did not carry over on 2H (1.11 vs 1.13 without it)
+//    or 8H, where it hurt (0.68 vs 1.06). On the 20-candle move it was chosen
+//    on, it did worse out of sample than open bounds on 15m, 30m, 2H, 8H, 1D.
+//  - DIRECTION ACCURACY (no trades, see the FlashGold Direction Filter v1.1
+//    and calibration/README.md): the signal's own direction, held until the
+//    next signal, is right a little less than half the time on BTC from 5m
+//    to 4H (47-49%, buys and sells averaged); the burst more often ends a
+//    short move than starts one.
 //  - EXITS: in the exit grid no trailing stop beat holding (a 3 ATR stop loss,
 //    the parent's break, no target) in sample on any timeframe from 5m to 8H,
 //    and holding also won out of sample on 5m, 15m, 30m, 2H and 4H: a trail
 //    cuts the trends that pay for the losers. The 1m, 5m, 15m, 1H and 4H
 //    presets hold; 30m, 2H and 1D trail and re-enter after the trail; 8H
-//    re-enters after its 8 R target.
+//    holds until the opposite signal or its 3 ATR stop: its 8 R target
+//    (24 ATR) was never reached in 2023-2026, so its re-entry never fired.
 //  - RE-ENTRY after a trailing / target exit (group "R"): it helped on 1D
 //    (out of sample 15.4 ATR vs 8.2 without) and was mixed elsewhere (over the
-//    trail settings tested on 5m-8H it helped both in and out of sample in 11%
-//    of them). Holding the trade is the better way to stay in "as long
-//    as the opportunity continues"; the re-entry is there for the presets that
-//    trail and for your own trailing settings.
+//    trail settings tested on 5m-8H it helped both in and out of sample in
+//    about 14% of them). Holding the trade is the better way to stay in "as
+//    long as the opportunity continues"; the re-entry is there for the presets
+//    that trail and for your own trailing settings.
 //  - YOUR SETTINGS before this calibration (framework with the PDF gates,
 //    parent 4 x the chart, Points exits: stop 5000 / target 50000 / trail
 //    4500 / 1000 points = $50 / $500 / $45 / $10 on BTC) lose on every
@@ -288,7 +315,7 @@ fdShow      = input.bool(true, "Show the parent levels, breaks and divergences",
 
 // ============================== INPUTS (signal quality and re-entry, calibration additions) ==============================
 gQ = "Q. Signal quality (real move vs end of move)"
-sqOn         = input.bool(false, "Use the signal-quality filter", group = gQ, tooltip = "What separated the signals that kept going (a real move) from the ones that printed at the end of the move, on BTC/USD 2023-2026: momentum still building on the chart and the parent (TDI fast line), not already exhausted, and enough volatility. A buy needs the chart's TDI fast line between the two buy levels and the parent's at or above its level; a sell, between the two sell levels and the parent's at or below; both, ATR(14) at or above the ratio x its 100-candle average. The preset sets these per timeframe.")
+sqOn         = input.bool(false, "Use the signal-quality filter", group = gQ, tooltip = "What separated the signals that kept going (a real move) from the ones that printed at the end of the move, on BTC/USD in sample (2023-01..2025-06; out of sample it helped on 1m-1H, 4H and 1D, not on 2H or 8H): momentum still building on the chart and the parent (TDI fast line), not already exhausted, and enough volatility. A buy needs the chart's TDI fast line between the two buy levels and the parent's at or above its level; a sell, between the two sell levels and the parent's at or below; both, ATR(14) at or above the ratio x its 100-candle average. The preset sets these per timeframe.")
 sqBuyMin     = input.float(0.0, "Buy: TDI fast at least", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)
 sqBuyMax     = input.float(100.0, "Buy: TDI fast at most", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)
 sqSellMin    = input.float(0.0, "Sell: TDI fast at least", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)

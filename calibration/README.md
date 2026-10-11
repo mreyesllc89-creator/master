@@ -24,20 +24,28 @@ This folder holds the calibration behind the presets in `flashgold_v5_fdf_strate
 
 ## Method (`pipe2.py`, then `reselect.py`)
 
-In-sample 2023-01 .. 2025-06, out-of-sample 2025-07 .. 2026-10. Every choice uses the in-sample period only, needs
-each in-sample year (2023, 2024, 2025 H1) positive, and takes the most common value of each setting among the 60
-best sets (a plateau rather than a single peak). The out-of-sample period is only reported.
+In-sample 2023-01 .. 2025-06, out-of-sample 2025-07 .. 2026-10. Every setting is picked from the in-sample period
+only, as the most common value of each setting among the 60 best sets (a plateau rather than a single peak), drawn
+from the sets with each in-sample year (2023, 2024, 2025 H1) positive when at least 60 sets meet that, otherwise from
+all sets with enough trades. The signal stage met the rule on every timeframe; the exit stage did not on 1m (0 sets),
+5m (0), 1H (37) or 8H (4), and the 1m, 5m and 8H presets lose in at least one in-sample year (ATR, 2023 / 2024 /
+2025 H1: 1m -9202 / -4496 / -2904, 5m +171 / -48 / -83, 8H +22.0 / +14.9 / -5.9). For the signal and the quality
+filter the out-of-sample period is only reported. For the exits it is not fully unseen: the ranking rule of step 2
+(total return instead of the t-statistic) was adopted after the first pass's out-of-sample results.
 
 1. **Signal and quality filter** (`features.py`, `stage_b.py`): parent x1 / x4 / x8, zones aligned 1 or 2 of
    chart x1 / x2 / x4, framework timeframe x1 / x4, trade with the parent or not, Hurst gate (off, H >= 0.5,
    H < 0.5), burst 0.5 - 2 ATR, chart TDI fast line bounds per side, parent TDI fast bound per side, volatility floor
    (ATR(14) / its 100-candle average). Ranked by the t-statistic of the move in the signal's direction over the next
-   20 candles, in ATR.
+   20 candles, in ATR. On 1m the grid was reduced: parent x1 / x4, 2 aligned zones, no buy cap, no parent-TDI bounds.
 2. **Exits and re-entry** (`pipe2.stage_c`): stop loss 1 / 1.5 / 2 / 3 ATR, target off / 4 / 8 R, trailing stop off
    or activation 1 / 2 / 4 ATR with distance 0.5 / 1 / 2 ATR, re-entry off / market (max 2, 5) / stop (max 2, 5), exit
-   on the opposite signal, exit on the parent's break: 2,400 sets per timeframe on 1-minute fills (1m charts: the 1m candles themselves). Ranked by
-   in-sample total return in ATR (`reselect.py`; ranking by the t-statistic favoured tight trails with many small
-   wins, and on 4H that pick lost out of sample while the total-return pick won; both are in `presets/*.json`).
+   on the opposite signal, exit on the parent's break: 2,400 sets per timeframe on 1-minute fills (1m charts: the
+   1m candles themselves). Ranked by in-sample total return in ATR (`reselect.py`). A first pass ranked by the
+   t-statistic chose a different stop, target or trail only on 30m, 4H and 8H; on 4H it took a tight trail (1/1 ATR,
+   target 4R; 417 in-sample trades, 69% wins) that lost out of sample (PF 0.84) while the total-return pick (no
+   trail) won (PF 1.22). The ranking was switched after that result was seen; the t-ranked presets are in
+   `presets/preset_t_<tf>.json` (and `exits_t_ranked` in `preset_<tf>.json`).
 3. **Checks on the preset** (`pipe2.finalize`): without the re-entry, with the framework's divergence gate, with the
    pullback gate, without the quality filter, and the previous settings.
 
@@ -52,7 +60,7 @@ best sets (a plateau rather than a single peak). The out-of-sample period is onl
 | 1H | x1 (1 zone) / x4, burst 0.5 ATR | fast 0-100, parent>=0 / fast 0-40, parent<=50 / - | SL 3 ATR, no trail, exit on break | off | 720, +0.28, 1.23 | 392, +0.07, 1.06 | 0.94 | 0.33 |
 | 2H | x4 (1 zone) / x4, with parent, H<0.5, burst 0.5 ATR | fast 50-80, parent>=50 / fast 0-40, parent<=50 / - | SL 2 ATR, TP 4R, trail 4/2 ATR, exit on break | stop (max 2) | 133, +0.68, 1.60 | 77, +0.14, 1.11 | 1.13 | 0.79 |
 | 4H | x1 (1 zone) / x1, burst 0.5 ATR | fast 0-100, parent>=0 / fast 30-40, parent<=50 / - | SL 3 ATR, no trail, exit on break | off | 203, +0.96, 1.89 | 134, +0.25, 1.22 | 1.13 | 0.26 |
-| 8H | x1 (1 zone) / x4, with parent, H<0.5, burst 0.5 ATR | fast 0-100, parent>=0 / fast 30-50, parent<=50 / - | SL 3 ATR, TP 8R, no trail, exit on opposite | stop (max 2) | 79, +0.39, 1.57 | 56, -0.23, 0.68 | 1.06 | 0.96 |
+| 8H | x1 (1 zone) / x4, with parent, H<0.5, burst 0.5 ATR | fast 0-100, parent>=0 / fast 30-50, parent<=50 / - | SL 3 ATR, TP 8R (never reached), no trail, exit on opposite | stop (max 2), never fired | 79, +0.39, 1.57 | 56, -0.23, 0.68 | 1.06 | 0.96 |
 | 1D | x1 (1 zone) / x1, burst 0.5 ATR | fast 0-100, parent>=0 / fast 30-100, parent<=100 / - | SL 3 ATR, trail 1/1 ATR | market (max 2) | 138, +0.25, 1.50 | 66, +0.23, 1.52 | 1.37 | 1.05 |
 
 On TradingView's bar-magnifier intrabars (`tv_check.py`, whole history magnified):
@@ -67,7 +75,9 @@ On TradingView's bar-magnifier intrabars (`tv_check.py`, whole history magnified
 | 8H | 30m | 1.57 / 1.57 | 0.68 / 0.68 |
 | 1D | 60m | 1.50 / 1.50 | 1.52 / 1.52 |
 
-Average per trade and drawdowns are in ATR(14) of the entry candle, after fees. "Your previous settings" = the strategy
+Average per trade and drawdowns are in ATR(14) of the entry candle, after fees. "Quality filter off" also switches
+the Hurst gate off; with the Hurst gate kept the out-of-sample PF without the filter is 2H 1.06, 8H 0.77, 15m 0.65,
+30m 0.80, 5m 0.45, 1m 0.42 (1H, 4H and 1D have no Hurst gate). "Your previous settings" = the strategy
 as it was before this calibration (framework with the PDF gates, parent 4 x the chart, Points exits 5000 / 50000 /
 4500 / 1000).
 

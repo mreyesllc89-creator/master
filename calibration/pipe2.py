@@ -1,7 +1,8 @@
 """Calibration v2 for one chart timeframe: features -> entry-filter grid -> exit / re-entry grid on 1-minute
-intrabar paths -> preset. Selection uses the in-sample period only (2023-01 .. 2025-06), requires every in-sample
-year to be positive, and takes the modal value of each setting among the 60 best sets (a plateau, not a peak).
-The out-of-sample period (2025-07 .. 2026-10) is only reported."""
+intrabar paths -> preset. Selection uses the in-sample period only (2023-01 .. 2025-06): the modal value of each
+setting among the 60 best sets (a plateau, not a peak), drawn from the sets with every in-sample year positive when
+at least 60 qualify, else from all sets with enough trades. The out-of-sample period (2025-07 .. 2026-10) is only
+reported."""
 import sys, json, time, itertools, os
 import numpy as np
 import pandas as pd

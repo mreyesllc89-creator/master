@@ -1,6 +1,8 @@
 """Exit selection by in-sample TOTAL return (sum of ATR units per trade, after fees) instead of the t-statistic,
-which favoured tight trails with many small wins. Same plateau rule: every in-sample year positive, modal value
-of each setting among the 60 best sets. Keeps the t-ranked preset as preset_t_<tf>.json."""
+which on 4H favoured a tight trail with many small wins that lost out of sample (this rule was adopted after that
+out-of-sample result was seen). Same plateau rule: modal value of each setting among the 60 best sets, from those
+with every in-sample year positive when at least 60 qualify, else from all sets with enough trades. Keeps the
+t-ranked preset as preset_t_<tf>.json."""
 import sys, json, os, shutil
 import numpy as np
 import pandas as pd
