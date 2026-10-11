@@ -111,3 +111,54 @@ funding either way.
 mexc.com is not reachable from this environment, so the fee figures come from
 search excerpts of those pages, not from the live fee page. Confirm the rate on
 the account's own fee page before going live.
+
+## 8. Profit factor on the exports (replica backtest, 11 Oct 2026)
+
+`tools/xpw_backtest_replica.py` re-implements the Stop-trigger path of v2.11 on
+historical bars (TradingView path assumption, emulator trail, percent commission,
+risk sizing, cost gate, arm latch) and runs it on `data/bitget_btcusdt_exports/`.
+It is a replica, not the TradingView tester; expect small differences on the chart.
+Open trades at the end of the window are marked to market at the last close.
+
+### A. v2.11 defaults: Pivot only, ATR SL 3 / TP 9, trail 1 / 1.5 ATR, Futures web/app
+
+| TF | PF | trades | wins | net (100k, 1 % risk) |
+|---|---|---|---|---|
+| 5m | 0.19 | 16 | 5 | -1,649 |
+| 10m | 1.52 | 14 | 8 | +1,198 |
+| 15m | 0.60 | 15 | 7 | -1,858 |
+| 30m | 1.11 | 16 | 9 | +537 |
+| 45m | 1.52 | 15 | 8 | +2,438 |
+| 60m | 1.39 | 20 | 11 | +2,320 |
+
+Every exit is the trail or the stop; the 9 ATR target was never reached.
+
+### B. The configuration the exported chart was running
+
+The Stop / TP / Level columns in the exports pin it down: Pivot plus Previous-day
+levels, Pct geometry with SL 0.02 % (16.5 USD below the level) and TP 1.5 %, no
+slippage and no commission widening (the zero-cost column is what that chart showed).
+
+| TF | zero cost PF | MEXC web/app PF | trades | wins | net at MEXC cost |
+|---|---|---|---|---|---|
+| 5m | 0.62 | 0.09 | 41 | 4 | -2,192 |
+| 10m | 1.39 | 0.51 | 45 | 4 | -1,409 |
+| 15m | 2.21 | 0.88 | 44 | 6 | -348 |
+| 30m | 7.31 | 3.15 | 40 | 7 | +5,182 |
+| 45m | 7.59 | 3.25 | 41 | 5 | +5,963 |
+| 60m | 6.66 | 2.88 | 39 | 7 | +4,539 |
+
+Read B with more care than A:
+- Cost is 1.5 R on this geometry (25 USD round trip against a 16.5 USD stop). It
+  halves the PF on 30m..60m and turns 10m and 15m from winners into losers.
+- Win rate is 12 to 17 %. Five to seven winners carry each result; one fewer and
+  the PF drops by a third.
+- A 16.5 USD stop on BTC is inside the tick-to-tick noise. On the fill bar the
+  replica and the TradingView tester both decide the stop by the open-high-low-close
+  path assumption, not by the real intrabar path, which wicks 17 USD many times per
+  bar. Treat B as an upper bound unless the chart runs with Bar Magnifier on
+  1-minute data, and even then as optimistic. This is the G1 warning in the script
+  header, five times tighter.
+- The qty cap binds on every trade (1 % risk over a 41 USD per-BTC loss is 24 BTC,
+  capped at 2). The table row "Qty next" shows the cap; the P&L is the cap's, not
+  the risk input's.
