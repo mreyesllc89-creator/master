@@ -64,7 +64,7 @@ def write_set(path, ind, ea, opt_ranges=None, comment=""):
     if float(p.get("trail_atr_mult", 0.0)) <= 0:
         p["trail_atr_mult"] = 2.0   # EA default; only used by the tight-SuperTrend trailing source
     opt_ranges = opt_ranges or {}
-    lines = [f"; RegimeTrend_EA v1.50 settings - {comment}", f"; chart timeframe: {p['chart_tf']}", ""]
+    lines = []
     for name, key, kind in MAP:
         if isinstance(key, str):
             v = p[key] if key in p else e[key]
@@ -75,12 +75,7 @@ def write_set(path, ind, ea, opt_ranges=None, comment=""):
             a, s, b = opt_ranges[name]
             lines.append(f"{name}={val}||{_fmt(a, kind)}||{_fmt(s, kind)}||{_fmt(b, kind)}||Y")
         else:
-            if kind == "tf":
-                lines.append(f"{name}={val}||0||0||0||N")
-            elif kind == "b":
-                lines.append(f"{name}={val}||false||0||true||N")
-            else:
-                lines.append(f"{name}={val}||{val}||0||{val}||N")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+            lines.append(f"{name}={val}")
+    with open(path, "w", encoding="ascii", newline="") as f:
+        f.write("\r\n".join(lines) + "\r\n")
     return path

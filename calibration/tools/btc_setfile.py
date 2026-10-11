@@ -34,19 +34,15 @@ def write_set(path, sig, ea, opt_ranges=None, comment=""):
     e["_trail_source"] = 1 if int(e["trail_mode"]) == 2 else 0
     e["_direction"] = 1 if e["long_only"] else (2 if e["short_only"] else 0)
     opt_ranges = opt_ranges or {}
-    lines = [f"; BTCSignalFlow_Test_EA v1.11 settings - {comment}", f"; chart timeframe: {p['chart_tf']}", ""]
+    lines = []
     for name, key, kind in MAP:
         v = (p[key] if key in p else e[key]) if isinstance(key, str) else key
         val = _fmt(v, kind)
         if name in opt_ranges:
             a, s, b = opt_ranges[name]
             lines.append(f"{name}={val}||{_fmt(a, kind)}||{_fmt(s, kind)}||{_fmt(b, kind)}||Y")
-        elif kind == "tf":
-            lines.append(f"{name}={val}||0||0||0||N")
-        elif kind == "b":
-            lines.append(f"{name}={val}||false||0||true||N")
         else:
-            lines.append(f"{name}={val}||{val}||0||{val}||N")
-    with open(path, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + "\n")
+            lines.append(f"{name}={val}")
+    with open(path, "w", encoding="ascii", newline="") as f:
+        f.write("\r\n".join(lines) + "\r\n")
     return path
