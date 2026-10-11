@@ -57,25 +57,90 @@
 // exit (the parent's break); FlashGold's signal, stops, targets, trailing and
 // sizing are unchanged. "Use the Fractal Direction Framework" off = the
 // original strategy, bar for bar.
-// CALIBRATION of the framework: none yet - its defaults come from the PDF
-// (H > 0.5 = persistence, q from -2 to 2, the higher-low / lower-high test).
-// On a 128-candle window a memoryless market reads H about 0.47 +- 0.08 and a
-// persistent one (AR 0.3) about 0.54, so a 0.5 minimum still passes about a
-// third of random windows: the minimum is the first setting to calibrate
-// (e.g. 0.55). The width reads about 0.04 +- 0.08 on a monofractal series.
-// The PDF itself warns that reliable spectra need thousands of points, so the
-// rolling estimate (default 128 candles) is a rough persistence read and the
-// width gate stays off. Calibrate it on TradingView exports before trading it:
-// sweep the structure timeframe, pivots, Minimum Hurst, Pullback depth and
-// Divergence lasts with both halves of the export positive, as was done for
-// the core below.
+// CALIBRATION of the framework and of the whole strategy: see CALIBRATED
+// PRESETS below. On BTC/USD the PDF's Hurst reading did not hold (signals taken
+// while H was BELOW 0.5 did better), and the divergence and pullback gates did
+// not improve the presets consistently (each helped in sample on 3-4 of the 9
+// timeframes, and in and out of sample only where the presets lose anyway:
+// 1m-5m, 30m), so the presets leave them off. On a
+// 128-candle window a memoryless market reads H about 0.47 +- 0.08 and a
+// persistent one (AR 0.3) about 0.54; the width reads about 0.04 +- 0.08 on a
+// monofractal series and its gate stays off.
 //
-// EXITS AND SIZING DEFAULTS (S2 / S3): your settings - Points unit, stop loss
-// 5000 pts ($50 at mintick 0.01), take profit 50000 pts ($500), trailing stop
-// on, activating at 4500 pts ($45) of profit and trailing 1000 pts ($10)
-// behind the best price; ATR-mode values 2 / 2 R / 4 / 0.2; fixed 10
-// contracts (oz), max 50. The core calibration note below was made with the
-// earlier ATR exits.
+// CALIBRATED PRESETS (group "P", on by default) - BTC/USD, Bitstamp 1-minute
+// data 2023-01-01 .. 2026-10-11, one preset per chart timeframe (1m, 5m, 15m,
+// 30m, 1H, 2H, 4H, 8H, 1D; other charts take the nearest). Every choice was
+// made on 2023-01 .. 2025-06 only, with each of those years positive and the
+// most common value among the 60 best sets (a plateau, not a single peak),
+// then tested on 2025-07 .. 2026-10, data the choice never saw:
+//  1. The signal: parent and zones (chart x1 / x2 / x4, parent x1 / x4 / x8),
+//     aligned zones, burst, framework timeframe, trade-with-the-parent, Hurst
+//     gate, and the SIGNAL-QUALITY filter (group "Q") - ranked by how far
+//     price went in the signal's direction over the next 20 candles (in ATR).
+//  2. The exits and the re-entry, simulated along the 1-minute path inside
+//     every candle (what TradingView's bar magnifier does) with a 0.05% fee
+//     per side, ranked by total return in ATR. (A first pass ranked by the
+//     t-statistic picked tight trails with many small wins; on 4H that pick
+//     lost out of sample while holding won - both are in the calibration log.)
+// Results of each preset (trades, average per trade in ATR, profit factor;
+// in-sample 2023-01..2025-06 | out-of-sample 2025-07..2026-10):
+//   1m   7612 / -2.18 / 0.60  | 4043 / -2.83 / 0.54   fees > the move: do not trade
+//   5m   3009 / +0.01 / 1.01  | 1637 / -0.43 / 0.82   no edge after fees
+//   15m   721 / +0.43 / 1.24  |  379 / +0.66 / 1.39   held up
+//   30m   359 / +0.30 / 1.36  |  192 / -0.15 / 0.84   did not hold up
+//   1H    720 / +0.28 / 1.23  |  392 / +0.07 / 1.06   weak
+//   2H    133 / +0.68 / 1.60  |   77 / +0.14 / 1.11   weak, few trades
+//   4H    203 / +0.96 / 1.89  |  134 / +0.25 / 1.22   held up
+//   8H     79 / +0.39 / 1.57  |   56 / -0.23 / 0.68   did not hold up
+//   1D    138 / +0.25 / 1.50  |   66 / +0.23 / 1.52   held up, few trades
+// The table's "Preset" row shows the in-sample / out-of-sample profit factor of
+// the preset in force.
+// What the calibration found:
+//  - REAL MOVE vs END OF MOVE: the quality filter is the part that carries over
+//    to new data. A buy needs the chart's TDI fast line at 50 or above (1m-30m,
+//    2H) and not stretched above 80 (15m, 30m, 2H), and the parent's at 50 or
+//    above (5m-30m, 2H); a sell needs the chart's fast line at 40-50 or below
+//    (all but 1D) but not already under 30 (1m, 5m, 4H, 8H, 1D: the move is
+//    spent), and the parent's at 50 or below (5m-8H); on 5m-30m also ATR(14)
+//    at least 0.8-1.2 x its 100-candle average (a quiet market's signals
+//    fail). Without the filter every timeframe from 1m to 1H loses; with it
+//    15m, 1H, 2H, 4H and 1D stay positive out of sample.
+//  - EXITS: in the exit grid no trailing stop beat holding (a 3 ATR stop loss,
+//    the parent's break, no target) in sample on any timeframe from 5m to 8H,
+//    and holding also won out of sample on 5m, 15m, 30m, 2H and 4H: a trail
+//    cuts the trends that pay for the losers. The 1m, 5m, 15m, 1H and 4H
+//    presets hold; 30m, 2H and 1D trail and re-enter after the trail; 8H
+//    re-enters after its 8 R target.
+//  - RE-ENTRY after a trailing / target exit (group "R"): it helped on 1D
+//    (out of sample 15.4 ATR vs 8.2 without) and was mixed elsewhere (over the
+//    trail settings tested on 5m-8H it helped both in and out of sample in 11%
+//    of them). Holding the trade is the better way to stay in "as long
+//    as the opportunity continues"; the re-entry is there for the presets that
+//    trail and for your own trailing settings.
+//  - YOUR SETTINGS before this calibration (framework with the PDF gates,
+//    parent 4 x the chart, Points exits: stop 5000 / target 50000 / trail
+//    4500 / 1000 points = $50 / $500 / $45 / $10 on BTC) lose on every
+//    timeframe from 1m to 8H once the fills follow the 1-minute path (1H out
+//    of sample PF 0.33; 1D is flat, 20 trades): without the bar magnifier
+//    TradingView fills a $10 trail at the candle's best price, which a real
+//    market does not give. They stay in the inputs for the preset off.
+//  - 1m / 5m: a 0.05% fee per side is 0.1% round trip, about $82 on BTC at
+//    $82k: 2.3 x the median 1m ATR ($35) and 0.8 x the 5m ATR ($105) since
+//    2025-07, so the fee eats the move the signal catches (15m: 0.4 x). Use
+//    15m or above, or the direction filter of a higher timeframe to time 1m
+//    entries by hand.
+// Set Properties > Commission to your exchange's fee in percent (e.g. 0.05%)
+// and turn on the bar magnifier (Premium) when testing BTC, or the backtest
+// will look better than the calibration.
+// (The core calibration below - XAUUSD exports, CALIBRATION.md section 17 -
+// is the original FlashGold sweep; the BTC presets above replace it while
+// the preset is on.)
+//
+// EXITS AND SIZING DEFAULTS (S2 / S3, used with the preset off): your settings
+// - Points unit, stop loss 5000 pts ($50 at mintick 0.01), take profit 50000
+// pts ($500), trailing stop on, activating at 4500 pts ($45) of profit and
+// trailing 1000 pts ($10) behind the best price; ATR-mode values 2 / 2 R / 4 /
+// 0.2; fixed 10 contracts (oz), max 50.
 //
 // CALIBRATION (CALIBRATION.md section 17): the defaults below are the
 // 60m pick of the FlashGold sweep on OANDA:XAUUSD 10m to 60m exports (2 to 16 weeks), chosen for profit
@@ -104,7 +169,12 @@ strategy("FlashGold v5 Strategy (XAUUSD) + FDF", "FlashGold v5 FDF (XAUUSD)", ov
      default_qty_type = strategy.fixed, default_qty_value = 10,
      commission_type = strategy.commission.cash_per_contract, commission_value = 0.13,  // USD per oz per side: half of a 2.5 pip ($0.25) spread + $0.6/lot commission (VT Markets)
      slippage = 5,                                                                      // ticks per side. mintick 0.01 -> $0.05/oz
-     calc_on_every_tick = false, process_orders_on_close = false, calc_on_order_fills = false, max_bars_back = 500)
+     calc_on_every_tick = false, process_orders_on_close = false, calc_on_order_fills = false, max_bars_back = 500,
+     use_bar_magnifier = true)                                                          // fills along the lower-timeframe path (Premium plans); without it a tight trail looks far better than it trades
+
+// ============================== INPUTS (calibrated preset) ==============================
+gP = "P. Calibrated preset (BTC/USD)"
+presetOn = input.bool(true, "Use the calibrated preset of this chart timeframe", group = gP, tooltip = "On: the settings calibrated on BTC/USD for the chart's timeframe (1m, 5m, 15m, 30m, 1H, 2H, 4H, 8H, 1D; other charts use the nearest one) replace these inputs: the burst / entry distance / hold (ATR unit), the TDI parent and child zones (chart x1, x2, x4), the parent and zone reads (last closed bar), the framework (structure timeframe, trade with the parent, Hurst gate, exit on the break; divergence and pullback gates off), the exits (ATR unit: stop loss, target, trailing stop), the opposite-signal exit, the entry-stop lifetime (3 bars), the signal-quality filter and the re-entry. Direction, sizing, spread and the visuals stay yours. Off: every input below is used as set. The table shows the preset in force.")
 
 // ============================== INPUTS (indicator, unchanged) ==============================
 gCore = "FlashGold Core"
@@ -134,6 +204,7 @@ tdiSlowLen      = input.int(7, "TDI slow length", minval = 1, group = gZone)
 minAlignedZones = input.int(2, "Minimum child zones aligned", minval = 0, maxval = 6, group = gZone)
 allowNeutralParent = input.bool(false, "Allow trade if parent is flat", group = gZone)
 ignoreNaZones   = input.bool(true, "Ignore zones without data", group = gZone, tooltip = "STRATEGY ADDITION. A child zone whose timeframe has no data on this bar (seconds bars outside the plan's seconds window) is dropped from the active count instead of counting as MIX.")
+parentNoRepaint = input.bool(true, "Higher-TF parent uses the last CLOSED bar", group = gZone, tooltip = "STRATEGY ADDITION. A parent timeframe HIGHER than the chart is read from its last closed bar, like the zones below. Off = the indicator's plain read: on history it sees the parent bar that closed with the chart bar, live it sees the parent bar still forming, so a backtest with a higher parent does not trade like the live chart.")
 htfNoRepaint    = input.bool(true, "Higher-TF zones use the last CLOSED bar", group = gZone, tooltip = "STRATEGY ADDITION. A child zone on a timeframe HIGHER than the chart is read from its last closed bar (lookahead_on + [1] idiom), so history and realtime agree and the backtest cannot see the future. Off = the indicator's plain request.security, which repaints on higher timeframes.")
 showZoneTable   = input.bool(true, "Show TDI zone table", group = gZone)
 
@@ -198,12 +269,136 @@ fdDivOn     = input.bool(true, "Divergence warning blocks entries with the paren
 fdDivBars   = input.int(10, "Divergence lasts, structure candles", minval = 1, group = gF)
 fdPullOn    = input.bool(true, "Enter on a sub-trend (pullback) only", group = gF, tooltip = "A buy needs a pullback of at least the depth below from the latest high since the parent turned up (a sell, a bounce from the latest low). The FlashGold burst after it is the sub-trend's completion.")
 fdPullAtr   = input.float(0.5, "Pullback depth, ATR(14) mult", minval = 0.0, step = 0.05, group = gF)
-fdHurstOn   = input.bool(true, "Hurst persistence gate", group = gF, tooltip = "Entries need the parent's generalized Hurst exponent H = h(2) (drift removed) at or above the minimum: above 0.5 the moves persist (up follows up); below 0.5 they mean-revert. On a 128-candle window a memoryless market reads about 0.47 +- 0.08 and a persistent one about 0.54, so 0.5 passes about a third of random windows: set the minimum in calibration (e.g. 0.55).")
+HM_OFF   = "Off"
+HM_ABOVE = "H at or above the minimum (PDF)"
+HM_BELOW = "H below the minimum (BTC calibration)"
+fdHurstMode = input.string(HM_ABOVE, "Hurst gate", options = [HM_OFF, HM_ABOVE, HM_BELOW], group = gF, tooltip = "Entries need the parent's generalized Hurst exponent H = h(2) (drift removed) at or above the minimum: above 0.5 the moves persist (up follows up); below 0.5 they mean-revert. On a 128-candle window a memoryless market reads about 0.47 +- 0.08 and a persistent one about 0.54, so 0.5 passes about a third of random windows: set the minimum in calibration (e.g. 0.55). BTC calibration: the PDF reading did not hold on BTC/USD - signals taken while H was below 0.5 (the structure timeframe mean-reverting, drift removed) moved further in their direction than those taken above 0.5, so the presets use 'below' or no gate.")
 fdHurstMin  = input.float(0.5, "Minimum Hurst H", minval = 0.0, maxval = 1.0, step = 0.01, group = gF)
 fdHurstWin  = input.int(128, "Hurst window, structure candles", minval = 64, maxval = 400, group = gF, tooltip = "Candles used for h(q), with tau = 2, 4, 8, 16. Longer = steadier but slower to react.")
 fdWidthOn   = input.bool(false, "Spectrum-width gate (the flip = maximum disorder)", group = gF, tooltip = "Blocks entries while the multifractal width h(-2) - h(2) is above the maximum: the moment the old structure breaks and the new one has not formed. Off by default: the rolling window is far shorter than the thousands of points the PDF asks for reliable spectra.")
 fdWidthMax  = input.float(0.5, "Max spectrum width h(-2) - h(2)", minval = 0.0, step = 0.05, group = gF)
 fdShow      = input.bool(true, "Show the parent levels, breaks and divergences", group = gF)
+
+// ============================== INPUTS (signal quality and re-entry, calibration additions) ==============================
+gQ = "Q. Signal quality (real move vs end of move)"
+sqOn         = input.bool(false, "Use the signal-quality filter", group = gQ, tooltip = "What separated the signals that kept going (a real move) from the ones that printed at the end of the move, on BTC/USD 2023-2026: momentum still building on the chart and the parent (TDI fast line), not already exhausted, and enough volatility. A buy needs the chart's TDI fast line between the two buy levels and the parent's at or above its level; a sell, between the two sell levels and the parent's at or below; both, ATR(14) at or above the ratio x its 100-candle average. The preset sets these per timeframe.")
+sqBuyMin     = input.float(0.0, "Buy: TDI fast at least", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)
+sqBuyMax     = input.float(100.0, "Buy: TDI fast at most", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)
+sqSellMin    = input.float(0.0, "Sell: TDI fast at least", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)
+sqSellMax    = input.float(100.0, "Sell: TDI fast at most", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)
+sqBuyParMin  = input.float(0.0, "Buy: parent TDI fast at least", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)
+sqSellParMax = input.float(100.0, "Sell: parent TDI fast at most", minval = 0.0, maxval = 100.0, step = 5.0, group = gQ)
+sqAtrMin     = input.float(0.0, "Volatility: ATR / its 100-candle average at least (0 = off)", minval = 0.0, step = 0.1, group = gQ)
+
+RE_OFF  = "Off"
+RE_MKT  = "Market, next candle"
+RE_STOP = "Stop, close + distance"
+gR = "R. Re-entry after a trailing / target exit"
+reMode    = input.string(RE_OFF, "Re-entry", options = [RE_OFF, RE_MKT, RE_STOP], group = gR, tooltip = "When the trailing stop or the target closes a trade, the move that paid may still be running: re-enter on the same side while the opportunity continues - the TDI zones, the framework and the quality filter still allow that side (no new burst needed). Market: at the next candle's open. Stop: a stop order at this close + the distance below (a buy) or - (a sell), cancelled like an entry stop. Never after a stop loss, an opposite-signal or a parent-break exit.")
+reMax     = input.int(2, "Max re-entries in a row (0 = no limit)", minval = 0, group = gR, tooltip = "Counted from the last fresh signal entry.")
+reDistAtr = input.float(0.25, "Re-entry stop distance, ATR(14) mult (Stop mode)", minval = 0.0, step = 0.05, group = gR)
+
+// ============================== CALIBRATED PRESET -> EFFECTIVE SETTINGS ==============================
+// The chart timeframe in minutes and its calibration bucket (the nearest calibrated timeframe).
+int fgChartMin = math.max(1, math.round(timeframe.in_seconds() / 60.0))
+int pTf = fgChartMin <= 2 ? 1 : fgChartMin <= 10 ? 5 : fgChartMin <= 22 ? 15 : fgChartMin <= 45 ? 30 : fgChartMin <= 90 ? 60 : fgChartMin <= 180 ? 120 : fgChartMin <= 360 ? 240 : fgChartMin <= 720 ? 480 : 1440
+// preset table, one value per chart bucket (1, 5, 15, 30, 60, 120, 240, 480 minutes, 1D)
+int pPm = pTf == 1 ? 1 : pTf == 5 ? 1 : pTf == 15 ? 1 : pTf == 30 ? 8 : pTf == 60 ? 1 : pTf == 120 ? 4 : pTf == 240 ? 1 : pTf == 480 ? 1 : 1
+int pMa = pTf == 1 ? 2 : pTf == 5 ? 1 : pTf == 15 ? 1 : pTf == 30 ? 1 : pTf == 60 ? 1 : pTf == 120 ? 1 : pTf == 240 ? 1 : pTf == 480 ? 1 : 1
+int pFm = pTf == 1 ? 4 : pTf == 5 ? 4 : pTf == 15 ? 4 : pTf == 30 ? 4 : pTf == 60 ? 4 : pTf == 120 ? 4 : pTf == 240 ? 1 : pTf == 480 ? 4 : 1
+float pBurst = pTf == 1 ? 2.0 : pTf == 5 ? 0.5 : pTf == 15 ? 0.5 : pTf == 30 ? 0.5 : pTf == 60 ? 0.5 : pTf == 120 ? 0.5 : pTf == 240 ? 0.5 : pTf == 480 ? 0.5 : 0.5
+bool pParent = pTf == 1 ? false : pTf == 5 ? false : pTf == 15 ? false : pTf == 30 ? true : pTf == 60 ? false : pTf == 120 ? true : pTf == 240 ? false : pTf == 480 ? true : false
+int pHurst = pTf == 1 ? 2 : pTf == 5 ? 2 : pTf == 15 ? 2 : pTf == 30 ? 2 : pTf == 60 ? 0 : pTf == 120 ? 2 : pTf == 240 ? 0 : pTf == 480 ? 2 : 0
+float pBuyFastMin = pTf == 1 ? 50.0 : pTf == 5 ? 50.0 : pTf == 15 ? 50.0 : pTf == 30 ? 50.0 : pTf == 60 ? 0.0 : pTf == 120 ? 50.0 : pTf == 240 ? 0.0 : pTf == 480 ? 0.0 : 0.0
+float pBuyFastMax = pTf == 1 ? 100.0 : pTf == 5 ? 100.0 : pTf == 15 ? 80.0 : pTf == 30 ? 80.0 : pTf == 60 ? 100.0 : pTf == 120 ? 80.0 : pTf == 240 ? 100.0 : pTf == 480 ? 100.0 : 100.0
+float pSellFastMin = pTf == 1 ? 30.0 : pTf == 5 ? 30.0 : pTf == 15 ? 0.0 : pTf == 30 ? 0.0 : pTf == 60 ? 0.0 : pTf == 120 ? 0.0 : pTf == 240 ? 30.0 : pTf == 480 ? 30.0 : 30.0
+float pSellFastMax = pTf == 1 ? 40.0 : pTf == 5 ? 40.0 : pTf == 15 ? 50.0 : pTf == 30 ? 40.0 : pTf == 60 ? 40.0 : pTf == 120 ? 40.0 : pTf == 240 ? 40.0 : pTf == 480 ? 50.0 : 100.0
+float pBuyPFastMin = pTf == 1 ? 0.0 : pTf == 5 ? 50.0 : pTf == 15 ? 50.0 : pTf == 30 ? 50.0 : pTf == 60 ? 0.0 : pTf == 120 ? 50.0 : pTf == 240 ? 0.0 : pTf == 480 ? 0.0 : 0.0
+float pSellPFastMax = pTf == 1 ? 100.0 : pTf == 5 ? 50.0 : pTf == 15 ? 50.0 : pTf == 30 ? 50.0 : pTf == 60 ? 50.0 : pTf == 120 ? 50.0 : pTf == 240 ? 50.0 : pTf == 480 ? 50.0 : 100.0
+float pAtrReg = pTf == 1 ? 0.0 : pTf == 5 ? 0.8 : pTf == 15 ? 1.2 : pTf == 30 ? 1.2 : pTf == 60 ? 0.0 : pTf == 120 ? 0.0 : pTf == 240 ? 0.0 : pTf == 480 ? 0.0 : 0.0
+float pSl = pTf == 1 ? 3.0 : pTf == 5 ? 3.0 : pTf == 15 ? 3.0 : pTf == 30 ? 1.5 : pTf == 60 ? 3.0 : pTf == 120 ? 2.0 : pTf == 240 ? 3.0 : pTf == 480 ? 3.0 : 3.0
+float pTpR = pTf == 1 ? 0.0 : pTf == 5 ? 0.0 : pTf == 15 ? 0.0 : pTf == 30 ? 0.0 : pTf == 60 ? 0.0 : pTf == 120 ? 4.0 : pTf == 240 ? 0.0 : pTf == 480 ? 8.0 : 0.0
+float pTrailAct = pTf == 1 ? 0.0 : pTf == 5 ? 0.0 : pTf == 15 ? 0.0 : pTf == 30 ? 2.0 : pTf == 60 ? 0.0 : pTf == 120 ? 4.0 : pTf == 240 ? 0.0 : pTf == 480 ? 0.0 : 1.0
+float pTrailDst = pTf == 1 ? 1.0 : pTf == 5 ? 1.0 : pTf == 15 ? 1.0 : pTf == 30 ? 2.0 : pTf == 60 ? 1.0 : pTf == 120 ? 2.0 : pTf == 240 ? 1.0 : pTf == 480 ? 1.0 : 1.0
+int pReMode = pTf == 1 ? 0 : pTf == 5 ? 0 : pTf == 15 ? 0 : pTf == 30 ? 1 : pTf == 60 ? 0 : pTf == 120 ? 2 : pTf == 240 ? 0 : pTf == 480 ? 2 : 1
+int pReMax = pTf == 1 ? 0 : pTf == 5 ? 0 : pTf == 15 ? 0 : pTf == 30 ? 5 : pTf == 60 ? 0 : pTf == 120 ? 2 : pTf == 240 ? 0 : pTf == 480 ? 2 : 2
+bool pExitOpp = pTf == 1 ? false : pTf == 5 ? false : pTf == 15 ? false : pTf == 30 ? false : pTf == 60 ? false : pTf == 120 ? false : pTf == 240 ? false : pTf == 480 ? true : false
+bool pExitBreak = pTf == 1 ? false : pTf == 5 ? false : pTf == 15 ? true : pTf == 30 ? false : pTf == 60 ? true : pTf == 120 ? true : pTf == 240 ? true : pTf == 480 ? false : false
+// the preset's test results, 1-minute intrabar fills, 0.05% fee per side: profit factor in-sample (2023-01..2025-06) and out-of-sample (2025-07..2026-10)
+float pIsPf = pTf == 1 ? 0.6 : pTf == 5 ? 1.01 : pTf == 15 ? 1.24 : pTf == 30 ? 1.36 : pTf == 60 ? 1.23 : pTf == 120 ? 1.6 : pTf == 240 ? 1.89 : pTf == 480 ? 1.57 : 1.5
+float pOosPf = pTf == 1 ? 0.54 : pTf == 5 ? 0.82 : pTf == 15 ? 1.39 : pTf == 30 ? 0.84 : pTf == 60 ? 1.06 : pTf == 120 ? 1.11 : pTf == 240 ? 1.22 : pTf == 480 ? 0.68 : 1.52
+
+// a multiple of the chart timeframe as a timeframe string (above a day: the nearest whole number of days)
+fgTf(int mult) =>
+    int m = fgChartMin * mult
+    m < 1440 ? str.tostring(m) : m == 1440 ? "1D" : str.tostring(math.round(m / 1440.0)) + "D"
+
+// every setting the preset can replace, as used below (the preset's value, or your input when it is off)
+bool   ePre           = presetOn
+string eDistUnit      = ePre ? "ATR" : DistUnit
+float  eBurstAtr      = ePre ? pBurst : burstAtrMult
+float  eEntryDistAtr  = ePre ? 0.25 : entryDistAtrMult
+int    eHoldBars      = ePre ? 0 : entryHoldBars
+bool   eUseBurst      = ePre ? true : useBurstGate
+bool   eAnyCombo      = ePre ? false : useAnyCombo
+bool   ePrior         = ePre ? false : usePriorFilter
+bool   eUseZoneFilter = ePre ? true : useTdiTradeZone
+string eParentTf      = ePre ? fgTf(pPm) : tdiParentTf
+int    eRsiLen        = ePre ? 14 : tdiRsiLen
+int    eFastLen       = ePre ? 2 : tdiFastLen
+int    eSlowLen       = ePre ? 7 : tdiSlowLen
+int    eMinAligned    = ePre ? pMa : minAlignedZones
+bool   eFlatParent    = ePre ? false : allowNeutralParent
+bool   eIgnoreNa      = ePre ? true : ignoreNaZones
+bool   eParNoRepaint  = ePre ? true : parentNoRepaint
+bool   eHtfNoRepaint  = ePre ? true : htfNoRepaint
+bool   eUseZ1         = ePre ? true : useZone1
+bool   eUseZ2         = ePre ? true : useZone2
+bool   eUseZ3         = ePre ? true : useZone3
+bool   eUseZ4         = ePre ? false : useZone4
+bool   eUseZ5         = ePre ? false : useZone5
+bool   eUseZ6         = ePre ? false : useZone6
+string eZoneTf1       = ePre ? fgTf(1) : zoneTf1
+string eZoneTf2       = ePre ? fgTf(2) : zoneTf2
+string eZoneTf3       = ePre ? fgTf(4) : zoneTf3
+string eZoneTf4       = zoneTf4
+string eZoneTf5       = zoneTf5
+string eZoneTf6       = zoneTf6
+int    eEntryValid    = ePre ? 3 : entryValidBars
+bool   eAllowRev      = ePre ? true : allowReverse
+bool   eExitOpp       = ePre ? pExitOpp : exitOnOpposite
+string eExitMode      = ePre ? "ATR" : ExitMode
+float  eSlAtr         = ePre ? pSl : slAtrMult
+float  eTpR           = ePre ? pTpR : tpR
+bool   eUseTrail      = ePre ? pTrailAct > 0 : useTrail
+float  eTrailAct      = ePre ? pTrailAct : trailActAtr
+float  eTrailDst      = ePre ? pTrailDst : trailDstAtr
+int    eAtrLen        = ePre ? 14 : atrLen
+int    eMaxBars       = ePre ? 0 : maxBarsHeld
+bool   eFdOn          = ePre ? true : fdOn
+string eFdTf          = ePre ? fgTf(pFm) : fdTf
+int    eFdPivL        = ePre ? 5 : fdPivL
+int    eFdPivR        = ePre ? 3 : fdPivR
+bool   eFdTrade       = ePre ? pParent : fdTrade
+bool   eFdExitBreak   = ePre ? pExitBreak : fdExitBreak
+bool   eFdDivOn       = ePre ? false : fdDivOn
+int    eFdDivBars     = ePre ? 10 : fdDivBars
+bool   eFdPullOn      = ePre ? false : fdPullOn
+int    eFdHurstMode   = ePre ? pHurst : fdHurstMode == HM_OFF ? 0 : fdHurstMode == HM_BELOW ? 2 : 1
+float  eFdHurstMin    = ePre ? 0.5 : fdHurstMin
+int    eFdHurstWin    = ePre ? 128 : fdHurstWin
+bool   eFdWidthOn     = ePre ? false : fdWidthOn
+bool   eSqOn          = ePre ? true : sqOn
+float  eSqBuyMin      = ePre ? pBuyFastMin : sqBuyMin
+float  eSqBuyMax      = ePre ? pBuyFastMax : sqBuyMax
+float  eSqSellMin     = ePre ? pSellFastMin : sqSellMin
+float  eSqSellMax     = ePre ? pSellFastMax : sqSellMax
+float  eSqBuyParMin   = ePre ? pBuyPFastMin : sqBuyParMin
+float  eSqSellParMax  = ePre ? pSellPFastMax : sqSellParMax
+float  eSqAtrMin      = ePre ? pAtrReg : sqAtrMin
+string eReMode        = ePre ? (pReMode == 1 ? RE_MKT : pReMode == 2 ? RE_STOP : RE_OFF) : reMode
+int    eReMax         = ePre ? pReMax : reMax
+float  eReDistAtr     = ePre ? 0.25 : reDistAtr
 
 // ============================== PRICE MODEL (indicator) ==============================
 pt = syminfo.mintick
@@ -214,9 +409,9 @@ midPrice = (bid + ask) * 0.5
 
 // ============================== TDI DIRECTION (indicator) ==============================
 tdiDir() =>
-    r = ta.rsi(close, tdiRsiLen)
-    f = ta.sma(r, tdiFastLen)
-    s = ta.sma(r, tdiSlowLen)
+    r = ta.rsi(close, eRsiLen)
+    f = ta.sma(r, eFastLen)
+    s = ta.sma(r, eSlowLen)
     d = f > f[1] ? 1 : f < f[1] ? -1 : 0
     [d, f, s]
 
@@ -227,37 +422,43 @@ tdiDirPrev() =>
 isHigher(string tf) =>
     timeframe.in_seconds(tf) > timeframe.in_seconds(timeframe.period)
 
-// plain (indicator) request and the last-closed-bar request; the higher-TF zones pick the second when htfNoRepaint is on
-[parentDir, parentFast, parentSlow] = request.security(syminfo.tickerid, tdiParentTf, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z1Dir0, z1Fast, z1Slow] = request.security(syminfo.tickerid, zoneTf1, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z2Dir0, z2Fast, z2Slow] = request.security(syminfo.tickerid, zoneTf2, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z3Dir0, z3Fast, z3Slow] = request.security(syminfo.tickerid, zoneTf3, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z4Dir0, z4Fast, z4Slow] = request.security(syminfo.tickerid, zoneTf4, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z5Dir0, z5Fast, z5Slow] = request.security(syminfo.tickerid, zoneTf5, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z6Dir0, z6Fast, z6Slow] = request.security(syminfo.tickerid, zoneTf6, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
-[z1DirP, z1FastP, z1SlowP] = request.security(syminfo.tickerid, zoneTf1, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z2DirP, z2FastP, z2SlowP] = request.security(syminfo.tickerid, zoneTf2, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z3DirP, z3FastP, z3SlowP] = request.security(syminfo.tickerid, zoneTf3, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z4DirP, z4FastP, z4SlowP] = request.security(syminfo.tickerid, zoneTf4, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z5DirP, z5FastP, z5SlowP] = request.security(syminfo.tickerid, zoneTf5, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-[z6DirP, z6FastP, z6SlowP] = request.security(syminfo.tickerid, zoneTf6, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
-z1Dir = htfNoRepaint and isHigher(zoneTf1) ? z1DirP : z1Dir0
-z2Dir = htfNoRepaint and isHigher(zoneTf2) ? z2DirP : z2Dir0
-z3Dir = htfNoRepaint and isHigher(zoneTf3) ? z3DirP : z3Dir0
-z4Dir = htfNoRepaint and isHigher(zoneTf4) ? z4DirP : z4Dir0
-z5Dir = htfNoRepaint and isHigher(zoneTf5) ? z5DirP : z5Dir0
-z6Dir = htfNoRepaint and isHigher(zoneTf6) ? z6DirP : z6Dir0
+// plain (indicator) request and the last-closed-bar request; the higher-TF zones pick the second when eHtfNoRepaint is on
+[parentDir0, parentFast0, parentSlow0] = request.security(syminfo.tickerid, eParentTf, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[parentDirP, parentFastP, parentSlowP] = request.security(syminfo.tickerid, eParentTf, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+// strategy addition: a parent higher than the chart is read from its last closed bar (no repaint)
+parentPrev = eParNoRepaint and isHigher(eParentTf)
+parentDir  = parentPrev ? parentDirP : parentDir0
+parentFast = parentPrev ? parentFastP : parentFast0
+parentSlow = parentPrev ? parentSlowP : parentSlow0
+[z1Dir0, z1Fast, z1Slow] = request.security(syminfo.tickerid, eZoneTf1, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z2Dir0, z2Fast, z2Slow] = request.security(syminfo.tickerid, eZoneTf2, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z3Dir0, z3Fast, z3Slow] = request.security(syminfo.tickerid, eZoneTf3, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z4Dir0, z4Fast, z4Slow] = request.security(syminfo.tickerid, eZoneTf4, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z5Dir0, z5Fast, z5Slow] = request.security(syminfo.tickerid, eZoneTf5, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z6Dir0, z6Fast, z6Slow] = request.security(syminfo.tickerid, eZoneTf6, tdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+[z1DirP, z1FastP, z1SlowP] = request.security(syminfo.tickerid, eZoneTf1, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z2DirP, z2FastP, z2SlowP] = request.security(syminfo.tickerid, eZoneTf2, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z3DirP, z3FastP, z3SlowP] = request.security(syminfo.tickerid, eZoneTf3, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z4DirP, z4FastP, z4SlowP] = request.security(syminfo.tickerid, eZoneTf4, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z5DirP, z5FastP, z5SlowP] = request.security(syminfo.tickerid, eZoneTf5, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+[z6DirP, z6FastP, z6SlowP] = request.security(syminfo.tickerid, eZoneTf6, tdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+z1Dir = eHtfNoRepaint and isHigher(eZoneTf1) ? z1DirP : z1Dir0
+z2Dir = eHtfNoRepaint and isHigher(eZoneTf2) ? z2DirP : z2Dir0
+z3Dir = eHtfNoRepaint and isHigher(eZoneTf3) ? z3DirP : z3Dir0
+z4Dir = eHtfNoRepaint and isHigher(eZoneTf4) ? z4DirP : z4Dir0
+z5Dir = eHtfNoRepaint and isHigher(eZoneTf5) ? z5DirP : z5Dir0
+z6Dir = eHtfNoRepaint and isHigher(eZoneTf6) ? z6DirP : z6Dir0
 
-// strategy addition: a zone with no data is inactive when ignoreNaZones is on
+// strategy addition: a zone with no data is inactive when eIgnoreNa is on
 zoneOn(bool use, int dir) =>
-    use and (not ignoreNaZones or not na(dir))
+    use and (not eIgnoreNa or not na(dir))
 
-on1 = zoneOn(useZone1, z1Dir)
-on2 = zoneOn(useZone2, z2Dir)
-on3 = zoneOn(useZone3, z3Dir)
-on4 = zoneOn(useZone4, z4Dir)
-on5 = zoneOn(useZone5, z5Dir)
-on6 = zoneOn(useZone6, z6Dir)
+on1 = zoneOn(eUseZ1, z1Dir)
+on2 = zoneOn(eUseZ2, z2Dir)
+on3 = zoneOn(eUseZ3, z3Dir)
+on4 = zoneOn(eUseZ4, z4Dir)
+on5 = zoneOn(eUseZ5, z5Dir)
+on6 = zoneOn(eUseZ6, z6Dir)
 
 activeZones = (on1 ? 1 : 0) + (on2 ? 1 : 0) + (on3 ? 1 : 0) + (on4 ? 1 : 0) + (on5 ? 1 : 0) + (on6 ? 1 : 0)
 parentSide = parentDir > 0 ? 1 : parentDir < 0 ? -1 : 0
@@ -275,12 +476,12 @@ alignedZones = alignCount(z1Dir, on1) + alignCount(z2Dir, on2) + alignCount(z3Di
 conflictZones = conflictCount(z1Dir, on1) + conflictCount(z2Dir, on2) + conflictCount(z3Dir, on3) + conflictCount(z4Dir, on4) + conflictCount(z5Dir, on5) + conflictCount(z6Dir, on6)
 mixedZones = mixedCount(z1Dir, on1) + mixedCount(z2Dir, on2) + mixedCount(z3Dir, on3) + mixedCount(z4Dir, on4) + mixedCount(z5Dir, on5) + mixedCount(z6Dir, on6)
 
-requiredAligned = math.min(minAlignedZones, activeZones)
-parentFlatAllowed = allowNeutralParent and parentSide == 0
+requiredAligned = math.min(eMinAligned, activeZones)
+parentFlatAllowed = eFlatParent and parentSide == 0
 zoneReady = activeZones == 0 or alignedZones >= requiredAligned
 
-tradeZoneBuyAllowed = not useTdiTradeZone or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
-tradeZoneSellAllowed = not useTdiTradeZone or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
+tradeZoneBuyAllowed = not eUseZoneFilter or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
+tradeZoneSellAllowed = not eUseZoneFilter or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
 
 zoneRiskText = alignedZones >= requiredAligned and conflictZones == 0 ? "LOW" : alignedZones >= requiredAligned ? "MIX" : "HIGH"
 
@@ -293,9 +494,18 @@ dirColor(dir) =>
 // ============================== FLASHGOLD-LIKE DIRECTION (indicator) ==============================
 atrChart = ta.atr(14)
 atrPts = atrChart / pt
-burstThrPts   = DistUnit == "ATR" ? burstAtrMult * atrPts : burstPointsInput
-entryDistPts  = DistUnit == "ATR" ? entryDistAtrMult * atrPts : entryDistPoints
-holdFavPts    = DistUnit == "ATR" ? holdFavAtrMult * atrPts : entryHoldMinFavPoints
+
+// ============================== SIGNAL QUALITY (calibration addition) ==============================
+// real move vs end of move: the chart's and the parent's TDI fast line and the volatility regime (ATR(14)
+// against its 100-candle average). na (warm-up) blocks the side, as in the calibration.
+float sqFast   = ta.sma(ta.rsi(close, eRsiLen), eFastLen)
+float sqAtrReg = atrChart / ta.sma(atrChart, 100)
+sqVolOk  = eSqAtrMin <= 0 or sqAtrReg >= eSqAtrMin
+sqBuyOk  = not eSqOn or (sqFast >= eSqBuyMin and sqFast <= eSqBuyMax and parentFast >= eSqBuyParMin and sqVolOk)
+sqSellOk = not eSqOn or (sqFast >= eSqSellMin and sqFast <= eSqSellMax and parentFast <= eSqSellParMax and sqVolOk)
+burstThrPts   = eDistUnit == "ATR" ? eBurstAtr * atrPts : burstPointsInput
+entryDistPts  = eDistUnit == "ATR" ? eEntryDistAtr * atrPts : entryDistPoints
+holdFavPts    = eDistUnit == "ATR" ? holdFavAtrMult * atrPts : entryHoldMinFavPoints
 
 burstPts = (midPrice - midPrice[1]) / pt
 priorDriftPts = (midPrice - midPrice[priorDriftBars]) / pt
@@ -303,11 +513,11 @@ priorDriftPts = (midPrice - midPrice[priorDriftBars]) / pt
 burstBuy = burstPts >= burstThrPts
 burstSell = burstPts <= -burstThrPts
 
-priorBuyOk = not usePriorFilter or priorDriftPts > 0
-priorSellOk = not usePriorFilter or priorDriftPts < 0
+priorBuyOk = not ePrior or priorDriftPts > 0
+priorSellOk = not ePrior or priorDriftPts < 0
 
-rawBuyCandidate = useAnyCombo ? (tradeZoneBuyAllowed and (not useBurstGate or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
-rawSellCandidate = useAnyCombo ? (tradeZoneSellAllowed and (not useBurstGate or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
+rawBuyCandidate = eAnyCombo ? (tradeZoneBuyAllowed and (not eUseBurst or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
+rawSellCandidate = eAnyCombo ? (tradeZoneSellAllowed and (not eUseBurst or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
 
 buyCandidate = rawBuyCandidate and priorBuyOk
 sellCandidate = rawSellCandidate and priorSellOk
@@ -327,7 +537,7 @@ bool sellSignal = false
 canFire = not oneEntryPerBar or na(lastEntryBar) or lastEntryBar != bar_index
 
 if buyCandidate and canFire
-    if entryHoldBars == 0
+    if eHoldBars == 0
         buyEntryPrice := ask + entryDistPts * pt
         buySignal := true
         lastEntryBar := bar_index
@@ -339,14 +549,14 @@ if buyCandidate and canFire
     else if holdIsBuy
         elapsedBars = bar_index - holdSignalBar
         holdMovePoints = (midPrice - holdSignalMid) / pt
-        if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+        if elapsedBars >= eHoldBars and holdMovePoints >= holdFavPts
             buyEntryPrice := ask + entryDistPts * pt
             buySignal := true
             lastEntryBar := bar_index
             holdActive := false
 
 if sellCandidate and canFire
-    if entryHoldBars == 0
+    if eHoldBars == 0
         sellEntryPrice := bid - entryDistPts * pt
         sellSignal := true
         lastEntryBar := bar_index
@@ -358,7 +568,7 @@ if sellCandidate and canFire
     else if not holdIsBuy
         elapsedBars = bar_index - holdSignalBar
         holdMovePoints = (holdSignalMid - midPrice) / pt
-        if elapsedBars >= entryHoldBars and holdMovePoints >= holdFavPts
+        if elapsedBars >= eHoldBars and holdMovePoints >= holdFavPts
             sellEntryPrice := bid - entryDistPts * pt
             sellSignal := true
             lastEntryBar := bar_index
@@ -382,15 +592,15 @@ if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and
 // K_2: the variance of the tau-moves (drift removed exactly).
 fdK2(float x, int tau) =>
     float dx = x - x[tau]
-    float m  = ta.sma(dx, fdHurstWin)
-    math.max(ta.sma(dx * dx, fdHurstWin) - m * m, 1e-20)
+    float m  = ta.sma(dx, eFdHurstWin)
+    math.max(ta.sma(dx * dx, eFdHurstWin) - m * m, 1e-20)
 
 // K_-2: the -2 moment of the tau-moves around their mean, with the floor.
 fdKm2(float x, int tau) =>
     float dx = x - x[tau]
-    float d  = math.abs(dx - ta.sma(dx, fdHurstWin))
-    float fl = 0.25 * ta.sma(d, fdHurstWin)
-    ta.sma(math.pow(d + fl, -2.0), fdHurstWin)
+    float d  = math.abs(dx - ta.sma(dx, eFdHurstWin))
+    float fl = 0.25 * ta.sma(d, eFdHurstWin)
+    ta.sma(math.pow(d + fl, -2.0), eFdHurstWin)
 
 // least-squares slope of y against log tau, tau = 2, 4, 8, 16
 fdSlope(float y1, float y2, float y3, float y4) =>
@@ -417,13 +627,13 @@ fdHurst() =>
 // [parent dir (1 up, -1 down, 0 forming), protected low, protected high,
 //  divergence warning in an uptrend, in a downtrend, H = h(2), width].
 fdStructure() =>
-    float ph  = ta.pivothigh(high, fdPivL, fdPivR)
-    float pl  = ta.pivotlow(low, fdPivL, fdPivR)
-    float mom = ta.sma(ta.rsi(close, tdiRsiLen), tdiFastLen)   // the TDI fast line
+    float ph  = ta.pivothigh(high, eFdPivL, eFdPivR)
+    float pl  = ta.pivotlow(low, eFdPivL, eFdPivR)
+    float mom = ta.sma(ta.rsi(close, eRsiLen), eFastLen)   // the TDI fast line
     // the leg's real extreme, confirmed as a pivot or not: the lowest low
     // since the last pivot high, the highest high since the last pivot low
-    float loPiv = ta.lowest(low, fdPivR + 1)
-    float hiPiv = ta.highest(high, fdPivR + 1)
+    float loPiv = ta.lowest(low, eFdPivR + 1)
+    float hiPiv = ta.highest(high, eFdPivR + 1)
     var float loSinceH = na
     var float hiSinceL = na
     loSinceH := na(loSinceH) ? low : math.min(loSinceH, low)
@@ -446,7 +656,7 @@ fdStructure() =>
         prevH  := lastH
         prevHM := lastHM
         lastH  := ph
-        lastHM := mom[fdPivR]
+        lastHM := mom[eFdPivR]
         loSinceH := loPiv
         if not na(prevH) and lastH > prevH
             // a higher high: momentum refusing it is the warning (used in an
@@ -463,7 +673,7 @@ fdStructure() =>
         prevL  := lastL
         prevLM := lastLM
         lastL  := pl
-        lastLM := mom[fdPivR]
+        lastLM := mom[eFdPivR]
         hiSinceL := hiPiv
         if not na(prevL) and lastL < prevL
             if not na(prevLM) and lastLM > prevLM and dir != 1
@@ -495,10 +705,10 @@ fdStructure() =>
         else if not na(lastL) and close < lastL
             dir   := -1
             protH := na(hiSinceL) ? lastH : hiSinceL
-    // the warning lasts fdDivBars structure candles, the divergence candle
+    // the warning lasts eFdDivBars structure candles, the divergence candle
     // being the first
-    bool  warnUp = dir == 1 and divDir == -1 and divAge < fdDivBars
-    bool  warnDn = dir == -1 and divDir == 1 and divAge < fdDivBars
+    bool  warnUp = dir == 1 and divDir == -1 and divAge < eFdDivBars
+    bool  warnDn = dir == -1 and divDir == 1 and divAge < eFdDivBars
     [h2, width] = fdHurst()
     [dir, protL, protH, warnUp, warnDn, h2, width]
 
@@ -508,9 +718,9 @@ fdStructurePrev() =>
 
 // the structure candle in force: on a higher timeframe its last CLOSED candle
 // (no repaint, no look-ahead), otherwise this chart's own candle
-[fdDir0, fdProtL0, fdProtH0, fdWarnUp0, fdWarnDn0, fdH0, fdW0] = request.security(syminfo.tickerid, fdTf, fdStructure(), barmerge.gaps_off, barmerge.lookahead_off)
-[fdDirP, fdProtLP, fdProtHP, fdWarnUpP, fdWarnDnP, fdHP, fdWP] = request.security(syminfo.tickerid, fdTf, fdStructurePrev(), barmerge.gaps_off, barmerge.lookahead_on)
-fdHigher = isHigher(fdTf)
+[fdDir0, fdProtL0, fdProtH0, fdWarnUp0, fdWarnDn0, fdH0, fdW0] = request.security(syminfo.tickerid, eFdTf, fdStructure(), barmerge.gaps_off, barmerge.lookahead_off)
+[fdDirP, fdProtLP, fdProtHP, fdWarnUpP, fdWarnDnP, fdHP, fdWP] = request.security(syminfo.tickerid, eFdTf, fdStructurePrev(), barmerge.gaps_off, barmerge.lookahead_on)
+fdHigher = isHigher(eFdTf)
 fdDir    = nz(fdHigher ? fdDirP : fdDir0)
 fdProtL  = fdHigher ? fdProtLP : fdProtL0
 fdProtH  = fdHigher ? fdProtHP : fdProtH0
@@ -551,16 +761,16 @@ else if fdDir == -1
         fdCtr := math.max(fdCtr, high)
 
 // the framework's permission for a new entry on each side
-fdHurstOk = not fdHurstOn or (not na(fdH) and fdH >= fdHurstMin)
-fdWidthOk = not fdWidthOn or (not na(fdW) and fdW <= fdWidthMax)
-fdBuyOk   = not fdOn or ((not fdTrade or fdDir == 1) and (not fdDivOn or not fdWarnUp) and (not fdPullOn or fdPullOk) and fdHurstOk and fdWidthOk)
-fdSellOk  = not fdOn or ((not fdTrade or fdDir == -1) and (not fdDivOn or not fdWarnDn) and (not fdPullOn or fdPullOk) and fdHurstOk and fdWidthOk)
+fdHurstOk = eFdHurstMode == 0 or (not na(fdH) and (eFdHurstMode == 1 ? fdH >= eFdHurstMin : fdH < eFdHurstMin))
+fdWidthOk = not eFdWidthOn or (not na(fdW) and fdW <= fdWidthMax)
+fdBuyOk   = not eFdOn or ((not eFdTrade or fdDir == 1) and (not eFdDivOn or not fdWarnUp) and (not eFdPullOn or fdPullOk) and fdHurstOk and fdWidthOk)
+fdSellOk  = not eFdOn or ((not eFdTrade or fdDir == -1) and (not eFdDivOn or not fdWarnDn) and (not eFdPullOn or fdPullOk) and fdHurstOk and fdWidthOk)
 
 // ============================== STRATEGY: EXIT GEOMETRY ==============================
-atrV = ta.atr(atrLen)
+atrV = ta.atr(eAtrLen)
 // distances in ticks (points) for strategy.exit
-slTicksNow = ExitMode == "Points" ? slPoints : (na(atrV) ? na : slAtrMult * atrV / pt)
-tpTicksNow = ExitMode == "Points" ? tpPoints : (na(slTicksNow) ? na : slTicksNow * tpR)
+slTicksNow = eExitMode == "Points" ? slPoints : (na(atrV) ? na : eSlAtr * atrV / pt)
+tpTicksNow = eExitMode == "Points" ? tpPoints : (na(slTicksNow) ? na : slTicksNow * eTpR)
 
 var float lockSlL = na   // locked per pending / open trade, so the ATR at signal time is used for the whole trade
 var float lockTpL = na
@@ -570,8 +780,8 @@ var float lockActL = na
 var float lockDstL = na
 var float lockActS = na
 var float lockDstS = na
-trailActNow = ExitMode == "Points" ? trailActPoints : trailActAtr * atrPts
-trailDstNow = ExitMode == "Points" ? trailPoints : math.max(trailDstAtr * atrPts, 1.0)
+trailActNow = eExitMode == "Points" ? trailActPoints : eTrailAct * atrPts
+trailDstNow = eExitMode == "Points" ? trailPoints : math.max(eTrailDst * atrPts, 1.0)
 
 calcQty(float slTicks) =>
     float q = fixedQty
@@ -592,27 +802,29 @@ flat    = strategy.position_size == 0
 
 var int placedBarL = na
 var int placedBarS = na
+bool placedNowL = false   // a fresh signal entry placed on this bar (no re-entry on that side then)
+bool placedNowS = false
 
 // opposite-signal handling on an open position
-if exitOnOpposite and sellSignal and inLong
+if eExitOpp and sellSignal and inLong
     strategy.close("Long", comment = "opp signal")
-if exitOnOpposite and buySignal and inShort
+if eExitOpp and buySignal and inShort
     strategy.close("Short", comment = "opp signal")
 
 // framework: the parent broke - close the old side and cancel its entry stop
-if fdOn and fdExitBreak and fdFlipDn
+if eFdOn and eFdExitBreak and fdFlipDn
     if inLong
         strategy.close("Long", comment = "parent break")
     strategy.cancel("Long")
     placedBarL := na
-if fdOn and fdExitBreak and fdFlipUp
+if eFdOn and eFdExitBreak and fdFlipUp
     if inShort
         strategy.close("Short", comment = "parent break")
     strategy.cancel("Short")
     placedBarS := na
 
 // long entry: stop order at the indicator's entry price
-if buySignal and allowL and fdBuyOk and not inLong and (flat or allowReverse or exitOnOpposite)
+if buySignal and allowL and fdBuyOk and sqBuyOk and not inLong and (flat or eAllowRev or eExitOpp)
     qL = calcQty(slTicksNow)
     if qL > 0 and not na(buyEntryPrice)
         lockSlL := slTicksNow
@@ -621,9 +833,10 @@ if buySignal and allowL and fdBuyOk and not inLong and (flat or allowReverse or 
         lockDstL := trailDstNow
         strategy.entry("Long", strategy.long, qty = qL, stop = buyEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG buy stop")
         placedBarL := bar_index
+        placedNowL := true
 
 // short entry
-if sellSignal and allowS and fdSellOk and not inShort and (flat or allowReverse or exitOnOpposite)
+if sellSignal and allowS and fdSellOk and sqSellOk and not inShort and (flat or eAllowRev or eExitOpp)
     qS = calcQty(slTicksNow)
     if qS > 0 and not na(sellEntryPrice)
         lockSlS := slTicksNow
@@ -632,22 +845,73 @@ if sellSignal and allowS and fdSellOk and not inShort and (flat or allowReverse 
         lockDstS := trailDstNow
         strategy.entry("Short", strategy.short, qty = qS, stop = sellEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG sell stop")
         placedBarS := bar_index
+        placedNowS := true
 
 // cancel a stale unfilled entry
-if entryValidBars > 0
-    if not na(placedBarL) and not inLong and bar_index - placedBarL >= entryValidBars
+if eEntryValid > 0
+    if not na(placedBarL) and not inLong and bar_index - placedBarL >= eEntryValid
         strategy.cancel("Long")
         placedBarL := na
-    if not na(placedBarS) and not inShort and bar_index - placedBarS >= entryValidBars
+    if not na(placedBarS) and not inShort and bar_index - placedBarS >= eEntryValid
         strategy.cancel("Short")
         placedBarS := na
+
+// ============================== STRATEGY: RE-ENTRY (calibration addition) ==============================
+// A trailing-stop or target exit on this bar (the bar's last closed trade), flat at the close, the side
+// still allowed by the zones, the framework and the quality filter (no new burst needed): re-enter on the
+// same side. A fresh signal fill restarts the count.
+var int reCount = 0
+if strategy.opentrades > 0 and strategy.opentrades.entry_bar_index(strategy.opentrades - 1) == bar_index and strategy.opentrades.entry_comment(strategy.opentrades - 1) != "FG re-entry"
+    reCount := 0
+if strategy.closedtrades > 0 and strategy.closedtrades.entry_bar_index(strategy.closedtrades - 1) == bar_index and strategy.closedtrades.entry_comment(strategy.closedtrades - 1) != "FG re-entry"
+    reCount := 0
+int reSide = 0
+if strategy.closedtrades > 0
+    int lastT = strategy.closedtrades - 1
+    string lastX = strategy.closedtrades.exit_comment(lastT)
+    if strategy.closedtrades.exit_bar_index(lastT) == bar_index and (lastX == "trail" or lastX == "TP")
+        reSide := strategy.closedtrades.size(lastT) > 0 ? 1 : -1
+reOkL = fdBuyOk and sqBuyOk and tradeZoneBuyAllowed
+reOkS = fdSellOk and sqSellOk and tradeZoneSellAllowed
+bool reNowL = false
+bool reNowS = false
+if eReMode != RE_OFF and flat and reSide != 0 and (eReMax == 0 or reCount < eReMax)
+    float reDist = nz(eReDistAtr * atrChart)
+    if reSide == 1 and allowL and reOkL and not placedNowL
+        qR = calcQty(slTicksNow)
+        if qR > 0
+            lockSlL := slTicksNow
+            lockTpL := tpTicksNow
+            lockActL := trailActNow
+            lockDstL := trailDstNow
+            if eReMode == RE_MKT
+                strategy.entry("Long", strategy.long, qty = qR, comment = "FG re-entry")
+            else
+                strategy.entry("Long", strategy.long, qty = qR, stop = close + reDist, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG re-entry")
+                placedBarL := bar_index
+            reCount += 1
+            reNowL := true
+    else if reSide == -1 and allowS and reOkS and not placedNowS
+        qR = calcQty(slTicksNow)
+        if qR > 0
+            lockSlS := slTicksNow
+            lockTpS := tpTicksNow
+            lockActS := trailActNow
+            lockDstS := trailDstNow
+            if eReMode == RE_MKT
+                strategy.entry("Short", strategy.short, qty = qR, comment = "FG re-entry")
+            else
+                strategy.entry("Short", strategy.short, qty = qR, stop = close - reDist, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG re-entry")
+                placedBarS := bar_index
+            reCount += 1
+            reNowS := true
 
 // protective exits, attached to the entry (also cover a fill on the same bar)
 slL = na(lockSlL) or lockSlL <= 0 ? na : lockSlL
 tpL = na(lockTpL) or lockTpL <= 0 ? na : lockTpL
 slS = na(lockSlS) or lockSlS <= 0 ? na : lockSlS
 tpS = na(lockTpS) or lockTpS <= 0 ? na : lockTpS
-if useTrail
+if eUseTrail
     strategy.exit("XL", "Long",  loss = slL, profit = tpL, trail_points = lockActL, trail_offset = lockDstL, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
     strategy.exit("XS", "Short", loss = slS, profit = tpS, trail_points = lockActS, trail_offset = lockDstS, comment_loss = "SL", comment_profit = "TP", comment_trailing = "trail")
 else
@@ -655,9 +919,9 @@ else
     strategy.exit("XS", "Short", loss = slS, profit = tpS, comment_loss = "SL", comment_profit = "TP")
 
 // time stop
-if maxBarsHeld > 0 and not flat and strategy.opentrades > 0
+if eMaxBars > 0 and not flat and strategy.opentrades > 0
     heldBars = bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1)
-    if heldBars >= maxBarsHeld
+    if heldBars >= eMaxBars
         strategy.close_all(comment = "time stop")
 
 // ============================== VISUALS (indicator) ==============================
@@ -668,12 +932,15 @@ plot(showEntryLines and buySignal ? buyEntryPrice : na, "Buy entry price", color
 plot(showEntryLines and sellSignal ? sellEntryPrice : na, "Sell entry price", color = color.red, linewidth = 2, style = plot.style_linebr)
 
 // framework: the parent's protected level, its breaks and the divergence warnings
-plot(fdOn and fdShow and fdDir == 1 ? fdProtL : na, "FDF higher low (protected)", color = color.new(color.lime, 30), linewidth = 2, style = plot.style_linebr)
-plot(fdOn and fdShow and fdDir == -1 ? fdProtH : na, "FDF lower high (protected)", color = color.new(color.red, 30), linewidth = 2, style = plot.style_linebr)
-plotshape(fdOn and fdShow and fdFlipUp, title = "FDF break up", style = shape.labelup, location = location.belowbar, color = color.new(color.lime, 0), size = size.tiny, text = "BREAK", textcolor = color.black)
-plotshape(fdOn and fdShow and fdFlipDn, title = "FDF break down", style = shape.labeldown, location = location.abovebar, color = color.new(color.red, 0), size = size.tiny, text = "BREAK", textcolor = color.white)
-plotshape(fdOn and fdShow and fdWarnUp and not fdWarnUp[1], title = "FDF divergence (uptrend)", style = shape.xcross, location = location.abovebar, color = color.orange, size = size.tiny, text = "DIV", textcolor = color.orange)
-plotshape(fdOn and fdShow and fdWarnDn and not fdWarnDn[1], title = "FDF divergence (downtrend)", style = shape.xcross, location = location.belowbar, color = color.orange, size = size.tiny, text = "DIV", textcolor = color.orange)
+plot(eFdOn and fdShow and fdDir == 1 ? fdProtL : na, "FDF higher low (protected)", color = color.new(color.lime, 30), linewidth = 2, style = plot.style_linebr)
+plot(eFdOn and fdShow and fdDir == -1 ? fdProtH : na, "FDF lower high (protected)", color = color.new(color.red, 30), linewidth = 2, style = plot.style_linebr)
+plotshape(eFdOn and fdShow and fdFlipUp, title = "FDF break up", style = shape.labelup, location = location.belowbar, color = color.new(color.lime, 0), size = size.tiny, text = "BREAK", textcolor = color.black)
+plotshape(eFdOn and fdShow and fdFlipDn, title = "FDF break down", style = shape.labeldown, location = location.abovebar, color = color.new(color.red, 0), size = size.tiny, text = "BREAK", textcolor = color.white)
+plotshape(eFdOn and fdShow and fdWarnUp and not fdWarnUp[1], title = "FDF divergence (uptrend)", style = shape.xcross, location = location.abovebar, color = color.orange, size = size.tiny, text = "DIV", textcolor = color.orange)
+plotshape(eFdOn and fdShow and fdWarnDn and not fdWarnDn[1], title = "FDF divergence (downtrend)", style = shape.xcross, location = location.belowbar, color = color.orange, size = size.tiny, text = "DIV", textcolor = color.orange)
+
+plotshape(reNowL, title = "Re-entry buy", style = shape.circle, location = location.belowbar, color = color.new(color.lime, 0), size = size.tiny, text = "RE", textcolor = color.lime)
+plotshape(reNowS, title = "Re-entry sell", style = shape.circle, location = location.abovebar, color = color.new(color.red, 0), size = size.tiny, text = "RE", textcolor = color.red)
 
 makeTimeText() =>
     str.format("{0,date,yyyy-MM-dd HH:mm:ss}", time)
@@ -693,7 +960,7 @@ if showSideTags and sellSignal
     label.new(bar_index + priceTagOffsetBars, sellEntryPrice, "SELL @ " + str.tostring(sellEntryPrice, format.mintick), style = label.style_label_left, color = color.new(color.red, 0), textcolor = color.white, size = size.small)
 
 // ============================== TABLE (indicator + strategy rows) ==============================
-var table tb = table.new(position.bottom_right, 2, 17, border_width = 1)
+var table tb = table.new(position.bottom_right, 2, 20, border_width = 1)
 
 if showZoneTable and barstate.islast
     table.cell(tb, 0, 0, "FlashGold v5 S", text_color = color.white, text_size = size.small)
@@ -725,10 +992,10 @@ if showZoneTable and barstate.islast
     table.cell(tb, 0, 11, "Trades / win% / net", text_color = color.gray, text_size = size.tiny)
     table.cell(tb, 1, 11, str.tostring(strategy.closedtrades) + " / " + str.tostring(wr, "#") + "% / " + str.tostring(strategy.netprofit, "#.##"), text_color = strategy.netprofit >= 0 ? color.lime : color.red, text_size = size.tiny)
     // framework rows
-    fdTfTxt = fdTf == "" ? "chart" : fdTf
-    fdParTxt = not fdOn ? "off" : fdDir == 1 ? "UP, HL " + (na(fdProtL) ? "-" : str.tostring(fdProtL, format.mintick)) : fdDir == -1 ? "DOWN, LH " + (na(fdProtH) ? "-" : str.tostring(fdProtH, format.mintick)) : "forming"
+    fdTfTxt = eFdTf == "" ? "chart" : eFdTf
+    fdParTxt = not eFdOn ? "off" : fdDir == 1 ? "UP, HL " + (na(fdProtL) ? "-" : str.tostring(fdProtL, format.mintick)) : fdDir == -1 ? "DOWN, LH " + (na(fdProtH) ? "-" : str.tostring(fdProtH, format.mintick)) : "forming"
     table.cell(tb, 0, 12, "FDF parent (" + fdTfTxt + ")", text_color = color.gray, text_size = size.tiny)
-    table.cell(tb, 1, 12, fdParTxt, text_color = not fdOn ? color.gray : fdDir == 1 ? color.lime : fdDir == -1 ? color.red : color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 12, fdParTxt, text_color = not eFdOn ? color.gray : fdDir == 1 ? color.lime : fdDir == -1 ? color.red : color.gray, text_size = size.tiny)
     table.cell(tb, 0, 13, "FDF Hurst H / width", text_color = color.gray, text_size = size.tiny)
     table.cell(tb, 1, 13, (na(fdH) ? "-" : str.tostring(fdH, "#.##")) + " / " + (na(fdW) ? "-" : str.tostring(fdW, "#.##")), text_color = fdHurstOk and fdWidthOk ? color.lime : color.orange, text_size = size.tiny)
     table.cell(tb, 0, 14, "FDF divergence", text_color = color.gray, text_size = size.tiny)
@@ -737,3 +1004,11 @@ if showZoneTable and barstate.islast
     table.cell(tb, 1, 15, (na(atrChart) or atrChart == 0 ? "-" : str.tostring(fdDepth / atrChart, "#.##")) + " (need " + str.tostring(fdPullAtr, "#.##") + ")", text_color = fdPullOk ? color.lime : color.gray, text_size = size.tiny)
     table.cell(tb, 0, 16, "FDF entries buy / sell", text_color = color.gray, text_size = size.tiny)
     table.cell(tb, 1, 16, (fdBuyOk ? "BUY ok" : "buy blocked") + " / " + (fdSellOk ? "SELL ok" : "sell blocked"), text_color = color.white, text_size = size.tiny)
+    // calibration rows
+    pTfTxt = pTf == 1440 ? "1D" : pTf >= 60 ? str.tostring(pTf / 60) + "H" : str.tostring(pTf) + "m"
+    table.cell(tb, 0, 17, "Preset", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 17, ePre ? "BTC " + pTfTxt + ": parent " + eParentTf + ", FDF " + eFdTf + ", SL " + str.tostring(eSlAtr) + " ATR, trail " + (eUseTrail ? str.tostring(eTrailAct) + "/" + str.tostring(eTrailDst) : "off") + " | tested PF " + str.tostring(pIsPf) + " / " + str.tostring(pOosPf) + (pOosPf < 1.0 ? " (no edge out of sample)" : "") : "off (your inputs)", text_color = not ePre ? color.gray : pOosPf < 1.0 ? color.orange : color.aqua, text_size = size.tiny)
+    table.cell(tb, 0, 18, "Quality buy / sell", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 18, not eSqOn ? "off" : (sqBuyOk ? "ok" : "blocked") + " / " + (sqSellOk ? "ok" : "blocked") + " (fast " + str.tostring(sqFast, "#") + ", parent " + str.tostring(parentFast, "#") + ", vol " + str.tostring(sqAtrReg, "#.##") + ")", text_color = color.white, text_size = size.tiny)
+    table.cell(tb, 0, 19, "Re-entry", text_color = color.gray, text_size = size.tiny)
+    table.cell(tb, 1, 19, eReMode == RE_OFF ? "off" : eReMode + ", " + str.tostring(reCount) + " of " + (eReMax == 0 ? "no limit" : str.tostring(eReMax)), text_color = color.white, text_size = size.tiny)
