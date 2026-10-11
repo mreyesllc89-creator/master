@@ -1,0 +1,16 @@
+InpMethod=2
+InpSignalPeriod=0
+InpBreakoutBars=30
+InpExitBars=10
+InpMinER=0.20
+InpPullbackEMA=20
+InpClearanceATR=0.20
+InpRiskPercent=0.50
+InpStopATR=2.50
+InpTrailATR=3.50
+InpTakeProfitR=4.00
+InpMaxHoldBars=0
+InpMaxSpreadATR=0.30
+InpMaxMarginPct=10
+InpSlippagePoints=1000
+InpMagic=2026101103

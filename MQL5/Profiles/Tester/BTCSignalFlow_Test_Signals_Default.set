@@ -1,0 +1,8 @@
+InpMethod=2
+InpSignalPeriod=0
+InpBreakoutBars=30
+InpExitBars=10
+InpMinER=0.20
+InpPullbackEMA=20
+InpClearanceATR=0.20
+InpHistoryBars=1000
