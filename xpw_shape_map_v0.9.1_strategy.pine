@@ -62,8 +62,8 @@
 //     (stop loss, trailing stop under the entry, time stop, failed cross...),
 //     the strategy immediately opens a trade in the OTHER direction, with the
 //     normal quantity and the same SL / TP / trail. A long that lost becomes a
-//     short, a short that lost becomes a long. A trade that closed in profit
-//     (or at zero) never triggers it.
+//     short, a short that lost becomes a long. A trade that closed with a real
+//     profit never triggers it (a tiny profit can, see below).
 //   * "Which exits count": any losing exit, or only the stop loss / trailing
 //     stop. "Max reversals in a row" (default 1) stops the ping-pong: after N
 //     reversal trades in a row that also lost, the strategy waits for the next
@@ -75,6 +75,11 @@
 //   * The reversal trade uses the normal "Long" / "Short" order ids, so the
 //     usual exits, the opposite-signal handling and the counters treat it like
 //     any other trade. Its entry comment is "L loss-rev" / "S loss-rev".
+//   * "Also reverse on a tiny profit": a trade that closes in the green but
+//     moved no more than N points from entry to exit (a trailing stop that
+//     fired right after it armed, a time stop at break-even...) counts as a
+//     loss and is reversed too. The move is measured in price points, so it
+//     does not depend on the quantity or the commission.
 
 strategy("XPW Shape Map v0.9.1 Strategy", shorttitle = "XPW-SM9.1 S", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 10, margin_long = 1, margin_short = 1, commission_type = strategy.commission.percent, commission_value = 0.05)
 
@@ -132,9 +137,11 @@ mgnPct   = input.float(1.0, "Margin % (match Properties -> Margin)", minval = 0.
 
 // ───────────────────── S4. LOSS REVERSAL (v0.9.1) ─────────────────────
 grpR = "S4. Loss reversal"
-lossRevOn   = input.bool(true, "Open the opposite trade when a trade exits at a loss", group = grpR, tooltip = "A trade that closes with a negative P&L is immediately followed by a trade in the other direction (long lost -> short, short lost -> long), with the normal quantity and the same SL / TP / trail. A trade that closes in profit never triggers this. 'Trade direction' is respected.")
+lossRevOn   = input.bool(true, "Open the opposite trade when a trade exits at a loss", group = grpR, tooltip = "A trade that closes with a negative P&L is immediately followed by a trade in the other direction (long lost -> short, short lost -> long), with the normal quantity and the same SL / TP / trail. A trade that closes with a real profit never triggers this (see 'tiny profit' below). 'Trade direction' is respected.")
 lossRevWhat = input.string("Any losing exit", "Which exits count", options = ["Any losing exit", "Stop loss / trail only"], group = grpR, tooltip = "Any losing exit: stop loss, trailing stop under the entry, time stop, failed cross, opposite signal in 'Close only' mode... anything that closed in the red. Stop loss / trail only: just the SL and the trailing stop.")
 lossRevMax  = input.int(1, "Max reversals in a row (0 = unlimited)", minval = 0, group = grpR, tooltip = "How many reversal trades may follow each other when they keep losing. 1 (default): one reversal per losing signal trade; if the reversal also loses, wait for the next real signal. A reversal trade that wins resets the count.")
+lossRevTiny = input.bool(true, "Also reverse on a tiny profit", group = grpR, inline = "tp", tooltip = "A trade that closed in profit but moved no more than this many points from entry to exit (the trailing stop fired as soon as it armed, a time stop near break-even...) is treated like a loss and reversed. 1 pt = 1 minimum tick. A profit above this is a real winner and is never reversed.")
+lossRevTinyPts = input.float(1500, "max pts", minval = 0, group = grpR, inline = "tp")
 
 // ───────────────────────── TDI ─────────────────────────
 grpT = "TDI"
@@ -716,7 +723,7 @@ if failExit and (turnPredict or turnAtCross) and barstate.isconfirmed and strate
 if timeStop > 0 and strategy.position_size != 0 and bar_index - strategy.opentrades.entry_bar_index(strategy.opentrades - 1) >= timeStop
     strategy.close_all(comment = "time stop")
 
-// ── Loss reversal (v0.9.1): a trade just closed in the red -> open the other side ──
+// ── Loss reversal (v0.9.1): a trade just closed in the red (or with a tiny profit) -> open the other side ──
 // The broker emulator books the exit before the script runs, so on the first
 // execution after the exit (the exit candle's close on history, the next tick
 // live) strategy.closedtrades has grown by one. Each closed trade is looked at
@@ -724,6 +731,7 @@ if timeStop > 0 and strategy.position_size != 0 and bar_index - strategy.opentra
 var int lossRevSeen  = 0     // closed trades already examined
 var int lossRevChain = 0     // reversal trades opened in a row (reset by a winner or a signal trade)
 var int nLossRev     = 0     // total reversal trades opened
+var int nTinyRev     = 0     // of which after a tiny profit
 if strategy.closedtrades > lossRevSeen
     lossRevSeen := strategy.closedtrades
     int    lastIdx   = strategy.closedtrades - 1
@@ -731,25 +739,31 @@ if strategy.closedtrades > lossRevSeen
     float  lastSize  = strategy.closedtrades.size(lastIdx)
     string lastExit  = strategy.closedtrades.exit_comment(lastIdx)
     string lastEntry = strategy.closedtrades.entry_comment(lastIdx)
-    bool   wasRev    = str.contains(lastEntry, "loss-rev")
-    bool   wasLoss   = lastPnL < 0
-    // A winner, or a normal signal trade, starts the chain over.
+    bool   wasRev    = str.contains(lastEntry, "loss-rev") or str.contains(lastEntry, "tiny-rev")
+    // Price move of the trade in ticks (independent of qty and commission).
+    float  movePts   = math.abs(strategy.closedtrades.exit_price(lastIdx) - strategy.closedtrades.entry_price(lastIdx)) / tk
+    bool   tinyWin   = lossRevTiny and lastPnL >= 0 and movePts <= lossRevTinyPts
+    bool   wasLoss   = lastPnL < 0 or tinyWin
+    // A real winner, or a normal signal trade, starts the chain over.
     if not wasLoss or not wasRev
         lossRevChain := 0
     bool exitCounts = lossRevWhat == "Any losing exit" or lastExit == "SL" or lastExit == "trail"
+    string revTag   = tinyWin ? "tiny-rev" : "loss-rev"
     bool chainOK    = lossRevMax <= 0 or lossRevChain < lossRevMax
     // Only when flat and no signal entry was placed on this same run.
     bool flatNow    = strategy.position_size == 0 and not (sigBarOK and (longSig or shortSig))
     if lossRevOn and wasLoss and exitCounts and chainOK and flatNow
         float q = calcQty()
         if lastSize > 0 and canShort and q > 0
-            strategy.entry("Short", strategy.short, qty = q, comment = "S loss-rev")
+            strategy.entry("Short", strategy.short, qty = q, comment = "S " + revTag)
             lossRevChain += 1
             nLossRev     += 1
+            nTinyRev     += tinyWin ? 1 : 0
         else if lastSize < 0 and canLong and q > 0
-            strategy.entry("Long", strategy.long, qty = q, comment = "L loss-rev")
+            strategy.entry("Long", strategy.long, qty = q, comment = "L " + revTag)
             lossRevChain += 1
             nLossRev     += 1
+            nTinyRev     += tinyWin ? 1 : 0
 
 // Predicted stop price (blue = buy stop, orange = sell stop) while a stop is armed.
 bool showL = turnPredict and armL and fast < slow
@@ -788,6 +802,6 @@ if showTable and barstate.islast
     table.cell(t, 0, 11, "Trading",    text_size = size.tiny)
     table.cell(t, 1, 11, sigMode + " / " + tradeDir + (isCont ? " / " + contEntry : ""), text_size = size.tiny)
     table.cell(t, 0, 12, "Loss-rev",   text_size = size.tiny)
-    table.cell(t, 1, 12, (lossRevOn ? str.tostring(nLossRev) + " opened, chain " + str.tostring(lossRevChain) + "/" + (lossRevMax > 0 ? str.tostring(lossRevMax) : "∞") : "off"), text_size = size.tiny)
+    table.cell(t, 1, 12, (lossRevOn ? str.tostring(nLossRev) + " opened (" + str.tostring(nTinyRev) + " tiny), chain " + str.tostring(lossRevChain) + "/" + (lossRevMax > 0 ? str.tostring(lossRevMax) : "∞") : "off"), text_size = size.tiny)
     table.cell(t, 0, 13, "Qty now",    text_size = size.tiny)
     table.cell(t, 1, 13, str.tostring(calcQty()) + (mgnCap ? " (margin cap)" : ""), text_size = size.tiny)
