@@ -46,3 +46,11 @@ Results of the run documented in the report are in `results/`:
 `stage1_indicator_grid.csv`, `stage2_ea_variants.csv`, `stage2_effects.csv`,
 `stage2b_factorial.csv`, `stage3_random_joint.csv.gz`, `baseline.csv`, and
 `final/` (summary, per-year, trades per config, equity chart, `.set` files).
+
+## BTCSignalFlow (BTCUSD)
+
+Same pipeline for the second EA: `tools/btc_model.py` (replica), `tools/btc_sweep.py`,
+`tools/btc_stage1.py` / `btc_stage2.py` / `btc_stage3.py`, `tools/btc_final_eval.py`,
+`tools/btc_setfile.py`, `tools/convert_bitfinex.py` (Bitfinex 1m candles -> M1 npz with a
+proportional spread). Data: `data/btcusd_m1_<year>.npz` (2015-2019 Bitfinex, 2026 broker
+ticks). Results and presets: `results/btc/` and `results/btc/final/`. Report: `BTC_REPORT.md`.

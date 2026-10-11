@@ -122,7 +122,20 @@ history (long-only loses return but not quality).
 
 ### Stage 3: joint random search (20,000 samples)
 
-STAGE3_PLACEHOLDER
+Every signal and EA input (including the v1.11 switches) drawn at random,
+5,000 samples per timeframe (`results/btc/btc_stage3.csv.gz`). Share of
+profitable samples in-sample / out-of-sample: H4 97 % / 96 %, H1 90 % / 93 %,
+M30 63 % / 71 %, M15 31 % / 60 %. Main effects on mean in-sample SQN:
+efficiency breakout 1.9 > momentum 1.1 ≈ pullback 1.0 ≈ retest 1.0 >
+Donchian 0.6; stop 2.5-5 ATR (1.7-1.9) >> 1.0 ATR (-0.2); trail 3.5-7 ATR or
+off (1.4-1.5) > 1.5-2 ATR (0.7-0.9); take-profit off or 8R (1.4) > 2R (0.7);
+ER exit off 1.7 > 0.10 0.9 > 0.15 0.5; long-only 2.0 vs both 1.0 (but with
+40 % less return, see stage 2); short-only -0.6. Break-even, lock-in,
+partial close, chandelier trailing, time stops and the signal-exit switch
+are all within +/-0.15 of neutral. The highest-SQN random samples
+(in-sample SQN 6.3-6.8 with 1.5-3 % drawdown) are long-only or
+few-trade variants whose out-of-sample return (+4 to +12 %) is below the
+stage 1 picks, so no joint sample replaced a recommendation.
 
 ## 5. Recommended configurations
 
