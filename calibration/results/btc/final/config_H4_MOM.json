@@ -1,0 +1,16 @@
+{
+ "sig": {
+  "chart_tf": "H4",
+  "method": 4,
+  "length": 60,
+  "exit_bars": 10,
+  "efficiency": 0.2,
+  "pullback_ema": 20,
+  "clearance": 0.2
+ },
+ "ea": {
+  "stop_atr": 2.5,
+  "trail_atr": 3.5,
+  "tp_r": 2.0
+ }
+}

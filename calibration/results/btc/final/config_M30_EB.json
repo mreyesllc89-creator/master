@@ -1,0 +1,16 @@
+{
+ "sig": {
+  "chart_tf": "M30",
+  "method": 2,
+  "length": 50,
+  "exit_bars": 10,
+  "efficiency": 0.2,
+  "pullback_ema": 20,
+  "clearance": 0.5
+ },
+ "ea": {
+  "stop_atr": 2.5,
+  "trail_atr": 3.5,
+  "tp_r": 4.0
+ }
+}

@@ -1,0 +1,12 @@
+{
+ "sig": {
+  "chart_tf": "H1",
+  "method": 2,
+  "length": 30,
+  "exit_bars": 10,
+  "efficiency": 0.2,
+  "pullback_ema": 20,
+  "clearance": 0.2
+ },
+ "ea": {}
+}

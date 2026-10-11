@@ -1,7 +1,8 @@
 #property copyright "MQL5-Foundry"
-#property version "1.10"
+#property version "1.11"
 #property strict
 #property description "BTC SignalFlow Test EA. Configurable-timeframe breakout strategy for demo and real accounts."
+#property description "v1.11: switchable exit / trailing improvements (defaults reproduce v1.10)."
 
 #include <Foundry\SignalFlowTest\xpMoneyManagement.mqh>
 #include <Foundry\SignalFlowTest\BTCMethodSignals.mqh>
@@ -26,6 +27,31 @@ input double InpMaxSpreadATR=0.30;
 input double InpMaxMarginPct=10;
 input int InpSlippagePoints=1000;
 input ulong InpMagic=2026101103;
+
+//--- v1.11 improvements. Every default reproduces v1.10 exactly.
+enum ENUM_BTC_TRAIL_SOURCE
+  {
+   BTC_TRAIL_ATR_CLOSE=0,   // Last closed bar close -/+ TrailATR x ATR (v1.10)
+   BTC_TRAIL_CHANDELIER=1   // Highest high / lowest low since entry -/+ TrailATR x ATR
+  };
+enum ENUM_BTC_DIRECTION
+  {
+   BTC_BOTH=0,              // Long and short
+   BTC_LONG_ONLY=1,         // Long only
+   BTC_SHORT_ONLY=2         // Short only
+  };
+input group "v1.11 improvements (defaults = v1.10 behaviour)"
+input bool InpUseSignalExit=true;                        // Close on the method's opposite signal state
+input ENUM_BTC_TRAIL_SOURCE InpTrailSource=BTC_TRAIL_ATR_CLOSE; // Trailing stop source
+input double InpTrailActivateR=0.0;                      // Start trailing only after N x initial risk (0 = at once)
+input bool InpUseBreakEven=false;                        // Move SL to entry after N x R
+input double InpBreakEvenR=1.0;                          // Break-even trigger (R)
+input double InpLockTriggerR=0.0;                        // Lock-in stage: when profit >= N x R ... (0 = off)
+input double InpLockR=0.0;                               // ... move SL to entry + N x R (must be < trigger)
+input double InpPartialR=0.0;                            // Partial close at N x R (0 = off)
+input double InpPartialPercent=50.0;                     // Partial close % of the original volume
+input double InpErExit=0.0;                              // Close when the 20-bar efficiency ratio drops below (0 = off)
+input ENUM_BTC_DIRECTION InpTradeDirection=BTC_BOTH;     // Allowed direction
 
 CBTCMethodSignals g_signals;
 CXPMoneyManager g_money;
@@ -57,20 +83,44 @@ int OnInit()
       InpTrailATR<0 || InpTakeProfitR<0 || InpMaxHoldBars<0 ||
       InpMaxSpreadATR<0 || InpMaxMarginPct<0 || InpSlippagePoints<0)
       { Print("Invalid mathematical parameter: periods and risk/stop must be positive; distances cannot be negative."); return INIT_PARAMETERS_INCORRECT; }
+   if(InpTrailActivateR<0 || InpBreakEvenR<=0 || InpLockTriggerR<0 || InpLockR<0 ||
+      (InpLockTriggerR>0 && InpLockR>=InpLockTriggerR) || InpPartialR<0 ||
+      (InpPartialR>0 && (InpPartialPercent<=0 || InpPartialPercent>=100)) || InpErExit<0)
+      { Print("Invalid v1.11 parameter: R multiples must be >= 0, lock R < lock trigger, partial percent in (0,100)."); return INIT_PARAMETERS_INCORRECT; }
    BTC_METHOD_CONFIG c;
    c.method=InpMethod; c.period=g_period; c.length=InpBreakoutBars;
    c.exit_bars=InpExitBars;
    c.efficiency=InpMinER; c.pullback_ema=InpPullbackEMA; c.clearance_atr=InpClearanceATR;
    if(!g_signals.Create(_Symbol,c)) return INIT_FAILED;
    XPMM_CONFIG mm; XPMM_Defaults(mm);
-   mm.symbol=_Symbol; mm.magic=InpMagic; mm.instance="BTCSignalFlow.Test.v1.10";
+   mm.symbol=_Symbol; mm.magic=InpMagic; mm.instance="BTCSignalFlow.Test.v1.11";
    mm.lot_mode=XPMM_PERCENT_EQUITY; mm.value=InpRiskPercent;
    mm.max_margin_percent=InpMaxMarginPct; mm.require_sl=true;
    mm.tp_mode=XPMM_TP_EXTERNAL; mm.exclusive_netting=true;
    mm.deviation_points=InpSlippagePoints;
    mm.trail_mode=InpTrailATR>0 ? XPMM_TRAIL_EXTERNAL : XPMM_TRAIL_OFF;
    mm.trail_step_points=50;
+   mm.trail_trigger_unit=XPMM_R;                 // v1.11: optional activation in R
+   mm.trail_trigger=InpTrailActivateR>0 ? InpTrailActivateR : 0;
    if(!g_money.Configure(mm)) { Print(g_money.Reason()); g_signals.Release(); return INIT_FAILED; }
+   if(InpUseBreakEven)
+     {
+      XPMM_BE_STAGE be; ZeroMemory(be);
+      be.unit=XPMM_R; be.trigger=InpBreakEvenR; be.lock_points=0; be.lock_r=0;
+      if(!g_money.AddBreakEven(be)) { Print(g_money.Reason()); g_signals.Release(); return INIT_PARAMETERS_INCORRECT; }
+     }
+   if(InpLockTriggerR>0)
+     {
+      XPMM_R_STAGE lock; ZeroMemory(lock);
+      lock.trigger_r=InpLockTriggerR; lock.lock_r=InpLockR;
+      if(!g_money.AddRTrail(lock)) { Print(g_money.Reason()); g_signals.Release(); return INIT_PARAMETERS_INCORRECT; }
+     }
+   if(InpPartialR>0)
+     {
+      XPMM_PARTIAL_STAGE part; ZeroMemory(part);
+      part.unit=XPMM_R; part.trigger=InpPartialR; part.percent_original=InpPartialPercent;
+      if(!g_money.AddPartial(part)) { Print(g_money.Reason()); g_signals.Release(); return INIT_PARAMETERS_INCORRECT; }
+     }
    // The shared manager reloads committed closes from terminal globals.
    // An adopted position gets tick-level retries until it is gone.
    if(!MQLInfoInteger(MQL_TESTER))
@@ -85,6 +135,25 @@ int OnInit()
 void OnDeinit(const int reason) { g_money.Shutdown(); g_signals.Release(); }
 void OnTradeTransaction(const MqlTradeTransaction &tx,const MqlTradeRequest &request,const MqlTradeResult &result)
   { g_money.OnTradeTransaction(tx,request,result); }
+
+//--- v1.11: trailing candidate according to the selected source
+double TrailCandidate(const int side,const datetime opened,const BTC_METHOD_SIGNAL &s)
+  {
+   if(InpTrailATR<=0) return 0;
+   if(InpTrailSource==BTC_TRAIL_CHANDELIER)
+     {
+      int held=iBarShift(_Symbol,g_period,opened,false);
+      if(held<1) held=1;
+      if(side==1)
+        {
+         int hi=iHighest(_Symbol,g_period,MODE_HIGH,held,1);
+         return hi>=0 ? iHigh(_Symbol,g_period,hi)-InpTrailATR*s.atr : 0;
+        }
+      int lo=iLowest(_Symbol,g_period,MODE_LOW,held,1);
+      return lo>=0 ? iLow(_Symbol,g_period,lo)+InpTrailATR*s.atr : 0;
+     }
+   return s.close-side*InpTrailATR*s.atr;
+  }
 
 void OnTick()
   {
@@ -116,20 +185,25 @@ void OnTick()
    g_bar=bar; g_money.Refresh();
    if(Own(ticket,id,side,opened))
      {
-      double trail=InpTrailATR>0 ? s.close-side*InpTrailATR*s.atr : 0;
+      double trail=TrailCandidate(side,opened,s);
       g_money.SetContext(id,s.atr,trail);
       bool close=false;
-      if(InpMethod==BTC_RANGE_REVERSION)
-         close=side==1 ? s.close>=s.mean : s.close<=s.mean;
-      else if(InpMethod==BTC_TREND_PULLBACK || InpMethod==BTC_BREAKOUT_RETEST)
-         close=side==1 ? s.macro<0 : s.macro>0;
-      else close=side==1 ? s.trend<0 : s.trend>0;
+      if(InpUseSignalExit)
+        {
+         if(InpMethod==BTC_RANGE_REVERSION)
+            close=side==1 ? s.close>=s.mean : s.close<=s.mean;
+         else if(InpMethod==BTC_TREND_PULLBACK || InpMethod==BTC_BREAKOUT_RETEST)
+            close=side==1 ? s.macro<0 : s.macro>0;
+         else close=side==1 ? s.trend<0 : s.trend>0;
+        }
       int age=iBarShift(_Symbol,g_period,opened,false);
       if(InpMaxHoldBars>0 && age>=InpMaxHoldBars) close=true;
+      if(InpErExit>0 && s.er<InpErExit) close=true;      // v1.11 efficiency exit
       if(close && g_money.RequestClose(id)) g_exit_pending=true;
       g_money.Manage(); return;
      }
    if(s.side==0) return;
+   if((InpTradeDirection==BTC_LONG_ONLY && s.side!=1) || (InpTradeDirection==BTC_SHORT_ONLY && s.side!=-1)) return;
    g_signals_count++;
    if((ENUM_ACCOUNT_MARGIN_MODE)AccountInfoInteger(ACCOUNT_MARGIN_MODE)!=ACCOUNT_MARGIN_MODE_RETAIL_HEDGING &&
       PositionSelect(_Symbol)) return;

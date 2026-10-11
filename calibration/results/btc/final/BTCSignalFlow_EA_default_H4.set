@@ -1,0 +1,30 @@
+; BTCSignalFlow_Test_EA v1.11 settings - default_H4
+; chart timeframe: H4
+
+InpMethod=2||2||0||2||N
+InpSignalPeriod=16388||0||0||0||N
+InpBreakoutBars=30||30||0||30||N
+InpExitBars=10||10||0||10||N
+InpMinER=0.2||0.2||0||0.2||N
+InpPullbackEMA=20||20||0||20||N
+InpClearanceATR=0.2||0.2||0||0.2||N
+InpRiskPercent=0.5||0.5||0||0.5||N
+InpStopATR=2.5||2.5||0||2.5||N
+InpTrailATR=3.5||3.5||0||3.5||N
+InpTakeProfitR=4||4||0||4||N
+InpMaxHoldBars=0||0||0||0||N
+InpMaxSpreadATR=0.3||0.3||0||0.3||N
+InpMaxMarginPct=10||10||0||10||N
+InpSlippagePoints=1000||1000||0||1000||N
+InpMagic=2026101103||2026101103||0||2026101103||N
+InpUseSignalExit=true||false||0||true||N
+InpTrailSource=0||0||0||0||N
+InpTrailActivateR=0||0||0||0||N
+InpUseBreakEven=false||false||0||true||N
+InpBreakEvenR=1||1||0||1||N
+InpLockTriggerR=0||0||0||0||N
+InpLockR=0||0||0||0||N
+InpPartialR=0||0||0||0||N
+InpPartialPercent=50||50||0||50||N
+InpErExit=0||0||0||0||N
+InpTradeDirection=0||0||0||0||N
