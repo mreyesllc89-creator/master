@@ -71,6 +71,31 @@ SETS[120].append(dict(parent=120, zones=(480, 720, 1440), ma=1, use_zones=True, 
 SETS[60].append(dict(parent=120, zones=(30, 60, 1440), ma=2, use_zones=True, kind="codex_candidate_H1"))
 
 
+# added after the review: the walk-forward fold pick whose test block is the period (chosen on 2020-01 .. the month
+# before it, purged), i.e. the out-of-sample comparison for that period; the final picks saw 2024H2 and 2025H1
+def fold_sets(tf, pname):
+    out = []
+    ff, fc = f"{OUT}/wf_folds_{tf}_utc_{READ}_real.csv", f"{OUT}/cands_{tf}_utc_{READ}_real_all.csv"
+    if run == "dry" or not os.path.exists(ff):
+        return out
+    folds, cands = pd.read_csv(ff), pd.read_csv(fc)
+    for k in ("R1_greedy", "R2_conservative"):
+        x = folds[(folds.fold == pname) & (folds.method == k)]
+        if len(x):
+            c = cands.iloc[int(x.cid.iloc[0])]
+            out.append(dict(parent=int(c.parent), zones=tuple(int(v) for v in str(c.zones).split("/")), ma=int(c.ma),
+                            use_zones=bool(c.use_zones), kind=f"wf_fold_{k}"))
+    return out
+
+
+def sample_status(kind, pname):
+    if kind.startswith("wf_fold_"):
+        return "out-of-sample (fold pick)"
+    if kind.startswith("frozen_") or kind.startswith("codex_"):
+        return "out-of-sample" if pname == "2025H2" else "in selection window"
+    return "baseline"
+
+
 def evaluate(S, tf, r, p0, p1):
     z, g, ctx = W.zone_of(S, tf, r, READ)
     ch = S.bars(tf)
@@ -85,6 +110,16 @@ def evaluate(S, tf, r, p0, p1):
         blk = (t[m] - p0) // 172800
         out[H] = (zz, y, blk, t[m])
     return out, z, t
+
+
+def acc_of(T):
+    """raw accuracy from (..., zone, label) counts: share right among BUY / SELL zone candles"""
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return (T[..., 2, 1] + T[..., 0, 0]) / (T[..., 2, :].sum(-1) + T[..., 0, :].sum(-1))
+
+
+def cov_of(T):
+    return (T[..., 2, :].sum(-1) + T[..., 0, :].sum(-1)) / T.sum((-1, -2))
 
 
 def table(zz, y, blk, nb):
@@ -103,15 +138,20 @@ for tf in W.FILTER_TFS:
         for src_name, S in (("broker", BK), ("bitstamp_server_clock", BS)):
             tabs = {}
             zones_by = {}
-            for r in SETS[tf]:
+            sets_here = SETS[tf] + fold_sets(tf, pname)
+            for r in sets_here:
                 ev, z, t = evaluate(S, tf, r, p0, p1)
                 tabs[r["kind"]] = {H: table(*ev[H][:3], nb) for H in W.HS}
                 zones_by[r["kind"]] = (z, t)
             ref = tabs["native_default"]
             ref_boot = np.nanmean([W.auc_table(*(lambda T: (T[..., 1], T[..., 0]))(np.einsum("bk,kzy->bzy", Wb, ref[H]))) for H in W.HS], axis=0)
-            for r in SETS[tf]:
+            ref_acc = np.nanmean([acc_of(np.einsum("bk,kzy->bzy", Wb, ref[H])) for H in W.HS], axis=0)
+            ref_acc_pt = float(np.nanmean([acc_of(ref[H].sum(0)) for H in W.HS]))
+            ref_cov_pt = float(np.nanmean([cov_of(ref[H].sum(0)) for H in W.HS]))
+            for r in sets_here:
                 T = tabs[r["kind"]]
-                row = dict(tf=W.NAMES[tf], period=pname, source=src_name, kind=r["kind"], setting=W.label(r))
+                row = dict(tf=W.NAMES[tf], period=pname, source=src_name, kind=r["kind"], setting=W.label(r),
+                           sample=sample_status(r["kind"], pname))
                 for H in W.HS:
                     pm = W.perm_metrics(T[H].sum(0)[:, 1], T[H].sum(0)[:, 0])
                     for k2, v in pm.items():
@@ -123,6 +163,11 @@ for tf in W.FILTER_TFS:
                 row["auc_mean_ci_lo"], row["auc_mean_ci_hi"] = np.nanpercentile(bo, [2.5, 97.5])
                 row["diff_vs_native_default"] = row["auc_mean"] - float(np.nanmean([W.auc_table(ref[H].sum(0)[:, 1], ref[H].sum(0)[:, 0]) for H in W.HS]))
                 row["diff_ci_lo"], row["diff_ci_hi"] = np.nanpercentile(d, [2.5, 97.5])
+                row["bal_recall_mean"] = float(np.nanmean([row[f"bal_recall_H{H}"] for H in W.HS]))
+                ab = np.nanmean([acc_of(np.einsum("bk,kzy->bzy", Wb, T[H])) for H in W.HS], axis=0)
+                row["acc_diff_vs_native_default"] = row["acc_mean"] - ref_acc_pt
+                row["acc_diff_ci_lo"], row["acc_diff_ci_hi"] = np.nanpercentile(ab - ref_acc, [2.5, 97.5])
+                row["coverage_diff_vs_native_default"] = row["coverage_mean"] - ref_cov_pt
                 res.append(row)
             if src_name == "broker":
                 zb = zones_by

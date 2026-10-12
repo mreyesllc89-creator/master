@@ -120,6 +120,31 @@ def held(c, atr, buy, sell, bpx, spx):
     return L, A, D
 
 
+# Bug fix 1 (after the freeze, reported by the MT5 port's audit): the v1.2 indicator (Pine and MT5) rounds the zone
+# edges OUTWARD to the tick grid and needs the price to clear the rounded edge by more than half a tick. The frozen
+# code compared close with level +- band directly. EXACT_TICK = 0.01 (BTCUSD point) applies the indicator's rule;
+# None restores the frozen comparison (kept for the before / after count).
+EXACT_TICK = 0.01
+
+
+def zone_edges(c, L, b, exact_tick=None):
+    """+1 BUY ZONE / -1 SELL ZONE / 0 NO TRADE from close c, level L and band b (b = 0.25 x ATR of the signal)"""
+    if exact_tick:
+        mt = exact_tick
+        with np.errstate(invalid="ignore"):
+            up = np.where(b > 0, np.ceil((L + b) / mt - 1e-9) * mt, L)
+            dn = np.where(b > 0, np.floor((L - b) / mt + 1e-9) * mt, L)
+            inup = np.where(b > 0, c > up + mt / 2, c > L)
+            indn = np.where(b > 0, c < dn - mt / 2, c < L)
+    else:
+        with np.errstate(invalid="ignore"):
+            inup = c > L + b
+            indn = c < L - b
+    z = np.where(inup, 1, np.where(indn, -1, 0)).astype(np.int8)
+    z[np.isnan(L)] = 0
+    return z
+
+
 READS = {
     # primary - the MT5 port's reads: parent = last parent bar closed by the filter candle's CLOSE; higher child zones =
     # last child bar closed by the filter candle's OPEN; child zones equal to / lower than the filter TF: closed by close
@@ -141,9 +166,7 @@ def zone_of(S, tf, r, read="mt5"):
     ctx = R.context(S, tf, p)
     ch = ctx["ch"]; c = ch["c"]
     L, A, D = held(c, ctx["atr14"], ctx["buy"], ctx["sell"], ctx["bpx"], ctx["spx"])
-    b = BAND * np.nan_to_num(A)
-    z = np.where(c > L + b, 1, np.where(c < L - b, -1, 0)).astype(np.int8)
-    z[np.isnan(L)] = 0
+    z = zone_edges(c, L, BAND * np.nan_to_num(A), exact_tick=EXACT_TICK)
     g = (c - L) / A
     g = np.clip(np.where(np.isfinite(g), g, 0.0), -5, 5)
     return z, g, ctx
@@ -174,8 +197,14 @@ def perm_metrics(nu, nd):
     buy = nu[2] + nd[2]; sell = nu[0] + nd[0]; allc = nu.sum() + nd.sum()
     hit_b = nu[2] / buy if buy else np.nan
     hit_s = nd[0] / sell if sell else np.nan
-    return dict(auc=float(auc_table(nu, nd)), acc=(nu[2] + nd[0]) / (buy + sell) if buy + sell else np.nan,
-                bal_acc=np.nanmean([hit_b, hit_s]), p_up_buy=hit_b, p_dn_sell=hit_s,
+    upz = nu[0] + nu[2]; dnz = nd[0] + nd[2]           # up / down labels on candles with a zone
+    rec_u = nu[2] / upz if upz else np.nan                # P(BUY | up, zone != 0)
+    rec_d = nd[0] / dnz if dnz else np.nan                # P(SELL | down, zone != 0)
+    with np.errstate(invalid="ignore"):
+        return dict(auc=float(auc_table(nu, nd)), acc=(nu[2] + nd[0]) / (buy + sell) if buy + sell else np.nan,
+                # 'bal_acc' = the PREREG's "balanced accuracy" = direction-balanced PRECISION (mean of P(up | BUY),
+                # P(down | SELL)); 'bal_recall' = mean class recall on candles with a zone (the MT5 study's balanced_accuracy)
+                bal_acc=np.nanmean([hit_b, hit_s]), bal_recall=np.nanmean([rec_u, rec_d]), p_up_buy=hit_b, p_dn_sell=hit_s,
                 up_rate=nu.sum() / allc if allc else np.nan, coverage=(buy + sell) / allc if allc else np.nan,
                 n_up=int(nu.sum()), n_down=int(nd.sum()), n_buy=int(buy), n_sell=int(sell), n_none=int(nu[1] + nd[1]))
 

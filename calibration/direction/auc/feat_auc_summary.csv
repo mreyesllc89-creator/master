@@ -1,0 +1,56 @@
+tf,kind,set,model,auc_train,auc_valid,auc_test_refit_exploratory
+1D,zone as is,F0 zone,zone as is,0.51838,0.50390,0.51898
+1D,best by validation,"F4 + TDI fast x4, x16 (closed)",logistic,0.78321,0.54965,0.54312
+1D,all,F1 distance from level,logistic,0.50784,0.50053,0.53647
+1D,all,F2 + signal side,logistic,0.60948,0.50989,0.53278
+1D,all,F3 + TDI fast x1,logistic,0.64933,0.49978,0.53497
+1D,all,"F4 + TDI fast x4, x16 (closed)",logistic,0.78321,0.54965,0.54312
+1D,all,F5 + returns 1/5/20,logistic,0.81635,0.54491,0.53450
+1D,all,F5 + returns 1/5/20,gradient boosting,0.93279,0.49572,0.52875
+1D,all,"F6 + volatility, age",logistic,0.84693,0.54233,0.56204
+1D,all,F7 + FDF trend,logistic,0.84693,0.54233,0.56027
+1D,all,F7 + FDF trend,gradient boosting,0.96443,0.49531,0.54216
+15m,zone as is,F0 zone,zone as is,0.53250,0.51265,0.51458
+15m,best by validation,F7 + FDF trend,gradient boosting,0.61162,0.53400,0.53513
+15m,all,F1 distance from level,logistic,0.52698,0.50731,0.50544
+15m,all,F2 + signal side,logistic,0.54693,0.52211,0.52845
+15m,all,F3 + TDI fast x1,logistic,0.55793,0.53088,0.53320
+15m,all,"F4 + TDI fast x4, x16 (closed)",logistic,0.55919,0.52932,0.53288
+15m,all,F5 + returns 1/5/20,logistic,0.55995,0.52920,0.53317
+15m,all,F5 + returns 1/5/20,gradient boosting,0.60742,0.53367,0.53441
+15m,all,"F6 + volatility, age",logistic,0.56156,0.52927,0.53297
+15m,all,F7 + FDF trend,logistic,0.56717,0.52886,0.53421
+15m,all,F7 + FDF trend,gradient boosting,0.61162,0.53400,0.53513
+30m,zone as is,F0 zone,zone as is,0.53284,0.51065,0.51049
+30m,best by validation,F5 + returns 1/5/20,gradient boosting,0.63505,0.53288,0.52790
+30m,all,F1 distance from level,logistic,0.51227,0.50127,0.50933
+30m,all,F2 + signal side,logistic,0.56652,0.52459,0.52559
+30m,all,F3 + TDI fast x1,logistic,0.56811,0.52792,0.52889
+30m,all,"F4 + TDI fast x4, x16 (closed)",logistic,0.57001,0.52685,0.52751
+30m,all,F5 + returns 1/5/20,logistic,0.57214,0.52668,0.52681
+30m,all,F5 + returns 1/5/20,gradient boosting,0.63505,0.53288,0.52790
+30m,all,"F6 + volatility, age",logistic,0.57450,0.52707,0.52741
+30m,all,F7 + FDF trend,logistic,0.57687,0.52719,0.52862
+30m,all,F7 + FDF trend,gradient boosting,0.64758,0.53277,0.52821
+5m,zone as is,F0 zone,zone as is,0.52024,0.51136,0.51140
+5m,best by validation,F3 + TDI fast x1,logistic,0.54388,0.52631,0.52748
+5m,all,F1 distance from level,logistic,0.51405,0.50881,0.50863
+5m,all,F2 + signal side,logistic,0.53243,0.51861,0.51890
+5m,all,F3 + TDI fast x1,logistic,0.54388,0.52631,0.52748
+5m,all,"F4 + TDI fast x4, x16 (closed)",logistic,0.54546,0.52550,0.52821
+5m,all,F5 + returns 1/5/20,logistic,0.54827,0.52422,0.52828
+5m,all,F5 + returns 1/5/20,gradient boosting,0.57436,0.52547,0.53089
+5m,all,"F6 + volatility, age",logistic,0.54917,0.52388,0.52865
+5m,all,F7 + FDF trend,logistic,0.54932,0.52402,0.52908
+5m,all,F7 + FDF trend,gradient boosting,0.57524,0.52569,0.53141
+1H,zone as is,F0 zone,zone as is,0.52010,0.52108,0.49752
+1H,best by validation,F7 + FDF trend,gradient boosting,0.70784,0.53454,0.52571
+1H,all,F1 distance from level,logistic,0.49433,0.48599,0.49739
+1H,all,F2 + signal side,logistic,0.55622,0.53054,0.52684
+1H,all,F3 + TDI fast x1,logistic,0.55738,0.53158,0.52927
+1H,all,"F4 + TDI fast x4, x16 (closed)",logistic,0.56322,0.53376,0.52485
+1H,all,F5 + returns 1/5/20,logistic,0.56653,0.53421,0.52242
+1H,all,F5 + returns 1/5/20,gradient boosting,0.70292,0.53346,0.52476
+1H,all,"F6 + volatility, age",logistic,0.57190,0.53143,0.52099
+1H,all,F7 + FDF trend,logistic,0.57628,0.53423,0.52177
+1H,all,F7 + FDF trend,gradient boosting,0.70784,0.53454,0.52571

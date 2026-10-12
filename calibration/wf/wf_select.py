@@ -130,6 +130,7 @@ def metrics_row(T):
     out["auc_mean"] = float(np.nanmean([out[f"auc_H{H}"] for H in W.HS]))
     out["acc_mean"] = float(np.nanmean([out[f"acc_H{H}"] for H in W.HS]))
     out["bal_acc_mean"] = float(np.nanmean([out[f"bal_acc_H{H}"] for H in W.HS]))
+    out["bal_recall_mean"] = float(np.nanmean([out[f"bal_recall_H{H}"] for H in W.HS]))
     out["coverage_mean"] = float(np.nanmean([out[f"coverage_H{H}"] for H in W.HS]))
     return out
 
@@ -137,6 +138,9 @@ def metrics_row(T):
 METHODS = ["R1_greedy", "R2_conservative"] + list(BASE)
 fold_rows, grid_rows = [], []
 per_month = {mth: np.zeros((nM, len(W.HS), 3, 2)) for mth in METHODS}
+# reporting sensitivity added after the freeze (MT5 audit): the same tables with the labels that end after the test
+# block removed (last month of each block keeps only candles whose label ends inside it)
+per_month_ep = {mth: np.zeros((nM, len(W.HS), 3, 2)) for mth in METHODS}
 month_group = np.array([""] * nM, dtype=object)
 for fi, f in enumerate(FOLDS):
     sel = select(f["start"], fi)
@@ -145,6 +149,8 @@ for fi, f in enumerate(FOLDS):
     pick = dict(R1_greedy=sel["r1"], R2_conservative=sel["r2"], **BASE)
     for mth, cid in pick.items():
         per_month[mth][f["start"] - m0:f["end"] - m0 + 1] = Tt[cid].transpose(1, 0, 2, 3)
+        per_month_ep[mth][f["start"] - m0:f["end"] - m0 + 1] = Tt[cid].transpose(1, 0, 2, 3)
+        per_month_ep[mth][f["end"] - m0] = cnt[cid, :, f["end"] - m0, 0]
         r = dict(tf=tf, clock=clock, read=read, fold=f["name"], group=f["group"],
                  train=f"{W.mid_name(m0)}..{W.mid_name(f['start'] - 1)} (last month purged)",
                  test=f"{W.mid_name(f['start'])}..{W.mid_name(f['end'])}", method=mth, cid=cid, setting=cand.label[cid],
@@ -168,6 +174,18 @@ for fi, f in enumerate(FOLDS):
 folds = pd.DataFrame(fold_rows)
 
 # ---- pooled walk-forward results per group with a paired block bootstrap over test months
+def vec_metrics(T):
+    """T (..., H, zone, label) -> mean over H of raw accuracy, balanced precision, balanced recall, coverage"""
+    nu = T[..., 1]; nd = T[..., 0]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        buy = nu[..., 2] + nd[..., 2]; sell = nu[..., 0] + nd[..., 0]; allc = nu.sum(-1) + nd.sum(-1)
+        acc = (nu[..., 2] + nd[..., 0]) / (buy + sell)
+        bp = np.nanmean(np.stack([nu[..., 2] / buy, nd[..., 0] / sell]), axis=0)
+        br = np.nanmean(np.stack([nu[..., 2] / (nu[..., 0] + nu[..., 2]), nd[..., 0] / (nd[..., 0] + nd[..., 2])]), axis=0)
+        cov = (buy + sell) / allc
+    return np.nanmean(acc, -1), np.nanmean(bp, -1), np.nanmean(br, -1), np.nanmean(cov, -1)
+
+
 pool_rows = []
 rng = np.random.default_rng(SEED + 999)
 groups = sorted(set(f["group"] for f in FOLDS))
@@ -182,27 +200,33 @@ for gname in groups + (["all_2021_2025H1"] if run != "dry" else []):
     Wb = np.zeros((B_TEST, len(ms)))
     for b in range(B_TEST):
         Wb[b] = np.bincount(idx[b], minlength=len(ms))
-    boot = {}
-    for mth in METHODS:
-        P = per_month[mth][ms]                       # (months, H, zone, label)
-        flat = P.reshape(len(ms), -1)
-        bt = (Wb @ flat).reshape(B_TEST, len(W.HS), 3, 2)
-        boot[mth] = bt
-    for mth in METHODS:
-        P = per_month[mth][ms].sum(axis=0)
-        r = dict(tf=tf, clock=clock, read=read, group=gname, months=len(ms), method=mth)
-        r.update(metrics_row(P))
-        a = mean_auc(boot[mth])
-        r["auc_mean_ci_lo"], r["auc_mean_ci_hi"] = np.nanpercentile(a, [2.5, 97.5])
-        d = a - mean_auc(boot["native_default"])
-        r["diff_vs_native_default"] = r["auc_mean"] - float(mean_auc(per_month["native_default"][ms].sum(axis=0)))
-        r["diff_ci_lo"], r["diff_ci_hi"] = np.nanpercentile(d, [2.5, 97.5])
-        r["p_diff_le_0"] = float(np.mean(d <= 0))
-        ba = np.array([np.nanmean([W.perm_metrics(boot[mth][b, j, :, 1], boot[mth][b, j, :, 0])["bal_acc"] for j in range(len(W.HS))])
-                       for b in range(0, B_TEST, 4)])
-        r["bal_acc_mean_ci_lo"], r["bal_acc_mean_ci_hi"] = np.nanpercentile(ba, [2.5, 97.5])
-        r["ties_dropped"] = int(ties[:, ms].sum())
-        pool_rows.append(r)
+    for lab_name, PM in (("all", per_month), ("endpoint_purged", per_month_ep)):
+        boot = {}
+        for mth in METHODS:
+            flat = PM[mth][ms].reshape(len(ms), -1)
+            boot[mth] = (Wb @ flat).reshape(B_TEST, len(W.HS), 3, 2)
+        ref_auc = mean_auc(boot["native_default"])
+        ref_acc, ref_bp, ref_br, ref_cov = vec_metrics(boot["native_default"])
+        ref_pt = metrics_row(PM["native_default"][ms].sum(axis=0))
+        for mth in METHODS:
+            P = PM[mth][ms].sum(axis=0)
+            r = dict(tf=tf, clock=clock, read=read, group=gname, labels=lab_name, months=len(ms), method=mth)
+            r.update(metrics_row(P))
+            a = mean_auc(boot[mth])
+            r["auc_mean_ci_lo"], r["auc_mean_ci_hi"] = np.nanpercentile(a, [2.5, 97.5])
+            d = a - ref_auc
+            r["diff_vs_native_default"] = r["auc_mean"] - ref_pt["auc_mean"]
+            r["diff_ci_lo"], r["diff_ci_hi"] = np.nanpercentile(d, [2.5, 97.5])
+            r["p_diff_le_0"] = float(np.mean(d <= 0))
+            acc, bp, br, cov = vec_metrics(boot[mth])
+            r["acc_mean_ci_lo"], r["acc_mean_ci_hi"] = np.nanpercentile(acc, [2.5, 97.5])
+            r["acc_diff_vs_native_default"] = r["acc_mean"] - ref_pt["acc_mean"]
+            r["acc_diff_ci_lo"], r["acc_diff_ci_hi"] = np.nanpercentile(acc - ref_acc, [2.5, 97.5])
+            r["bal_acc_mean_ci_lo"], r["bal_acc_mean_ci_hi"] = np.nanpercentile(bp, [2.5, 97.5])
+            r["bal_recall_mean_ci_lo"], r["bal_recall_mean_ci_hi"] = np.nanpercentile(br, [2.5, 97.5])
+            r["coverage_diff_vs_native_default"] = r["coverage_mean"] - ref_pt["coverage_mean"]
+            r["ties_dropped"] = int(ties[:, ms].sum())
+            pool_rows.append(r)
 pooled = pd.DataFrame(pool_rows)
 
 # ---- final frozen pick: training 2020-01 .. 2025-06 (purged), never the 2025H2-2026 period
@@ -219,6 +243,9 @@ if run != "dry":
     final["R1_bootstrap_pick_frequency"] = sel["r1_freq"]
     final["R1_bootstrap_top5"] = [dict(cid=i, setting=cand.label[i], freq=f) for i, f in sel["top_freq"]]
     final["R2_eligible_count"] = sel["n_elig"]
+    k22 = 2022 * 12 + 11 - m0
+    final["fresh_origin_labels_ending_in_2023_per_H"] = {str(H): int(cnt[REF, j, k22, 1].sum()) for j, H in enumerate(W.HS)}
+    final["fresh_origin_labels_total_per_H"] = {str(H): int(cnt[REF, j, 2021 * 12 - m0:2023 * 12 - m0].sum()) for j, H in enumerate(W.HS)}
 
 suffix = f"{tf}_{clock}_{read}_{run}"
 folds.to_csv(f"{OUT}/wf_folds_{suffix}.csv", index=False, float_format="%.5f")

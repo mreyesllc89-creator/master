@@ -122,6 +122,11 @@ Balanced accuracy, mean of 1, 3 and 10 candles later, in-sample 2023-01..2025-06
   of +- 0.25 ATR around it - and says whether the signal's direction is confirmed. The three readings' live scores
   are available in its status box (off by default; information only).
 
+### Longer history, native MT5 grid, purged walk-forward (2020-2026)
+Pre-registered (`wf/PREREG.md`, frozen before evaluation) follow-up for the MT5 port: Bitstamp 2020-2026, 6,640 native-MT5
+parent / child settings, purged half-year walk-forward with block-bootstrap CIs, a broker BTCUSD.c comparison and
+graded scores reported apart from the permission. Results and the decision per timeframe: `wf/HANDOFF_WF.md`.
+
 ## Limits
 
 - One market (BTC/USD, Bitstamp), one regime split. 30m, 8H, 5m and 1m did not hold up out of sample; 1H and 2H only
