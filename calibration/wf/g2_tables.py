@@ -20,15 +20,17 @@ def row(tf, per, src, sc):
 
 
 print("### Reading rule (broker candles, pooled 2024H2-2025H2)\n")
-print("| TF | P0 zone AUC | G2 AUC | G2 - P0 AUC [CI] | P0 raw acc / cov | G2P raw acc / cov | G2P - P0 acc [CI] | periods with G2 - P0 < 0 | G2 transfers? |")
+print("| TF | P0 zone AUC | G2 AUC | G2 - P0 AUC [CI] | P0 raw acc / cov | G2P raw acc / cov | G2P - P0 acc [CI] | flagged periods (AUC or acc diff < 0) | G2 transfers? |")
 print("|---|---|---|---|---|---|---|---|---|")
 out = []
 for tf in ORDER:
     p0, g2, gp = (row(tf, POOL, "broker", s) for s in ("P0", "G2", "G2P"))
     if p0 is None:
         continue
+    # pre-registered flag: G2 - P0 mean-AUC or G2P - P0 raw-accuracy point difference negative in a broker period
     neg = [per for per in ("2024H2", "2025H1", "2025H2")
-           if (r := row(tf, per, "broker", "G2")) is not None and r.auc_diff_vs_P0 < 0]
+           if row(tf, per, "broker", "G2") is not None
+           and (row(tf, per, "broker", "G2").auc_diff_vs_P0 < 0 or row(tf, per, "broker", "G2P").acc_diff_vs_P0 < 0)]
     c1 = g2.auc_diff_ci_lo > 0
     c2 = gp.acc_diff_ci_lo > 0
     c3 = abs(gp.coverage_diff_vs_P0) <= 0.10

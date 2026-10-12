@@ -16,7 +16,8 @@ before any 2020-2026 evaluation; every post-freeze change is listed in section 7
   timeframe and setting; nothing reaches 0.53 out of sample.
 - The **graded logistic score** (not the indicator's output) reaches AUC 0.53-0.545 on M5-H1 in every period, but it is
   mostly a contrarian / mean-reversion score (largest weights negative: FDF trend, last signal side, distance from the
-  level, 20-candle return) and has not been tested on broker candles.
+  level, 20-candle return). **Broker test (section 10, pre-registered): it transfers on M5, M15 and M30**, not on H1 or
+  slower; most of its edge is short-term mean reversion that one contrarian input already captures on M5 and M30.
 - The winning family is stable even though the exact pick is not: on M5-H1 every fold pick keeps parent = filter TF,
   **drops the filter-TF child zone, uses 2-3 higher children and needs only 1 aligned**. The exact children vary
   (R1 bootstrap pick frequency 0.23-0.51).
@@ -83,7 +84,7 @@ Walk-forward, same folds, native-default zones (`wf_graded_pooled.csv`; logistic
 
 The logistic score's edge is largest at H = 1 and comes mainly from fading the FDF trend, the last signal side, the
 distance from the level and the 20-candle move. It is a different rule from the zone (it often disagrees with it);
-turning it into a permission needs its own threshold, coverage and broker test. The preserved exploratory feature run
+turning it into a permission needs its own threshold and coverage; section 10 does that and tests it on the broker. The preserved exploratory feature run
 (`dir_feat_auc.py`, 2023 / 2024-25H1 / 2025H2-26 split; `../direction/auc/feat_auc_summary.csv`, all 8 timeframes) agrees: the best-by-validation feature
 score reaches 0.526-0.535 on M5-H1, 0.528 H2, 0.532 H4, 0.504 H8 and 0.543 D1 on 2025H2-26, vs 0.50-0.52 for the zone
 (inspected period; exploratory only; the gradient-boosted models fit train far better than test).
@@ -130,3 +131,67 @@ score reaches 0.526-0.535 on M5-H1, 0.528 H2, 0.532 H4, 0.504 H8 and 0.543 D1 on
   `wf_grid_rank_stability.csv`, `wf_graded_pooled.csv`, `wf_graded_folds.csv`, `broker_eval.csv`,
   `broker_zone_agreement.csv`, `broker_clock.csv`, `broker_clock_best.csv`, `tickfix_count.csv`,
   `tickfix_effect_pooled.csv`, `handoff_tables.md`, `pre_tickfix_v0/`.
+- Logistic-score broker test: `PREREG_G2_BROKER.md`, `wf_g2_broker.py`, `g2_tables.py`; `results/g2_broker/`
+  (`g2_broker_eval.csv`, `g2_broker_reading.csv`, `g2_broker_weights.json`, `g2_tables.md`, `g2_parity_check.csv`,
+  `exploratory_after_freeze/` with the verification and stress-test tables and scripts).
+
+## 10. Broker transfer of the logistic score (pre-registered addendum, `PREREG_G2_BROKER.md`, frozen at `5c9009d`)
+
+**Design.** G2 (section 5) was fitted on Bitstamp candles re-stamped to the broker clock, using only labels that end
+before each broker half-year (models for 2024H2, 2025H1, 2025H2), then applied with **frozen coefficients,
+standardisation and thresholds** to BTCUSD.c candles, as a fixed MQL5 port would. On identical candles it is compared
+with the filter's zone (P0, native default). **G2P** turns G2 into a permission at the zone's coverage (BUY above the
+training 58.5% score quantile, SELL below 41.5%, NO TRADE between). Paired block bootstrap, 500 repeats, blocks of
+max(48 h, 4 x the 10-candle label span). Reviewed before the freeze (fixes listed in the addendum). The first real
+run computed but could not save (missing output folder) and printed nothing; it was re-run unchanged.
+
+**Result (broker candles, pooled 2024H2-2025H2, mean of H = 1/3/10; pre-registered reading rule):**
+
+| TF | Zone (P0) AUC | G2 AUC | G2 - P0 AUC [95% CI] | P0 raw acc | G2P raw acc | G2P - P0 acc [95% CI] | Coverage P0 -> G2P | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| **M5** | 0.5091 | 0.5237 | +0.0146 [+0.0111, +0.0184] | 0.5094 | 0.5185 | +0.0091 [+0.0057, +0.0130] | 0.836 -> 0.840 | **transfers** |
+| **M15** | 0.5085 | 0.5277 | +0.0192 [+0.0131, +0.0249] | 0.5087 | 0.5221 | +0.0134 [+0.0071, +0.0189] | 0.835 -> 0.839 | **transfers** |
+| **M30** | 0.5061 | 0.5281 | +0.0220 [+0.0142, +0.0304] | 0.5065 | 0.5241 | +0.0176 [+0.0097, +0.0262] | 0.825 -> 0.841 | **transfers** |
+| H1 | 0.5139 | 0.5269 | +0.0131 [-0.0012, +0.0267] | 0.5145 | 0.5257 | +0.0112 [-0.0022, +0.0240] | 0.830 -> 0.834 | no (both CIs include 0) |
+| H2 | 0.5183 | 0.5276 | +0.0093 [-0.0068, +0.0270] | 0.5189 | 0.5239 | +0.0050 [-0.0102, +0.0203] | 0.838 -> 0.827 | no; flagged 2024H2 |
+| H4 | 0.5141 | 0.5174 | +0.0033 [-0.0235, +0.0303] | 0.5154 | 0.5155 | +0.0001 [-0.0231, +0.0251] | 0.838 -> 0.834 | no; flagged 2024H2, 2025H1 |
+| H8 | 0.5081 | 0.5006 | -0.0074 [-0.0402, +0.0325] | 0.5094 | 0.5046 | -0.0048 [-0.0338, +0.0320] | 0.854 -> 0.816 | no; flagged all 3 |
+| D1 | 0.5151 | 0.5060 | -0.0090 [-0.1425, +0.1182] | 0.5226 | 0.4961 | -0.0266 [-0.1312, +0.0810] | 0.830 -> 0.812 | no; flagged all 3 |
+
+- M5, M15 and M30 meet all three pre-registered conditions and are positive in every half-year (no flagged period).
+  Coverage is near-equal: G2P minus P0 = +0.004 / +0.004 / +0.016.
+- On the same broker candles the edge is at least as large as on Bitstamp server-clock candles (G2 - P0, pooled:
+  M5 0.0146 vs 0.0124, M15 0.0192 vs 0.0187, M30 0.0220 vs 0.0194). The Bitstamp edge was not a last-trade
+  artefact: on M5 the broker gain grows with the horizon (+0.008 at H = 1, +0.021 at H = 10).
+- Per period, every M5-M30 point estimate is positive, but some accuracy CIs include 0 (M5 2025H1 +0.0033
+  [-0.0028, +0.0095]; M15 2025H1 +0.0052 [-0.0058, +0.0157]; M30 2024H2 +0.0093 [-0.0038, +0.0223]).
+- Full tables (per period, broker vs Bitstamp, per horizon): `results/g2_broker/g2_tables.md`; model file with
+  coefficients, training mean / sd and thresholds: `results/g2_broker/g2_broker_weights.json`.
+
+**Independent verification** (after the run; `results/g2_broker/exploratory_after_freeze/`):
+- Recompute from the exported model with separate code (sklearn AUC, own labels): 384 / 384 numbers match (largest
+  difference 5e-6, CSV rounding); all 27 training sets, means, sds and thresholds reproduce; every training label ends
+  at or before its period start; an sklearn refit reproduces the coefficients to 3e-6. Limitation: the features were
+  built with the same `features()` code, so a shared feature bug would not show.
+- *Exploratory stress tests (done after the frozen run; they cannot upgrade or downgrade a verdict):* with 7-day and
+  28-day blocks the M5-M30 CIs stay above 0 (AUC lower bounds 0.011 / 0.013 / 0.015); G2 - P0 AUC is positive in
+  18 / 18 / 17 of 18 months; the edge holds in both low- and high-volatility halves. H1's longer-block CIs exclude 0,
+  but H1 stays a fail under the frozen rule.
+
+**What G2 is, and what it is not.**
+- G2 is a short-horizon **contrarian / mean-reversion score, not a refinement of the zone**. Its rank correlation with
+  the zone is about 0.38-0.40; G2P opposes the zone on 21-23% of its calls. On those candles the zone is right only
+  0.48-0.49 of the time, and flipping them gives 56-69% of G2P's accuracy gain; the rest comes from dropping about 17%
+  of zone calls that were coin flips.
+- One input carries most of it. Fading the TDI fast-line level of the filter's own timeframe (RSI(14) + SMA(2), high
+  = sell) alone reaches AUC 0.5223 / 0.5228 / 0.5248 on M5 / M15 / M30, i.e. **91% / 74% / 85% of the G2 - P0 gap**.
+  G2's lead over it: M5 +0.0013 [-0.0003, +0.0030], M15 +0.0050 [+0.0014, +0.0085], M30 +0.0033 [-0.0033, +0.0094]
+  (7-day blocks). So G2 clearly adds to it only on M15. That single input was identified on broker data after the
+  run (exploratory), although its sign matches the Bitstamp-trained coefficients.
+- At H1 the whole edge rests on one input (last signal side); 20-candle reversal alone matches G2 there.
+
+**Caveats.** Effects are small (AUC about 0.52-0.53, raw accuracy about 0.52); direction sign only, no spread or
+costs, nothing here shows it is tradable. This tests a move to another venue and clock more than a new period: G2 was
+chosen after Bitstamp walk-forward results that cover the same calendar months, and the broker months were already used
+for zone work. The pooled AUC ranks scores of three period models together (within 0.0007 of the per-period average).
+No Pine or MT5 default was changed.

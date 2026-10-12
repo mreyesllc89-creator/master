@@ -1,0 +1,9 @@
+tf,auc_diff,auc_diff_ci_lo,acc_diff,acc_diff_ci_lo,coverage_diff,c1_auc_ci_above_0,c2_acc_ci_above_0,c3_coverage_within_010,transfers,flagged_periods,block_hours
+M5,0.01457,0.01107,0.00914,0.00569,0.00401,True,True,True,True,,48.00000
+M15,0.01921,0.01305,0.01339,0.00707,0.00363,True,True,True,True,,48.00000
+M30,0.02199,0.01420,0.01765,0.00967,0.01575,True,True,True,True,,48.00000
+H1,0.01306,-0.00124,0.01118,-0.00224,0.00415,False,False,True,False,,48.00000
+H2,0.00929,-0.00684,0.00504,-0.01018,-0.01076,False,False,True,False,2024H2,80.00000
+H4,0.00332,-0.02351,0.00010,-0.02310,-0.00434,False,False,True,False,2024H2;2025H1,160.00000
+H8,-0.00744,-0.04019,-0.00480,-0.03384,-0.03820,False,False,True,False,2024H2;2025H1;2025H2,320.00000
+D1,-0.00901,-0.14249,-0.02656,-0.13121,-0.01799,False,False,True,False,2024H2;2025H1;2025H2,960.00000
