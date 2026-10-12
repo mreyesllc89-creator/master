@@ -23,7 +23,7 @@ The score reads the filter's own state, so the port's P0 must equal the calibrat
   clear the rounded edge by more than half a tick (v1.2 rule).
 - Everything on **closed** filter candles only.
 
-## 2. Features (18 inputs in this order; `features` in the JSON lists them with `b0` first)
+## 2. Features (17 inputs in this order; `features` in the JSON has 18 entries, `b0` first then the 17 inputs)
 All at the close of filter candle t. ATR = Wilder ATR(14) of the filter timeframe (SMA seed, as Pine `ta.atr`);
 RSI = Wilder RSI(14) (SMA seed); fast line F = SMA(2) of RSI.
 
@@ -43,7 +43,7 @@ RSI = Wilder RSI(14) (SMA seed); fast line F = SMA(2) of RSI.
 | 12-13 | `f<tf>`, `s<tf>` | zone 1 (the filter TF): level (F - 50) / 50 and slope (F - F[1]) / 10 of its fast line | same candle |
 | 14-15 | `f<2tf>`, `s<2tf>` | zone 2 (x2 native): same, from the bar closed by the filter candle's open | e.g. M10 for M5 |
 | 16-17 | `f<4tf>`, `s<4tf>` | zone 3 (x4 native): same | e.g. M20 for M5 |
-| (18) | `b0` | intercept (first entry of `w`) | not an input |
+| - | `b0` | intercept = `w[0]` (listed first in `features`) | not an input |
 
 Exact JSON names per timeframe: M5 `f5 s5 f10 s10 f20 s20`; M15 `f15 s15 f30 s30 f60 s60`; M30 `f30 s30 f60 s60 f120
 s120`; H1 `f60 s60 f120 s120 f240 s240`.
@@ -54,8 +54,8 @@ never imputes. `dist` is the one exception: it is 0 (not missing) when no signal
 until the first signal.
 
 ## 3. Score
-`logit = b0 + sum_i w_i * (x_i - mu_i) / sd_i` with `w` (length 19, `w[0]` = b0), `mu`, `sd` (length 18) from the
-JSON. Units: log-odds of "close H candles later is higher"; no sigmoid is needed for the rule. Double precision.
+`logit = w[0] + sum_{i=1..17} w[i] * (x_i - mu[i-1]) / sd[i-1]` with `w` (length 18, `w[0]` = b0), `mu` and `sd`
+(length 17, aligned with `features[1:]`) from the JSON. Units: log-odds of "close H candles later is higher"; no sigmoid is needed for the rule. Double precision.
 
 ## 4. Permission and veto
 - `G2P = BUY if logit > q_hi; SELL if logit < q_lo; else NO TRADE` (strict inequalities; equality = NO TRADE).
