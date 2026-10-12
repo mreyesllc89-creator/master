@@ -84,8 +84,9 @@ Walk-forward, same folds, native-default zones (`wf_graded_pooled.csv`; logistic
 The logistic score's edge is largest at H = 1 and comes mainly from fading the FDF trend, the last signal side, the
 distance from the level and the 20-candle move. It is a different rule from the zone (it often disagrees with it);
 turning it into a permission needs its own threshold, coverage and broker test. The preserved exploratory feature run
-(`dir_feat_auc.py`, 2023 / 2024-25H1 / 2025H2-26 split; `../direction/auc/feat_auc_summary.csv`; M5, M15, M30, H1 and D1 finished, H2-H8 still running at this commit) agrees: best-by-validation
-feature scores 0.526-0.543 on 2025H2-26 vs 0.50-0.52 for the zone (inspected period; exploratory only).
+(`dir_feat_auc.py`, 2023 / 2024-25H1 / 2025H2-26 split; `../direction/auc/feat_auc_summary.csv`, all 8 timeframes) agrees: the best-by-validation feature
+score reaches 0.526-0.535 on M5-H1, 0.528 H2, 0.532 H4, 0.504 H8 and 0.543 D1 on 2025H2-26, vs 0.50-0.52 for the zone
+(inspected period; exploratory only; the gradient-boosted models fit train far better than test).
 
 ## 6. Codex's audit points
 1. **Tick-exact edges** (bug fix 1): the frozen code compared close with level +- band; the indicator rounds the edges

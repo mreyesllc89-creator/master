@@ -1,4 +1,15 @@
 tf,kind,set,model,auc_train,auc_valid,auc_test_refit_exploratory
+2H,zone as is,F0 zone,zone as is,0.52091,0.52577,0.52380
+2H,best by validation,F2 + signal side,logistic,0.54998,0.53154,0.52811
+2H,all,F1 distance from level,logistic,0.50101,0.49657,0.52172
+2H,all,F2 + signal side,logistic,0.54998,0.53154,0.52811
+2H,all,F3 + TDI fast x1,logistic,0.56602,0.52978,0.53267
+2H,all,"F4 + TDI fast x4, x16 (closed)",logistic,0.56970,0.52912,0.52751
+2H,all,F5 + returns 1/5/20,logistic,0.57068,0.52863,0.52782
+2H,all,F5 + returns 1/5/20,gradient boosting,0.75818,0.52959,0.52231
+2H,all,"F6 + volatility, age",logistic,0.57725,0.52902,0.52377
+2H,all,F7 + FDF trend,logistic,0.58165,0.53110,0.52444
+2H,all,F7 + FDF trend,gradient boosting,0.76672,0.52956,0.52212
 1D,zone as is,F0 zone,zone as is,0.51838,0.50390,0.51898
 1D,best by validation,"F4 + TDI fast x4, x16 (closed)",logistic,0.78321,0.54965,0.54312
 1D,all,F1 distance from level,logistic,0.50784,0.50053,0.53647
@@ -21,6 +32,17 @@ tf,kind,set,model,auc_train,auc_valid,auc_test_refit_exploratory
 15m,all,"F6 + volatility, age",logistic,0.56156,0.52927,0.53297
 15m,all,F7 + FDF trend,logistic,0.56717,0.52886,0.53421
 15m,all,F7 + FDF trend,gradient boosting,0.61162,0.53400,0.53513
+4H,zone as is,F0 zone,zone as is,0.51802,0.49348,0.50814
+4H,best by validation,F5 + returns 1/5/20,gradient boosting,0.83381,0.51971,0.53202
+4H,all,F1 distance from level,logistic,0.50006,0.51245,0.49517
+4H,all,F2 + signal side,logistic,0.55293,0.51907,0.51663
+4H,all,F3 + TDI fast x1,logistic,0.55736,0.51371,0.51782
+4H,all,"F4 + TDI fast x4, x16 (closed)",logistic,0.56346,0.51144,0.51570
+4H,all,F5 + returns 1/5/20,logistic,0.56504,0.51520,0.50860
+4H,all,F5 + returns 1/5/20,gradient boosting,0.83381,0.51971,0.53202
+4H,all,"F6 + volatility, age",logistic,0.57948,0.50687,0.51086
+4H,all,F7 + FDF trend,logistic,0.57977,0.50651,0.51296
+4H,all,F7 + FDF trend,gradient boosting,0.84884,0.51182,0.53345
 30m,zone as is,F0 zone,zone as is,0.53284,0.51065,0.51049
 30m,best by validation,F5 + returns 1/5/20,gradient boosting,0.63505,0.53288,0.52790
 30m,all,F1 distance from level,logistic,0.51227,0.50127,0.50933
@@ -32,6 +54,17 @@ tf,kind,set,model,auc_train,auc_valid,auc_test_refit_exploratory
 30m,all,"F6 + volatility, age",logistic,0.57450,0.52707,0.52741
 30m,all,F7 + FDF trend,logistic,0.57687,0.52719,0.52862
 30m,all,F7 + FDF trend,gradient boosting,0.64758,0.53277,0.52821
+8H,zone as is,F0 zone,zone as is,0.54990,0.50994,0.50083
+8H,best by validation,"F6 + volatility, age",logistic,0.62510,0.53276,0.50382
+8H,all,F1 distance from level,logistic,0.54231,0.50812,0.48417
+8H,all,F2 + signal side,logistic,0.55765,0.52085,0.50403
+8H,all,F3 + TDI fast x1,logistic,0.56620,0.52393,0.51119
+8H,all,"F4 + TDI fast x4, x16 (closed)",logistic,0.59839,0.51431,0.51708
+8H,all,F5 + returns 1/5/20,logistic,0.61267,0.51916,0.50537
+8H,all,F5 + returns 1/5/20,gradient boosting,0.92296,0.52933,0.52534
+8H,all,"F6 + volatility, age",logistic,0.62510,0.53276,0.50382
+8H,all,F7 + FDF trend,logistic,0.62523,0.53209,0.50748
+8H,all,F7 + FDF trend,gradient boosting,0.92448,0.53022,0.51667
 5m,zone as is,F0 zone,zone as is,0.52024,0.51136,0.51140
 5m,best by validation,F3 + TDI fast x1,logistic,0.54388,0.52631,0.52748
 5m,all,F1 distance from level,logistic,0.51405,0.50881,0.50863
