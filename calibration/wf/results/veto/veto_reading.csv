@@ -1,0 +1,5 @@
+tf,in_rule,acc_diff,acc_diff_ci_lo,auc_diff,auc_diff_ci_lo,coverage_R2,c1_acc_ci_above_0,c2_auc_ci_above_0,holds,flagged_fresh_periods,secondary
+M5,True,0.04324,0.04073,0.02428,0.02251,0.46088,True,True,True,,"secondary 2021-2022: acc +0.0220, auc +0.0133; secondary 2026: acc +0.0177, auc +0.0115"
+M15,True,0.04105,0.03736,0.02416,0.02128,0.47777,True,True,True,,"secondary 2021-2022: acc +0.0243, auc +0.0135; secondary 2026: acc +0.0204, auc +0.0126"
+M30,True,0.03965,0.03466,0.02307,0.01868,0.45249,True,True,True,,"secondary 2021-2022: acc +0.0240, auc +0.0128; secondary 2026: acc +0.0109, auc +0.0049"
+H1,False,0.05053,0.04295,0.02919,0.02294,0.36977,True,True,,,"secondary 2021-2022: acc +0.0293, auc +0.0179; secondary 2026: acc +0.0126, auc +0.0101"
