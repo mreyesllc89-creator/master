@@ -28,8 +28,8 @@ Twenty-one inputs. Missing (warm-up, no W1 history) -> not scored, as in the vet
   inputs; one model per horizon H. Permission **FRP**: BUY above the training 58.5% quantile, SELL below 41.5%
   (the veto's coverage convention, about 83%).
 - **FRV** (fractal veto, the candidate for the Pine filter): keep the zone's BUY / SELL only where FRP agrees.
-- **CNT** (interpretable baseline, no fitting): score = align_fdf + align_tdi; permission at the same training
-  quantiles; veto **CNTV** = zone kept where CNT agrees.
+- **CNT** (interpretable baseline, no fitting): score = align_fdf + align_tdi (an integer, -12 .. +12); permission
+  = its sign (net alignment up -> BUY, down -> SELL, 0 -> NO TRADE); veto **CNTV** = zone kept where that sign agrees.
 - Baselines on identical candles: **P0** the zone alone; **R2s** the option-2 veto (H = 3 model) as frozen in
   `veto_model_2026.json`'s procedure, refitted per window by the same rule; **G2P** the option-2 score alone.
 
@@ -51,7 +51,7 @@ accuracies, AUCs and the differences FRV - P0, FRV - R2s, FRP - G2P, CNTV - P0. 
 coefficients of FR per model, grouped by timeframe, and a drop-one-timeframe ablation on the fresh window
 (exploratory, after the result).
 
-## Reading rule (computed by the script, `fractal_reading_real.csv`)
+## Reading rule (computed by the script, `fractal_reading_real.csv` and `.json`)
 **The fractal stack adds something** if, on fresh 2018-2019 pooled at **H = 1**: (1) FRV - P0 raw accuracy has a
 95% CI above 0, (2) **FRV - R2s raw accuracy has a 95% CI above 0** (the stack beats the local veto at comparable
 coverage, |coverage difference| <= 0.10), and (3) FRP - G2P AUC has a 95% CI above 0. A result that passes (1) but
@@ -60,10 +60,16 @@ H = 3 / 10 and CNT are reported and do not change the verdict. Flag: any fresh h
 accuracy difference.
 
 ## For Pine
-If the rule holds, FR's coefficients are exported as constants (`fractal_model_2026.json`, fitted on 2020-01-01 ..
-labels before 2026-01-01) and the Pine filter gets an optional "Fractal veto" switch, off by default, with six
+FR's 2026 coefficients are always written for the record (`fractal_model_2026.json`, fitted on 2020-01-01 .. labels
+before 2026-01-01). Only if the rule holds does the Pine filter get an optional "Fractal veto" switch, off by default, with six
 `request.security` reads of a tuple (FDF direction, TDI direction, TDI level) per timeframe. If it does not hold,
 nothing is added to Pine and the reason is written down.
+
+## Pre-freeze review
+An independent review (two reviewers, one skeptic per finding) ran on the draft. Fixed before this freeze: per-period
+mean-of-H rows were emitted once per horizon under one key (summarise is now called once per period); balanced
+precision / recall were missing; the reading file name; CNT's quantile thresholds fell on integer ties (now the sign
+rule above); W1 moved from MT5 Sunday weeks to TradingView Monday weeks.
 
 ## Known limits before running
 - One asset, one venue for the fresh window. W1 has about 200 bars in the training window: its weight will be noisy.
