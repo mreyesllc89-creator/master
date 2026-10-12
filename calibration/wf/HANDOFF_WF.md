@@ -195,3 +195,58 @@ costs, nothing here shows it is tradable. This tests a move to another venue and
 chosen after Bitstamp walk-forward results that cover the same calendar months, and the broker months were already used
 for zone work. The pooled AUC ranks scores of three period models together (within 0.0007 of the per-period average).
 No Pine or MT5 default was changed.
+
+## 11. Option 2 (score veto): frozen fresh-window test, independent verification, fresh broker test, MQL5 module
+
+**Design** (`PREREG_VETO.md`, frozen at `196d771`): keep the filter's zone only where the logistic score permission
+agrees ("R2"); never reverses the zone. Primary window Bitstamp 2018-2019, never evaluated before by any rule here,
+models trained on candles from 2015-01-01 whose labels end before each half-year starts (the 2018H2-2019H2 models
+therefore include the earlier fresh half-years; no model sees its own half-year or later); secondary 2021-2022 and 2026; baselines: the
+zone alone (P0), the one-model variant R2s (H = 3 model for every use; the version to port), a distance-only veto of
+the same size (DV), the score alone (G2P).
+
+**Frozen result** (`results/veto/`, pre-registered reading rule met on all three timeframes):
+
+| TF | window | P0 raw acc / cov | R2 raw acc / cov | R2 - P0 acc [95% CI] | R2 - P0 AUC [95% CI] |
+|---|---|---|---|---|---|
+| M5 | fresh 2018-19 | 0.5230 / 0.851 | 0.5662 / 0.461 | +0.0432 [+0.0407, +0.0456] | +0.0243 [+0.0225, +0.0260] |
+| M15 | fresh 2018-19 | 0.5205 / 0.844 | 0.5615 / 0.478 | +0.0411 [+0.0374, +0.0444] | +0.0242 [+0.0213, +0.0267] |
+| M30 | fresh 2018-19 | 0.5153 / 0.845 | 0.5550 / 0.452 | +0.0396 [+0.0347, +0.0445] | +0.0231 [+0.0187, +0.0271] |
+| M5 | 2021-22 | 0.5155 / 0.847 | 0.5374 / 0.510 | +0.0220 [+0.0201, +0.0239] | +0.0133 [+0.0118, +0.0148] |
+| M5 | 2026 Jan-Oct | 0.5105 / 0.846 | 0.5283 / 0.521 | +0.0177 [+0.0152, +0.0206] | +0.0115 [+0.0094, +0.0138] |
+
+Every fresh half-year positive; DV (same number of calls, zone's own strength) is **worse** than the zone everywhere
+(-0.03 in 2018-19), so the gain is the score's, not a side effect of calling less.
+
+**Why 2018-2019 is larger than every later window.** Bitstamp 2018-19 minute prints carry a Roll-implied bid-ask
+bounce of about 7 bp (1-lag return autocorrelation -0.08 at 1m); a "bounce oracle" that only exploits that reaches
+55.5% accuracy at H = 1 there, against 51.2% in 2021-22 and 50.0% on Bitstamp 2026 (Roll spread 0; bid-quote
+broker candles carry no last-trade bounce by construction).
+
+**Independent judge's verdict** (recompute, regime and leakage material; `wf/verify_veto/`): numerically correct
+(every frozen M5 / M15 / M30 value reproduced, max |diff| 5e-6; dry-window truncation shows no look-ahead; apply-path
+JSON round trip exact). Of the M5 +4.3 pts: stale prints at most 0.1 pt; Bitstamp's last-trade bounce about 1-1.5 pt
+(1-2 pt of the +5.0 at H = 1), measured by re-labelling the frozen calls with a centred mid-price proxy and netting
+the proxy's lag bias with the bounce-free 2026 window as placebo; about 0.2 pt of the M30 +4.0. The de-bounced
+2018-19 gains, about +3 (M5) / +3.8 (M30), are a genuine but era-specific mean-reversion regime: a de-bounced
+"fade the last candle" veto gains +2.4 (2018-19) -> +1.5 (2021-22) -> +0.8 (2026) over the zone; all 24 fresh
+months positive; the monthly gain tracks the sign-reversal rate (Spearman 0.81). The 2018-19 models also weight the
+last return about 4x more than the shipped 2026 bank, so that window tests the rule, not the shipped coefficients;
+the fresh broker test below is the only test of the shipped bank. Sizes on bounce-free data: +1 to +2 pts.
+
+**Fresh broker test** (run by the MT5 study on BTCUSD.c, 2026-07-01 .. 2026-10-12, protocol frozen before outcomes;
+`results/veto/codex_fresh_broker_2026.md`): M5, fixed H = 3 model, next-5-minute labels, n = 29,284: raw accuracy
+51.04% -> 52.10% [+0.60, +1.51 pts], permission AUC 0.5101 -> 0.5164 [+0.0025, +0.0102], coverage 83.9% -> 53.1%;
+positive in both quarters. **Independently recomputed here** with the frozen `apply` path on the same candles:
+identical to 5 decimals (n, calls, AUC, accuracy, coverage). The hard-coded coefficient bank in the MQL5 source
+equals the frozen JSON exactly on all 9 models. Honest effect size for deployment discussions: **about one extra
+correct call per hundred, at a little over half the zone's coverage.**
+
+**MQL5 module** (`BTCUSD_Score_Veto_MT5.mq5`, separate optional indicator, SHA-256 `d50e2f0e...`, EnableVeto = false
+by default, no order API, original indicator / binary / defaults unchanged and hash-verified by its author):
+independent adversarial source review in progress (three reviewers, skeptics); verdict to be appended here.
+My own checks so far: the 11-line diff from the first upload is exactly the retry clamp, enum validation and the
+removed stale buffer comment; the README's 13-buffer map matches `OnInit`; coefficient bank exact on 9 models.
+
+**Not done, by design**: no Pine or MT5 default changed; no live iCustom chart smoke (isolated terminal without a
+broker clock; stated limitation); the Pine-side veto is a pending user choice.

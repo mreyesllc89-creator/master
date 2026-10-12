@@ -85,6 +85,9 @@ slice), for an aggregate check after the row-level one.
 Fresh Bitstamp 2018-2019 (never evaluated before): R2 raises raw accuracy over the zone by +4.3 / +4.1 / +4.0 points
 on M5 / M15 / M30 (95% CIs entirely above +3.5) at about 46-48% coverage instead of 85%, AUC +0.024; 2021-2022:
 +2.2 / +2.4 / +2.4; 2026 (Jan-Oct): +1.8 / +2.0 / +1.1. A distance-only veto of the same size is worse than the zone.
+Caveat (HANDOFF section 11): about 1-1.5 pt of the 2018-19 M5 figure is Bitstamp's last-trade bounce and the rest
+is an era-specific regime; the deployment-relevant size is the fresh broker test, M5 H = 1 **+1.1 pts [+0.6, +1.5]**
+at coverage 84% -> 53% (`results/veto/codex_fresh_broker_2026.md`).
 The independent verification of this run is reported in `HANDOFF_WF.md` section 11 when complete (recompute part
-done: all M5 / M30 metrics, thresholds and training-window checks match). The 2026 broker
+done: all M5 / M15 / M30 metrics, thresholds and training-window checks match). The 2026 broker
 candles are the remaining fully fresh test: `python wf_veto.py apply <broker_csv> 2026-01-01 <end> veto_model_2026.json`.
