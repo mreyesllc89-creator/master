@@ -244,9 +244,24 @@ correct call per hundred, at a little over half the zone's coverage.**
 
 **MQL5 module** (`BTCUSD_Score_Veto_MT5.mq5`, separate optional indicator, SHA-256 `d50e2f0e...`, EnableVeto = false
 by default, no order API, original indicator / binary / defaults unchanged and hash-verified by its author):
-independent adversarial source review in progress (three reviewers, skeptics); verdict to be appended here.
-My own checks so far: the 11-line diff from the first upload is exactly the retry clamp, enum validation and the
-removed stale buffer comment; the README's 13-buffer map matches `OnInit`; coefficient bank exact on 9 models.
+independent adversarial source review (three reviewers, one skeptic per finding; final source SHA-256
+`d50e2f0e...`): **no numerical or causality defect; two low robustness findings, four claims refuted.**
+- Confirmed (low): global feed and model state survive `OnInit` re-entry, so changing `ModelTimeframe` (or the
+  symbol) in the properties dialog splices the previous timeframe's bars in front of the new feed; and after a rebuild
+  that extends the retained history anchor, historical buffers on a chart whose period differs from `ModelTimeframe`
+  are not recomputed (`OnCalculate` resumes from `prev_calculated`). Both affect **displayed history and the
+  retrospective statistics only**; the live permission resyncs. One fix covers both: free the feed, arm and veto
+  arrays and reset `ready` / `built_time` / `built_closed` / `retry_at` in `OnInit`, and force a full buffer pass when
+  the anchor moves. Recommended before any live use; not a parity issue.
+- Refuted: buffer 2 = `EMPTY_VALUE` on unscored or expired candles (the declared MQL5 "no value", `PLOT_EMPTY_VALUE`
+  set); `EnableVeto = false` publishing 0 (documented; the README tells an EA to check `EnableVeto` and `ModelReady`);
+  gap expiry only on the forming slot (correct on a same-period chart); a flat-close TDI rounding difference on x2 /
+  x4 children (no realistic effect).
+- Checked by me: the 11-line diff from the first upload is exactly the retry clamp, enum validation and the removed
+  stale buffer comment; the README's 13-buffer map matches `OnInit`; the coefficient bank equals the JSON on all 9
+  models; an independent run of the research `apply` path on the same broker candles reproduces the author's M5
+  metrics to 5 decimals.
+- Still outstanding, by design: a live `iCustom` chart smoke test (the isolated terminal has no broker clock).
 
 **Not done, by design**: no Pine or MT5 default changed; no live iCustom chart smoke (isolated terminal without a
 broker clock; stated limitation); the Pine-side veto is a pending user choice.
