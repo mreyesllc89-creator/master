@@ -3,7 +3,7 @@
 # SYMBOL: MEXC:BTCUSDT.P
 # Strategy Tester Properties, identical on every run: commission 0.02 % per side (percent type), slippage 50 ticks (5 USD per side), order size fixed 0.1 contracts, bar magnifier the same way on every run
 # Inputs at validated defaults with fixedQty 0.1 and qtyStep 0.01 set in S3; block at indicator defaults (filter 60, zones 60 / 120 / 240)
-# Common window (from the 5-minute first bar to the common last bar): FROM ________ TO ________  (H1 = first half, H2 = second half; split at the midpoint date)
+# Common window (5-minute history sets it): FROM 2026-07-14 TO 2026-10-13, 92 days. H1 = 2026-07-14 to 2026-08-28 (46 days), H2 = 2026-08-29 to 2026-10-13 (46 days). Set the Strategy Tester date range to the window on every run; H1 / H2 only in Stage 3.
 # Every run: reset all inputs to defaults first, set the one cell change, set the window, record the five metrics from the Strategy Tester Overview.
 # Stage 1 rows are prefilled. Append Stage 2 / 2b / 3 rows with: python3 sweep_score.py plan stage2 --log runlog_FlashGold_v5_FGF.csv --chart-tf <tf>
 # Score with: python3 sweep_score.py score --log runlog_FlashGold_v5_FGF.csv --out scores_fg5.csv --report SWEEP_REPORT_fg5.md
