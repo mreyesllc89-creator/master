@@ -13,9 +13,11 @@ candles up to 2026-10-11 02:00 UTC:
 | `score` | the frozen H = 3 model's log-odds (Pine: `FGV score (last filter candle)` / `FGF veto score`) |
 | `answer` | 1 UP (score > q_hi), -1 DOWN (score < q_lo), 0 undecided (Pine: `FGV answer`) |
 | `zone_P0` | the filter's zone at that close: 1 BUY ZONE, -1 SELL ZONE, 0 NO TRADE (Pine: `FGV in 1 zone`) |
-| `veto_permission` | the zone where the answer agrees with it, else 0 (Pine: `FGF score veto` with the veto on, read on the next candle) |
+| `veto_permission` | the zone where the answer agrees with it, else 0 (Pine: `FGF zone` with the veto on, on the filter's own timeframe in "Candle close" mode; `FGF score veto` is the answer alone) |
 
 ## How to compare on TradingView
+The export assumes a tick of 0.01 (BITSTAMP:BTCUSD); the zone's tick rounding uses the chart symbol's tick, so another symbol's zone can differ at the band edges.
+
 1. Chart **BITSTAMP:BTCUSD**, chart timeframe = the filter timeframe (5, 15, 30 or 60 minutes), exchange time zone UTC.
 2. Add `flashgold_direction_filter.pine` with every input at its default, **Filter timeframe = the chart timeframe**,
    and switch on "Score inputs in the Data Window" (group "Score veto"). The veto switch itself may stay off: the

@@ -352,12 +352,21 @@ what the zones forbid.
   and the filter's band / level inputs, `dist`, `side`, `r1 / r5 / r20`, `vol`, `age`, `zone_vol`, `dist_vol`, the FDF
   structure direction (`fgvFdf()`, the strategy's state machine without the divergence and Hurst parts), the TDI fast
   line's level and slope on the filter timeframe (same candle) and on 2 x / 4 x it (two nested `request.security`
-  calls with `lookahead_on` and `[1]`, the `map_prev_on` read; the script now makes 16 `request.security` calls).
+  calls with `lookahead_on` and `[1]`, the `map_prev_on` read; the script now makes 16 `request.security` calls
+  returning 63 tuple values, against TradingView's limits of 40 calls and 127 tuple values per script; pasted into the
+  FlashGold v5 strategy, whose calls return 56, both fit; the 17 parity inputs can be deleted to free 17).
   Division and clipping follow the calibration's numpy semantics (`fgvDiv`); a candle with any undefined input is not
   scored and, with the veto on, allows nothing (the contract's fail-closed rule).
 - **Timing**: the score, its answer and the ready flag travel in the same tuple as the arm and are picked by the same
   rule (`fgfSel`: latest filter candle closed by the clock, the one before it, or the previous bar's pick), so the
   permission of candle t applies from t's close to the next close, as the zone does and as the research labelled it.
+- **Status box and labels** reflect the veto everywhere they speak of a permission: row 0 (why NO TRADE), the zone
+  rows ("blocked now (score veto)"), the signal-direction row, the zone labels at the last candle, plus a veto row
+  (model, score, answer; "NOT APPLIED" without a model; "waiting for the first signal" / "inputs not ready" while fail
+  closed). Two reviews of the edit (feature parity against the Python definitions, including a 120,000-bar
+  equivalence test of the FDF port and an exact check of every coefficient; and timing / compile / default-path
+  review) found no high-severity defect; their medium findings (status rows ignoring the veto; header attributing
+  the 2018-2022 per-period refits to the shipped coefficients) and low ones are fixed in the committed version.
 - **Calibration guard**: the status box lists any input that differs from the calibrated settings (band 0.25, level =
   Entry price, lasts until next signal, against on, parent = filter TF, child zones 1-3 at 1 / 2 / 4 x, min aligned 2,
   v1.2 signal defaults). It is a warning, not a lock.

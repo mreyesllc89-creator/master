@@ -104,7 +104,8 @@
 //    score on your own symbol and timeframe before relying on any rule.
 //
 //  SCORE VETO  (group "Score veto", OFF by default: with the switch off
-//  nothing in this section touches the filter)
+//  nothing in this section changes a permission; it only adds two
+//  request.security calls, Data Window rows and the input group)
 //    A frozen logistic score, read from the filter's own state at the close
 //    of each filter candle, says UP, DOWN or undecided. With the veto on, a
 //    BUY ZONE allows buys only while the score says UP and a SELL ZONE
@@ -124,23 +125,32 @@
 //    calibration/wf/VETO_PORT_CONTRACT.md, results/veto/.
 //    What it did, zone alone -> zone + veto, raw accuracy of the allowed side
 //    at the next filter candle (and the share of candles with a permission):
-//      broker BTCUSD 2026-07 .. 2026-10, 5m: 51.0% -> 52.1% (95% CI of the
-//        gain +0.6 .. +1.5 points), permission on 84% -> 53% of candles;
-//      Bitstamp, never used in the design, 2018-2019: 5m 51.5% -> 56.1%,
-//        15m 51.4% -> 55.6%, 30m 50.9% -> 55.1%, 1H 50.8% -> 56.4%, of which
-//        about 1-1.5 points are that era's last-trade bounce; 2021-2022:
-//        +1.9 / +2.4 / +1.8 / +3.0; 2026-01 .. 10: +1.4 / +2.0 / +1.5 / +2.3;
-//        permission on 84% -> 40-54% of candles.
-//    The gain is small, varies by era and roughly halves the trades; 1H was
-//    reported, not part of the rule. The model was calibrated with the
+//      these coefficients, fresh broker BTCUSD 2026-07 .. 2026-10, 5m: 51.0%
+//        -> 52.1% (95% CI of the gain +0.6 .. +1.5 points), permission on
+//        84% -> 53% of candles; these coefficients on Bitstamp 2026-01 .. 10
+//        (a window looked at during the design): +1.4 / +2.0 / +1.5 / +2.3
+//        points on 5m / 15m / 30m / 1H;
+//      the same recipe refitted walk-forward per half-year (not these
+//        coefficients), Bitstamp 2018-2019, never looked at before the test:
+//        5m 51.5% -> 56.1%, 15m 51.4% -> 55.6%, 30m 50.9% -> 55.1%, 1H 50.8%
+//        -> 56.4%, of which about 1-2 points are that era's last-trade
+//        bounce; 2021-2022 (looked at during the design): +1.9 / +2.4 / +1.8
+//        / +3.0; permission on 84% -> 40-54% of candles in every window.
+//    The gain is small, varies by era and removes a third to a half of the
+//    permissions; 1H was reported, not part of the rule. In "Tick" mode the
+//    zone is the live one while the score is the last closed filter
+//    candle's (the research judged both at the candle's close: "Candle
+//    close" on the filter's own timeframe). The model was calibrated with the
 //    signal inputs at the v1.2 defaults, the band at 0.25, Level = Entry
 //    price, parent = the filter timeframe and the child zones at 1 / 2 / 4 x
 //    it (at least 2 aligned): the status box lists any setting that differs.
 //    The 30m and 1H models read 2H / 4H bars that, in the calibration, began
 //    on the broker's clock (UTC+2 / +3); TradingView's begin at 00:00 UTC,
-//    so those two models see shifted bars (5m and 15m are unaffected).
+//    so those two models see shifted bars (5m and 15m are unaffected). The
+//    zone's tick rounding uses the symbol's tick (0.01 in the calibration).
 //    Compare the Data Window inputs ("Score inputs in the Data Window") with
-//    calibration/wf/results/veto/pine_parity/ on BITSTAMP:BTCUSD.
+//    calibration/wf/results/veto/pine_parity/ on BITSTAMP:BTCUSD; on the
+//    live bar they show the forming filter candle.
 //
 //  FILTER TIMEFRAME  (default 1 hour)
 //    The signal runs on the candles of "Filter timeframe", every FlashGold
@@ -212,8 +222,10 @@
 //    FGF veto score     The score (log-odds; > 0 leans up) of the filter
 //                       candle in force, when a model exists.
 //    FGV in 1 .. 17, FGV score / answer (last filter candle)  The score's
-//                       inputs at the last closed filter candle, with "Score
-//                       inputs in the Data Window" on (parity check).
+//                       inputs, score and answer at the latest filter candle
+//                       (closed bars: the candle that closed with them; the
+//                       live bar: the forming candle), with "Score inputs in
+//                       the Data Window" on (parity check).
 //
 //  HOW TO USE IT
 //  A) Paste into your strategy (recommended)
@@ -226,7 +238,10 @@
 //     Exits are never gated. Every name starts with "fgf", so nothing clashes
 //     with your script (the FlashGold strategy included). If your script
 //     runs in its own pane, set FGF_FORCE_OVERLAY = true. The block makes 16
-//     request.security calls; a script may make 40 in total.
+//     request.security calls (a script may make 40) returning 63 tuple
+//     values (a script's calls may return 127 together; the FlashGold v5
+//     strategy's return 56, so both fit). To free 17, delete the "x1 ..
+//     x17" / "fvX1 .. fvX17" tuple members and the "FGV in" plots.
 //  B) Link without editing
 //     Add this indicator to the chart. In your strategy add
 //         fgfBuyExt  = input.source(close, "FG filter buy allowed")
@@ -302,8 +317,8 @@ fgsWin  = input.int(500, "Window, filter candles (0 = all history)", minval=0, m
 fgsH    = input.int(10, "Longer horizon H, filter candles", minval=2, maxval=100, group=GRP_FGS)
 
 GRP_FGV = "Score veto"
-fgvOn  = input.bool(false, "Score veto: a zone allows its side only while the score agrees", group=GRP_FGV, tooltip="Off (default): the zones alone decide. On: a frozen logistic score, read from the filter's own state at the close of each filter candle, must also say UP for a buy (DOWN for a sell); it never allows what the zones forbid. Models exist for the 5m, 15m, 30m and 1H filter timeframes (BTC/USD, Bitstamp 2020-2025); on any other timeframe the veto is not applied and the status box says so. Until the score's inputs exist (about 100 filter candles) nothing is allowed. Out of sample it added about +1 to +2 points of next-candle accuracy and removed about a third of the permissions (see the header).")
-fgvDbg = input.bool(false, "Score inputs in the Data Window", group=GRP_FGV, tooltip="Adds the score's 17 inputs, its value and its answer at the last closed filter candle to the Data Window, to check them against the research export (calibration/wf/results/veto/pine_parity, BITSTAMP:BTCUSD).")
+fgvOn  = input.bool(false, "Score veto: a zone allows its side only while the score agrees", group=GRP_FGV, tooltip="Off (default): the zones alone decide. On: a frozen logistic score, read from the filter's own state at the close of each filter candle, must also say UP for a buy (DOWN for a sell); it never allows what the zones forbid. Models exist for the 5m, 15m, 30m and 1H filter timeframes (BTC/USD, Bitstamp 2020-2025); on any other timeframe the veto is not applied and the status box says so. Until the score's inputs exist (about 100 filter candles of chart history) nothing is allowed. Out of sample it added about +1 to +2 points of next-candle accuracy and removed a third to a half of the permissions (see the header).")
+fgvDbg = input.bool(false, "Score inputs in the Data Window", group=GRP_FGV, tooltip="Adds the score's 17 inputs, its value and its answer at the latest filter candle (the forming one on the live bar) to the Data Window, to check them against the research export (calibration/wf/results/veto/pine_parity, BITSTAMP:BTCUSD).")
 
 // ---- FlashGold signal inputs (the strategy's, same defaults) ----------------
 GRP_FGC = "FlashGold signal: core"
@@ -666,7 +681,7 @@ fgvFastPrev() =>
 // clipped to [-lim, lim].
 fgvDiv(float x, float y, float lim) =>
     float v = y == 0 ? (x > 0 ? lim : x < 0 ? -lim : na) : x / y
-    math.max(-lim, math.min(lim, v))
+    na(v) ? na : math.max(-lim, math.min(lim, v))
 
 // The score at this filter candle's close. Returns [score (log-odds), answer
 // (1 UP, -1 DOWN, 0 undecided or inputs missing), inputs ready (1 / 0), the
@@ -678,8 +693,10 @@ fgvScore(float aPx, int aDir, int aBar, float aAtr, float fAtr) =>
     float qLo = fgvModelQlo(fgfTfSec)
     float qHi = fgvModelQhi(fgfTfSec)
     // 1-3: the zone at this close (the filter's rule: band edges rounded
-    // outward to the tick, cleared by more than half a tick), the distance
-    // from the level in ATR(14) of the signal candle, the last signal's side
+    // outward to the tick, cleared by more than half a tick; with no band the
+    // level alone, without the chart gate's "at the level on the signal
+    // candle" exception, as the calibration), the distance from the level in
+    // ATR(14) of the signal candle, the last signal's side
     float mt   = syminfo.mintick
     float band = fgfBandAtr * nz(aAtr)
     float up   = band > 0 ? math.ceil((aPx + band) / mt - 1e-9) * mt : aPx
@@ -742,26 +759,26 @@ fgvScore(float aPx, int aDir, int aBar, float aAtr, float fAtr) =>
 // The names of the settings that differ from the veto's calibration ("" = none).
 fgvCalibDiff() =>
     string s = ""
-    s += fgfBandAtr != 0.25 ? "band 0.25, " : ""
-    s += fgfLvMode != "Entry price" ? "level Entry price, " : ""
-    s += fgfLast != "Until next signal" ? "lasts until next signal, " : ""
-    s += not fgfAgainst ? "against on, " : ""
-    s += not fgfUseZones ? "TDI zones on, " : ""
-    s += timeframe.in_seconds(fgfParentTf) != fgfTfSec ? "parent = filter TF, " : ""
-    s += not (fgfUseZ1 and fgfUseZ2 and fgfUseZ3) or fgfUseZ4 or fgfUseZ5 or fgfUseZ6 ? "child zones 1-3 only, " : ""
-    s += fgfUseZ1 and timeframe.in_seconds(fgfZTf1) != fgfTfSec ? "zone 1 = filter TF, " : ""
-    s += fgfUseZ2 and timeframe.in_seconds(fgfZTf2) != fgfTfSec * 2 ? "zone 2 = 2 x filter TF, " : ""
-    s += fgfUseZ3 and timeframe.in_seconds(fgfZTf3) != fgfTfSec * 4 ? "zone 3 = 4 x filter TF, " : ""
-    s += fgfMinAligned != 2 ? "min aligned 2, " : ""
-    s += fgfFlatParent ? "flat parent off, " : ""
-    s += not fgfIgnoreNa ? "ignore no-data on, " : ""
-    s += not fgfHtfClosed ? "higher-TF closed on, " : ""
-    s += fgfRsiLen != 14 or fgfFastLen != 2 ? "RSI 14 / fast 2, " : ""
-    s += fgfSpreadPts != 25 ? "spread 25, " : ""
-    s += fgfDistUnit != "ATR" or fgfBurstAtr != 0.5 or fgfEntryDistAtr != 0.25 ? "burst 0.5 / entry 0.25 ATR, " : ""
-    s += fgfHoldBars != 0 ? "hold 0, " : ""
-    s += not fgfOnePerBar or not fgfUseBurst or fgfAnyCombo or fgfUseDrift ? "one per bar, burst on, any combo off, drift off, " : ""
-    str.length(s) > 2 ? str.substring(s, 0, str.length(s) - 2) : s
+    s += fgfBandAtr != 0.25 ? "band 0.25\n" : ""
+    s += fgfLvMode != "Entry price" ? "level Entry price\n" : ""
+    s += fgfLast != "Until next signal" ? "lasts until next signal\n" : ""
+    s += not fgfAgainst ? "against on\n" : ""
+    s += not fgfUseZones ? "TDI zones on\n" : ""
+    s += timeframe.in_seconds(fgfParentTf) != fgfTfSec ? "parent = filter TF\n" : ""
+    s += not (fgfUseZ1 and fgfUseZ2 and fgfUseZ3) or fgfUseZ4 or fgfUseZ5 or fgfUseZ6 ? "child zones 1-3 only\n" : ""
+    s += fgfUseZ1 and timeframe.in_seconds(fgfZTf1) != fgfTfSec ? "zone 1 = filter TF\n" : ""
+    s += fgfUseZ2 and timeframe.in_seconds(fgfZTf2) != fgfTfSec * 2 ? "zone 2 = 2 x filter TF\n" : ""
+    s += fgfUseZ3 and timeframe.in_seconds(fgfZTf3) != fgfTfSec * 4 ? "zone 3 = 4 x filter TF\n" : ""
+    s += fgfMinAligned != 2 ? "min aligned 2\n" : ""
+    s += fgfFlatParent ? "flat parent off\n" : ""
+    s += not fgfIgnoreNa ? "ignore no-data on\n" : ""
+    s += not fgfHtfClosed ? "higher-TF closed on\n" : ""
+    s += fgfRsiLen != 14 or fgfFastLen != 2 ? "RSI 14 / fast 2\n" : ""
+    s += fgfSpreadPts != 25 ? "spread 25\n" : ""
+    s += fgfDistUnit != "ATR" or fgfBurstAtr != 0.5 or fgfEntryDistAtr != 0.25 ? "burst 0.5 / entry 0.25 ATR\n" : ""
+    s += fgfHoldBars != 0 ? "hold 0\n" : ""
+    s += not fgfOnePerBar or not fgfUseBurst or fgfAnyCombo or fgfUseDrift ? "one per bar, burst on, any combo off, drift off\n" : ""
+    str.length(s) > 0 ? str.substring(s, 0, str.length(s) - 1) : s
 // ===== END SCORE VETO =========================================================
 
 // Each filter candle sends its arm, its conditions, its index, open and close
@@ -990,8 +1007,9 @@ if barstate.islast
         // (with the score veto on, a zone the score blocks right now is marked)
         bool upVeto = upAllowed and not fgvBuyOk
         bool dnVeto = dnAllowed and not fgvSellOk
-        fgfZUp  := label.new(bar_index + 3, fgfUpLv, (upAllowed ? (upVeto ? "BUY ZONE (score veto) " : "BUY ZONE ") : "NO TRADE ") + fgfEdgeTx(true), style=label.style_label_lower_left, color=color.new(upAllowed and not upVeto ? color.lime : color.gray, 30), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
-        fgfZDn  := label.new(bar_index + 3, fgfDnLv, (dnAllowed ? (dnVeto ? "SELL ZONE (score veto) " : "SELL ZONE ") : "NO TRADE ") + fgfEdgeTx(false), style=label.style_label_upper_left, color=color.new(dnAllowed and not dnVeto ? color.red : color.gray, 30), textcolor=color.white, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+        string vetoTx = fgvRdy ? " (score veto) " : " (score not ready) "
+        fgfZUp  := label.new(bar_index + 3, fgfUpLv, (upAllowed ? (upVeto ? "BUY ZONE" + vetoTx : "BUY ZONE ") : "NO TRADE ") + fgfEdgeTx(true), style=label.style_label_lower_left, color=color.new(upAllowed and not upVeto ? color.lime : color.gray, 30), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+        fgfZDn  := label.new(bar_index + 3, fgfDnLv, (dnAllowed ? (dnVeto ? "SELL ZONE" + vetoTx : "SELL ZONE ") : "NO TRADE ") + fgfEdgeTx(false), style=label.style_label_upper_left, color=color.new(dnAllowed and not dnVeto ? color.red : color.gray, 30), textcolor=color.white, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
         if fgfBand > 0
             fgfZMid := label.new(bar_index + 3, fgfLevel, "NO TRADE (band)", style=label.style_label_left, color=color.new(color.gray, 30), textcolor=color.white, size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
 
@@ -1036,8 +1054,10 @@ if fgfShowTbl and fgfOn and barstate.islast
     string dState = dBuy ? "BUY ZONE - buys allowed, no sells" : dSell ? "SELL ZONE - sells allowed, no buys" : "NO TRADE - " + dWhy
     color  dCol   = dBuy ? color.lime : dSell ? color.red : color.orange
     bool   dConf  = dOpen and fgfSigOk
-    bool   dSideOn = fgfSigDir > 0 ? fgfAllowBuy : fgfAllowSell
-    string dSigTx = not fgfArmed ? "-" : not dOpen ? "- (permission ended)" : dConf ? (dSideOn ? "CONFIRMED - " + dDo + "s allowed" : "CONFIRMED - but " + dDo + "s are switched off") : "NOT CONFIRMED - do not " + dDo
+    bool   dSideSw = fgfSigDir > 0 ? fgfAllowBuy : fgfAllowSell
+    bool   dSideV  = fgfSigDir > 0 ? fgvBuyOk : fgvSellOk
+    bool   dSideOn = dSideSw and dSideV
+    string dSigTx = not fgfArmed ? "-" : not dOpen ? "- (permission ended)" : dConf ? (dSideOn ? "CONFIRMED - " + dDo + "s allowed" : not dSideSw ? "CONFIRMED - but " + dDo + "s are switched off" : "CONFIRMED - but " + dDo + "s are blocked by the score veto") : "NOT CONFIRMED - do not " + dDo
     int    dSecs  = dOpen and not na(fgfEnd) ? math.max(0, math.floor((fgfEnd - (fgfCheck == "Tick" ? timenow : fgfClock)) / 1000.0)) : 0
     string dLeft  = not dOpen ? "-" : fgfLast == "Minutes" ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : fgfLast == "Candles" ? str.tostring(fgfEndBar - fgfIdx) + (fgfEndBar - fgfIdx == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
     string dSig   = na(fgfSigAt) ? "-" : dSide + " " + str.format_time(fgfSigAt, "MMM dd HH:mm", syminfo.timezone) + " @ " + (na(fgfLevel) ? "-" : str.tostring(fgfLevel, format.mintick))
@@ -1052,12 +1072,15 @@ if fgfShowTbl and fgfOn and barstate.islast
     table.cell(fgfTable, 0, 2, "Signal direction", text_color=color.white)
     table.cell(fgfTable, 1, 2, dSigTx, text_color=not fgfArmed ? color.white : dConf and dSideOn ? (fgfSigDir > 0 ? color.lime : color.red) : color.orange)
     table.cell(fgfTable, 0, 3, "BUY ZONE  " + dUp, text_color=color.white)
-    bool   dUpOk  = dOpen and fgfAllowBuy and (fgfAgainst or fgfSigDir > 0)
-    bool   dDnOk  = dOpen and fgfAllowSell and (fgfAgainst or fgfSigDir < 0)
+    bool   dUpSw  = dOpen and fgfAllowBuy and (fgfAgainst or fgfSigDir > 0)
+    bool   dDnSw  = dOpen and fgfAllowSell and (fgfAgainst or fgfSigDir < 0)
+    bool   dUpOk  = dUpSw and fgvBuyOk
+    bool   dDnOk  = dDnSw and fgvSellOk
     string dOff   = not fgfArmed ? "NO TRADE (no signal yet)" : not dOpen ? "NO TRADE (permission ended)" : "NO TRADE there"
-    table.cell(fgfTable, 1, 3, dBuy ? "ALLOWED (now)" : dUpOk ? "allowed there" : dOff, text_color=dBuy ? color.lime : dUpOk ? color.gray : color.orange)
+    string dVeto  = fgvRdy ? "blocked now (score veto)" : "blocked (score not ready)"
+    table.cell(fgfTable, 1, 3, dBuy ? "ALLOWED (now)" : dUpOk ? "allowed there" : dUpSw ? dVeto : dOff, text_color=dBuy ? color.lime : dUpOk ? color.gray : color.orange)
     table.cell(fgfTable, 0, 4, "SELL ZONE " + dDn, text_color=color.white)
-    table.cell(fgfTable, 1, 4, dSell ? "ALLOWED (now)" : dDnOk ? "allowed there" : dOff, text_color=dSell ? color.red : dDnOk ? color.gray : color.orange)
+    table.cell(fgfTable, 1, 4, dSell ? "ALLOWED (now)" : dDnOk ? "allowed there" : dDnSw ? dVeto : dOff, text_color=dSell ? color.red : dDnOk ? color.gray : color.orange)
     table.cell(fgfTable, 0, 5, "NO TRADE band", text_color=color.white)
     table.cell(fgfTable, 1, 5, na(fgfLevel) ? "-" : fgfBand > 0 ? str.tostring(fgfDnLv, format.mintick) + " - " + str.tostring(fgfUpLv, format.mintick) : fgfBandAtr > 0 and fgfArmed and na(fgfSigAtr) ? "off (no ATR yet at the signal)" : "off", text_color=color.white)
     table.cell(fgfTable, 0, 6, fgfCheck == "Candle open" ? "Candle open" : fgfCheck == "Candle close" ? "Last close" : "Price now", text_color=color.white)
@@ -1080,13 +1103,15 @@ if fgfShowTbl and fgfOn and barstate.islast
         table.cell(fgfTable, 0, 13, "BTC 2025-26 (1/10), parent = TF, zones x1/2/4", text_color=color.gray)
         table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
     if fgvOn
-        string vTxt = not fgvModel ? "NOT APPLIED: no model for " + fgfTfTag + " (5m, 15m, 30m, 1H only); zones alone" : not fgvRdy ? "inputs not ready (about 100 " + fgfTfTag + " candles): NO TRADE" : "score " + str.tostring(fgvSc, "#.####") + " = " + (fgvAns > 0 ? "UP: buys pass, sells blocked" : fgvAns < 0 ? "DOWN: sells pass, buys blocked" : "undecided: nothing passes")
-        table.cell(fgfTable, 0, 14, "Score veto (" + fgfTfTag + " model, BTC 2020-25)", text_color=color.white)
-        table.cell(fgfTable, 1, 14, vTxt, text_color=not fgvModel or not fgvRdy ? color.orange : fgvAns > 0 ? color.lime : fgvAns < 0 ? color.red : color.orange)
+        // (right under the last row in use: 9 without the direction score, 14 with it)
+        int    vRow = fgsShow ? 14 : 9
+        string vTxt = not fgvModel ? "NOT APPLIED: no model for " + fgfTfTag + " (5m, 15m, 30m, 1H only); zones alone" : not fgvRdy ? (not fgfArmed ? "waiting for the first signal: NO TRADE" : "inputs not ready (about 100 " + fgfTfTag + " candles of history): NO TRADE") : "score " + str.tostring(fgvSc, "#.####") + " = " + (fgvAns > 0 ? "UP: buys pass, sells blocked" : fgvAns < 0 ? "DOWN: sells pass, buys blocked" : "undecided: nothing passes")
+        table.cell(fgfTable, 0, vRow, fgvModel ? "Score veto (" + fgfTfTag + " model, BTC 2020-25)" : "Score veto", text_color=color.white)
+        table.cell(fgfTable, 1, vRow, vTxt, text_color=not fgvModel or not fgvRdy ? color.orange : fgvAns > 0 ? color.lime : fgvAns < 0 ? color.red : color.orange)
         string vDiff = fgvCalibDiff()
         if vDiff != ""
-            table.cell(fgfTable, 0, 15, "Veto calibrated with", text_color=color.gray)
-            table.cell(fgfTable, 1, 15, vDiff, text_color=color.orange)
+            table.cell(fgfTable, 0, vRow + 1, "Veto calibrated with", text_color=color.gray)
+            table.cell(fgfTable, 1, vRow + 1, vDiff, text_color=color.orange)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
 // Exported values (Data Window + linkable as a source from other scripts).
