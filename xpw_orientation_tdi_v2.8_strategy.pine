@@ -41,6 +41,9 @@
 //      "Reverse every label" trades the opposite direction of whatever the
 //      label says: every "enter" becomes "enter opposite" and vice versa.
 //      AGREE entries flip too. "exit only" rows are not changed.
+//    MONEY MANAGEMENT (groups "S2. Exits" and "S3. Sizing")
+//      Replaces the v2.7 trailing TP / stop inputs and the percent-of-
+//      equity default size. See STRATEGY below.
 //    TIMEFRAME ON EVERY LABEL AND ORDER
 //      Every label starts with the rung it came from ("5 Min *: DIV SHORT
 //      ZONE", "1 Min <<: 1st LEG ENTER LONGS"). Every order comment names
@@ -58,10 +61,13 @@
 //                      on any chart timeframe. A label on the side already
 //                      held stacks a new entry (up to "Max open entries"),
 //                      each with its own trailing TP / stop.
-//    Trailing TP       Arms once price moves "activation" in your favour,
-//                      then trails "offset" behind the best price.
-//                      Units: ticks, price, or percent of entry.
-//    Stop loss         Optional fixed stop, same units.
+//    S2. EXITS         Per entry: stop loss, take profit, trailing stop and
+//                      time stop. Unit = ATR (multiples of the chart ATR,
+//                      target as an R multiple of the stop) or Points
+//                      (ticks). 0 turns an exit off.
+//    S3. SIZING        Quantity per entry in contracts. Fixed, or Risk:
+//                      the quantity that loses "Risk %" of equity at the
+//                      stop. Rounded down to the step, capped at the max.
 //    LABELS            every label type has its own show/hide tick box next
 //                      to its colour. Hiding is display only; the strategy
 //                      still trades every label whose action is not "off".
@@ -135,7 +141,7 @@
 //  the map for location. Do not trade the verdict column on its own.
 // ============================================================================
 
-strategy("XPW Orientation TDI v2.8 Strategy", shorttitle="XPW-OTDI8 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
+strategy("XPW Orientation TDI v2.8 Strategy", shorttitle="XPW-OTDI8 S", overlay=false, max_labels_count=500, max_lines_count=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, process_orders_on_close=true, calc_on_every_tick=true)
 
 // ---------------------------------------------------------------- INPUTS ----
 rsiLen   = input.int(13,       "RSI length",            group="TDI core")
@@ -206,12 +212,28 @@ tradeDir   = input.string("Both", "Trade direction", options=["Both","Long only 
 reverseAll = input.bool(false, "Reverse every label (trade the opposite direction)", group="Strategy", tooltip="ON: every label trades against what it says. 'enter' rows become 'enter opposite' and vice versa, AGREE LONG enters short, AGREE SHORT enters long. 'exit only' rows are unchanged.")
 oppCloses  = input.bool(true, "Opposite ENTER closes (one-side mode)", group="Strategy", tooltip="Long only / Short only: an entry signal on the other side closes the open trade without opening a new one. In 'Both' an opposite entry always reverses.")
 tradeAgree = input.bool(true, "Also enter on AGREE labels", group="Strategy", tooltip="Needs 'Require rung agreement' on. Enters on the bar 'AGREE LONG xN' / 'AGREE SHORT xN' fires.")
-trailOn    = input.bool(true, "Use trailing take profit", group="Strategy")
-trailUnit  = input.string("price", "Trail / stop units", options=["ticks","price","percent"], group="Strategy", tooltip="ticks = minimum price moves. price = raw price distance (e.g. 2.0 on XAUUSD = $2). percent = % of the entry price.")
-trailAct   = input.float(2.0, "Trail activation", minval=0.0, step=0.1, group="Strategy", tooltip="Distance price must move in your favour before the trail arms.")
-trailOff   = input.float(1.0, "Trail offset", minval=0.0, step=0.1, group="Strategy", tooltip="Distance the stop trails behind the best price once armed.")
-slOn       = input.bool(false, "Use stop loss", group="Strategy")
-slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
+
+// S2. EXITS. Every entry gets its own stop, target and trail, in ATR or in
+// points. A value of 0 turns that exit off.
+exitUnit   = input.string("ATR", "SL / TP / trail unit", options=["ATR","Points"], group="S2. Exits", tooltip="ATR: distances are multiples of the chart ATR. Points: distances are in points (ticks = syminfo.mintick; on BTC with a 0.01 tick, 10000 pts = $100).")
+slPtsIn    = input.float(10000, "Stop loss, pts (Points mode)", minval=0, step=100, group="S2. Exits", tooltip="0 = no stop loss.")
+tpPtsIn    = input.float(30000, "Take profit, pts (Points mode)", minval=0, step=100, group="S2. Exits", tooltip="0 = no take profit.")
+atrLen     = input.int(14, "ATR length (ATR mode)", minval=1, group="S2. Exits")
+slAtrMult  = input.float(3.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="0 = no stop loss.")
+tpRMult    = input.float(1.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="Target = this many times the stop distance. 0 = no take profit.")
+trailOn    = input.bool(true, "Trailing stop", group="S2. Exits", tooltip="Arms once the trade is in profit by the activation distance, then trails behind the best price by the trail distance.")
+trActPts   = input.float(15000, "Trail activation, pts of profit (Points mode)", minval=0, step=100, group="S2. Exits")
+trDistPts  = input.float(10000, "Trail distance, pts (Points mode)", minval=0, step=100, group="S2. Exits")
+trActAtr   = input.float(1.0, "Trail activation, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits")
+trDistAtr  = input.float(0.75, "Trail distance, ATR mult (ATR mode)", minval=0, step=0.05, group="S2. Exits")
+timeStop   = input.int(0, "Time stop, bars (0 = off)", minval=0, group="S2. Exits", tooltip="Closes an entry at market once it has been open this many bars.")
+
+// S3. SIZING. Quantity per entry, in contracts (BTC on a BTC chart).
+qtyMode    = input.string("Fixed", "Quantity", options=["Fixed","Risk"], group="S3. Sizing", tooltip="Fixed: every entry is the fixed quantity. Risk: the quantity that loses 'Risk %' of equity if the stop loss is hit. With no stop loss, Risk falls back to Fixed.")
+qtyFixed   = input.float(0.1, "Fixed quantity (contracts = BTC)", minval=0, step=0.01, group="S3. Sizing")
+riskPct    = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0, step=0.1, group="S3. Sizing")
+qtyMax     = input.float(2.0, "Max quantity", minval=0, step=0.01, group="S3. Sizing")
+qtyStep    = input.float(0.01, "Quantity step (rounds down)", minval=0, step=0.001, group="S3. Sizing", tooltip="The quantity is rounded down to a multiple of this. An entry whose quantity rounds to 0 is skipped.")
 entryFill  = input.string("Signal tick", "Entry fill", options=["Signal tick","Limit at label price"], group="Strategy", tooltip="Limit at label price: buy limit at the label's price (candle low), sell limit at the candle high, filled only if price returns to it. Signal tick: live, a market fill on the tick the label appears; in the backtest, at the close of the label's candle.")
 limitBars  = input.int(5, "Limit valid (bars)", minval=1, maxval=500, group="Strategy", tooltip="An unfilled limit entry is cancelled after this many bars, or sooner when an exit or an opposite signal arrives.")
 useLimit   = entryFill == "Limit at label price"
@@ -734,10 +756,30 @@ if closeL
 if closeS
     strategy.close_all(comment=exitS ? "exit | " + exitSSrc : "opp ENTER | " + firstLong)
 
-// Distances in ticks from the entry. The percent unit uses this tick's price
-// (or the limit price), which is the price the entry is placed at.
-toTicks(float d, float ref) =>
-    trailUnit == "ticks" ? d : trailUnit == "price" ? d / syminfo.mintick : ref * d / 100.0 / syminfo.mintick
+// -------------------------------------------------- EXITS AND SIZING ----
+// Stop, target and trail distances in ticks for an entry placed now. ATR is
+// the chart ATR on this bar (computed every bar, as Pine requires).
+float atrNow  = ta.atr(atrLen)
+bool  atrMode = exitUnit == "ATR"
+float slTicks = atrMode ? slAtrMult * atrNow / syminfo.mintick : slPtsIn
+float tpTicks = atrMode ? tpRMult * slTicks : tpPtsIn
+float trAct   = atrMode ? trActAtr  * atrNow / syminfo.mintick : trActPts
+float trDist  = atrMode ? trDistAtr * atrNow / syminfo.mintick : trDistPts
+bool  slUse   = slTicks > 0
+bool  tpUse   = tpTicks > 0
+bool  trUse   = trailOn and trDist > 0
+
+// Quantity for one entry. Risk mode: the quantity that loses riskPct of the
+// current equity if the stop is hit (stop distance in price x point value).
+// Rounded down to the step and capped at the max.
+entryQty() =>
+    float q = qtyFixed
+    if qtyMode == "Risk" and slUse
+        float riskPerContract = slTicks * syminfo.mintick * syminfo.pointvalue
+        q := riskPerContract > 0 ? strategy.equity * riskPct / 100.0 / riskPerContract : 0.0
+    if qtyStep > 0
+        q := math.floor(q / qtyStep + 1e-9) * qtyStep
+    math.min(q, qtyMax)
 
 // Pending limit entries (limit mode): id and the bar each was placed on.
 var array<string> pendId  = array.new_string()
@@ -754,17 +796,24 @@ if useLimit and array.size(pendId) > 0
             array.remove(pendBar, k)
             array.remove(pendDir, k)
 
-// One entry per label. Its exit is attached to that entry id only. The
-// comment names the rung and the label that placed the order.
+// One entry per label, with its own stop / target / trail attached to that
+// entry id only. The comment names the rung and the label that placed it.
+// Returns false when the quantity rounds to 0 and nothing was placed.
 placeEntry(string id, bool isLong, float lim, string src) =>
-    float ref = na(lim) ? close : lim
-    float trPts = trailOn ? math.max(toTicks(trailAct, ref), 0.0) : na
-    float trOff = trailOn ? math.max(toTicks(trailOff, ref), 1.0) : na
-    float slPts = slOn    ? math.max(toTicks(slDist,   ref), 1.0) : na
-    string cmt = (isLong ? "ENTER LONG" : "ENTER SHORT") + (na(lim) ? "" : " @ label") + " | " + src
-    strategy.entry(id, isLong ? strategy.long : strategy.short, limit=lim, comment=cmt)
-    if trailOn or slOn
-        strategy.exit("X " + id, from_entry=id, trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP | " + src, comment_loss="SL | " + src)
+    float q = entryQty()
+    bool placed = q > 0
+    if placed
+        string cmt = (isLong ? "ENTER LONG" : "ENTER SHORT") + (na(lim) ? "" : " @ label") + " | " + src
+        strategy.entry(id, isLong ? strategy.long : strategy.short, qty=q, limit=lim, comment=cmt)
+        if slUse or tpUse or trUse
+            strategy.exit("X " + id, from_entry=id, loss=slUse ? slTicks : na, profit=tpUse ? tpTicks : na, trail_points=trUse ? math.max(trAct, 0.0) : na, trail_offset=trUse ? math.max(trDist, 1.0) : na, comment_loss="SL | " + src, comment_profit="TP | " + src, comment_trailing="trail | " + src)
+    placed
+
+// Time stop: close any entry that has been open for timeStop bars.
+if timeStop > 0 and strategy.opentrades > 0
+    for t = strategy.opentrades - 1 to 0
+        if bar_index - strategy.opentrades.entry_bar_index(t) >= timeStop
+            strategy.close(strategy.opentrades.entry_id(t), comment="time stop | " + strategy.opentrades.entry_comment(t))
 
 int room = maxOpen - strategy.opentrades - array.size(pendId)
 if goLong
@@ -772,23 +821,23 @@ if goLong
     for k = 0 to nLong - 1
         if room > 0 or strategy.position_size < 0
             string id = "L" + str.tostring(bar_index) + "-" + str.tostring(k + 1)
-            placeEntry(id, true, useLimit ? low : na, array.get(longSrc, k))
-            room -= 1
-            if useLimit
-                array.push(pendId, id)
-                array.push(pendBar, bar_index)
-                array.push(pendDir, 1)
+            if placeEntry(id, true, useLimit ? low : na, array.get(longSrc, k))
+                room -= 1
+                if useLimit
+                    array.push(pendId, id)
+                    array.push(pendBar, bar_index)
+                    array.push(pendDir, 1)
 if goShort
     doneS := bar_index
     for k = 0 to nShort - 1
         if room > 0 or strategy.position_size > 0
             string id = "S" + str.tostring(bar_index) + "-" + str.tostring(k + 1)
-            placeEntry(id, false, useLimit ? high : na, array.get(shortSrc, k))
-            room -= 1
-            if useLimit
-                array.push(pendId, id)
-                array.push(pendBar, bar_index)
-                array.push(pendDir, -1)
+            if placeEntry(id, false, useLimit ? high : na, array.get(shortSrc, k))
+                room -= 1
+                if useLimit
+                    array.push(pendId, id)
+                    array.push(pendBar, bar_index)
+                    array.push(pendDir, -1)
 
 // A limit that filled is no longer pending.
 if useLimit and array.size(pendId) > 0 and strategy.opentrades > 0
