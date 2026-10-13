@@ -283,9 +283,11 @@ timeframes" baseline (CNT / CNTV), all on identical candles.
 | 2026 Jan-Oct | 0.5087 / 0.846 | 0.5224 / 0.540 | 0.5225 / 0.501 | +0.0139 | +0.0001 [-0.0026, +0.0028] |
 
 Pre-registered conditions: (1) FRV beats the zone, met; (2) FRV beats R2s at comparable coverage, **not met**
-(worse in all four fresh half-years); (3) FRP's AUC beats the option-2 score's, **not met** (-0.013). The
-continuous fractal score FR has an AUC 0.003 below the option-2 score on fresh data and 0.005-0.006 above it in
-2021-26: a difference of no practical size.
+(worse in all four fresh half-years, three with the CI below zero); (3) FRP's permission AUC beats the option-2
+permission's, **not met** (-0.013 [-0.015, -0.011]). As continuous scores, FR's AUC (0.557) is 0.014 [0.013, 0.016]
+below the option-2 score's (0.571) on the fresh window. Horizon convention: the option-2 baselines use the fixed
+H = 3 model at every horizon (as ported), FR a model per horizon; this favours FR. (The section 11 veto table reports
+the mean of H with per-horizon R2, so its zone row reads 0.5230 for the same window; this table is H = 1.)
 
 **Where the weight went** (standardised |w|, fresh H = 1 models): M5 0.32, M15 0.11, W1 0.06, H1 0.04, H4 0.03,
 D1 0.02; the three alignment summaries 0.05. The two largest inputs are the M5 TDI level and direction, both
@@ -296,7 +298,19 @@ positive (trend-following) weights with stable signs.
 window, and the count veto CNTV is below the zone: when the whole stack points one way, the next five minutes lean
 very slightly the other way.
 
-VERDICT_FRACTAL_PLACEHOLDER
+**Independent verification** (`wf/verify_fractal/`): every pooled fresh H = 1 quantity for P0, R2s, G2P, FRP, FRV
+and the three differences reproduces with separate code to < 5e-6; sklearn refits equal the frozen weights to 5e-6;
+every training label ends before its half-year; a truncation test at two cuts shows all 21 inputs and the zone are
+identical on truncated and full data (no look-ahead); a Sunday-week control does not reproduce the CSV, so the
+published numbers use TradingView's Monday weeks as designed. Post-hoc checks by the judge, not pre-registered:
+**adding all fifteen higher-timeframe inputs to the option-2 veto's own inputs changes the 5-minute AUC by +0.0003
+[+0.0000, +0.0008] and the veto's accuracy by +0.0001 [-0.0010, +0.0012]**; the H1-and-above readings alone forecast
+the next 5 minutes with AUC 0.508, M15-and-above 0.517, the three M5 readings alone 0.556, all 21 inputs 0.557. So the
+frozen design shows a stack-only score does not beat the local veto; the nested check shows the higher timeframes add
+nothing measurable to it at 5 minutes. The pre-registered drop-one-timeframe ablation and the longer-horizon look
+(where the stack starts to pay) are reported in `results/fractal/ablation.csv` (exploratory). Code note, no effect on
+results: higher-TF direction columns carry an int64 fill in 1,440 warm-up rows that the level column's NaN mask
+removes; cast before `take` in any future version.
 
 **Consequence for Pine.** Under the pre-registered rule no fractal veto is added to the Pine filter. The 2026
 coefficients are kept for the record (`results/fractal/fractal_model_2026.json`), not for use. The one veto that
