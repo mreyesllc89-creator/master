@@ -1,0 +1,2 @@
+c1_FRV_beats_P0,c2_FRV_beats_R2s_at_comparable_coverage,c3_FRP_beats_G2P_auc,stack_adds_something,works_but_restates_local_veto,flagged_fresh_halves,FRV_minus_P0_acc,FRV_minus_R2s_acc,FRV_minus_R2s_acc_ci,FRP_minus_G2P_auc,coverage_FRV,coverage_R2s
+True,False,False,False,True,2018H1;2018H2;2019H1;2019H2,0.04044537089575684,-0.005056022977514507,-0.00699;-0.00284,-0.013174447656571053,0.4071394926317206,0.46032760725580857

@@ -265,3 +265,39 @@ independent adversarial source review (three reviewers, one skeptic per finding;
 
 **Not done, by design**: no Pine or MT5 default changed; no live iCustom chart smoke (isolated terminal without a
 broker clock; stated limitation); the Pine-side veto is a pending user choice.
+
+## 12. The fractal direction score (W1 down to M5): frozen test (`PREREG_FRACTAL.md`, frozen at `8e53ab5`)
+
+**Question.** Does reading the direction state of every higher timeframe (FDF structure trend and TDI fast line at
+M5, M15, H1, H4, D1 and W1, W1 = TradingView's Monday week) forecast the next 5-minute direction better than the
+zone alone, and better than the local option-2 veto that reads only M5 / M10 / M20? Fitted frozen logistic weights
+(FR), its permission (FRP), the veto FRV = zone kept where FRP agrees, and a no-fitting "count the aligned
+timeframes" baseline (CNT / CNTV), all on identical candles.
+
+**Frozen verdict: the stack works only because it contains the local reading; it does not beat the local veto.**
+
+| window (M5, H = 1) | zone acc / cov | option-2 veto R2s acc / cov | fractal veto FRV acc / cov | FRV - zone | FRV - R2s [95% CI] |
+|---|---|---|---|---|---|
+| fresh 2018-19 | 0.5155 / 0.851 | 0.5610 / 0.460 | 0.5559 / 0.407 | +0.0404 | **-0.0051 [-0.0070, -0.0028]** |
+| 2021-22 | 0.5163 / 0.847 | 0.5352 / 0.538 | 0.5368 / 0.477 | +0.0205 | +0.0016 [-0.0003, +0.0036] |
+| 2026 Jan-Oct | 0.5087 / 0.846 | 0.5224 / 0.540 | 0.5225 / 0.501 | +0.0139 | +0.0001 [-0.0026, +0.0028] |
+
+Pre-registered conditions: (1) FRV beats the zone, met; (2) FRV beats R2s at comparable coverage, **not met**
+(worse in all four fresh half-years); (3) FRP's AUC beats the option-2 score's, **not met** (-0.013). The
+continuous fractal score FR has an AUC 0.003 below the option-2 score on fresh data and 0.005-0.006 above it in
+2021-26: a difference of no practical size.
+
+**Where the weight went** (standardised |w|, fresh H = 1 models): M5 0.32, M15 0.11, W1 0.06, H1 0.04, H4 0.03,
+D1 0.02; the three alignment summaries 0.05. The two largest inputs are the M5 TDI level and direction, both
+negative (contrarian), i.e. the same reading the option-2 veto already uses. The higher timeframes carry small
+positive (trend-following) weights with stable signs.
+
+**The alignment count is wrong-way at 5 minutes.** CNT (net number of timeframes pointing up) has AUC 0.48 in every
+window, and the count veto CNTV is below the zone: when the whole stack points one way, the next five minutes lean
+very slightly the other way.
+
+VERDICT_FRACTAL_PLACEHOLDER
+
+**Consequence for Pine.** Under the pre-registered rule no fractal veto is added to the Pine filter. The 2026
+coefficients are kept for the record (`results/fractal/fractal_model_2026.json`), not for use. The one veto that
+earned a place remains option 2 (section 11), whose Pine integration is the user's pending choice.
