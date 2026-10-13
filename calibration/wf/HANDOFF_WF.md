@@ -335,3 +335,40 @@ if a longer-horizon filter is ever wanted, and would need its own frozen test.
 **Consequence for Pine.** Under the pre-registered rule no fractal veto is added to the Pine filter. The 2026
 coefficients are kept for the record (`results/fractal/fractal_model_2026.json`), not for use. The one veto that
 earned a place remains option 2 (section 11), whose Pine integration is the user's pending choice.
+
+## 13. Option 2 in the Pine filter: optional "Score veto", off by default
+
+The user's choice after sections 11-12: the full option-2 veto goes into `flashgold_direction_filter.pine` as a switch
+in the new input group "Score veto", **off by default** (with it off every gate, plot, label and status-box text is what
+v1.2 produced; two new Data Window plots and the new input group are the only additions). With it on, a BUY ZONE
+allows buys only while the frozen score says UP and a SELL ZONE allows sells only while it says DOWN; it never allows
+what the zones forbid.
+
+- **Model**: the H = 3 entry of `results/veto/veto_model_2026.json` for the filter timeframe, hard-coded in the script
+  (`fgvModelW / Mu / Sd / Qlo / Qhi`, one array per timeframe: 5m, 15m, 30m, 1H). On any other filter timeframe the
+  veto is not applied, the zones decide alone and the status box says "NOT APPLIED".
+- **Inputs**: the 17 of `VETO_PORT_CONTRACT.md` section 2, computed in `fgvScore()` inside the filter-timeframe
+  `request.security` call at each candle's close, from the filter's own state: the zone with the v1.2 tick-exact edges
+  and the filter's band / level inputs, `dist`, `side`, `r1 / r5 / r20`, `vol`, `age`, `zone_vol`, `dist_vol`, the FDF
+  structure direction (`fgvFdf()`, the strategy's state machine without the divergence and Hurst parts), the TDI fast
+  line's level and slope on the filter timeframe (same candle) and on 2 x / 4 x it (two nested `request.security`
+  calls with `lookahead_on` and `[1]`, the `map_prev_on` read; the script now makes 16 `request.security` calls).
+  Division and clipping follow the calibration's numpy semantics (`fgvDiv`); a candle with any undefined input is not
+  scored and, with the veto on, allows nothing (the contract's fail-closed rule).
+- **Timing**: the score, its answer and the ready flag travel in the same tuple as the arm and are picked by the same
+  rule (`fgfSel`: latest filter candle closed by the clock, the one before it, or the previous bar's pick), so the
+  permission of candle t applies from t's close to the next close, as the zone does and as the research labelled it.
+- **Calibration guard**: the status box lists any input that differs from the calibrated settings (band 0.25, level =
+  Entry price, lasts until next signal, against on, parent = filter TF, child zones 1-3 at 1 / 2 / 4 x, min aligned 2,
+  v1.2 signal defaults). It is a warning, not a lock.
+- **Known deviation**: the 30m and 1H models were fitted with 2H / 4H child bars on the broker's clock (UTC+2 / +3);
+  TradingView's start at 00:00 UTC. `results/veto/pine_parity/aggregates_2026_utc.csv` applies the frozen model to UTC
+  bars for 2026: within 0.3 pt of the clock-matched run on every timeframe (no CIs; 2026 is an inspected window).
+- **Parity check for the user**: `veto_pine_parity.py` writes `results/veto/pine_parity/parity_<TF>.csv` (last 3,000
+  candles, every input, the score, the answer, the zone and the veto permission on Bitstamp UTC bars) and the README
+  there says how to compare them with the Data Window plots `FGV in 1 .. 17` / `FGV score` / `FGV answer` (switch
+  "Score inputs in the Data Window"). The script could not be compiled here (no TradingView); it was syntax-checked
+  with pynescript and reviewed against the Python definitions; the row-level check on TradingView is the user's.
+- **Evidence on the switch itself**: header section "SCORE VETO" of the filter repeats the frozen numbers (fresh
+  2018-2019, 2021-2022, 2026, the broker 2026 test) with the bounce caveat; the gain is +1 to +2 points of next-candle
+  accuracy out of sample at about 45-55 % of the candles allowed instead of 84 %.
