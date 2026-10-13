@@ -312,6 +312,26 @@ nothing measurable to it at 5 minutes. The pre-registered drop-one-timeframe abl
 results: higher-TF direction columns carry an int64 fill in 1,440 warm-up rows that the level column's NaN mask
 removes; cast before `take` in any future version.
 
+**Where each reading pays** (`results/fractal/ablation.csv`, `fractal_ablation.py`; exploratory, point AUCs, no
+CIs; fresh 2018-19 walk-forward; labels at longer horizons overlap heavily, so the 1-day column rests on far fewer
+independent observations than its n suggests):
+
+| inputs | 5 min | 15 min | 50 min | 1 h | 4 h | 1 day |
+|---|---|---|---|---|---|---|
+| all 21 (W1 .. M5) | 0.557 | 0.563 | 0.575 | 0.577 | 0.563 | 0.523 |
+| local only (M5 + M15) | 0.556 | 0.562 | 0.573 | 0.574 | 0.559 | **0.482** |
+| M5 only | 0.556 | 0.560 | 0.572 | 0.573 | 0.552 | 0.491 |
+| M15 and above | 0.552 | 0.558 | 0.571 | 0.572 | 0.562 | 0.523 |
+| **stack only (H1, H4, D1, W1 + depth)** | **0.508** | 0.519 | 0.539 | 0.542 | 0.540 | **0.523** |
+| drop-one at 5 min: M5 / M15 / H1 / H4 / D1 / W1 | loss 0.0046 / 0.0012 / 0.0002 / 0.0001 / 0.0000 / -0.0001 | | | | | |
+
+Reading: at 5 minutes the forecast is the local contrarian reading and the big timeframes add nothing (dropping W1
+changes the AUC by 0.0001). The higher stack's own AUC rises with the horizon (0.508 at 5 min, 0.54 at 1-4 h) and
+at one day it carries all the information there is (0.523) while the local reading has turned wrong-way (0.482).
+So "read from the biggest chart down" is the right idea for a 1-hour-to-1-day direction and the wrong one for the
+next five minutes; a per-horizon switch (local below about 1 h, stack above about 4 h) would be the natural design
+if a longer-horizon filter is ever wanted, and would need its own frozen test.
+
 **Consequence for Pine.** Under the pre-registered rule no fractal veto is added to the Pine filter. The 2026
 coefficients are kept for the record (`results/fractal/fractal_model_2026.json`), not for use. The one veto that
 earned a place remains option 2 (section 11), whose Pine integration is the user's pending choice.
