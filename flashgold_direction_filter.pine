@@ -36,7 +36,8 @@
 //      SELL ZONE   price below the level (- the band): sells allowed, buys not.
 //      NO TRADE    price inside the band around the level (it has not chosen
 //                  a side yet), or against the signal with that switched
-//                  off, or the side switched off: nothing allowed (gray).
+//                  off, or the side switched off, or, with the score veto
+//                  on, the score disagreeing: nothing allowed (gray).
 //                  Before the first signal and after a Minutes / Candles
 //                  permission ends nothing is allowed either (no shade).
 //    The band's edges are rounded outward to the tick grid, so the price
@@ -128,13 +129,14 @@
 //      these coefficients, fresh broker BTCUSD 2026-07 .. 2026-10, 5m: 51.0%
 //        -> 52.1% (95% CI of the gain +0.6 .. +1.5 points), permission on
 //        84% -> 53% of candles; these coefficients on Bitstamp 2026-01 .. 10
-//        (a window looked at during the design): +1.4 / +2.0 / +1.5 / +2.3
-//        points on 5m / 15m / 30m / 1H;
+//        UTC bars (a window looked at during the design; no CI): +1.4 / +1.9
+//        / +1.2 / +2.2 points on 5m / 15m / 30m / 1H;
 //      the same recipe refitted walk-forward per half-year (not these
 //        coefficients), Bitstamp 2018-2019, never looked at before the test:
 //        5m 51.5% -> 56.1%, 15m 51.4% -> 55.6%, 30m 50.9% -> 55.1%, 1H 50.8%
-//        -> 56.4%, of which about 1-2 points are that era's last-trade
-//        bounce; 2021-2022 (looked at during the design): +1.9 / +2.4 / +1.8
+//        -> 56.4%, of which, on 5m, about 1-2 points are that era's
+//        last-trade bounce (about 0.2 on 30m; 15m and 1H not measured);
+//        2021-2022 (looked at during the design): +1.9 / +2.4 / +1.8
 //        / +3.0; permission on 84% -> 40-54% of candles in every window.
 //    The gain is small, varies by era and removes a third to a half of the
 //    permissions; 1H was reported, not part of the rule. In "Tick" mode the
@@ -217,15 +219,17 @@
 //                       (0-1), when the score is on.
 //    FGF score veto     With the veto on: 1 buys only, -1 sells only, 0
 //                       nothing (score undecided or inputs not ready);
-//                       2 when it is off or no model exists for the filter
-//                       timeframe (the zones decide alone).
+//                       2 when it is off, the filter is off, or no model
+//                       exists for the filter timeframe (the zones decide
+//                       alone).
 //    FGF veto score     The score (log-odds; > 0 leans up) of the filter
 //                       candle in force, when a model exists.
 //    FGV in 1 .. 17, FGV score / answer (last filter candle)  The score's
 //                       inputs, score and answer at the latest filter candle
-//                       (closed bars: the candle that closed with them; the
-//                       live bar: the forming candle), with "Score inputs in
-//                       the Data Window" on (parity check).
+//                       (closed bars: the latest filter candle closed by the
+//                       bar's close; the live bar: the forming candle), with
+//                       "Score inputs in the Data Window" on (parity check;
+//                       the 2 x / 4 x rows only where a model exists).
 //
 //  HOW TO USE IT
 //  A) Paste into your strategy (recommended)
@@ -307,7 +311,7 @@ fgfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_FGF)
 fgfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_FGF, tooltip="Turn one side off completely.")
 fgfShowBg    = input.bool(true, "Shade", inline="vis", group=GRP_FGF)
 fgfShowLv    = input.bool(true, "Level line", inline="vis", group=GRP_FGF)
-fgfSigMark   = input.bool(true, "Signal marks", inline="vis", group=GRP_FGF, tooltip="Shade: green = BUY ZONE (buys allowed), red = SELL ZONE (sells allowed), gray = NO TRADE (inside the band, against the signal when that is off, or that side turned off). Level line: the signal's level, dashed lines: the band edges, names of the zones at the last candle. Signal marks: a triangle where a signal becomes known.")
+fgfSigMark   = input.bool(true, "Signal marks", inline="vis", group=GRP_FGF, tooltip="Shade: green = BUY ZONE (buys allowed), red = SELL ZONE (sells allowed), gray = NO TRADE (inside the band, against the signal when that is off, that side turned off, or, with the score veto on, the score disagreeing). Level line: the signal's level, dashed lines: the band edges, names of the zones at the last candle. Signal marks: a triangle where a signal becomes known.")
 fgfShowTbl   = input.bool(true, "Status box", inline="tbl", group=GRP_FGF)
 fgfTblPos    = input.string("top_right", "", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], inline="tbl", group=GRP_FGF)
 
@@ -1124,9 +1128,9 @@ plot(fgfExpired ? 1 : 0, "FGF ended", display=display.data_window)
 plot(fgfZone, "FGF zone (1 buy, -1 sell, 0 no trade, 2 off)", display=display.data_window)
 plot(fgfOn and fgfOpen and fgfSigOk ? 1 : 0, "FGF signal confirmed", display=display.data_window)
 plot(fgsShow ? fgsL1 : na, "FGF score (next candle)", display=display.data_window)
-plot(fgvActive ? fgvAns : 2, "FGF score veto (1 buys only, -1 sells only, 0 none, 2 not applied)", display=display.data_window)
+plot(fgfOn and fgvActive ? fgvAns : 2, "FGF score veto (1 buys only, -1 sells only, 0 none, 2 not applied)", display=display.data_window)
 plot(fgvModel ? fgvSc : na, "FGF veto score (log-odds, > 0 up)", display=display.data_window)
-// the score's inputs at the last closed filter candle ("Score inputs in the Data Window", parity check)
+// the score's inputs at the latest filter candle (the forming one on the live bar; "Score inputs in the Data Window", parity check)
 plot(fgvDbg ? fvX1 : na, "FGV in 1 zone", display=display.data_window)
 plot(fgvDbg ? fvX2 : na, "FGV in 2 dist", display=display.data_window)
 plot(fgvDbg ? fvX3 : na, "FGV in 3 side", display=display.data_window)
@@ -1140,9 +1144,9 @@ plot(fgvDbg ? fvX10 : na, "FGV in 10 dist_vol", display=display.data_window)
 plot(fgvDbg ? fvX11 : na, "FGV in 11 fdir", display=display.data_window)
 plot(fgvDbg ? fvX12 : na, "FGV in 12 f level TF", display=display.data_window)
 plot(fgvDbg ? fvX13 : na, "FGV in 13 f slope TF", display=display.data_window)
-plot(fgvDbg ? fvX14 : na, "FGV in 14 f level 2xTF", display=display.data_window)
-plot(fgvDbg ? fvX15 : na, "FGV in 15 f slope 2xTF", display=display.data_window)
-plot(fgvDbg ? fvX16 : na, "FGV in 16 f level 4xTF", display=display.data_window)
-plot(fgvDbg ? fvX17 : na, "FGV in 17 f slope 4xTF", display=display.data_window)
+plot(fgvDbg and fgvModel ? fvX14 : na, "FGV in 14 f level 2xTF", display=display.data_window)
+plot(fgvDbg and fgvModel ? fvX15 : na, "FGV in 15 f slope 2xTF", display=display.data_window)
+plot(fgvDbg and fgvModel ? fvX16 : na, "FGV in 16 f level 4xTF", display=display.data_window)
+plot(fgvDbg and fgvModel ? fvX17 : na, "FGV in 17 f slope 4xTF", display=display.data_window)
 plot(fgvDbg ? fpVSc : na, "FGV score (last filter candle)", display=display.data_window)
 plot(fgvDbg ? fpVAns : na, "FGV answer (last filter candle)", display=display.data_window)

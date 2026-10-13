@@ -366,7 +366,11 @@ what the zones forbid.
   closed). Two reviews of the edit (feature parity against the Python definitions, including a 120,000-bar
   equivalence test of the FDF port and an exact check of every coefficient; and timing / compile / default-path
   review) found no high-severity defect; their medium findings (status rows ignoring the veto; header attributing
-  the 2018-2022 per-period refits to the shipped coefficients) and low ones are fixed in the committed version.
+  the 2018-2022 per-period refits to the shipped coefficients) and low ones are fixed in the committed version. A
+  final three-lens review (compile validity, parity and numbers, behaviour and texts), each finding put to three
+  skeptics, let 7 of 15 findings stand, all documentation or Data Window texts (the Bitstamp 2026 row now cites the
+  shipped coefficients on UTC bars, +1.4 / +1.9 / +1.2 / +2.2; the bounce caveat is a 5m measurement; "FGF score
+  veto" prints 2 when the filter is off; the 2 x / 4 x parity rows show only where a model exists); fixed.
 - **Calibration guard**: the status box lists any input that differs from the calibrated settings (band 0.25, level =
   Entry price, lasts until next signal, against on, parent = filter TF, child zones 1-3 at 1 / 2 / 4 x, min aligned 2,
   v1.2 signal defaults). It is a warning, not a lock.
