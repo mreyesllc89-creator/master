@@ -1,0 +1,20 @@
+# FGF sweep run log, MODE = REAL. Build: XPW Orientation TDI v2.8 FGF
+# Validated file (never modified): xpw_orientation_tdi_v2.8_strategy_FGF.pine on main
+# SYMBOL: MEXC:BTCUSDT.P
+# Strategy Tester Properties, identical on every run: commission 0.02 % per side (percent type), slippage 50 ticks (5 USD per side), order size fixed 0.1 contracts, bar magnifier the same way on every run
+# Inputs at validated defaults: qtyMode Fixed, qtyFixed 0.1; block at indicator defaults (filter 60, zones 60 / 120 / 240)
+# Common window (from the 5-minute first bar to the common last bar): FROM ________ TO ________  (H1 = first half, H2 = second half; split at the midpoint date)
+# Every run: reset all inputs to defaults first, set the one cell change, set the window, record the five metrics from the Strategy Tester Overview.
+# Stage 1 rows are prefilled. Append Stage 2 / 2b / 3 rows with: python3 sweep_score.py plan stage2 --log runlog_xpw_v2.8_FGF.csv --chart-tf <tf>
+# Score with: python3 sweep_score.py score --log runlog_xpw_v2.8_FGF.csv --out scores_v28.csv --report SWEEP_REPORT_v28.md
+run_id,stage,chart_tf,filter_tf,input,value,gate,window,net_profit,profit_factor,max_dd,trades,net_per_trade,notes
+1,1,5,60,defaults,,off,full,,,,,,
+2,1,5,60,defaults,,on,full,,,,,,
+3,1,15,60,defaults,,off,full,,,,,,
+4,1,15,60,defaults,,on,full,,,,,,
+5,1,30,60,defaults,,off,full,,,,,,must reproduce 2111 trades inside the full window
+6,1,30,60,defaults,,on,full,,,,,,must reproduce 922 trades inside the full window
+7,1,60,60,defaults,,off,full,,,,,,
+8,1,60,60,defaults,,on,full,,,,,,
+9,1,240,240,defaults,,off,full,,,,,,optional; block filter 240 and zones 240 / 480 / D; compare only to run 10
+10,1,240,240,defaults,,on,full,,,,,,optional; block filter 240 and zones 240 / 480 / D; compare only to run 9
