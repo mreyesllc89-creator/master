@@ -404,10 +404,11 @@ def score(rows):
             if m1 is None or not m1["eligible"] or m1["net_profit"] <= num(offs["H1"]["net_profit"]):
                 continue
             nb = [o for o in grid if is_neighbour(cell, o)]
-            expected = 3 ** len(names) - 1
-            if len(nb) < min(expected, 8 if len(names) == 2 else 26):
-                pass  # edge cells have fewer neighbours; every present neighbour must be above gate off
-            if not nb or any(grid[o].get("H1") is None or not grid[o]["H1"]["eligible"]
+            # The pick needs its whole neighbourhood (8 cells in a 3x3, 26 in a
+            # 3x3x3): only the plateau centre qualifies, never an edge or corner.
+            if len(nb) < 3 ** len(names) - 1:
+                continue
+            if any(grid[o].get("H1") is None or not grid[o]["H1"]["eligible"]
                              or grid[o]["H1"]["net_profit"] <= num(offs["H1"]["net_profit"]) for o in nb):
                 continue
             if pick_net is None or m1["net_profit"] > pick_net:
