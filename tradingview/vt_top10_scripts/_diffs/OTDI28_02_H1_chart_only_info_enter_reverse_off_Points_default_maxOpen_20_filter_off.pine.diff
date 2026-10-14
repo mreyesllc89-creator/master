@@ -1,0 +1,57 @@
+--- base_assembled.pine
++++ OTDI28_02_H1_chart_only_info_enter_reverse_off_Points_default_maxOpen_20_filter_off.pine
+@@ -1,0 +2,30 @@
++// ============================================================================
++// Orientation v2.8  |  TOP-02 of the VT Markets screen  |  XAUUSD-ECNc H1
++// Settings: chart only, info enter, reverse off, Points_default, maxOpen 20, filter off
++// Screen (VT XAUUSD-ECNc real bid/ask ticks, July 2026, 0.10 cent lot, 0.60 USD round trip per lot):
++//   trades 37  net 122.55 USD  PF 8.81  win 76%  maxDD 7.23 USD  positive weeks 100%  halves 66.42/56.12
++// Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),
++//   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.
++// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed; expect different fills.
++// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.
++// Hard-coded input defaults (everything else is the author's default):
++//   sigRung = "chart rung (*)"
++//   lblRead = false
++//   actInf = "enter"
++//   reverseAll = false
++//   exitUnit = "Points"
++//   slPtsIn = 10000.0
++//   tpPtsIn = 30000.0
++//   trailOn = true
++//   trActPts = 15000.0
++//   trDistPts = 10000.0
++//   maxOpen = 20
++//   qtyMode = "Fixed"
++//   qtyFixed = 0.1
++//   qtyStep = 0.01
++//   fgfOn = false
++//   fgfSpreadPts = 13.0
++// XPW Orientation TDI v2.8 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.
++// CAUTION: the VT replay had NO 1 Day / 1 Week / 1 Month bars (July 2026 ticks only), so those three rungs were empty in the test.
++// On TradingView those rungs are populated, so the ladder (and the trades) will differ from the screened result.
++// ============================================================================
+@@ -144 +174 @@
+-strategy("XPW Orientation TDI v2.8 Strategy", shorttitle="XPW-OTDI8 S", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, process_orders_on_close=true, calc_on_every_tick=true)
++strategy("Orientation v2.8 S | VT XAUUSD H1 #02", shorttitle="OTDI28 02 H1", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, commission_type=strategy.commission.cash_per_contract, commission_value=0.30, slippage=10, process_orders_on_close=true, calc_on_every_tick=true)
+@@ -165 +195 @@
+-lblRead = input.bool(true, "Also trade / label the READ HERE rung (<<)", group="Signals", tooltip="Adds the << rung's labels and orders on top of the signal rung. They carry the rung's name, e.g. '1 Min <<:'.")
++lblRead = input.bool(false, "Also trade / label the READ HERE rung (<<)", group="Signals", tooltip="Adds the << rung's labels and orders on top of the signal rung. They carry the rung's name, e.g. '1 Min <<:'.")
+@@ -218,3 +248,3 @@
+-exitUnit   = input.string("ATR", "SL / TP / trail unit", options=["ATR","Points"], group="S2. Exits", tooltip="ATR: distances are multiples of the chart ATR. Points: distances are in points (ticks = syminfo.mintick; on BTC with a 0.01 tick, 10000 pts = $100).")
+-slPtsIn    = input.float(10000, "Stop loss, pts (Points mode)", minval=0, step=100, group="S2. Exits", tooltip="0 = no stop loss.")
+-tpPtsIn    = input.float(30000, "Take profit, pts (Points mode)", minval=0, step=100, group="S2. Exits", tooltip="0 = no take profit.")
++exitUnit   = input.string("Points", "SL / TP / trail unit", options=["ATR","Points"], group="S2. Exits", tooltip="ATR: distances are multiples of the chart ATR. Points: distances are in points (ticks = syminfo.mintick; on BTC with a 0.01 tick, 10000 pts = $100).")
++slPtsIn    = input.float(10000.0, "Stop loss, pts (Points mode)", minval=0, step=100, group="S2. Exits", tooltip="0 = no stop loss.")
++tpPtsIn    = input.float(30000.0, "Take profit, pts (Points mode)", minval=0, step=100, group="S2. Exits", tooltip="0 = no take profit.")
+@@ -225,2 +255,2 @@
+-trActPts   = input.float(15000, "Trail activation, pts of profit (Points mode)", minval=0, step=100, group="S2. Exits")
+-trDistPts  = input.float(10000, "Trail distance, pts (Points mode)", minval=0, step=100, group="S2. Exits")
++trActPts   = input.float(15000.0, "Trail activation, pts of profit (Points mode)", minval=0, step=100, group="S2. Exits")
++trDistPts  = input.float(10000.0, "Trail distance, pts (Points mode)", minval=0, step=100, group="S2. Exits")
+@@ -248 +278 @@
+-fgfOn        = input.bool(true, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
++fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
+@@ -272 +302 @@
+-fgfSpreadPts    = input.float(25.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")
++fgfSpreadPts    = input.float(13.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")

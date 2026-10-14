@@ -1,0 +1,61 @@
+--- base_assembled.pine
++++ SM92_05_H1_CONT_Stop_ATR_default_2.0_2R_4.0_0.2_lossrev_SLtrail+tiny_filter_off.pine
+@@ -1,0 +2,29 @@
++// ============================================================================
++// ShapeMap v0.9.2  |  TOP-05 of the VT Markets screen  |  XAUUSD-ECNc H1
++// Settings: CONT_Stop, ATR_default_2.0_2R_4.0_0.2, lossrev SLtrail+tiny, filter off
++// Screen (VT XAUUSD-ECNc real bid/ask ticks, July 2026, 0.10 cent lot, 0.60 USD round trip per lot):
++//   trades 15  net 24.79 USD  PF 2.65  win 60%  maxDD 3.33 USD  positive weeks 100%  halves 9.04/15.74
++// Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),
++//   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.
++// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed; expect different fills.
++// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.
++// Hard-coded input defaults (everything else is the author's default):
++//   sigMode = "CONT ▲/▼"
++//   contEntry = "Stop past signal candle"
++//   exitUnit = "ATR"
++//   slAtrM = 2.0
++//   tpR = 2.0
++//   trailOn = true
++//   trActAtr = 4.0
++//   trDisAtr = 0.2
++//   lossRevOn = true
++//   lossRevWhat = "Stop loss / trail only"
++//   lossRevTiny = true
++//   lossRevMax = 1
++//   lossRevTinyPts = 1500.0
++//   qtyMode = "Fixed"
++//   qtyFixed = 0.1
++//   fgfOn = false
++//   fgfSpreadPts = 13.0
++// XPW Shape Map v0.9.2 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.
++// ============================================================================
+@@ -121 +150 @@
+-strategy("XPW Shape Map v0.9.2 Strategy", shorttitle = "XPW-SM9.2 S", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_lines_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 10, margin_long = 1, margin_short = 1, commission_type = strategy.commission.percent, commission_value = 0.05)
++strategy("ShapeMap v0.9.2 S | VT XAUUSD H1 #05", shorttitle = "SM92 05 H1", overlay = false, max_boxes_count = 500, max_labels_count = 500, max_lines_count = 500, max_bars_back = 500, pyramiding = 0, calc_on_every_tick = true, process_orders_on_close = true, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 0.1, margin_long = 1, margin_short = 1, commission_type = strategy.commission.cash_per_contract, commission_value = 0.30, slippage = 10)
+@@ -125 +154 @@
+-sigMode  = input.string("Turn ▲/▼", "Entry signal (one only)", options = ["BOT/TOP square", "Turn ▲/▼", "BOT/TOP tick", "CONT ▲/▼"], group = grpE, tooltip = "Only this pair of labels opens trades. BOT / ▲ side = long, TOP / ▼ side = short. The other labels still draw but never trade. CONT ▲/▼ = continuation without a cross (big candle -> little odd area -> pinch -> candle in trend direction).")
++sigMode  = input.string("CONT ▲/▼", "Entry signal (one only)", options = ["BOT/TOP square", "Turn ▲/▼", "BOT/TOP tick", "CONT ▲/▼"], group = grpE, tooltip = "Only this pair of labels opens trades. BOT / ▲ side = long, TOP / ▼ side = short. The other labels still draw but never trade. CONT ▲/▼ = continuation without a cross (big candle -> little odd area -> pinch -> candle in trend direction).")
+@@ -142 +171 @@
+-contEntry   = input.string("At signal close", "CONT entry timing", options = ["At signal close", "Stop past signal candle"], group = grpCE, tooltip = "At signal close: market order on the CONT candle (on tick if 'Enter on tick' is on). Stop past signal candle: buy stop above the CONT candle's high (sell stop below its low) plus the buffer, so the trade only starts if price keeps going. The CONT candle is the SIGNAL timeframe's candle.")
++contEntry   = input.string("Stop past signal candle", "CONT entry timing", options = ["At signal close", "Stop past signal candle"], group = grpCE, tooltip = "At signal close: market order on the CONT candle (on tick if 'Enter on tick' is on). Stop past signal candle: buy stop above the CONT candle's high (sell stop below its low) plus the buffer, so the trade only starts if price keeps going. The CONT candle is the SIGNAL timeframe's candle.")
+@@ -153 +182 @@
+-exitUnit = input.string("Points", "SL / TP / trail unit", options = ["Points", "ATR"], group = grpX)
++exitUnit = input.string("ATR", "SL / TP / trail unit", options = ["Points", "ATR"], group = grpX)
+@@ -168,2 +197,2 @@
+-qtyMode  = input.string("Risk %", "Quantity", options = ["Fixed", "Risk %"], group = grpZ)
+-qtyFixed = input.float(10,  "Fixed quantity (contracts = oz, 100 = 1 lot)", minval = 0, group = grpZ)
++qtyMode  = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"], group = grpZ)
++qtyFixed = input.float(0.1,  "Fixed quantity (contracts = oz, 100 = 1 lot)", minval = 0, group = grpZ)
+@@ -179 +208 @@
+-lossRevWhat = input.string("Any losing exit", "Which exits count", options = ["Any losing exit", "Stop loss / trail only"], group = grpR, tooltip = "Any losing exit: stop loss, trailing stop under the entry, time stop, failed cross, opposite signal in 'Close only' mode... anything that closed in the red. Stop loss / trail only: just the SL and the trailing stop.")
++lossRevWhat = input.string("Stop loss / trail only", "Which exits count", options = ["Any losing exit", "Stop loss / trail only"], group = grpR, tooltip = "Any losing exit: stop loss, trailing stop under the entry, time stop, failed cross, opposite signal in 'Close only' mode... anything that closed in the red. Stop loss / trail only: just the SL and the trailing stop.")
+@@ -182 +211 @@
+-lossRevTinyPts = input.float(1500, "max pts", minval = 0, group = grpR, inline = "tp")
++lossRevTinyPts = input.float(1500.0, "max pts", minval = 0, group = grpR, inline = "tp")
+@@ -289 +318 @@
+-fgfOn        = input.bool(true, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
++fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
+@@ -313 +342 @@
+-fgfSpreadPts    = input.float(25.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")
++fgfSpreadPts    = input.float(13.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")

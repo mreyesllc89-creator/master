@@ -1,0 +1,1574 @@
+//@version=6
+// ============================================================================
+// Orientation v2.8  |  TOP-06 of the VT Markets screen  |  XAUUSD-ECNc M15
+// Settings: chart+READ, info enter, reverse off, Points_default, maxOpen 20, filter off
+// Screen (VT XAUUSD-ECNc real bid/ask ticks, July 2026, 0.10 cent lot, 0.60 USD round trip per lot):
+//   trades 242  net 101.21 USD  PF 1.78  win 53%  maxDD 27.74 USD  positive weeks 100%  halves 48.79/52.42
+// Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),
+//   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.
+// Chart: XAUUSD, timeframe M15. TradingView's feed is not VT's tick feed; expect different fills.
+// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.
+// Hard-coded input defaults (everything else is the author's default):
+//   sigRung = "chart rung (*)"
+//   lblRead = true
+//   actInf = "enter"
+//   reverseAll = false
+//   exitUnit = "Points"
+//   slPtsIn = 10000.0
+//   tpPtsIn = 30000.0
+//   trailOn = true
+//   trActPts = 15000.0
+//   trDistPts = 10000.0
+//   maxOpen = 20
+//   qtyMode = "Fixed"
+//   qtyFixed = 0.1
+//   qtyStep = 0.01
+//   fgfOn = false
+//   fgfSpreadPts = 13.0
+// XPW Orientation TDI v2.8 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.
+// CAUTION: the VT replay had NO 1 Day / 1 Week / 1 Month bars (July 2026 ticks only), so those three rungs were empty in the test.
+// On TradingView those rungs are populated, so the ladder (and the trades) will differ from the screened result.
+// ============================================================================
+// ============================================================================
+//  XPW ORIENTATION TDI  -  v2.8 STRATEGY (ANY TIMEFRAME, EVERY LABEL TRADES)
+// ----------------------------------------------------------------------------
+//  This is the v2.4 indicator turned into a strategy. Calibration, ladder
+//  logic, rung map, agreement gate and labels are the indicator's, line for
+//  line. The only change to the indicator's own logic: an event is detected
+//  whether or not labels are shown, so hiding labels never stops trading.
+//
+//  v2.8 (what changed from v2.7)
+//    SIGNAL RUNG (group "Signals")
+//      The chart can sit on ANY timeframe from 1 Sec up to 1 Month. The
+//      "Signal rung" input picks where the labels and orders come from:
+//        chart rung (*)   the rung that matches the chart (as before)
+//        every rung       all 13 rungs, 1 Sec to 1 Month, each firing its
+//                         own labels and orders
+//        1 Sec .. 1 Month one fixed rung of your choice, whatever the chart
+//                         is on. A rung below the chart timeframe is only
+//                         known when the chart candle closes, so put the
+//                         chart on (or below) the rung you trade to get the
+//                         signal the moment it happens.
+//      The READ HERE rung (<<) can still be added on top (toggle).
+//    EVERY LABEL TRADES (group "Labels", third box on each row)
+//      Each label row has: show tick box, colour, and a TRADE action:
+//        off             the label never trades
+//        enter           trade the direction the label points to
+//        enter opposite  trade against the label
+//        exit only       close the side the label is against, open nothing
+//      The direction each label points to:
+//        Long 1st / 2nd leg       LONG        Short 1st / 2nd leg   SHORT
+//        Divergence LONG zone     LONG        Divergence SHORT zone SHORT
+//        End of leg (END 2nd LEG) against the leg that ended
+//                                 (upright rung = longs ended -> SHORT)
+//        Info "look for X"        X           Info "continue" (staircase)
+//                                             the way the stairs run, i.e.
+//                                             against the rung's side
+//      "enter" on a Divergence zone or End-of-leg label still closes the
+//      leg that ended (an opposite entry reverses the position), so the old
+//      "exit once" behaviour is "exit only" on those rows.
+//    REVERSE (group "Strategy")
+//      "Reverse every label" trades the opposite direction of whatever the
+//      label says: every "enter" becomes "enter opposite" and vice versa.
+//      AGREE entries flip too. "exit only" rows are not changed.
+//    MONEY MANAGEMENT (groups "S2. Exits" and "S3. Sizing")
+//      Replaces the v2.7 trailing TP / stop inputs and the percent-of-
+//      equity default size. See STRATEGY below.
+//    TIMEFRAME ON EVERY LABEL AND ORDER
+//      Every label starts with the rung it came from ("5 Min *: DIV SHORT
+//      ZONE", "1 Min <<: 1st LEG ENTER LONGS"). Every order comment names
+//      the rung and the label that placed it ("ENTER LONG | 5 Min * 2nd
+//      LEG", "exit | 1 Min DIV SHORT ZONE"), so the Strategy Tester list
+//      of trades shows which chart each order came from.
+//    FIX  a chart above 1 Month now anchors on the 1 Month rung instead of
+//         falling through to 1 Sec.
+//
+//  STRATEGY (group "Strategy")
+//    Trade direction   Both / Long only (buy only) / Short only (sell only).
+//    Opposite signal   Both: reverses. Long only / Short only: the opposite
+//                      ENTER closes the position (toggle) but never opens one.
+//    EVERY LABEL       every label with an "enter" action is its own entry,
+//                      on any chart timeframe. A label on the side already
+//                      held stacks a new entry (up to "Max open entries"),
+//                      each with its own trailing TP / stop.
+//    S2. EXITS         Per entry: stop loss, take profit, trailing stop and
+//                      time stop. Unit = ATR (multiples of the chart ATR,
+//                      target as an R multiple of the stop) or Points
+//                      (ticks). 0 turns an exit off.
+//    S3. SIZING        Quantity per entry in contracts. Fixed, or Risk:
+//                      the quantity that loses "Risk %" of equity at the
+//                      stop. Rounded down to the step, capped at the max.
+//    LABELS            every label type has its own show/hide tick box next
+//                      to its colour. Hiding is display only; the strategy
+//                      still trades every label whose action is not "off".
+//  ENTRY FILL ("Entry fill" input)
+//    Limit at label price  a buy limit at the label's price (the
+//                          candle low) or a sell limit at the candle high,
+//                          placed when the label prints and kept for
+//                          "Limit valid (bars)". It fills only if price comes
+//                          back to that level, never before the label exists.
+//    Signal tick           (default) live: the script runs on every tick
+//                          and the market order goes in on the tick the
+//                          label appears, without waiting for the candle to
+//                          close. History has no ticks, so backtest bars
+//                          fill at the close of the label's candle.
+//                          ENTER labels show THAT price (the entry price),
+//                          not the candle low/high, so label = fill.
+//    A fill at the candle's low on the label candle itself is impossible: the
+//    label is only known once that candle has closed, so a backtest that
+//    filled there would be using the future.
+//
+//  AGREEMENT (group "Agreement", off by default)
+//    Every rung casts one vote from its own position and side:
+//      LONG   a first / second / mid leg while upright,
+//             or END FIRST LEG while inverted (the divergence flips it long)
+//      SHORT  the same shapes while inverted,
+//             or END FIRST LEG while upright (DIV SHORT ZONE)
+//      none   STAIRCASE. "continue, no entry" disagrees with entering,
+//             so it BREAKS a domino chain.
+//      skip   no data, unreadable, or an inherited position (per input).
+//             Transparent: it neither counts nor breaks the chain.
+//    A label draws only when at least N rungs (2..10) agree with its side.
+//      domino  = the rungs must agree in one unbroken chain that contains
+//                the rung that fired. One rung after the next, top down.
+//      fractal = any N agreeing rungs inside the scope, contiguous or not.
+//                The same read repeating at different scales.
+//    Scope = the whole ladder (default), the chart rung and every higher
+//    rung, or the chart rung and every lower one. N is clamped to the rungs
+//    in scope and the READ HERE row says so.
+//    "AGREE LONG x5" / "AGREE SHORT x5" fires the instant the Nth rung
+//    joins, so a signal that was gated at its own bar still shows up the
+//    moment the ladder catches up (the domino effect). In domino mode that
+//    chain has to run through the rung you read (READ HERE << if there is
+//    one, else the chart rung *): the dominoes must reach the rung you act
+//    on. The rung map gets an AGREE column with every rung's vote, and the
+//    READ HERE row shows the long and short counts against the required N.
+//
+//  LABEL EVENTS (per signal rung)
+//    DIV SHORT ZONE / DIV LONG ZONE  the refusal at the extreme (divergence
+//                                    on price). Upright ladder: price broke
+//                                    the high, TDI refused -> SHORT zone.
+//                                    Inverted: broke the low -> LONG zone.
+//    END 1st LEG / END 2nd LEG       which leg the divergence closed.
+//    1st LEG  ENTER LONGS/SHORTS     a first leg formed (own shape).
+//    2nd LEG  ENTER LONGS/SHORTS     a second leg formed (own shape).
+//    END 2nd LEG                     a second leg went into a staircase or
+//                                    lost its shape into MID FIRST LEG.
+//    look for LONGS/SHORTS,          info labels (Labels > Info), display
+//    continue, no entry              off by default, trade per their action.
+//  Long labels sit at the candle low, short labels at the candle high, both
+//  pointing at the bar from the right, with the price in the text and a
+//  short tick line at that price. Inherited positions never label.
+//
+//  v2.2 FIXES (kept)
+//    D1. An INHERITED position no longer moves the orientation.
+//    D2. baseDir comes from the highest rung whose direction is computed.
+//    D3. READ HERE lands only on a rung with its OWN first or second leg.
+//    D4. The trend SMA is computed on every bar.
+//
+//  HISTORY TEST 2026-09-19 (XAUUSD 1m May-Sep 2026): the ENTER verdict showed
+//  NO SIGNAL on the 1 minute rung; every rung above it was underpowered. Read
+//  the map for location. Do not trade the verdict column on its own.
+// ============================================================================
+
+strategy("Orientation v2.8 S | VT XAUUSD M15 #06", shorttitle="OTDI28 06 M15", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, commission_type=strategy.commission.cash_per_contract, commission_value=0.30, slippage=10, process_orders_on_close=true, calc_on_every_tick=true)
+
+// ---------------------------------------------------------------- INPUTS ----
+rsiLen   = input.int(13,       "RSI length",            group="TDI core")
+fastLen  = input.int(2,        "Fast line (RSI SMA)",   group="TDI core")
+slowLen  = input.int(7,        "Signal line (RSI SMA)", group="TDI core")
+bbLen    = input.int(34,       "Base line / bands",     group="TDI core")
+bbMult   = input.float(1.6185, "Band width",            group="TDI core")
+
+scaleWin = input.bool(true, "Scale window with rung", group="Structure", tooltip="ON: each rung measures about 4 of its parent's bars. OFF: flat window on every rung, as in v1.")
+flatWin  = input.int(20, "Flat window (bars)", group="Structure", tooltip="Used on every rung when scaling is off.")
+areaLen  = input.int(5, "Area window (bars)", group="Structure", tooltip="How many bars must hold together to count as an area rather than a spike.")
+areaFrac = input.float(0.45, "Area compression max", group="Structure", tooltip="Area range / window range. At or below this = area. Above = V spike = illegible.")
+trendLen = input.int(20, "Trend window (bars)", group="Structure", tooltip="Only used by the highest rung that has a computed direction.")
+
+showTable = input.bool(true, "Show rung map", group="Display")
+tblSize   = input.string("normal", "Table text size", options=["tiny","small","normal","large","huge"], group="Display", tooltip="Makes the whole table bigger or smaller.")
+tblPos    = input.string("middle_right", "Table position", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], group="Display", tooltip="Where the table sits on the price chart.")
+
+// SIGNALS: which rung(s) the labels and orders come from.
+sigRung = input.string("chart rung (*)", "Signal rung", options=["chart rung (*)","every rung (1 Sec to 1 Month)","1 Month","1 Week","1 Day","4 Hour","1 Hour","30 Min","15 Min","5 Min","1 Min","30 Sec","15 Sec","5 Sec","1 Sec"], group="Signals", tooltip="chart rung: the rung that matches the chart timeframe. every rung: all 13 rungs fire their own labels and orders. A named rung: that timeframe alone, whatever the chart is on. A rung below the chart timeframe is only known when the chart candle closes, so put the chart on (or below) the rung you trade to get the signal when it happens.")
+lblRead = input.bool(true, "Also trade / label the READ HERE rung (<<)", group="Signals", tooltip="Adds the << rung's labels and orders on top of the signal rung. They carry the rung's name, e.g. '1 Min <<:'.")
+
+// LABELS
+showLbl  = input.bool(true,  "Show event labels on price", group="Labels", tooltip="Display only. The strategy trades the events whether or not their labels are shown.")
+lblSizeS = input.string("normal", "Label size", options=["tiny","small","normal","large","huge"], group="Labels")
+lblPrice = input.bool(true,  "Show price in label + price tick", group="Labels", tooltip="Adds the signal price to the label text and draws a short line at that price beside the candle.")
+lblTick  = input.int(3, "Price tick length (bars)", minval=1, maxval=20, group="Labels")
+// Each label row: show tick box, colour, TRADE action. Hiding never changes trading.
+shL1  = input.bool(true,  "Long  - 1st leg",         inline="L1",  group="Labels")
+cL1   = input.color(#00e676, "",                     inline="L1",  group="Labels")
+actL1 = input.string("enter", "", options=["off","enter","enter opposite","exit only"], inline="L1", group="Labels", tooltip="Tick box = show the label (display only). Third box = what the strategy does on it: enter = go LONG, enter opposite = go SHORT, exit only = close shorts, open nothing.")
+shL2  = input.bool(true,  "Long  - 2nd leg",         inline="L2",  group="Labels")
+cL2   = input.color(#00897b, "",                     inline="L2",  group="Labels")
+actL2 = input.string("enter", "", options=["off","enter","enter opposite","exit only"], inline="L2", group="Labels", tooltip="enter = go LONG, enter opposite = go SHORT, exit only = close shorts.")
+shS1  = input.bool(true,  "Short - 1st leg",         inline="S1",  group="Labels")
+cS1   = input.color(#ff1744, "",                     inline="S1",  group="Labels")
+actS1 = input.string("enter", "", options=["off","enter","enter opposite","exit only"], inline="S1", group="Labels", tooltip="enter = go SHORT, enter opposite = go LONG, exit only = close longs.")
+shS2  = input.bool(true,  "Short - 2nd leg",         inline="S2",  group="Labels")
+cS2   = input.color(#ad1457, "",                     inline="S2",  group="Labels")
+actS2 = input.string("enter", "", options=["off","enter","enter opposite","exit only"], inline="S2", group="Labels", tooltip="enter = go SHORT, enter opposite = go LONG, exit only = close longs.")
+shDL  = input.bool(true,  "Divergence LONG zone",    inline="DL",  group="Labels")
+cDL   = input.color(#76ff03, "",                     inline="DL",  group="Labels")
+actDL = input.string("enter", "", options=["off","enter","enter opposite","exit only"], inline="DL", group="Labels", tooltip="The divergence at the low that ends a short leg. enter = go LONG (closes shorts), enter opposite = go SHORT, exit only = close shorts (the v2.7 'exit once').")
+shDS  = input.bool(true,  "Divergence SHORT zone",   inline="DS",  group="Labels")
+cDS   = input.color(#ff9100, "",                     inline="DS",  group="Labels")
+actDS = input.string("enter", "", options=["off","enter","enter opposite","exit only"], inline="DS", group="Labels", tooltip="The divergence at the high that ends a long leg. enter = go SHORT (closes longs), enter opposite = go LONG, exit only = close longs (the v2.7 'exit once').")
+shEnd = input.bool(true,  "End of leg / exit once",  inline="END", group="Labels")
+cEnd  = input.color(#ffd600, "",                     inline="END", group="Labels")
+actEnd = input.string("enter", "", options=["off","enter","enter opposite","exit only"], inline="END", group="Labels", tooltip="END 2nd LEG: the leg lost its shape. enter = go against the leg that ended (longs ended -> SHORT), enter opposite = re-enter the leg's side, exit only = close the leg's side (the v2.7 'exit once').")
+lblInfo = input.bool(false, "Info (look for / stair)", inline="INF", group="Labels")
+cInf  = input.color(#90a4ae, "",                     inline="INF", group="Labels")
+actInf = input.string("enter", "", options=["off","enter","enter opposite","exit only"], inline="INF", group="Labels", tooltip="'look for LONGS/SHORTS' points that way; 'continue, no entry' (staircase) points the way the stairs run. Display is off by default; the action still trades them unless set to off.")
+
+// AGREEMENT
+agreeOn    = input.bool(false, "Require rung agreement", group="Agreement", tooltip="ON: a label draws only when at least N rungs agree with its side. OFF: every event labels, as in v2.3.")
+agreeN     = input.int(3, "Rungs that must agree (N)", minval=2, maxval=10, group="Agreement")
+agreeMode  = input.string("domino", "Agreement mode", options=["domino","fractal"], group="Agreement", tooltip="domino: N rungs in one unbroken chain that contains the rung that fired. fractal: any N agreeing rungs inside the scope, contiguous or not.")
+agreeScope = input.string("whole ladder", "Scope", options=["whole ladder","chart rung and above","chart rung and below"], group="Agreement", tooltip="Which rungs may vote. 'chart rung and above' = the * rung and every higher timeframe. 'chart rung and below' = the * rung and every lower one. On a 1 Min chart 'below' is only the seconds rungs, so prefer the whole ladder or 'above'.")
+agreeInh   = input.string("skip (transparent)", "Inherited rungs", options=["skip (transparent)","vote with parent","no vote (breaks chain)"], group="Agreement", tooltip="A rung with no shape of its own shows its parent's position '(inh)'. skip: it neither counts nor breaks a chain. vote with parent: it repeats the parent's vote (not independent evidence, so it inflates the count). no vote: it breaks a domino chain.")
+agreeLbl   = input.bool(true, "Label the moment N rungs agree", group="Agreement", tooltip="Draws 'AGREE LONG xN' / 'AGREE SHORT xN' on the bar where the count first reaches N. Display only: with 'Also enter on AGREE labels' the strategy trades them either way.")
+shAgL = input.bool(true, "Agree LONG",  inline="AGL", group="Agreement")
+cAgL  = input.color(#00bfa5, "",        inline="AGL", group="Agreement", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+shAgS = input.bool(true, "Agree SHORT", inline="AGS", group="Agreement")
+cAgS  = input.color(#d500f9, "",        inline="AGS", group="Agreement", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
+
+// STRATEGY
+tradeDir   = input.string("Both", "Trade direction", options=["Both","Long only (buy only)","Short only (sell only)"], group="Strategy", tooltip="Long only: only LONG entries open trades. Short only: only SHORT entries open trades. Applied after 'Reverse every label'.")
+reverseAll = input.bool(false, "Reverse every label (trade the opposite direction)", group="Strategy", tooltip="ON: every label trades against what it says. 'enter' rows become 'enter opposite' and vice versa, AGREE LONG enters short, AGREE SHORT enters long. 'exit only' rows are unchanged.")
+oppCloses  = input.bool(true, "Opposite ENTER closes (one-side mode)", group="Strategy", tooltip="Long only / Short only: an entry signal on the other side closes the open trade without opening a new one. In 'Both' an opposite entry always reverses.")
+tradeAgree = input.bool(true, "Also enter on AGREE labels", group="Strategy", tooltip="Needs 'Require rung agreement' on. Enters on the bar 'AGREE LONG xN' / 'AGREE SHORT xN' fires.")
+
+// S2. EXITS. Every entry gets its own stop, target and trail, in ATR or in
+// points. A value of 0 turns that exit off.
+exitUnit   = input.string("Points", "SL / TP / trail unit", options=["ATR","Points"], group="S2. Exits", tooltip="ATR: distances are multiples of the chart ATR. Points: distances are in points (ticks = syminfo.mintick; on BTC with a 0.01 tick, 10000 pts = $100).")
+slPtsIn    = input.float(10000.0, "Stop loss, pts (Points mode)", minval=0, step=100, group="S2. Exits", tooltip="0 = no stop loss.")
+tpPtsIn    = input.float(30000.0, "Take profit, pts (Points mode)", minval=0, step=100, group="S2. Exits", tooltip="0 = no take profit.")
+atrLen     = input.int(14, "ATR length (ATR mode)", minval=1, group="S2. Exits")
+slAtrMult  = input.float(3.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="0 = no stop loss.")
+tpRMult    = input.float(1.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="Target = this many times the stop distance. 0 = no take profit.")
+trailOn    = input.bool(true, "Trailing stop", group="S2. Exits", tooltip="Arms once the trade is in profit by the activation distance, then trails behind the best price by the trail distance.")
+trActPts   = input.float(15000.0, "Trail activation, pts of profit (Points mode)", minval=0, step=100, group="S2. Exits")
+trDistPts  = input.float(10000.0, "Trail distance, pts (Points mode)", minval=0, step=100, group="S2. Exits")
+trActAtr   = input.float(1.0, "Trail activation, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits")
+trDistAtr  = input.float(0.75, "Trail distance, ATR mult (ATR mode)", minval=0, step=0.05, group="S2. Exits")
+timeStop   = input.int(0, "Time stop, bars (0 = off)", minval=0, group="S2. Exits", tooltip="Closes an entry at market once it has been open this many bars.")
+
+// S3. SIZING. Quantity per entry, in contracts (BTC on a BTC chart).
+qtyMode    = input.string("Fixed", "Quantity", options=["Fixed","Risk"], group="S3. Sizing", tooltip="Fixed: every entry is the fixed quantity. Risk: the quantity that loses 'Risk %' of equity if the stop loss is hit. With no stop loss, Risk falls back to Fixed.")
+qtyFixed   = input.float(0.1, "Fixed quantity (contracts = BTC)", minval=0, step=0.01, group="S3. Sizing")
+riskPct    = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0, step=0.1, group="S3. Sizing")
+qtyMax     = input.float(2.0, "Max quantity", minval=0, step=0.01, group="S3. Sizing")
+qtyStep    = input.float(0.01, "Quantity step (rounds down)", minval=0, step=0.001, group="S3. Sizing", tooltip="The quantity is rounded down to a multiple of this. An entry whose quantity rounds to 0 is skipped.")
+entryFill  = input.string("Signal tick", "Entry fill", options=["Signal tick","Limit at label price"], group="Strategy", tooltip="Limit at label price: buy limit at the label's price (candle low), sell limit at the candle high, filled only if price returns to it. Signal tick: live, a market fill on the tick the label appears; in the backtest, at the close of the label's candle.")
+limitBars  = input.int(5, "Limit valid (bars)", minval=1, maxval=500, group="Strategy", tooltip="An unfilled limit entry is cancelled after this many bars, or sooner when an exit or an opposite signal arrives.")
+useLimit   = entryFill == "Limit at label price"
+maxOpen    = input.int(20, "Max open entries", minval=1, maxval=100, group="Strategy", tooltip="Every entry label opens its own entry, stacking on an open trade of the same side, up to this many at once. Each entry has its own trailing TP / stop.")
+
+// ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
+// Set true when this block lives in a script that runs in its own pane
+// (overlay=false) so the visuals are drawn on the price chart.
+FGF_FORCE_OVERLAY = true
+
+GRP_FGF = "Direction filter"
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
+fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
+fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
+fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
+fgfMinutes   = input.int(60, "Minutes", minval=1, group=GRP_FGF)
+fgfBars      = input.int(1, "Candles", minval=1, group=GRP_FGF)
+fgfCheck     = input.string("Tick", "Check price on", options=["Tick", "Candle open", "Candle close"], group=GRP_FGF, tooltip="When price is compared to the level. Tick: the live price, on every tick (closed candles keep their close). Candle open: each candle's open, decided on its first tick and fixed for the whole candle. Candle close: each candle's close, decided when it closes; while a candle is forming it is judged at its open with the last closed candle's close.")
+fgfBandAtr   = input.float(0.25, "No-trade band, ATR mult", minval=0.0, step=0.05, group=GRP_FGF, tooltip="NO TRADE zone around the level: +- this many ATR(14) of the filter timeframe at the signal candle. Inside it price has not chosen a side, so neither buys nor sells are allowed. 0 = no band: above the level BUY ZONE, below it SELL ZONE.")
+fgfAgainst   = input.bool(true, "Allow trading against the signal", group=GRP_FGF, tooltip="On: below a BUY signal's level the SELL ZONE allows sells (and above a SELL signal's level the BUY ZONE allows buys). Off: those zones are NO TRADE; only the signal's own direction is allowed, and only once price confirms it.")
+fgfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_FGF)
+fgfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_FGF, tooltip="Turn one side off completely.")
+fgfShowBg    = input.bool(true, "Shade", inline="vis", group=GRP_FGF)
+fgfShowLv    = input.bool(true, "Level line", inline="vis", group=GRP_FGF)
+fgfSigMark   = input.bool(true, "Signal marks", inline="vis", group=GRP_FGF, tooltip="Shade: green = BUY ZONE (buys allowed), red = SELL ZONE (sells allowed), gray = NO TRADE (inside the band, against the signal when that is off, or that side turned off). Level line: the signal's level, dashed lines: the band edges, names of the zones at the last candle. Signal marks: a triangle where a signal becomes known.")
+fgfShowTbl   = input.bool(true, "Status box", inline="tbl", group=GRP_FGF)
+fgfTblPos    = input.string("top_right", "", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], inline="tbl", group=GRP_FGF)
+
+GRP_FGS = "Direction score"
+fgsShow = input.bool(false, "Show the direction score", group=GRP_FGS, tooltip="In the status box: how often each of three readings of the signals (level side, signal direction, signal reversed) was right on the filter timeframe's candles, 1 and H candles later, buys and sells averaged (50% = a coin flip). Information only: the zones never use it.")
+fgsWin  = input.int(500, "Window, filter candles (0 = all history)", minval=0, maxval=500, group=GRP_FGS)
+fgsH    = input.int(10, "Longer horizon H, filter candles", minval=2, maxval=100, group=GRP_FGS)
+
+// ---- FlashGold signal inputs (the strategy's, same defaults) ----------------
+GRP_FGC = "FlashGold signal: core"
+fgfSpreadPts    = input.float(13.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")
+fgfEntryDistPts = input.float(50.0, "Entry distance pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGC)
+fgfHoldBars     = input.int(0, "Entry hold bars", minval=0, group=GRP_FGC)
+fgfHoldFavPts   = input.float(5.0, "Hold min favorable pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGC)
+fgfOnePerBar    = input.bool(true, "One signal per bar", group=GRP_FGC)
+
+GRP_FGB = "FlashGold signal: burst / direction"
+fgfDistUnit     = input.string("ATR", "Burst / entry distance / hold unit", options=["ATR", "Points"], group=GRP_FGB, tooltip="ATR: the three thresholds below are multiples of ATR(14) of the filter timeframe. Points: the point inputs in the core group are used.")
+fgfBurstAtr     = input.float(0.5, "Burst threshold, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfEntryDistAtr = input.float(0.25, "Entry distance, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfHoldFavAtr   = input.float(0.1, "Hold min favorable, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfBurstPts     = input.float(172.0, "Burst threshold pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGB)
+fgfUseBurst     = input.bool(true, "Require burst gate", group=GRP_FGB)
+fgfAnyCombo     = input.bool(false, "Allow any combo", group=GRP_FGB, tooltip="If on, TDI parent/zone can approve direction even when burst is weaker.")
+fgfDriftBars    = input.int(60, "Prior drift bars", minval=1, group=GRP_FGB)
+fgfUseDrift     = input.bool(false, "Use prior drift filter", group=GRP_FGB)
+
+GRP_FGZ = "FlashGold signal: TDI trade zone"
+fgfUseZones   = input.bool(true, "Use TDI trade-zone filter", group=GRP_FGZ)
+fgfParentTf   = input.timeframe("60", "Parent obedience timeframe", group=GRP_FGZ, tooltip="Calibrated with the parent = the timeframe the signal runs on. Keep it equal to Filter timeframe: a parent above it reads its forming bar live, so it repaints.")
+fgfRsiLen     = input.int(14, "TDI RSI length", minval=2, group=GRP_FGZ)
+fgfFastLen    = input.int(2, "TDI white fast length", minval=1, group=GRP_FGZ)
+fgfMinAligned = input.int(2, "Minimum child zones aligned", minval=0, maxval=6, group=GRP_FGZ)
+fgfFlatParent = input.bool(false, "Allow trade if parent is flat", group=GRP_FGZ)
+fgfIgnoreNa   = input.bool(true, "Ignore zones without data", group=GRP_FGZ, tooltip="A child zone whose timeframe has no data on this candle is dropped from the active count instead of counting as MIX.")
+fgfHtfClosed  = input.bool(true, "Higher-TF zones use the last CLOSED bar", group=GRP_FGZ, tooltip="A child zone on a timeframe HIGHER than the filter timeframe is read from its last closed bar, so history and live agree. Off: such a zone reads its forming bar live, so it repaints.")
+fgfUseZ1 = input.bool(true, "Use child zone 1", group=GRP_FGZ)
+fgfZTf1  = input.timeframe("60", "Zone 1 timeframe", group=GRP_FGZ)
+fgfUseZ2 = input.bool(true, "Use child zone 2", group=GRP_FGZ)
+fgfZTf2  = input.timeframe("120", "Zone 2 timeframe", group=GRP_FGZ)
+fgfUseZ3 = input.bool(true, "Use child zone 3", group=GRP_FGZ)
+fgfZTf3  = input.timeframe("240", "Zone 3 timeframe", group=GRP_FGZ)
+fgfUseZ4 = input.bool(false, "Use child zone 4", group=GRP_FGZ)
+fgfZTf4  = input.timeframe("480", "Zone 4 timeframe", group=GRP_FGZ)
+fgfUseZ5 = input.bool(false, "Use child zone 5", group=GRP_FGZ)
+fgfZTf5  = input.timeframe("1", "Zone 5 timeframe", group=GRP_FGZ)
+fgfUseZ6 = input.bool(false, "Use child zone 6", group=GRP_FGZ)
+fgfZTf6  = input.timeframe("2", "Zone 6 timeframe", group=GRP_FGZ)
+
+// The timeframe the signal runs on ("Chart" = the chart's own).
+string fgfTfEff = fgfTf == "" ? timeframe.period : fgfTf
+int    fgfTfSec = timeframe.in_seconds(fgfTfEff)
+
+// ===== FLASHGOLD SIGNAL =======================================================
+// The strategy's signal logic, unchanged. It runs on the filter timeframe
+// (ctxSec = its seconds, used where the strategy compared to the chart).
+
+// TDI direction: fast line (SMA of RSI) rising = 1, falling = -1, flat = 0.
+fgfTdiDir() =>
+    float r = ta.rsi(close, fgfRsiLen)
+    float f = ta.sma(r, fgfFastLen)
+    f > f[1] ? 1 : f < f[1] ? -1 : 0
+
+fgfTdiDirPrev() =>
+    int d = fgfTdiDir()
+    d[1]
+
+// Direction of a child zone. A zone on a timeframe HIGHER than the one the
+// signal runs on is read from its last closed bar (fgfHtfClosed).
+fgfZoneDir(string tf, int ctxSec) =>
+    int dNow  = request.security(syminfo.tickerid, tf, fgfTdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    int dPrev = request.security(syminfo.tickerid, tf, fgfTdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+    fgfHtfClosed and timeframe.in_seconds(tf) > ctxSec ? dPrev : dNow
+
+fgfZoneOn(bool use, int dir) =>
+    use and (not fgfIgnoreNa or not na(dir))
+
+fgfAlign(int dir, bool on, int side) =>
+    on and side != 0 and dir == side ? 1 : 0
+
+// Returns [buy signal, sell signal, signal (entry) price, parent side,
+// aligned zones, active zones].
+fgfSignal(int ctxSec) =>
+    // price model
+    float pt         = syminfo.mintick
+    float halfSpread = fgfSpreadPts * pt * 0.5
+    float bidPx      = close - halfSpread
+    float askPx      = close + halfSpread
+    float midPrice   = (bidPx + askPx) * 0.5
+
+    // TDI trade zone
+    int parentDir = request.security(syminfo.tickerid, fgfParentTf, fgfTdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    int z1Dir = fgfZoneDir(fgfZTf1, ctxSec)
+    int z2Dir = fgfZoneDir(fgfZTf2, ctxSec)
+    int z3Dir = fgfZoneDir(fgfZTf3, ctxSec)
+    int z4Dir = fgfZoneDir(fgfZTf4, ctxSec)
+    int z5Dir = fgfZoneDir(fgfZTf5, ctxSec)
+    int z6Dir = fgfZoneDir(fgfZTf6, ctxSec)
+
+    bool on1 = fgfZoneOn(fgfUseZ1, z1Dir)
+    bool on2 = fgfZoneOn(fgfUseZ2, z2Dir)
+    bool on3 = fgfZoneOn(fgfUseZ3, z3Dir)
+    bool on4 = fgfZoneOn(fgfUseZ4, z4Dir)
+    bool on5 = fgfZoneOn(fgfUseZ5, z5Dir)
+    bool on6 = fgfZoneOn(fgfUseZ6, z6Dir)
+
+    int activeZones  = (on1 ? 1 : 0) + (on2 ? 1 : 0) + (on3 ? 1 : 0) + (on4 ? 1 : 0) + (on5 ? 1 : 0) + (on6 ? 1 : 0)
+    int parentSide   = parentDir > 0 ? 1 : parentDir < 0 ? -1 : 0
+    int alignedZones = fgfAlign(z1Dir, on1, parentSide) + fgfAlign(z2Dir, on2, parentSide) + fgfAlign(z3Dir, on3, parentSide) + fgfAlign(z4Dir, on4, parentSide) + fgfAlign(z5Dir, on5, parentSide) + fgfAlign(z6Dir, on6, parentSide)
+
+    int  requiredAligned   = math.min(fgfMinAligned, activeZones)
+    bool parentFlatAllowed = fgfFlatParent and parentSide == 0
+    bool zoneReady         = activeZones == 0 or alignedZones >= requiredAligned
+
+    bool tradeZoneBuyAllowed  = not fgfUseZones or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
+    bool tradeZoneSellAllowed = not fgfUseZones or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
+
+    // burst / prior drift
+    float atrPts       = ta.atr(14) / pt
+    float burstThrPts  = fgfDistUnit == "ATR" ? fgfBurstAtr * atrPts : fgfBurstPts
+    float entryDistPts = fgfDistUnit == "ATR" ? fgfEntryDistAtr * atrPts : fgfEntryDistPts
+    float holdFavPts   = fgfDistUnit == "ATR" ? fgfHoldFavAtr * atrPts : fgfHoldFavPts
+
+    float burstPts      = (midPrice - midPrice[1]) / pt
+    float priorDriftPts = (midPrice - midPrice[fgfDriftBars]) / pt
+
+    bool burstBuy  = burstPts >= burstThrPts
+    bool burstSell = burstPts <= -burstThrPts
+
+    bool priorBuyOk  = not fgfUseDrift or priorDriftPts > 0
+    bool priorSellOk = not fgfUseDrift or priorDriftPts < 0
+
+    bool rawBuyCandidate  = fgfAnyCombo ? (tradeZoneBuyAllowed and (not fgfUseBurst or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
+    bool rawSellCandidate = fgfAnyCombo ? (tradeZoneSellAllowed and (not fgfUseBurst or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
+
+    bool buyCandidate  = rawBuyCandidate and priorBuyOk
+    bool sellCandidate = rawSellCandidate and priorSellOk
+
+    // entry hold / virtual stop
+    var bool  holdActive    = false
+    var bool  holdIsBuy     = false
+    var int   holdSignalBar = na
+    var float holdSignalMid = na
+    var int   lastEntryBar  = na
+
+    float buyEntryPrice  = na
+    float sellEntryPrice = na
+    bool  buySignal      = false
+    bool  sellSignal     = false
+
+    bool canFire = not fgfOnePerBar or na(lastEntryBar) or lastEntryBar != bar_index
+
+    if buyCandidate and canFire
+        if fgfHoldBars == 0
+            buyEntryPrice := askPx + entryDistPts * pt
+            buySignal     := true
+            lastEntryBar  := bar_index
+        else if not holdActive
+            holdActive    := true
+            holdIsBuy     := true
+            holdSignalBar := bar_index
+            holdSignalMid := midPrice
+        else if holdIsBuy
+            int   elapsedBars    = bar_index - holdSignalBar
+            float holdMovePoints = (midPrice - holdSignalMid) / pt
+            if elapsedBars >= fgfHoldBars and holdMovePoints >= holdFavPts
+                buyEntryPrice := askPx + entryDistPts * pt
+                buySignal     := true
+                lastEntryBar  := bar_index
+                holdActive    := false
+
+    if sellCandidate and canFire
+        if fgfHoldBars == 0
+            sellEntryPrice := bidPx - entryDistPts * pt
+            sellSignal     := true
+            lastEntryBar   := bar_index
+        else if not holdActive
+            holdActive    := true
+            holdIsBuy     := false
+            holdSignalBar := bar_index
+            holdSignalMid := midPrice
+        else if not holdIsBuy
+            int   elapsedBars    = bar_index - holdSignalBar
+            float holdMovePoints = (holdSignalMid - midPrice) / pt
+            if elapsedBars >= fgfHoldBars and holdMovePoints >= holdFavPts
+                sellEntryPrice := bidPx - entryDistPts * pt
+                sellSignal     := true
+                lastEntryBar   := bar_index
+                holdActive     := false
+
+    if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and not tradeZoneSellAllowed))
+        holdActive    := false
+        holdSignalBar := na
+        holdSignalMid := na
+
+    float signalPx = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
+    [buySignal, sellSignal, signalPx, parentSide, alignedZones, activeZones]
+// ===== END FLASHGOLD SIGNAL ===================================================
+
+// Arming, on the filter timeframe: a signal candle sets the level at its
+// close. Committed state only (var), so backtests and live agree. aId counts
+// the signals.
+fgfArm(bool sBuy, bool sSell, float sPx, float sAtr) =>
+    var int   aAt  = na
+    var int   aBar = na
+    var float aPx  = na
+    var int   aDir = 0
+    var int   aId  = 0
+    var float aAtr = na
+    if sBuy or sSell
+        aAt  := nz(time_close, time)
+        aBar := bar_index
+        aPx  := fgfLvMode == "Entry price" ? nz(sPx, close) : close
+        aDir := sBuy ? 1 : -1
+        aId  += 1
+        aAtr := sAtr
+    [aAt, aBar, aPx, aDir, aId, aAtr]
+
+// Direction score, on the filter timeframe: a rule's direction d at a candle
+// is right h candles later when the close has moved that way. Returns the
+// balanced share right (mean of the UP and DOWN shares; na until both
+// exist) and the number of scored calls, over the window.
+fgfHits(int d, int h) =>
+    float mv   = close - close[h]
+    int   pd   = nz(d[h])
+    float upN  = pd == 1 and mv != 0 ? 1.0 : 0.0
+    float upH  = pd == 1 and mv > 0 ? 1.0 : 0.0
+    float dnN  = pd == -1 and mv != 0 ? 1.0 : 0.0
+    float dnH  = pd == -1 and mv < 0 ? 1.0 : 0.0
+    int   w    = math.max(fgsWin, 1)
+    float wUpN = math.sum(upN, w)
+    float wUpH = math.sum(upH, w)
+    float wDnN = math.sum(dnN, w)
+    float wDnH = math.sum(dnH, w)
+    float cUpN = ta.cum(upN)
+    float cUpH = ta.cum(upH)
+    float cDnN = ta.cum(dnN)
+    float cDnH = ta.cum(dnH)
+    // (until the window is full: every candle so far)
+    float sUpN = fgsWin > 0 and not na(wUpN) ? wUpN : cUpN
+    float sUpH = fgsWin > 0 and not na(wUpH) ? wUpH : cUpH
+    float sDnN = fgsWin > 0 and not na(wDnN) ? wDnN : cDnN
+    float sDnH = fgsWin > 0 and not na(wDnH) ? wDnH : cDnH
+    float acc  = sUpN > 0 and sDnN > 0 ? 0.5 * (sUpH / sUpN + sDnH / sDnN) : na
+    [acc, sUpN + sDnN]
+
+// The three rules at this filter candle's close, scored 1 and H candles later.
+// (Level side: on the signal candle a close exactly AT the level counts as
+// the signal's side, as the gate allows it there.)
+fgfScore(float aPx, int aDir, int aBar) =>
+    int dL = na(aPx) ? 0 : close > aPx ? 1 : close < aPx ? -1 : aBar == bar_index ? nz(aDir) : 0
+    int dS = nz(aDir)
+    int dR = -nz(aDir)
+    [l1, ln] = fgfHits(dL, 1)
+    [lh, lhn] = fgfHits(dL, fgsH)
+    [s1, sn] = fgfHits(dS, 1)
+    [sh, shn] = fgfHits(dS, fgsH)
+    [r1, rn] = fgfHits(dR, 1)
+    [rh, rhn] = fgfHits(dR, fgsH)
+    [l1, lh, s1, sh, r1, rh, ln]
+
+// Each filter candle sends its arm, its conditions, its index, open and close
+// time, and the arm, conditions and close time of the candle before it. An
+// arm is used only once the candle that made it has closed by this chart's
+// clock, so the forming filter candle is never read and nothing repaints.
+fgfRead() =>
+    [sBuy, sSell, sPx, sPar, sAl, sAc] = fgfSignal(fgfTfSec)
+    float fAtr = ta.atr(14)
+    [aAt, aBar, aPx, aDir, aId, aAtr] = fgfArm(sBuy, sSell, sPx, fAtr)
+    [cL1, cLh, cS1, cSh, cR1, cRh, cN] = fgfScore(aPx, aDir, aBar)
+    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1], aAtr, aAtr[1]]
+
+[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN, fpAtr, fqAtr] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
+
+fgfTfText(string tf) =>
+    int sec = timeframe.in_seconds(tf)
+    sec < 60 ? str.tostring(sec) + "s" : sec < 3600 ? str.tostring(sec / 60, "#.##") + "m" : sec < 86400 ? str.tostring(sec / 3600, "#.##") + "H" : tf
+string fgfTfTag = fgfTfText(fgfTfEff)
+
+// Clock: the moment a bar is judged ("Check price on").
+//   Tick          a closed bar at its close time; the live bar at the real
+//                 clock (every tick), kept inside the bar.
+//   Candle open   every bar at its open time (fixed from its first tick).
+//   Candle close  a closed bar at its close time; the live bar at its open
+//                 time, with the last closed candle's close (see fgfValue).
+// Closed bars never repaint in any mode.
+bool fgfLiveBar = not barstate.isconfirmed
+bool fgfAtOpen  = fgfCheck == "Candle open" or (fgfCheck == "Candle close" and fgfLiveBar)
+// The close-time clock (Tick, and closed bars in Candle close). A live bar's
+// real clock never reaches the bar's close, nor the close of the filter
+// candle still forming (fp on a live bar), so a filter candle is never read
+// before its data has closed (delayed data, late ticks).
+int  fgfClockC  = fgfLiveBar ? math.max(time, math.min(timenow, nz(time_close, timenow + 1) - 1, nz(fpClose, timenow + 1) - 1)) : nz(time_close, time)
+fgfClock = fgfAtOpen ? time : fgfClockC
+
+// The arm in force = the latest filter candle closed by the clock:
+//   1  the latest filter candle (fp), once it has closed by the clock
+//   2  the candle before it (fq), once that one has closed
+//   0  neither (a chart candle longer than the filter candle, judged at its
+//      open): the previous chart bar's close-time pick, the latest filter
+//      candle closed by this bar's open, as none closes between the two;
+//      its index is judged at this bar's open (after a session gap, the
+//      next candle)
+int fgfSelC = fgfClockC >= fpClose ? 1 : 2
+int fgfSel  = fgfAtOpen ? (fpClose <= time ? 1 : fqClose <= time ? 2 : 0) : fgfSelC
+// the close-time pick of every bar, kept for the next bar's open (fgfSel 0)
+int   fgfCAt  = fgfSelC == 1 ? fpAt  : fqAt
+int   fgfCBar = fgfSelC == 1 ? fpBar : fqBar
+float fgfCPx  = fgfSelC == 1 ? fpPx  : fqPx
+int   fgfCDir = fgfSelC == 1 ? fpDir : fqDir
+int   fgfCId  = fgfSelC == 1 ? fpId  : fqId
+int   fgfCPar = fgfSelC == 1 ? fpPar : fqPar
+int   fgfCAl  = fgfSelC == 1 ? fpAl  : fqAl
+int   fgfCAc  = fgfSelC == 1 ? fpAc  : fqAc
+// The filter candle the clock falls in (Candles mode): the picked candle when
+// it closes exactly at the clock, else the one after it.
+int   fgfCIdx = fgfSelC == 1 ? (fgfClockC == fpClose ? fpIdx : fpIdx + 1) : (fgfClockC == fqClose ? fpIdx - 1 : fpIdx)
+// the picked candle itself and its close, for the next bar's open (fgfSel 0)
+int   fgfCK      = fgfSelC == 1 ? fpIdx : fpIdx - 1
+int   fgfCKClose = fgfSelC == 1 ? fpClose : fqClose
+
+int   fgfSigAt  = fgfSel == 1 ? fpAt  : fgfSel == 2 ? fqAt  : fgfCAt[1]
+int   fgfSigBar = fgfSel == 1 ? fpBar : fgfSel == 2 ? fqBar : fgfCBar[1]
+float fgfLevel  = fgfSel == 1 ? fpPx  : fgfSel == 2 ? fqPx  : fgfCPx[1]
+int   fgfSigDir = nz(fgfSel == 1 ? fpDir : fgfSel == 2 ? fqDir : fgfCDir[1])
+// the ATR(14) of the signal candle (the no-trade band's unit)
+float fgfCAtr   = fgfSelC == 1 ? fpAtr : fqAtr
+float fgfSigAtr = fgfSel == 1 ? fpAtr : fgfSel == 2 ? fqAtr : fgfCAtr[1]
+int   fgfSigId  = nz(fgfSel == 1 ? fpId  : fgfSel == 2 ? fqId  : fgfCId[1])
+// The conditions of the last closed filter candle (status box).
+int   fgfPar    = fgfSel == 1 ? fpPar : fgfSel == 2 ? fqPar : fgfCPar[1]
+int   fgfAl     = fgfSel == 1 ? fpAl  : fgfSel == 2 ? fqAl  : fgfCAl[1]
+int   fgfAc     = fgfSel == 1 ? fpAc  : fgfSel == 2 ? fqAc  : fgfCAc[1]
+// The direction score of the last closed filter candle (status box, output).
+fgfPickC(float p, float q) =>
+    fgfSelC == 1 ? p : q
+fgfPick(float p, float q, float cPrev) =>
+    fgfSel == 1 ? p : fgfSel == 2 ? q : cPrev
+float fgsCL1 = fgfPickC(fpL1, fqL1)
+float fgsCLh = fgfPickC(fpLh, fqLh)
+float fgsCS1 = fgfPickC(fpS1, fqS1)
+float fgsCSh = fgfPickC(fpSh, fqSh)
+float fgsCR1 = fgfPickC(fpR1, fqR1)
+float fgsCRh = fgfPickC(fpRh, fqRh)
+float fgsCN  = fgfPickC(fpN, fqN)
+float fgsL1  = fgfPick(fpL1, fqL1, fgsCL1[1])
+float fgsLh  = fgfPick(fpLh, fqLh, fgsCLh[1])
+float fgsS1  = fgfPick(fpS1, fqS1, fgsCS1[1])
+float fgsSh  = fgfPick(fpSh, fqSh, fgsCSh[1])
+float fgsR1  = fgfPick(fpR1, fqR1, fgsCR1[1])
+float fgsRh  = fgfPick(fpRh, fqRh, fgsCRh[1])
+float fgsN   = fgfPick(fpN, fqN, fgsCN[1])
+int   fgfIdx    = not fgfAtOpen ? fgfCIdx : fgfSel == 1 ? (time == fpClose ? fpIdx : fpIdx + 1) : fgfSel == 2 ? (time == fqClose ? fpIdx - 1 : fpIdx) : (time == fgfCKClose[1] ? fgfCK[1] : fgfCK[1] + 1)
+
+// The price compared to the level, at that moment.
+fgfValue = fgfCheck == "Candle open" ? open : fgfCheck == "Candle close" and fgfLiveBar ? close[1] : close
+
+// Permission window: from the signal candle's close, until the next signal
+// (or the minutes / candles run out).
+bool fgfArmed  = not na(fgfSigAt) and fgfClock >= fgfSigAt
+int  fgfEnd    = fgfLast == "Minutes" and fgfArmed ? fgfSigAt + fgfMinutes * 60000 : na
+int  fgfEndBar = fgfLast == "Candles" and fgfArmed ? fgfSigBar + fgfBars : na
+bool fgfOpen   = fgfArmed and (fgfLast == "Minutes" ? fgfClock < fgfEnd : fgfLast == "Candles" ? fgfIdx < fgfEndBar : true)
+
+// On the signal candle itself price can sit exactly at the level ("Signal
+// close"): there the signal's own side counts as allowed AT the level.
+bool fgfOnSigBar = fgfArmed and fgfIdx == fgfSigBar
+bool fgfAtBuyLv  = fgfOnSigBar and fgfSigDir > 0 and fgfValue >= fgfLevel
+bool fgfAtSellLv = fgfOnSigBar and fgfSigDir < 0 and fgfValue <= fgfLevel
+
+// The zones (see ZONES): above the band BUY ZONE, below it SELL ZONE, inside
+// it NO TRADE. With no band the level itself splits them (and on the signal
+// candle price exactly at the level counts for the signal's side).
+float fgfBand  = fgfBandAtr * nz(fgfSigAtr)
+float fgfMt    = syminfo.mintick
+float fgfUpLv  = fgfBand > 0 ? math.ceil((fgfLevel + fgfBand) / fgfMt - 1e-9) * fgfMt : fgfLevel
+float fgfDnLv  = fgfBand > 0 ? math.floor((fgfLevel - fgfBand) / fgfMt + 1e-9) * fgfMt : fgfLevel
+bool  fgfInUp  = fgfBand > 0 ? fgfValue > fgfUpLv + fgfMt / 2 : (fgfValue > fgfLevel or fgfAtBuyLv)
+bool  fgfInDn  = fgfBand > 0 ? fgfValue < fgfDnLv - fgfMt / 2 : (fgfValue < fgfLevel or fgfAtSellLv)
+// the signal's direction is confirmed while price is in its own zone
+bool  fgfSigOk = fgfArmed and (fgfSigDir > 0 ? fgfInUp : fgfSigDir < 0 ? fgfInDn : false)
+// a zone allows its side unless it is against the signal and that is off
+bool  fgfUpNow = fgfInUp and (fgfAgainst or fgfSigDir > 0)
+bool  fgfDnNow = fgfInDn and (fgfAgainst or fgfSigDir < 0)
+
+// Final gates: is a buy / a sell ALLOWED on this bar? (Permission only.)
+fgfBuyOk  = not fgfOn or (fgfOpen and fgfAllowBuy  and fgfUpNow)
+fgfSellOk = not fgfOn or (fgfOpen and fgfAllowSell and fgfDnNow)
+
+// A new signal became known on this bar; a Minutes / Candles permission ended.
+bool fgfNewSig  = fgfSigId > fgfSigId[1]
+// What may be done now: 1 BUY ZONE, -1 SELL ZONE, 0 NO TRADE, 2 filter off.
+int  fgfZone    = not fgfOn ? 2 : fgfBuyOk ? 1 : fgfSellOk ? -1 : 0
+bool fgfEnded   = fgfArmed and not fgfOpen
+bool fgfExpired = fgfOn and fgfEnded and not fgfEnded[1] and not barstate.isfirst
+
+// ---- Visuals (optional: delete from here to END if you only want the gates)
+fgfPosOf(string s) =>
+    switch s
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+
+bgcolor(fgfShowBg and fgfOn and fgfOpen ? (fgfBuyOk ? color.new(color.green, 85) : fgfSellOk ? color.new(color.red, 85) : color.new(color.gray, 88)) : na, title="FGF permission", force_overlay=FGF_FORCE_OVERLAY)
+plotshape(fgfSigMark and fgfOn and fgfNewSig and fgfSigDir > 0, "FGF buy signal",  shape.triangleup,   location.belowbar, color.lime, size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
+plotshape(fgfSigMark and fgfOn and fgfNewSig and fgfSigDir < 0, "FGF sell signal", shape.triangledown, location.abovebar, color.red,  size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
+plotshape(fgfExpired, "FGF permission ended", shape.xcross, location.top, color.orange, size=size.tiny, text="FGF end", textcolor=color.orange, force_overlay=FGF_FORCE_OVERLAY)
+
+// Level line as a drawing (it does not stretch the price scale). Each signal
+// keeps its own line and label, so past levels stay readable. Redrawn every
+// bar so a host script's own drawings never garbage-collect the current one.
+var line  fgfLn   = na
+var label fgfLbl  = na
+var int   fgfFrom = na
+if fgfNewSig or (na(fgfFrom) and fgfArmed)
+    // a new signal: leave the previous signal's drawings where they ended
+    fgfLn   := na
+    fgfLbl  := na
+    fgfFrom := bar_index
+if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom)
+    int   fgfX1  = math.max(fgfFrom, bar_index - 9000)
+    color fgfCol = fgfSigDir > 0 ? color.lime : color.red
+    line.delete(fgfLn)
+    fgfLn := line.new(fgfX1, fgfLevel, bar_index, fgfLevel, color=fgfCol, width=2, force_overlay=FGF_FORCE_OVERLAY)
+    if na(fgfLbl)
+        string fgfLastTxt = fgfLast == "Minutes" ? str.tostring(fgfMinutes) + " min" : fgfLast == "Candles" ? str.tostring(fgfBars) + (fgfBars == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
+        string fgfTxt     = (fgfSigDir > 0 ? "BUY" : "SELL") + " signal " + fgfTfTag + " @ " + str.tostring(fgfLevel, format.mintick) + "\n" + fgfLastTxt
+        fgfLbl := label.new(fgfX1, fgfLevel, fgfTxt, style=label.style_label_right, color=color.new(fgfCol, 20), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+
+// The permission as the status box and the zone names show it: Tick + Minutes
+// also ends it by the real clock (the gates, shading and outputs keep the
+// candle's clock, see TIMING).
+bool fgfDOpen = fgfOpen and not (fgfCheck == "Tick" and fgfLast == "Minutes" and timenow >= fgfEnd)
+
+// The edge of a zone as text: with a band, the band edge (the last NO TRADE
+// tick); with no band, the level rounded to the last tick that is not
+// allowed, or on the signal candle the first tick that is (">=" / "<=").
+fgfEdgeTx(bool up) =>
+    bool  incl = fgfBand == 0 and fgfOnSigBar and (up ? fgfSigDir > 0 : fgfSigDir < 0)
+    float edge = up ? fgfUpLv : fgfDnLv
+    float k    = edge / fgfMt
+    float tk   = fgfBand > 0 ? edge : (up != incl ? math.floor(k + 1e-9) : math.ceil(k - 1e-9)) * fgfMt
+    (up ? (incl ? ">= " : "> ") : (incl ? "<= " : "< ")) + str.tostring(tk, format.mintick)
+
+// The band's edges (dashed) and the zone names at the last candle.
+var line  fgfLnUp = na
+var line  fgfLnDn = na
+var label fgfZUp  = na
+var label fgfZDn  = na
+var label fgfZMid = na
+if fgfNewSig
+    fgfLnUp := na
+    fgfLnDn := na
+if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom) and fgfBand > 0
+    int fgfX2 = math.max(fgfFrom, bar_index - 9000)
+    line.delete(fgfLnUp)
+    line.delete(fgfLnDn)
+    fgfLnUp := line.new(fgfX2, fgfUpLv, bar_index, fgfUpLv, color=color.new(color.lime, 40), style=line.style_dashed, width=1, force_overlay=FGF_FORCE_OVERLAY)
+    fgfLnDn := line.new(fgfX2, fgfDnLv, bar_index, fgfDnLv, color=color.new(color.red, 40), style=line.style_dashed, width=1, force_overlay=FGF_FORCE_OVERLAY)
+if barstate.islast
+    label.delete(fgfZUp)
+    label.delete(fgfZDn)
+    label.delete(fgfZMid)
+    if fgfShowLv and fgfOn and fgfDOpen and not na(fgfLevel)
+        bool upAllowed = fgfAllowBuy and (fgfAgainst or fgfSigDir > 0)
+        bool dnAllowed = fgfAllowSell and (fgfAgainst or fgfSigDir < 0)
+        fgfZUp  := label.new(bar_index + 3, fgfUpLv, (upAllowed ? "BUY ZONE " : "NO TRADE ") + fgfEdgeTx(true), style=label.style_label_lower_left, color=color.new(upAllowed ? color.lime : color.gray, 30), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+        fgfZDn  := label.new(bar_index + 3, fgfDnLv, (dnAllowed ? "SELL ZONE " : "NO TRADE ") + fgfEdgeTx(false), style=label.style_label_upper_left, color=color.new(dnAllowed ? color.red : color.gray, 30), textcolor=color.white, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+        if fgfBand > 0
+            fgfZMid := label.new(bar_index + 3, fgfLevel, "NO TRADE (band)", style=label.style_label_left, color=color.new(color.gray, 30), textcolor=color.white, size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
+
+// Status box (display only; the gates never use it). Judged like the gates,
+// at the bar's clock; Tick + Minutes also ends it by the real clock.
+var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 14, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
+
+// the BTC/USD reference scores (out of sample 2025-07 .. 2026-10) of the filter timeframe's bucket
+fgsRefTxt(int sec) =>
+    int m = math.round(sec / 60.0)
+    if m >= 1 and m <= 2
+        "1m: level 50/50  signal 50/49  reversed 50/51"
+    else if m >= 3 and m <= 10
+        "5m: level 51/51  signal 49/49  reversed 51/51"
+    else if m >= 11 and m <= 22
+        "15m: level 51/51  signal 48/48  reversed 52/52"
+    else if m >= 23 and m <= 45
+        "30m: level 51/52  signal 49/48  reversed 51/52"
+    else if m >= 46 and m <= 90
+        "1H: level 50/49  signal 48/50  reversed 52/50"
+    else if m >= 91 and m <= 180
+        "2H: level 49/52  signal 49/48  reversed 51/52"
+    else if m >= 181 and m <= 360
+        "4H: level 49/53  signal 49/48  reversed 51/52"
+    else if m >= 361 and m <= 720
+        "8H: level 51/48  signal 48/51  reversed 52/49"
+    else if m >= 1080 and m <= 2880
+        "1D: level 49/57  signal 53/43  reversed 47/57"
+    else
+        "-"
+
+fgsPct(float v) =>
+    na(v) ? "-" : str.tostring(v * 100, "#") + "%"
+if fgfShowTbl and fgfOn and barstate.islast
+    bool   dOpen  = fgfDOpen
+    bool   dBuy   = dOpen and fgfAllowBuy  and fgfUpNow
+    bool   dSell  = dOpen and fgfAllowSell and fgfDnNow
+    string dSide  = fgfSigDir > 0 ? "BUY" : "SELL"
+    string dDo    = fgfSigDir > 0 ? "buy" : "sell"
+    // what may be done now, and why not when nothing may
+    string dWhy   = not fgfArmed ? "waiting for a signal" : not dOpen ? "permission ended" : not (fgfInUp or fgfInDn) ? "price at the level (band)" : fgfInUp and not fgfAgainst and fgfSigDir < 0 ? "above a SELL signal (against it)" : fgfInDn and not fgfAgainst and fgfSigDir > 0 ? "below a BUY signal (against it)" : "that side is switched off"
+    string dState = dBuy ? "BUY ZONE - buys allowed, no sells" : dSell ? "SELL ZONE - sells allowed, no buys" : "NO TRADE - " + dWhy
+    color  dCol   = dBuy ? color.lime : dSell ? color.red : color.orange
+    bool   dConf  = dOpen and fgfSigOk
+    bool   dSideOn = fgfSigDir > 0 ? fgfAllowBuy : fgfAllowSell
+    string dSigTx = not fgfArmed ? "-" : not dOpen ? "- (permission ended)" : dConf ? (dSideOn ? "CONFIRMED - " + dDo + "s allowed" : "CONFIRMED - but " + dDo + "s are switched off") : "NOT CONFIRMED - do not " + dDo
+    int    dSecs  = dOpen and not na(fgfEnd) ? math.max(0, math.floor((fgfEnd - (fgfCheck == "Tick" ? timenow : fgfClock)) / 1000.0)) : 0
+    string dLeft  = not dOpen ? "-" : fgfLast == "Minutes" ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : fgfLast == "Candles" ? str.tostring(fgfEndBar - fgfIdx) + (fgfEndBar - fgfIdx == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
+    string dSig   = na(fgfSigAt) ? "-" : dSide + " " + str.format_time(fgfSigAt, "MMM dd HH:mm", syminfo.timezone) + " @ " + (na(fgfLevel) ? "-" : str.tostring(fgfLevel, format.mintick))
+    string dPar   = na(fgfPar) ? "-" : fgfPar > 0 ? "BUY" : fgfPar < 0 ? "SELL" : "FLAT"
+    string dZones = na(fgfAc) ? "-" : str.tostring(fgfAl) + "/" + str.tostring(fgfAc)
+    string dUp    = na(fgfLevel) ? "-" : fgfEdgeTx(true)
+    string dDn    = na(fgfLevel) ? "-" : fgfEdgeTx(false)
+    table.cell(fgfTable, 0, 0, "FG filter " + fgfTfTag, text_color=color.white)
+    table.cell(fgfTable, 1, 0, dState, text_color=dCol)
+    table.cell(fgfTable, 0, 1, "Signal (exch tz)", text_color=color.white)
+    table.cell(fgfTable, 1, 1, dSig, text_color=fgfSigDir > 0 ? color.lime : fgfSigDir < 0 ? color.red : color.white)
+    table.cell(fgfTable, 0, 2, "Signal direction", text_color=color.white)
+    table.cell(fgfTable, 1, 2, dSigTx, text_color=not fgfArmed ? color.white : dConf and dSideOn ? (fgfSigDir > 0 ? color.lime : color.red) : color.orange)
+    table.cell(fgfTable, 0, 3, "BUY ZONE  " + dUp, text_color=color.white)
+    bool   dUpOk  = dOpen and fgfAllowBuy and (fgfAgainst or fgfSigDir > 0)
+    bool   dDnOk  = dOpen and fgfAllowSell and (fgfAgainst or fgfSigDir < 0)
+    string dOff   = not fgfArmed ? "NO TRADE (no signal yet)" : not dOpen ? "NO TRADE (permission ended)" : "NO TRADE there"
+    table.cell(fgfTable, 1, 3, dBuy ? "ALLOWED (now)" : dUpOk ? "allowed there" : dOff, text_color=dBuy ? color.lime : dUpOk ? color.gray : color.orange)
+    table.cell(fgfTable, 0, 4, "SELL ZONE " + dDn, text_color=color.white)
+    table.cell(fgfTable, 1, 4, dSell ? "ALLOWED (now)" : dDnOk ? "allowed there" : dOff, text_color=dSell ? color.red : dDnOk ? color.gray : color.orange)
+    table.cell(fgfTable, 0, 5, "NO TRADE band", text_color=color.white)
+    table.cell(fgfTable, 1, 5, na(fgfLevel) ? "-" : fgfBand > 0 ? str.tostring(fgfDnLv, format.mintick) + " - " + str.tostring(fgfUpLv, format.mintick) : fgfBandAtr > 0 and fgfArmed and na(fgfSigAtr) ? "off (no ATR yet at the signal)" : "off", text_color=color.white)
+    table.cell(fgfTable, 0, 6, fgfCheck == "Candle open" ? "Candle open" : fgfCheck == "Candle close" ? "Last close" : "Price now", text_color=color.white)
+    table.cell(fgfTable, 1, 6, na(fgfValue) ? "-" : str.tostring(fgfValue, format.mintick), text_color=color.white)
+    table.cell(fgfTable, 0, 7, "Left", text_color=color.white)
+    table.cell(fgfTable, 1, 7, dLeft, text_color=color.white)
+    table.cell(fgfTable, 0, 8, "Last " + fgfTfTag + " parent / zones", text_color=color.white)
+    table.cell(fgfTable, 1, 8, dPar + " / " + dZones + " aligned", text_color=dPar == "BUY" ? color.lime : dPar == "SELL" ? color.red : color.white)
+    if fgsShow
+        string hTxt = "next 1 / " + str.tostring(fgsH) + " " + fgfTfTag
+        string wTxt = fgsWin > 0 ? "last " + str.tostring(fgsWin) : "all"
+        table.cell(fgfTable, 0, 9, "Direction score (" + wTxt + ", " + (na(fgsN) ? "-" : str.tostring(fgsN, "#")) + " level-side calls)", text_color=color.gray)
+        table.cell(fgfTable, 1, 9, hTxt + "  (50% = coin flip)", text_color=color.gray)
+        table.cell(fgfTable, 0, 10, "Level side (bare level)", text_color=color.aqua)
+        table.cell(fgfTable, 1, 10, fgsPct(fgsL1) + " / " + fgsPct(fgsLh), text_color=color.aqua)
+        table.cell(fgfTable, 0, 11, "Signal direction", text_color=color.gray)
+        table.cell(fgfTable, 1, 11, fgsPct(fgsS1) + " / " + fgsPct(fgsSh), text_color=color.gray)
+        table.cell(fgfTable, 0, 12, "Signal reversed", text_color=color.gray)
+        table.cell(fgfTable, 1, 12, fgsPct(fgsR1) + " / " + fgsPct(fgsRh), text_color=color.gray)
+        table.cell(fgfTable, 0, 13, "BTC 2025-26 (1/10), parent = TF, zones x1/2/4", text_color=color.gray)
+        table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
+// ====================== END FLASHGOLD DIRECTION FILTER =======================
+
+// Exported values (Data Window + linkable as a source from other scripts).
+plot(fgfOn and fgfOpen ? 1 : 0, "FGF active", display=display.data_window)
+plot(fgfBuyOk ? 1 : 0, "FGF buy allowed", display=display.data_window)
+plot(fgfSellOk ? 1 : 0, "FGF sell allowed", display=display.data_window)
+plot(fgfLevel, "FGF level", display=display.data_window)
+plot(fgfNewSig ? fgfSigDir : 0, "FGF signal (1 buy, -1 sell)", display=display.data_window)
+plot(fgfExpired ? 1 : 0, "FGF ended", display=display.data_window)
+plot(fgfZone, "FGF zone (1 buy, -1 sell, 0 no trade, 2 off)", display=display.data_window)
+plot(fgfOn and fgfOpen and fgfSigOk ? 1 : 0, "FGF signal confirmed", display=display.data_window)
+plot(fgsShow ? fgsL1 : na, "FGF score (next candle)", display=display.data_window)
+
+// PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
+hM   = scaleWin ? 20 : flatWin
+hW   = scaleWin ? 17 : flatWin
+hD   = scaleWin ? 28 : flatWin
+h4   = scaleWin ? 24 : flatWin
+h1h  = scaleWin ? 16 : flatWin
+h30  = scaleWin ? 12 : flatWin
+h15  = scaleWin ? 12 : flatWin
+h5   = scaleWin ? 12 : flatWin
+h1   = scaleWin ? 20 : flatWin
+hs30 = scaleWin ? 12 : flatWin
+hs15 = scaleWin ? 12 : flatWin
+hs5  = scaleWin ? 12 : flatWin
+hs1  = scaleWin ? 20 : flatWin
+
+// ------------------------------------------------------------- TDI CORE ----
+tdiCore() =>
+    r     = ta.rsi(close, rsiLen)
+    fast  = ta.sma(r, fastLen)
+    slow  = ta.sma(r, slowLen)
+    basis = ta.sma(r, bbLen)
+    dev   = bbMult * ta.stdev(r, bbLen)
+    [r, fast, slow, basis, basis + dev, basis - dev]
+
+// --------------------------------------------------------- RUNG MEASURE ----
+// DIRECTION-BLIND. Shape carries no direction; the parent supplies it later.
+rungState(simple int h) =>
+    [_r, fast, _slow, basis, _up, _lo] = tdiCore()
+
+    recentLow  = ta.lowest(low,   h)
+    priorLow   = ta.lowest(low,   h)[h]
+    recentHigh = ta.highest(high, h)
+    priorHigh  = ta.highest(high, h)[h]
+    fastLowR   = ta.lowest(fast,  h)
+    fastLowP   = ta.lowest(fast,  h)[h]
+    fastHighR  = ta.highest(fast, h)
+    fastHighP  = ta.highest(fast, h)[h]
+
+    brokeLow     = recentLow  < priorLow
+    brokeHigh    = recentHigh > priorHigh
+    tdiBrokeLow  = fastLowR   < fastLowP
+    tdiBrokeHigh = fastHighR  > fastHighP
+
+    refuseLow  = brokeLow  and not tdiBrokeLow
+    refuseHigh = brokeHigh and not tdiBrokeHigh
+
+    rngShort   = ta.highest(fast, areaLen) - ta.lowest(fast, areaLen)
+    rngLong    = ta.highest(fast, h)       - ta.lowest(fast, h)
+    compressed = rngLong > 0 and (rngShort / rngLong) <= areaFrac
+
+    stairUp   = brokeHigh and tdiBrokeHigh and not refuseHigh
+    stairDown = brokeLow  and tdiBrokeLow  and not refuseLow
+
+    smaC    = ta.sma(close, trendLen)
+    basisP  = basis[trendLen]
+    dirUp   = basis > basisP and close > smaC
+    dirDown = basis < basisP and close < smaC
+    dir     = dirUp ? 1.0 : dirDown ? -1.0 : 0.0
+    dirOk   = not na(basisP) and not na(smaC)
+
+    [dir, refuseLow ? 1.0 : 0.0, refuseHigh ? 1.0 : 0.0, compressed ? 1.0 : 0.0, stairUp ? 1.0 : 0.0, stairDown ? 1.0 : 0.0, dirOk ? 1.0 : 0.0]
+
+// ------------------------------------------------------------ RUNG FETCH ----
+LA = barmerge.lookahead_off
+[dM,  rlM,  rhM,  cM,  suM,  sdM,  okM ] = request.security(syminfo.tickerid, "M",   rungState(hM),   lookahead=LA)
+[dW,  rlW,  rhW,  cW,  suW,  sdW,  okW ] = request.security(syminfo.tickerid, "W",   rungState(hW),   lookahead=LA)
+[dD,  rlD,  rhD,  cD,  suD,  sdD,  okD ] = request.security(syminfo.tickerid, "D",   rungState(hD),   lookahead=LA)
+[d4,  rl4,  rh4,  c4,  su4,  sd4,  ok4 ] = request.security(syminfo.tickerid, "240", rungState(h4),   lookahead=LA)
+[d1h, rl1h, rh1h, c1h, su1h, sd1h, ok1h] = request.security(syminfo.tickerid, "60",  rungState(h1h),  lookahead=LA)
+[d30, rl30, rh30, c30, su30, sd30, ok30] = request.security(syminfo.tickerid, "30",  rungState(h30),  lookahead=LA)
+[d15, rl15, rh15, c15, su15, sd15, ok15] = request.security(syminfo.tickerid, "15",  rungState(h15),  lookahead=LA)
+[d5,  rl5,  rh5,  c5,  su5,  sd5,  ok5 ] = request.security(syminfo.tickerid, "5",   rungState(h5),   lookahead=LA)
+[d1,  rl1,  rh1,  c1,  su1,  sd1,  ok1 ] = request.security(syminfo.tickerid, "1",   rungState(h1),   lookahead=LA)
+[e30, f30, g30, i30, j30, k30, n30] = request.security(syminfo.tickerid, "30S", rungState(hs30), lookahead=LA)
+[e15, f15, g15, i15, j15, k15, n15] = request.security(syminfo.tickerid, "15S", rungState(hs15), lookahead=LA)
+[e5,  f5,  g5,  i5,  j5,  k5,  n5 ] = request.security(syminfo.tickerid, "5S",  rungState(hs5),  lookahead=LA)
+[e1,  f1,  g1,  i1,  j1,  k1,  n1 ] = request.security(syminfo.tickerid, "1S",  rungState(hs1),  lookahead=LA)
+
+// ------------------------------------------------------------- ASSEMBLY ----
+var array<string> tfName = array.from("1 Month","1 Week","1 Day","4 Hour","1 Hour","30 Min","15 Min","5 Min","1 Min","30 Sec","15 Sec","5 Sec","1 Sec")
+var array<float>  tfSec  = array.from(2592000.,604800.,86400.,14400.,3600.,1800.,900.,300.,60.,30.,15.,5.,1.)
+
+dirA = array.from(dM,  dW,  dD,  d4,  d1h,  d30,  d15,  d5,  d1,  e30, e15, e5, e1)
+rlA  = array.from(rlM, rlW, rlD, rl4, rl1h, rl30, rl15, rl5, rl1, f30, f15, f5, f1)
+rhA  = array.from(rhM, rhW, rhD, rh4, rh1h, rh30, rh15, rh5, rh1, g30, g15, g5, g1)
+cA   = array.from(cM,  cW,  cD,  c4,  c1h,  c30,  c15,  c5,  c1,  i30, i15, i5, i1)
+suA  = array.from(suM, suW, suD, su4, su1h, su30, su15, su5, su1, j30, j15, j5, j1)
+sdA  = array.from(sdM, sdW, sdD, sd4, sd1h, sd30, sd15, sd5, sd1, k30, k15, k5, k1)
+okA  = array.from(okM, okW, okD, ok4, ok1h, ok30, ok15, ok5, ok1, n30, n15, n5, n1)
+
+var array<string> posA    = array.new_string(13, "UNAVAILABLE")
+var array<string> shapeA  = array.new_string(13, "-")
+var array<float>  orientA = array.new_float(13, 1.0)
+var array<bool>   inhA    = array.new_bool(13, false)
+
+// D2. The side comes from the highest rung whose direction is computed.
+float baseDir = na
+for i = 0 to 12
+    if na(baseDir) and array.get(okA, i) == 1
+        baseDir := array.get(dirA, i) >= 0 ? 1.0 : -1.0
+baseDir := na(baseDir) ? 1.0 : baseDir
+bool flip = false
+
+for i = 0 to 12
+    bool   avail = not na(array.get(rlA, i))
+    float  o     = baseDir * (flip ? -1.0 : 1.0)
+    array.set(orientA, i, o)
+
+    bool refStart = o > 0 ? array.get(rlA, i) == 1 : array.get(rhA, i) == 1
+    bool refEnd   = o > 0 ? array.get(rhA, i) == 1 : array.get(rlA, i) == 1
+    bool stair    = o > 0 ? array.get(sdA, i) == 1 : array.get(suA, i) == 1
+    bool area     = array.get(cA, i) == 1
+
+    string shape = not avail ? "-" : stair ? "staircase" : refEnd ? "refusal hi" : refStart and area ? "refusal lo" : area ? "area" : "none"
+    array.set(shapeA, i, shape)
+
+    string pp  = i == 0 ? "" : array.get(posA, i - 1)
+    bool   inh = false
+    string pos = "UNAVAILABLE"
+
+    if avail
+        if stair
+            pos := "STAIRCASE"
+        else if refEnd
+            pos := "END FIRST LEG"
+        else if refStart and area
+            pos := pp == "END FIRST LEG" or pp == "FIRST LEG" or pp == "MID FIRST LEG" ? "SECOND LEG" : "FIRST LEG"
+        else if area
+            pos := pp == "SECOND LEG" or pp == "MID SECOND LEG" ? "MID SECOND LEG" : pp == "STAIRCASE" ? "STAIRCASE" : "MID FIRST LEG"
+        else
+            inh := true
+            pos := i == 0 or pp == "UNAVAILABLE" or pp == "UNREADABLE" ? "UNREADABLE" : pp
+
+    array.set(posA, i, pos)
+    array.set(inhA, i, inh)
+
+    // D1. Only a rung's OWN shape hands a new side down.
+    if pos == "END FIRST LEG" and not inh
+        flip := not flip
+    if pos == "FIRST LEG" and not inh
+        flip := false
+
+// --------------------------------------------------------- CHART ANCHOR ----
+// The smallest rung that is at least the chart timeframe. 1 Sec charts land
+// on the 1 Sec rung; anything above 1 Month lands on the 1 Month rung.
+chartSec = timeframe.in_seconds(timeframe.period)
+int chartIdx = 0
+for i = 0 to 12
+    if array.get(tfSec, i) >= chartSec
+        chartIdx := i
+
+// D3. READ HERE only lands on a rung with its OWN first or second leg.
+int readAt = -1
+for i = chartIdx to 12
+    if readAt == -1
+        string p = array.get(posA, i)
+        if (p == "FIRST LEG" or p == "SECOND LEG") and not array.get(inhA, i)
+            readAt := i
+
+verdictOf(int i) =>
+    string p    = array.get(posA, i)
+    bool   inh  = array.get(inhA, i)
+    string side = array.get(orientA, i) > 0 ? "LONGS" : "SHORTS"
+    string v = switch
+        p == "UNAVAILABLE"   => "no data"
+        p == "UNREADABLE"    => "STAY OUT"
+        inh                  => "no shape here"
+        p == "STAIRCASE"     => "continue, no entry"
+        p == "END FIRST LEG" => "exit once, then wait"
+        p == "FIRST LEG"     => "ENTER " + side
+        p == "SECOND LEG"    => "ENTER " + side
+        => "look for " + side
+    v
+
+// ------------------------------------------------------------ AGREEMENT ----
+// One vote per rung: +1 long, -1 short, 0 none (staircase), 9 skip.
+// Skip is transparent: it neither counts toward N nor breaks a domino chain.
+int VOTE_SKIP = 9
+var array<int> voteA = array.new_int(13, 0)
+for i = 0 to 12
+    string p    = array.get(posA, i)
+    bool   inh  = array.get(inhA, i)
+    int    side = array.get(orientA, i) > 0 ? 1 : -1
+    int v = VOTE_SKIP
+    if p == "UNAVAILABLE" or p == "UNREADABLE"
+        v := VOTE_SKIP
+    else if inh and agreeInh == "skip (transparent)"
+        v := VOTE_SKIP
+    else if inh and agreeInh == "no vote (breaks chain)"
+        v := 0
+    else if inh
+        // vote with parent: copy the parent's vote as already cast this bar.
+        // Not recomputed from this rung's side: the rung under an own-shape
+        // END FIRST LEG is already flipped, so recomputing would vote AGAINST
+        // the parent. (i > 0 here: an inherited i == 0 is UNREADABLE above.)
+        v := array.get(voteA, i - 1)
+    else
+        v := p == "FIRST LEG" or p == "SECOND LEG" or p == "MID FIRST LEG" or p == "MID SECOND LEG" ? side : p == "END FIRST LEG" ? -side : 0
+    array.set(voteA, i, v)
+
+int scopeLo   = agreeScope == "chart rung and below" ? chartIdx : 0
+int scopeHi   = agreeScope == "chart rung and above" ? chartIdx : 12
+int scopeSize = scopeHi - scopeLo + 1
+// N can never exceed the rungs that may vote; the READ HERE row says so.
+int needN     = math.min(agreeN, scopeSize)
+
+// The unbroken chain of vote v that runs through rung i, stepping over skip
+// votes and breaking on anything else. selfIn: count rung i as one of them
+// regardless of its own vote (an event rung always counts itself).
+// Both walks are clipped to the scope: a rung outside it is never counted
+// and never breaks the chain (the READ HERE rung can sit below the scope
+// when the scope is "chart rung and above").
+chainThrough(int i, int v, bool selfIn) =>
+    int n = selfIn ? 1 : 0
+    int dnFrom = math.max(i + 1, scopeLo)
+    if dnFrom <= scopeHi
+        for j = dnFrom to scopeHi
+            int vj = array.get(voteA, j)
+            if vj == v
+                n += 1
+            else if vj != VOTE_SKIP
+                break
+    int upFrom = math.min(i - 1, scopeHi)
+    if upFrom >= scopeLo
+        for j = upFrom to scopeLo
+            int vj = array.get(voteA, j)
+            if vj == v
+                n += 1
+            else if vj != VOTE_SKIP
+                break
+    n
+
+// How many rungs agree with vote v for an event on rung i. The event rung
+// always counts as one, in both modes.
+//   domino : the unbroken chain through rung i.
+//   fractal: every agreeing rung inside the scope, contiguous or not.
+agreeCount(int i, int v) =>
+    int n = 0
+    if v == 1 or v == -1
+        if agreeMode == "fractal"
+            n := 1
+            for j = scopeLo to scopeHi
+                if j != i and array.get(voteA, j) == v
+                    n += 1
+        else
+            n := chainThrough(i, v, true)
+    n
+
+// The agreement one side has right now, for the AGREE label and the table.
+//   fractal: the number of rungs on that side inside the scope.
+//   domino : the chain that runs through the rung you read: READ HERE (<<)
+//            when it exists, otherwise the chart rung (*). The same rung the
+//            event gate uses, so the label and the table never disagree.
+//            The dominoes have to reach that rung; a chain that stops above
+//            it does not count. An anchor rung that skips is stepped through.
+int anchor = readAt != -1 ? readAt : chartIdx
+sideCount(int v) =>
+    int n = 0
+    if agreeMode == "fractal"
+        for j = scopeLo to scopeHi
+            if array.get(voteA, j) == v
+                n += 1
+    else
+        int va = array.get(voteA, anchor)
+        n := va == v ? chainThrough(anchor, v, true) : va == VOTE_SKIP ? chainThrough(anchor, v, false) : 0
+    n
+
+int longN  = sideCount(1)
+int shortN = sideCount(-1)
+
+// ---------------------------------------------------------------- LABELS ----
+// Drawn on the price pane beside the candle. Long side = at the candle low,
+// short side = at the candle high. A label fires the moment a rung's position
+// CHANGES on the current bar, so history shows every instant it happened.
+// Pine rolls back objects drawn on a live bar between ticks, so a state
+// that flickers inside one bar leaves only the last label.
+lsz = switch lblSizeS
+    "tiny"   => size.tiny
+    "small"  => size.small
+    "large"  => size.large
+    "huge"   => size.huge
+    => size.normal
+
+// The signal price is the candle extreme the shape formed on: the low for a
+// long-side event, the high for a short-side event. The label sits at that
+// price, pointing left at the candle, and a short line marks the level.
+// atPx: draw at this price instead (ENTER labels in Signal tick mode use the
+// price the strategy enters at, so the label and the fill always match).
+putLbl(string txt, color col, bool below, float atPx = na) =>
+    float px = not na(atPx) ? atPx : below ? low : high
+    string t = lblPrice ? txt + "\n@ " + str.tostring(px, format.mintick) : txt
+    label.new(bar_index, px, t, xloc=xloc.bar_index, yloc=yloc.price, color=col, style=label.style_label_left, textcolor=color.black, size=lsz, force_overlay=true)
+    if lblPrice
+        line.new(bar_index - lblTick, px, bar_index + lblTick, px, xloc=xloc.bar_index, color=col, style=line.style_solid, width=2, force_overlay=true)
+
+// Label event codes handed to the strategy, one per label type.
+int EV_NONE  = 0
+int EV_LEG1  = 1   // 1st LEG  ENTER LONGS/SHORTS
+int EV_LEG2  = 2   // 2nd LEG  ENTER LONGS/SHORTS
+int EV_DIV   = 3   // DIV SHORT ZONE / DIV LONG ZONE (END 1st/2nd LEG, exit once)
+int EV_END2  = 4   // END 2nd LEG
+int EV_LOOK  = 5   // look for LONGS/SHORTS (info)
+int EV_STAIR = 6   // continue, no entry (info)
+
+// Returns the rung's current position (the caller stores it as prev), the
+// label event that fired, its text (for the order comment) and whether the
+// rung is upright. The event fires on exactly the condition the indicator
+// labels on; showLbl and the row tick boxes only decide whether it draws.
+// tag = the rung's name, so every label says which chart it came from.
+rungEvents(int i, string prev, string tag, float entryPx) =>
+    string p    = array.get(posA, i)
+    bool   inh  = array.get(inhA, i)
+    bool   up   = array.get(orientA, i) > 0
+    string side = up ? "LONGS" : "SHORTS"
+    bool wasSecond = prev == "SECOND LEG" or prev == "MID SECOND LEG"
+    // Agreement gate. The event's side is the rung's own vote. An END 2nd LEG
+    // that rolled into a staircase has no vote, so it is judged on the side
+    // the leg was on.
+    int  v  = array.get(voteA, i)
+    int  ev = v == 1 or v == -1 ? v : (up ? 1 : -1)
+    int  n  = agreeOn ? agreeCount(i, ev) : 0
+    bool ok = not agreeOn or n >= needN
+    string ag = agreeOn ? "\n" + str.tostring(n) + " rungs agree" : ""
+    int    code = EV_NONE
+    string what = ""
+    if ok and p != prev and not inh
+        if p == "END FIRST LEG"
+            // The divergence on price. Upright: broke the high, TDI refused -> short zone (top).
+            // Inverted: broke the low, TDI refused -> long zone (bottom).
+            // Exit once: the leg that ended was on this rung's side.
+            string zone = up ? "DIV SHORT ZONE" : "DIV LONG ZONE"
+            string leg  = wasSecond ? "END 2nd LEG" : "END 1st LEG"
+            code := EV_DIV
+            what := zone + " " + leg
+            if showLbl and (up ? shDS : shDL)
+                putLbl(tag + zone + "\n" + leg + "\nexit once, then wait" + ag, up ? cDS : cDL, not up)
+        else if p == "FIRST LEG"
+            code := EV_LEG1
+            what := "1st LEG " + side
+            if showLbl and (up ? shL1 : shS1)
+                putLbl(tag + "1st LEG\nENTER " + side + ag, up ? cL1 : cS1, up, entryPx)
+        else if p == "SECOND LEG"
+            code := EV_LEG2
+            what := "2nd LEG " + side
+            if showLbl and (up ? shL2 : shS2)
+                putLbl(tag + "2nd LEG\nENTER " + side + ag, up ? cL2 : cS2, up, entryPx)
+        else if wasSecond and (p == "STAIRCASE" or p == "MID FIRST LEG")
+            code := EV_END2
+            what := "END 2nd LEG " + side
+            if showLbl and shEnd
+                putLbl(tag + "END 2nd LEG" + ag, cEnd, up)
+        else if p == "MID FIRST LEG"
+            code := EV_LOOK
+            what := "look for " + side
+            if showLbl and lblInfo
+                putLbl(tag + "look for " + side + ag, cInf, up)
+        else if p == "STAIRCASE"
+            code := EV_STAIR
+            what := "staircase"
+            if showLbl and lblInfo
+                putLbl(tag + "continue, no entry" + ag, cInf, up)
+    [p, code, what, up]
+
+// What the strategy does with one label: the direction the label points to
+// (+1 long, -1 short) and the action chosen on that label's row.
+labelAction(int code, bool up) =>
+    int    d   = 0
+    string act = "off"
+    if code == EV_LEG1
+        d   := up ? 1 : -1
+        act := up ? actL1 : actS1
+    else if code == EV_LEG2
+        d   := up ? 1 : -1
+        act := up ? actL2 : actS2
+    else if code == EV_DIV
+        // Upright rung: DIV SHORT ZONE, the long leg ended -> points SHORT.
+        d   := up ? -1 : 1
+        act := up ? actDS : actDL
+    else if code == EV_END2
+        // The leg on the rung's side ended -> points against it.
+        d   := up ? -1 : 1
+        act := actEnd
+    else if code == EV_LOOK
+        d   := up ? 1 : -1
+        act := actInf
+    else if code == EV_STAIR
+        // Stairs on an upright rung step down -> points against the side.
+        d   := up ? -1 : 1
+        act := actInf
+    [d, act]
+
+// Entry price shown on ENTER labels in Signal tick mode: the price of the
+// tick the entry first fired on in this bar (varip keeps it across live
+// ticks; on history it is the candle close, where the backtest fills).
+varip float tickPx  = na
+varip int   tickBar = -1
+float entryPx = not useLimit ? (tickBar == bar_index ? tickPx : close) : na
+
+// --------------------------------------------------------- SIGNAL RUNGS ----
+// Which rungs fire this bar: the chart rung, every rung, or one fixed rung,
+// plus the READ HERE rung on top. Each rung keeps its own previous position
+// so a label fires only when THAT rung's position changes. The READ HERE
+// rung starts fresh when it moves to another rung (as in v2.7).
+var array<string> prevPosA  = array.new_string(13, "")
+var int           prevReadAt = -1
+int pickIdx  = array.indexof(tfName, sigRung)
+bool everyRung = sigRung == "every rung (1 Sec to 1 Month)"
+
+// Entries and exits collected from every label this bar, with the rung and
+// label that asked for them (they go into the order comments).
+array<string> longSrc  = array.new_string()
+array<string> shortSrc = array.new_string()
+bool   exitL   = false
+bool   exitS   = false
+string exitLSrc = ""
+string exitSSrc = ""
+
+for i = 0 to 12
+    string prev    = array.get(prevPosA, i)
+    bool   isChart = i == chartIdx
+    bool   active  = everyRung or (pickIdx == -1 ? isChart : i == pickIdx)
+    bool   isRead  = lblRead and i == readAt and not active
+    if isRead and readAt != prevReadAt
+        prev := ""
+    if active or isRead
+        string mark = isChart ? " *" : isRead ? " <<" : ""
+        string tag  = array.get(tfName, i) + mark + ": "
+        [p, code, what, up] = rungEvents(i, prev, tag, entryPx)
+        [d, act] = labelAction(code, up)
+        string src = array.get(tfName, i) + mark + " " + what
+        if d != 0 and act != "off"
+            if act == "exit only"
+                // Close the side the label is against.
+                if d > 0
+                    exitS    := true
+                    exitSSrc := src
+                else
+                    exitL    := true
+                    exitLSrc := src
+            else
+                int dd = act == "enter opposite" ? -d : d
+                dd := reverseAll ? -dd : dd
+                if dd > 0
+                    array.push(longSrc, src)
+                else
+                    array.push(shortSrc, src)
+    array.set(prevPosA, i, array.get(posA, i))
+prevReadAt := readAt
+
+// The domino effect: the bar where the Nth rung joins one side.
+var int prevLongN  = 0
+var int prevShortN = 0
+bool agreeLongNow  = agreeOn and longN  >= needN and prevLongN  < needN
+bool agreeShortNow = agreeOn and shortN >= needN and prevShortN < needN
+if showLbl and agreeOn and agreeLbl
+    if agreeLongNow and shAgL
+        putLbl("AGREE LONG x" + str.tostring(longN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgL, true, tradeAgree ? entryPx : na)
+    if agreeShortNow and shAgS
+        putLbl("AGREE SHORT x" + str.tostring(shortN) + "\n" + agreeMode + ", need " + str.tostring(needN), cAgS, false, tradeAgree ? entryPx : na)
+prevLongN  := longN
+prevShortN := shortN
+if tradeAgree and agreeLongNow
+    if reverseAll
+        array.push(shortSrc, "AGREE LONG x" + str.tostring(longN) + " reversed")
+    else
+        array.push(longSrc, "AGREE LONG x" + str.tostring(longN))
+if tradeAgree and agreeShortNow
+    if reverseAll
+        array.push(longSrc, "AGREE SHORT x" + str.tostring(shortN) + " reversed")
+    else
+        array.push(shortSrc, "AGREE SHORT x" + str.tostring(shortN))
+
+// -------------------------------------------------------------- STRATEGY ----
+// EVERY label with an "enter" action is an entry, from every signal rung,
+// whatever timeframe the chart is on. Each label opens its own entry with
+// its own id, stacked on an open trade of the same side, and gets its own
+// trailing TP / stop. Only the direction filter and "Max open entries" hold
+// one back. Long and short labels on the same bar cancel out (a position
+// can't be both).
+int nLong  = array.size(longSrc)
+int nShort = array.size(shortSrc)
+if nLong > 0 and nShort > 0
+    nLong  := 0
+    nShort := 0
+
+bool allowLong  = tradeDir != "Short only (sell only)"
+bool allowShort = tradeDir != "Long only (buy only)"
+
+// Live, the script runs on every tick and a label stays true for the rest of
+// its bar, so each bar's labels enter once: on the first tick they appear.
+varip int doneL = -1
+varip int doneS = -1
+bool goLong  = nLong  > 0 and allowLong  and doneL != bar_index
+bool goShort = nShort > 0 and allowShort and doneS != bar_index
+
+if (goLong or goShort) and tickBar != bar_index
+    tickPx  := close
+    tickBar := bar_index
+
+// Closes. An opposite entry reverses the whole position by itself (market
+// mode); in limit mode the open side is closed now, because the new side
+// only opens if its limit fills.
+bool oppL   = oppCloses and nShort > 0 and not allowShort
+bool oppS   = oppCloses and nLong  > 0 and not allowLong
+bool closeL = strategy.position_size > 0 and not goLong  and (useLimit ? (exitL or oppL or goShort) : not goShort and (exitL or oppL))
+bool closeS = strategy.position_size < 0 and not goShort and (useLimit ? (exitS or oppS or goLong)  : not goLong  and (exitS or oppS))
+string firstLong  = ""
+string firstShort = ""
+if array.size(longSrc) > 0
+    firstLong := array.get(longSrc, 0)
+if array.size(shortSrc) > 0
+    firstShort := array.get(shortSrc, 0)
+if closeL
+    strategy.close_all(comment=exitL ? "exit | " + exitLSrc : "opp ENTER | " + firstShort)
+if closeS
+    strategy.close_all(comment=exitS ? "exit | " + exitSSrc : "opp ENTER | " + firstLong)
+
+// -------------------------------------------------- EXITS AND SIZING ----
+// Stop, target and trail distances in ticks for an entry placed now. ATR is
+// the chart ATR on this bar (computed every bar, as Pine requires).
+float atrNow  = ta.atr(atrLen)
+bool  atrMode = exitUnit == "ATR"
+float slTicks = atrMode ? slAtrMult * atrNow / syminfo.mintick : slPtsIn
+float tpTicks = atrMode ? tpRMult * slTicks : tpPtsIn
+float trAct   = atrMode ? trActAtr  * atrNow / syminfo.mintick : trActPts
+float trDist  = atrMode ? trDistAtr * atrNow / syminfo.mintick : trDistPts
+bool  slUse   = slTicks > 0
+bool  tpUse   = tpTicks > 0
+bool  trUse   = trailOn and trDist > 0
+
+// Quantity for one entry. Risk mode: the quantity that loses riskPct of the
+// current equity if the stop is hit (stop distance in price x point value).
+// Rounded down to the step and capped at the max.
+entryQty() =>
+    float q = qtyFixed
+    if qtyMode == "Risk" and slUse
+        float riskPerContract = slTicks * syminfo.mintick * syminfo.pointvalue
+        q := riskPerContract > 0 ? strategy.equity * riskPct / 100.0 / riskPerContract : 0.0
+    if qtyStep > 0
+        q := math.floor(q / qtyStep + 1e-9) * qtyStep
+    math.min(q, qtyMax)
+
+// Pending limit entries (limit mode): id and the bar each was placed on.
+var array<string> pendId  = array.new_string()
+var array<int>    pendBar = array.new_int()
+var array<int>    pendDir = array.new_int()
+if useLimit and array.size(pendId) > 0
+    for k = array.size(pendId) - 1 to 0
+        int  d     = array.get(pendDir, k)
+        bool stale = bar_index - array.get(pendBar, k) >= limitBars
+        bool against = d > 0 ? (exitL or goShort) : (exitS or goLong)
+        if stale or against
+            strategy.cancel(array.get(pendId, k))
+            array.remove(pendId, k)
+            array.remove(pendBar, k)
+            array.remove(pendDir, k)
+
+// One entry per label, with its own stop / target / trail attached to that
+// entry id only. The comment names the rung and the label that placed it.
+// Returns false when the quantity rounds to 0 and nothing was placed.
+placeEntry(string id, bool isLong, float lim, string src) =>
+    float q = entryQty()
+    bool placed = q > 0
+    if placed
+        string cmt = (isLong ? "ENTER LONG" : "ENTER SHORT") + (na(lim) ? "" : " @ label") + " | " + src
+        strategy.entry(id, isLong ? strategy.long : strategy.short, qty=q, limit=lim, comment=cmt)
+        if slUse or tpUse or trUse
+            strategy.exit("X " + id, from_entry=id, loss=slUse ? slTicks : na, profit=tpUse ? tpTicks : na, trail_points=trUse ? math.max(trAct, 0.0) : na, trail_offset=trUse ? math.max(trDist, 1.0) : na, comment_loss="SL | " + src, comment_profit="TP | " + src, comment_trailing="trail | " + src)
+    placed
+
+// Time stop: close any entry that has been open for timeStop bars.
+if timeStop > 0 and strategy.opentrades > 0
+    for t = strategy.opentrades - 1 to 0
+        if bar_index - strategy.opentrades.entry_bar_index(t) >= timeStop
+            strategy.close(strategy.opentrades.entry_id(t), comment="time stop | " + strategy.opentrades.entry_comment(t))
+
+int room = maxOpen - strategy.opentrades - array.size(pendId)
+if goLong and fgfBuyOk
+    doneL := bar_index
+    for k = 0 to nLong - 1
+        if room > 0 or strategy.position_size < 0
+            string id = "L" + str.tostring(bar_index) + "-" + str.tostring(k + 1)
+            if placeEntry(id, true, useLimit ? low : na, array.get(longSrc, k))
+                room -= 1
+                if useLimit
+                    array.push(pendId, id)
+                    array.push(pendBar, bar_index)
+                    array.push(pendDir, 1)
+if goShort and fgfSellOk
+    doneS := bar_index
+    for k = 0 to nShort - 1
+        if room > 0 or strategy.position_size > 0
+            string id = "S" + str.tostring(bar_index) + "-" + str.tostring(k + 1)
+            if placeEntry(id, false, useLimit ? high : na, array.get(shortSrc, k))
+                room -= 1
+                if useLimit
+                    array.push(pendId, id)
+                    array.push(pendBar, bar_index)
+                    array.push(pendDir, -1)
+
+// A limit that filled is no longer pending.
+if useLimit and array.size(pendId) > 0 and strategy.opentrades > 0
+    for k = array.size(pendId) - 1 to 0
+        string id = array.get(pendId, k)
+        for t = 0 to strategy.opentrades - 1
+            if strategy.opentrades.entry_id(t) == id
+                array.remove(pendId, k)
+                array.remove(pendBar, k)
+                array.remove(pendDir, k)
+                break
+
+// FGF diagnostics (Data Window only, no logic): the entry funnel.
+bool fgdRawLong      = goLong
+bool fgdRawShort     = goShort
+bool fgdBlockedLong  = fgdRawLong  and not fgfBuyOk
+bool fgdBlockedShort = fgdRawShort and not fgfSellOk
+plot(fgdRawLong      ? 1 : 0, "FGD raw long",      display=display.data_window)
+plot(fgdRawShort     ? 1 : 0, "FGD raw short",     display=display.data_window)
+plot(fgdBlockedLong  ? 1 : 0, "FGD blocked long",  display=display.data_window)
+plot(fgdBlockedShort ? 1 : 0, "FGD blocked short", display=display.data_window)
+plot(ta.cum(fgdRawLong      ? 1 : 0), "FGD raw long count",      display=display.data_window)
+plot(ta.cum(fgdRawShort     ? 1 : 0), "FGD raw short count",     display=display.data_window)
+plot(ta.cum(fgdBlockedLong  ? 1 : 0), "FGD blocked long count",  display=display.data_window)
+plot(ta.cum(fgdBlockedShort ? 1 : 0), "FGD blocked short count", display=display.data_window)
+
+// ----------------------------------------------------------- CHART PANE ----
+[_rNow, fastNow, slowNow, basisNow, upNow, loNow] = tdiCore()
+chartOrient = array.get(orientA, chartIdx)
+inv(v) => chartOrient > 0 ? v : 100.0 - v
+
+plot(inv(fastNow),  "Fast",      color=color.new(#26c6da, 0), linewidth=2)
+plot(inv(slowNow),  "Signal",    color=color.new(#ffa726, 0), linewidth=2)
+plot(inv(basisNow), "Base line", color=color.new(#b0bec5, 0), linewidth=1)
+pu = plot(inv(chartOrient > 0 ? upNow : loNow), "Band A", color=color.new(#546e7a, 40))
+pl = plot(inv(chartOrient > 0 ? loNow : upNow), "Band B", color=color.new(#546e7a, 40))
+fill(pu, pl, color=color.new(#546e7a, 92))
+hline(50, "50", color=color.new(#78909c, 60), linestyle=hline.style_dotted)
+
+// ---------------------------------------------------------------- TABLE ----
+if showTable and barstate.islast
+    tPos = switch tblPos
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+    var table t = table.new(tPos, 6, 15, border_width=1, force_overlay=true)
+    int lastCol = agreeOn ? 5 : 4
+    table.clear(t, 0, 0, lastCol, 14)
+    sz = switch tblSize
+        "tiny"  => size.tiny
+        "small" => size.small
+        "large" => size.large
+        "huge"  => size.huge
+        => size.normal
+    hdr = color.new(#263238, 0)
+
+    table.cell(t, 0, 0, "RUNG",     text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 1, 0, "ORIENT",   text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 2, 0, "SHAPE",    text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 3, 0, "POSITION", text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 4, 0, "VERDICT",  text_color=color.white, bgcolor=hdr, text_size=sz)
+    if agreeOn
+        table.cell(t, 5, 0, "AGREE", text_color=color.white, bgcolor=hdr, text_size=sz)
+
+    for i = 0 to 12
+        string p   = array.get(posA, i)
+        bool   av  = p != "UNAVAILABLE"
+        float  o   = array.get(orientA, i)
+        bool   inh = array.get(inhA, i)
+        string orS = not av ? "-" : (o > 0 ? "upright" : "INVERTED")
+        string pS  = p + (inh and av ? " (inh)" : "")
+
+        color bg = switch
+            not av               => color.new(#37474f, 30)
+            p == "SECOND LEG"    => color.new(#2e7d32, 20)
+            p == "FIRST LEG"     => color.new(#2e7d32, 20)
+            p == "END FIRST LEG" => color.new(#f9a825, 25)
+            p == "STAIRCASE"     => color.new(#1565c0, 25)
+            p == "UNREADABLE"    => color.new(#37474f, 30)
+            => color.new(#455a64, 30)
+
+        // *  = chart rung, << = READ HERE, S = a fixed / every-rung signal rung.
+        bool   sigHere = everyRung or (pickIdx != -1 and i == pickIdx)
+        string mark = i == readAt ? "  <<" : (i == chartIdx ? "  *" : "")
+        mark := sigHere and i != chartIdx and i != readAt ? mark + "  S" : mark
+        table.cell(t, 0, i + 1, array.get(tfName, i) + mark, text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 1, i + 1, orS,                          text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 2, i + 1, array.get(shapeA, i),         text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 3, i + 1, pS,                           text_color=color.white, bgcolor=bg, text_size=sz)
+        table.cell(t, 4, i + 1, verdictOf(i),                 text_color=color.white, bgcolor=bg, text_size=sz)
+        if agreeOn
+            int    vv   = array.get(voteA, i)
+            bool   inSc = i >= scopeLo and i <= scopeHi
+            string vS   = not inSc ? "out of scope" : vv == 1 ? "LONG" : vv == -1 ? "SHORT" : vv == 0 ? "none" : "skip"
+            color  vbg  = not inSc ? color.new(#37474f, 30) : vv == 1 ? color.new(#1b5e20, 20) : vv == -1 ? color.new(#b71c1c, 20) : bg
+            table.cell(t, 5, i + 1, vS, text_color=color.white, bgcolor=vbg, text_size=sz)
+
+    string summary = readAt == -1 ? "nothing at or below " + array.get(tfName, chartIdx) + " - stay out" : array.get(tfName, readAt) + " - " + verdictOf(readAt)
+    summary := summary + "  |  signals: " + (everyRung ? "every rung" : pickIdx != -1 ? sigRung + " (S)" : array.get(tfName, chartIdx) + " (*)") + (lblRead and readAt != -1 ? " + READ HERE (<<)" : "") + (reverseAll ? "  |  REVERSED" : "")
+    if agreeOn
+        summary := summary + "  |  agree: LONG " + str.tostring(longN) + ", SHORT " + str.tostring(shortN) + " (need " + str.tostring(needN) + " of " + str.tostring(scopeSize) + " in scope, " + agreeMode + ")"
+        if agreeN > scopeSize
+            summary := summary + "  N " + str.tostring(agreeN) + " clamped to " + str.tostring(scopeSize)
+    table.cell(t, 0, 14, "READ HERE", text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.cell(t, 1, 14, summary,     text_color=color.white, bgcolor=hdr, text_size=sz)
+    table.merge_cells(t, 1, 14, lastCol, 14)

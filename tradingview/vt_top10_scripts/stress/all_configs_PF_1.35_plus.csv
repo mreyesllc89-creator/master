@@ -1,0 +1,194 @@
+strategy,symbol,tf,cfg,trades,net,pf,win,maxdd,pos_weeks,halves
+FlashGold v5,BTCUSD.c,H1,ATR_sl2.0_tp2.0_partial_b0.3 | filter on,17,3.328,1.778,0.588,1.849,0.75,1.73/1.60
+FlashGold v5,BTCUSD.c,H1,ATR_sl2.0_tp2.0_fixed_b0.3 | filter on,18,3.267,1.693,0.556,1.849,0.75,3.32/-0.05
+FlashGold v5,BTCUSD.c,H1,ATR_sl2.0_tp3.0_fixed_b0.3 | filter on,17,2.117,1.424,0.529,2.564,0.5,-0.96/3.07
+FlashGold v5,BTCUSD.c,H1,ATR_sl2.0_tp3.0_partial_b0.3 | filter on,17,1.791,1.359,0.529,2.564,0.25,-0.96/2.75
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.1_tp3.0_fixed_b0.3 | filter on,12,1.436,2.126,0.5,0.467,1.0,0.72/0.72
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.1_tp3.0_fixedtrail_b0.3 | filter on,12,1.436,2.126,0.5,0.467,1.0,0.72/0.72
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl1.0_tp3.0_fixed_b0.7 | filter off,21,18.963,1.836,0.524,9.64,0.8,0.75/18.22
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl2.0_tp3.0_fixed_b0.7 | filter off,14,18.223,1.804,0.571,13.962,0.8,-0.04/18.26
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl2.0_tp3.0_partial_b0.7 | filter off,14,16.463,1.726,0.571,13.962,0.8,-1.15/17.62
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.1_tp2.0_fixed_b0.3 | filter on,12,0.772,1.72,0.583,0.467,1.0,0.63/0.14
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.1_tp2.0_fixedtrail_b0.3 | filter on,12,0.772,1.72,0.583,0.467,1.0,0.63/0.14
+FlashGold v5,XAUUSD-ECNc,H1,PIPS_sl20_run450 | filter off,20,12.406,1.662,0.55,9.097,0.6,-5.58/17.99
+FlashGold v5,XAUUSD-ECNc,H1,PIPS_sl20_run600 | filter off,20,12.406,1.662,0.55,9.097,0.6,-5.58/17.99
+FlashGold v5,XAUUSD-ECNc,H1,PIPS_sl20_run800 | filter off,20,12.406,1.662,0.55,9.097,0.6,-5.58/17.99
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp5.0_fixedtrail_b0.7 | filter off,30,8.644,1.612,0.467,4.984,0.8,4.63/4.01
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl1.0_tp3.0_partial_b0.7 | filter off,19,12.433,1.602,0.526,7.605,0.6,-0.26/12.70
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl2.0_tp5.0_partial_b0.7 | filter off,14,13.279,1.586,0.571,13.962,0.6,-4.06/17.34
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl2.0_tp5.0_fixed_b0.7 | filter off,14,13.279,1.586,0.571,13.962,0.6,-4.06/17.34
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp5.0_fixed_b0.3 | filter on,12,4.251,1.56,0.25,3.507,0.75,0.31/3.94
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp3.0_fixedtrail_b0.7 | filter off,30,7.426,1.526,0.467,4.984,0.8,5.10/2.33
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp5.0_partial_b0.3 | filter on,12,3.942,1.52,0.25,3.507,0.75,1.34/2.60
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl1.0_tp3.0_fixed_b0.5 | filter off,29,15.835,1.515,0.448,7.605,0.8,3.02/12.81
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl1.0_tp5.0_fixed_b0.7 | filter off,17,10.977,1.506,0.471,11.436,0.6,1.65/9.33
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp2.0_fixed_b0.7 | filter off,30,6.702,1.475,0.467,4.984,0.8,3.82/2.88
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp2.0_fixedtrail_b0.7 | filter off,30,6.702,1.475,0.467,4.984,0.8,3.82/2.88
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl1.0_tp5.0_fixed_b0.5 | filter off,22,8.807,1.474,0.5,7.006,0.4,-3.10/11.91
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp5.0_fixedtrail_b0.3 | filter off,58,13.103,1.47,0.448,8.542,0.8,4.82/8.28
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp5.0_fixedtrail_b0.5 | filter off,42,8.839,1.436,0.452,5.862,0.4,5.79/3.05
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp5.0_fixed_b0.7 | filter off,25,6.6,1.421,0.28,6.53,0.6,1.07/5.54
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp5.0_fixed_b0.3 | filter off,45,11.275,1.409,0.289,7.599,0.6,1.93/9.35
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl1.0_tp5.0_partial_b0.5 | filter off,22,7.385,1.398,0.5,7.006,0.4,-3.10/10.49
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp2.0_fixed_b0.3 | filter off,58,11.037,1.395,0.448,8.604,0.8,4.14/6.90
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp2.0_fixedtrail_b0.3 | filter off,58,11.037,1.395,0.448,8.604,0.8,4.14/6.90
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp3.0_fixedtrail_b0.3 | filter off,58,10.954,1.393,0.448,8.542,0.8,3.74/7.22
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp5.0_fixed_b0.5 | filter off,34,8.399,1.387,0.265,7.947,0.8,10.06/-1.66
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl1.0_tp5.0_partial_b0.7 | filter off,17,8.253,1.38,0.471,11.436,0.6,0.35/7.91
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp2.0_fixed_b0.5 | filter off,42,7.661,1.378,0.452,5.924,0.6,5.50/2.16
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp2.0_fixedtrail_b0.5 | filter off,42,7.661,1.378,0.452,5.924,0.6,5.50/2.16
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp3.0_fixedtrail_b0.5 | filter off,42,7.621,1.376,0.452,5.862,0.4,6.26/1.37
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.25_tp2.0_fixed_b0.3 | filter on,12,1.041,1.363,0.5,2.401,0.5,-1.76/2.80
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.25_tp2.0_fixedtrail_b0.3 | filter on,12,1.041,1.363,0.5,2.401,0.5,-1.76/2.80
+FlashGold v5,XAUUSD-ECNc,H1,ATR_sl0.5_tp3.0_fixed_b0.3 | filter off,51,10.253,1.354,0.333,7.124,0.6,4.99/5.26
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter off,19,2.271,2.725,0.895,0.795,0.8,0.51/1.76
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter off,19,2.271,2.725,0.895,0.795,0.8,0.51/1.76
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter off,19,2.271,2.725,0.895,0.795,0.8,0.51/1.76
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_1.5_2R_1.0_0.5 | lossrev off | filter off,17,1.879,2.427,0.882,0.95,0.8,0.34/1.54
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter off,20,6.735,2.062,0.6,2.025,0.75,3.39/3.34
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter off,20,6.735,2.062,0.6,2.025,0.75,3.39/3.34
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter off,20,6.735,2.062,0.6,2.025,0.75,3.39/3.34
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_default_2.0_2R_4.0_0.2 | lossrev off | filter off,14,3.999,1.919,0.571,1.374,0.5,2.12/1.88
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_1.0_3R_notrail | lossrev off | filter off,15,2.414,1.784,0.467,2.024,0.6,0.74/1.68
+ShapeMap v0.9.2,BTCUSD.c,H1,CONT_Close | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter on,10,0.641,1.58,0.8,1.105,0.6,1.22/-0.58
+ShapeMap v0.9.2,BTCUSD.c,H1,CONT_Close | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,10,0.641,1.58,0.8,1.105,0.6,1.22/-0.58
+ShapeMap v0.9.2,BTCUSD.c,H1,CONT_Close | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter on,10,0.641,1.58,0.8,1.105,0.6,1.22/-0.58
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_2.5_2R_1.0_0.5 | lossrev off | filter off,17,1.085,1.514,0.882,1.743,0.8,-0.46/1.54
+ShapeMap v0.9.2,BTCUSD.c,H1,Square | ATR_2.5_2R_1.0_0.5 | lossrev off | filter on,19,0.963,1.422,0.737,1.144,0.75,1.33/-0.36
+ShapeMap v0.9.2,BTCUSD.c,H1,Square | ATR_2.5_2R_1.0_0.5 | lossrev any+tiny | filter on,19,0.963,1.422,0.737,1.144,0.75,1.33/-0.36
+ShapeMap v0.9.2,BTCUSD.c,H1,Square | ATR_2.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,19,0.963,1.422,0.737,1.144,0.75,1.33/-0.36
+ShapeMap v0.9.2,BTCUSD.c,H1,Square | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter on,19,0.963,1.422,0.737,1.144,0.75,1.33/-0.36
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_1.0_3R_notrail | lossrev any+tiny | filter off,23,2.011,1.379,0.391,3.919,0.4,0.42/1.60
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_1.0_3R_notrail | lossrev SLtrail+tiny | filter off,23,2.011,1.379,0.391,3.919,0.4,0.42/1.60
+ShapeMap v0.9.2,BTCUSD.c,H1,Tick | ATR_1.0_3R_notrail | lossrev any_notiny | filter off,23,2.011,1.379,0.391,3.919,0.4,0.42/1.60
+ShapeMap v0.9.2,BTCUSD.c,M30,CONT_Stop | ATR_1.5_2R_1.0_0.5 | lossrev off | filter on,16,1.255,1.801,0.75,0.485,0.6,0.18/1.07
+ShapeMap v0.9.2,BTCUSD.c,M30,CONT_Stop | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter on,16,1.255,1.801,0.75,0.485,0.6,0.18/1.07
+ShapeMap v0.9.2,BTCUSD.c,M30,CONT_Stop | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,16,1.255,1.801,0.75,0.485,0.6,0.18/1.07
+ShapeMap v0.9.2,BTCUSD.c,M30,CONT_Stop | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter on,16,1.255,1.801,0.75,0.485,0.6,0.18/1.07
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter off,12,13.215,7.073,0.917,2.176,1.0,6.44/6.78
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_1.5_2R_1.0_0.5 | lossrev off | filter off,11,12.046,6.536,0.909,2.176,1.0,5.27/6.78
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter off,12,11.387,4.142,0.917,3.624,1.0,4.61/6.78
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_2.5_2R_1.0_0.5 | lossrev off | filter off,11,10.598,3.924,0.909,3.624,1.0,3.82/6.78
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Stop | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter off,15,24.789,2.651,0.6,3.327,1.0,9.04/15.74
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Stop | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter off,15,24.789,2.651,0.6,3.327,1.0,9.04/15.74
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Stop | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter off,15,24.789,2.651,0.6,3.327,1.0,9.04/15.74
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter off,16,23.365,2.253,0.562,3.424,0.75,5.09/18.27
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter off,16,23.365,2.253,0.562,3.424,0.75,5.09/18.27
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter off,16,23.365,2.253,0.562,3.424,0.75,5.09/18.27
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Tick | ATR_2.5_2R_1.0_0.5 | lossrev any+tiny | filter off,16,11.898,2.082,0.75,4.304,0.4,10.76/1.14
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Tick | ATR_2.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter off,16,11.898,2.082,0.75,4.304,0.4,10.76/1.14
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_default_2.0_2R_4.0_0.2 | lossrev off | filter off,11,14.361,1.944,0.545,6.327,0.75,-2.16/16.52
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_1.0_3R_notrail | lossrev off | filter off,11,8.161,1.859,0.455,3.263,0.6,0.82/7.34
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter off,16,8.042,1.846,0.75,4.117,0.75,9.41/-1.37
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter off,16,8.042,1.846,0.75,4.117,0.75,9.41/-1.37
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_AfterHold | Points_default | lossrev any+tiny | filter off,17,4.18,1.642,0.706,2.347,0.5,2.09/2.09
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_AfterHold | Points_default | lossrev SLtrail+tiny | filter off,17,4.18,1.642,0.706,2.347,0.5,2.09/2.09
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_AtCross | ATR_1.0_3R_notrail | lossrev any+tiny | filter off,20,9.578,1.631,0.45,5.641,0.75,10.93/-1.35
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_AtCross | ATR_1.0_3R_notrail | lossrev SLtrail+tiny | filter off,20,9.578,1.631,0.45,5.641,0.75,10.93/-1.35
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_AtCross | ATR_1.0_3R_notrail | lossrev any_notiny | filter off,20,9.578,1.631,0.45,5.641,0.75,10.93/-1.35
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_Predict_Squares | ATR_2.5_2R_1.0_0.5 | lossrev any+tiny | filter off,23,7.489,1.608,0.696,6.505,0.5,7.46/0.03
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_Predict_Squares | ATR_2.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter off,23,7.489,1.608,0.696,6.505,0.5,7.46/0.03
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Stop | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter off,12,5.324,1.583,0.833,8.346,0.75,-2.88/8.20
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_AtCross | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter off,20,6.379,1.577,0.7,4.497,0.5,8.32/-1.94
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Turn_AtCross | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter off,20,6.379,1.577,0.7,4.497,0.5,8.32/-1.94
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Stop | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter off,13,5.706,1.545,0.692,3.513,0.8,-2.30/8.01
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Tick | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter off,13,5.772,1.525,0.692,5.07,0.4,6.54/-0.77
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Tick | ATR_1.0_3R_notrail | lossrev any+tiny | filter off,20,10.553,1.519,0.35,8.494,0.6,-0.99/11.54
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Tick | ATR_1.0_3R_notrail | lossrev SLtrail+tiny | filter off,20,10.553,1.519,0.35,8.494,0.6,-0.99/11.54
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Tick | ATR_1.0_3R_notrail | lossrev any_notiny | filter off,20,10.553,1.519,0.35,8.494,0.6,-0.99/11.54
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Stop | ATR_1.0_3R_notrail | lossrev off | filter off,10,4.986,1.505,0.4,3.167,0.6,-1.87/6.86
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | Points_default | lossrev any_notiny | filter off,12,3.438,1.486,0.917,7.07,0.75,-2.45/5.89
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Stop | Points_default | lossrev any_notiny | filter off,11,3.131,1.443,0.909,7.061,0.75,-2.46/5.59
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Square | ATR_1.0_3R_notrail | lossrev any+tiny | filter off,22,8.277,1.423,0.455,4.625,0.5,7.23/1.05
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Square | ATR_1.0_3R_notrail | lossrev SLtrail+tiny | filter off,22,8.277,1.423,0.455,4.625,0.5,7.23/1.05
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,Square | ATR_1.0_3R_notrail | lossrev any_notiny | filter off,22,8.277,1.423,0.455,4.625,0.5,7.23/1.05
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Stop | ATR_1.5_2R_1.0_0.5 | lossrev off | filter off,10,2.776,1.377,0.7,4.711,0.6,-2.92/5.70
+ShapeMap v0.9.2,XAUUSD-ECNc,H1,CONT_Close | Points_default | lossrev off | filter off,11,2.52,1.356,0.909,7.07,0.75,-3.37/5.89
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Stop | Points_default | lossrev any+tiny | filter on,16,9.413,2.332,0.938,7.065,0.75,8.54/0.88
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Stop | Points_default | lossrev SLtrail+tiny | filter on,16,9.413,2.332,0.938,7.065,0.75,8.54/0.88
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | Points_default | lossrev any_notiny | filter off,64,26.092,1.997,0.734,7.066,0.8,6.86/19.23
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | Points_default | lossrev off | filter off,63,25.257,1.965,0.73,7.066,0.8,6.03/19.23
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_1.5_2R_1.0_0.5 | lossrev off | filter off,68,20.16,1.951,0.676,4.796,1.0,7.07/13.09
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Stop | Points_default | lossrev off | filter on,14,6.503,1.92,0.929,7.065,0.75,7.44/-0.94
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Stop | Points_default | lossrev any_notiny | filter on,14,6.503,1.92,0.929,7.065,0.75,7.44/-0.94
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_2.5_2R_1.0_0.5 | lossrev off | filter off,19,5.623,1.918,0.789,2.385,0.8,1.91/3.71
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter off,74,22.357,1.902,0.757,6.261,0.8,12.85/9.51
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter off,82,23.646,1.898,0.671,4.935,0.8,8.96/14.69
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_1.0_3R_notrail | lossrev off | filter off,21,9.723,1.881,0.381,6.072,1.0,6.26/3.46
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev off | filter off,66,19.332,1.834,0.742,7.05,1.0,8.20/11.13
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_1.5_2R_1.0_0.5 | lossrev off | filter on,26,6.498,1.801,0.731,2.889,0.75,4.97/1.53
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter on,26,6.498,1.801,0.731,2.889,0.75,4.97/1.53
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_Predict_Squares | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter on,45,12.226,1.735,0.689,5.773,0.6,11.03/1.19
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_Predict_Squares | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,45,12.226,1.735,0.689,5.773,0.6,11.03/1.19
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_1.5_2R_1.0_0.5 | lossrev off | filter off,21,4.955,1.721,0.714,2.214,0.8,2.00/2.96
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_Predict_Squares | ATR_1.5_2R_1.0_0.5 | lossrev off | filter on,41,10.489,1.684,0.683,5.211,0.8,8.73/1.76
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter on,27,5.389,1.585,0.704,2.889,0.75,4.97/0.42
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,27,5.389,1.585,0.704,2.889,0.75,4.97/0.42
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_Predict_Squares | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter on,43,9.443,1.568,0.674,6.525,0.6,9.00/0.44
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev off | filter off,62,21.369,1.567,0.435,8.508,0.6,1.17/20.20
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | Points_default | lossrev off | filter on,18,4.382,1.544,0.833,7.074,0.8,6.13/-1.75
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | Points_default | lossrev any_notiny | filter on,18,4.382,1.544,0.833,7.074,0.8,6.13/-1.75
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | Points_default | lossrev any+tiny | filter on,19,4.251,1.519,0.789,7.074,0.8,4.96/-0.71
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | Points_default | lossrev SLtrail+tiny | filter on,19,4.251,1.519,0.789,7.074,0.8,4.96/-0.71
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter off,28,12.217,1.508,0.429,6.033,0.6,9.95/2.27
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter off,28,12.217,1.508,0.429,6.033,0.6,9.95/2.27
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter off,28,12.217,1.508,0.429,6.033,0.6,9.95/2.27
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_1.5_2R_1.0_0.5 | lossrev any_notiny | filter off,26,4.681,1.506,0.692,2.845,0.8,1.96/2.72
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | ATR_2.5_2R_1.0_0.5 | lossrev any+tiny | filter on,21,3.803,1.484,0.857,3.175,0.8,2.64/1.17
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | ATR_2.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,21,3.803,1.484,0.857,3.175,0.8,2.64/1.17
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter on,21,3.803,1.484,0.857,3.175,0.8,2.64/1.17
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_Predict_Squares | ATR_2.5_2R_1.0_0.5 | lossrev any+tiny | filter on,41,8.928,1.476,0.732,7.923,0.8,9.87/-0.94
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_Predict_Squares | ATR_2.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,41,8.928,1.476,0.732,7.923,0.8,9.87/-0.94
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter off,22,3.948,1.47,0.727,3.172,0.6,0.95/3.00
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter on,26,7.433,1.443,0.5,3.301,1.0,5.09/2.34
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter on,26,7.433,1.443,0.5,3.301,1.0,5.09/2.34
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter on,26,7.433,1.443,0.5,3.301,1.0,5.09/2.34
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter off,74,21.968,1.443,0.419,9.131,0.6,4.22/17.75
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter off,74,21.968,1.443,0.419,9.131,0.6,4.22/17.75
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter off,74,21.968,1.443,0.419,9.131,0.6,4.22/17.75
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev any+tiny | filter on,26,4.453,1.417,0.769,4.64,0.5,3.41/1.04
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,26,4.453,1.417,0.769,4.64,0.5,3.41/1.04
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter on,26,4.453,1.417,0.769,4.64,0.5,3.41/1.04
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_1.0_3R_notrail | lossrev any+tiny | filter off,33,7.692,1.417,0.333,10.926,0.6,5.81/1.88
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_1.0_3R_notrail | lossrev SLtrail+tiny | filter off,33,7.692,1.417,0.333,10.926,0.6,5.81/1.88
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_1.0_3R_notrail | lossrev any_notiny | filter off,33,7.692,1.417,0.333,10.926,0.6,5.81/1.88
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | ATR_default_2.0_2R_4.0_0.2 | lossrev off | filter on,16,4.442,1.407,0.625,4.228,0.5,-3.41/7.85
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev off | filter on,25,4.192,1.393,0.76,4.901,0.5,2.93/1.26
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AtCross | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter on,42,5.775,1.385,0.571,8.264,0.8,11.64/-5.86
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Turn_AtCross | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter on,42,5.775,1.385,0.571,8.264,0.8,11.64/-5.86
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_1.5_2R_1.0_0.5 | lossrev any+tiny | filter off,40,5.264,1.383,0.65,2.734,0.6,5.09/0.17
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,Tick | ATR_1.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter off,40,5.264,1.383,0.65,2.734,0.6,5.09/0.17
+ShapeMap v0.9.2,XAUUSD-ECNc,M15,CONT_Close | ATR_2.5_2R_1.0_0.5 | lossrev off | filter on,20,2.887,1.368,0.85,3.175,0.6,2.64/0.25
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter off,27,40.423,2.889,0.63,5.984,1.0,15.66/24.76
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter off,27,40.423,2.889,0.63,5.984,1.0,15.66/24.76
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter off,27,40.423,2.889,0.63,5.984,1.0,15.66/24.76
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter off,24,16.848,2.495,0.792,6.26,0.8,13.77/3.08
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev off | filter off,22,27.274,2.444,0.591,4.26,0.8,7.85/19.42
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_1.0_3R_notrail | lossrev off | filter off,23,18.964,2.397,0.478,4.847,0.8,-1.81/20.77
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev off | filter off,22,13.557,2.203,0.773,6.144,0.8,11.44/2.11
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_1.0_3R_notrail | lossrev any+tiny | filter off,31,19.185,1.96,0.419,3.962,0.8,3.33/15.86
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_1.0_3R_notrail | lossrev SLtrail+tiny | filter off,31,19.185,1.96,0.419,3.962,0.8,3.33/15.86
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_1.0_3R_notrail | lossrev any_notiny | filter off,31,19.185,1.96,0.419,3.962,0.8,3.33/15.86
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Square | ATR_1.0_3R_notrail | lossrev any+tiny | filter off,54,26.16,1.954,0.537,6.628,1.0,5.48/20.68
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Square | ATR_1.0_3R_notrail | lossrev SLtrail+tiny | filter off,54,26.16,1.954,0.537,6.628,1.0,5.48/20.68
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Square | ATR_1.0_3R_notrail | lossrev any_notiny | filter off,54,26.16,1.954,0.537,6.628,1.0,5.48/20.68
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Square | ATR_1.0_3R_notrail | lossrev off | filter off,38,16.497,1.884,0.553,3.993,0.6,7.00/9.50
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev any+tiny | filter off,35,14.799,1.817,0.771,8.15,0.6,17.01/-2.21
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev SLtrail+tiny | filter off,35,14.799,1.817,0.771,8.15,0.6,17.01/-2.21
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev off | filter on,11,6.982,1.806,0.545,4.487,0.5,3.37/3.61
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter on,11,6.982,1.806,0.545,4.487,0.5,3.37/3.61
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter on,11,6.982,1.806,0.545,4.487,0.5,3.37/3.61
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter on,11,6.982,1.806,0.545,4.487,0.5,3.37/3.61
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AtCross | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter off,42,25.528,1.751,0.476,7.638,0.8,7.69/17.83
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AtCross | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter off,42,25.528,1.751,0.476,7.638,0.8,7.69/17.83
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AtCross | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter off,42,25.528,1.751,0.476,7.638,0.8,7.69/17.83
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AtCross | ATR_default_2.0_2R_4.0_0.2 | lossrev off | filter off,33,16.707,1.592,0.455,6.766,0.8,4.96/11.75
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Square | ATR_default_2.0_2R_4.0_0.2 | lossrev any+tiny | filter off,40,17.387,1.564,0.55,7.277,0.8,6.38/11.01
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Square | ATR_default_2.0_2R_4.0_0.2 | lossrev SLtrail+tiny | filter off,40,17.387,1.564,0.55,7.277,0.8,6.38/11.01
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Square | ATR_default_2.0_2R_4.0_0.2 | lossrev any_notiny | filter off,40,17.387,1.564,0.55,7.277,0.8,6.38/11.01
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Square | ATR_default_2.0_2R_4.0_0.2 | lossrev off | filter off,34,14.064,1.555,0.618,6.313,0.8,5.29/8.78
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_AfterHold | ATR_1.5_2R_1.0_0.5 | lossrev off | filter off,23,6.354,1.508,0.696,4.204,0.6,-1.36/7.72
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_Predict_Squares | Points_default | lossrev off | filter off,34,7.816,1.495,0.706,5.852,0.8,4.37/3.44
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_Predict_Squares | Points_default | lossrev any_notiny | filter off,34,7.816,1.495,0.706,5.852,0.8,4.37/3.44
+ShapeMap v0.9.2,XAUUSD-ECNc,M30,Turn_Predict_Squares | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter off,44,7.31,1.368,0.682,5.121,0.8,4.75/2.56
+ShapeMap v0.9.2,XAUUSD-ECNc,M5,Turn_AfterHold | ATR_2.5_2R_1.0_0.5 | lossrev any_notiny | filter on,67,4.845,1.351,0.701,2.383,0.6,2.14/2.70
