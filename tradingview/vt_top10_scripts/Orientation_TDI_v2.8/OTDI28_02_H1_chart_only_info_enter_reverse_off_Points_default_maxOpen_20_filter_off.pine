@@ -6,8 +6,11 @@
 //   trades 37  net 122.55 USD  PF 8.81  win 76%  maxDD 7.23 USD  positive weeks 100%  halves 66.42/56.12
 // Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),
 //   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.
-// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed; expect different fills.
-// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.
+// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed and its tester fills on bar OHLC, not ticks: expect different signals and fills.
+// This is a 4-week screen, not a calibration: 15-275 trades, one month, no out-of-sample test. Treat as a candidate only.
+// Stress re-run on the same VT ticks (stress/ folder): +10 ticks/side net 121.81 PF 8.68; 2x commission + 10 ticks/side net 119.59 PF 8.29
+// TICK SIZE: every point input (spread 13 pts, slippage 10 ticks, Points-mode SL/TP/trail) assumes mintick 0.01 as on VT. On a 3-decimal gold symbol (mintick 0.001)
+//   multiply them by 10, or the exits are 10x too tight. Confirm 1 contract = 1 oz and that the List of Trades shows qty 0.1 on the first fill.
 // Hard-coded input defaults (everything else is the author's default):
 //   sigRung = "chart rung (*)"
 //   lblRead = false
@@ -25,9 +28,11 @@
 //   qtyStep = 0.01
 //   fgfOn = false
 //   fgfSpreadPts = 13.0
+// THIS SCRIPT USES POINTS-MODE EXITS (SL / TP / trail in ticks): check the tick size note above before running it.
 // XPW Orientation TDI v2.8 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.
-// CAUTION: the VT replay had NO 1 Day / 1 Week / 1 Month bars (July 2026 ticks only), so those three rungs were empty in the test.
-// On TradingView those rungs are populated, so the ladder (and the trades) will differ from the screened result.
+// CAUTION: the VT replay had NO 1 Day / 1 Week / 1 Month bars (July 2026 ticks only), the seconds rungs were off, and every rung started cold on 1 July.
+// On TradingView all 13 rungs are live and the 1 Month rung orients the ladder, so the screened result is NOT reproducible here: treat the numbers above as the VT partial-ladder result only.
+// margin_long = margin_short = 1 was added so TradingView's default 100% margin never silently caps the 20-entry stack (the replay had no equity cap).
 // ============================================================================
 // ============================================================================
 //  XPW ORIENTATION TDI  -  v2.8 STRATEGY (ANY TIMEFRAME, EVERY LABEL TRADES)
@@ -171,7 +176,7 @@
 //  the map for location. Do not trade the verdict column on its own.
 // ============================================================================
 
-strategy("Orientation v2.8 S | VT XAUUSD H1 #02", shorttitle="OTDI28 02 H1", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, commission_type=strategy.commission.cash_per_contract, commission_value=0.30, slippage=10, process_orders_on_close=true, calc_on_every_tick=true)
+strategy("Orientation v2.8 S | VT XAUUSD H1 #02", shorttitle="OTDI28 02 H1", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, commission_type=strategy.commission.cash_per_contract, commission_value=0.30, slippage=10, margin_long=1, margin_short=1, process_orders_on_close=true, calc_on_every_tick=true)
 
 // ---------------------------------------------------------------- INPUTS ----
 rsiLen   = input.int(13,       "RSI length",            group="TDI core")

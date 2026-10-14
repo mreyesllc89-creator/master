@@ -65,7 +65,7 @@ def v92_inputs(label):
     if rev == "off": d.update(lossRevOn=False)
     else:
         d.update(lossRevOn=True, lossRevWhat="Stop loss / trail only" if rev.startswith("SL") else "Any losing exit", lossRevTiny=rev.endswith("+tiny"), lossRevMax=1, lossRevTinyPts=1500.0)
-    d.update(qtyMode="Fixed", qtyFixed=QTY, fgfOn=f == "on", fgfSpreadPts=SPREAD_PTS)
+    d.update(enterTick=False, qtyMode="Fixed", qtyFixed=QTY, fgfOn=f == "on", fgfSpreadPts=SPREAD_PTS)
     return d
 
 def v28_inputs(label):
@@ -102,18 +102,23 @@ def patch_header(strat, src, title, short):
     else:
         src = replace_once(src, 'strategy("XPW Orientation TDI v2.8 Strategy", shorttitle="XPW-OTDI8 S",', f'strategy("{title}", shorttitle="{short}",')
         src = replace_once(src, "default_qty_type=strategy.fixed, default_qty_value=0.1, process_orders_on_close=true,",
-                           f"default_qty_type=strategy.fixed, default_qty_value={QTY}, commission_type=strategy.commission.cash_per_contract, commission_value={COMM:.2f}, slippage={SLIP_TICKS}, process_orders_on_close=true,")
+                           f"default_qty_type=strategy.fixed, default_qty_value={QTY}, commission_type=strategy.commission.cash_per_contract, commission_value={COMM:.2f}, slippage={SLIP_TICKS}, margin_long=1, margin_short=1, process_orders_on_close=true,")
     return src
 
 NOTES = {
     "FlashGold v5": "FlashGold v5 strategy source as supplied (BTCUSD build), unchanged except the input defaults and strategy() costs listed above.",
-    "ShapeMap v0.9.2": "XPW Shape Map v0.9.2 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.",
+    "ShapeMap v0.9.2": "XPW Shape Map v0.9.2 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.\n"
+        "// enterTick is set to false: the replay decided every signal on the CLOSED candle (ticks were used only for fills and stops), so live entries wait for the close too. The historical tester is unaffected.",
     "Orientation v2.8 (partial ladder)": "XPW Orientation TDI v2.8 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.\n"
-        "// CAUTION: the VT replay had NO 1 Day / 1 Week / 1 Month bars (July 2026 ticks only), so those three rungs were empty in the test.\n"
-        "// On TradingView those rungs are populated, so the ladder (and the trades) will differ from the screened result.",
+        "// CAUTION: the VT replay had NO 1 Day / 1 Week / 1 Month bars (July 2026 ticks only), the seconds rungs were off, and every rung started cold on 1 July.\n"
+        "// On TradingView all 13 rungs are live and the 1 Month rung orients the ladder, so the screened result is NOT reproducible here: treat the numbers above as the VT partial-ladder result only.\n"
+        "// margin_long = margin_short = 1 was added so TradingView's default 100% margin never silently caps the 20-entry stack (the replay had no equity cap).",
 }
 
+STRESS = {(w["strategy"], int(w["rank"])): w for w in csv.DictReader(open(os.path.join(P, "..", "deliver", "top30_stress_results_wide.csv"), encoding="utf-8"))}
+
 def header_comment(strat, r, rank, inputs):
+    w = STRESS[(strat, rank)]
     lines = ["// ============================================================================",
              f"// {strat.replace(' (partial ladder)', '')}  |  TOP-{rank:02d} of the VT Markets screen  |  {r['symbol']} {r['tf']}",
              f"// Settings: {r['settings']}",
@@ -121,10 +126,14 @@ def header_comment(strat, r, rank, inputs):
              f"//   trades {r['trades']}  net {float(r['net']):.2f} USD  PF {float(r['pf']):.2f}  win {float(r['win'])*100:.0f}%  maxDD {float(r['maxdd']):.2f} USD  positive weeks {float(r['pos_weeks'])*100:.0f}%  halves {r['halves']}",
              "// Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),",
              "//   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.",
-             "// Chart: XAUUSD, timeframe " + r['tf'] + ". TradingView's feed is not VT's tick feed; expect different fills.",
-             "// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.",
+             "// Chart: XAUUSD, timeframe " + r['tf'] + ". TradingView's feed is not VT's tick feed and its tester fills on bar OHLC, not ticks: expect different signals and fills.",
+             "// This is a 4-week screen, not a calibration: 15-275 trades, one month, no out-of-sample test. Treat as a candidate only.",
+             f"// Stress re-run on the same VT ticks (stress/ folder): +10 ticks/side net {float(w['net@c0.30_s10']):.2f} PF {float(w['pf@c0.30_s10']):.2f}; 2x commission + 10 ticks/side net {float(w['net@c0.60_s10']):.2f} PF {float(w['pf@c0.60_s10']):.2f}" + (" (trade count changed across levels: tick-timing sensitive)" if w['trade_count_changed'] == 'True' else ""),
+             "// TICK SIZE: every point input (spread 13 pts, slippage 10 ticks, Points-mode SL/TP/trail) assumes mintick 0.01 as on VT. On a 3-decimal gold symbol (mintick 0.001)",
+             "//   multiply them by 10, or the exits are 10x too tight. Confirm 1 contract = 1 oz and that the List of Trades shows qty 0.1 on the first fill.",
              "// Hard-coded input defaults (everything else is the author's default):"]
     for k, v in inputs.items(): lines.append(f"//   {k} = {fmt(v)}")
+    if inputs.get("exitUnit") == "Points": lines.append("// THIS SCRIPT USES POINTS-MODE EXITS (SL / TP / trail in ticks): check the tick size note above before running it.")
     lines.append("// " + NOTES[strat].replace("\n", "\n// ") if False else "// " + NOTES[strat])
     lines.append("// ============================================================================")
     return "\n".join(lines) + "\n"

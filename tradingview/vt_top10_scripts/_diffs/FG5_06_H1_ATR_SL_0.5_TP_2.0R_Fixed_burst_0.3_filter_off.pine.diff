@@ -1,6 +1,6 @@
 --- base_assembled.pine
 +++ FG5_06_H1_ATR_SL_0.5_TP_2.0R_Fixed_burst_0.3_filter_off.pine
-@@ -64 +64,28 @@
+@@ -64 +64,31 @@
 -strategy("FlashGold v5 Strategy (BTCUSD)", "FlashGold v5 S (BTCUSD)", overlay = true, max_labels_count = 500, max_lines_count = 500,
 +// ============================================================================
 +// FlashGold v5  |  TOP-06 of the VT Markets screen  |  XAUUSD-ECNc H1
@@ -9,8 +9,11 @@
 +//   trades 58  net 11.04 USD  PF 1.40  win 45%  maxDD 8.60 USD  positive weeks 80%  halves 4.14/6.90
 +// Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),
 +//   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.
-+// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed; expect different fills.
-+// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.
++// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed and its tester fills on bar OHLC, not ticks: expect different signals and fills.
++// This is a 4-week screen, not a calibration: 15-275 trades, one month, no out-of-sample test. Treat as a candidate only.
++// Stress re-run on the same VT ticks (stress/ folder): +10 ticks/side net 10.46 PF 1.37; 2x commission + 10 ticks/side net 6.98 PF 1.23
++// TICK SIZE: every point input (spread 13 pts, slippage 10 ticks, Points-mode SL/TP/trail) assumes mintick 0.01 as on VT. On a 3-decimal gold symbol (mintick 0.001)
++//   multiply them by 10, or the exits are 10x too tight. Confirm 1 contract = 1 oz and that the List of Trades shows qty 0.1 on the first fill.
 +// Hard-coded input defaults (everything else is the author's default):
 +//   ExitMode = "ATR"
 +//   slAtrMult = 0.5
@@ -30,37 +33,37 @@
 +// FlashGold v5 strategy source as supplied (BTCUSD build), unchanged except the input defaults and strategy() costs listed above.
 +// ============================================================================
 +strategy("FlashGold v5 S | VT XAUUSD H1 #06", "FG5 06 H1", overlay = true, max_labels_count = 500, max_lines_count = 500,
-@@ -66,3 +93,3 @@
+@@ -66,3 +96,3 @@
 -     default_qty_type = strategy.fixed, default_qty_value = 10,
 -     commission_type = strategy.commission.percent, commission_value = 0.02,  // % of notional per side (typical crypto futures taker fee)
 -     slippage = 5,                                                            // ticks per side. mintick 0.01 -> $0.05/BTC
 +     default_qty_type = strategy.fixed, default_qty_value = 0.1,
 +     commission_type = strategy.commission.cash_per_contract, commission_value = 0.30,  // USD per contract (oz) per side = VT Markets 0.60 round trip per cent lot
 +     slippage = 10,                                                           // ticks per side: ~half of the 13-tick VT spread + 3 ticks execution
-@@ -73 +100 @@
+@@ -73 +103 @@
 -spreadPoints          = input.float(25.0, "Spread pts", minval = 0.0, step = 0.1, group = gCore, tooltip = "Full spread in points (mintick units). Half of it offsets bid and ask.")
 +spreadPoints          = input.float(13.0, "Spread pts", minval = 0.0, step = 0.1, group = gCore, tooltip = "Full spread in points (mintick units). Half of it offsets bid and ask.")
-@@ -81 +108 @@
+@@ -81 +111 @@
 -burstAtrMult     = input.float(0.5, "Burst threshold, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
 +burstAtrMult     = input.float(0.3, "Burst threshold, ATR mult (ATR unit)", minval = 0.0, step = 0.05, group = gBurst)
-@@ -139 +166 @@
+@@ -139 +169 @@
 -ExitMode        = input.string("Pips", "SL / TP / trail unit", options = ["Pips", "ATR", "Points"], group = gS2, tooltip = "Pips: fixed distances in pips (calibrated, see the Pips inputs). ATR: distances scale with volatility (more robust when volatility changes a lot). Points: mintick units.")
 +ExitMode        = input.string("ATR", "SL / TP / trail unit", options = ["Pips", "ATR", "Points"], group = gS2, tooltip = "Pips: fixed distances in pips (calibrated, see the Pips inputs). ATR: distances scale with volatility (more robust when volatility changes a lot). Points: mintick units.")
-@@ -149 +176 @@
+@@ -149 +179 @@
 -slAtrMult       = input.float(0.1, "Stop loss, ATR mult (ATR mode)", minval = 0.01, step = 0.01, group = gS2, tooltip = "Calibrated: 0.1. Tested range 0.08 to 0.12, all positive.")
 +slAtrMult       = input.float(0.5, "Stop loss, ATR mult (ATR mode)", minval = 0.01, step = 0.01, group = gS2, tooltip = "Calibrated: 0.1. Tested range 0.08 to 0.12, all positive.")
-@@ -157 +184 @@
+@@ -157 +187 @@
 -TpStyle         = input.string("Partial + runner", "Take profit style", options = ["Fixed", "Partial + runner"], group = gS2, tooltip = "Fixed: the whole position closes at the take profit (uses the trailing stop inputs above if on). Partial + runner: part of the position closes at the take profit, the rest (runner) moves its stop to breakeven and follows price with an ATR trail, so long moves are not cut at the target. The trailing stop inputs above are ignored in this mode.")
 +TpStyle         = input.string("Fixed", "Take profit style", options = ["Fixed", "Partial + runner"], group = gS2, tooltip = "Fixed: the whole position closes at the take profit (uses the trailing stop inputs above if on). Partial + runner: part of the position closes at the take profit, the rest (runner) moves its stop to breakeven and follows price with an ATR trail, so long moves are not cut at the target. The trailing stop inputs above are ignored in this mode.")
-@@ -165 +192 @@
+@@ -165 +195 @@
 -fixedQty        = input.float(10, "Fixed quantity (contracts = BTC)", minval = 0.0, group = gS3, tooltip = "The calibration used 10 (= 10 BTC, about $800k notional). Use a size that fits your account.")
 +fixedQty        = input.float(0.1, "Fixed quantity (contracts = BTC)", minval = 0.0, group = gS3, tooltip = "The calibration used 10 (= 10 BTC, about $800k notional). Use a size that fits your account.")
-@@ -168 +195 @@
+@@ -168 +198 @@
 -qtyStep         = input.float(1, "Quantity step (rounds down)", minval = 0.000001, group = gS3, tooltip = "Use 0.001 for fractional BTC sizes.")
 +qtyStep         = input.float(0.01, "Quantity step (rounds down)", minval = 0.000001, group = gS3, tooltip = "Use 0.001 for fractional BTC sizes.")
-@@ -176 +203 @@
+@@ -176 +206 @@
 -fgfOn        = input.bool(true, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
 +fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
-@@ -200 +227 @@
+@@ -200 +230 @@
 -fgfSpreadPts    = input.float(25.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")
 +fgfSpreadPts    = input.float(13.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")

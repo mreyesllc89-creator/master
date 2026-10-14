@@ -68,8 +68,11 @@
 //   trades 21  net 18.96 USD  PF 1.84  win 52%  maxDD 9.64 USD  positive weeks 80%  halves 0.75/18.22
 // Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),
 //   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.
-// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed; expect different fills.
-// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.
+// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed and its tester fills on bar OHLC, not ticks: expect different signals and fills.
+// This is a 4-week screen, not a calibration: 15-275 trades, one month, no out-of-sample test. Treat as a candidate only.
+// Stress re-run on the same VT ticks (stress/ folder): +10 ticks/side net 20.71 PF 2.00; 2x commission + 10 ticks/side net 19.51 PF 1.92 (trade count changed across levels: tick-timing sensitive)
+// TICK SIZE: every point input (spread 13 pts, slippage 10 ticks, Points-mode SL/TP/trail) assumes mintick 0.01 as on VT. On a 3-decimal gold symbol (mintick 0.001)
+//   multiply them by 10, or the exits are 10x too tight. Confirm 1 contract = 1 oz and that the List of Trades shows qty 0.1 on the first fill.
 // Hard-coded input defaults (everything else is the author's default):
 //   ExitMode = "ATR"
 //   slAtrMult = 1.0

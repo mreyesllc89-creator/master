@@ -1,6 +1,6 @@
 --- base_assembled.pine
 +++ OTDI28_09_M30_chart+READ_info_enter_reverse_off_ATR_2.0_2R_notrail_maxOpen_20_filter_off.pine
-@@ -1,0 +2,28 @@
+@@ -1,0 +2,32 @@
 +// ============================================================================
 +// Orientation v2.8  |  TOP-09 of the VT Markets screen  |  XAUUSD-ECNc M30
 +// Settings: chart+READ, info enter, reverse off, ATR_2.0_2R_notrail, maxOpen 20, filter off
@@ -8,8 +8,11 @@
 +//   trades 138  net 76.74 USD  PF 1.84  win 52%  maxDD 24.38 USD  positive weeks 80%  halves 46.49/30.26
 +// Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),
 +//   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.
-+// Chart: XAUUSD, timeframe M30. TradingView's feed is not VT's tick feed; expect different fills.
-+// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.
++// Chart: XAUUSD, timeframe M30. TradingView's feed is not VT's tick feed and its tester fills on bar OHLC, not ticks: expect different signals and fills.
++// This is a 4-week screen, not a calibration: 15-275 trades, one month, no out-of-sample test. Treat as a candidate only.
++// Stress re-run on the same VT ticks (stress/ folder): +10 ticks/side net 74.35 PF 1.80; 2x commission + 10 ticks/side net 66.07 PF 1.68
++// TICK SIZE: every point input (spread 13 pts, slippage 10 ticks, Points-mode SL/TP/trail) assumes mintick 0.01 as on VT. On a 3-decimal gold symbol (mintick 0.001)
++//   multiply them by 10, or the exits are 10x too tight. Confirm 1 contract = 1 oz and that the List of Trades shows qty 0.1 on the first fill.
 +// Hard-coded input defaults (everything else is the author's default):
 +//   sigRung = "chart rung (*)"
 +//   lblRead = true
@@ -26,22 +29,23 @@
 +//   fgfOn = false
 +//   fgfSpreadPts = 13.0
 +// XPW Orientation TDI v2.8 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.
-+// CAUTION: the VT replay had NO 1 Day / 1 Week / 1 Month bars (July 2026 ticks only), so those three rungs were empty in the test.
-+// On TradingView those rungs are populated, so the ladder (and the trades) will differ from the screened result.
++// CAUTION: the VT replay had NO 1 Day / 1 Week / 1 Month bars (July 2026 ticks only), the seconds rungs were off, and every rung started cold on 1 July.
++// On TradingView all 13 rungs are live and the 1 Month rung orients the ladder, so the screened result is NOT reproducible here: treat the numbers above as the VT partial-ladder result only.
++// margin_long = margin_short = 1 was added so TradingView's default 100% margin never silently caps the 20-entry stack (the replay had no equity cap).
 +// ============================================================================
-@@ -144 +172 @@
+@@ -144 +176 @@
 -strategy("XPW Orientation TDI v2.8 Strategy", shorttitle="XPW-OTDI8 S", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, process_orders_on_close=true, calc_on_every_tick=true)
-+strategy("Orientation v2.8 S | VT XAUUSD M30 #09", shorttitle="OTDI28 09 M30", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, commission_type=strategy.commission.cash_per_contract, commission_value=0.30, slippage=10, process_orders_on_close=true, calc_on_every_tick=true)
-@@ -222,3 +250,3 @@
++strategy("Orientation v2.8 S | VT XAUUSD M30 #09", shorttitle="OTDI28 09 M30", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=0.1, commission_type=strategy.commission.cash_per_contract, commission_value=0.30, slippage=10, margin_long=1, margin_short=1, process_orders_on_close=true, calc_on_every_tick=true)
+@@ -222,3 +254,3 @@
 -slAtrMult  = input.float(3.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="0 = no stop loss.")
 -tpRMult    = input.float(1.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="Target = this many times the stop distance. 0 = no take profit.")
 -trailOn    = input.bool(true, "Trailing stop", group="S2. Exits", tooltip="Arms once the trade is in profit by the activation distance, then trails behind the best price by the trail distance.")
 +slAtrMult  = input.float(2.0, "Stop loss, ATR mult (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="0 = no stop loss.")
 +tpRMult    = input.float(2.0, "Take profit, R multiple of SL (ATR mode)", minval=0, step=0.1, group="S2. Exits", tooltip="Target = this many times the stop distance. 0 = no take profit.")
 +trailOn    = input.bool(false, "Trailing stop", group="S2. Exits", tooltip="Arms once the trade is in profit by the activation distance, then trails behind the best price by the trail distance.")
-@@ -248 +276 @@
+@@ -248 +280 @@
 -fgfOn        = input.bool(true, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
 +fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
-@@ -272 +300 @@
+@@ -272 +304 @@
 -fgfSpreadPts    = input.float(25.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")
 +fgfSpreadPts    = input.float(13.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")

@@ -6,8 +6,11 @@
 //   trades 16  net 23.36 USD  PF 2.25  win 56%  maxDD 3.42 USD  positive weeks 75%  halves 5.09/18.27
 // Costs in strategy(): commission 0.30 USD per contract per side (= VT 0.60 round trip per cent lot of 1 oz),
 //   slippage 10 ticks per side (~half of the 13-tick VT spread + ~3 ticks execution), quantity 0.1 contracts = 0.10 cent lot.
-// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed; expect different fills.
-// This is a 4-week screen, not a calibration: 20-110 trades, one month, no out-of-sample test. Treat as a candidate only.
+// Chart: XAUUSD, timeframe H1. TradingView's feed is not VT's tick feed and its tester fills on bar OHLC, not ticks: expect different signals and fills.
+// This is a 4-week screen, not a calibration: 15-275 trades, one month, no out-of-sample test. Treat as a candidate only.
+// Stress re-run on the same VT ticks (stress/ folder): +10 ticks/side net 23.26 PF 2.24; 2x commission + 10 ticks/side net 22.30 PF 2.16
+// TICK SIZE: every point input (spread 13 pts, slippage 10 ticks, Points-mode SL/TP/trail) assumes mintick 0.01 as on VT. On a 3-decimal gold symbol (mintick 0.001)
+//   multiply them by 10, or the exits are 10x too tight. Confirm 1 contract = 1 oz and that the List of Trades shows qty 0.1 on the first fill.
 // Hard-coded input defaults (everything else is the author's default):
 //   sigMode = "CONT ▲/▼"
 //   contEntry = "At signal close"
@@ -22,11 +25,13 @@
 //   lossRevTiny = true
 //   lossRevMax = 1
 //   lossRevTinyPts = 1500.0
+//   enterTick = false
 //   qtyMode = "Fixed"
 //   qtyFixed = 0.1
 //   fgfOn = false
 //   fgfSpreadPts = 13.0
 // XPW Shape Map v0.9.2 strategy source as supplied, unchanged except the input defaults and strategy() costs listed above.
+// enterTick is set to false: the replay decided every signal on the CLOSED candle (ticks were used only for fills and stops), so live entries wait for the close too. The historical tester is unaffected.
 // ============================================================================
 // XPW Shape Map v0.9.2 STRATEGY
 // Built from the XPW Shape Map v0.6 indicator. Same detection, same labels.
@@ -154,7 +159,7 @@ grpE = "S1. Entry"
 sigMode  = input.string("CONT ▲/▼", "Entry signal (one only)", options = ["BOT/TOP square", "Turn ▲/▼", "BOT/TOP tick", "CONT ▲/▼"], group = grpE, tooltip = "Only this pair of labels opens trades. BOT / ▲ side = long, TOP / ▼ side = short. The other labels still draw but never trade. CONT ▲/▼ = continuation without a cross (big candle -> little odd area -> pinch -> candle in trend direction).")
 sigTF    = input.timeframe("", "Signal timeframe (blank = chart)", group = grpE, tooltip = "Timeframe the entry logic runs on. Blank = the chart's timeframe (v0.9.1 behaviour). Example: 10 on a 15 min chart -> the signals (TDI, squares, turns, ticks, CONT, predict price) come from the 10 min candles, while the trade (SL / TP / trail / time stop, sizing, loss reversal) is managed on the 15 min chart candles. A higher timeframe signal arrives on the chart candle where that higher candle closes (on history) or inside it (live, 'Enter on tick'). A lower timeframe signal is acted on at the chart candle's close (history) or on tick (live). Prefer a timeframe that divides the chart timeframe (5 on 15, 15 on 60).")
 tradeDir = input.string("Both", "Trade direction", options = ["Both", "Long only", "Short only"], group = grpE)
-enterTick = input.bool(true, "Enter on tick (don't wait for candle close)", group = grpE, tooltip = "ON: in realtime the script runs on every tick and enters the moment the signal appears inside the forming candle. The signal can still disappear before the candle closes; the trade stays open anyway. OFF: wait for the candle to close and fill on the next candle's open. On history there are no ticks, so the backtest always uses closed candles.")
+enterTick = input.bool(false, "Enter on tick (don't wait for candle close)", group = grpE, tooltip = "ON: in realtime the script runs on every tick and enters the moment the signal appears inside the forming candle. The signal can still disappear before the candle closes; the trade stays open anyway. OFF: wait for the candle to close and fill on the next candle's open. On history there are no ticks, so the backtest always uses closed candles.")
 turnEntry = input.string("Predict (stop at cross price)", "Turn entry timing", options = ["Predict (stop at cross price)", "At the cross", "After hold (when ▲/▼ confirms)"], group = grpE, tooltip = "Predict: at each candle close the strategy calculates the exact price where fast would cross slow on the next candle and places a stop order there. It fills the instant price gets there — live and in the backtest. At the cross: enter when the cross is seen (candle close, or on tick if 'Enter on tick' is on). After hold: wait until the cross has held for 'Bars the cross must hold'.")
 failExit  = input.bool(false, "Turn: exit if the cross fails to hold", group = grpE, tooltip = "Predict / At the cross. If at a candle close the lines are back on the wrong side within 'Bars the cross must hold' candles of entry, close the trade.")
 oppMode  = input.string("Reverse", "Opposite signal while in a trade", options = ["Reverse", "Close only", "Ignore"], group = grpE, tooltip = "Reverse: close and open the other side. Close only: close and wait. Ignore: let the exits handle it.")

@@ -25,9 +25,22 @@ How each script was built
         slippage          = 10             ticks per side: about half of the 13-tick VT spread plus ~3 ticks execution
                                            (TradingView fills at one price series; it has no bid/ask, so the spread
                                            has to be charged through slippage)
-     Quantity inputs: Fixed 0.1 contracts, quantity step 0.01 (so 0.1 does not round down to 0). Spread inputs 13 pts.
+     Quantity inputs: Fixed 0.1 contracts; quantity step 0.01 in FlashGold and v2.8 (the shipped FlashGold step of 1 would have
+     rounded 0.1 down to 0 = no trades), 0.001 in v0.9.2 (author default, fine). Spread inputs 13 pts.
      Direction filter (FGF) off in all 30, as in the screen.
-  4. A header comment at the top of every script repeats the settings, the screen numbers and the warnings.
+     ShapeMap v0.9.2: 'Enter on tick' set to false. The replay decided every signal on the CLOSED candle and used ticks only
+     for fills and stops; with the author's default (true) the LIVE script would enter on unconfirmed intrabar signals.
+     The historical tester is unaffected either way.
+     Orientation v2.8: margin_long = margin_short = 1 added, so TradingView's default 100% margin never silently caps the
+     20-entry stack (0.1 oz x 20 x ~4100 USD = ~8.2k notional on a 10k account); the replay had no equity cap.
+  4. A header comment at the top of every script repeats the settings, the screen numbers, the stress numbers and the warnings.
+
+CHECK THE TICK SIZE FIRST
+  Every point-denominated input (spread 13 pts, slippage 10 ticks, Points-mode SL / TP / trail) assumes mintick 0.01 as on
+  VT XAUUSD-ECNc. On a TradingView gold symbol quoted to 3 decimals (mintick 0.001) they are 10x too small: OTDI28_02-06 and
+  SM92_03 (Points-mode exits) would run with a 10 USD stop instead of 100. Multiply those inputs and strategy() slippage by
+  10 on such a symbol. Also confirm 1 contract = 1 oz (syminfo.pointvalue = 1) and that the List of Trades shows qty 0.1 on
+  the first fill; if TradingView rounds a 0.1-contract order away, use quantity 1 and divide every USD result by 10.
 
 Re-run with commission and slippage (stress/)
   Every config was re-run in its replay engine on the same VT XAUUSD-ECNc July 2026 bid/ask ticks with the cost applied
@@ -46,8 +59,15 @@ Before trusting any of these
     one-month winners.
   - TradingView's XAUUSD feed (OANDA, FXCM, ...) is not VT's tick feed. Signals and fills will differ; use the TV
     strategy tester to see if the pattern survives on another feed, not to confirm these numbers.
-  - Orientation v2.8: the replay had no Day / Week / Month bars, so those three rungs were empty. On TradingView they
-    are populated and the ladder (and the trades) will change. Its nets are large because it stacks up to 20 entries
+  - Orientation v2.8: the replay had no Day / Week / Month bars, the seconds rungs were off and every rung started cold
+    on 1 July. On TradingView all 13 rungs are live and the 1 Month rung orients the ladder, so the screened result is NOT
+    reproducible there; the ten OTDI28 scripts carry the tested inputs, not a reproducible backtest. Its nets are large because it stacks up to 20 entries
     of 0.10 lot; drawdowns scale the same way (43 USD on rank 1).
   - FlashGold v5 runs with autoTf zones (chart, 2x, 4x) and the 3-bar stop-entry validity, as in the screen.
-  - ShapeMap v0.9.2 scripts run on every tick (calc_on_every_tick); the replay did the same.
+  - ShapeMap v0.9.2 scripts still run calc_on_every_tick (for stops and trails); signals are taken on the closed candle.
+  - Known engine-vs-Pine gaps that can move single trades: TradingView fills on bar OHLC (no tick path), so the tight v0.9.2
+    trails (0.2 ATR / 100 pts) will differ; v0.9.2 ATR-mode exits use the signal candle's ATR in Pine and the next candle's
+    ATR in the replay; SM92_05 (CONT stop) can keep a reversing stop working in Pine where the replay cancelled it after 3
+    candles; the replay force-closed the last open position at the end of the data (counted as a trade), TradingView does not.
+  - FG5_05 and FG5_06 are the same trades (the trailing stop in FG5_05 never acted in July); FG5_03 / FG5_08 / FG5_09 share
+    one 58-trade signal set with different exits. FG5_09 (M15) is below PF 1.35 even at actual costs.
