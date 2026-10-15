@@ -1,0 +1,17 @@
+{
+ "c1_FRV_beats_P0": true,
+ "c2_FRV_beats_R2s_at_comparable_coverage": false,
+ "c3_FRP_beats_G2P_auc": false,
+ "stack_adds_something": false,
+ "works_but_restates_local_veto": true,
+ "flagged_fresh_halves": "2018H1;2018H2;2019H1;2019H2",
+ "FRV_minus_P0_acc": 0.04044537089575684,
+ "FRV_minus_R2s_acc": -0.005056022977514507,
+ "FRV_minus_R2s_acc_ci": [
+  -0.006987446287174642,
+  -0.002838693212780608
+ ],
+ "FRP_minus_G2P_auc": -0.013174447656571053,
+ "coverage_FRV": 0.4071394926317206,
+ "coverage_R2s": 0.46032760725580857
+}
