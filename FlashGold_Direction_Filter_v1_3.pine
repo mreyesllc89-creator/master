@@ -3,7 +3,8 @@
 //  FLASHGOLD DIRECTION FILTER  -  v1.3 (buy zone / sell zone / no trade)
 // ----------------------------------------------------------------------------
 //  v1.3 = v1.2 plus the optional SCORE VETO (group "Score veto", off by
-//  default). With the veto off it trades exactly like v1.2.
+//  default), with adjustable cut-offs and an accuracy-vs-coverage table.
+//  With the veto off it trades exactly like v1.2.
 //
 //  The entry signal of "FlashGold v5 Strategy (XAUUSD)" used as a direction
 //  PERMISSION for your other strategies. It never opens, closes or manages a
@@ -156,6 +157,31 @@
 //    Compare the Data Window inputs ("Score inputs in the Data Window") with
 //    calibration/wf/results/veto/pine_parity/ on BITSTAMP:BTCUSD; on the
 //    live bar they show the forming filter candle.
+//
+//  VETO CUT-OFFS AND ACCURACY VS COVERAGE
+//    The score says UP above its upper cut-off, DOWN below its lower one and
+//    undecided in between. "Cut-offs" moves both away from (+) or toward (-)
+//    the middle by that many times the model's own gap (upper - lower):
+//      0     the model's cut-offs (the calibrated rule, default)
+//      -0.5  both meet in the middle: every score is UP or DOWN, so the veto
+//            blocks least (most permissions)
+//      +1    a gap three times as wide: only strong scores decide, so the
+//            veto blocks most (fewest permissions)
+//    Wider cut-offs give fewer permissions; whether they are also right more
+//    often is what the table measures. "Show accuracy vs coverage" adds it
+//    to the status box, live on the filter timeframe's own candles, over the
+//    direction-score window ("Window, filter candles"), for: the zones alone,
+//    and the zones + veto at cut-offs -0.5, 0, +0.5, +1, +2 (and yours, if
+//    different). For each: ACCURACY = how often the allowed side was right
+//    at the next filter candle's close (buys and sells averaged, 50% = coin
+//    flip; the zone judged at the candle's close, as the research did),
+//    COVERAGE = the share of filter candles with a permission, and the number
+//    of scored calls. It reads closed filter candles only (one candle
+//    behind the forming one) and never changes a permission. Rows with fewer
+//    than 100 calls are gray: too few to tell 52% from 50%. Pick a setting
+//    on a window you did not use to choose it, and check it again later: the
+//    model was fitted on BTC/USD 2020-2025, and choosing the best row on the
+//    same history overstates it.
 //
 //  FILTER TIMEFRAME  (default 1 hour)
 //    The signal runs on the candles of "Filter timeframe", every FlashGold
@@ -325,6 +351,8 @@ fgsH    = input.int(10, "Longer horizon H, filter candles", minval=2, maxval=100
 
 GRP_FGV = "Score veto"
 fgvOn  = input.bool(false, "Score veto: a zone allows its side only while the score agrees", group=GRP_FGV, tooltip="Off (default): the zones alone decide. On: a frozen logistic score, read from the filter's own state at the close of each filter candle, must also say UP for a buy (DOWN for a sell); it never allows what the zones forbid. Models exist for the 5m, 15m, 30m and 1H filter timeframes (BTC/USD, Bitstamp 2020-2025); on any other timeframe the veto is not applied and the status box says so. Until the score's inputs exist (about 100 filter candles of chart history) nothing is allowed. Out of sample it added about +1 to +2 points of next-candle accuracy and removed a third to a half of the permissions (see the header).")
+fgvWiden = input.float(0.0, "Cut-offs: widen (+) / narrow (-), x the model's gap", minval=-0.5, maxval=5.0, step=0.25, group=GRP_FGV, tooltip="0 (default): the model's calibrated cut-offs. Above 0: the score must be further from the middle to say UP or DOWN, so the veto blocks more (fewer permissions). -0.5: both cut-offs meet in the middle and every score decides (fewest blocks). See 'Show accuracy vs coverage' for what each setting did on this chart.")
+fgvCurveOn = input.bool(false, "Show accuracy vs coverage", group=GRP_FGV, tooltip="Status box: for the zones alone and for the zones + veto at several cut-offs, how often the allowed side was right at the next filter candle (buys and sells averaged, 50% = coin flip), the share of filter candles with a permission, and the number of scored calls, over the direction-score window. Information only: it never changes a permission. Models exist for 5m, 15m, 30m and 1H only.")
 fgvDbg = input.bool(false, "Score inputs in the Data Window", group=GRP_FGV, tooltip="Adds the score's 17 inputs, its value and its answer at the latest filter candle (the forming one on the live bar) to the Data Window, to check them against the research export (calibration/wf/results/veto/pine_parity, BITSTAMP:BTCUSD).")
 
 // ---- FlashGold signal inputs (the strategy's, same defaults) ----------------
@@ -690,6 +718,30 @@ fgvDiv(float x, float y, float lim) =>
     float v = y == 0 ? (x > 0 ? lim : x < 0 ? -lim : na) : x / y
     na(v) ? na : math.max(-lim, math.min(lim, v))
 
+// The cut-offs: the model's, moved away from (+) or toward (-) the middle by k
+// x their gap; at k = -0.5 both meet in the middle. Returns [lower, upper].
+fgvCuts(float qLo, float qHi, float k) =>
+    float mid = (qLo + qHi) / 2
+    float g   = qHi - qLo
+    [math.min(qLo - k * g, mid), math.max(qHi + k * g, mid)]
+
+// Share of filter candles with a permission (d != 0), over the window.
+fgvCov(int d) =>
+    float on = d != 0 ? 1.0 : 0.0
+    int   w  = math.max(fgsWin, 1)
+    float wS = math.sum(on, w)
+    fgsWin > 0 and not na(wS) ? wS / w : ta.cum(on) / (bar_index + 1)
+
+// One row of the accuracy-vs-coverage table: the gate's side dZ alone (k na)
+// or kept only while the score at cut-offs k agrees. Returns [accuracy at the
+// next candle, scored calls, coverage].
+fgvCurve(int dZ, float sc, bool rdy, float qLo, float qHi, float k) =>
+    [lo, hi] = fgvCuts(qLo, qHi, nz(k))
+    int a = na(k) ? dZ : not rdy ? 2 : sc > hi ? 1 : sc < lo ? -1 : 0
+    int d = a == dZ ? dZ : 0
+    [acc, n] = fgfHits(d, 1)
+    [acc, n, fgvCov(d)]
+
 // The score at this filter candle's close. Returns [score (log-odds), answer
 // (1 UP, -1 DOWN, 0 undecided or inputs missing), inputs ready (1 / 0), the
 // 17 inputs]. Without a model for the timeframe: not ready.
@@ -760,8 +812,19 @@ fgvScore(float aPx, int aDir, int aBar, float aAtr, float fAtr) =>
     z += (fL4 - array.get(mu, 15)) / array.get(sd, 15) * array.get(w, 16)
     z += (fS4 - array.get(mu, 16)) / array.get(sd, 16) * array.get(w, 17)
     float sc  = rdy ? z : na
-    float ans = rdy ? (sc > qHi ? 1 : sc < qLo ? -1 : 0) : 0
-    [sc, ans, rdy ? 1.0 : 0.0, zone, dist, side, r1, r5, r20, vol, age, zv, dv, fdir, fL1, fS1, fL2, fS2, fL4, fS4]
+    [lo, hi]  = fgvCuts(qLo, qHi, fgvWiden)
+    float ans = rdy ? (sc > hi ? 1 : sc < lo ? -1 : 0) : 0
+    // accuracy vs coverage: the gate's side at this close (the zone with the
+    // against / side switches), alone and with the veto at several cut-offs
+    int dZ = zone == 1 and fgfAllowBuy and (fgfAgainst or side > 0) ? 1 : zone == -1 and fgfAllowSell and (fgfAgainst or side < 0) ? -1 : 0
+    [k0a, k0n, k0c] = fgvCurve(dZ, sc, rdy, qLo, qHi, na)
+    [k1a, k1n, k1c] = fgvCurve(dZ, sc, rdy, qLo, qHi, -0.5)
+    [k2a, k2n, k2c] = fgvCurve(dZ, sc, rdy, qLo, qHi, 0.0)
+    [k3a, k3n, k3c] = fgvCurve(dZ, sc, rdy, qLo, qHi, 0.5)
+    [k4a, k4n, k4c] = fgvCurve(dZ, sc, rdy, qLo, qHi, 1.0)
+    [k5a, k5n, k5c] = fgvCurve(dZ, sc, rdy, qLo, qHi, 2.0)
+    [k6a, k6n, k6c] = fgvCurve(dZ, sc, rdy, qLo, qHi, fgvWiden)
+    [sc, ans, rdy ? 1.0 : 0.0, zone, dist, side, r1, r5, r20, vol, age, zv, dv, fdir, fL1, fS1, fL2, fS2, fL4, fS4, k0a, k0n, k0c, k1a, k1n, k1c, k2a, k2n, k2c, k3a, k3n, k3c, k4a, k4n, k4c, k5a, k5n, k5c, k6a, k6n, k6c]
 
 // The names of the settings that differ from the veto's calibration ("" = none).
 fgvCalibDiff() =>
@@ -797,10 +860,10 @@ fgfRead() =>
     float fAtr = ta.atr(14)
     [aAt, aBar, aPx, aDir, aId, aAtr] = fgfArm(sBuy, sSell, sPx, fAtr)
     [cL1, cLh, cS1, cSh, cR1, cRh, cN] = fgfScore(aPx, aDir, aBar)
-    [vSc, vAns, vOk, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17] = fgvScore(aPx, aDir, aBar, aAtr, fAtr)
-    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1], aAtr, aAtr[1], vSc, vAns, vOk, vSc[1], vAns[1], vOk[1], x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17]
+    [vSc, vAns, vOk, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a, k0n, k0c, k1a, k1n, k1c, k2a, k2n, k2c, k3a, k3n, k3c, k4a, k4n, k4c, k5a, k5n, k5c, k6a, k6n, k6c] = fgvScore(aPx, aDir, aBar, aAtr, fAtr)
+    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1], aAtr, aAtr[1], vSc, vAns, vOk, vSc[1], vAns[1], vOk[1], x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a[1], k0n[1], k0c[1], k1a[1], k1n[1], k1c[1], k2a[1], k2n[1], k2c[1], k3a[1], k3n[1], k3c[1], k4a[1], k4n[1], k4c[1], k5a[1], k5n[1], k5c[1], k6a[1], k6n[1], k6c[1]]
 
-[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN, fpAtr, fqAtr, fpVSc, fpVAns, fpVOk, fqVSc, fqVAns, fqVOk, fvX1, fvX2, fvX3, fvX4, fvX5, fvX6, fvX7, fvX8, fvX9, fvX10, fvX11, fvX12, fvX13, fvX14, fvX15, fvX16, fvX17] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
+[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN, fpAtr, fqAtr, fpVSc, fpVAns, fpVOk, fqVSc, fqVAns, fqVOk, fvX1, fvX2, fvX3, fvX4, fvX5, fvX6, fvX7, fvX8, fvX9, fvX10, fvX11, fvX12, fvX13, fvX14, fvX15, fvX16, fvX17, fcA0, fcN0, fcC0, fcA1, fcN1, fcC1, fcA2, fcN2, fcC2, fcA3, fcN3, fcC3, fcA4, fcN4, fcC4, fcA5, fcN5, fcC5, fcA6, fcN6, fcC6] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
 
 fgfTfText(string tf) =>
     int sec = timeframe.in_seconds(tf)
@@ -1022,7 +1085,7 @@ if barstate.islast
 
 // Status box (display only; the gates never use it). Judged like the gates,
 // at the bar's clock; Tick + Minutes also ends it by the real clock.
-var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 16, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
+var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 25, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
 
 // the BTC/USD reference scores (out of sample 2025-07 .. 2026-10) of the filter timeframe's bucket
 fgsRefTxt(int sec) =>
@@ -1112,13 +1175,33 @@ if fgfShowTbl and fgfOn and barstate.islast
     if fgvOn
         // (right under the last row in use: 9 without the direction score, 14 with it)
         int    vRow = fgsShow ? 14 : 9
-        string vTxt = not fgvModel ? "NOT APPLIED: no model for " + fgfTfTag + " (5m, 15m, 30m, 1H only); zones alone" : not fgvRdy ? (not fgfArmed ? "waiting for the first signal: NO TRADE" : "inputs not ready (about 100 " + fgfTfTag + " candles of history): NO TRADE") : "score " + str.tostring(fgvSc, "#.####") + " = " + (fgvAns > 0 ? "UP: buys pass, sells blocked" : fgvAns < 0 ? "DOWN: sells pass, buys blocked" : "undecided: nothing passes")
+        [vLo, vHi] = fgvCuts(fgvModelQlo(fgfTfSec), fgvModelQhi(fgfTfSec), fgvWiden)
+        string vCut = " (cut-offs x" + str.tostring(fgvWiden) + ": UP > " + str.tostring(vHi, "#.####") + ", DOWN < " + str.tostring(vLo, "#.####") + ")"
+        string vTxt = not fgvModel ? "NOT APPLIED: no model for " + fgfTfTag + " (5m, 15m, 30m, 1H only); zones alone" : not fgvRdy ? (not fgfArmed ? "waiting for the first signal: NO TRADE" : "inputs not ready (about 100 " + fgfTfTag + " candles of history): NO TRADE") : "score " + str.tostring(fgvSc, "#.####") + " = " + (fgvAns > 0 ? "UP: buys pass, sells blocked" : fgvAns < 0 ? "DOWN: sells pass, buys blocked" : "undecided: nothing passes") + vCut
         table.cell(fgfTable, 0, vRow, fgvModel ? "Score veto (" + fgfTfTag + " model, BTC 2020-25)" : "Score veto", text_color=color.white)
         table.cell(fgfTable, 1, vRow, vTxt, text_color=not fgvModel or not fgvRdy ? color.orange : fgvAns > 0 ? color.lime : fgvAns < 0 ? color.red : color.orange)
         string vDiff = fgvCalibDiff()
         if vDiff != ""
             table.cell(fgfTable, 0, vRow + 1, "Veto calibrated with", text_color=color.gray)
             table.cell(fgfTable, 1, vRow + 1, vDiff, text_color=color.orange)
+    if fgvCurveOn and fgvModel
+        // (under the veto rows when they are shown, else under the last row)
+        int cRow = fgvOn ? (fgsShow ? 14 : 9) + (fgvCalibDiff() != "" ? 2 : 1) : fgsShow ? 14 : 9
+        string wTxt2 = fgsWin > 0 ? "last " + str.tostring(fgsWin) : "all"
+        table.cell(fgfTable, 0, cRow, "Accuracy vs coverage (" + wTxt2 + " " + fgfTfTag + " candles, next candle, buys/sells averaged)", text_color=color.white)
+        table.cell(fgfTable, 1, cRow, "right / permitted / calls  (50% = coin flip)", text_color=color.white)
+        bool cMine = fgvWiden != -0.5 and fgvWiden != 0 and fgvWiden != 0.5 and fgvWiden != 1 and fgvWiden != 2
+        for r = 0 to (cMine ? 6 : 5)
+            float  ca = r == 0 ? fcA0 : r == 1 ? fcA1 : r == 2 ? fcA2 : r == 3 ? fcA3 : r == 4 ? fcA4 : r == 5 ? fcA5 : fcA6
+            float  cn = r == 0 ? fcN0 : r == 1 ? fcN1 : r == 2 ? fcN2 : r == 3 ? fcN3 : r == 4 ? fcN4 : r == 5 ? fcN5 : fcN6
+            float  cc = r == 0 ? fcC0 : r == 1 ? fcC1 : r == 2 ? fcC2 : r == 3 ? fcC3 : r == 4 ? fcC4 : r == 5 ? fcC5 : fcC6
+            float  ck = r == 1 ? -0.5 : r == 2 ? 0.0 : r == 3 ? 0.5 : r == 4 ? 1.0 : r == 5 ? 2.0 : fgvWiden
+            bool   cUse = r == 0 ? not fgvOn : fgvOn and ck == fgvWiden and (r == 6 or not cMine)
+            string cName = r == 0 ? "Zones alone (veto off)" : "Zones + veto, cut-offs x" + str.tostring(ck) + (r == 2 ? " (model)" : r == 1 ? " (every score decides)" : "")
+            string cVal = (na(ca) ? "-" : str.tostring(ca * 100, "#.0") + "%") + " / " + (na(cc) ? "-" : str.tostring(cc * 100, "#") + "%") + " / " + (na(cn) ? "-" : str.tostring(cn, "#"))
+            color  cCol = na(cn) or cn < 100 ? color.gray : cUse ? color.aqua : color.white
+            table.cell(fgfTable, 0, cRow + 1 + r, cName + (cUse ? "  <- in use" : ""), text_color=cCol)
+            table.cell(fgfTable, 1, cRow + 1 + r, cVal, text_color=cCol)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
 // Exported values (Data Window + linkable as a source from other scripts).
