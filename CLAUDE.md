@@ -18,8 +18,12 @@ and indicators for the XPW and FlashGold systems, mostly on XAUUSD and BTCUSD.
   version is v2.8, with an `_FGF` build.
 - **FlashGold v5**: TDI continuation with a parent zone plus six child zones,
   a burst gate, prior-drift filter and entry hold. XAUUSD and BTCUSD builds.
-- **FlashGold Direction Filter (FGF) v1.2**: a level filter that the `_FGF`
-  builds fuse in (buy only above the level, sell only below it).
+- **FlashGold Direction Filter (FGF)**: a level filter (buy only above the
+  level + no-trade band, sell only below it). TradingView:
+  `FlashGold_Direction_Filter_v1_2.pine` (the version the `_FGF` builds fuse
+  in) and `FlashGold_Direction_Filter_v1_3.pine` (v1.2 plus an optional score
+  veto, off by default). MT5: `MQL5/Indicators/FlashGold_Direction_Filter.mq5`
+  (the v1.2 rule; no direction score or veto).
 - **XPW Shape Map, XPW Breakout, Asia–London Breakout, RegimeTrend,
   Directional Time Filter**: see the inventory.
 
