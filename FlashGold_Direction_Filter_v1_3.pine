@@ -378,7 +378,7 @@ fgvDbg = input.bool(false, "Score inputs in the Data Window", group=GRP_FGV, too
 GRP_FGR = "Reverse-old-signal readout"
 fgrShow = input.bool(false, "Show the reverse-old-signal readout", group=GRP_FGR, tooltip="Information only: never allows or blocks anything. When the last FlashGold signal is at least N filter candles old, the readout calls the opposite of its direction, and counts how often that call was right 6 and 12 filter candles later (buys and sells averaged, 50% = coin flip). Tested as found with Filter timeframe = 15 minutes. See the header.")
 fgrAge  = input.int(9, "Signal at least this many filter candles old", minval=1, group=GRP_FGR, tooltip="9 in the test that found the rule. Change it and the forward test no longer tests the same rule.")
-fgrFrom = input.time(timestamp("2026-10-18T00:00:00Z"), "Count accuracy from", group=GRP_FGR, tooltip="Only calls made on or after this time are scored. The rule was found on data up to 2026-10-17, so the default counts only data it was not chosen on.")
+fgrFrom = input.time(timestamp("18 Oct 2026 00:00 +0000"), "Count accuracy from", group=GRP_FGR, tooltip="Only calls made on or after this time are scored. The rule was found on data up to 2026-10-17, so the default counts only data it was not chosen on.")
 
 // ---- FlashGold signal inputs (the strategy's, same defaults) ----------------
 GRP_FGC = "FlashGold signal: core"
