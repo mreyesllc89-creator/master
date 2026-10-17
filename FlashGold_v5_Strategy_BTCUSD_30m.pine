@@ -32,6 +32,22 @@
 //    on demo before any real money. Results: docs/results/fg_30m_*.md and
 //    fg_sweep_BTCUSD_5m_*.md.
 //
+// FORWARD-TEST SCORECARD (group "S4", on by default, display only): from
+// "Score trades from" (default 2026-10-18, after all the data above) it
+// scores the strategy's own closed trades on the chart's real candles
+// against what the backtest says to expect, per entry (the partial and the
+// runner of one entry count as one trade), in % of the entry's notional so
+// the size does not matter. Expected (worst-case replay, 2025-08..2026-10,
+// 654 trades): 10.5 trades a week, 33% winners, average winner +1.78%,
+// average loser -0.73%, average trade +0.105% (spread 1.47%), PF 1.21, max
+// drawdown 15.6% of notional, 11 of 15 months positive. Each live figure is
+// shown with its 95% range for the number of trades so far: "in range" =
+// behaves like the backtest. Trades a week, win rate and loser size test
+// that the strategy BEHAVES as tested (wrong settings, symbol or fills show
+// up there within a few weeks); the average trade tests the EDGE, which at
+// this spread needs about 750 trades (some 16 months) to tell from zero -
+// until then "in range" means "not contradicted", not "proven".
+//
 // The notes below are the original BTCUSD build's (60m, one month) and are
 // kept for reference; the 30m figures above supersede them for this file.
 //
@@ -197,6 +213,11 @@ QtyMode         = input.string("Fixed", "Quantity", options = ["Fixed", "Risk %"
 fixedQty        = input.float(10, "Fixed quantity (contracts = BTC)", minval = 0.0, group = gS3, tooltip = "The calibration used 10 (= 10 BTC, about $800k notional). Use a size that fits your account.")
 riskPct         = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval = 0.0, step = 0.25, group = gS3, tooltip = "Quantity = equity x risk% / (stop distance x point value). Needs a stop loss > 0.")
 maxQty          = input.float(50, "Max quantity", minval = 0.0, group = gS3)
+gS4 = "S4. Forward-test scorecard"
+fsShow = input.bool(true, "Show the forward-test scorecard", group = gS4, tooltip = "Display only. Scores the closed trades from the date below against the backtest's expectations (see the header).")
+fsFrom = input.time(timestamp("18 Oct 2026 00:00 +0000"), "Score trades from", group = gS4, tooltip = "Only trades entered on or after this time are scored. Default: after all the data the 30m settings were chosen and tested on.")
+fsPos  = input.string("bottom_left", "Scorecard position", options = ["top_left", "middle_left", "bottom_left", "top_center", "bottom_center"], group = gS4)
+
 qtyStep         = input.float(1, "Quantity step (rounds down)", minval = 0.000001, group = gS3, tooltip = "Use 0.001 for fractional BTC sizes.")
 
 // ============================== PRICE MODEL (indicator) ==============================
@@ -548,3 +569,124 @@ if showZoneTable and barstate.islast
     wr = strategy.closedtrades > 0 ? strategy.wintrades * 100.0 / strategy.closedtrades : na
     table.cell(tb, 0, 11, "Trades / win% / net", text_color = color.gray, text_size = size.tiny)
     table.cell(tb, 1, 11, str.tostring(strategy.closedtrades) + " / " + str.tostring(wr, "#") + "% / " + str.tostring(strategy.netprofit, "#.##"), text_color = strategy.netprofit >= 0 ? color.lime : color.red, text_size = size.tiny)
+
+// ===================== FORWARD-TEST SCORECARD (display only) =====================
+// Backtest expectations (see the header), per entry, in % of entry notional.
+float FS_PER_WEEK = 10.5
+float FS_WIN      = 0.333
+float FS_AVG      = 0.105
+float FS_SD       = 1.47
+float FS_AVG_W    = 1.78
+float FS_SD_W     = 1.41
+float FS_AVG_L    = -0.73
+float FS_SD_L     = 0.38
+float FS_PF       = 1.21
+float FS_MAXDD    = 15.6
+
+fsPosOf(string p) =>
+    switch p
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.bottom_left
+
+// One row: label, live value, expected value with its 95% range, verdict.
+fsRow(table t, int r, string name, string live, string exp, int verdict) =>
+    color vc = verdict == 0 ? color.lime : verdict == 9 ? color.gray : color.orange
+    string vt = verdict == 0 ? "in range" : verdict == 9 ? "too few" : verdict < 0 ? "BELOW" : "ABOVE"
+    table.cell(t, 0, r, name, text_color = color.gray, text_size = size.tiny)
+    table.cell(t, 1, r, live, text_color = color.white, text_size = size.tiny)
+    table.cell(t, 2, r, exp, text_color = color.gray, text_size = size.tiny)
+    table.cell(t, 3, r, vt, text_color = vc, text_size = size.tiny)
+
+fsPc(float v, string f) =>
+    na(v) ? "-" : str.tostring(v, f) + "%"
+
+fsVerdict(float v, float lo, float hi, bool enough) =>
+    not enough or na(v) ? 9 : v < lo ? -1 : v > hi ? 1 : 0
+
+var table fsT = table.new(fsPosOf(fsPos), 4, 11, bgcolor = color.new(color.black, 20), border_width = 1)
+if fsShow and barstate.islast
+    // closed trades from fsFrom, grouped per entry (partial + runner = one)
+    int   n = 0
+    int   nW = 0
+    int   nL = 0
+    float sumP = 0.0
+    float sumW = 0.0
+    float sumL = 0.0
+    float grossW = 0.0
+    float grossL = 0.0
+    float net = 0.0
+    float eq = 0.0
+    float peak = 0.0
+    float maxDD = 0.0
+    int   curBar = -1
+    float curProfit = 0.0
+    float curNotional = 0.0
+    int   total = strategy.closedtrades
+    for i = 0 to total
+        bool last = i == total
+        bool inWin = not last and strategy.closedtrades.entry_time(i) >= fsFrom
+        int  eb = last or not inWin ? -2 : strategy.closedtrades.entry_bar_index(i)
+        if curBar >= 0 and eb != curBar
+            float pct = curNotional > 0 ? curProfit / curNotional * 100 : 0.0
+            n += 1
+            sumP += pct
+            net += curProfit
+            if pct > 0
+                nW += 1
+                sumW += pct
+                grossW += pct
+            else if pct < 0
+                nL += 1
+                sumL += pct
+                grossL -= pct
+            eq += pct
+            peak := math.max(peak, eq)
+            maxDD := math.max(maxDD, peak - eq)
+            curBar := -1
+            curProfit := 0.0
+            curNotional := 0.0
+        if inWin
+            curBar := eb
+            curProfit += strategy.closedtrades.profit(i)
+            curNotional += strategy.closedtrades.entry_price(i) * math.abs(strategy.closedtrades.size(i))
+    float weeks = math.max((time_close - fsFrom) / (7 * 86400000.0), 0.0)
+    float expN  = FS_PER_WEEK * weeks
+    float avg   = n > 0 ? sumP / n : na
+    float wr    = n > 0 ? nW * 1.0 / n : na
+    float aW    = nW > 0 ? sumW / nW : na
+    float aL    = nL > 0 ? sumL / nL : na
+    float pf    = grossL > 0 ? grossW / grossL : na
+    bool  e20   = n >= 20
+    float bN    = 1.96 * math.sqrt(math.max(expN, 1))
+    float bWr   = n > 0 ? 1.96 * math.sqrt(FS_WIN * (1 - FS_WIN) / n) : na
+    float bAvg  = n > 0 ? 1.96 * FS_SD / math.sqrt(n) : na
+    float bW    = nW > 0 ? 1.96 * FS_SD_W / math.sqrt(nW) : na
+    float bL    = nL > 0 ? 1.96 * FS_SD_L / math.sqrt(nL) : na
+    int vN   = fsVerdict(n, expN - bN, expN + bN, weeks >= 2)
+    int vWr  = fsVerdict(wr, FS_WIN - bWr, FS_WIN + bWr, e20)
+    int vW   = fsVerdict(aW, FS_AVG_W - bW, FS_AVG_W + bW, nW >= 10)
+    int vL   = fsVerdict(aL, FS_AVG_L - bL, FS_AVG_L + bL, nL >= 10)
+    int vAvg = fsVerdict(avg, FS_AVG - bAvg, FS_AVG + bAvg, e20)
+    int vDD  = n == 0 ? 9 : maxDD > FS_MAXDD ? -1 : 0
+    table.cell(fsT, 0, 0, "Forward test since " + str.format_time(fsFrom, "yyyy-MM-dd", "UTC"), text_color = color.white, text_size = size.tiny)
+    table.cell(fsT, 1, 0, "live", text_color = color.white, text_size = size.tiny)
+    table.cell(fsT, 2, 0, "backtest (95% range now)", text_color = color.white, text_size = size.tiny)
+    table.cell(fsT, 3, 0, "", text_size = size.tiny)
+    fsRow(fsT, 1, "Trades (" + str.tostring(weeks, "#.#") + " weeks)", str.tostring(n), str.tostring(expN, "#") + " (" + str.tostring(math.max(expN - bN, 0), "#") + "-" + str.tostring(expN + bN, "#") + ")", vN)
+    fsRow(fsT, 2, "Winners", na(wr) ? "-" : str.tostring(wr * 100, "#") + "%", "33% (" + (na(bWr) ? "-" : str.tostring((FS_WIN - bWr) * 100, "#") + "-" + str.tostring((FS_WIN + bWr) * 100, "#")) + "%)", vWr)
+    fsRow(fsT, 3, "Average winner", fsPc(aW, "#.##"), "+1.78% (" + (na(bW) ? "-" : str.tostring(FS_AVG_W - bW, "#.##") + " to " + str.tostring(FS_AVG_W + bW, "#.##")) + "%)", vW)
+    fsRow(fsT, 4, "Average loser", fsPc(aL, "#.##"), "-0.73% (" + (na(bL) ? "-" : str.tostring(FS_AVG_L - bL, "#.##") + " to " + str.tostring(FS_AVG_L + bL, "#.##")) + "%)", vL)
+    fsRow(fsT, 5, "Average trade (the edge)", fsPc(avg, "#.###"), "+0.105% (" + (na(bAvg) ? "-" : str.tostring(FS_AVG - bAvg, "#.##") + " to " + str.tostring(FS_AVG + bAvg, "#.##")) + "%)", vAvg)
+    fsRow(fsT, 6, "Profit factor", na(pf) ? "-" : str.tostring(pf, "#.##"), "1.21", 9)
+    fsRow(fsT, 7, "Max drawdown, % of notional", fsPc(maxDD, "#.#"), "15.6% in 15 months", vDD)
+    fsRow(fsT, 8, "Net profit", str.tostring(net, "#"), "-", 9)
+    bool behaves = (vN == 0 or vN == 9) and (vWr == 0 or vWr == 9) and (vL == 0 or vL == 9) and (vW == 0 or vW == 9)
+    bool early = vWr == 9
+    string verdict = early ? "TOO EARLY: fewer than 20 trades" : not behaves ? "BEHAVES DIFFERENTLY from the backtest: check settings, symbol, fills" : vAvg < 0 ? "Behaves as tested, but the average trade is below the backtest's range" : "Behaves as tested (the edge needs ~750 trades to confirm)"
+    table.cell(fsT, 0, 9, "Verdict", text_color = color.white, text_size = size.tiny)
+    table.cell(fsT, 1, 9, verdict, text_color = early ? color.gray : not behaves or vAvg < 0 ? color.orange : color.lime, text_size = size.tiny)
+    table.merge_cells(fsT, 1, 9, 3, 9)
+
