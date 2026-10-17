@@ -725,22 +725,42 @@ fgvCuts(float qLo, float qHi, float k) =>
     float g   = qHi - qLo
     [math.min(qLo - k * g, mid), math.max(qHi + k * g, mid)]
 
-// Share of filter candles with a permission (d != 0), over the window.
-fgvCov(int d) =>
-    float on = d != 0 ? 1.0 : 0.0
-    int   w  = math.max(fgsWin, 1)
-    float wS = math.sum(on, w)
-    fgsWin > 0 and not na(wS) ? wS / w : ta.cum(on) / (bar_index + 1)
-
 // One row of the accuracy-vs-coverage table: the gate's side dZ alone (k na)
-// or kept only while the score at cut-offs k agrees. Returns [accuracy at the
-// next candle, scored calls, coverage].
+// or kept only while the score at cut-offs k agrees. Counted with one queue
+// per row over the last fgsWin filter candles (0 = all history), so the
+// permitted candles, the scored calls and the hits always cover the same
+// candles. Returns [accuracy at the next candle (buys and sells averaged),
+// scored calls, coverage, candles in the window].
 fgvCurve(int dZ, float sc, bool rdy, float qLo, float qHi, float k) =>
     [lo, hi] = fgvCuts(qLo, qHi, nz(k))
     int a = na(k) ? dZ : not rdy ? 2 : sc > hi ? 1 : sc < lo ? -1 : 0
     int d = a == dZ ? dZ : 0
-    [acc, n] = fgfHits(d, 1)
-    [acc, n, fgvCov(d)]
+    // this close scores the previous close's permission: 1 up right, 2 up
+    // wrong, 3 down right, 4 down wrong, 0 none (no permission, or no move)
+    int   pd = nz(d[1])
+    float mv = close - close[1]
+    int   ev = pd == 1 and mv > 0 ? 1 : pd == 1 and mv < 0 ? 2 : pd == -1 and mv < 0 ? 3 : pd == -1 and mv > 0 ? 4 : 0
+    int   on = d != 0 ? 1 : 0
+    // running counts: [permitted candles, ev 1, ev 2, ev 3, ev 4]
+    var array<int> cnt = array.new<int>(5, 0)
+    var array<int> qEv = array.new<int>()
+    var array<int> qOn = array.new<int>()
+    array.set(cnt, 0, array.get(cnt, 0) + on)
+    if ev > 0
+        array.set(cnt, ev, array.get(cnt, ev) + 1)
+    if fgsWin > 0
+        array.push(qEv, ev)
+        array.push(qOn, on)
+        if array.size(qOn) > fgsWin
+            int oEv = array.shift(qEv)
+            array.set(cnt, 0, array.get(cnt, 0) - array.shift(qOn))
+            if oEv > 0
+                array.set(cnt, oEv, array.get(cnt, oEv) - 1)
+    int   nC  = fgsWin > 0 ? array.size(qOn) : bar_index + 1
+    int   uN  = array.get(cnt, 1) + array.get(cnt, 2)
+    int   dN  = array.get(cnt, 3) + array.get(cnt, 4)
+    float acc = uN > 0 and dN > 0 ? 0.5 * (float(array.get(cnt, 1)) / uN + float(array.get(cnt, 3)) / dN) : na
+    [acc, float(uN + dN), nC > 0 ? float(array.get(cnt, 0)) / nC : na, float(nC)]
 
 // The score at this filter candle's close. Returns [score (log-odds), answer
 // (1 UP, -1 DOWN, 0 undecided or inputs missing), inputs ready (1 / 0), the
@@ -817,14 +837,14 @@ fgvScore(float aPx, int aDir, int aBar, float aAtr, float fAtr) =>
     // accuracy vs coverage: the gate's side at this close (the zone with the
     // against / side switches), alone and with the veto at several cut-offs
     int dZ = zone == 1 and fgfAllowBuy and (fgfAgainst or side > 0) ? 1 : zone == -1 and fgfAllowSell and (fgfAgainst or side < 0) ? -1 : 0
-    [k0a, k0n, k0c] = fgvCurve(dZ, sc, rdy, qLo, qHi, na)
-    [k1a, k1n, k1c] = fgvCurve(dZ, sc, rdy, qLo, qHi, -0.5)
-    [k2a, k2n, k2c] = fgvCurve(dZ, sc, rdy, qLo, qHi, 0.0)
-    [k3a, k3n, k3c] = fgvCurve(dZ, sc, rdy, qLo, qHi, 0.5)
-    [k4a, k4n, k4c] = fgvCurve(dZ, sc, rdy, qLo, qHi, 1.0)
-    [k5a, k5n, k5c] = fgvCurve(dZ, sc, rdy, qLo, qHi, 2.0)
-    [k6a, k6n, k6c] = fgvCurve(dZ, sc, rdy, qLo, qHi, fgvWiden)
-    [sc, ans, rdy ? 1.0 : 0.0, zone, dist, side, r1, r5, r20, vol, age, zv, dv, fdir, fL1, fS1, fL2, fS2, fL4, fS4, k0a, k0n, k0c, k1a, k1n, k1c, k2a, k2n, k2c, k3a, k3n, k3c, k4a, k4n, k4c, k5a, k5n, k5c, k6a, k6n, k6c]
+    [k0a, k0n, k0c, k0s] = fgvCurve(dZ, sc, rdy, qLo, qHi, na)
+    [k1a, k1n, k1c, k1s] = fgvCurve(dZ, sc, rdy, qLo, qHi, -0.5)
+    [k2a, k2n, k2c, k2s] = fgvCurve(dZ, sc, rdy, qLo, qHi, 0.0)
+    [k3a, k3n, k3c, k3s] = fgvCurve(dZ, sc, rdy, qLo, qHi, 0.5)
+    [k4a, k4n, k4c, k4s] = fgvCurve(dZ, sc, rdy, qLo, qHi, 1.0)
+    [k5a, k5n, k5c, k5s] = fgvCurve(dZ, sc, rdy, qLo, qHi, 2.0)
+    [k6a, k6n, k6c, k6s] = fgvCurve(dZ, sc, rdy, qLo, qHi, fgvWiden)
+    [sc, ans, rdy ? 1.0 : 0.0, zone, dist, side, r1, r5, r20, vol, age, zv, dv, fdir, fL1, fS1, fL2, fS2, fL4, fS4, k0a, k0n, k0c, k1a, k1n, k1c, k2a, k2n, k2c, k3a, k3n, k3c, k4a, k4n, k4c, k5a, k5n, k5c, k6a, k6n, k6c, k0s]
 
 // The names of the settings that differ from the veto's calibration ("" = none).
 fgvCalibDiff() =>
@@ -860,10 +880,10 @@ fgfRead() =>
     float fAtr = ta.atr(14)
     [aAt, aBar, aPx, aDir, aId, aAtr] = fgfArm(sBuy, sSell, sPx, fAtr)
     [cL1, cLh, cS1, cSh, cR1, cRh, cN] = fgfScore(aPx, aDir, aBar)
-    [vSc, vAns, vOk, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a, k0n, k0c, k1a, k1n, k1c, k2a, k2n, k2c, k3a, k3n, k3c, k4a, k4n, k4c, k5a, k5n, k5c, k6a, k6n, k6c] = fgvScore(aPx, aDir, aBar, aAtr, fAtr)
-    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1], aAtr, aAtr[1], vSc, vAns, vOk, vSc[1], vAns[1], vOk[1], x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a[1], k0n[1], k0c[1], k1a[1], k1n[1], k1c[1], k2a[1], k2n[1], k2c[1], k3a[1], k3n[1], k3c[1], k4a[1], k4n[1], k4c[1], k5a[1], k5n[1], k5c[1], k6a[1], k6n[1], k6c[1]]
+    [vSc, vAns, vOk, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a, k0n, k0c, k1a, k1n, k1c, k2a, k2n, k2c, k3a, k3n, k3c, k4a, k4n, k4c, k5a, k5n, k5c, k6a, k6n, k6c, k0s] = fgvScore(aPx, aDir, aBar, aAtr, fAtr)
+    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1], aAtr, aAtr[1], vSc, vAns, vOk, vSc[1], vAns[1], vOk[1], x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a[1], k0n[1], k0c[1], k1a[1], k1n[1], k1c[1], k2a[1], k2n[1], k2c[1], k3a[1], k3n[1], k3c[1], k4a[1], k4n[1], k4c[1], k5a[1], k5n[1], k5c[1], k6a[1], k6n[1], k6c[1], k0s[1]]
 
-[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN, fpAtr, fqAtr, fpVSc, fpVAns, fpVOk, fqVSc, fqVAns, fqVOk, fvX1, fvX2, fvX3, fvX4, fvX5, fvX6, fvX7, fvX8, fvX9, fvX10, fvX11, fvX12, fvX13, fvX14, fvX15, fvX16, fvX17, fcA0, fcN0, fcC0, fcA1, fcN1, fcC1, fcA2, fcN2, fcC2, fcA3, fcN3, fcC3, fcA4, fcN4, fcC4, fcA5, fcN5, fcC5, fcA6, fcN6, fcC6] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
+[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN, fpAtr, fqAtr, fpVSc, fpVAns, fpVOk, fqVSc, fqVAns, fqVOk, fvX1, fvX2, fvX3, fvX4, fvX5, fvX6, fvX7, fvX8, fvX9, fvX10, fvX11, fvX12, fvX13, fvX14, fvX15, fvX16, fvX17, fcA0, fcN0, fcC0, fcA1, fcN1, fcC1, fcA2, fcN2, fcC2, fcA3, fcN3, fcC3, fcA4, fcN4, fcC4, fcA5, fcN5, fcC5, fcA6, fcN6, fcC6, fcS0] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
 
 fgfTfText(string tf) =>
     int sec = timeframe.in_seconds(tf)
@@ -1187,7 +1207,7 @@ if fgfShowTbl and fgfOn and barstate.islast
     if fgvCurveOn and fgvModel
         // (under the veto rows when they are shown, else under the last row)
         int cRow = fgvOn ? (fgsShow ? 14 : 9) + (fgvCalibDiff() != "" ? 2 : 1) : fgsShow ? 14 : 9
-        string wTxt2 = fgsWin > 0 ? "last " + str.tostring(fgsWin) : "all"
+        string wTxt2 = (na(fcS0) ? "-" : str.tostring(fcS0, "#")) + (fgsWin > 0 ? " of the last " + str.tostring(fgsWin) : " (all)")
         table.cell(fgfTable, 0, cRow, "Accuracy vs coverage (" + wTxt2 + " " + fgfTfTag + " candles, next candle, buys/sells averaged)", text_color=color.white)
         table.cell(fgfTable, 1, cRow, "right / permitted / calls  (50% = coin flip)", text_color=color.white)
         bool cMine = fgvWiden != -0.5 and fgvWiden != 0 and fgvWiden != 0.5 and fgvWiden != 1 and fgvWiden != 2
