@@ -192,7 +192,9 @@
 //    (2026-03..10): on a 15m filter it was right 53.5% (6 candles later) and
 //    53.9% (12 candles later) over 843 signals pooled, above 50% in all three
 //    markets; on 1H it pointed the other way (45-48%), so it is a lead, not
-//    a result (docs/results/fgf_acc_cross_market.md). It was picked after
+//    a result (docs/results/fgf_acc_cross_market.md). On ten earlier months
+//    of BTC it had not been chosen on (15m export, 2025-08..2026-05) it
+//    scored 50.7% / 50.0% over 477 signals: NOT CONFIRMED. It was picked after
 //    looking, so only data after that counts: the readout scores calls made
 //    on or after "Count accuracy from" (default 2026-10-18).
 //    The status box shows the call now (and the age of the signal), and its

@@ -32,3 +32,21 @@ What it says:
 - The 15m row was picked after seeing this table (5 timeframes x 2
   horizons), so it is a lead, not a result. The clean test is fresh data:
   the same rule, unchanged, on exports from after 2026-10-17.
+
+## Out-of-sample check on older BTC data: NOT CONFIRMED
+
+TradingView export CRYPTO:BTCUSD 15m, 2025-08-01..2026-10-17. The rule was
+found on BTC data from 2026-05-25 on, so 2025-08-06..2026-05-24 is ten
+months it never saw. Same rule, unchanged (age >= 9, call reversed):
+
+| Filter TF | Fresh 2025-08..2026-05: +6 / +12 | Found-on 2026-05..10: +6 / +12 |
+|---|---|---|
+| 15m | **50.7% / 50.0%** (477 signals, 45.5 - 54.6%) | 53.5% / 55.2% (242 signals) |
+| 30m | 52.0% / 49.9% (312) | 50.6% / 50.7% (137) |
+| 1H | 50.1% / 48.9% (168) | 43.6% / 44.9% (86) |
+| 2H | 48.3% / 50.9% (101) | 64.3% / 72.2% (41) |
+
+On the fresh BTC data the 15m rule is a coin flip (twice the signals of
+the period it was found on), and the 2H "72%" disappears too. The
+found-on column reproduces the earlier figures from the 5m export, so the
+data agree; the effect does not. **Verdict: drop the lead.**
