@@ -22,7 +22,8 @@ and indicators for the XPW and FlashGold systems, mostly on XAUUSD and BTCUSD.
   level + no-trade band, sell only below it). TradingView:
   `FlashGold_Direction_Filter_v1_2.pine` (the version the `_FGF` builds fuse
   in) and `FlashGold_Direction_Filter_v1_3.pine` (v1.2 plus an optional score
-  veto, off by default). MT5: `MQL5/Indicators/FlashGold_Direction_Filter.mq5`
+  veto and an information-only reverse-old-signal readout, both off by
+  default). MT5: `MQL5/Indicators/FlashGold_Direction_Filter.mq5`
   (the v1.2 rule; no direction score or veto).
 - **XPW Shape Map, XPW Breakout, Asia–London Breakout, RegimeTrend,
   Directional Time Filter**: see the inventory.

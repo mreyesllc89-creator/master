@@ -3,7 +3,8 @@
 //  FLASHGOLD DIRECTION FILTER  -  v1.3 (buy zone / sell zone / no trade)
 // ----------------------------------------------------------------------------
 //  v1.3 = v1.2 plus the optional SCORE VETO (group "Score veto", off by
-//  default), with adjustable cut-offs and an accuracy-vs-coverage table.
+//  default), with adjustable cut-offs and an accuracy-vs-coverage table,
+//  and the information-only REVERSE-OLD-SIGNAL READOUT (off by default).
 //  With the veto off it trades exactly like v1.2.
 //
 //  The entry signal of "FlashGold v5 Strategy (XAUUSD)" used as a direction
@@ -183,6 +184,25 @@
 //    model was fitted on BTC/USD 2020-2025, and choosing the best row on the
 //    same history overstates it.
 //
+//  REVERSE-OLD-SIGNAL READOUT  (group "Reverse-old-signal readout", off by
+//  default; information only: it never allows or blocks anything)
+//    The rule under forward test: when the last FlashGold signal is 9 or more
+//    filter candles old, call the OPPOSITE of its direction. Found on
+//    TradingView 5m exports of BTCUSD, ETHUSD (2026-05..10) and OANDA XAUUSD
+//    (2026-03..10): on a 15m filter it was right 53.5% (6 candles later) and
+//    53.9% (12 candles later) over 843 signals pooled, above 50% in all three
+//    markets; on 1H it pointed the other way (45-48%), so it is a lead, not
+//    a result (docs/results/fgf_acc_cross_market.md). It was picked after
+//    looking, so only data after that counts: the readout scores calls made
+//    on or after "Count accuracy from" (default 2026-10-18).
+//    The status box shows the call now (and the age of the signal), and its
+//    accuracy 6 and 12 filter candles later: buys and sells averaged (50% =
+//    coin flip), number of calls and of distinct signals behind them (calls
+//    under one signal overlap: the signals are the real sample). Set the
+//    filter timeframe to 15 minutes to test the rule as found; on another
+//    timeframe the box says so. Judge it after about 100+ signals: below
+//    about 54% it is gone.
+//
 //  FILTER TIMEFRAME  (default 1 hour)
 //    The signal runs on the candles of "Filter timeframe", every FlashGold
 //    input working as on that timeframe's own chart. Put the filter on a 1m
@@ -354,6 +374,11 @@ fgvOn  = input.bool(false, "Score veto: a zone allows its side only while the sc
 fgvWiden = input.float(0.0, "Cut-offs: widen (+) / narrow (-), x the model's gap", minval=-0.5, maxval=5.0, step=0.25, group=GRP_FGV, tooltip="0 (default): the model's calibrated cut-offs. Above 0: the score must be further from the middle to say UP or DOWN, so the veto blocks more (fewer permissions). -0.5: both cut-offs meet in the middle and every score decides (fewest blocks). See 'Show accuracy vs coverage' for what each setting did on this chart.")
 fgvCurveOn = input.bool(false, "Show accuracy vs coverage", group=GRP_FGV, tooltip="Status box: for the zones alone and for the zones + veto at several cut-offs, how often the allowed side was right at the next filter candle (buys and sells averaged, 50% = coin flip), the share of filter candles with a permission, and the number of scored calls, over the direction-score window. Information only: it never changes a permission. Models exist for 5m, 15m, 30m and 1H only.")
 fgvDbg = input.bool(false, "Score inputs in the Data Window", group=GRP_FGV, tooltip="Adds the score's 17 inputs, its value and its answer at the latest filter candle (the forming one on the live bar) to the Data Window, to check them against the research export (calibration/wf/results/veto/pine_parity, BITSTAMP:BTCUSD).")
+
+GRP_FGR = "Reverse-old-signal readout"
+fgrShow = input.bool(false, "Show the reverse-old-signal readout", group=GRP_FGR, tooltip="Information only: never allows or blocks anything. When the last FlashGold signal is at least N filter candles old, the readout calls the opposite of its direction, and counts how often that call was right 6 and 12 filter candles later (buys and sells averaged, 50% = coin flip). Tested as found with Filter timeframe = 15 minutes. See the header.")
+fgrAge  = input.int(9, "Signal at least this many filter candles old", minval=1, group=GRP_FGR, tooltip="9 in the test that found the rule. Change it and the forward test no longer tests the same rule.")
+fgrFrom = input.time(timestamp("2026-10-18T00:00:00Z"), "Count accuracy from", group=GRP_FGR, tooltip="Only calls made on or after this time are scored. The rule was found on data up to 2026-10-17, so the default counts only data it was not chosen on.")
 
 // ---- FlashGold signal inputs (the strategy's, same defaults) ----------------
 GRP_FGC = "FlashGold signal: core"
@@ -875,15 +900,45 @@ fgvCalibDiff() =>
 // time, and the arm, conditions and close time of the candle before it. An
 // arm is used only once the candle that made it has closed by this chart's
 // clock, so the forming filter candle is never read and nothing repaints.
+// Reverse-old-signal readout, on the filter timeframe: the call d made h
+// candles ago is right when the close has moved its way since. Counts only
+// calls made on or after fgrFrom. Returns [balanced accuracy (na until both
+// sides have calls), calls, distinct signals behind them].
+fgrHits(int d, int id, int h) =>
+    float mv = close - close[h]
+    int   pd = nz(d[h])
+    bool  ok = pd != 0 and not na(time[h]) and time[h] >= fgrFrom and not na(mv) and mv != 0
+    var float uN = 0.0
+    var float uH = 0.0
+    var float dN = 0.0
+    var float dH = 0.0
+    var int   sN = 0
+    var int   lastId = -1
+    if ok
+        if pd > 0
+            uN += 1
+            uH += mv > 0 ? 1 : 0
+        else
+            dN += 1
+            dH += mv < 0 ? 1 : 0
+        if nz(id[h]) != lastId
+            sN += 1
+            lastId := nz(id[h])
+    [uN > 0 and dN > 0 ? 0.5 * (uH / uN + dH / dN) : na, uN + dN, float(sN)]
+
 fgfRead() =>
     [sBuy, sSell, sPx, sPar, sAl, sAc] = fgfSignal(fgfTfSec)
     float fAtr = ta.atr(14)
     [aAt, aBar, aPx, aDir, aId, aAtr] = fgfArm(sBuy, sSell, sPx, fAtr)
     [cL1, cLh, cS1, cSh, cR1, cRh, cN] = fgfScore(aPx, aDir, aBar)
+    int rAge  = na(aBar) ? -1 : bar_index - aBar
+    int rCall = rAge >= fgrAge ? -aDir : 0
+    [r6a, r6n, r6s] = fgrHits(rCall, aId, 6)
+    [r12a, r12n, r12s] = fgrHits(rCall, aId, 12)
     [vSc, vAns, vOk, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a, k0n, k0c, k1a, k1n, k1c, k2a, k2n, k2c, k3a, k3n, k3c, k4a, k4n, k4c, k5a, k5n, k5c, k6a, k6n, k6c, k0s] = fgvScore(aPx, aDir, aBar, aAtr, fAtr)
-    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1], aAtr, aAtr[1], vSc, vAns, vOk, vSc[1], vAns[1], vOk[1], x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a[1], k0n[1], k0c[1], k1a[1], k1n[1], k1c[1], k2a[1], k2n[1], k2c[1], k3a[1], k3n[1], k3c[1], k4a[1], k4n[1], k4c[1], k5a[1], k5n[1], k5c[1], k6a[1], k6n[1], k6c[1], k0s[1]]
+    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1], aAtr, aAtr[1], vSc, vAns, vOk, vSc[1], vAns[1], vOk[1], x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, k0a[1], k0n[1], k0c[1], k1a[1], k1n[1], k1c[1], k2a[1], k2n[1], k2c[1], k3a[1], k3n[1], k3c[1], k4a[1], k4n[1], k4c[1], k5a[1], k5n[1], k5c[1], k6a[1], k6n[1], k6c[1], k0s[1], rCall, rAge, rCall[1], rAge[1], r6a[1], r6n[1], r6s[1], r12a[1], r12n[1], r12s[1]]
 
-[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN, fpAtr, fqAtr, fpVSc, fpVAns, fpVOk, fqVSc, fqVAns, fqVOk, fvX1, fvX2, fvX3, fvX4, fvX5, fvX6, fvX7, fvX8, fvX9, fvX10, fvX11, fvX12, fvX13, fvX14, fvX15, fvX16, fvX17, fcA0, fcN0, fcC0, fcA1, fcN1, fcC1, fcA2, fcN2, fcC2, fcA3, fcN3, fcC3, fcA4, fcN4, fcC4, fcA5, fcN5, fcC5, fcA6, fcN6, fcC6, fcS0] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
+[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN, fpAtr, fqAtr, fpVSc, fpVAns, fpVOk, fqVSc, fqVAns, fqVOk, fvX1, fvX2, fvX3, fvX4, fvX5, fvX6, fvX7, fvX8, fvX9, fvX10, fvX11, fvX12, fvX13, fvX14, fvX15, fvX16, fvX17, fcA0, fcN0, fcC0, fcA1, fcN1, fcC1, fcA2, fcN2, fcC2, fcA3, fcN3, fcC3, fcA4, fcN4, fcC4, fcA5, fcN5, fcC5, fcA6, fcN6, fcC6, fcS0, fpRC, fpRA, fqRC, fqRA, frA6, frN6, frS6, frA12, frN12, frS12] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
 
 fgfTfText(string tf) =>
     int sec = timeframe.in_seconds(tf)
@@ -964,6 +1019,11 @@ float fgsR1  = fgfPick(fpR1, fqR1, fgsCR1[1])
 float fgsRh  = fgfPick(fpRh, fqRh, fgsCRh[1])
 float fgsN   = fgfPick(fpN, fqN, fgsCN[1])
 // The score veto of the filter candle in force (picked like the arm).
+// The reverse-old-signal call of the filter candle in force (picked like the arm).
+float fgrCC   = fgfPickC(fpRC, fqRC)
+float fgrCA   = fgfPickC(fpRA, fqRA)
+int   fgrCall = int(nz(fgfPick(fpRC, fqRC, fgrCC[1])))
+int   fgrAgeN = int(nz(fgfPick(fpRA, fqRA, fgrCA[1]), -1))
 float fgvCSc  = fgfPickC(fpVSc, fqVSc)
 float fgvCAns = fgfPickC(fpVAns, fqVAns)
 float fgvCOk  = fgfPickC(fpVOk, fqVOk)
@@ -1105,7 +1165,11 @@ if barstate.islast
 
 // Status box (display only; the gates never use it). Judged like the gates,
 // at the bar's clock; Tick + Minutes also ends it by the real clock.
-var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 25, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
+// The readout's accuracy as text: accuracy (calls, signals).
+fgrRes(float acc, float n, float sg) =>
+    (na(acc) ? "-" : str.tostring(acc * 100, "#.0") + "%") + "  (" + (na(n) ? "0" : str.tostring(n, "#")) + " calls, " + (na(sg) ? "0" : str.tostring(sg, "#")) + " signals)"
+
+var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 30, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
 
 // the BTC/USD reference scores (out of sample 2025-07 .. 2026-10) of the filter timeframe's bucket
 fgsRefTxt(int sec) =>
@@ -1222,6 +1286,23 @@ if fgfShowTbl and fgfOn and barstate.islast
             color  cCol = na(cn) or cn < 100 ? color.gray : cUse ? color.aqua : color.white
             table.cell(fgfTable, 0, cRow + 1 + r, cName + (cUse ? "  <- in use" : ""), text_color=cCol)
             table.cell(fgfTable, 1, cRow + 1 + r, cVal, text_color=cCol)
+    if fgrShow
+        // (under every row in use above)
+        int  rRow  = fgsShow ? 14 : 9
+        rRow += fgvOn ? (fgvCalibDiff() != "" ? 2 : 1) : 0
+        bool rMine = fgvWiden != -0.5 and fgvWiden != 0 and fgvWiden != 0.5 and fgvWiden != 1 and fgvWiden != 2
+        rRow += fgvCurveOn and fgvModel ? (rMine ? 8 : 7) : 0
+        string rTf  = fgfTfSec == 900 ? "" : "  (tested on 15m, this is " + fgfTfTag + ")"
+        string rNow = not fgfArmed ? "no signal yet" : fgrCall > 0 ? "BUY (last SELL signal " + str.tostring(fgrAgeN) + " candles old)" : fgrCall < 0 ? "SELL (last BUY signal " + str.tostring(fgrAgeN) + " candles old)" : "none (last signal " + str.tostring(fgrAgeN) + " of " + str.tostring(fgrAge) + " candles old)"
+        table.cell(fgfTable, 0, rRow, "Reverse old signal (info only)" + rTf, text_color=color.white)
+        table.cell(fgfTable, 1, rRow, rNow, text_color=fgrCall > 0 ? color.lime : fgrCall < 0 ? color.red : color.gray)
+        string rFrom = str.format_time(fgrFrom, "yyyy-MM-dd", "UTC")
+        color rCol6  = na(frS6) or frS6 < 100 ? color.gray : frA6 >= 0.54 ? color.lime : frA6 <= 0.5 ? color.orange : color.white
+        color rCol12 = na(frS12) or frS12 < 100 ? color.gray : frA12 >= 0.54 ? color.lime : frA12 <= 0.5 ? color.orange : color.white
+        table.cell(fgfTable, 0, rRow + 1, "  right 6 " + fgfTfTag + " candles later, since " + rFrom, text_color=color.gray)
+        table.cell(fgfTable, 1, rRow + 1, fgrRes(frA6, frN6, frS6), text_color=rCol6)
+        table.cell(fgfTable, 0, rRow + 2, "  right 12 " + fgfTfTag + " candles later, since " + rFrom, text_color=color.gray)
+        table.cell(fgfTable, 1, rRow + 2, fgrRes(frA12, frN12, frS12), text_color=rCol12)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
 // Exported values (Data Window + linkable as a source from other scripts).
@@ -1236,6 +1317,7 @@ plot(fgfOn and fgfOpen and fgfSigOk ? 1 : 0, "FGF signal confirmed", display=dis
 plot(fgsShow ? fgsL1 : na, "FGF score (next candle)", display=display.data_window)
 plot(fgfOn and fgvActive ? fgvAns : 2, "FGF score veto (1 buys only, -1 sells only, 0 none, 2 not applied)", display=display.data_window)
 plot(fgvModel ? fgvSc : na, "FGF veto score (log-odds, > 0 up)", display=display.data_window)
+plot(fgrShow ? fgrCall : na, "FGR reverse-old-signal call (1 buy, -1 sell, 0 none)", display=display.data_window)
 // the score's inputs at the latest filter candle (the forming one on the live bar; "Score inputs in the Data Window", parity check)
 plot(fgvDbg ? fvX1 : na, "FGV in 1 zone", display=display.data_window)
 plot(fgvDbg ? fvX2 : na, "FGV in 2 dist", display=display.data_window)
