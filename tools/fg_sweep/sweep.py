@@ -36,16 +36,16 @@ BURST = [0.5, 1.0]                                  # burst threshold, ATR mult
 G = {}   # per-process data (set by init)
 
 
-def build_tf(ms, o, h, l, c, base_ms, mult):
+def build_tf(ms, o, h, l, c, base_ms, mult, anchor=0):
     """Chart of mult x the base candles, aligned to 00:00 UTC; each chart bar's
     path is its base candles, 4 points each (TradingView's open-nearer-extreme
     rule)."""
     path = tv_path(o, h, l, c)
     path_t = np.repeat(ms, 4) + np.tile(np.arange(4), len(ms))
     tf = base_ms * mult
-    key = ms // tf
+    key = (ms - anchor) // tf
     st = np.flatnonzero(np.r_[True, key[1:] != key[:-1]]); en = np.r_[st[1:], len(ms)]
-    chart = F.Bars(key[st] * tf, o[st], np.maximum.reduceat(h, st), np.minimum.reduceat(l, st), c[en - 1], tf, st * 4, en * 4)
+    chart = F.Bars(key[st] * tf + anchor, o[st], np.maximum.reduceat(h, st), np.minimum.reduceat(l, st), c[en - 1], tf, st * 4, en * 4)
     return chart, path_t, path
 
 
@@ -95,6 +95,8 @@ def main():
     ap.add_argument("--warmup-days", type=float, default=5.0)
     ap.add_argument("--min-trades", type=int, default=30, help="in-sample trades a cell needs to be chosen")
     ap.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
+    ap.add_argument("--anchor-hours", type=float, default=0.0,
+                    help="UTC hour where the symbol's 2H / 4H candles start (crypto 0; OANDA XAUUSD in US summer time 21)")
     a = ap.parse_args()
 
     ms, o, h, l, c = load_csv(a.csv)
@@ -109,9 +111,10 @@ def main():
     data = dict(cost=cost, nocost=nocost)
     tfs = [int(x) for x in a.tfs.split(",")]
     for m in tfs:
-        chart, path_t, path = build_tf(ms, o, h, l, c, base_ms, m)
+        anchor = int(a.anchor_hours * 3600000)
+        chart, path_t, path = build_tf(ms, o, h, l, c, base_ms, m, anchor)
         data["path_t"], data["path"] = path_t, path
-        z2 = F.resample(chart, 2); z3 = F.resample(chart, 4)
+        z2 = F.resample(chart, 2, anchor); z3 = F.resample(chart, 4, anchor)
         sig = {b: F.signal(chart, z2, z3, F.SigParams(burst_atr=b), a.tick) for b in BURST}
         data[m] = dict(chart=chart, sig=sig, b_start=int(np.searchsorted(chart.t, t0)),
                        b_split=int(np.searchsorted(chart.t, t_split)))

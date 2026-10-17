@@ -63,10 +63,10 @@ def build(ms, o, h, l, c, tf_ms):
     return chart, path_t, path
 
 
-def resample_to(chart, target_ms):
+def resample_to(chart, target_ms, anchor=0):
     if target_ms % chart.tf_ms:
         sys.exit(f"chart timeframe {chart.tf_ms // 60000}m does not divide {target_ms // 60000}m")
-    return F.resample(chart, target_ms // chart.tf_ms) if target_ms != chart.tf_ms else chart
+    return F.resample(chart, target_ms // chart.tf_ms, anchor) if target_ms != chart.tf_ms else chart
 
 
 def score(tr, cost, mid_ms):
@@ -98,18 +98,21 @@ def main():
     ap.add_argument("--exit-mode", default="Pips", choices=["Pips", "ATR", "Points"])
     ap.add_argument("--warmup-days", type=float, default=3.0, help="no trades before this (indicator warm-up)")
     ap.add_argument("--placebos", type=int, default=20, help="random filters that block the same share of signals")
+    ap.add_argument("--anchor-hours", type=float, default=0.0,
+                    help="UTC hour where the symbol's 2H / 4H candles start (crypto 0; OANDA XAUUSD in US summer time 21)")
     a = ap.parse_args()
 
     ms, o, h, l, c = load_csv(a.csv)
     tf_ms = int(np.median(np.diff(ms)))
     chart, path_t, path = build(ms, o, h, l, c, tf_ms)
-    z2 = F.resample(chart, 2); z3 = F.resample(chart, 4)
+    anchor = int(a.anchor_hours * 3600000)
+    z2 = F.resample(chart, 2, anchor); z3 = F.resample(chart, 4, anchor)
     if a.filter_tf * 60000 <= tf_ms:
         print(f"WARNING: filter timeframe {a.filter_tf}m is not above the {tf_ms // 60000}m chart. Every FlashGold "
               "signal is then also a filter signal whose level sits beyond the signal candle's close, so the filter "
               "blocks every entry by design. Use a lower-timeframe export or a higher --filter-tf.", file=sys.stderr)
-    fb = resample_to(chart, a.filter_tf * 60000)
-    fz2 = F.resample(fb, 2); fz3 = F.resample(fb, 4)
+    fb = resample_to(chart, a.filter_tf * 60000, anchor)
+    fz2 = F.resample(fb, 2, anchor); fz3 = F.resample(fb, 4, anchor)
     sp = F.SigParams(spread_pts=a.spread_pts)
     sig = F.signal(chart, z2, z3, sp, a.tick)
     start_ms = ms[0] + int(a.warmup_days * 86400000)

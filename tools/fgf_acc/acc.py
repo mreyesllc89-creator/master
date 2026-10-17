@@ -23,16 +23,16 @@ import fg5 as F
 from fgf_ab import load_csv
 
 
-def bars(ms, o, h, l, c, base_ms, mult):
-    tf = base_ms * mult; key = ms // tf
+def bars(ms, o, h, l, c, base_ms, mult, anchor=0):
+    tf = base_ms * mult; key = (ms - anchor) // tf
     st = np.flatnonzero(np.r_[True, key[1:] != key[:-1]]); en = np.r_[st[1:], len(ms)]
-    return F.Bars(key[st] * tf, o[st], np.maximum.reduceat(h, st), np.minimum.reduceat(l, st), c[en - 1], tf)
+    return F.Bars(key[st] * tf + anchor, o[st], np.maximum.reduceat(h, st), np.minimum.reduceat(l, st), c[en - 1], tf)
 
 
-def state(fb, tick, band_atr):
+def state(fb, tick, band_atr, anchor=0):
     """The filter at each filter candle close: zone, last signal side, its
     age, distance from the level in ATR, volatility regime."""
-    f2 = F.resample(fb, 2); f4 = F.resample(fb, 4)
+    f2 = F.resample(fb, 2, anchor); f4 = F.resample(fb, 4, anchor)
     s = F.signal(fb, f2, f4, F.SigParams(), tick)
     n = len(fb.t)
     sig = np.where(s["buy"], 1, np.where(s["sell"], -1, 0))
@@ -137,14 +137,17 @@ def main():
     ap.add_argument("--band-atr", type=float, default=0.25)
     ap.add_argument("--min-calls", type=int, default=150, help="in-sample calls a candidate needs")
     ap.add_argument("--warmup-days", type=float, default=5.0)
+    ap.add_argument("--anchor-hours", type=float, default=0.0,
+                    help="UTC hour where the symbol's 2H / 4H candles start (crypto 0; OANDA XAUUSD in US summer time 21)")
     a = ap.parse_args()
+    anchor = int(a.anchor_hours * 3600000)
 
     ms, o, h, l, c = load_csv(a.csv)
     base = int(np.median(np.diff(ms)))
     t0 = ms[0] + int(a.warmup_days * 86400000); ts = t0 + int((ms[-1] - t0) * a.is_frac)
     rows = []; keep = {}
     for m in [int(x) for x in a.tfs.split(",")]:
-        fb = bars(ms, o, h, l, c, base, m); S = state(fb, a.tick, a.band_atr)
+        fb = bars(ms, o, h, l, c, base, m, anchor); S = state(fb, a.tick, a.band_atr, anchor)
         O = outcomes(fb, S["atr"], (1, 3, 6, 12), 1.0, 24)
         isp = (fb.t >= t0) & (fb.t + fb.tf_ms <= ts); oos = fb.t >= ts
         z, sd, par = S["zone"], S["sdir"], S["parent"]
