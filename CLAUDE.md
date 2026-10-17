@@ -17,7 +17,10 @@ and indicators for the XPW and FlashGold systems, mostly on XAUUSD and BTCUSD.
 - **XPW Orientation TDI**: TDI (RSI → fast/slow SMA) direction strategy. Latest
   version is v2.8, with an `_FGF` build.
 - **FlashGold v5**: TDI continuation with a parent zone plus six child zones,
-  a burst gate, prior-drift filter and entry hold. XAUUSD and BTCUSD builds.
+  a burst gate, prior-drift filter and entry hold. XAUUSD and BTCUSD builds;
+  `FlashGold_v5_Strategy_BTCUSD_30m.pine` is the BTC 30m build (ATR exits
+  SL 2 / TP 3R, partial + runner, burst 1), the only setting that held out of
+  sample after costs (BTC only; see docs/results).
 - **FlashGold Direction Filter (FGF)**: a level filter (buy only above the
   level + no-trade band, sell only below it). TradingView:
   `FlashGold_Direction_Filter_v1_2.pine` (the version the `_FGF` builds fuse
