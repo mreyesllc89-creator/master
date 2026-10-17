@@ -32,10 +32,11 @@ def load_csv(path):
         if c not in df.columns:
             sys.exit(f"{path}: missing column '{c}' (need time, open, high, low, close)")
     t = df["time"]
-    if np.issubdtype(t.dtype, np.number):
+    if pd.api.types.is_numeric_dtype(t):
         ms = (t.astype("int64") * (1000 if t.max() < 1e12 else 1)).to_numpy()
     else:
-        ms = (pd.to_datetime(t, utc=True).astype("int64") // 1_000_000).to_numpy()
+        dt = pd.to_datetime(t, utc=True)
+        ms = ((dt - pd.Timestamp(0, tz="UTC")) // pd.Timedelta(milliseconds=1)).to_numpy().astype("int64")
     o = df["open"].to_numpy(float); h = df["high"].to_numpy(float)
     l = df["low"].to_numpy(float); c = df["close"].to_numpy(float)
     order = np.argsort(ms, kind="stable")
@@ -103,6 +104,10 @@ def main():
     tf_ms = int(np.median(np.diff(ms)))
     chart, path_t, path = build(ms, o, h, l, c, tf_ms)
     z2 = F.resample(chart, 2); z3 = F.resample(chart, 4)
+    if a.filter_tf * 60000 <= tf_ms:
+        print(f"WARNING: filter timeframe {a.filter_tf}m is not above the {tf_ms // 60000}m chart. Every FlashGold "
+              "signal is then also a filter signal whose level sits beyond the signal candle's close, so the filter "
+              "blocks every entry by design. Use a lower-timeframe export or a higher --filter-tf.", file=sys.stderr)
     fb = resample_to(chart, a.filter_tf * 60000)
     fz2 = F.resample(fb, 2); fz3 = F.resample(fb, 4)
     sp = F.SigParams(spread_pts=a.spread_pts)
