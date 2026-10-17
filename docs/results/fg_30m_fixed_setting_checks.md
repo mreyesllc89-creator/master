@@ -25,3 +25,12 @@ it was not chosen on. Worst-case fills, 0.02% commission per side + slippage,
   real cost before ruling it out.
 - The BTC 15m export gives the 30m chart only two intrabar points per
   candle (15m candles); with 2-3 ATR stops that matters little.
+
+## Signal parity with TradingView (30m build settings)
+
+FlashGold v5 indicator export, CRYPTO:BTCUSD 30m, 2026-08-04..10-17 (3,525
+candles, burst 1.0): the Python engine gives the same BUY / SELL on 100% of
+candles after warm-up (143 buys, 124 sells, all matched) and the same entry
+prices (largest difference 0.00000001). A 300-candle 15m export (3 days)
+agrees on 99% of candles; the misses are on the first candles, before ATR /
+RSI and the x4 zone have enough history.
