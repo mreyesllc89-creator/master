@@ -1,4 +1,40 @@
 //@version=6
+// ============================================================================
+// GVLiveV2 + FlashGold Direction Filter (FGF build)
+// ----------------------------------------------------------------------------
+// CALIBRATION (2026-10-18): OANDA:XAUUSD 60m (4,750 bars, 2025-12-23 to
+// 2026-10-14), 120m (2,420 bars, same span) and 240m (2,205 bars, 2025-05-13
+// to 2026-10-14). Python replica of this script's entries and exits, the
+// filter read from TradingView's own exported "FGF buy / sell allowed"
+// columns. Fills: stop first when a bar touches stop and target, market
+// entries at the next open, $0.30 spread per round trip. Results in R
+// (1 R = the stop distance, i.e. what Risk % sizing risks per trade).
+// About 2.8 million input combinations per timeframe.
+//  - Calibrated defaults: EMA 8 / 21, trend EMA 100, pre-candle Market Next
+//    Candle, radar = Chart, min vol score 35, close location 0.75, trend
+//    direction off, ATR exits SL 1.0 x ATR(14), TP 5R, no trail, no bar exit,
+//    no $ daily lock, direction filter OFF.
+//      60m  +72.5R, 209 trades (~22 a month), PF 1.44, win 23%, halves +41.6 / +30.9, max DD 17R
+//      120m +42.2R,  91 trades, PF 1.60, halves +19.2 / +23.0, max DD 17R
+//      240m +45.9R,  97 trades, PF 1.62, halves +39.3 / +6.6,  max DD 15R
+//    The old defaults: 60m +1.4R, 120m +3.2R, 240m -4.1R.
+//  - Out of sample: settings picked on 60m + 120m only, then run on the
+//    240m bars from May to Dec 2025 that those charts do not cover: the 300
+//    best averaged +15.7R (83% positive); 300 random settings -4.1R (24%).
+//  - Direction filter: it makes the AVERAGE setting lose less, but with the
+//    calibrated settings it halves the trades and the profit (60m +13.7R,
+//    120m +11.6R, 240m +21.6R with half the drawdown, 7R). Off by default;
+//    on 240m it is a fair choice if a smaller drawdown matters more.
+//  - The old trailing stop passed price distances to trail_points /
+//    trail_offset, which are in ticks: on XAUUSD a "$20" trail was $0.02,
+//    so TradingView booked exits at the bar extreme. S2 now converts to ticks.
+//  - Win rate is low (~23%) by design (5R target): expect runs of 10+
+//    losers; a 1% risk saw drawdowns of 15-17%. Consider 0.5%.
+//  - Not calibrated: BTCUSDT (only 1 day of 30s and 3 hours of 15s data,
+//    a handful of trades), Polymarket settlement odds, the Max Quantity /
+//    margin caps (results are per R), the radar on a lower timeframe.
+//    Re-check with Bar Magnifier and on new data before trading live.
+// ============================================================================
 strategy("GVLiveV2 | Crypto Polymarket Any-Chart Pre-Candle", shorttitle="GVLiveV2 Poly PreArm", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
 //==============================================================================
@@ -13,8 +49,8 @@ slowVoVixLen = input.int(30, "Slow VoVix Length", minval=15, group=group_devma)
 // Directional Trend Logic
 //==============================================================================
 group_trend = "Directional Trend"
-fastEmaLen = input.int(5, "Fast EMA", group=group_trend)
-slowEmaLen = input.int(13, "Slow EMA", group=group_trend)
+fastEmaLen = input.int(8, "Fast EMA", group=group_trend, tooltip="Calibrated: 8 (was 5).")
+slowEmaLen = input.int(21, "Slow EMA", group=group_trend, tooltip="Calibrated: 21 (was 13).")
 trendFilterLen = input.int(100, "Trend Filter EMA", group=group_trend)
 
 //==============================================================================
@@ -30,25 +66,38 @@ rsiOversold = input.int(30, "RSI Oversold", group=group_mom)
 // Execution, Sizing, And Paper Bridge Settings
 //==============================================================================
 group_execution = "Execution And Sizing"
-useDynamicRisk = input.bool(false, "Use Dynamic Risk %", group=group_execution, tooltip="Turn on after verifying the live broker point value and quantity step.")
-riskPercent = input.float(0.25, "Risk % Per Trade", minval=0.01, step=0.01, group=group_execution)
-tradeQty = input.float(1.0, "Fixed Trade Quantity", minval=0.0, step=0.01, group=group_execution)
-
 brokerPreset = input.string("Manual / custom", "Point-Value Preset", options=["Manual / custom", "Crypto 1 USD per qty"], group=group_execution, tooltip="Dollar value of a 1.00 price move for one quantity unit.")
 manualPointValue = input.float(1.0, "Manual Point Value", minval=0.01, step=0.01, group=group_execution)
-qtyStep = input.float(0.01, "Quantity Step", minval=0.0001, step=0.01, group=group_execution)
-minQty = input.float(0.01, "Minimum Quantity", minval=0.0, step=0.01, group=group_execution)
-maxQty = input.float(100.0, "Maximum Quantity", minval=0.01, step=0.01, group=group_execution)
 
-ATR_SL_MULTIPLIER = input.float(2.0, "Stop Loss ATR Multiplier", minval=0.5, step=0.1, group=group_execution)
-ATR_TP_MULTIPLIER = input.float(2.0, "Take Profit ATR Multiplier", minval=0.5, step=0.1, group=group_execution)
-USE_TRAILING_STOP = input.bool(true, "Use Trailing Stop", group=group_execution)
+gS2 = "S2. Exits"
+ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="Points: fixed distances in points (mintick units: XAUUSD 0.001, so 1000 pts = $1; BTCUSDT 0.01, so 100 pts = $1). ATR: distances scale with volatility, ATR(length) at the signal bar. Distances are measured from the fill price.")
+slPoints       = input.float(16500, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no stop loss (not recommended). 16500 = 1 x the median ATR(14) of XAUUSD 60m in the calibration ($16.5).")
+tpPoints       = input.float(82500, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no target. 82500 = 5 x the stop.")
+atrLen         = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
+slAtrMult      = input.float(1.0, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Calibrated: 1.0. 1.5 is also positive everywhere; 0.5 is not.")
+tpR            = input.float(5.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Target = this many times the stop distance. 0 = no target. Calibrated: 5 (3 is about half as good, 2 a quarter).")
+useTrail       = input.bool(false, "Trailing stop", group=gS2, tooltip="Calibrated: off. A wide trail (6 / 1 ATR) changes almost nothing; tighter trails cut the result.")
+trailActPoints = input.float(99000, "Trail activation, pts of profit (Points mode)", minval=0.0, step=1.0, group=gS2)
+trailPoints    = input.float(16500, "Trail distance, pts (Points mode)", minval=1.0, step=1.0, group=gS2)
+trailActAtr    = input.float(6.0, "Trail activation, ATR mult (ATR mode)", minval=0.0, step=0.05, group=gS2)
+trailDstAtr    = input.float(1.0, "Trail distance, ATR mult (ATR mode)", minval=0.005, step=0.005, group=gS2)
+maxBarsHeld    = input.int(0, "Time stop, bars (0 = off)", minval=0, group=gS2, tooltip="Closes the position at market once it has been open this many bars. Works alongside Paper Safety Layer -> Max Signal Bars In Trade; the shorter one wins.")
+
+gS3 = "S3. Sizing"
+QtyMode    = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3)
+fixedQty   = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3)
+riskPct    = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Quantity = equity x risk% / (stop distance x point value). Needs a stop loss > 0.")
+maxQty     = input.float(50, "Max quantity", minval=0.0, group=gS3)
+qtyStep    = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
+capMargin  = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
+marginPct  = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.0, step=0.5, group=gS3)
+riskPercent = riskPct
 
 group_risk = "Paper Safety Layer"
-useMaxBarsExit = input.bool(true, "Close If Still Open After N Bars", group=group_risk)
+useMaxBarsExit = input.bool(false, "Close If Still Open After N Bars", group=group_risk, tooltip="Calibrated: off. Closing after 1-4 bars cut the result to about a fifth on every timeframe; the S2 stop / target do the exiting. Turn on only for Polymarket reset use.")
 maxBarsInTrade = input.int(1, "Max Signal Bars In Trade", minval=1, group=group_risk, tooltip="This only resets the TradingView strategy position so another later window can signal. Polymarket paper exits are handled by market settlement.")
 useDailyLossLock = input.bool(true, "Use Daily Loss Lock", group=group_risk)
-maxDailyLossCurrency = input.float(150.0, "Max Daily Loss ($)", minval=0.0, step=10.0, group=group_risk)
+maxDailyLossCurrency = input.float(0.0, "Max Daily Loss ($)", minval=0.0, step=10.0, group=group_risk, tooltip="0 = off (calibrated). With Risk % sizing one stop costs equity x risk %, so the old $150 locked the day after the first loss and halved the result.")
 maxDailyLosses = input.int(3, "Max Losing Trades Per Day", minval=1, group=group_risk)
 useMaxStopDistance = input.bool(false, "Block Entries If ATR Stop Is Too Wide", group=group_risk)
 maxStopDistancePoints = input.float(8.0, "Max Stop Distance In Price Points", minval=0.1, step=0.1, group=group_risk)
@@ -70,12 +119,12 @@ allowWeekendEntries = input.bool(true, "Allow Weekend Entries", group=group_poly
 group_pre = "Pre-Candle Early Confirmation"
 usePreCandleArm = input.bool(true, "Use Pre-Candle Arm", group=group_pre)
 preCandleEntryMode = input.string("Market Next Candle", "Pre-Candle Entry Mode", options=["Signal Only", "Market Next Candle", "Stop Next Candle"], group=group_pre)
-radarTimeframeMode = input.string("Auto", "Radar Timeframe", options=["Auto", "Chart", "1", "3", "5", "15", "30", "60", "120", "240"], group=group_pre)
+radarTimeframeMode = input.string("Chart", "Radar Timeframe", options=["Auto", "Chart", "1", "3", "5", "15", "30", "60", "120", "240"], group=group_pre)
 preMinScore = input.int(60, "Minimum Pre-Candle Score", minval=0, maxval=100, group=group_pre)
 preMinVolScore = input.float(35.0, "Minimum Radar Vol Score", minval=0.0, maxval=100.0, step=1.0, group=group_pre)
 preMinVolRise = input.float(0.0, "Minimum Radar Vol Rise", minval=0.0, step=0.5, group=group_pre)
-preCloseLocation = input.float(0.55, "Close Location Pressure", minval=0.50, maxval=0.95, step=0.05, group=group_pre)
-preUseTrend = input.bool(true, "Use Trend Direction", group=group_pre)
+preCloseLocation = input.float(0.75, "Close Location Pressure", minval=0.50, maxval=0.95, step=0.05, group=group_pre, tooltip="Calibrated: 0.75 (was 0.55).")
+preUseTrend = input.bool(false, "Use Trend Direction", group=group_pre, tooltip="Calibrated: off.")
 preUseEmaSlope = input.bool(false, "Use Radar EMA Slope", group=group_pre)
 preUseRvol = input.bool(false, "Use Radar Relative Volume", group=group_pre)
 preRvolLength = input.int(20, "Radar RVOL Length", minval=1, group=group_pre)
@@ -108,7 +157,7 @@ flat_session = input.session("0930-1545", "Must Be Flat Outside This NY Session"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(true, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
@@ -956,10 +1005,14 @@ f_round_down_to_step(_qty, _step) =>
     _step > 0 ? math.floor(_qty / _step) * _step : _qty
 
 f_get_qty(_stop_distance) =>
-    raw_qty = useDynamicRisk and _stop_distance > 0 ? (strategy.equity * (riskPercent / 100.0)) / (_stop_distance * pointValue) : tradeQty
-    stepped_qty = f_round_down_to_step(raw_qty, qtyStep)
-    capped_qty = math.min(maxQty, stepped_qty)
-    useDynamicRisk ? (capped_qty >= minQty ? capped_qty : 0.0) : math.max(minQty, capped_qty)
+    float q = fixedQty
+    if QtyMode == "Risk %"
+        stopCash = _stop_distance * pointValue
+        q := stopCash > 0 ? strategy.equity * riskPct / 100.0 / stopCash : 0.0
+    q := math.min(q, maxQty)
+    if capMargin and marginPct > 0
+        q := math.min(q, strategy.equity / (close * pointValue * marginPct / 100.0))
+    f_round_down_to_step(q + 1e-9 * qtyStep, qtyStep)
 
 //==============================================================================
 // Daily Risk Lock
@@ -996,8 +1049,18 @@ if (dailyLossHit or dailyLossCountHit) and not dailyLocked
 //==============================================================================
 // Trade Entry And Exit
 //==============================================================================
-stop_distance = atr_value * ATR_SL_MULTIPLIER
-profit_distance = atr_value * ATR_TP_MULTIPLIER
+// S2 exit geometry, in ticks for strategy.exit (loss / profit / trail are
+// measured from the fill price).
+exitTick = syminfo.mintick
+exitAtr = ta.atr(atrLen)
+slTicks = ExitMode == "Points" ? slPoints : nz(slAtrMult * exitAtr / exitTick)
+tpTicks = ExitMode == "Points" ? tpPoints : slTicks * tpR
+trActTicks = ExitMode == "Points" ? trailActPoints : nz(trailActAtr * exitAtr / exitTick)
+trDstTicks = math.max(ExitMode == "Points" ? trailPoints : nz(trailDstAtr * exitAtr / exitTick), 1.0)
+exitLoss = slTicks > 0 ? slTicks : na
+exitProfit = tpTicks > 0 ? tpTicks : na
+stop_distance = slTicks * exitTick
+profit_distance = tpTicks * exitTick
 entry_qty = f_get_qty(stop_distance)
 stop_distance_ok = not useMaxStopDistance or stop_distance <= maxStopDistancePoints
 
@@ -1034,10 +1097,10 @@ if preCanOrder and preLongEntryArm and can_enter and fgfBuyOk
     trainingPlannedOrderPrice := expected_entry
     trainingEntryNumber := strategy.closedtrades + 1
     trainingEntryReason := preCandleEntryMode == "Stop Next Candle" ? "pre_candle_stop" : "pre_candle_open"
-    if USE_TRAILING_STOP
-        strategy.exit("Exit Long", "Long", stop=stop_loss, limit=take_profit, trail_points=profit_distance * 0.9, trail_offset=stop_distance * 0.3, alert_message=f_alert_message("exit", "long", "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+    if useTrail
+        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "long", "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
     else
-        strategy.exit("Exit Long", "Long", stop=stop_loss, limit=take_profit, alert_message=f_alert_message("exit", "long", "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "long", "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
 
 if preCanOrder and preShortEntryArm and can_enter and not preOrderThisBar and fgfSellOk
     expected_entry = preCandleEntryMode == "Stop Next Candle" ? preShortStopPrice : close
@@ -1057,10 +1120,10 @@ if preCanOrder and preShortEntryArm and can_enter and not preOrderThisBar and fg
     trainingPlannedOrderPrice := expected_entry
     trainingEntryNumber := strategy.closedtrades + 1
     trainingEntryReason := preCandleEntryMode == "Stop Next Candle" ? "pre_candle_stop" : "pre_candle_open"
-    if USE_TRAILING_STOP
-        strategy.exit("Exit Short", "Short", stop=stop_loss, limit=take_profit, trail_points=profit_distance * 0.9, trail_offset=stop_distance * 0.3, alert_message=f_alert_message("exit", "short", "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+    if useTrail
+        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "short", "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
     else
-        strategy.exit("Exit Short", "Short", stop=stop_loss, limit=take_profit, alert_message=f_alert_message("exit", "short", "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "short", "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
 
 if preCandleEntryMode == "Stop Next Candle" and strategy.position_size == 0 and not na(lastPreStopOrderBar) and bar_index - lastPreStopOrderBar > preCancelAfterBars
     strategy.cancel("Long")
@@ -1078,10 +1141,10 @@ if longCondition and can_enter and not preOrderThisBar and fgfBuyOk
     trainingPlannedOrderPrice := close
     trainingEntryNumber := strategy.closedtrades + 1
     trainingEntryReason := "signal"
-    if USE_TRAILING_STOP
-        strategy.exit("Exit Long", "Long", stop=stop_loss, limit=take_profit, trail_points=profit_distance * 0.9, trail_offset=stop_distance * 0.3, alert_message=f_alert_message("exit", "long", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+    if useTrail
+        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "long", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
     else
-        strategy.exit("Exit Long", "Long", stop=stop_loss, limit=take_profit, alert_message=f_alert_message("exit", "long", "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "long", "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
 
 if shortCondition and can_enter and not preOrderThisBar and fgfSellOk
     stop_loss = close + stop_distance
@@ -1094,10 +1157,10 @@ if shortCondition and can_enter and not preOrderThisBar and fgfSellOk
     trainingPlannedOrderPrice := close
     trainingEntryNumber := strategy.closedtrades + 1
     trainingEntryReason := "signal"
-    if USE_TRAILING_STOP
-        strategy.exit("Exit Short", "Short", stop=stop_loss, limit=take_profit, trail_points=profit_distance * 0.9, trail_offset=stop_distance * 0.3, alert_message=f_alert_message("exit", "short", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+    if useTrail
+        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "short", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
     else
-        strategy.exit("Exit Short", "Short", stop=stop_loss, limit=take_profit, alert_message=f_alert_message("exit", "short", "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "short", "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
 
 // Track bars in trade. The CSV showed that trades held beyond one bar were net negative.
 var int entryBarIndex = na
@@ -1114,6 +1177,13 @@ if maxBarsExitHit
         strategy.close("Long", comment="Max Bars Exit", alert_message=f_alert_message("close", "long", "max_bars_exit", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
     if strategy.position_size < 0
         strategy.close("Short", comment="Max Bars Exit", alert_message=f_alert_message("close", "short", "max_bars_exit", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+
+timeStopHit = maxBarsHeld > 0 and strategy.position_size != 0 and not na(barsInTrade) and barsInTrade >= maxBarsHeld and not maxBarsExitHit
+if timeStopHit
+    if strategy.position_size > 0
+        strategy.close("Long", comment="Time stop", alert_message=f_alert_message("close", "long", "time_stop", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+    if strategy.position_size < 0
+        strategy.close("Short", comment="Time stop", alert_message=f_alert_message("close", "short", "time_stop", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
 
 if dailyLocked and strategy.position_size != 0
     if strategy.position_size > 0
