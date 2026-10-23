@@ -1,0 +1,106 @@
+//@version=5
+strategy("MTF Fractal Strategy", overlay=true, initial_capital=10000, commission_type=strategy.commission.percent, commission_value=0.05, slippage=2, process_orders_on_close=true)
+
+// ---------- Inputs ----------
+n          = input.int(2, "Fractal bars each side", minval=1)
+htf1       = input.timeframe("60",  "Higher TF 1")
+htf2       = input.timeframe("240", "Higher TF 2")
+useHtf2    = input.bool(true, "Require Higher TF 2 to agree")
+rr         = input.float(2.0, "Reward to risk (target)", minval=0.5, step=0.5)
+maxRiskPct = input.float(3.0, "Skip trade if stop is farther than %", minval=0.1, step=0.1)
+riskPct    = input.float(1.0, "Risk % of equity per trade", minval=0.05, step=0.05)
+maxPosPct  = input.float(100.0, "Max position size % of equity", minval=1, step=1)
+oneBreak   = input.bool(true, "Only one breakout per fractal level")
+allowLong  = input.bool(true, "Allow longs")
+allowShort = input.bool(true, "Allow shorts")
+
+// ---------- Timeframe guard ----------
+if barstate.isfirst
+    chartSec = timeframe.in_seconds()
+    if timeframe.in_seconds(htf1) <= chartSec or (useHtf2 and timeframe.in_seconds(htf2) <= chartSec)
+        runtime.error("Higher TF 1 and Higher TF 2 must be above the chart timeframe")
+
+// ---------- Fractal engine ----------
+f_fr() =>
+    ph = ta.pivothigh(high, n, n)
+    pl = ta.pivotlow(low, n, n)
+    var float upL = na
+    var float dnL = na
+    var int trend = 0
+    if not na(ph)
+        upL := ph
+    if not na(pl)
+        dnL := pl
+    if not na(upL) and close > upL
+        trend := 1
+    if not na(dnL) and close < dnL
+        trend := -1
+    [upL, dnL, trend]
+
+// Trend of the last *completed* higher-TF bar (non-repainting with lookahead_on)
+f_htfTrend() =>
+    [u, d, t] = f_fr()
+    t[1]
+
+[cUp, cDn, cTrend] = f_fr()
+h1Trend = request.security(syminfo.tickerid, htf1, f_htfTrend(), lookahead=barmerge.lookahead_on)
+h2Trend = request.security(syminfo.tickerid, htf2, f_htfTrend(), lookahead=barmerge.lookahead_on)
+
+htfBull = h1Trend == 1 and (not useHtf2 or h2Trend == 1)
+htfBear = h1Trend == -1 and (not useHtf2 or h2Trend == -1)
+
+// ---------- Entry signals ----------
+var float usedUp = na
+var float usedDn = na
+freshUp = not oneBreak or na(usedUp) or cUp != usedUp
+freshDn = not oneBreak or na(usedDn) or cDn != usedDn
+
+breakUp = not na(cUp) and ta.crossover(close, cUp) and freshUp
+breakDn = not na(cDn) and ta.crossunder(close, cDn) and freshDn
+
+longRisk  = close - cDn
+shortRisk = cUp - close
+
+longOk  = allowLong  and breakUp and htfBull and not na(cDn) and longRisk > 0 and longRisk / close * 100 <= maxRiskPct
+shortOk = allowShort and breakDn and htfBear and not na(cUp) and shortRisk > 0 and shortRisk / close * 100 <= maxRiskPct
+
+// A level counts as used once broken, whether or not a trade was taken
+if breakUp
+    usedUp := cUp
+if breakDn
+    usedDn := cDn
+
+// ---------- Position sizing (fixed % risk, capped by max position size) ----------
+f_qty(risk) =>
+    riskQty = strategy.equity * riskPct / 100 / (risk * syminfo.pointvalue)
+    capQty  = strategy.equity * maxPosPct / 100 / (close * syminfo.pointvalue)
+    math.min(riskQty, capQty)
+
+f_px(x) => str.tostring(x, format.mintick)
+
+// ---------- Orders ----------
+if longOk and strategy.position_size <= 0
+    longSl = cDn
+    longTp = close + longRisk * rr
+    strategy.entry("Long", strategy.long, qty=f_qty(longRisk), alert_message='{"action":"buy","ticker":"' + syminfo.tickerid + '","price":' + f_px(close) + ',"sl":' + f_px(longSl) + ',"tp":' + f_px(longTp) + '}')
+    strategy.exit("Long exit", "Long", stop=longSl, limit=longTp, alert_message='{"action":"close_long","ticker":"' + syminfo.tickerid + '"}')
+
+if shortOk and strategy.position_size >= 0
+    shortSl = cUp
+    shortTp = close - shortRisk * rr
+    strategy.entry("Short", strategy.short, qty=f_qty(shortRisk), alert_message='{"action":"sell","ticker":"' + syminfo.tickerid + '","price":' + f_px(close) + ',"sl":' + f_px(shortSl) + ',"tp":' + f_px(shortTp) + '}')
+    strategy.exit("Short exit", "Short", stop=shortSl, limit=shortTp, alert_message='{"action":"close_short","ticker":"' + syminfo.tickerid + '"}')
+
+// ---------- Visuals ----------
+plotshape(not na(ta.pivothigh(high, n, n)), "Up fractal", shape.triangledown, location.abovebar, color.red, offset=-n, size=size.tiny)
+plotshape(not na(ta.pivotlow(low, n, n)), "Down fractal", shape.triangleup, location.belowbar, color.green, offset=-n, size=size.tiny)
+plot(cUp, "Chart up level", color.new(color.red, 40), 1, plot.style_stepline)
+plot(cDn, "Chart down level", color.new(color.green, 40), 1, plot.style_stepline)
+plotshape(longOk, "Long signal", shape.labelup, location.belowbar, color.new(color.green, 0), size=size.tiny)
+plotshape(shortOk, "Short signal", shape.labeldown, location.abovebar, color.new(color.red, 0), size=size.tiny)
+bgcolor(htfBull ? color.new(color.green, 92) : htfBear ? color.new(color.red, 92) : na, title="Higher TF bias")
+
+// ---------- Alerts ----------
+// Create the alert on this strategy with "Order fills" and set the message to:
+//     {{strategy.order.alert_message}}
+// Each entry/exit then sends the JSON payload defined in alert_message above.
