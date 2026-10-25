@@ -1,0 +1,1378 @@
+//@version=6
+// ============================================================================
+// GVLiveV2 + FlashGold Direction Filter (FGF build)
+// ----------------------------------------------------------------------------
+// CALIBRATION (2026-10-18): OANDA:XAUUSD 60m (4,750 bars, 2025-12-23 to
+// 2026-10-14), 120m (2,420 bars, same span) and 240m (2,205 bars, 2025-05-13
+// to 2026-10-14). Python replica of this script's entries and exits, the
+// filter read from TradingView's own exported "FGF buy / sell allowed"
+// columns. Fills: stop first when a bar touches stop and target, market
+// entries at the next open, $0.30 spread per round trip. Results in R
+// (1 R = the stop distance, i.e. what Risk % sizing risks per trade).
+// About 2.8 million input combinations per timeframe.
+//  - XAUUSD-only calibration (2026-10-18): EMA 8 / 21, trend EMA 100, pre-candle
+//    Market Next Candle, radar = Chart, min vol score 35, vol rise 0, close
+//    location 0.75, trend direction off, ATR exits SL 1.0 x ATR(14), TP 5R, no
+//    trail, no bar exit, no $ daily lock, direction filter OFF.
+//      60m  +72.5R, 209 trades (~22 a month), PF 1.44, win 23%, halves +41.6 / +30.9, max DD 17R
+//      120m +42.2R,  91 trades, PF 1.60, halves +19.2 / +23.0, max DD 17R
+//      240m +45.9R,  97 trades, PF 1.62, halves +39.3 / +6.6,  max DD 15R
+//    The old defaults: 60m +1.4R, 120m +3.2R, 240m -4.1R.
+//  - BTCUSD check and TWO-MARKET DEFAULTS (2026-10-25): Bitfinex BTCUSD 1m,
+//    2018-2019 (public GitHub dataset; older regime, no filter columns), built
+//    into 1m / 5m / 60m / 120m / 240m; 0.02% fee per side + $0.20 spread. The
+//    XAUUSD settings, untouched, on BTC hourly: 60m +62R (609 trades, PF 1.12,
+//    DD 45R), 120m +35R, 240m +25R, every half positive; they rank in the top
+//    0.8% of 1.05M settings on BTC, and the 300 best XAUUSD settings average
+//    +157R on BTC (91% positive) against -132R for random settings. 2,543
+//    settings are positive in all 12 half-periods of both markets. The CURRENT
+//    DEFAULTS are the best of those that keep TP 5R / no trail: as above but
+//    vol rise 1.0, close location 0.65, trend direction ON.
+//      XAUUSD: 60m +43.8R (163 trades, PF 1.33, DD 33R), 120m +36.8R (PF 1.57), 240m +48.3R (PF 1.79, DD 9R)
+//      BTCUSD: 60m +174.9R (561 trades, PF 1.38, DD 25R), 120m +124.7R (PF 1.57), 240m +36.7R (PF 1.34)
+//    Six-timeframe total +465R against +283R for the XAUUSD-only settings;
+//    gold alone gives up ~20% for a BTC result ~2.7x better and a BTC 60m
+//    drawdown of 25R instead of 45R. For a gold-only chart set vol rise 0,
+//    close location 0.75, trend direction off.
+//  - 5-MINUTE and 1-MINUTE CHARTS (BTC 2018-2019): with the hourly settings both
+//    lose heavily (5m -368R, 1m -2,853R): fee + spread is 12-200% of a 1-ATR
+//    stop. A separate 5m profile is viable ONLY at low fees: EMA 5 / 13, trend
+//    100, pre-candle STOP Next Candle, min vol 35, vol rise 0, close location
+//    0.75, trend direction off, SL 2.0 ATR, TP 5R, no trail, no bar exit:
+//    +510R over 2,255 trades (3 a day, PF 1.25, halves +218 / +291, DD 69R) at
+//    0.02%/side; +225R at 0.035%; -58R at 0.05%; -987R at 0.1%. Neighbouring
+//    settings (EMA 8/21, trend 50-200, min vol 40) give +390 to +505R, so it is
+//    a plateau, not a lucky point; only 10% of all 5m settings are positive
+//    in both halves. 1m: best +351R (SL 5 ATR, EMA 8/21, min vol 30, close
+//    location 0.55) at 0.02%/side, -141R at 0.05%; only 1.2% of settings
+//    positive in both halves: not recommended. Polymarket proxy for the 5m
+//    profile: direction right from fill to the window close 68% of the time
+//    (a stop entry on a breakout of the prior bar; the market's odds will
+//    already have moved by then, so this is not a 68% win rate on the token).
+//  - ALL-TIMEFRAME SWEEP ON VANTAGE GOLD (2026-10-25): VANTAGE:XAUUSD exports
+//    10m (6.8 months), 15m (10.7), 30m / 60m / 120m / 240m (21.6; the hourly
+//    bars built from the 30m export), 45m (33.7); $0.30 spread; no filter
+//    columns, so the direction filter is off. Full grid (1.2M settings) per
+//    timeframe. The current (hourly) defaults on VANTAGE gold:
+//      10m -33.6R, 15m +19.2R, 30m -11.8R, 45m +109.7R, 60m +76.9R, 120m +45.6R, 240m +37.4R
+//    (45m and up positive in both halves; 10m-30m not). Hold-out per
+//    timeframe (pick the 50 best on the first half, score the second half):
+//    10m +1.3R, 15m +19.7R, 30m +27.7R, 45m +35.6R, 60m +5.6R, 120m +0.2R,
+//    240m +2.3R against -5 to -35R for random settings: the strategy has an
+//    edge on every gold timeframe from 15m up, but the settings that win the
+//    first half only reliably win the second half on 30m-45m. 758 of 1.2M
+//    settings are positive in all 14 halves of the 7 timeframes.
+//    ALL-TIMEFRAME PROFILE (NOT the default; the best of those 758 by its
+//    worst half): EMA 5 / 13, trend EMA 200, pre-candle STOP Next Candle,
+//    radar Chart, min vol score 0, vol rise 1.0, close location 0.65, trend
+//    direction on, SL 1.5 x ATR(14), TP 5R, no trail, no bar exit, no $ lock.
+//      VANTAGE gold (used to pick it): 10m +33.6R (443 trades, PF 1.09, DD 36R), 15m +27.2R (PF 1.06), 30m +99.2R (PF 1.20), 45m +130.4R (PF 1.27), 60m +79.8R (PF 1.34), 120m +48.1R (PF 1.35), 240m +39.6R (PF 1.88); every half positive
+//      OANDA gold (not used to pick it): 60m +9.3R, 120m +8.0R, 240m +35.6R (PF 2.03)
+//      BTCUSD 2018-2019 (not used to pick it): 1m -1,209R, 5m +301R (2,815 trades, PF 1.11, DD 101R), 15m +88.5R, 30m +57.4R, 60m +56.8R, 120m +63.6R, 240m +29.5R
+//    Positive on 16 of 17 datasets (both halves on 13), but on the hourly
+//    charts the defaults earn 2-5x more on OANDA gold and on BTC, and its
+//    BTC 5m / 15m result needs a fee of 0.02% per side or less: at 0.035%
+//    5m is -308R and 15m -55R; at 0.05% -932R / -199R (30m: +11R / -36R).
+//    Use: keep the defaults on 60m-240m charts; switch to this profile on a
+//    gold chart under 60m (10m-45m); on BTC under 30m only with maker fees.
+//  - Out of sample: settings picked on 60m + 120m only, then run on the
+//    240m bars from May to Dec 2025 that those charts do not cover: the 300
+//    best averaged +15.7R (83% positive); 300 random settings -4.1R (24%).
+//  - Direction filter: it makes the AVERAGE setting lose less, but with the
+//    calibrated settings it halves the trades and the profit (60m +13.7R,
+//    120m +11.6R, 240m +21.6R with half the drawdown, 7R). Off by default;
+//    on 240m it is a fair choice if a smaller drawdown matters more.
+//  - The old trailing stop passed price distances to trail_points /
+//    trail_offset, which are in ticks: on XAUUSD a "$20" trail was $0.02,
+//    so TradingView booked exits at the bar extreme. S2 now converts to ticks.
+//  - Win rate is low (~23%) by design (5R target): expect runs of 10+
+//    losers; a 1% risk saw drawdowns of 15-17%. Consider 0.5%.
+//  - CYCLE GATE (2026-10-25): tested and NOT added. Four causal dominant-cycle
+//    estimators (Ehlers homodyne, autocorrelation periodogram, DFT bank,
+//    adaptive band-pass; all pass synthetic tests) drove 1,485 gate settings
+//    each (resonance threshold, phase window, 2x-timeframe sync, 3 period
+//    bands) on top of these defaults. On the BEST settings 0 of 297 gate
+//    settings per estimator improved every half of every timeframe; the best
+//    totals (+3 to +14R) were below what 20 RANDOM gates reached on the same
+//    grid (median +24R, max +50R), and out of sample every estimator roughly
+//    halved the ungated +12 to +15R. On real XAUUSD the measured phase is
+//    near-random relative to the actual swings (resultant 0.04-0.23 vs 0.99
+//    on a clean sine), so there is no cycle structure here to gate on.
+//  - Not calibrated: recent BTCUSDT (the BTC data ends 2019-12-31; only 1 day
+//    of 30s and 3 hours of 15s 2026 data, a handful of trades), Polymarket
+//    settlement odds, the Max Quantity / margin caps (results are per R), the
+//    radar on a lower timeframe, the direction filter on BTC. Re-check with
+//    Bar Magnifier and on new data before trading live.
+// ============================================================================
+strategy("GVLiveV2 | Crypto Polymarket Any-Chart Pre-Candle", shorttitle="GVLiveV2 Poly PreArm", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
+
+//==============================================================================
+// Volatility Filter (DEVMA)
+//==============================================================================
+group_devma = "Volatility Filter (DEVMA)"
+devLen = input.int(30, "Deviation Lookback", minval=10, group=group_devma)
+fastVoVixLen = input.int(10, "Fast VoVix Length", minval=5, group=group_devma)
+slowVoVixLen = input.int(30, "Slow VoVix Length", minval=15, group=group_devma)
+
+//==============================================================================
+// Directional Trend Logic
+//==============================================================================
+group_trend = "Directional Trend"
+fastEmaLen = input.int(8, "Fast EMA", group=group_trend, tooltip="Calibrated: 8 (was 5).")
+slowEmaLen = input.int(21, "Slow EMA", group=group_trend, tooltip="Calibrated: 21 (was 13).")
+trendFilterLen = input.int(100, "Trend Filter EMA", group=group_trend)
+
+//==============================================================================
+// Momentum Filter
+//==============================================================================
+group_mom = "Momentum Filter"
+useRsiFilter = input.bool(true, "Use RSI Filter", group=group_mom)
+rsiLen = input.int(14, "RSI Length", group=group_mom)
+rsiOverbought = input.int(70, "RSI Overbought", group=group_mom)
+rsiOversold = input.int(30, "RSI Oversold", group=group_mom)
+
+//==============================================================================
+// Execution, Sizing, And Paper Bridge Settings
+//==============================================================================
+group_execution = "Execution And Sizing"
+brokerPreset = input.string("Manual / custom", "Point-Value Preset", options=["Manual / custom", "Crypto 1 USD per qty"], group=group_execution, tooltip="Dollar value of a 1.00 price move for one quantity unit.")
+manualPointValue = input.float(1.0, "Manual Point Value", minval=0.01, step=0.01, group=group_execution)
+
+gS2 = "S2. Exits"
+ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="Points: fixed distances in points (mintick units: XAUUSD 0.001, so 1000 pts = $1; BTCUSDT 0.01, so 100 pts = $1). ATR: distances scale with volatility, ATR(length) at the signal bar. Distances are measured from the fill price.")
+slPoints       = input.float(16500, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no stop loss (not recommended). 16500 = 1 x the median ATR(14) of XAUUSD 60m in the calibration ($16.5).")
+tpPoints       = input.float(82500, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no target. 82500 = 5 x the stop.")
+atrLen         = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
+slAtrMult      = input.float(1.0, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Calibrated: 1.0. 1.5 is also positive everywhere; 0.5 is not.")
+tpR            = input.float(5.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Target = this many times the stop distance. 0 = no target. Calibrated: 5 (3 is about half as good, 2 a quarter).")
+useTrail       = input.bool(false, "Trailing stop", group=gS2, tooltip="Calibrated: off. A wide trail (6 / 1 ATR) changes almost nothing; tighter trails cut the result.")
+trailActPoints = input.float(99000, "Trail activation, pts of profit (Points mode)", minval=0.0, step=1.0, group=gS2)
+trailPoints    = input.float(16500, "Trail distance, pts (Points mode)", minval=1.0, step=1.0, group=gS2)
+trailActAtr    = input.float(6.0, "Trail activation, ATR mult (ATR mode)", minval=0.0, step=0.05, group=gS2)
+trailDstAtr    = input.float(1.0, "Trail distance, ATR mult (ATR mode)", minval=0.005, step=0.005, group=gS2)
+maxBarsHeld    = input.int(0, "Time stop, bars (0 = off)", minval=0, group=gS2, tooltip="Closes the position at market once it has been open this many bars. Works alongside Paper Safety Layer -> Max Signal Bars In Trade; the shorter one wins.")
+
+gS3 = "S3. Sizing"
+QtyMode    = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3)
+fixedQty   = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3)
+riskPct    = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Quantity = equity x risk% / (stop distance x point value). Needs a stop loss > 0.")
+maxQty     = input.float(50, "Max quantity", minval=0.0, group=gS3)
+qtyStep    = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
+capMargin  = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
+marginPct  = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.0, step=0.5, group=gS3)
+riskPercent = riskPct
+
+group_risk = "Paper Safety Layer"
+useMaxBarsExit = input.bool(false, "Close If Still Open After N Bars", group=group_risk, tooltip="Calibrated: off. Closing after 1-4 bars cut the result to about a fifth on every timeframe; the S2 stop / target do the exiting. Turn on only for Polymarket reset use.")
+maxBarsInTrade = input.int(1, "Max Signal Bars In Trade", minval=1, group=group_risk, tooltip="This only resets the TradingView strategy position so another later window can signal. Polymarket paper exits are handled by market settlement.")
+useDailyLossLock = input.bool(true, "Use Daily Loss Lock", group=group_risk)
+maxDailyLossCurrency = input.float(0.0, "Max Daily Loss ($)", minval=0.0, step=10.0, group=group_risk, tooltip="0 = off (calibrated). With Risk % sizing one stop costs equity x risk %, so the old $150 locked the day after the first loss and halved the result.")
+maxDailyLosses = input.int(3, "Max Losing Trades Per Day", minval=1, group=group_risk)
+useMaxStopDistance = input.bool(false, "Block Entries If ATR Stop Is Too Wide", group=group_risk)
+maxStopDistancePoints = input.float(8.0, "Max Stop Distance In Price Points", minval=0.1, step=0.1, group=group_risk)
+maxLiveSpreadPoints = input.float(0.50, "Max Live Spread Points For Bridge", minval=0.0, step=0.01, group=group_risk, tooltip="Included in JSON alerts for bridges that reject bad-spread orders.")
+
+group_poly = "Polymarket Paper Router"
+routerStrategyName = input.string("GVLiveV2_POLY_4H_FIRST_WINDOW", "Alert Strategy Name", group=group_poly)
+seriesSlug = input.string("btc-up-or-down-5m", "Polymarket Series", options=["btc-up-or-down-5m", "doge-up-or-down-5m"], group=group_poly)
+routerTimeframe = input.string("5", "Router Market Timeframe", group=group_poly, tooltip="Keep this at 5. The local paper router maps signals into 5-minute Polymarket Up/Down markets.")
+requiredSignalTimeframe = input.string("240", "Required Signal Chart Timeframe", group=group_poly, tooltip="Only used when Allow Any Chart Timeframe is OFF. Keep 240 for the original 4H-only validation mode.")
+allowAnyChartTimeframe = input.bool(true, "Allow Any Chart Timeframe", group=group_poly, tooltip="ON: run the strategy on any chart timeframe. OFF: only trade when the chart timeframe equals Required Signal Chart Timeframe.")
+maxSignalSecondsAfterWindowStart = input.int(90, "Max Seconds After 5M Window Start", minval=0, maxval=299, group=group_poly)
+oneSignalPerPolyWindow = input.bool(true, "Only One Signal Per 5M Window", group=group_poly)
+paperStakeUsd = input.float(5.0, "Paper Stake USD", minval=0.01, step=0.01, group=group_poly)
+sendEntryAlertsToWebhook = input.bool(true, "Send Entry Alerts To Webhook", group=group_poly)
+sendExitAlertsToWebhook = input.bool(false, "Send Exit/Close Alerts To Webhook", group=group_poly, tooltip="Leave off for Polymarket settle mode. The router waits for the market result instead of using strategy exits.")
+allowWeekendEntries = input.bool(true, "Allow Weekend Entries", group=group_poly, tooltip="This seconds-test variant defaults to 24/7 paper testing. Turn off to match the weekday-filtered validation exports.")
+
+group_pre = "Pre-Candle Early Confirmation"
+usePreCandleArm = input.bool(true, "Use Pre-Candle Arm", group=group_pre)
+preCandleEntryMode = input.string("Market Next Candle", "Pre-Candle Entry Mode", options=["Signal Only", "Market Next Candle", "Stop Next Candle"], group=group_pre)
+radarTimeframeMode = input.string("Chart", "Radar Timeframe", options=["Auto", "Chart", "1", "3", "5", "15", "30", "60", "120", "240"], group=group_pre)
+preMinScore = input.int(60, "Minimum Pre-Candle Score", minval=0, maxval=100, group=group_pre)
+preMinVolScore = input.float(35.0, "Minimum Radar Vol Score", minval=0.0, maxval=100.0, step=1.0, group=group_pre)
+preMinVolRise = input.float(1.0, "Minimum Radar Vol Rise", minval=0.0, step=0.5, group=group_pre, tooltip="Calibrated on XAUUSD + BTCUSD: 1.0 (was 0).")
+preCloseLocation = input.float(0.65, "Close Location Pressure", minval=0.50, maxval=0.95, step=0.05, group=group_pre, tooltip="Calibrated on XAUUSD + BTCUSD: 0.65 (XAUUSD alone preferred 0.75; the original was 0.55).")
+preUseTrend = input.bool(true, "Use Trend Direction", group=group_pre, tooltip="Calibrated on XAUUSD + BTCUSD: on (XAUUSD alone preferred off).")
+preUseEmaSlope = input.bool(false, "Use Radar EMA Slope", group=group_pre)
+preUseRvol = input.bool(false, "Use Radar Relative Volume", group=group_pre)
+preRvolLength = input.int(20, "Radar RVOL Length", minval=1, group=group_pre)
+preMinRvol = input.float(1.10, "Minimum Radar RVOL", minval=0.0, step=0.05, group=group_pre)
+preUseBodyAtr = input.bool(false, "Use Radar Body/ATR Impulse", group=group_pre)
+preMinBodyAtr = input.float(0.20, "Minimum Radar Body/ATR", minval=0.0, step=0.05, group=group_pre)
+preUseMicroBreak = input.bool(false, "Use Radar Micro-Breakout", group=group_pre)
+preBreakoutLookback = input.int(2, "Radar Breakout Lookback", minval=1, maxval=20, group=group_pre)
+preStopAtrBuffer = input.float(0.03, "Stop Next Candle ATR Buffer", minval=0.0, step=0.01, group=group_pre)
+preCancelAfterBars = input.int(2, "Cancel Unfilled Pre-Stop After Bars", minval=1, maxval=10, group=group_pre)
+showPreDebug = input.bool(true, "Show Pre-Candle Debug", group=group_pre)
+
+group_data = "Training Data Capture"
+collectTrainingData = input.bool(true, "Collect Entry Training Data", group=group_data)
+includeTrainingDataInAlerts = input.bool(true, "Include Training Data In Entry Alerts", group=group_data)
+plotTrainingData = input.bool(true, "Plot Export Fields In Data Window", group=group_data, tooltip="Use TradingView Export chart data, then filter rows where TD Entry Direction is 1 or -1.")
+showTrainingLabels = input.bool(false, "Show Training Labels On Entry Bars", group=group_data)
+trainingLabelHistory = input.int(60, "Training Label History", minval=1, maxval=300, group=group_data)
+
+group_session = "New York Session"
+useSessionFilter = input.bool(false, "Use NY Session Filter", group=group_session, tooltip="This seconds-test variant defaults to 24/7 paper testing. Turn on to match the session-filtered validation exports.")
+tradePreset = input.string("Balanced", "Trade Preset", options=["Aggressive", "Balanced", "Conservative AM", "Custom"], group=group_session, tooltip="Balanced blocks the weak entry bars found in GVLive. Conservative AM trades the clean morning window only. Aggressive uses the full safe window.")
+entry_session = input.session("0945-1530", "Custom/Aggressive Entry Session", group=group_session, tooltip="Used by Aggressive, Balanced, and Custom presets.")
+morning_entry_session = input.session("0945-1115", "Conservative AM Entry Session", group=group_session)
+flat_session = input.session("0930-1545", "Must Be Flat Outside This NY Session", group=group_session)
+
+// ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
+// Set true when this block lives in a script that runs in its own pane
+// (overlay=false) so the visuals are drawn on the price chart.
+FGF_FORCE_OVERLAY = false
+
+GRP_FGF = "Direction filter"
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: buys and sells are always allowed. On: each FlashGold signal sets the level: BUY ZONE above it (+ the no-trade band), SELL ZONE below it (- the band), NO TRADE inside the band. Nothing is allowed before the first signal.")
+fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
+fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
+fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
+fgfMinutes   = input.int(60, "Minutes", minval=1, group=GRP_FGF)
+fgfBars      = input.int(1, "Candles", minval=1, group=GRP_FGF)
+fgfCheck     = input.string("Tick", "Check price on", options=["Tick", "Candle open", "Candle close"], group=GRP_FGF, tooltip="When price is compared to the level. Tick: the live price, on every tick (closed candles keep their close). Candle open: each candle's open, decided on its first tick and fixed for the whole candle. Candle close: each candle's close, decided when it closes; while a candle is forming it is judged at its open with the last closed candle's close.")
+fgfBandAtr   = input.float(0.25, "No-trade band, ATR mult", minval=0.0, step=0.05, group=GRP_FGF, tooltip="NO TRADE zone around the level: +- this many ATR(14) of the filter timeframe at the signal candle. Inside it price has not chosen a side, so neither buys nor sells are allowed. 0 = no band: above the level BUY ZONE, below it SELL ZONE.")
+fgfAgainst   = input.bool(true, "Allow trading against the signal", group=GRP_FGF, tooltip="On: below a BUY signal's level the SELL ZONE allows sells (and above a SELL signal's level the BUY ZONE allows buys). Off: those zones are NO TRADE; only the signal's own direction is allowed, and only once price confirms it.")
+fgfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_FGF)
+fgfAllowSell = input.bool(true, "Allow sells", inline="side", group=GRP_FGF, tooltip="Turn one side off completely.")
+fgfShowBg    = input.bool(true, "Shade", inline="vis", group=GRP_FGF)
+fgfShowLv    = input.bool(true, "Level line", inline="vis", group=GRP_FGF)
+fgfSigMark   = input.bool(true, "Signal marks", inline="vis", group=GRP_FGF, tooltip="Shade: green = BUY ZONE (buys allowed), red = SELL ZONE (sells allowed), gray = NO TRADE (inside the band, against the signal when that is off, or that side turned off). Level line: the signal's level, dashed lines: the band edges, names of the zones at the last candle. Signal marks: a triangle where a signal becomes known.")
+fgfShowTbl   = input.bool(true, "Status box", inline="tbl", group=GRP_FGF)
+fgfTblPos    = input.string("top_right", "", options=["top_right","middle_right","bottom_right","top_left","middle_left","bottom_left","top_center","bottom_center"], inline="tbl", group=GRP_FGF)
+
+GRP_FGS = "Direction score"
+fgsShow = input.bool(false, "Show the direction score", group=GRP_FGS, tooltip="In the status box: how often each of three readings of the signals (level side, signal direction, signal reversed) was right on the filter timeframe's candles, 1 and H candles later, buys and sells averaged (50% = a coin flip). Information only: the zones never use it.")
+fgsWin  = input.int(500, "Window, filter candles (0 = all history)", minval=0, maxval=500, group=GRP_FGS)
+fgsH    = input.int(10, "Longer horizon H, filter candles", minval=2, maxval=100, group=GRP_FGS)
+
+// ---- FlashGold signal inputs (the strategy's, same defaults) ----------------
+GRP_FGC = "FlashGold signal: core"
+fgfSpreadPts    = input.float(25.0, "Spread pts", minval=0.0, step=0.1, group=GRP_FGC, tooltip="Full spread in points (mintick units). Half of it offsets bid and ask.")
+fgfEntryDistPts = input.float(50.0, "Entry distance pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGC)
+fgfHoldBars     = input.int(0, "Entry hold bars", minval=0, group=GRP_FGC)
+fgfHoldFavPts   = input.float(5.0, "Hold min favorable pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGC)
+fgfOnePerBar    = input.bool(true, "One signal per bar", group=GRP_FGC)
+
+GRP_FGB = "FlashGold signal: burst / direction"
+fgfDistUnit     = input.string("ATR", "Burst / entry distance / hold unit", options=["ATR", "Points"], group=GRP_FGB, tooltip="ATR: the three thresholds below are multiples of ATR(14) of the filter timeframe. Points: the point inputs in the core group are used.")
+fgfBurstAtr     = input.float(0.5, "Burst threshold, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfEntryDistAtr = input.float(0.25, "Entry distance, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfHoldFavAtr   = input.float(0.1, "Hold min favorable, ATR mult (ATR unit)", minval=0.0, step=0.05, group=GRP_FGB)
+fgfBurstPts     = input.float(172.0, "Burst threshold pts (Points unit)", minval=0.0, step=0.1, group=GRP_FGB)
+fgfUseBurst     = input.bool(true, "Require burst gate", group=GRP_FGB)
+fgfAnyCombo     = input.bool(false, "Allow any combo", group=GRP_FGB, tooltip="If on, TDI parent/zone can approve direction even when burst is weaker.")
+fgfDriftBars    = input.int(60, "Prior drift bars", minval=1, group=GRP_FGB)
+fgfUseDrift     = input.bool(false, "Use prior drift filter", group=GRP_FGB)
+
+GRP_FGZ = "FlashGold signal: TDI trade zone"
+fgfUseZones   = input.bool(true, "Use TDI trade-zone filter", group=GRP_FGZ)
+fgfParentTf   = input.timeframe("60", "Parent obedience timeframe", group=GRP_FGZ, tooltip="Calibrated with the parent = the timeframe the signal runs on. Keep it equal to Filter timeframe: a parent above it reads its forming bar live, so it repaints.")
+fgfRsiLen     = input.int(14, "TDI RSI length", minval=2, group=GRP_FGZ)
+fgfFastLen    = input.int(2, "TDI white fast length", minval=1, group=GRP_FGZ)
+fgfMinAligned = input.int(2, "Minimum child zones aligned", minval=0, maxval=6, group=GRP_FGZ)
+fgfFlatParent = input.bool(false, "Allow trade if parent is flat", group=GRP_FGZ)
+fgfIgnoreNa   = input.bool(true, "Ignore zones without data", group=GRP_FGZ, tooltip="A child zone whose timeframe has no data on this candle is dropped from the active count instead of counting as MIX.")
+fgfHtfClosed  = input.bool(true, "Higher-TF zones use the last CLOSED bar", group=GRP_FGZ, tooltip="A child zone on a timeframe HIGHER than the filter timeframe is read from its last closed bar, so history and live agree. Off: such a zone reads its forming bar live, so it repaints.")
+fgfUseZ1 = input.bool(true, "Use child zone 1", group=GRP_FGZ)
+fgfZTf1  = input.timeframe("60", "Zone 1 timeframe", group=GRP_FGZ)
+fgfUseZ2 = input.bool(true, "Use child zone 2", group=GRP_FGZ)
+fgfZTf2  = input.timeframe("120", "Zone 2 timeframe", group=GRP_FGZ)
+fgfUseZ3 = input.bool(true, "Use child zone 3", group=GRP_FGZ)
+fgfZTf3  = input.timeframe("240", "Zone 3 timeframe", group=GRP_FGZ)
+fgfUseZ4 = input.bool(false, "Use child zone 4", group=GRP_FGZ)
+fgfZTf4  = input.timeframe("480", "Zone 4 timeframe", group=GRP_FGZ)
+fgfUseZ5 = input.bool(false, "Use child zone 5", group=GRP_FGZ)
+fgfZTf5  = input.timeframe("1", "Zone 5 timeframe", group=GRP_FGZ)
+fgfUseZ6 = input.bool(false, "Use child zone 6", group=GRP_FGZ)
+fgfZTf6  = input.timeframe("2", "Zone 6 timeframe", group=GRP_FGZ)
+
+// The timeframe the signal runs on ("Chart" = the chart's own).
+string fgfTfEff = fgfTf == "" ? timeframe.period : fgfTf
+int    fgfTfSec = timeframe.in_seconds(fgfTfEff)
+
+// ===== FLASHGOLD SIGNAL =======================================================
+// The strategy's signal logic, unchanged. It runs on the filter timeframe
+// (ctxSec = its seconds, used where the strategy compared to the chart).
+
+// TDI direction: fast line (SMA of RSI) rising = 1, falling = -1, flat = 0.
+fgfTdiDir() =>
+    float r = ta.rsi(close, fgfRsiLen)
+    float f = ta.sma(r, fgfFastLen)
+    f > f[1] ? 1 : f < f[1] ? -1 : 0
+
+fgfTdiDirPrev() =>
+    int d = fgfTdiDir()
+    d[1]
+
+// Direction of a child zone. A zone on a timeframe HIGHER than the one the
+// signal runs on is read from its last closed bar (fgfHtfClosed).
+fgfZoneDir(string tf, int ctxSec) =>
+    int dNow  = request.security(syminfo.tickerid, tf, fgfTdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    int dPrev = request.security(syminfo.tickerid, tf, fgfTdiDirPrev(), barmerge.gaps_off, barmerge.lookahead_on)
+    fgfHtfClosed and timeframe.in_seconds(tf) > ctxSec ? dPrev : dNow
+
+fgfZoneOn(bool use, int dir) =>
+    use and (not fgfIgnoreNa or not na(dir))
+
+fgfAlign(int dir, bool on, int side) =>
+    on and side != 0 and dir == side ? 1 : 0
+
+// Returns [buy signal, sell signal, signal (entry) price, parent side,
+// aligned zones, active zones].
+fgfSignal(int ctxSec) =>
+    // price model
+    float pt         = syminfo.mintick
+    float halfSpread = fgfSpreadPts * pt * 0.5
+    float bidPx      = close - halfSpread
+    float askPx      = close + halfSpread
+    float midPrice   = (bidPx + askPx) * 0.5
+
+    // TDI trade zone
+    int parentDir = request.security(syminfo.tickerid, fgfParentTf, fgfTdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    int z1Dir = fgfZoneDir(fgfZTf1, ctxSec)
+    int z2Dir = fgfZoneDir(fgfZTf2, ctxSec)
+    int z3Dir = fgfZoneDir(fgfZTf3, ctxSec)
+    int z4Dir = fgfZoneDir(fgfZTf4, ctxSec)
+    int z5Dir = fgfZoneDir(fgfZTf5, ctxSec)
+    int z6Dir = fgfZoneDir(fgfZTf6, ctxSec)
+
+    bool on1 = fgfZoneOn(fgfUseZ1, z1Dir)
+    bool on2 = fgfZoneOn(fgfUseZ2, z2Dir)
+    bool on3 = fgfZoneOn(fgfUseZ3, z3Dir)
+    bool on4 = fgfZoneOn(fgfUseZ4, z4Dir)
+    bool on5 = fgfZoneOn(fgfUseZ5, z5Dir)
+    bool on6 = fgfZoneOn(fgfUseZ6, z6Dir)
+
+    int activeZones  = (on1 ? 1 : 0) + (on2 ? 1 : 0) + (on3 ? 1 : 0) + (on4 ? 1 : 0) + (on5 ? 1 : 0) + (on6 ? 1 : 0)
+    int parentSide   = parentDir > 0 ? 1 : parentDir < 0 ? -1 : 0
+    int alignedZones = fgfAlign(z1Dir, on1, parentSide) + fgfAlign(z2Dir, on2, parentSide) + fgfAlign(z3Dir, on3, parentSide) + fgfAlign(z4Dir, on4, parentSide) + fgfAlign(z5Dir, on5, parentSide) + fgfAlign(z6Dir, on6, parentSide)
+
+    int  requiredAligned   = math.min(fgfMinAligned, activeZones)
+    bool parentFlatAllowed = fgfFlatParent and parentSide == 0
+    bool zoneReady         = activeZones == 0 or alignedZones >= requiredAligned
+
+    bool tradeZoneBuyAllowed  = not fgfUseZones or ((parentSide == 1 or parentFlatAllowed) and zoneReady)
+    bool tradeZoneSellAllowed = not fgfUseZones or ((parentSide == -1 or parentFlatAllowed) and zoneReady)
+
+    // burst / prior drift
+    float atrPts       = ta.atr(14) / pt
+    float burstThrPts  = fgfDistUnit == "ATR" ? fgfBurstAtr * atrPts : fgfBurstPts
+    float entryDistPts = fgfDistUnit == "ATR" ? fgfEntryDistAtr * atrPts : fgfEntryDistPts
+    float holdFavPts   = fgfDistUnit == "ATR" ? fgfHoldFavAtr * atrPts : fgfHoldFavPts
+
+    float burstPts      = (midPrice - midPrice[1]) / pt
+    float priorDriftPts = (midPrice - midPrice[fgfDriftBars]) / pt
+
+    bool burstBuy  = burstPts >= burstThrPts
+    bool burstSell = burstPts <= -burstThrPts
+
+    bool priorBuyOk  = not fgfUseDrift or priorDriftPts > 0
+    bool priorSellOk = not fgfUseDrift or priorDriftPts < 0
+
+    bool rawBuyCandidate  = fgfAnyCombo ? (tradeZoneBuyAllowed and (not fgfUseBurst or burstBuy or parentSide == 1)) : (tradeZoneBuyAllowed and burstBuy)
+    bool rawSellCandidate = fgfAnyCombo ? (tradeZoneSellAllowed and (not fgfUseBurst or burstSell or parentSide == -1)) : (tradeZoneSellAllowed and burstSell)
+
+    bool buyCandidate  = rawBuyCandidate and priorBuyOk
+    bool sellCandidate = rawSellCandidate and priorSellOk
+
+    // entry hold / virtual stop
+    var bool  holdActive    = false
+    var bool  holdIsBuy     = false
+    var int   holdSignalBar = na
+    var float holdSignalMid = na
+    var int   lastEntryBar  = na
+
+    float buyEntryPrice  = na
+    float sellEntryPrice = na
+    bool  buySignal      = false
+    bool  sellSignal     = false
+
+    bool canFire = not fgfOnePerBar or na(lastEntryBar) or lastEntryBar != bar_index
+
+    if buyCandidate and canFire
+        if fgfHoldBars == 0
+            buyEntryPrice := askPx + entryDistPts * pt
+            buySignal     := true
+            lastEntryBar  := bar_index
+        else if not holdActive
+            holdActive    := true
+            holdIsBuy     := true
+            holdSignalBar := bar_index
+            holdSignalMid := midPrice
+        else if holdIsBuy
+            int   elapsedBars    = bar_index - holdSignalBar
+            float holdMovePoints = (midPrice - holdSignalMid) / pt
+            if elapsedBars >= fgfHoldBars and holdMovePoints >= holdFavPts
+                buyEntryPrice := askPx + entryDistPts * pt
+                buySignal     := true
+                lastEntryBar  := bar_index
+                holdActive    := false
+
+    if sellCandidate and canFire
+        if fgfHoldBars == 0
+            sellEntryPrice := bidPx - entryDistPts * pt
+            sellSignal     := true
+            lastEntryBar   := bar_index
+        else if not holdActive
+            holdActive    := true
+            holdIsBuy     := false
+            holdSignalBar := bar_index
+            holdSignalMid := midPrice
+        else if not holdIsBuy
+            int   elapsedBars    = bar_index - holdSignalBar
+            float holdMovePoints = (holdSignalMid - midPrice) / pt
+            if elapsedBars >= fgfHoldBars and holdMovePoints >= holdFavPts
+                sellEntryPrice := bidPx - entryDistPts * pt
+                sellSignal     := true
+                lastEntryBar   := bar_index
+                holdActive     := false
+
+    if holdActive and ((holdIsBuy and not tradeZoneBuyAllowed) or (not holdIsBuy and not tradeZoneSellAllowed))
+        holdActive    := false
+        holdSignalBar := na
+        holdSignalMid := na
+
+    float signalPx = buySignal ? buyEntryPrice : sellSignal ? sellEntryPrice : na
+    [buySignal, sellSignal, signalPx, parentSide, alignedZones, activeZones]
+// ===== END FLASHGOLD SIGNAL ===================================================
+
+// Arming, on the filter timeframe: a signal candle sets the level at its
+// close. Committed state only (var), so backtests and live agree. aId counts
+// the signals.
+fgfArm(bool sBuy, bool sSell, float sPx, float sAtr) =>
+    var int   aAt  = na
+    var int   aBar = na
+    var float aPx  = na
+    var int   aDir = 0
+    var int   aId  = 0
+    var float aAtr = na
+    if sBuy or sSell
+        aAt  := nz(time_close, time)
+        aBar := bar_index
+        aPx  := fgfLvMode == "Entry price" ? nz(sPx, close) : close
+        aDir := sBuy ? 1 : -1
+        aId  += 1
+        aAtr := sAtr
+    [aAt, aBar, aPx, aDir, aId, aAtr]
+
+// Direction score, on the filter timeframe: a rule's direction d at a candle
+// is right h candles later when the close has moved that way. Returns the
+// balanced share right (mean of the UP and DOWN shares; na until both
+// exist) and the number of scored calls, over the window.
+fgfHits(int d, int h) =>
+    float mv   = close - close[h]
+    int   pd   = nz(d[h])
+    float upN  = pd == 1 and mv != 0 ? 1.0 : 0.0
+    float upH  = pd == 1 and mv > 0 ? 1.0 : 0.0
+    float dnN  = pd == -1 and mv != 0 ? 1.0 : 0.0
+    float dnH  = pd == -1 and mv < 0 ? 1.0 : 0.0
+    int   w    = math.max(fgsWin, 1)
+    float wUpN = math.sum(upN, w)
+    float wUpH = math.sum(upH, w)
+    float wDnN = math.sum(dnN, w)
+    float wDnH = math.sum(dnH, w)
+    float cUpN = ta.cum(upN)
+    float cUpH = ta.cum(upH)
+    float cDnN = ta.cum(dnN)
+    float cDnH = ta.cum(dnH)
+    // (until the window is full: every candle so far)
+    float sUpN = fgsWin > 0 and not na(wUpN) ? wUpN : cUpN
+    float sUpH = fgsWin > 0 and not na(wUpH) ? wUpH : cUpH
+    float sDnN = fgsWin > 0 and not na(wDnN) ? wDnN : cDnN
+    float sDnH = fgsWin > 0 and not na(wDnH) ? wDnH : cDnH
+    float acc  = sUpN > 0 and sDnN > 0 ? 0.5 * (sUpH / sUpN + sDnH / sDnN) : na
+    [acc, sUpN + sDnN]
+
+// The three rules at this filter candle's close, scored 1 and H candles later.
+// (Level side: on the signal candle a close exactly AT the level counts as
+// the signal's side, as the gate allows it there.)
+fgfScore(float aPx, int aDir, int aBar) =>
+    int dL = na(aPx) ? 0 : close > aPx ? 1 : close < aPx ? -1 : aBar == bar_index ? nz(aDir) : 0
+    int dS = nz(aDir)
+    int dR = -nz(aDir)
+    [l1, ln] = fgfHits(dL, 1)
+    [lh, lhn] = fgfHits(dL, fgsH)
+    [s1, sn] = fgfHits(dS, 1)
+    [sh, shn] = fgfHits(dS, fgsH)
+    [r1, rn] = fgfHits(dR, 1)
+    [rh, rhn] = fgfHits(dR, fgsH)
+    [l1, lh, s1, sh, r1, rh, ln]
+
+// Each filter candle sends its arm, its conditions, its index, open and close
+// time, and the arm, conditions and close time of the candle before it. An
+// arm is used only once the candle that made it has closed by this chart's
+// clock, so the forming filter candle is never read and nothing repaints.
+fgfRead() =>
+    [sBuy, sSell, sPx, sPar, sAl, sAc] = fgfSignal(fgfTfSec)
+    float fAtr = ta.atr(14)
+    [aAt, aBar, aPx, aDir, aId, aAtr] = fgfArm(sBuy, sSell, sPx, fAtr)
+    [cL1, cLh, cS1, cSh, cR1, cRh, cN] = fgfScore(aPx, aDir, aBar)
+    [aAt, aBar, aPx, aDir, aId, sPar, sAl, sAc, bar_index, time, nz(time_close, time), aAt[1], aBar[1], aPx[1], aDir[1], aId[1], sPar[1], sAl[1], sAc[1], nz(time_close[1], time[1]), cL1, cLh, cS1, cSh, cR1, cRh, cN, cL1[1], cLh[1], cS1[1], cSh[1], cR1[1], cRh[1], cN[1], aAtr, aAtr[1]]
+
+[fpAt, fpBar, fpPx, fpDir, fpId, fpPar, fpAl, fpAc, fpIdx, fpOpen, fpClose, fqAt, fqBar, fqPx, fqDir, fqId, fqPar, fqAl, fqAc, fqClose, fpL1, fpLh, fpS1, fpSh, fpR1, fpRh, fpN, fqL1, fqLh, fqS1, fqSh, fqR1, fqRh, fqN, fpAtr, fqAtr] = request.security(syminfo.tickerid, fgfTfEff, fgfRead(), barmerge.gaps_off, barmerge.lookahead_off)
+
+fgfTfText(string tf) =>
+    int sec = timeframe.in_seconds(tf)
+    sec < 60 ? str.tostring(sec) + "s" : sec < 3600 ? str.tostring(sec / 60, "#.##") + "m" : sec < 86400 ? str.tostring(sec / 3600, "#.##") + "H" : tf
+string fgfTfTag = fgfTfText(fgfTfEff)
+
+// Clock: the moment a bar is judged ("Check price on").
+//   Tick          a closed bar at its close time; the live bar at the real
+//                 clock (every tick), kept inside the bar.
+//   Candle open   every bar at its open time (fixed from its first tick).
+//   Candle close  a closed bar at its close time; the live bar at its open
+//                 time, with the last closed candle's close (see fgfValue).
+// Closed bars never repaint in any mode.
+bool fgfLiveBar = not barstate.isconfirmed
+bool fgfAtOpen  = fgfCheck == "Candle open" or (fgfCheck == "Candle close" and fgfLiveBar)
+// The close-time clock (Tick, and closed bars in Candle close). A live bar's
+// real clock never reaches the bar's close, nor the close of the filter
+// candle still forming (fp on a live bar), so a filter candle is never read
+// before its data has closed (delayed data, late ticks).
+int  fgfClockC  = fgfLiveBar ? math.max(time, math.min(timenow, nz(time_close, timenow + 1) - 1, nz(fpClose, timenow + 1) - 1)) : nz(time_close, time)
+fgfClock = fgfAtOpen ? time : fgfClockC
+
+// The arm in force = the latest filter candle closed by the clock:
+//   1  the latest filter candle (fp), once it has closed by the clock
+//   2  the candle before it (fq), once that one has closed
+//   0  neither (a chart candle longer than the filter candle, judged at its
+//      open): the previous chart bar's close-time pick, the latest filter
+//      candle closed by this bar's open, as none closes between the two;
+//      its index is judged at this bar's open (after a session gap, the
+//      next candle)
+int fgfSelC = fgfClockC >= fpClose ? 1 : 2
+int fgfSel  = fgfAtOpen ? (fpClose <= time ? 1 : fqClose <= time ? 2 : 0) : fgfSelC
+// the close-time pick of every bar, kept for the next bar's open (fgfSel 0)
+int   fgfCAt  = fgfSelC == 1 ? fpAt  : fqAt
+int   fgfCBar = fgfSelC == 1 ? fpBar : fqBar
+float fgfCPx  = fgfSelC == 1 ? fpPx  : fqPx
+int   fgfCDir = fgfSelC == 1 ? fpDir : fqDir
+int   fgfCId  = fgfSelC == 1 ? fpId  : fqId
+int   fgfCPar = fgfSelC == 1 ? fpPar : fqPar
+int   fgfCAl  = fgfSelC == 1 ? fpAl  : fqAl
+int   fgfCAc  = fgfSelC == 1 ? fpAc  : fqAc
+// The filter candle the clock falls in (Candles mode): the picked candle when
+// it closes exactly at the clock, else the one after it.
+int   fgfCIdx = fgfSelC == 1 ? (fgfClockC == fpClose ? fpIdx : fpIdx + 1) : (fgfClockC == fqClose ? fpIdx - 1 : fpIdx)
+// the picked candle itself and its close, for the next bar's open (fgfSel 0)
+int   fgfCK      = fgfSelC == 1 ? fpIdx : fpIdx - 1
+int   fgfCKClose = fgfSelC == 1 ? fpClose : fqClose
+
+int   fgfSigAt  = fgfSel == 1 ? fpAt  : fgfSel == 2 ? fqAt  : fgfCAt[1]
+int   fgfSigBar = fgfSel == 1 ? fpBar : fgfSel == 2 ? fqBar : fgfCBar[1]
+float fgfLevel  = fgfSel == 1 ? fpPx  : fgfSel == 2 ? fqPx  : fgfCPx[1]
+int   fgfSigDir = nz(fgfSel == 1 ? fpDir : fgfSel == 2 ? fqDir : fgfCDir[1])
+// the ATR(14) of the signal candle (the no-trade band's unit)
+float fgfCAtr   = fgfSelC == 1 ? fpAtr : fqAtr
+float fgfSigAtr = fgfSel == 1 ? fpAtr : fgfSel == 2 ? fqAtr : fgfCAtr[1]
+int   fgfSigId  = nz(fgfSel == 1 ? fpId  : fgfSel == 2 ? fqId  : fgfCId[1])
+// The conditions of the last closed filter candle (status box).
+int   fgfPar    = fgfSel == 1 ? fpPar : fgfSel == 2 ? fqPar : fgfCPar[1]
+int   fgfAl     = fgfSel == 1 ? fpAl  : fgfSel == 2 ? fqAl  : fgfCAl[1]
+int   fgfAc     = fgfSel == 1 ? fpAc  : fgfSel == 2 ? fqAc  : fgfCAc[1]
+// The direction score of the last closed filter candle (status box, output).
+fgfPickC(float p, float q) =>
+    fgfSelC == 1 ? p : q
+fgfPick(float p, float q, float cPrev) =>
+    fgfSel == 1 ? p : fgfSel == 2 ? q : cPrev
+float fgsCL1 = fgfPickC(fpL1, fqL1)
+float fgsCLh = fgfPickC(fpLh, fqLh)
+float fgsCS1 = fgfPickC(fpS1, fqS1)
+float fgsCSh = fgfPickC(fpSh, fqSh)
+float fgsCR1 = fgfPickC(fpR1, fqR1)
+float fgsCRh = fgfPickC(fpRh, fqRh)
+float fgsCN  = fgfPickC(fpN, fqN)
+float fgsL1  = fgfPick(fpL1, fqL1, fgsCL1[1])
+float fgsLh  = fgfPick(fpLh, fqLh, fgsCLh[1])
+float fgsS1  = fgfPick(fpS1, fqS1, fgsCS1[1])
+float fgsSh  = fgfPick(fpSh, fqSh, fgsCSh[1])
+float fgsR1  = fgfPick(fpR1, fqR1, fgsCR1[1])
+float fgsRh  = fgfPick(fpRh, fqRh, fgsCRh[1])
+float fgsN   = fgfPick(fpN, fqN, fgsCN[1])
+int   fgfIdx    = not fgfAtOpen ? fgfCIdx : fgfSel == 1 ? (time == fpClose ? fpIdx : fpIdx + 1) : fgfSel == 2 ? (time == fqClose ? fpIdx - 1 : fpIdx) : (time == fgfCKClose[1] ? fgfCK[1] : fgfCK[1] + 1)
+
+// The price compared to the level, at that moment.
+fgfValue = fgfCheck == "Candle open" ? open : fgfCheck == "Candle close" and fgfLiveBar ? close[1] : close
+
+// Permission window: from the signal candle's close, until the next signal
+// (or the minutes / candles run out).
+bool fgfArmed  = not na(fgfSigAt) and fgfClock >= fgfSigAt
+int  fgfEnd    = fgfLast == "Minutes" and fgfArmed ? fgfSigAt + fgfMinutes * 60000 : na
+int  fgfEndBar = fgfLast == "Candles" and fgfArmed ? fgfSigBar + fgfBars : na
+bool fgfOpen   = fgfArmed and (fgfLast == "Minutes" ? fgfClock < fgfEnd : fgfLast == "Candles" ? fgfIdx < fgfEndBar : true)
+
+// On the signal candle itself price can sit exactly at the level ("Signal
+// close"): there the signal's own side counts as allowed AT the level.
+bool fgfOnSigBar = fgfArmed and fgfIdx == fgfSigBar
+bool fgfAtBuyLv  = fgfOnSigBar and fgfSigDir > 0 and fgfValue >= fgfLevel
+bool fgfAtSellLv = fgfOnSigBar and fgfSigDir < 0 and fgfValue <= fgfLevel
+
+// The zones (see ZONES): above the band BUY ZONE, below it SELL ZONE, inside
+// it NO TRADE. With no band the level itself splits them (and on the signal
+// candle price exactly at the level counts for the signal's side).
+float fgfBand  = fgfBandAtr * nz(fgfSigAtr)
+float fgfMt    = syminfo.mintick
+float fgfUpLv  = fgfBand > 0 ? math.ceil((fgfLevel + fgfBand) / fgfMt - 1e-9) * fgfMt : fgfLevel
+float fgfDnLv  = fgfBand > 0 ? math.floor((fgfLevel - fgfBand) / fgfMt + 1e-9) * fgfMt : fgfLevel
+bool  fgfInUp  = fgfBand > 0 ? fgfValue > fgfUpLv + fgfMt / 2 : (fgfValue > fgfLevel or fgfAtBuyLv)
+bool  fgfInDn  = fgfBand > 0 ? fgfValue < fgfDnLv - fgfMt / 2 : (fgfValue < fgfLevel or fgfAtSellLv)
+// the signal's direction is confirmed while price is in its own zone
+bool  fgfSigOk = fgfArmed and (fgfSigDir > 0 ? fgfInUp : fgfSigDir < 0 ? fgfInDn : false)
+// a zone allows its side unless it is against the signal and that is off
+bool  fgfUpNow = fgfInUp and (fgfAgainst or fgfSigDir > 0)
+bool  fgfDnNow = fgfInDn and (fgfAgainst or fgfSigDir < 0)
+
+// Final gates: is a buy / a sell ALLOWED on this bar? (Permission only.)
+fgfBuyOk  = not fgfOn or (fgfOpen and fgfAllowBuy  and fgfUpNow)
+fgfSellOk = not fgfOn or (fgfOpen and fgfAllowSell and fgfDnNow)
+
+// A new signal became known on this bar; a Minutes / Candles permission ended.
+bool fgfNewSig  = fgfSigId > fgfSigId[1]
+// What may be done now: 1 BUY ZONE, -1 SELL ZONE, 0 NO TRADE, 2 filter off.
+int  fgfZone    = not fgfOn ? 2 : fgfBuyOk ? 1 : fgfSellOk ? -1 : 0
+bool fgfEnded   = fgfArmed and not fgfOpen
+bool fgfExpired = fgfOn and fgfEnded and not fgfEnded[1] and not barstate.isfirst
+
+// ---- Visuals (optional: delete from here to END if you only want the gates)
+fgfPosOf(string s) =>
+    switch s
+        "top_right"     => position.top_right
+        "bottom_right"  => position.bottom_right
+        "top_left"      => position.top_left
+        "middle_left"   => position.middle_left
+        "bottom_left"   => position.bottom_left
+        "top_center"    => position.top_center
+        "bottom_center" => position.bottom_center
+        => position.middle_right
+
+bgcolor(fgfShowBg and fgfOn and fgfOpen ? (fgfBuyOk ? color.new(color.green, 85) : fgfSellOk ? color.new(color.red, 85) : color.new(color.gray, 88)) : na, title="FGF permission", force_overlay=FGF_FORCE_OVERLAY)
+plotshape(fgfSigMark and fgfOn and fgfNewSig and fgfSigDir > 0, "FGF buy signal",  shape.triangleup,   location.belowbar, color.lime, size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
+plotshape(fgfSigMark and fgfOn and fgfNewSig and fgfSigDir < 0, "FGF sell signal", shape.triangledown, location.abovebar, color.red,  size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
+// GVLiveV2 fuse: the "FGF permission ended" mark is left out. GVLiveV2 already
+// uses 61 of the 64 plots a script may have; the status box still shows
+// when a Minutes / Candles permission has ended.
+
+// Level line as a drawing (it does not stretch the price scale). Each signal
+// keeps its own line and label, so past levels stay readable. Redrawn every
+// bar so a host script's own drawings never garbage-collect the current one.
+var line  fgfLn   = na
+var label fgfLbl  = na
+var int   fgfFrom = na
+if fgfNewSig or (na(fgfFrom) and fgfArmed)
+    // a new signal: leave the previous signal's drawings where they ended
+    fgfLn   := na
+    fgfLbl  := na
+    fgfFrom := bar_index
+if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom)
+    int   fgfX1  = math.max(fgfFrom, bar_index - 9000)
+    color fgfCol = fgfSigDir > 0 ? color.lime : color.red
+    line.delete(fgfLn)
+    fgfLn := line.new(fgfX1, fgfLevel, bar_index, fgfLevel, color=fgfCol, width=2, force_overlay=FGF_FORCE_OVERLAY)
+    if na(fgfLbl)
+        string fgfLastTxt = fgfLast == "Minutes" ? str.tostring(fgfMinutes) + " min" : fgfLast == "Candles" ? str.tostring(fgfBars) + (fgfBars == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
+        string fgfTxt     = (fgfSigDir > 0 ? "BUY" : "SELL") + " signal " + fgfTfTag + " @ " + str.tostring(fgfLevel, format.mintick) + "\n" + fgfLastTxt
+        fgfLbl := label.new(fgfX1, fgfLevel, fgfTxt, style=label.style_label_right, color=color.new(fgfCol, 20), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+
+// The permission as the status box and the zone names show it: Tick + Minutes
+// also ends it by the real clock (the gates, shading and outputs keep the
+// candle's clock, see TIMING).
+bool fgfDOpen = fgfOpen and not (fgfCheck == "Tick" and fgfLast == "Minutes" and timenow >= fgfEnd)
+
+// The edge of a zone as text: with a band, the band edge (the last NO TRADE
+// tick); with no band, the level rounded to the last tick that is not
+// allowed, or on the signal candle the first tick that is (">=" / "<=").
+fgfEdgeTx(bool up) =>
+    bool  incl = fgfBand == 0 and fgfOnSigBar and (up ? fgfSigDir > 0 : fgfSigDir < 0)
+    float edge = up ? fgfUpLv : fgfDnLv
+    float k    = edge / fgfMt
+    float tk   = fgfBand > 0 ? edge : (up != incl ? math.floor(k + 1e-9) : math.ceil(k - 1e-9)) * fgfMt
+    (up ? (incl ? ">= " : "> ") : (incl ? "<= " : "< ")) + str.tostring(tk, format.mintick)
+
+// The band's edges (dashed) and the zone names at the last candle.
+var line  fgfLnUp = na
+var line  fgfLnDn = na
+var label fgfZUp  = na
+var label fgfZDn  = na
+var label fgfZMid = na
+if fgfNewSig
+    fgfLnUp := na
+    fgfLnDn := na
+if fgfShowLv and fgfOn and fgfOpen and not na(fgfLevel) and not na(fgfFrom) and fgfBand > 0
+    int fgfX2 = math.max(fgfFrom, bar_index - 9000)
+    line.delete(fgfLnUp)
+    line.delete(fgfLnDn)
+    fgfLnUp := line.new(fgfX2, fgfUpLv, bar_index, fgfUpLv, color=color.new(color.lime, 40), style=line.style_dashed, width=1, force_overlay=FGF_FORCE_OVERLAY)
+    fgfLnDn := line.new(fgfX2, fgfDnLv, bar_index, fgfDnLv, color=color.new(color.red, 40), style=line.style_dashed, width=1, force_overlay=FGF_FORCE_OVERLAY)
+if barstate.islast
+    label.delete(fgfZUp)
+    label.delete(fgfZDn)
+    label.delete(fgfZMid)
+    if fgfShowLv and fgfOn and fgfDOpen and not na(fgfLevel)
+        bool upAllowed = fgfAllowBuy and (fgfAgainst or fgfSigDir > 0)
+        bool dnAllowed = fgfAllowSell and (fgfAgainst or fgfSigDir < 0)
+        fgfZUp  := label.new(bar_index + 3, fgfUpLv, (upAllowed ? "BUY ZONE " : "NO TRADE ") + fgfEdgeTx(true), style=label.style_label_lower_left, color=color.new(upAllowed ? color.lime : color.gray, 30), textcolor=color.black, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+        fgfZDn  := label.new(bar_index + 3, fgfDnLv, (dnAllowed ? "SELL ZONE " : "NO TRADE ") + fgfEdgeTx(false), style=label.style_label_upper_left, color=color.new(dnAllowed ? color.red : color.gray, 30), textcolor=color.white, size=size.small, force_overlay=FGF_FORCE_OVERLAY)
+        if fgfBand > 0
+            fgfZMid := label.new(bar_index + 3, fgfLevel, "NO TRADE (band)", style=label.style_label_left, color=color.new(color.gray, 30), textcolor=color.white, size=size.tiny, force_overlay=FGF_FORCE_OVERLAY)
+
+// Status box (display only; the gates never use it). Judged like the gates,
+// at the bar's clock; Tick + Minutes also ends it by the real clock.
+var table fgfTable = table.new(fgfPosOf(fgfTblPos), 2, 14, bgcolor=color.new(color.black, 20), border_width=1, force_overlay=FGF_FORCE_OVERLAY)
+
+// the BTC/USD reference scores (out of sample 2025-07 .. 2026-10) of the filter timeframe's bucket
+fgsRefTxt(int sec) =>
+    int m = math.round(sec / 60.0)
+    if m >= 1 and m <= 2
+        "1m: level 50/50  signal 50/49  reversed 50/51"
+    else if m >= 3 and m <= 10
+        "5m: level 51/51  signal 49/49  reversed 51/51"
+    else if m >= 11 and m <= 22
+        "15m: level 51/51  signal 48/48  reversed 52/52"
+    else if m >= 23 and m <= 45
+        "30m: level 51/52  signal 49/48  reversed 51/52"
+    else if m >= 46 and m <= 90
+        "1H: level 50/49  signal 48/50  reversed 52/50"
+    else if m >= 91 and m <= 180
+        "2H: level 49/52  signal 49/48  reversed 51/52"
+    else if m >= 181 and m <= 360
+        "4H: level 49/53  signal 49/48  reversed 51/52"
+    else if m >= 361 and m <= 720
+        "8H: level 51/48  signal 48/51  reversed 52/49"
+    else if m >= 1080 and m <= 2880
+        "1D: level 49/57  signal 53/43  reversed 47/57"
+    else
+        "-"
+
+fgsPct(float v) =>
+    na(v) ? "-" : str.tostring(v * 100, "#") + "%"
+if fgfShowTbl and fgfOn and barstate.islast
+    bool   dOpen  = fgfDOpen
+    bool   dBuy   = dOpen and fgfAllowBuy  and fgfUpNow
+    bool   dSell  = dOpen and fgfAllowSell and fgfDnNow
+    string dSide  = fgfSigDir > 0 ? "BUY" : "SELL"
+    string dDo    = fgfSigDir > 0 ? "buy" : "sell"
+    // what may be done now, and why not when nothing may
+    string dWhy   = not fgfArmed ? "waiting for a signal" : not dOpen ? "permission ended" : not (fgfInUp or fgfInDn) ? "price at the level (band)" : fgfInUp and not fgfAgainst and fgfSigDir < 0 ? "above a SELL signal (against it)" : fgfInDn and not fgfAgainst and fgfSigDir > 0 ? "below a BUY signal (against it)" : "that side is switched off"
+    string dState = dBuy ? "BUY ZONE - buys allowed, no sells" : dSell ? "SELL ZONE - sells allowed, no buys" : "NO TRADE - " + dWhy
+    color  dCol   = dBuy ? color.lime : dSell ? color.red : color.orange
+    bool   dConf  = dOpen and fgfSigOk
+    bool   dSideOn = fgfSigDir > 0 ? fgfAllowBuy : fgfAllowSell
+    string dSigTx = not fgfArmed ? "-" : not dOpen ? "- (permission ended)" : dConf ? (dSideOn ? "CONFIRMED - " + dDo + "s allowed" : "CONFIRMED - but " + dDo + "s are switched off") : "NOT CONFIRMED - do not " + dDo
+    int    dSecs  = dOpen and not na(fgfEnd) ? math.max(0, math.floor((fgfEnd - (fgfCheck == "Tick" ? timenow : fgfClock)) / 1000.0)) : 0
+    string dLeft  = not dOpen ? "-" : fgfLast == "Minutes" ? str.tostring(math.floor(dSecs / 60), "00") + ":" + str.tostring(dSecs % 60, "00") : fgfLast == "Candles" ? str.tostring(fgfEndBar - fgfIdx) + (fgfEndBar - fgfIdx == 1 ? " candle " : " candles ") + fgfTfTag : "until next signal"
+    string dSig   = na(fgfSigAt) ? "-" : dSide + " " + str.format_time(fgfSigAt, "MMM dd HH:mm", syminfo.timezone) + " @ " + (na(fgfLevel) ? "-" : str.tostring(fgfLevel, format.mintick))
+    string dPar   = na(fgfPar) ? "-" : fgfPar > 0 ? "BUY" : fgfPar < 0 ? "SELL" : "FLAT"
+    string dZones = na(fgfAc) ? "-" : str.tostring(fgfAl) + "/" + str.tostring(fgfAc)
+    string dUp    = na(fgfLevel) ? "-" : fgfEdgeTx(true)
+    string dDn    = na(fgfLevel) ? "-" : fgfEdgeTx(false)
+    table.cell(fgfTable, 0, 0, "FG filter " + fgfTfTag, text_color=color.white)
+    table.cell(fgfTable, 1, 0, dState, text_color=dCol)
+    table.cell(fgfTable, 0, 1, "Signal (exch tz)", text_color=color.white)
+    table.cell(fgfTable, 1, 1, dSig, text_color=fgfSigDir > 0 ? color.lime : fgfSigDir < 0 ? color.red : color.white)
+    table.cell(fgfTable, 0, 2, "Signal direction", text_color=color.white)
+    table.cell(fgfTable, 1, 2, dSigTx, text_color=not fgfArmed ? color.white : dConf and dSideOn ? (fgfSigDir > 0 ? color.lime : color.red) : color.orange)
+    table.cell(fgfTable, 0, 3, "BUY ZONE  " + dUp, text_color=color.white)
+    bool   dUpOk  = dOpen and fgfAllowBuy and (fgfAgainst or fgfSigDir > 0)
+    bool   dDnOk  = dOpen and fgfAllowSell and (fgfAgainst or fgfSigDir < 0)
+    string dOff   = not fgfArmed ? "NO TRADE (no signal yet)" : not dOpen ? "NO TRADE (permission ended)" : "NO TRADE there"
+    table.cell(fgfTable, 1, 3, dBuy ? "ALLOWED (now)" : dUpOk ? "allowed there" : dOff, text_color=dBuy ? color.lime : dUpOk ? color.gray : color.orange)
+    table.cell(fgfTable, 0, 4, "SELL ZONE " + dDn, text_color=color.white)
+    table.cell(fgfTable, 1, 4, dSell ? "ALLOWED (now)" : dDnOk ? "allowed there" : dOff, text_color=dSell ? color.red : dDnOk ? color.gray : color.orange)
+    table.cell(fgfTable, 0, 5, "NO TRADE band", text_color=color.white)
+    table.cell(fgfTable, 1, 5, na(fgfLevel) ? "-" : fgfBand > 0 ? str.tostring(fgfDnLv, format.mintick) + " - " + str.tostring(fgfUpLv, format.mintick) : fgfBandAtr > 0 and fgfArmed and na(fgfSigAtr) ? "off (no ATR yet at the signal)" : "off", text_color=color.white)
+    table.cell(fgfTable, 0, 6, fgfCheck == "Candle open" ? "Candle open" : fgfCheck == "Candle close" ? "Last close" : "Price now", text_color=color.white)
+    table.cell(fgfTable, 1, 6, na(fgfValue) ? "-" : str.tostring(fgfValue, format.mintick), text_color=color.white)
+    table.cell(fgfTable, 0, 7, "Left", text_color=color.white)
+    table.cell(fgfTable, 1, 7, dLeft, text_color=color.white)
+    table.cell(fgfTable, 0, 8, "Last " + fgfTfTag + " parent / zones", text_color=color.white)
+    table.cell(fgfTable, 1, 8, dPar + " / " + dZones + " aligned", text_color=dPar == "BUY" ? color.lime : dPar == "SELL" ? color.red : color.white)
+    if fgsShow
+        string hTxt = "next 1 / " + str.tostring(fgsH) + " " + fgfTfTag
+        string wTxt = fgsWin > 0 ? "last " + str.tostring(fgsWin) : "all"
+        table.cell(fgfTable, 0, 9, "Direction score (" + wTxt + ", " + (na(fgsN) ? "-" : str.tostring(fgsN, "#")) + " level-side calls)", text_color=color.gray)
+        table.cell(fgfTable, 1, 9, hTxt + "  (50% = coin flip)", text_color=color.gray)
+        table.cell(fgfTable, 0, 10, "Level side (bare level)", text_color=color.aqua)
+        table.cell(fgfTable, 1, 10, fgsPct(fgsL1) + " / " + fgsPct(fgsLh), text_color=color.aqua)
+        table.cell(fgfTable, 0, 11, "Signal direction", text_color=color.gray)
+        table.cell(fgfTable, 1, 11, fgsPct(fgsS1) + " / " + fgsPct(fgsSh), text_color=color.gray)
+        table.cell(fgfTable, 0, 12, "Signal reversed", text_color=color.gray)
+        table.cell(fgfTable, 1, 12, fgsPct(fgsR1) + " / " + fgsPct(fgsRh), text_color=color.gray)
+        table.cell(fgfTable, 0, 13, "BTC 2025-26 (1/10), parent = TF, zones x1/2/4", text_color=color.gray)
+        table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
+// ====================== END FLASHGOLD DIRECTION FILTER =======================
+
+//==============================================================================
+// Calculations
+//==============================================================================
+atr_value = ta.atr(14)
+
+f_vovix_source() =>
+    (ta.atr(fastVoVixLen) - ta.atr(slowVoVixLen)) / (ta.stdev(ta.atr(fastVoVixLen), devLen) + 1e-6)
+
+f_clamp(_value, _min, _max) =>
+    math.max(_min, math.min(_max, _value))
+
+f_vol_score() =>
+    fastAtr = ta.atr(fastVoVixLen)
+    slowAtr = ta.atr(slowVoVixLen)
+    atrRatio = slowAtr > 0 ? fastAtr / slowAtr : 1.0
+    f_clamp((atrRatio - 0.50) / 1.50 * 100.0, 0.0, 100.0)
+
+f_auto_radar_tf() =>
+    chartSec = timeframe.in_seconds(timeframe.period)
+    chartSec >= 86400 ? "60" : chartSec >= 14400 ? "15" : chartSec >= 3600 ? "5" : chartSec >= 1800 ? "3" : chartSec >= 900 ? "1" : timeframe.period
+
+f_ema_slope(_len) =>
+    emaNow = ta.ema(close, _len)
+    emaNow - nz(emaNow[1], emaNow)
+
+f_rvol(_len) =>
+    avgVol = ta.sma(volume, _len)
+    na(volume) or na(avgVol) or avgVol <= 0 ? 1.0 : volume / avgVol
+
+f_body_atr() =>
+    atrNow = ta.atr(14)
+    atrNow > 0 ? math.abs(close - open) / atrNow : 0.0
+
+f_break_long(_lookback) =>
+    close > ta.highest(high[1], _lookback)
+
+f_break_short(_lookback) =>
+    close < ta.lowest(low[1], _lookback)
+
+src = f_vovix_source()
+dev = ta.stdev(src, devLen)
+fastDEVMA = ta.sma(dev, fastVoVixLen)
+slowDEVMA = ta.sma(dev, slowVoVixLen)
+expansion_regime = (fastDEVMA > slowDEVMA) or ta.rising(fastDEVMA, 2)
+
+fastEma = ta.ema(close, fastEmaLen)
+slowEma = ta.ema(close, slowEmaLen)
+trendEma = ta.ema(close, trendFilterLen)
+
+rsiVal = ta.rsi(close, rsiLen)
+rsiLongCondition = not useRsiFilter or rsiVal < rsiOverbought
+rsiShortCondition = not useRsiFilter or rsiVal > rsiOversold
+
+bullCross = ta.crossover(fastEma, slowEma)
+bearCross = ta.crossunder(fastEma, slowEma)
+upTrend = close > trendEma
+downTrend = close < trendEma
+
+chartSeconds = timeframe.in_seconds(timeframe.period)
+autoRadarTimeframe = f_auto_radar_tf()
+radarTimeframe = radarTimeframeMode == "Auto" ? autoRadarTimeframe : radarTimeframeMode == "Chart" ? timeframe.period : radarTimeframeMode
+radarSeconds = timeframe.in_seconds(radarTimeframe)
+useRadarTimeframe = radarTimeframe != timeframe.period and radarSeconds < chartSeconds
+
+radarVolRaw = request.security(syminfo.tickerid, radarTimeframe, f_vol_score(), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+radarSlopeRaw = request.security(syminfo.tickerid, radarTimeframe, f_ema_slope(fastEmaLen), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+radarRvolRaw = request.security(syminfo.tickerid, radarTimeframe, f_rvol(preRvolLength), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+radarBodyAtrRaw = request.security(syminfo.tickerid, radarTimeframe, f_body_atr(), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+radarBreakLongRaw = request.security(syminfo.tickerid, radarTimeframe, f_break_long(preBreakoutLookback), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+radarBreakShortRaw = request.security(syminfo.tickerid, radarTimeframe, f_break_short(preBreakoutLookback), gaps=barmerge.gaps_off, lookahead=barmerge.lookahead_off)
+
+radarVolScore = useRadarTimeframe ? radarVolRaw : f_vol_score()
+radarSlope = useRadarTimeframe ? radarSlopeRaw : f_ema_slope(fastEmaLen)
+radarRvol = useRadarTimeframe ? radarRvolRaw : f_rvol(preRvolLength)
+radarBodyAtr = useRadarTimeframe ? radarBodyAtrRaw : f_body_atr()
+radarBreakLong = useRadarTimeframe ? radarBreakLongRaw : f_break_long(preBreakoutLookback)
+radarBreakShort = useRadarTimeframe ? radarBreakShortRaw : f_break_short(preBreakoutLookback)
+radarVolRise = radarVolScore - nz(radarVolScore[1], radarVolScore)
+
+barRange = high - low
+closeLocation = barRange > 0 ? (close - low) / barRange : 0.50
+
+preVolOk = radarVolScore >= preMinVolScore and radarVolRise >= preMinVolRise
+preRvolOk = not preUseRvol or radarRvol >= preMinRvol
+preBodyOk = not preUseBodyAtr or radarBodyAtr >= preMinBodyAtr
+preLongTrendOk = not preUseTrend or upTrend
+preShortTrendOk = not preUseTrend or downTrend
+preLongSlopeOk = not preUseEmaSlope or radarSlope > 0
+preShortSlopeOk = not preUseEmaSlope or radarSlope < 0
+preLongPressureOk = closeLocation >= preCloseLocation
+preShortPressureOk = closeLocation <= 1.0 - preCloseLocation
+preLongBreakOk = not preUseMicroBreak or radarBreakLong
+preShortBreakOk = not preUseMicroBreak or radarBreakShort
+
+preLongScore = (preVolOk ? 25 : 0) + (preLongTrendOk ? 20 : 0) + (preLongSlopeOk ? 15 : 0) + (preRvolOk ? 10 : 0) + (preBodyOk ? 10 : 0) + (preLongPressureOk ? 10 : 0) + (preLongBreakOk ? 10 : 0)
+preShortScore = (preVolOk ? 25 : 0) + (preShortTrendOk ? 20 : 0) + (preShortSlopeOk ? 15 : 0) + (preRvolOk ? 10 : 0) + (preBodyOk ? 10 : 0) + (preShortPressureOk ? 10 : 0) + (preShortBreakOk ? 10 : 0)
+preLongArm = usePreCandleArm and barstate.isconfirmed and preVolOk and preLongTrendOk and preLongSlopeOk and preRvolOk and preBodyOk and preLongPressureOk and preLongBreakOk and preLongScore >= preMinScore
+preShortArm = usePreCandleArm and barstate.isconfirmed and preVolOk and preShortTrendOk and preShortSlopeOk and preRvolOk and preBodyOk and preShortPressureOk and preShortBreakOk and preShortScore >= preMinScore
+preLongBlocker = not preVolOk ? "VOL" : not preLongTrendOk ? "TREND" : not preLongSlopeOk ? "SLOPE" : not preRvolOk ? "RVOL" : not preBodyOk ? "BODY" : not preLongPressureOk ? "PRESS" : not preLongBreakOk ? "BREAK" : preLongScore < preMinScore ? "SCORE" : "READY"
+preShortBlocker = not preVolOk ? "VOL" : not preShortTrendOk ? "TREND" : not preShortSlopeOk ? "SLOPE" : not preRvolOk ? "RVOL" : not preBodyOk ? "BODY" : not preShortPressureOk ? "PRESS" : not preShortBreakOk ? "BREAK" : preShortScore < preMinScore ? "SCORE" : "READY"
+
+longCondition = bullCross and upTrend and expansion_regime and rsiLongCondition
+shortCondition = bearCross and downTrend and expansion_regime and rsiShortCondition
+
+signalBody = close - open
+signalBodyAbs = math.abs(signalBody)
+signalUpperWick = barRange > 0 ? high - math.max(open, close) : na
+signalLowerWick = barRange > 0 ? math.min(open, close) - low : na
+signalBodyPct = barRange > 0 ? signalBodyAbs / barRange : na
+signalDirection = close > open ? 1.0 : close < open ? -1.0 : 0.0
+signalEmaSpread = fastEma - slowEma
+signalTrendDistance = close - trendEma
+
+previousRange = high[1] - low[1]
+previousBody = close[1] - open[1]
+previousBodyAbs = math.abs(previousBody)
+previousUpperWick = previousRange > 0 ? high[1] - math.max(open[1], close[1]) : na
+previousLowerWick = previousRange > 0 ? math.min(open[1], close[1]) - low[1] : na
+previousBodyPct = previousRange > 0 ? previousBodyAbs / previousRange : na
+previousCloseLocation = previousRange > 0 ? (close[1] - low[1]) / previousRange : na
+previousDirection = close[1] > open[1] ? 1.0 : close[1] < open[1] ? -1.0 : 0.0
+previousEmaSpread = fastEma[1] - slowEma[1]
+previousTrendDistance = close[1] - trendEma[1]
+
+custom_entry_session_active = not na(time(timeframe.period, entry_session, "America/New_York"))
+morning_entry_session_active = not na(time(timeframe.period, morning_entry_session, "America/New_York"))
+flat_session_active = not na(time(timeframe.period, flat_session, "America/New_York"))
+ny_day_of_week = dayofweek(time, "America/New_York")
+is_weekday = ny_day_of_week != dayofweek.saturday and ny_day_of_week != dayofweek.sunday
+ny_hhmm = hour(time, "America/New_York") * 100 + minute(time, "America/New_York")
+
+entry_session_active = switch tradePreset
+    "Conservative AM" => morning_entry_session_active
+    => custom_entry_session_active
+
+polyWindowMs = 5 * 60 * 1000
+polyWindowStartMs = time - (time % polyWindowMs)
+secondsFromPolyWindowStart = int((time - polyWindowStartMs) / 1000)
+poly_window_time_ok = secondsFromPolyWindowStart <= maxSignalSecondsAfterWindowStart
+
+var int lastSignalPolyWindowStartMs = na
+var int lastPreStopOrderBar = na
+one_signal_window_ok = not oneSignalPerPolyWindow or na(lastSignalPolyWindowStartMs) or polyWindowStartMs != lastSignalPolyWindowStartMs
+
+timeframe_ok = allowAnyChartTimeframe or timeframe.period == requiredSignalTimeframe
+weekday_ok = allowWeekendEntries or is_weekday
+entry_window_ok = not useSessionFilter or entry_session_active
+flat_window_ok = not useSessionFilter or flat_session_active
+
+balanced_weak_entry_bar = useSessionFilter and tradePreset == "Balanced" and (ny_hhmm == 1245 or ny_hhmm == 1345 or ny_hhmm == 1400 or ny_hhmm == 1500)
+
+pointValue = switch brokerPreset
+    "Crypto 1 USD per qty" => 1.0
+    => manualPointValue
+
+f_json_num(float _value) =>
+    na(_value) ? "null" : str.tostring(_value)
+
+f_json_int(int _value) =>
+    na(_value) ? "null" : str.tostring(_value)
+
+f_json_bool(bool _value) =>
+    _value ? "true" : "false"
+
+f_training_json(string _action, string _side, string _reason) =>
+    plannedOrderPrice = _action == "entry" ? (_reason == "pre_candle_stop" ? (_side == "long" ? high + atr_value * preStopAtrBuffer : low - atr_value * preStopAtrBuffer) : close) : na
+    entryKind = _reason == "pre_candle_open" ? 1 : _reason == "pre_candle_stop" ? 2 : _reason == "signal" ? 3 : 0
+    collectTrainingData and includeTrainingDataInAlerts and _action == "entry" ? ",\"training\":{" +
+     "\"trade_number\":" + str.tostring(strategy.closedtrades + 1) + "," +
+     "\"entry_kind\":" + str.tostring(entryKind) + "," +
+     "\"planned_order_price\":" + f_json_num(plannedOrderPrice) + "," +
+     "\"entry_side_value\":" + (_side == "long" ? "1" : _side == "short" ? "-1" : "0") + "," +
+     "\"radar_timeframe\":\"" + radarTimeframe + "\"," +
+     "\"signal_candle\":{" +
+     "\"time\":" + f_json_int(time) + "," +
+     "\"open\":" + f_json_num(open) + "," +
+     "\"high\":" + f_json_num(high) + "," +
+     "\"low\":" + f_json_num(low) + "," +
+     "\"close\":" + f_json_num(close) + "," +
+     "\"volume\":" + f_json_num(volume) + "," +
+     "\"range\":" + f_json_num(barRange) + "," +
+     "\"body\":" + f_json_num(signalBody) + "," +
+     "\"body_abs\":" + f_json_num(signalBodyAbs) + "," +
+     "\"body_pct\":" + f_json_num(signalBodyPct) + "," +
+     "\"upper_wick\":" + f_json_num(signalUpperWick) + "," +
+     "\"lower_wick\":" + f_json_num(signalLowerWick) + "," +
+     "\"close_location\":" + f_json_num(closeLocation) + "," +
+     "\"direction\":" + f_json_num(signalDirection) +
+     "}," +
+     "\"previous_candle\":{" +
+     "\"time\":" + f_json_int(time[1]) + "," +
+     "\"open\":" + f_json_num(open[1]) + "," +
+     "\"high\":" + f_json_num(high[1]) + "," +
+     "\"low\":" + f_json_num(low[1]) + "," +
+     "\"close\":" + f_json_num(close[1]) + "," +
+     "\"volume\":" + f_json_num(volume[1]) + "," +
+     "\"range\":" + f_json_num(previousRange) + "," +
+     "\"body\":" + f_json_num(previousBody) + "," +
+     "\"body_abs\":" + f_json_num(previousBodyAbs) + "," +
+     "\"body_pct\":" + f_json_num(previousBodyPct) + "," +
+     "\"upper_wick\":" + f_json_num(previousUpperWick) + "," +
+     "\"lower_wick\":" + f_json_num(previousLowerWick) + "," +
+     "\"close_location\":" + f_json_num(previousCloseLocation) + "," +
+     "\"direction\":" + f_json_num(previousDirection) +
+     "}," +
+     "\"context\":{" +
+     "\"atr\":" + f_json_num(atr_value) + "," +
+     "\"rsi\":" + f_json_num(rsiVal) + "," +
+     "\"ema_spread\":" + f_json_num(signalEmaSpread) + "," +
+     "\"trend_distance\":" + f_json_num(signalTrendDistance) + "," +
+     "\"prev_atr\":" + f_json_num(atr_value[1]) + "," +
+     "\"prev_rsi\":" + f_json_num(rsiVal[1]) + "," +
+     "\"prev_ema_spread\":" + f_json_num(previousEmaSpread) + "," +
+     "\"prev_trend_distance\":" + f_json_num(previousTrendDistance) + "," +
+     "\"pre_long_score\":" + str.tostring(preLongScore) + "," +
+     "\"pre_short_score\":" + str.tostring(preShortScore) + "," +
+     "\"pre_long_blocker\":\"" + preLongBlocker + "\"," +
+     "\"pre_short_blocker\":\"" + preShortBlocker + "\"," +
+     "\"radar_vol_score\":" + f_json_num(radarVolScore) + "," +
+     "\"radar_vol_rise\":" + f_json_num(radarVolRise) + "," +
+     "\"radar_rvol\":" + f_json_num(radarRvol) + "," +
+     "\"radar_body_atr\":" + f_json_num(radarBodyAtr) + "," +
+     "\"long_condition\":" + f_json_bool(longCondition) + "," +
+     "\"short_condition\":" + f_json_bool(shortCondition) + "," +
+     "\"pre_long_arm\":" + f_json_bool(preLongArm) + "," +
+     "\"pre_short_arm\":" + f_json_bool(preShortArm) + "," +
+     "\"entry_allowed\":true" +
+     "}}}" : ""
+
+f_training_label(float _direction, string _reason, float _plannedPrice) =>
+    sideText = _direction > 0 ? "LONG" : "SHORT"
+    sideText + " " + _reason + "\n" +
+     "plan " + str.tostring(_plannedPrice, "#.##") + " | signal C " + str.tostring(close, "#.##") + "\n" +
+     "body% " + str.tostring(signalBodyPct, "#.##") + " | closeLoc " + str.tostring(closeLocation, "#.##") + "\n" +
+     "RSI " + str.tostring(rsiVal, "#.##") + " | ATR " + str.tostring(atr_value, "#.##") + "\n" +
+     "L/S " + str.tostring(preLongScore) + "/" + str.tostring(preShortScore)
+
+f_alert_message(string _action, string _side, string _reason, float _qty, float _stop, float _limit) =>
+    "{" +
+     "\"strategy\":\"" + routerStrategyName + "\"," +
+     "\"router_profile\":\"polymarket_crypto_any_chart_precandle\"," +
+     "\"series_slug\":\"" + seriesSlug + "\"," +
+     "\"ticker\":\"" + syminfo.tickerid + "\"," +
+     "\"timeframe\":\"" + routerTimeframe + "\"," +
+     "\"source_timeframe\":\"" + timeframe.period + "\"," +
+     "\"required_timeframe\":\"" + requiredSignalTimeframe + "\"," +
+     "\"signal_timeframe\":\"" + requiredSignalTimeframe + "\"," +
+     "\"action\":\"" + _action + "\"," +
+     "\"side\":\"" + _side + "\"," +
+     "\"reason\":\"" + _reason + "\"," +
+     "\"stake_usd\":" + f_json_num(paperStakeUsd) + "," +
+     "\"qty\":" + f_json_num(_qty) + "," +
+     "\"price\":" + f_json_num(close) + "," +
+     "\"stop\":" + f_json_num(_stop) + "," +
+     "\"limit\":" + f_json_num(_limit) + "," +
+     "\"point_value\":" + f_json_num(pointValue) + "," +
+     "\"risk_percent\":" + f_json_num(riskPercent) + "," +
+     "\"max_bars_in_trade\":" + str.tostring(maxBarsInTrade) + "," +
+     "\"max_live_spread_points\":" + f_json_num(maxLiveSpreadPoints) + "," +
+     "\"trade_preset\":\"" + tradePreset + "\"," +
+     "\"seconds_from_poly_window_start\":" + str.tostring(secondsFromPolyWindowStart) + "," +
+     "\"poly_window_start_ms\":" + str.tostring(polyWindowStartMs) + "," +
+     "\"bar_time\":" + str.tostring(time) +
+     f_training_json(_action, _side, _reason) +
+     "}"
+
+f_round_down_to_step(_qty, _step) =>
+    _step > 0 ? math.floor(_qty / _step) * _step : _qty
+
+f_get_qty(_stop_distance) =>
+    float q = fixedQty
+    if QtyMode == "Risk %"
+        stopCash = _stop_distance * pointValue
+        q := stopCash > 0 ? strategy.equity * riskPct / 100.0 / stopCash : 0.0
+    q := math.min(q, maxQty)
+    if capMargin and marginPct > 0
+        q := math.min(q, strategy.equity / (close * pointValue * marginPct / 100.0))
+    f_round_down_to_step(q + 1e-9 * qtyStep, qtyStep)
+
+//==============================================================================
+// Daily Risk Lock
+//==============================================================================
+ny_day_key = year(time, "America/New_York") * 10000 + month(time, "America/New_York") * 100 + dayofmonth(time, "America/New_York")
+
+var int activeDayKey = na
+var float dayStartEquity = na
+var int dayLossCount = 0
+var int lastClosedTrades = 0
+var bool dailyLocked = false
+
+is_new_day = na(activeDayKey) or ny_day_key != activeDayKey
+if is_new_day
+    activeDayKey := ny_day_key
+    dayStartEquity := strategy.equity
+    dayLossCount := 0
+    dailyLocked := false
+
+if strategy.closedtrades > lastClosedTrades
+    last_trade_index = strategy.closedtrades - 1
+    last_trade_profit = strategy.closedtrades.profit(last_trade_index)
+    if last_trade_profit < 0
+        dayLossCount += 1
+    lastClosedTrades := strategy.closedtrades
+
+dayPnL = strategy.equity - dayStartEquity
+dailyLossHit = useDailyLossLock and maxDailyLossCurrency > 0 and dayPnL <= -maxDailyLossCurrency
+dailyLossCountHit = useDailyLossLock and dayLossCount >= maxDailyLosses
+
+if (dailyLossHit or dailyLossCountHit) and not dailyLocked
+    dailyLocked := true
+
+//==============================================================================
+// Trade Entry And Exit
+//==============================================================================
+// S2 exit geometry, in ticks for strategy.exit (loss / profit / trail are
+// measured from the fill price).
+exitTick = syminfo.mintick
+exitAtr = ta.atr(atrLen)
+slTicks = ExitMode == "Points" ? slPoints : nz(slAtrMult * exitAtr / exitTick)
+tpTicks = ExitMode == "Points" ? tpPoints : slTicks * tpR
+trActTicks = ExitMode == "Points" ? trailActPoints : nz(trailActAtr * exitAtr / exitTick)
+trDstTicks = math.max(ExitMode == "Points" ? trailPoints : nz(trailDstAtr * exitAtr / exitTick), 1.0)
+exitLoss = slTicks > 0 ? slTicks : na
+exitProfit = tpTicks > 0 ? tpTicks : na
+stop_distance = slTicks * exitTick
+profit_distance = tpTicks * exitTick
+entry_qty = f_get_qty(stop_distance)
+stop_distance_ok = not useMaxStopDistance or stop_distance <= maxStopDistancePoints
+
+can_enter = strategy.position_size == 0 and timeframe_ok and poly_window_time_ok and one_signal_window_ok and entry_window_ok and weekday_ok and not dailyLocked and not balanced_weak_entry_bar and stop_distance_ok and entry_qty > 0
+
+preLongStopPrice = high + atr_value * preStopAtrBuffer
+preShortStopPrice = low - atr_value * preStopAtrBuffer
+preCanOrder = preCandleEntryMode != "Signal Only"
+preLongEntryArm = preLongArm and preLongScore >= preShortScore
+preShortEntryArm = preShortArm and preShortScore > preLongScore
+bool preOrderThisBar = false
+bool trainingEntrySignal = false
+float trainingEntryDirection = na
+float trainingEntryKind = na
+float trainingPlannedOrderPrice = na
+float trainingEntryNumber = na
+string trainingEntryReason = ""
+
+if preCanOrder and preLongEntryArm and can_enter and fgfBuyOk
+    expected_entry = preCandleEntryMode == "Stop Next Candle" ? preLongStopPrice : close
+    stop_loss = expected_entry - stop_distance
+    take_profit = expected_entry + profit_distance
+    if preCandleEntryMode == "Stop Next Candle"
+        strategy.entry("Long", strategy.long, qty=entry_qty, stop=preLongStopPrice, alert_message=f_alert_message("entry", "long", "pre_candle_stop", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+        lastPreStopOrderBar := bar_index
+    else
+        strategy.entry("Long", strategy.long, qty=entry_qty, alert_message=f_alert_message("entry", "long", "pre_candle_open", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+        lastPreStopOrderBar := na
+    lastSignalPolyWindowStartMs := polyWindowStartMs
+    preOrderThisBar := true
+    trainingEntrySignal := collectTrainingData
+    trainingEntryDirection := 1.0
+    trainingEntryKind := preCandleEntryMode == "Stop Next Candle" ? 2.0 : 1.0
+    trainingPlannedOrderPrice := expected_entry
+    trainingEntryNumber := strategy.closedtrades + 1
+    trainingEntryReason := preCandleEntryMode == "Stop Next Candle" ? "pre_candle_stop" : "pre_candle_open"
+    if useTrail
+        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "long", "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+    else
+        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "long", "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+
+if preCanOrder and preShortEntryArm and can_enter and not preOrderThisBar and fgfSellOk
+    expected_entry = preCandleEntryMode == "Stop Next Candle" ? preShortStopPrice : close
+    stop_loss = expected_entry + stop_distance
+    take_profit = expected_entry - profit_distance
+    if preCandleEntryMode == "Stop Next Candle"
+        strategy.entry("Short", strategy.short, qty=entry_qty, stop=preShortStopPrice, alert_message=f_alert_message("entry", "short", "pre_candle_stop", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+        lastPreStopOrderBar := bar_index
+    else
+        strategy.entry("Short", strategy.short, qty=entry_qty, alert_message=f_alert_message("entry", "short", "pre_candle_open", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+        lastPreStopOrderBar := na
+    lastSignalPolyWindowStartMs := polyWindowStartMs
+    preOrderThisBar := true
+    trainingEntrySignal := collectTrainingData
+    trainingEntryDirection := -1.0
+    trainingEntryKind := preCandleEntryMode == "Stop Next Candle" ? 2.0 : 1.0
+    trainingPlannedOrderPrice := expected_entry
+    trainingEntryNumber := strategy.closedtrades + 1
+    trainingEntryReason := preCandleEntryMode == "Stop Next Candle" ? "pre_candle_stop" : "pre_candle_open"
+    if useTrail
+        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "short", "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+    else
+        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "short", "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+
+if preCandleEntryMode == "Stop Next Candle" and strategy.position_size == 0 and not na(lastPreStopOrderBar) and bar_index - lastPreStopOrderBar > preCancelAfterBars
+    strategy.cancel("Long")
+    strategy.cancel("Short")
+    lastPreStopOrderBar := na
+
+if longCondition and can_enter and not preOrderThisBar and fgfBuyOk
+    stop_loss = close - stop_distance
+    take_profit = close + profit_distance
+    strategy.entry("Long", strategy.long, qty=entry_qty, alert_message=f_alert_message("entry", "long", "signal", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+    lastSignalPolyWindowStartMs := polyWindowStartMs
+    trainingEntrySignal := collectTrainingData
+    trainingEntryDirection := 1.0
+    trainingEntryKind := 3.0
+    trainingPlannedOrderPrice := close
+    trainingEntryNumber := strategy.closedtrades + 1
+    trainingEntryReason := "signal"
+    if useTrail
+        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "long", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+    else
+        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "long", "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+
+if shortCondition and can_enter and not preOrderThisBar and fgfSellOk
+    stop_loss = close + stop_distance
+    take_profit = close - profit_distance
+    strategy.entry("Short", strategy.short, qty=entry_qty, alert_message=f_alert_message("entry", "short", "signal", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+    lastSignalPolyWindowStartMs := polyWindowStartMs
+    trainingEntrySignal := collectTrainingData
+    trainingEntryDirection := -1.0
+    trainingEntryKind := 3.0
+    trainingPlannedOrderPrice := close
+    trainingEntryNumber := strategy.closedtrades + 1
+    trainingEntryReason := "signal"
+    if useTrail
+        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "short", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+    else
+        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "short", "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+
+// Track bars in trade. The CSV showed that trades held beyond one bar were net negative.
+var int entryBarIndex = na
+if strategy.position_size != 0 and strategy.position_size[1] == 0
+    entryBarIndex := bar_index
+if strategy.position_size == 0
+    entryBarIndex := na
+
+barsInTrade = strategy.position_size != 0 and not na(entryBarIndex) ? bar_index - entryBarIndex : na
+maxBarsExitHit = useMaxBarsExit and strategy.position_size != 0 and not na(barsInTrade) and barsInTrade >= maxBarsInTrade
+
+if maxBarsExitHit
+    if strategy.position_size > 0
+        strategy.close("Long", comment="Max Bars Exit", alert_message=f_alert_message("close", "long", "max_bars_exit", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+    if strategy.position_size < 0
+        strategy.close("Short", comment="Max Bars Exit", alert_message=f_alert_message("close", "short", "max_bars_exit", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+
+timeStopHit = maxBarsHeld > 0 and strategy.position_size != 0 and not na(barsInTrade) and barsInTrade >= maxBarsHeld and not maxBarsExitHit
+if timeStopHit
+    if strategy.position_size > 0
+        strategy.close("Long", comment="Time stop", alert_message=f_alert_message("close", "long", "time_stop", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+    if strategy.position_size < 0
+        strategy.close("Short", comment="Time stop", alert_message=f_alert_message("close", "short", "time_stop", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+
+if dailyLocked and strategy.position_size != 0
+    if strategy.position_size > 0
+        strategy.close("Long", comment="Daily Lock", alert_message=f_alert_message("close", "long", "daily_lock", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+    if strategy.position_size < 0
+        strategy.close("Short", comment="Daily Lock", alert_message=f_alert_message("close", "short", "daily_lock", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+
+if not flat_window_ok and strategy.position_size != 0
+    if strategy.position_size > 0
+        strategy.close("Long", comment="EOD", alert_message=f_alert_message("close", "long", "session_flat", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+    if strategy.position_size < 0
+        strategy.close("Short", comment="EOD", alert_message=f_alert_message("close", "short", "session_flat", math.abs(strategy.position_size), na, na), disable_alert=not sendExitAlertsToWebhook)
+
+//==============================================================================
+// Plots
+//==============================================================================
+plot(fastEma, "Fast EMA", color=color.blue)
+plot(slowEma, "Slow EMA", color=color.orange)
+plot(trendEma, "Trend EMA", color=color.white, linewidth=2)
+
+plotshape(longCondition and can_enter, title="Long Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
+plotshape(shortCondition and can_enter, title="Short Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
+plotshape(preLongArm and can_enter, title="Pre-Candle Long Arm", style=shape.flag, location=location.belowbar, color=color.lime, text="PRE-L", textcolor=color.black, size=size.small)
+plotshape(preShortArm and can_enter, title="Pre-Candle Short Arm", style=shape.flag, location=location.abovebar, color=color.red, text="PRE-S", textcolor=color.white, size=size.small)
+plot(preCandleEntryMode == "Stop Next Candle" and preLongArm and can_enter ? preLongStopPrice : na, "Pre Long Stop", color=color.new(color.lime, 35), style=plot.style_circles, linewidth=2)
+plot(preCandleEntryMode == "Stop Next Candle" and preShortArm and can_enter ? preShortStopPrice : na, "Pre Short Stop", color=color.new(color.red, 35), style=plot.style_circles, linewidth=2)
+
+var label[] trainingLabels = array.new_label()
+if collectTrainingData and showTrainingLabels and trainingEntrySignal
+    trainingLabelStyle = trainingEntryDirection > 0 ? label.style_label_up : label.style_label_down
+    trainingLabelColor = trainingEntryDirection > 0 ? color.new(color.lime, 10) : color.new(color.red, 10)
+    trainingLabelY = trainingEntryDirection > 0 ? low : high
+    trainingLabel = label.new(bar_index, trainingLabelY, f_training_label(trainingEntryDirection, trainingEntryReason, trainingPlannedOrderPrice), style=trainingLabelStyle, color=trainingLabelColor, textcolor=color.black, size=size.small)
+    array.push(trainingLabels, trainingLabel)
+    if array.size(trainingLabels) > trainingLabelHistory
+        label.delete(array.shift(trainingLabels))
+
+bgcolor(entry_window_ok and weekday_ok and poly_window_time_ok and one_signal_window_ok and not balanced_weak_entry_bar ? color.new(color.blue, 95) : na, title="Entry Session Background")
+bgcolor(balanced_weak_entry_bar ? color.new(color.orange, 88) : na, title="Balanced Block Background")
+bgcolor(dailyLocked ? color.new(color.red, 88) : na, title="Daily Lock Background")
+bgcolor(not timeframe_ok ? color.new(color.red, 82) : na, title="Wrong Timeframe Background")
+
+var table preDash = table.new(position.bottom_right, 2, 9, bgcolor=color.new(color.black, 20), border_width=1, border_color=color.gray)
+if showPreDebug and barstate.islast
+    table.cell(preDash, 0, 0, "Chart TF", text_color=color.white)
+    table.cell(preDash, 1, 0, timeframe.period, text_color=color.white)
+    table.cell(preDash, 0, 1, "Radar TF", text_color=color.white)
+    table.cell(preDash, 1, 1, radarTimeframe, text_color=useRadarTimeframe ? color.aqua : color.white)
+    table.cell(preDash, 0, 2, "TF Lock", text_color=color.white)
+    table.cell(preDash, 1, 2, timeframe_ok ? "OK" : "BLOCK", bgcolor=timeframe_ok ? color.new(color.green, 60) : color.new(color.red, 55), text_color=color.white)
+    table.cell(preDash, 0, 3, "Vol Score", text_color=color.white)
+    table.cell(preDash, 1, 3, str.tostring(radarVolScore, "#.##") + " / " + str.tostring(preMinVolScore, "#.##"), text_color=preVolOk ? color.lime : color.white)
+    table.cell(preDash, 0, 4, "Vol Rise", text_color=color.white)
+    table.cell(preDash, 1, 4, str.tostring(radarVolRise, "#.##"), text_color=radarVolRise >= preMinVolRise ? color.lime : color.white)
+    table.cell(preDash, 0, 5, "Long Pre", text_color=color.white)
+    table.cell(preDash, 1, 5, str.tostring(preLongScore) + " " + preLongBlocker, bgcolor=preLongBlocker == "READY" ? color.new(color.green, 55) : color.new(color.red, 65), text_color=color.white)
+    table.cell(preDash, 0, 6, "Short Pre", text_color=color.white)
+    table.cell(preDash, 1, 6, str.tostring(preShortScore) + " " + preShortBlocker, bgcolor=preShortBlocker == "READY" ? color.new(color.green, 55) : color.new(color.red, 65), text_color=color.white)
+    table.cell(preDash, 0, 7, "Can Enter", text_color=color.white)
+    table.cell(preDash, 1, 7, can_enter ? "YES" : "NO", bgcolor=can_enter ? color.new(color.green, 60) : color.new(color.red, 60), text_color=color.white)
+    table.cell(preDash, 0, 8, "Pre Mode", text_color=color.white)
+    table.cell(preDash, 1, 8, usePreCandleArm ? preCandleEntryMode : "OFF", text_color=usePreCandleArm ? color.aqua : color.white)
+
+plot(useMaxBarsExit and strategy.position_size != 0 ? barsInTrade : na, "Bars In Trade", color=color.gray, display=display.data_window)
+plot(secondsFromPolyWindowStart, "Seconds From 5M Window Start", color=color.gray, display=display.data_window)
+plotchar(timeframe_ok, "Signal Timeframe OK", "TF", location=location.top, display=display.data_window)
+plotchar(poly_window_time_ok, "Polymarket Entry Window OK", "W", location=location.top, display=display.data_window)
+plotchar(sendExitAlertsToWebhook, "Exit Alerts Enabled", "E", location=location.top, display=display.data_window)
+plot(preLongScore, "Pre Long Score", color=color.lime, display=display.data_window)
+plot(preShortScore, "Pre Short Score", color=color.red, display=display.data_window)
+plot(radarVolScore, "Radar Vol Score", color=color.aqua, display=display.data_window)
+
+trainingPlotOk = collectTrainingData and plotTrainingData and trainingEntrySignal
+closedTradeThisBar = strategy.closedtrades > nz(strategy.closedtrades[1], 0)
+float trainingClosedProfit = na
+float trainingClosedBars = na
+float trainingClosedWin = na
+if collectTrainingData and closedTradeThisBar
+    closedTradeIndex = strategy.closedtrades - 1
+    trainingClosedProfit := strategy.closedtrades.profit(closedTradeIndex)
+    trainingClosedBars := strategy.closedtrades.exit_bar_index(closedTradeIndex) - strategy.closedtrades.entry_bar_index(closedTradeIndex)
+    trainingClosedWin := trainingClosedProfit > 0 ? 1.0 : trainingClosedProfit < 0 ? -1.0 : 0.0
+
+plot(trainingPlotOk ? trainingEntryNumber : na, "TD Entry Number", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? trainingEntryDirection : na, "TD Entry Direction", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? trainingEntryKind : na, "TD Entry Kind", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? trainingPlannedOrderPrice : na, "TD Planned Order Price", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? open : na, "TD Signal Open", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? high : na, "TD Signal High", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? low : na, "TD Signal Low", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? close : na, "TD Signal Close", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? volume : na, "TD Signal Volume", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? barRange : na, "TD Signal Range", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? signalBody : na, "TD Signal Body", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? signalBodyPct : na, "TD Signal Body Pct", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? signalUpperWick : na, "TD Signal Upper Wick", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? signalLowerWick : na, "TD Signal Lower Wick", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? closeLocation : na, "TD Signal Close Location", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? signalDirection : na, "TD Signal Candle Direction", color=color.white, display=display.data_window)
+plot(trainingPlotOk ? open[1] : na, "TD Previous Open", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? high[1] : na, "TD Previous High", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? low[1] : na, "TD Previous Low", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? close[1] : na, "TD Previous Close", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? volume[1] : na, "TD Previous Volume", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? previousRange : na, "TD Previous Range", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? previousBody : na, "TD Previous Body", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? previousBodyPct : na, "TD Previous Body Pct", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? previousCloseLocation : na, "TD Previous Close Location", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? previousDirection : na, "TD Previous Candle Direction", color=color.gray, display=display.data_window)
+plot(trainingPlotOk ? atr_value : na, "TD ATR", color=color.aqua, display=display.data_window)
+plot(trainingPlotOk ? rsiVal : na, "TD RSI", color=color.aqua, display=display.data_window)
+plot(trainingPlotOk ? signalEmaSpread : na, "TD EMA Spread", color=color.aqua, display=display.data_window)
+plot(trainingPlotOk ? signalTrendDistance : na, "TD Trend Distance", color=color.aqua, display=display.data_window)
+plot(trainingPlotOk ? preLongScore : na, "TD Pre Long Score", color=color.lime, display=display.data_window)
+plot(trainingPlotOk ? preShortScore : na, "TD Pre Short Score", color=color.red, display=display.data_window)
+plot(trainingPlotOk ? radarVolScore : na, "TD Radar Vol Score", color=color.aqua, display=display.data_window)
+plot(trainingPlotOk ? radarVolRise : na, "TD Radar Vol Rise", color=color.aqua, display=display.data_window)
+plot(trainingPlotOk ? radarRvol : na, "TD Radar RVOL", color=color.aqua, display=display.data_window)
+plot(trainingPlotOk ? radarBodyAtr : na, "TD Radar Body ATR", color=color.aqua, display=display.data_window)
+plot(collectTrainingData and plotTrainingData and closedTradeThisBar ? strategy.closedtrades : na, "TD Closed Trade Number", color=color.yellow, display=display.data_window)
+plot(collectTrainingData and plotTrainingData and closedTradeThisBar ? trainingClosedProfit : na, "TD Closed Profit", color=color.yellow, display=display.data_window)
+plot(collectTrainingData and plotTrainingData and closedTradeThisBar ? trainingClosedWin : na, "TD Closed Win", color=color.yellow, display=display.data_window)
+plot(collectTrainingData and plotTrainingData and closedTradeThisBar ? trainingClosedBars : na, "TD Closed Bars", color=color.yellow, display=display.data_window)
