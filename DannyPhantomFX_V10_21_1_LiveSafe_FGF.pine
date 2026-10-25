@@ -11,6 +11,11 @@
 //   - process_orders_on_close = true
 //   - V10.21 NAS100 adaptive 10/12-bar dead exit
 //
+// Signal direction (2026-10-25): the 'Trade Original (Un-Inverted) Signals' switch
+// moved from the Style group to the top of the Preset group as 'Signal
+// direction': Inverted (default, the V10 model) or Original (un-inverted).
+// The trading logic is unchanged; only the input moved.
+//
 // S2 / S3 (2026-10-25): the "Manual Risk Management" group, the preset SL / TP /
 // trail / max-bars profile values, the V2 max-bars and SL/TP override inputs and
 // the preset-group sizing inputs are replaced by two groups:
@@ -48,6 +53,8 @@ strategy("OF S/D Robust — Inverted FX Top 3 V10.21.1 LiveSafe", shorttitle="DP
 groupPreset = "Preset"
 
 presetMode = input.string("Auto", "Preset Mode", options=["Auto", "AUDJPY 2m", "EURGBP 3m", "USDCAD 5m", "XAGUSD 5m", "XAUUSD 5m", "NAS100 5m", "Manual"], group=groupPreset, tooltip="Auto detects presets from the symbol and timeframe. Force a preset manually if your broker ticker name is not detected.")
+
+signalDirection = input.string("Inverted (V10 design)", "Signal direction", options=["Inverted (V10 design)", "Original (un-inverted)"], group=groupPreset, tooltip="Inverted (default, the V10 model): buys on the original supply-zone sell signals and sells on the original demand-zone buy signals. Original: inverts them again and trades the zone signals as they are. The direction filter, the directional time windows, the stop and the target apply to whichever direction is traded.")
 
 v2Source = input.string("Auto Optimized Profile", "V2 Settings Source", options=["Auto Optimized Profile", "Manual V2 Toggles"], group=groupPreset, tooltip="Auto Optimized Profile loads the validated symbol profile. Manual V2 Toggles is honored only when Lock Auto Safety Profile is OFF or Preset Mode is Manual.")
 
@@ -209,7 +216,7 @@ buySignalColor = input.color(#089981, "Inverted Buy Signal Color", group=groupSt
 sellSignalColor = input.color(#f23645, "Inverted Sell Signal Color", group=groupStyle)
 showOriginalSignals = input.bool(false, "Show Original Non-Inverted Signals", group=groupStyle)
 showRawActiveSignals = input.bool(false, "Show Raw Active Signals (Diagnostic)", group=groupStyle)
-tradeOriginalDirection = input.bool(false, "Trade Original (Un-Inverted) Signals", group=groupStyle)
+tradeOriginalDirection = signalDirection == "Original (un-inverted)"
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane
