@@ -2,11 +2,26 @@
 //@strategy_alert_message {{strategy.order.alert_message}}
 // ============================================================================
 // Danny Phantom FX V10.21.1 LiveSafe FGF: XAUUSD 45m
-// STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (hold-out passed both ways)
+// STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (rule v3.1 hold-out passed)
+// READ FIRST: the FRAGILITY lines below say where this result comes from.
 // ----------------------------------------------------------------------------
 // Same code as DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine (the master file).
 // Only this record, the strategy title and the input defaults listed below
-// differ. Record date 2026-10-25, rule v3.
+// differ. Record date 2026-10-25, rule v3.1.
+//
+// FRAGILITY
+//  - VANTAGE XAUUSD: without the 10 biggest trades +88.1R (halves +19.8 /
+//    +68.3), without the 10 best entry days +95.1R; cost break-even $1.2
+//    extra per round trip; the file's strategy() properties add 75 ticks of
+//    slippage per fill and 0.001% commission, so TradingView's report depends
+//    on the symbol's tick: 0.001 tick $0.075 per fill +216.5R, 0.01 tick
+//    $0.75 per fill -81.0R; long trades +299.8R, short trades -38.8R; 123
+//    trades held over a weekend +469.1R, all other trades -208.1R; closing
+//    before every weekend (approximation) +130.6R; exits: stop 966
+//    (-1028.8R), time stop 173 (+1331.6R), reversal 71 (-36.8R), dead exit 24
+//    (-7.6R), end of data 1 (+2.7R); no bar of this chart opens in the
+//    16:45-18:00 NY window, so the daily and weekend blackout closes never
+//    fire and positions are held through the daily break and over weekends.
 //
 // DATA AND COSTS
 //  - VANTAGE XAUUSD 45m: 22,410 bars, 2024-01-01 to 2026-10-23 (33.7 months)
@@ -15,39 +30,43 @@
 //  The gold exports have no volume column, so the zones are built from candle
 //    shape only (the Pine's nz(volume, 1)); a TradingView gold chart with
 //    tick volume forms different zones.
-//  Python replica of this script, swept over 124,416 input settings per
-//    dataset after cleaning (35,035 with distinct results).
+//  Python replica of this script, swept over every setting of its input grid:
+//    VANTAGE XAUUSD 124,416 after cleaning. 35,035 have distinct results.
 //
-// RULE v3 (the same for every pair and timeframe)
+// RULE v3.1 (the same for every pair and timeframe)
 //  Candidates: at least 15 trades and a positive result in both halves of
-//    every dataset above. Pick: the best by worst half, on a plateau (at
-//    least 5 grid neighbours with a positive mean worst half). The pick is
-//    adopted only if (1) selecting on the first halves and scoring the second
-//    halves works: the 40 best are at least 60% positive with a positive
-//    mean, and that mean beats 95% of 2,000 random 40-setting draws from the
-//    same pool; (2) the reverse direction (select on the second halves) also
-//    beats 95% of such random draws; (3) the pick stays positive on every
-//    dataset under stressed costs. Otherwise the strategy's general set is
-//    used if it is positive in both halves of every dataset with PF >= 1.10
-//    and positive under stressed costs; otherwise no file is published for
-//    the timeframe.
+//    every dataset above. Pick: among the 40 best by worst half, the best by
+//    0.5 x worst half + 0.5 x the mean worst half of its clone-free grid
+//    neighbours (at least 5 neighbours with a positive mean). The pick is
+//    adopted only if (1) selecting on the first halves works on the second
+//    halves: the 40 best are at least 60% positive with a positive mean, the
+//    mean beats 95% of random 40-setting draws from the same pool, and the 40
+//    counted as their distinct entry-overlap clusters also beat random draws
+//    of that size; (2) the same two tests pass with the halves swapped; (3)
+//    the pick stays positive on every dataset under stressed costs. Otherwise
+//    the strategy's general set is used only if it is positive in both halves
+//    of every dataset with PF >= 1.10, positive under stressed costs and on a
+//    plateau in this timeframe's grid; otherwise no file is published for the
+//    timeframe.
 //
 // THIS TIMEFRAME
 //  6,495 candidates.
 //  Forward (select on first halves): the 40 best settings by the selection
-//    half score +72.0R on average on the other half, 95% positive; settings
-//    from the same pool average +18.1R (71% positive), and 95% of random
-//    40-setting draws stay below +27.4R (share of draws at or above the top
-//    40: 0.000). PASSED.
+//    half average +72.0R on the other half, 95% positive; settings from the
+//    same pool average +18.1R (71% positive) and 95% of random 40-setting
+//    draws stay below +27.4R. Counted as their 10 distinct entry-overlap
+//    clusters, the representatives average +76.3R against a 95th percentile
+//    of +37.2R for random 10-setting draws. PASSED.
 //  Reverse (select on second halves): the 40 best settings by the selection
-//    half score +40.8R on average on the other half, 85% positive; settings
-//    from the same pool average -10.4R (40% positive), and 95% of random
-//    40-setting draws stay below -2.2R (share of draws at or above the top
-//    40: 0.000). PASSED.
+//    half average +40.8R on the other half, 85% positive; settings from the
+//    same pool average -10.4R (40% positive) and 95% of random 40-setting
+//    draws stay below -2.2R. Counted as their 7 distinct entry-overlap
+//    clusters, the representatives average +41.4R against a 95th percentile
+//    of +7.8R for random 7-setting draws. PASSED.
 //  Stress test of the pick: PASSED.
 //  DECISION: the per-timeframe pick is the default set in this file.
 //
-// THE DEFAULTS IN THIS FILE
+// THE DEFAULTS IN THIS FILE (S2 unit: ATR)
 //    preset Auto (manual path on this chart), direction ORIGINAL (not
 //    inverted), S2 ATR mode: SL 0.8 x ATR(14), no target, no trail, time stop
 //    50 bars, dead exit on, 30 bars, EMA filter on, length 200, delta
@@ -56,13 +75,40 @@
 //    VANTAGE XAUUSD: +260.9R, 1235 trades, PF 1.24, win 14%, max DD 64.6R,
 //      halves +105.0 / +155.9, thirds +11.9 / +164.1 / +85.0, 22 of 34 months
 //      positive, best 2 months = 27% of the total, worst month -39.4R,
-//      longest losing streak 32 trades, without the 5 biggest winners +168.6R
+//      longest losing streak 32 trades
 //    VANTAGE XAUUSD: spread $0.50 + 1 tick/side +213.9R (halves +71.6 /
-//      +142.3); spread $1.00 + 1 tick/side +107.1R; best-case intrabar fills
-//      +260.9R; with the file's TradingView properties (75 ticks slippage per
-//      fill) -102.3R
-//    Plateau: worst half +105.0R; 13 grid neighbours, mean worst half +18.9R,
-//    69% of them positive in every half.
+//      +142.3); spread $1.00 + 1 tick/side +107.1R; break-even extra cost
+//      $1.2 per round trip on top of the $0.30 spread; best-case intrabar
+//      fills +260.9R
+//    Plateau: worst half +105.0R; 13 clone-free grid neighbours, mean worst
+//    half +18.9R, 69% of them positive in every half; two steps out 83
+//    settings, 53% positive in every half, mean worst half -16.3R.
+//
+// S2 POINTS MODE (switch 'SL / TP / trail unit' to Points; the trail switch and time stop are shared)
+//  Stop $11.34 (1,134 points at a 0.01 tick), target $68.04 (6,804 points):
+//    calibrated for this file's signal inputs.
+//    VANTAGE XAUUSD: +104.8R, 1350 trades, PF 1.1, halves +58.8 / +46.0
+//    For comparison, the ATR distances converted at the median ATR (0.8 x
+//      $8.10 stop, no target): VANTAGE XAUUSD +352.0R, PF 1.3, halves +50.3 /
+//      +301.7. Not used because its grid neighbours average -117.2R in their
+//      worst half (3 clone-free neighbours), so it is not on a plateau.
+//  Exit grid of 104 settings (104 distinct), 46 positive in both halves of
+//    every dataset. Forward: the 10 best by first half average +139.3R on the
+//    second (random 10-setting draws, 95th percentile +103.7R). Reverse:
+//    +53.7R (95th percentile +46.5R). Stressed costs: VANTAGE XAUUSD +78.6R.
+//  Points are written for a 0.01-tick symbol. On another tick size, points =
+//    the dollar amount / your symbol's tick (gold on OANDA: 0.001, so x10).
+//
+// S3 SIZING (Risk %, compounded from the strategy's $2,000 initial capital)
+//  Rule: the largest of 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2% risk per trade whose
+//    maximum drawdown stays within 20% on every dataset. Default here: 0.25%.
+//    VANTAGE XAUUSD: 0.25% -> x1.83, max DD 14.9%; 0.5% -> x3.08, max DD
+//      27.7%; 0.75% -> x4.76, max DD 38.6%; 1.0% -> x6.79, max DD 47.9%; 1.5%
+//      -> x11.06, max DD 62.6%; 2.0% -> x15.83, max DD 73.3% (Max quantity /
+//      margin cap bound on 0% of trades at 1%)
+//    Fixed quantity equivalent: 0.78 units (the default risk at the median
+//      stop of $6.44); VANTAGE XAUUSD +1,365 USD, max DD 461 USD, no
+//      compounding.
 //
 // OTHER INPUT SETS ON THE SAME DATA
 //  The file's original defaults (filter off): VANTAGE XAUUSD -23.3R (1396
@@ -72,14 +118,12 @@
 //  Every result above is from the full dataset the rule saw, so it is
 //    in-sample; the hold-out lines are the honest guide to what selection
 //    delivers out of sample. Not modelled: the Max Quantity and margin caps
-//    (results are per R). Re-check with Bar Magnifier and on new data before
-//    trading live.
-//  The strategy() properties keep the original 75 ticks of slippage and
-//    0.001% commission, so TradingView's report will differ from the R
-//    figures above (see the TradingView-properties line).
+//    in R results (see S3 SIZING where given). Re-check with Bar Magnifier
+//    and on new data before trading live.
 // ============================================================================
 //
-// ---------------------------------------------------------------- original header
+// ------------------------------------------- original header of the master file
+// (describes the master file's design and defaults, NOT this file's defaults)
 //====================================================//
 // Danny Phantom FX V10.21.1 LiveSafe
 //====================================================//
@@ -200,8 +244,8 @@ manualEntryMode = input.string("Normal Retest Touch", "Entry Mode", options=["No
 
 gS2 = "S2. Exits"
 ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (the tested mode).")
-slPointsIn     = input.float(5000, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no stop loss (not recommended).")
-tpPointsIn     = input.float(50000, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no target.")
+slPointsIn     = input.float(1134, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode: calibrated for this file's signal inputs; $11.34 at a 0.01 tick (points = dollars / tick).")
+tpPointsIn     = input.float(6804, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode target: $68.04.")
 atrLenS2       = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
 slAtrMultS2    = input.float(0.8, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Calibrated for XAUUSD 45m (see the header).")
 tpRS2          = input.float(0.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Calibrated for XAUUSD 45m (see the header). 0 = no target.")
@@ -214,8 +258,8 @@ timeStopBars   = input.int(50, "Time stop, bars (0 = off)", minval=0, group=gS2,
 
 gS3 = "S3. Sizing"
 QtyMode    = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3, tooltip="Backtest sizing (strategy.entry qty). The live MT4 lot in the alert text is sized by the MT4 Lot Sizing group below.")
-fixedQtyS3 = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3)
-riskPctS3  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Quantity = equity x risk% / (stop distance x point value). Needs a stop loss > 0.")
+fixedQtyS3 = input.float(0.78, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3, tooltip="Fixed mode: the quantity that risks the default Risk % of $2,000 at the median stop (see the header).")
+riskPctS3  = input.float(0.25, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Calibrated: the largest tested risk whose compounded max drawdown stays within 20% on this timeframe's data (see the header).")
 maxQtyS3   = input.float(50, "Max quantity", minval=0.0, group=gS3)
 qtyStepS3  = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
 capMarginS3 = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
@@ -297,7 +341,7 @@ tradeOriginalDirection = input.bool(true, "Trade Original (Un-Inverted) Signals"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the filter can only be tested on the OANDA exports (see the header for its effect there).")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (the tested setting). Its effect could not be tested on this data (no filter columns), so it stays off.")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")

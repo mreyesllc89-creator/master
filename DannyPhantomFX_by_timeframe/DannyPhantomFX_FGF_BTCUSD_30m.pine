@@ -2,67 +2,113 @@
 //@strategy_alert_message {{strategy.order.alert_message}}
 // ============================================================================
 // Danny Phantom FX V10.21.1 LiveSafe FGF: BTCUSD 30m
-// STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (hold-out passed both ways)
+// STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (rule v3.1 hold-out passed)
+// READ FIRST: the FRAGILITY lines below say where this result comes from.
 // ----------------------------------------------------------------------------
 // Same code as DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine (the master file).
 // Only this record, the strategy title and the input defaults listed below
-// differ. Record date 2026-10-25, rule v3.
+// differ. Record date 2026-10-25, rule v3.1.
+//
+// FRAGILITY
+//  - Bitfinex BTCUSD: without the 10 biggest trades +45.5R (halves +95.7 /
+//    -50.2), without the 10 best entry days -4.8R; fee break-even 0.0626% per
+//    side; the file's strategy() properties add 75 ticks of slippage per fill
+//    and 0.001% commission, so TradingView's report depends on the symbol's
+//    tick: 0.01 tick $0.75 per fill +243.7R, 0.1 tick $7.5 per fill -754.7R,
+//    1 tick $75 per fill -9942.1R; long trades +215.1R, short trades +155.7R;
+//    5 trades held over a weekend -5.2R, all other trades +376.0R; closing
+//    before every weekend (approximation) +376.8R; exits: stop 1370 (+15.9R),
+//    blackout close 236 (+388.4R), reversal 49 (-30.0R), dead exit 8 (-3.4R);
+//    the 50-bar time stop never fires (longest hold 45 bars).
 //
 // DATA AND COSTS
 //  - Bitfinex BTCUSD 30m: 35,016 bars, 2018-01-01 to 2019-12-31 (23.9 months)
 //  Costs: 0.02% fee per side + $0.20 spread per round trip, no slippage. Stop
 //    first when a bar touches both stop and target. R = the stop distance.
-//    One sample only: Bitfinex 2018-2019 (no later BTC data was tested).
-//  Python replica of this script, swept over 124,416 input settings per
-//    dataset after cleaning (29,317 with distinct results).
+//    One sample only: Bitfinex 2018-2019 (no later BTC data was tested); its
+//    volume differs from other exchanges'.
+//  Python replica of this script, swept over every setting of its input grid:
+//    Bitfinex BTCUSD 124,416 after cleaning. 29,317 have distinct results.
 //
-// RULE v3 (the same for every pair and timeframe)
+// RULE v3.1 (the same for every pair and timeframe)
 //  Candidates: at least 15 trades and a positive result in both halves of
-//    every dataset above. Pick: the best by worst half, on a plateau (at
-//    least 5 grid neighbours with a positive mean worst half). The pick is
-//    adopted only if (1) selecting on the first halves and scoring the second
-//    halves works: the 40 best are at least 60% positive with a positive
-//    mean, and that mean beats 95% of 2,000 random 40-setting draws from the
-//    same pool; (2) the reverse direction (select on the second halves) also
-//    beats 95% of such random draws; (3) the pick stays positive on every
-//    dataset under stressed costs. Otherwise the strategy's general set is
-//    used if it is positive in both halves of every dataset with PF >= 1.10
-//    and positive under stressed costs; otherwise no file is published for
-//    the timeframe.
+//    every dataset above. Pick: among the 40 best by worst half, the best by
+//    0.5 x worst half + 0.5 x the mean worst half of its clone-free grid
+//    neighbours (at least 5 neighbours with a positive mean). The pick is
+//    adopted only if (1) selecting on the first halves works on the second
+//    halves: the 40 best are at least 60% positive with a positive mean, the
+//    mean beats 95% of random 40-setting draws from the same pool, and the 40
+//    counted as their distinct entry-overlap clusters also beat random draws
+//    of that size; (2) the same two tests pass with the halves swapped; (3)
+//    the pick stays positive on every dataset under stressed costs. Otherwise
+//    the strategy's general set is used only if it is positive in both halves
+//    of every dataset with PF >= 1.10, positive under stressed costs and on a
+//    plateau in this timeframe's grid; otherwise no file is published for the
+//    timeframe.
 //
 // THIS TIMEFRAME
 //  6,649 candidates.
 //  Forward (select on first halves): the 40 best settings by the selection
-//    half score +128.0R on average on the other half, 100% positive; settings
-//    from the same pool average +12.2R (62% positive), and 95% of random
-//    40-setting draws stay below +28.1R (share of draws at or above the top
-//    40: 0.000). PASSED.
+//    half average +128.0R on the other half, 100% positive; settings from the
+//    same pool average +12.2R (62% positive) and 95% of random 40-setting
+//    draws stay below +28.1R. Counted as their 4 distinct entry-overlap
+//    clusters, the representatives average +111.4R against a 95th percentile
+//    of +59.9R for random 4-setting draws. PASSED.
 //  Reverse (select on second halves): the 40 best settings by the selection
-//    half score +93.8R on average on the other half, 100% positive; settings
-//    from the same pool average +30.3R (81% positive), and 95% of random
-//    40-setting draws stay below +43.8R (share of draws at or above the top
-//    40: 0.000). PASSED.
+//    half average +93.8R on the other half, 100% positive; settings from the
+//    same pool average +30.3R (81% positive) and 95% of random 40-setting
+//    draws stay below +43.8R. Counted as their 5 distinct entry-overlap
+//    clusters, the representatives average +111.2R against a 95th percentile
+//    of +68.3R for random 5-setting draws. PASSED.
 //  Stress test of the pick: PASSED.
 //  DECISION: the per-timeframe pick is the default set in this file.
 //
-// THE DEFAULTS IN THIS FILE
+// THE DEFAULTS IN THIS FILE (S2 unit: ATR)
 //    preset Auto (manual path on this chart), direction ORIGINAL (not
 //    inverted), S2 ATR mode: SL 0.8 x ATR(14), no target, trail: arm at 4
-//    ATR, distance 0.2 ATR, time stop 50 bars, dead exit off, EMA filter on,
-//    length 100, delta threshold 1, zone length 100, cooldown on, 10 bars,
+//    ATR, distance 0.2 ATR, time stop 50 bars, dead exit on, 30 bars, EMA
+//    filter on, length 100, delta threshold 1, zone length 100, cooldown off,
 //    one entry per zone off, direction filter off
-//    Bitfinex BTCUSD: +377.4R, 1661 trades, PF 1.27, win 22%, max DD 52.7R,
-//      halves +186.5 / +190.9, thirds +96.1 / +201.7 / +79.6, 17 of 24 months
-//      positive, best 2 months = 51% of the total, worst month -30.7R,
-//      longest losing streak 18 trades, without the 5 biggest winners +142.9R
-//    Bitfinex BTCUSD: fee 0.035%/side + 1 tick +222.3R (halves +109.5 /
-//      +112.8); fee 0.05%/side + 1 tick +91.9R; best-case intrabar fills
-//      +377.4R; with the file's TradingView properties (75 ticks slippage per
-//      fill) -1201.6R
-//    Bitfinex BTCUSD: the 5 biggest trades are 62% of the total (2019-04-02,
-//      2019-02-08, 2018-11-14, 2018-10-11, 2018-07-16).
-//    Plateau: worst half +186.5R; 15 grid neighbours, mean worst half +68.9R,
-//    73% of them positive in every half.
+//    Bitfinex BTCUSD: +370.8R, 1663 trades, PF 1.27, win 22%, max DD 52.7R,
+//      halves +185.1 / +185.7, thirds +94.5 / +201.9 / +74.4, 17 of 24 months
+//      positive, best 2 months = 52% of the total, worst month -30.7R,
+//      longest losing streak 18 trades
+//    Bitfinex BTCUSD: fee 0.035%/side + $0.20 spread + 1 tick/side +215.6R
+//      (halves +108.0 / +107.5); fee 0.05%/side + $0.20 + 1 tick/side +85.0R;
+//      fee break-even 0.0626% per side
+//    Plateau: worst half +185.1R; 13 clone-free grid neighbours, mean worst
+//    half +53.6R, 69% of them positive in every half; two steps out 94
+//    settings, 52% positive in every half, mean worst half -5.9R.
+//
+// S2 POINTS MODE (switch 'SL / TP / trail unit' to Points; the trail switch and time stop are shared)
+//  Stop $160.00 (16,000 points at a 0.01 tick), target $960.00 (96,000
+//    points), trail arm $40.00 / distance $8.00: calibrated for this file's
+//    signal inputs.
+//    Bitfinex BTCUSD: +63.4R, 1823 trades, PF 1.1, halves +33.2 / +30.1
+//    For comparison, the ATR distances converted at the median ATR (0.8 x
+//      $40.00 stop, no target): Bitfinex BTCUSD -80.2R, PF 1.0, halves -6.7 /
+//      -73.5. Not used because it is not positive in both halves with enough
+//      trades.
+//  Exit grid of 1248 settings (859 distinct), 256 positive in both halves of
+//    every dataset. Forward: the 10 best by first half average +106.5R on the
+//    second (random 10-setting draws, 95th percentile +29.0R). Reverse:
+//    +98.2R (95th percentile +33.8R). Stressed costs: Bitfinex BTCUSD +34.1R.
+//  WARNING: these dollar distances come from 2018-2019 BTC prices
+//    ($3,200-$13,800, median about $7,350). At today's prices they are far
+//    too tight; use ATR mode, or scale the points by today's price / 7,350.
+//  Points are written for a 0.01-tick symbol. On another tick size, points =
+//    the dollar amount / your symbol's tick (gold on OANDA: 0.001, so x10).
+//
+// S3 SIZING (Risk %, compounded from the strategy's $2,000 initial capital)
+//  Rule: the largest of 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2% risk per trade whose
+//    maximum drawdown stays within 20% on every dataset. Default here: 0.25%.
+//    Bitfinex BTCUSD: 0.25% -> x2.3, max DD 12.4%; 0.5% -> x4.54, max DD
+//      23.5%; 0.75% -> x7.87, max DD 33.9%; 1.0% -> x12.2, max DD 44.5%; 1.5%
+//      -> x22.03, max DD 62.6%; 2.0% -> x33.14, max DD 74.2% (Max quantity /
+//      margin cap bound on 0% of trades at 1%)
+//    Fixed quantity equivalent: 0.14 units (the default risk at the median
+//      stop of $34.56); Bitfinex BTCUSD +694 USD, max DD 570 USD, no
+//      compounding.
 //
 // OTHER INPUT SETS ON THE SAME DATA
 //  The file's original defaults (filter off): Bitfinex BTCUSD -52.9R (1355
@@ -72,17 +118,15 @@
 //  Every result above is from the full dataset the rule saw, so it is
 //    in-sample; the hold-out lines are the honest guide to what selection
 //    delivers out of sample. Not modelled: the Max Quantity and margin caps
-//    (results are per R). Re-check with Bar Magnifier and on new data before
-//    trading live.
-//  The trail is modelled pessimistically (an exit on the activation bar when
-//    that bar reaches the activation level); TradingView without Bar
-//    Magnifier may book trail exits differently.
-//  The strategy() properties keep the original 75 ticks of slippage and
-//    0.001% commission, so TradingView's report will differ from the R
-//    figures above (see the TradingView-properties line).
+//    in R results (see S3 SIZING where given). Re-check with Bar Magnifier
+//    and on new data before trading live.
+//  The trail arms on a bar close once the trade is far enough in profit and
+//    is live as a stop from the next bar (no intrabar activation), as in the
+//    Pine.
 // ============================================================================
 //
-// ---------------------------------------------------------------- original header
+// ------------------------------------------- original header of the master file
+// (describes the master file's design and defaults, NOT this file's defaults)
 //====================================================//
 // Danny Phantom FX V10.21.1 LiveSafe
 //====================================================//
@@ -130,7 +174,7 @@ strategy("Danny Phantom FX V10.21.1 LiveSafe FGF | BTCUSD 30m (calibrated)", sho
 
 groupPreset = "Preset"
 
-presetMode = input.string("Auto", "Preset Mode", options=["Auto", "AUDJPY 2m", "EURGBP 3m", "USDCAD 5m", "XAGUSD 5m", "XAUUSD 5m", "NAS100 5m", "Manual"], group=groupPreset, tooltip="Calibrated for BTCUSD 30m (see the header). Auto = the manual path on this chart (the XAUUSD preset applies only on a 5m chart); XAUUSD 5m forces that profile on any timeframe.")
+presetMode = input.string("Auto", "Preset Mode", options=["Auto", "AUDJPY 2m", "EURGBP 3m", "USDCAD 5m", "XAGUSD 5m", "XAUUSD 5m", "NAS100 5m", "Manual"], group=groupPreset, tooltip="Calibrated for BTCUSD 30m (see the header). Auto: no preset matches BTCUSD, so the manual inputs below apply.")
 
 v2Source = input.string("Auto Optimized Profile", "V2 Settings Source", options=["Auto Optimized Profile", "Manual V2 Toggles"], group=groupPreset, tooltip="Auto Optimized Profile loads the validated symbol profile. Manual V2 Toggles is honored only when Lock Auto Safety Profile is OFF or Preset Mode is Manual.")
 
@@ -162,8 +206,8 @@ appendExitReason = input.bool(false, "Append reason= To CLOSE Messages", group=g
 
 groupV2 = "V2 Optimizations (Manual)"
 
-useDeadExit = input.bool(false, "(2) Scratch Trades Not In Profit After N Bars", group=groupV2, tooltip="Calibrated for BTCUSD 30m (see the header). (manual path; the forced XAUUSD 5m profile turns it off)")
-deadBarsIn = input.int(15, "    Dead Trade Bars", minval=1, group=groupV2, tooltip="Calibrated for BTCUSD 30m (see the header).")
+useDeadExit = input.bool(true, "(2) Scratch Trades Not In Profit After N Bars", group=groupV2, tooltip="Calibrated for BTCUSD 30m (see the header).")
+deadBarsIn = input.int(30, "    Dead Trade Bars", minval=1, group=groupV2, tooltip="Calibrated for BTCUSD 30m (see the header).")
 
 useBreakeven = input.bool(false, "(4) Move Stop To Breakeven", group=groupV2)
 beTriggerAtr = input.float(1.0, "    Breakeven Trigger (ATR)", minval=0.1, step=0.1, group=groupV2)
@@ -178,7 +222,7 @@ entryWindowIn = input.session("0800-1200", "    Entry Window", group=groupV2)
 
 useOnePerZone = input.bool(false, "(8) One Entry Per Zone", group=groupV2, tooltip="Calibrated for BTCUSD 30m (see the header).")
 
-useCooldown = input.bool(true, "(9) Re-Entry Cooldown After Dead/Time Exit", group=groupV2, tooltip="Calibrated for BTCUSD 30m (see the header).")
+useCooldown = input.bool(false, "(9) Re-Entry Cooldown After Dead/Time Exit", group=groupV2, tooltip="Calibrated for BTCUSD 30m (see the header).")
 cooldownIn = input.int(10, "    Cooldown Bars", minval=1, group=groupV2, tooltip="Calibrated for BTCUSD 30m (see the header).")
 
 //====================================================//
@@ -203,22 +247,22 @@ manualEntryMode = input.string("Normal Retest Touch", "Entry Mode", options=["No
 
 gS2 = "S2. Exits"
 ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (the tested mode).")
-slPointsIn     = input.float(5000, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no stop loss (not recommended).")
-tpPointsIn     = input.float(50000, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no target.")
+slPointsIn     = input.float(16000, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode: calibrated for this file's signal inputs; $160.00 at a 0.01 tick (points = dollars / tick). 2018-2019 BTC prices: use ATR mode today.")
+tpPointsIn     = input.float(96000, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode target: $960.00.")
 atrLenS2       = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
 slAtrMultS2    = input.float(0.8, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Calibrated for BTCUSD 30m (see the header).")
 tpRS2          = input.float(0.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Calibrated for BTCUSD 30m (see the header). 0 = no target.")
 useTrailS2     = input.bool(true, "Trailing stop", group=gS2, tooltip="Calibrated for BTCUSD 30m (see the header).")
-trailActPts    = input.float(1000, "Trail activation, pts of profit (Points mode)", minval=0.0, step=1.0, group=gS2)
-trailPts       = input.float(100, "Trail distance, pts (Points mode)", minval=1.0, step=1.0, group=gS2)
+trailActPts    = input.float(4000, "Trail activation, pts of profit (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode trail activation: $40.00.")
+trailPts       = input.float(800, "Trail distance, pts (Points mode)", minval=1.0, step=1.0, group=gS2, tooltip="Points mode trail distance: $8.00.")
 trailActAtr    = input.float(4.0, "Trail activation, ATR mult (ATR mode)", minval=0.0, step=0.05, group=gS2, tooltip="Calibrated for BTCUSD 30m (see the header).")
 trailDstAtr    = input.float(0.2, "Trail distance, ATR mult (ATR mode)", minval=0.005, step=0.005, group=gS2, tooltip="Calibrated for BTCUSD 30m (see the header).")
 timeStopBars   = input.int(50, "Time stop, bars (0 = off)", minval=0, group=gS2, tooltip="Calibrated for BTCUSD 30m (see the header). 0 = off.")
 
 gS3 = "S3. Sizing"
 QtyMode    = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3, tooltip="Backtest sizing (strategy.entry qty). The live MT4 lot in the alert text is sized by the MT4 Lot Sizing group below.")
-fixedQtyS3 = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3)
-riskPctS3  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Quantity = equity x risk% / (stop distance x point value). Needs a stop loss > 0.")
+fixedQtyS3 = input.float(0.14, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3, tooltip="Fixed mode: the quantity that risks the default Risk % of $2,000 at the median stop (see the header).")
+riskPctS3  = input.float(0.25, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Calibrated: the largest tested risk whose compounded max drawdown stays within 20% on this timeframe's data (see the header).")
 maxQtyS3   = input.float(50, "Max quantity", minval=0.0, group=gS3)
 qtyStepS3  = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
 capMarginS3 = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
@@ -300,7 +344,7 @@ tradeOriginalDirection = input.bool(true, "Trade Original (Un-Inverted) Signals"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the filter can only be tested on the OANDA exports (see the header for its effect there).")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (the tested setting). Its effect could not be tested on this data (no filter columns), so it stays off.")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
