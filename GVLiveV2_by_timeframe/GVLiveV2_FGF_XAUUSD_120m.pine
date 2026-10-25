@@ -2,61 +2,85 @@
 // ============================================================================
 // GVLiveV2 FGF: XAUUSD 120m
 // STATUS: FALLBACK GENERAL SET. NOT calibrated for this timeframe (see below)
+// READ FIRST: the FRAGILITY lines below say where this result comes from.
 // ----------------------------------------------------------------------------
 // Same code as GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine (the master
 // file). Only this record, the strategy title and the input defaults listed
-// below differ. Record date 2026-10-25, rule v3.
+// below differ. Record date 2026-10-25, rule v3.1.
+//
+// FRAGILITY
+//  - OANDA XAUUSD: without the 10 biggest trades -14.2R (halves -15.8 /
+//    +1.6), without the 10 best entry days -14.2R; cost break-even $13.49
+//    extra per round trip; TradingView's own report shows +37.6R because the
+//    file's strategy() properties have commission 0 and slippage 0 (no costs
+//    at all).
+//  - VANTAGE XAUUSD: without the 10 biggest trades -4.3R (halves +20.9 /
+//    -25.2), without the 10 best entry days -4.3R; cost break-even $4.25
+//    extra per round trip; TradingView's own report shows +48.8R because the
+//    file's strategy() properties have commission 0 and slippage 0 (no costs
+//    at all).
 //
 // DATA AND COSTS
 //  - OANDA XAUUSD 120m: 2,421 bars, 2025-12-31 to 2026-10-14 (9.4 months)
 //  - VANTAGE XAUUSD 120m: 5,597 bars, 2025-01-01 to 2026-10-23 (21.6 months)
-//  The OANDA window lies inside the VANTAGE window, so the two datasets
-//    overlap from Dec 2025 to Oct 2026; their halves are not independent
-//    periods. VANTAGE Jan to Nov 2025 is the only slice the OANDA data does
-//    not cover.
+//  The OANDA data (2025-12-31 to 2026-10-14) lies inside the VANTAGE data
+//    (2025-01-01 to 2026-10-23); only VANTAGE 2025-01-01 to 2025-12-31 is not
+//    covered by OANDA. The halves are not calendar-disjoint: OANDA's halves
+//    split at 2026-05-25, VANTAGE's at 2025-11-26, so part of the months used
+//    to select on one dataset are scored on the other; the hold-out lines
+//    below therefore overstate the out-of-sample evidence.
 //  Costs: $0.30 spread per round trip, no commission, no slippage. Stop first
 //    when a bar touches both stop and target. R = the stop distance.
-//  Python replica of this script, swept over 730,944 input settings per
-//    dataset after cleaning (265,263 with distinct results). Dropped before
-//    ranking: 307,296 settings whose trail activation lies at or beyond the
-//    target (in the Pine the target always fills first) and 43,650 with no
-//    exit rule.
+//  Python replica of this script, swept over every setting of its input grid:
+//    OANDA XAUUSD 1,045,854 after cleaning (dropped 307,296 settings whose
+//    trail activation lies at or beyond the target and 43,650 with no exit
+//    rule); VANTAGE XAUUSD 939,348 after cleaning (dropped 265,392 settings
+//    whose trail activation lies at or beyond the target and 10,476 with no
+//    exit rule). 730,944 settings exist in every dataset; 265,263 have
+//    distinct results.
 //
-// RULE v3 (the same for every pair and timeframe)
+// RULE v3.1 (the same for every pair and timeframe)
 //  Candidates: at least 10 trades and a positive result in both halves of
-//    every dataset above. Pick: the best by worst half, on a plateau (at
-//    least 5 grid neighbours with a positive mean worst half). The pick is
-//    adopted only if (1) selecting on the first halves and scoring the second
-//    halves works: the 40 best are at least 60% positive with a positive
-//    mean, and that mean beats 95% of 2,000 random 40-setting draws from the
-//    same pool; (2) the reverse direction (select on the second halves) also
-//    beats 95% of such random draws; (3) the pick stays positive on every
-//    dataset under stressed costs. Otherwise the strategy's general set is
-//    used if it is positive in both halves of every dataset with PF >= 1.10
-//    and positive under stressed costs; otherwise no file is published for
-//    the timeframe.
+//    every dataset above. Pick: among the 40 best by worst half, the best by
+//    0.5 x worst half + 0.5 x the mean worst half of its clone-free grid
+//    neighbours (at least 5 neighbours with a positive mean). The pick is
+//    adopted only if (1) selecting on the first halves works on the second
+//    halves: the 40 best are at least 60% positive with a positive mean, the
+//    mean beats 95% of random 40-setting draws from the same pool, and the 40
+//    counted as their distinct entry-overlap clusters also beat random draws
+//    of that size; (2) the same two tests pass with the halves swapped; (3)
+//    the pick stays positive on every dataset under stressed costs. Otherwise
+//    the strategy's general set is used only if it is positive in both halves
+//    of every dataset with PF >= 1.10, positive under stressed costs and on a
+//    plateau in this timeframe's grid; otherwise no file is published for the
+//    timeframe.
 //
 // THIS TIMEFRAME
 //  20,021 candidates.
 //  Forward (select on first halves): the 40 best settings by the selection
-//    half score +1.1R on average on the other half, 55% positive; settings
-//    from the same pool average +2.4R (60% positive), and 95% of random
-//    40-setting draws stay below +6.7R (share of draws at or above the top
-//    40: 0.685). FAILED.
+//    half average +1.1R on the other half, 55% positive; settings from the
+//    same pool average +2.4R (60% positive) and 95% of random 40-setting
+//    draws stay below +6.7R. Counted as their 9 distinct entry-overlap
+//    clusters, the representatives average +22.4R against a 95th percentile
+//    of +11.3R for random 9-setting draws. FAILED.
 //  Reverse (select on second halves): the 40 best settings by the selection
-//    half score +54.9R on average on the other half, 100% positive; settings
-//    from the same pool average +2.2R (57% positive), and 95% of random
-//    40-setting draws stay below +5.4R (share of draws at or above the top
-//    40: 0.000). PASSED.
-//  Stress test of the pick: PASSED.
-//  DECISION: the per-timeframe rule is not trusted here, so this file carries
-//    the master-file hourly defaults (fallback). It was NOT selected for this
-//    timeframe.
+//    half average +54.9R on the other half, 100% positive; settings from the
+//    same pool average +2.2R (57% positive) and 95% of random 40-setting
+//    draws stay below +5.4R. Counted as their 10 distinct entry-overlap
+//    clusters, the representatives average +43.9R against a 95th percentile
+//    of +9.6R for random 10-setting draws. PASSED.
+//  Stress test of the rejected pick: PASSED.
+//  DECISION: the per-timeframe rule is not trusted here (forward hold-out
+//    failed: only 55% positive (60% needed), mean +1.1R not above the random
+//    95th percentile +6.7R), so this file carries the master-file hourly
+//    defaults (fallback). It was NOT selected for this timeframe.
 //  Where that set comes from: the master file's two-market defaults, picked
-//    on OANDA XAUUSD 60/120/240m and BTCUSD 60/120/240m jointly (in-sample
-//    there).
+//    on OANDA XAUUSD 60/120/240m and BTCUSD 60/120/240m jointly, so its check
+//    here is in-sample. Plateau in this grid: 14 clone-free neighbours, mean
+//    worst half +4.9R (79% positive in every half); two steps out 51%
+//    positive, mean -1.1R.
 //
-// THE DEFAULTS IN THIS FILE
+// THE DEFAULTS IN THIS FILE (S2 unit: ATR)
 //    EMA 8 / 21, trend EMA 100, RSI filter on, pre-candle Market Next Candle,
 //    radar Chart, min vol score 35, vol rise 1, close location 0.65, trend
 //    direction on, SL 1 x ATR(14), TP 5R, no trail, no time stop, no $ daily
@@ -65,17 +89,20 @@
 //    OANDA XAUUSD: +36.8R, 82 trades, PF 1.57, win 24%, max DD 17.0R, halves
 //      +15.3 / +21.5, thirds +12.9 / +4.5 / +19.3, 7 of 11 months positive,
 //      best 2 months = 81% of the total, worst month -16.0R, longest losing
-//      streak 16 trades, without the 5 biggest winners +10.7R
+//      streak 16 trades
 //    VANTAGE XAUUSD: +45.6R, 209 trades, PF 1.27, win 21%, max DD 21.7R,
 //      halves +25.9 / +19.7, thirds -1.5 / +44.0 / +3.1, 11 of 22 months
 //      positive, best 2 months = 63% of the total, worst month -9.1R, longest
-//      losing streak 16 trades, without the 5 biggest winners +20.6R
+//      losing streak 16 trades
 //    OANDA XAUUSD: spread $0.50 + 1 tick/side +36.2R (halves +15.1 / +21.1);
-//      spread $1.00 + 1 tick/side +34.9R; best-case intrabar fills +36.8R;
-//      with the 3-losing-trades daily lock OFF +36.8R (82 trades); with the
-//      direction filter ON (OANDA export columns) +6.4R, 36 trades, PF 1.22
+//      spread $1.00 + 1 tick/side +34.9R; break-even extra cost $13.49 per
+//      round trip on top of the $0.30 spread; best-case intrabar fills
+//      +36.8R; with the 3-losing-trades daily lock OFF +36.8R (82 trades);
+//      with the direction filter ON (OANDA export columns) +6.4R, 36 trades,
+//      PF 1.22
 //    VANTAGE XAUUSD: spread $0.50 + 1 tick/side +43.2R (halves +24.3 /
-//      +18.9); spread $1.00 + 1 tick/side +37.9R; best-case intrabar fills
+//      +18.9); spread $1.00 + 1 tick/side +37.9R; break-even extra cost $4.25
+//      per round trip on top of the $0.30 spread; best-case intrabar fills
 //      +45.6R; with the 3-losing-trades daily lock OFF +45.6R (209 trades)
 //    OANDA XAUUSD: 33% of the trades (+2.1R) come from the EMA-cross entry.
 //      That entry is not limited to closed bars while the script calculates
@@ -105,8 +132,8 @@
 //  Every result above is from the full dataset the rule saw, so it is
 //    in-sample; the hold-out lines are the honest guide to what selection
 //    delivers out of sample. Not modelled: the Max Quantity and margin caps
-//    (results are per R), Polymarket settlement. Re-check with Bar Magnifier
-//    and on new data before trading live.
+//    in R results (see S3 SIZING where given), Polymarket settlement.
+//    Re-check with Bar Magnifier and on new data before trading live.
 // ============================================================================
 strategy("GVLiveV2 FGF | XAUUSD 120m (fallback, not calibrated for this TF)", shorttitle="GV2 XAU 120m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
@@ -230,7 +257,7 @@ flat_session = input.session("0930-1545", "Must Be Flat Outside This NY Session"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the filter can only be tested on the OANDA exports (see the header for its effect there).")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (the tested setting). The header gives the result with the filter on, from the OANDA export columns.")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")

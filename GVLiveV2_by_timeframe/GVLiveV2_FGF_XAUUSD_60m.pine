@@ -1,57 +1,78 @@
 //@version=6
 // ============================================================================
 // GVLiveV2 FGF: XAUUSD 60m
-// STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (hold-out passed both ways)
+// STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (rule v3.1 hold-out passed)
+// READ FIRST: the FRAGILITY lines below say where this result comes from.
 // ----------------------------------------------------------------------------
 // Same code as GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine (the master
 // file). Only this record, the strategy title and the input defaults listed
-// below differ. Record date 2026-10-25, rule v3.
+// below differ. Record date 2026-10-25, rule v3.1.
+//
+// FRAGILITY
+//  - OANDA XAUUSD: without the 10 biggest trades +22.2R (halves -6.0 /
+//    +28.2), without the 10 best entry days +18.3R; cost break-even $8.42
+//    extra per round trip; TradingView's own report shows +78.6R because the
+//    file's strategy() properties have commission 0 and slippage 0 (no costs
+//    at all).
+//  - VANTAGE XAUUSD: without the 10 biggest trades +82.3R (halves +59.6 /
+//    +22.7), without the 10 best entry days +82.3R; cost break-even $3.66
+//    extra per round trip; TradingView's own report shows +143.2R because the
+//    file's strategy() properties have commission 0 and slippage 0 (no costs
+//    at all).
 //
 // DATA AND COSTS
 //  - OANDA XAUUSD 60m: 4,751 bars, 2025-12-23 to 2026-10-14 (9.7 months)
 //  - VANTAGE XAUUSD 60m: 10,725 bars, 2025-01-01 to 2026-10-23 (21.6 months)
-//  The OANDA window lies inside the VANTAGE window, so the two datasets
-//    overlap from Dec 2025 to Oct 2026; their halves are not independent
-//    periods. VANTAGE Jan to Nov 2025 is the only slice the OANDA data does
-//    not cover.
+//  The OANDA data (2025-12-23 to 2026-10-14) lies inside the VANTAGE data
+//    (2025-01-01 to 2026-10-23); only VANTAGE 2025-01-01 to 2025-12-23 is not
+//    covered by OANDA. The halves are not calendar-disjoint: OANDA's halves
+//    split at 2026-05-21, VANTAGE's at 2025-11-26, so part of the months used
+//    to select on one dataset are scored on the other; the hold-out lines
+//    below therefore overstate the out-of-sample evidence.
 //  Costs: $0.30 spread per round trip, no commission, no slippage. Stop first
 //    when a bar touches both stop and target. R = the stop distance.
-//  Python replica of this script, swept over 730,944 input settings per
-//    dataset after cleaning (271,233 with distinct results). Dropped before
-//    ranking: 307,296 settings whose trail activation lies at or beyond the
-//    target (in the Pine the target always fills first) and 43,650 with no
-//    exit rule.
+//  Python replica of this script, swept over every setting of its input grid:
+//    OANDA XAUUSD 1,045,854 after cleaning (dropped 307,296 settings whose
+//    trail activation lies at or beyond the target and 43,650 with no exit
+//    rule); VANTAGE XAUUSD 939,348 after cleaning (dropped 265,392 settings
+//    whose trail activation lies at or beyond the target and 10,476 with no
+//    exit rule). 730,944 settings exist in every dataset; 271,233 have
+//    distinct results.
 //
-// RULE v3 (the same for every pair and timeframe)
+// RULE v3.1 (the same for every pair and timeframe)
 //  Candidates: at least 15 trades and a positive result in both halves of
-//    every dataset above. Pick: the best by worst half, on a plateau (at
-//    least 5 grid neighbours with a positive mean worst half). The pick is
-//    adopted only if (1) selecting on the first halves and scoring the second
-//    halves works: the 40 best are at least 60% positive with a positive
-//    mean, and that mean beats 95% of 2,000 random 40-setting draws from the
-//    same pool; (2) the reverse direction (select on the second halves) also
-//    beats 95% of such random draws; (3) the pick stays positive on every
-//    dataset under stressed costs. Otherwise the strategy's general set is
-//    used if it is positive in both halves of every dataset with PF >= 1.10
-//    and positive under stressed costs; otherwise no file is published for
-//    the timeframe.
+//    every dataset above. Pick: among the 40 best by worst half, the best by
+//    0.5 x worst half + 0.5 x the mean worst half of its clone-free grid
+//    neighbours (at least 5 neighbours with a positive mean). The pick is
+//    adopted only if (1) selecting on the first halves works on the second
+//    halves: the 40 best are at least 60% positive with a positive mean, the
+//    mean beats 95% of random 40-setting draws from the same pool, and the 40
+//    counted as their distinct entry-overlap clusters also beat random draws
+//    of that size; (2) the same two tests pass with the halves swapped; (3)
+//    the pick stays positive on every dataset under stressed costs. Otherwise
+//    the strategy's general set is used only if it is positive in both halves
+//    of every dataset with PF >= 1.10, positive under stressed costs and on a
+//    plateau in this timeframe's grid; otherwise no file is published for the
+//    timeframe.
 //
 // THIS TIMEFRAME
 //  7,817 candidates.
 //  Forward (select on first halves): the 40 best settings by the selection
-//    half score +52.8R on average on the other half, 93% positive; settings
-//    from the same pool average -4.6R (38% positive), and 95% of random
-//    40-setting draws stay below +0.7R (share of draws at or above the top
-//    40: 0.000). PASSED.
+//    half average +52.8R on the other half, 93% positive; settings from the
+//    same pool average -4.6R (38% positive) and 95% of random 40-setting
+//    draws stay below +0.7R. Counted as their 16 distinct entry-overlap
+//    clusters, the representatives average +40.3R against a 95th percentile
+//    of +4.2R for random 16-setting draws. PASSED.
 //  Reverse (select on second halves): the 40 best settings by the selection
-//    half score +11.8R on average on the other half, 62% positive; settings
-//    from the same pool average -3.3R (36% positive), and 95% of random
-//    40-setting draws stay below +3.6R (share of draws at or above the top
-//    40: 0.000). PASSED.
+//    half average +11.8R on the other half, 62% positive; settings from the
+//    same pool average -3.3R (36% positive) and 95% of random 40-setting
+//    draws stay below +3.6R. Counted as their 9 distinct entry-overlap
+//    clusters, the representatives average +29.7R against a 95th percentile
+//    of +11.2R for random 9-setting draws. PASSED.
 //  Stress test of the pick: PASSED.
 //  DECISION: the per-timeframe pick is the default set in this file.
 //
-// THE DEFAULTS IN THIS FILE
+// THE DEFAULTS IN THIS FILE (S2 unit: ATR)
 //    EMA 5 / 13, trend EMA 200, RSI filter off, pre-candle Market Next
 //    Candle, radar Chart, min vol score 35, vol rise 1, close location 0.75,
 //    trend direction off, SL 1 x ATR(14), TP 5R, no trail, no time stop, no $
@@ -60,18 +81,22 @@
 //    OANDA XAUUSD: +75.9R, 194 trades, PF 1.5, win 24%, max DD 16.5R, halves
 //      +42.7 / +33.2, thirds +46.0 / -7.9 / +37.8, 6 of 11 months positive,
 //      best 2 months = 84% of the total, worst month -7.3R, longest losing
-//      streak 16 trades, without the 5 biggest winners +47.2R
+//      streak 16 trades
 //    VANTAGE XAUUSD: +132.3R, 490 trades, PF 1.33, win 22%, max DD 17.7R,
 //      halves +59.6 / +72.7, thirds +46.5 / +49.0 / +36.9, 15 of 22 months
 //      positive, best 2 months = 40% of the total, worst month -5.1R, longest
-//      losing streak 16 trades, without the 5 biggest winners +107.3R
+//      losing streak 16 trades
 //    OANDA XAUUSD: spread $0.50 + 1 tick/side +74.1R (halves +42.0 / +32.1);
-//      spread $1.00 + 1 tick/side +69.6R; best-case intrabar fills +75.9R;
-//      with the 3-losing-trades daily lock OFF +72.9R (197 trades); with the
-//      direction filter ON (OANDA export columns) +10.8R, 106 trades, PF 1.12
+//      spread $1.00 + 1 tick/side +69.6R; break-even extra cost $8.42 per
+//      round trip on top of the $0.30 spread; best-case intrabar fills
+//      +75.9R; with the 3-losing-trades daily lock OFF +72.9R (197 trades);
+//      with the direction filter ON (OANDA export columns) +10.8R, 106
+//      trades, PF 1.12
 //    VANTAGE XAUUSD: spread $0.50 + 1 tick/side +124.4R (halves +54.2 /
-//      +70.2); spread $1.00 + 1 tick/side +106.3R; best-case intrabar fills
-//      +132.3R; with the 3-losing-trades daily lock OFF +130.2R (498 trades)
+//      +70.2); spread $1.00 + 1 tick/side +106.3R; break-even extra cost
+//      $3.66 per round trip on top of the $0.30 spread; best-case intrabar
+//      fills +132.3R; with the 3-losing-trades daily lock OFF +130.2R (498
+//      trades)
 //    OANDA XAUUSD: 28% of the trades (+36.0R) come from the EMA-cross entry.
 //      That entry is not limited to closed bars while the script calculates
 //      on every tick, so live it can fire mid-bar; the backtest fills it at
@@ -80,8 +105,9 @@
 //      entry. That entry is not limited to closed bars while the script
 //      calculates on every tick, so live it can fire mid-bar; the backtest
 //      fills it at the bar close.
-//    Plateau: worst half +33.2R; 13 grid neighbours, mean worst half +9.6R,
-//    69% of them positive in every half.
+//    Plateau: worst half +33.2R; 13 clone-free grid neighbours, mean worst
+//    half +9.6R, 69% of them positive in every half; two steps out 82
+//    settings, 46% positive in every half, mean worst half -4.0R.
 //
 // OTHER INPUT SETS ON THE SAME DATA
 //  Master-file hourly defaults: OANDA XAUUSD +43.8R (163 trades, PF 1.33),
@@ -93,8 +119,8 @@
 //  Every result above is from the full dataset the rule saw, so it is
 //    in-sample; the hold-out lines are the honest guide to what selection
 //    delivers out of sample. Not modelled: the Max Quantity and margin caps
-//    (results are per R), Polymarket settlement. Re-check with Bar Magnifier
-//    and on new data before trading live.
+//    in R results (see S3 SIZING where given), Polymarket settlement.
+//    Re-check with Bar Magnifier and on new data before trading live.
 // ============================================================================
 strategy("GVLiveV2 FGF | XAUUSD 60m (calibrated)", shorttitle="GV2 XAU 60m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
@@ -218,7 +244,7 @@ flat_session = input.session("0930-1545", "Must Be Flat Outside This NY Session"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the filter can only be tested on the OANDA exports (see the header for its effect there).")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (the tested setting). The header gives the result with the filter on, from the OANDA export columns.")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
