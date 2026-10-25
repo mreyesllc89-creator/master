@@ -11,6 +11,20 @@
 //   - process_orders_on_close = true
 //   - V10.21 NAS100 adaptive 10/12-bar dead exit
 //
+// S2 / S3 (2026-10-25): the "Manual Risk Management" group, the preset SL / TP /
+// trail / max-bars profile values, the V2 max-bars and SL/TP override inputs and
+// the preset-group sizing inputs are replaced by two groups:
+//   S2. Exits  - unit Points or ATR, stop, take profit (points or an R multiple of
+//                the stop), ATR length, trailing stop (activation + distance), time
+//                stop (bars, 0 = off). Distances are measured from the fill price.
+//                Defaults = the V10.21 XAUUSD / NAS100 profile (1.2 ATR stop, 5.0
+//                ATR target = 4.1667 R, no trail, 50 bars).
+//   S3. Sizing - Fixed or Risk % quantity, max quantity, quantity step, cap to
+//                available margin. The MT4 lot in the alert text is still sized
+//                by the MT4 Lot Sizing group.
+// Everything else (zones, filters, dead exit, breakeven, blackout, cooldown,
+// loss cluster, LiveSafe locks, alerts) is unchanged.
+//
 // LiveSafe hardening:
 //   1) one entry/reversal decision per chart bar
 //   2) one forced-flat order per chart bar
@@ -45,12 +59,6 @@ useV1021NasAdaptiveDead = input.bool(true, "Use V10.21 NAS100 Adaptive 10/12-Bar
 
 nasAdaptiveRunupAtr = input.float(2.0, "    NAS100 Extension Run-Up Threshold (ATR)", minval=0.5, maxval=5.0, step=0.25, group=groupPreset)
 
-riskPercent = input.float(1.0, "Risk % Per Trade", minval=0.1, step=0.1, group=groupPreset, tooltip="Simulation-only compounding risk when ATR Risk Sizing is ON.")
-
-useRiskSizing = input.bool(false, "Use 1% ATR Risk Sizing (SIMULATION ONLY)", group=groupPreset, tooltip="Backtest-only. It does not control the live MT4 lot field.")
-
-fixedQty = input.float(1.0, "Fixed Qty If Risk Sizing Off", minval=0.01, step=0.01, group=groupPreset)
-
 //====================================================//
 // LIVE EXECUTION SAFETY
 //====================================================//
@@ -71,15 +79,8 @@ appendExitReason = input.bool(false, "Append reason= To CLOSE Messages", group=g
 
 groupV2 = "V2 Optimizations (Manual)"
 
-useV2MaxBars = input.bool(true, "(1) Use Reduced Max Bars In Trade", group=groupV2)
-v2MaxBars = input.int(50, "    Max Bars In Trade (V2)", minval=1, group=groupV2)
-
 useDeadExit = input.bool(true, "(2) Scratch Trades Not In Profit After N Bars", group=groupV2)
 deadBarsIn = input.int(15, "    Dead Trade Bars", minval=1, group=groupV2)
-
-useSlTpOverride = input.bool(false, "(3) Override SL/TP ATR Multipliers", group=groupV2)
-slOverride = input.float(1.2, "    SL ATR Override", minval=0.1, step=0.1, group=groupV2)
-tpOverride = input.float(4.0, "    TP ATR Override", minval=0.1, step=0.1, group=groupV2)
 
 useBreakeven = input.bool(false, "(4) Move Stop To Breakeven", group=groupV2)
 beTriggerAtr = input.float(1.0, "    Breakeven Trigger (ATR)", minval=0.1, step=0.1, group=groupV2)
@@ -117,13 +118,28 @@ manualZoneTrend = input.bool(false, "Only Create Zones With EMA Trend", group=gr
 groupEntry = "Manual Entry Filter"
 manualEntryMode = input.string("Normal Retest Touch", "Entry Mode", options=["Normal Retest Touch", "Close Beyond Key Zone"], group=groupEntry)
 
-groupRisk = "Manual Risk Management"
-manualAtrLength = input.int(14, "ATR Length", minval=1, group=groupRisk)
-manualSlAtrMult = input.float(3.0, "Stop Loss ATR Multiplier", step=0.1, group=groupRisk)
-manualTpAtrMult = input.float(6.0, "Take Profit ATR Multiplier", step=0.1, group=groupRisk)
-manualUseTrailing = input.bool(false, "Use Trailing Stop", group=groupRisk)
-manualTrailAtrMult = input.float(2.0, "Trailing Stop ATR Multiplier", step=0.1, group=groupRisk)
-manualMaxBarsInTrade = input.int(200, "Max Bars In Trade (Legacy)", minval=1, group=groupRisk)
+gS2 = "S2. Exits"
+ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="Replaces the preset / manual SL, TP, trailing and max-bars settings of V10.21. Points: fixed distances in points (mintick units). ATR: distances scale with ATR(length) at the signal bar. All distances are measured from the fill price.")
+slPointsIn     = input.float(5000, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no stop loss (not recommended).")
+tpPointsIn     = input.float(50000, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 = no target.")
+atrLenS2       = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
+slAtrMultS2    = input.float(1.2, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="1.2 = the V10.21 XAUUSD / NAS100 profile.")
+tpRS2          = input.float(4.1667, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Target = this many times the stop distance. 4.1667 x 1.2 ATR = the V10.21 profile's 5.0 ATR target. 0 = no target.")
+useTrailS2     = input.bool(false, "Trailing stop", group=gS2, tooltip="Arms once the trade is this far in profit (activation), then trails the close by the distance. The V10.21 profiles used a trail on XAGUSD only.")
+trailActPts    = input.float(1000, "Trail activation, pts of profit (Points mode)", minval=0.0, step=1.0, group=gS2)
+trailPts       = input.float(100, "Trail distance, pts (Points mode)", minval=1.0, step=1.0, group=gS2)
+trailActAtr    = input.float(4.0, "Trail activation, ATR mult (ATR mode)", minval=0.0, step=0.05, group=gS2)
+trailDstAtr    = input.float(0.2, "Trail distance, ATR mult (ATR mode)", minval=0.005, step=0.005, group=gS2)
+timeStopBars   = input.int(50, "Time stop, bars (0 = off)", minval=0, group=gS2, tooltip="Closes the trade at the bar close once it has been open this many bars (the V10.21 'Max Bars In Trade', 50 on the top-three profiles). The dead-trade exit, blackout close and cooldown are unchanged.")
+
+gS3 = "S3. Sizing"
+QtyMode    = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3, tooltip="Backtest sizing (strategy.entry qty). The live MT4 lot in the alert text is sized by the MT4 Lot Sizing group below.")
+fixedQtyS3 = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3)
+riskPctS3  = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Quantity = equity x risk% / (stop distance x point value). Needs a stop loss > 0.")
+maxQtyS3   = input.float(50, "Max quantity", minval=0.0, group=gS3)
+qtyStepS3  = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
+capMarginS3 = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
+marginPctS3 = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.0, step=0.5, group=gS3)
 
 groupSession = "Session Filter"
 useSessionFilter = input.bool(false, "Use NY Cash Session Filter", group=groupSession)
@@ -823,13 +839,8 @@ bool useProfile = usingFxPreset and (lockAutoProfile or v2Source == "Auto Optimi
 // PER-SYMBOL PROFILES
 //====================================================//
 
-float legacyProfSl = presetAUDJPY ? 1.8 : presetEURGBP ? 1.5 : presetUSDCAD ? 1.8 : topThreePreset ? 2.0 : manualSlAtrMult
-float profSl = useV106GrowthSlTp and topThreePreset ? 1.2 : legacyProfSl
-float profTp = presetAUDJPY ? 3.6 : presetEURGBP ? 4.5 : presetUSDCAD ? 4.5 : presetXAGUSD ? 4.0 : (presetXAUUSD or presetNAS100) ? 5.0 : manualTpAtrMult
-
-bool profTrailOn = presetXAGUSD
-float profTrailAtr = presetXAGUSD ? 2.5 : manualTrailAtrMult
-int profMaxBars = topThreePreset ? 50 : 25
+// SL / TP / trailing / max bars: the S2. Exits group replaces the V10.21 profile values
+// (XAUUSD / NAS100 1.2 ATR SL, 5.0 ATR TP; XAGUSD trail 2.5 ATR; 50 bars) on every preset.
 bool profDeadOn = not presetXAUUSD
 int profDeadBars = presetNAS100 ? 10 : 15
 bool profBeOn = false
@@ -851,16 +862,11 @@ int zoneLengthInput = usingFxPreset ? 50 : manualZoneLength
 float deltaThresholdInput = usingFxPreset ? 1.5 : manualDeltaThreshold
 int emaLength = usingFxPreset ? 100 : manualEmaLength
 
-float baseSl = useProfile ? profSl : (usingFxPreset ? profSl : manualSlAtrMult)
-float baseTp = useProfile ? profTp : (usingFxPreset ? profTp : manualTpAtrMult)
-float slAtrMult = useSlTpOverride ? slOverride : baseSl
-float tpAtrMult = useSlTpOverride ? tpOverride : baseTp
-
-bool useTrailing = useProfile ? profTrailOn : (presetXAGUSD ? true : manualUseTrailing)
-float trailAtrMult = useProfile ? profTrailAtr : (presetXAGUSD ? 2.5 : manualTrailAtrMult)
-
-int legacyMaxBars = usingFxPreset ? 200 : manualMaxBarsInTrade
-int maxBarsInTrade = useProfile ? profMaxBars : (useV2MaxBars ? v2MaxBars : legacyMaxBars)
+// S2. Exits (replaces the profile / manual / override SL, TP, trailing and max-bars settings)
+float slAtrMult = ExitMode == "ATR" ? slAtrMultS2 : na
+float tpAtrMult = ExitMode == "ATR" ? slAtrMultS2 * tpRS2 : na
+bool useTrailing = useTrailS2
+int maxBarsInTrade = timeStopBars
 bool deadExitActive = useProfile ? profDeadOn : useDeadExit
 int deadBars = useProfile ? profDeadBars : deadBarsIn
 bool breakevenActive = useProfile ? profBeOn : useBreakeven
@@ -880,7 +886,7 @@ bool zoneTrendFilter = presetMode == "Manual" ? manualZoneTrend : false
 bool invalidateZones = manualInvalidate
 int minRetestBars = manualMinRetestBars
 int maxZoneAge = manualMaxZoneAge
-int atrLength = manualAtrLength
+int atrLength = atrLenS2
 
 float contractSize = contractOverride > 0.0 ? contractOverride : presetXAUUSD ? 100.0 : presetXAGUSD ? 5000.0 : presetNAS100 ? 1.0 : (presetAUDJPY or presetEURGBP or presetUSDCAD) ? 100000.0 : 1.0
 
@@ -1002,6 +1008,12 @@ var float longAtrAtEntry = na
 var float shortAtrAtEntry = na
 var float pendingLongAtr = na
 var float pendingShortAtr = na
+var float pendingSlDist = na
+var float pendingTpDist = na
+var float slDistAtEntry = na
+var float tpDistAtEntry = na
+var bool trailArmedLong = false
+var bool trailArmedShort = false
 var bool beArmedLong = false
 var bool beArmedShort = false
 
@@ -1030,13 +1042,19 @@ float avgDelta = ta.sma(math.abs(volumeDelta), zoneLengthInput)
 float emaValue = ta.ema(close, emaLength)
 float atrValue = ta.atr(atrLength)
 
+// S2 exit geometry (price units, from the fill price)
+float slDistNow = ExitMode == "Points" ? slPointsIn * syminfo.mintick : atrValue * slAtrMultS2
+float tpDistNow = ExitMode == "Points" ? (tpPointsIn > 0 ? tpPointsIn * syminfo.mintick : na) : (tpRS2 > 0 ? slDistNow * tpRS2 : na)
+float trailActNow = ExitMode == "Points" ? trailActPts * syminfo.mintick : atrValue * trailActAtr
+float trailDstNow = ExitMode == "Points" ? trailPts * syminfo.mintick : math.max(atrValue * trailDstAtr, syminfo.mintick)
+
 bool topThreeCostProfile = topThreePreset
 int autoModeledSlippageTicks = presetXAGUSD ? 1000 : 75
 int modeledSlippageTicks = modeledSlippageTicksOverride > 0 ? modeledSlippageTicksOverride : autoModeledSlippageTicks
 float estimatedRoundTripSlippage = 2.0 * modeledSlippageTicks * syminfo.mintick
 float estimatedRoundTripCommission = close * 0.00002
 float estimatedRoundTripCost = estimatedRoundTripSlippage + estimatedRoundTripCommission
-float currentAtrStopDistance = atrValue * slAtrMult
+float currentAtrStopDistance = slDistNow
 float stopToCostRatio = estimatedRoundTripCost > 0.0 ? currentAtrStopDistance / estimatedRoundTripCost : na
 bool volatilityCostBlock = useV1013VolCostFilter and topThreeCostProfile and not na(stopToCostRatio) and stopToCostRatio < minStopToCostRatio
 
@@ -1057,7 +1075,7 @@ bool standardDeadShort = deadExitActive and positionShortNotProfitable and not n
 
 bool deadLong = presetNAS100 and useV1021NasAdaptiveDead ? positionLongNotProfitable and (nasAdaptiveEarlyExit or nasAdaptiveFallbackExit) : standardDeadLong
 bool deadShort = presetNAS100 and useV1021NasAdaptiveDead ? positionShortNotProfitable and (nasAdaptiveEarlyExit or nasAdaptiveFallbackExit) : standardDeadShort
-bool timeExit = strategy.position_size != 0 and not na(barsInTrade) and barsInTrade >= maxBarsInTrade
+bool timeExit = maxBarsInTrade > 0 and strategy.position_size != 0 and not na(barsInTrade) and barsInTrade >= maxBarsInTrade
 bool blackoutExitIntent = (blackoutActive or preBlackoutClose) and strategy.position_size != 0
 bool forcedExitThisBar = deadLong or deadShort or timeExit or blackoutExitIntent
 
@@ -1137,21 +1155,25 @@ if isSupplySpike
 // POSITION SIZE / ALERT HELPERS
 //====================================================//
 
-f_qty(float atrForStop) =>
-    float stopDistance = atrForStop * slAtrMult
-    float riskCash = strategy.equity * riskPercent / 100.0
+f_qty(float stopDistance) =>
     float pointValue = syminfo.pointvalue > 0 ? syminfo.pointvalue : 1.0
-    float rawQty = stopDistance > syminfo.mintick ? riskCash / (stopDistance * pointValue) : fixedQty
-    useRiskSizing ? math.max(rawQty, 0.0) : fixedQty
+    float q = fixedQtyS3
+    if QtyMode == "Risk %"
+        float stopCash = stopDistance * pointValue
+        q := stopCash > 0 ? strategy.equity * riskPctS3 / 100.0 / stopCash : 0.0
+    q := math.min(q, maxQtyS3)
+    if capMarginS3 and marginPctS3 > 0
+        q := math.min(q, strategy.equity / (close * pointValue * marginPctS3 / 100.0))
+    math.floor(q / qtyStepS3 + 1e-9) * qtyStepS3
 
 f_audit_suffix(string action, string reason) =>
     string idPart = appendLiveSafeId ? " | id=" + str.upper(syminfo.ticker) + "-" + str.tostring(time) + "-" + action : ""
     string reasonPart = appendExitReason and reason != "" ? " | reason=" + reason : ""
     idPart + reasonPart
 
-int slPoints = math.round((atrValue * slAtrMult) / webhookPointSize)
-int tpPoints = math.round((atrValue * tpAtrMult) / webhookPointSize)
-float slPriceDist = atrValue * slAtrMult
+int slPoints = math.round(slDistNow / webhookPointSize)
+int tpPoints = na(tpDistNow) ? 0 : math.round(tpDistNow / webhookPointSize)
+float slPriceDist = slDistNow
 float usdPerLotPerPoint = contractSize * quoteUsd
 float rawLots = slPriceDist > 0 and usdPerLotPerPoint > 0 ? (mt4Balance * mt4RiskPct / 100.0) / (slPriceDist * usdPerLotPerPoint) : minLot
 float mt4Lots = math.max(minLot, math.min(maxLot, math.floor(rawLots / lotStep) * lotStep))
@@ -1190,9 +1212,11 @@ bool shortEntrySubmittedThisBar = (not na(lastShortSubmissionBar) and lastShortS
 //====================================================//
 
 if canSubmitEntryThisBar and invertedBuySignal and strategy.position_size <= 0 and fgfBuyOk
-    float qtyLong = f_qty(atrValue)
+    float qtyLong = f_qty(slDistNow)
     pendingLongAtr := atrValue
     pendingShortAtr := na
+    pendingSlDist := slDistNow
+    pendingTpDist := tpDistNow
     strategy.entry("Inverted Long", strategy.long, qty=qtyLong, alert_message=buyAlertMsg)
     lastLongSubmissionBar := bar_index
     lastLongSubmissionTime := time
@@ -1213,9 +1237,11 @@ if canSubmitEntryThisBar and invertedBuySignal and strategy.position_size <= 0 a
             supplyKeyBottom := na
             supplyBar := na
 else if canSubmitEntryThisBar and invertedSellSignal and strategy.position_size >= 0 and fgfSellOk
-    float qtyShort = f_qty(atrValue)
+    float qtyShort = f_qty(slDistNow)
     pendingShortAtr := atrValue
     pendingLongAtr := na
+    pendingSlDist := slDistNow
+    pendingTpDist := tpDistNow
     strategy.entry("Inverted Short", strategy.short, qty=qtyShort, alert_message=sellAlertMsg)
     lastShortSubmissionBar := bar_index
     lastShortSubmissionTime := time
@@ -1256,6 +1282,10 @@ plot(ta.cum(fgdBlockedShort ? 1 : 0), "FGD blocked short count", display = displ
 
 if strategy.position_size > 0 and na(longAtrAtEntry)
     longAtrAtEntry := not na(pendingLongAtr) ? pendingLongAtr : atrValue
+    slDistAtEntry := not na(pendingSlDist) ? pendingSlDist : slDistNow
+    tpDistAtEntry := not na(pendingSlDist) ? pendingTpDist : tpDistNow
+    trailArmedLong := false
+    trailArmedShort := false
     shortAtrAtEntry := na
     pendingLongAtr := na
     pendingShortAtr := na
@@ -1264,6 +1294,10 @@ if strategy.position_size > 0 and na(longAtrAtEntry)
 
 if strategy.position_size < 0 and na(shortAtrAtEntry)
     shortAtrAtEntry := not na(pendingShortAtr) ? pendingShortAtr : atrValue
+    slDistAtEntry := not na(pendingSlDist) ? pendingSlDist : slDistNow
+    tpDistAtEntry := not na(pendingSlDist) ? pendingTpDist : tpDistNow
+    trailArmedLong := false
+    trailArmedShort := false
     longAtrAtEntry := na
     pendingLongAtr := na
     pendingShortAtr := na
@@ -1273,6 +1307,12 @@ if strategy.position_size < 0 and na(shortAtrAtEntry)
 if strategy.position_size == 0
     longAtrAtEntry := na
     shortAtrAtEntry := na
+    slDistAtEntry := na
+    tpDistAtEntry := na
+    pendingSlDist := na
+    pendingTpDist := na
+    trailArmedLong := false
+    trailArmedShort := false
     beArmedLong := false
     beArmedShort := false
 
@@ -1284,12 +1324,15 @@ var float trailStopLong = na
 var float trailStopShort = na
 
 if strategy.position_size > 0 and not na(longAtrAtEntry)
-    float longStop = strategy.position_avg_price - longAtrAtEntry * slAtrMult
-    float longTarget = strategy.position_avg_price + longAtrAtEntry * tpAtrMult
+    float longStop = slDistAtEntry > 0 ? strategy.position_avg_price - slDistAtEntry : na
+    float longTarget = na(tpDistAtEntry) ? na : strategy.position_avg_price + tpDistAtEntry
     if useTrailing
-        float newTrail = close - atrValue * trailAtrMult
-        trailStopLong := na(trailStopLong) ? longStop : math.max(trailStopLong, newTrail)
-        longStop := trailStopLong
+        if close - strategy.position_avg_price >= trailActNow
+            trailArmedLong := true
+        if trailArmedLong
+            float newTrail = close - trailDstNow
+            trailStopLong := na(trailStopLong) ? newTrail : math.max(trailStopLong, newTrail)
+            longStop := na(longStop) ? trailStopLong : math.max(longStop, trailStopLong)
     if breakevenActive
         if close >= strategy.position_avg_price + longAtrAtEntry * beTrigger
             beArmedLong := true
@@ -1300,12 +1343,15 @@ else
     trailStopLong := na
 
 if strategy.position_size < 0 and not na(shortAtrAtEntry)
-    float shortStop = strategy.position_avg_price + shortAtrAtEntry * slAtrMult
-    float shortTarget = strategy.position_avg_price - shortAtrAtEntry * tpAtrMult
+    float shortStop = slDistAtEntry > 0 ? strategy.position_avg_price + slDistAtEntry : na
+    float shortTarget = na(tpDistAtEntry) ? na : strategy.position_avg_price - tpDistAtEntry
     if useTrailing
-        float newTrail = close + atrValue * trailAtrMult
-        trailStopShort := na(trailStopShort) ? shortStop : math.min(trailStopShort, newTrail)
-        shortStop := trailStopShort
+        if strategy.position_avg_price - close >= trailActNow
+            trailArmedShort := true
+        if trailArmedShort
+            float newTrail = close + trailDstNow
+            trailStopShort := na(trailStopShort) ? newTrail : math.min(trailStopShort, newTrail)
+            shortStop := na(shortStop) ? trailStopShort : math.min(shortStop, trailStopShort)
     if breakevenActive
         if close <= strategy.position_avg_price - shortAtrAtEntry * beTrigger
             beArmedShort := true
@@ -1395,7 +1441,7 @@ if barstate.islast
     table.cell(infoTable, 0, 2, "Direction", text_color=color.white, bgcolor=headerBg)
     table.cell(infoTable, 1, 2, tradeOriginalDirection ? "ORIGINAL" : "INVERTED", text_color=color.white, bgcolor=cellBg)
     table.cell(infoTable, 0, 3, "SL / TP", text_color=color.white, bgcolor=headerBg)
-    table.cell(infoTable, 1, 3, str.tostring(slAtrMult, "#.##") + " / " + str.tostring(tpAtrMult, "#.##") + " ATR", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 1, 3, ExitMode == "ATR" ? str.tostring(slAtrMultS2, "#.##") + " ATR / " + str.tostring(tpRS2, "#.##") + "R" + (useTrailS2 ? " +trail" : "") : str.tostring(slPointsIn, "#") + " / " + str.tostring(tpPointsIn, "#") + " pts" + (useTrailS2 ? " +trail" : ""), text_color=color.white, bgcolor=cellBg)
     table.cell(infoTable, 0, 4, "MT4 Lot", text_color=color.white, bgcolor=headerBg)
     table.cell(infoTable, 1, 4, str.tostring(mt4Lots, "#.##") + " lots", text_color=color.white, bgcolor=cellBg)
     table.cell(infoTable, 0, 5, "Entry Lock", text_color=color.white, bgcolor=headerBg)
