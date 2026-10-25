@@ -10,14 +10,45 @@
 // entries at the next open, $0.30 spread per round trip. Results in R
 // (1 R = the stop distance, i.e. what Risk % sizing risks per trade).
 // About 2.8 million input combinations per timeframe.
-//  - Calibrated defaults: EMA 8 / 21, trend EMA 100, pre-candle Market Next
-//    Candle, radar = Chart, min vol score 35, close location 0.75, trend
-//    direction off, ATR exits SL 1.0 x ATR(14), TP 5R, no trail, no bar exit,
-//    no $ daily lock, direction filter OFF.
+//  - XAUUSD-only calibration (2026-10-18): EMA 8 / 21, trend EMA 100, pre-candle
+//    Market Next Candle, radar = Chart, min vol score 35, vol rise 0, close
+//    location 0.75, trend direction off, ATR exits SL 1.0 x ATR(14), TP 5R, no
+//    trail, no bar exit, no $ daily lock, direction filter OFF.
 //      60m  +72.5R, 209 trades (~22 a month), PF 1.44, win 23%, halves +41.6 / +30.9, max DD 17R
 //      120m +42.2R,  91 trades, PF 1.60, halves +19.2 / +23.0, max DD 17R
 //      240m +45.9R,  97 trades, PF 1.62, halves +39.3 / +6.6,  max DD 15R
 //    The old defaults: 60m +1.4R, 120m +3.2R, 240m -4.1R.
+//  - BTCUSD check and TWO-MARKET DEFAULTS (2026-10-25): Bitfinex BTCUSD 1m,
+//    2018-2019 (public GitHub dataset; older regime, no filter columns), built
+//    into 1m / 5m / 60m / 120m / 240m; 0.02% fee per side + $0.20 spread. The
+//    XAUUSD settings, untouched, on BTC hourly: 60m +62R (609 trades, PF 1.12,
+//    DD 45R), 120m +35R, 240m +25R, every half positive; they rank in the top
+//    0.8% of 1.05M settings on BTC, and the 300 best XAUUSD settings average
+//    +157R on BTC (91% positive) against -132R for random settings. 2,543
+//    settings are positive in all 12 half-periods of both markets. The CURRENT
+//    DEFAULTS are the best of those that keep TP 5R / no trail: as above but
+//    vol rise 1.0, close location 0.65, trend direction ON.
+//      XAUUSD: 60m +43.8R (163 trades, PF 1.33, DD 33R), 120m +36.8R (PF 1.57), 240m +48.3R (PF 1.79, DD 9R)
+//      BTCUSD: 60m +174.9R (561 trades, PF 1.38, DD 25R), 120m +124.7R (PF 1.57), 240m +36.7R (PF 1.34)
+//    Six-timeframe total +465R against +283R for the XAUUSD-only settings;
+//    gold alone gives up ~20% for a BTC result ~2.7x better and a BTC 60m
+//    drawdown of 25R instead of 45R. For a gold-only chart set vol rise 0,
+//    close location 0.75, trend direction off.
+//  - 5-MINUTE and 1-MINUTE CHARTS (BTC 2018-2019): with the hourly settings both
+//    lose heavily (5m -368R, 1m -2,853R): fee + spread is 12-200% of a 1-ATR
+//    stop. A separate 5m profile is viable ONLY at low fees: EMA 5 / 13, trend
+//    100, pre-candle STOP Next Candle, min vol 35, vol rise 0, close location
+//    0.75, trend direction off, SL 2.0 ATR, TP 5R, no trail, no bar exit:
+//    +510R over 2,255 trades (3 a day, PF 1.25, halves +218 / +291, DD 69R) at
+//    0.02%/side; +225R at 0.035%; -58R at 0.05%; -987R at 0.1%. Neighbouring
+//    settings (EMA 8/21, trend 50-200, min vol 40) give +390 to +505R, so it is
+//    a plateau, not a lucky point; only 10% of all 5m settings are positive
+//    in both halves. 1m: best +351R (SL 5 ATR, EMA 8/21, min vol 30, close
+//    location 0.55) at 0.02%/side, -141R at 0.05%; only 1.2% of settings
+//    positive in both halves: not recommended. Polymarket proxy for the 5m
+//    profile: direction right from fill to the window close 68% of the time
+//    (a stop entry on a breakout of the prior bar; the market's odds will
+//    already have moved by then, so this is not a 68% win rate on the token).
 //  - Out of sample: settings picked on 60m + 120m only, then run on the
 //    240m bars from May to Dec 2025 that those charts do not cover: the 300
 //    best averaged +15.7R (83% positive); 300 random settings -4.1R (24%).
@@ -41,10 +72,11 @@
 //    halved the ungated +12 to +15R. On real XAUUSD the measured phase is
 //    near-random relative to the actual swings (resultant 0.04-0.23 vs 0.99
 //    on a clean sine), so there is no cycle structure here to gate on.
-//  - Not calibrated: BTCUSDT (only 1 day of 30s and 3 hours of 15s data,
-//    a handful of trades), Polymarket settlement odds, the Max Quantity /
-//    margin caps (results are per R), the radar on a lower timeframe.
-//    Re-check with Bar Magnifier and on new data before trading live.
+//  - Not calibrated: recent BTCUSDT (the BTC data ends 2019-12-31; only 1 day
+//    of 30s and 3 hours of 15s 2026 data, a handful of trades), Polymarket
+//    settlement odds, the Max Quantity / margin caps (results are per R), the
+//    radar on a lower timeframe, the direction filter on BTC. Re-check with
+//    Bar Magnifier and on new data before trading live.
 // ============================================================================
 strategy("GVLiveV2 | Crypto Polymarket Any-Chart Pre-Candle", shorttitle="GVLiveV2 Poly PreArm", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
@@ -133,9 +165,9 @@ preCandleEntryMode = input.string("Market Next Candle", "Pre-Candle Entry Mode",
 radarTimeframeMode = input.string("Chart", "Radar Timeframe", options=["Auto", "Chart", "1", "3", "5", "15", "30", "60", "120", "240"], group=group_pre)
 preMinScore = input.int(60, "Minimum Pre-Candle Score", minval=0, maxval=100, group=group_pre)
 preMinVolScore = input.float(35.0, "Minimum Radar Vol Score", minval=0.0, maxval=100.0, step=1.0, group=group_pre)
-preMinVolRise = input.float(0.0, "Minimum Radar Vol Rise", minval=0.0, step=0.5, group=group_pre)
-preCloseLocation = input.float(0.75, "Close Location Pressure", minval=0.50, maxval=0.95, step=0.05, group=group_pre, tooltip="Calibrated: 0.75 (was 0.55).")
-preUseTrend = input.bool(false, "Use Trend Direction", group=group_pre, tooltip="Calibrated: off.")
+preMinVolRise = input.float(1.0, "Minimum Radar Vol Rise", minval=0.0, step=0.5, group=group_pre, tooltip="Calibrated on XAUUSD + BTCUSD: 1.0 (was 0).")
+preCloseLocation = input.float(0.65, "Close Location Pressure", minval=0.50, maxval=0.95, step=0.05, group=group_pre, tooltip="Calibrated on XAUUSD + BTCUSD: 0.65 (XAUUSD alone preferred 0.75; the original was 0.55).")
+preUseTrend = input.bool(true, "Use Trend Direction", group=group_pre, tooltip="Calibrated on XAUUSD + BTCUSD: on (XAUUSD alone preferred off).")
 preUseEmaSlope = input.bool(false, "Use Radar EMA Slope", group=group_pre)
 preUseRvol = input.bool(false, "Use Radar Relative Volume", group=group_pre)
 preRvolLength = input.int(20, "Radar RVOL Length", minval=1, group=group_pre)
