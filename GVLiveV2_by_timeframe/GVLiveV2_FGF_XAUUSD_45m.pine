@@ -1,105 +1,94 @@
 //@version=6
 // ============================================================================
-// GVLiveV2 + FlashGold Direction Filter (FGF build)
-// CALIBRATED DEFAULTS FOR XAUUSD 45m  (one file per pair and timeframe, 2026-10-25)
+// GVLiveV2 FGF: XAUUSD 45m
+// STATUS: FALLBACK GENERAL SET. NOT calibrated for this timeframe (see below)
 // ----------------------------------------------------------------------------
 // Same code as GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine (the master
-// file, whose defaults are the two-market hourly set). Only the input
-// defaults below and this record differ: they were chosen for XAUUSD on a
-// 45-minute chart by the rule written down here.
+// file). Only this record, the strategy title and the input defaults listed
+// below differ. Record date 2026-10-25, rule v3.
 //
-// DATA
+// DATA AND COSTS
 //  - VANTAGE XAUUSD 45m: 22,410 bars, 2024-01-01 to 2026-10-23 (33.7 months)
-//  Costs: $0.30 spread per round trip, no commission, no slippage. Fills:
-//    market entries at the next open (or the stop level for Stop Next
-//    Candle), stop first when a bar touches both stop and target. R = the
-//    stop distance (what Risk % sizing risks per trade). Python replica of
-//    this script (entries, exits, S2/S3), same engine as the master-file
-//    calibration.
+//  Costs: $0.30 spread per round trip, no commission, no slippage. Stop first
+//    when a bar touches both stop and target. R = the stop distance.
+//  Python replica of this script, swept over 939,348 input settings per
+//    dataset after cleaning (395,769 with distinct results). Dropped before
+//    ranking: 265,392 settings whose trail activation lies at or beyond the
+//    target (in the Pine the target always fills first) and 10,476 with no
+//    exit rule.
 //
-// SELECTION RULE (the same for every pair and timeframe, fixed before looking)
-//  Full input grid of 1,215,216 settings per dataset. Candidates: settings
-//    with at least 15 trades in BOTH halves of EVERY dataset above and a
-//    positive result in every one of those halves (46,627 settings qualify).
-//    Score = the WORST half (the setting is judged by its weakest period).
-//    Plateau: for the 40 best by score, the mean score of the grid neighbours
-//    (each input moved one grid step); the pick maximises 0.5 x score + 0.5 x
-//    neighbour mean and needs at least 5 neighbours with a positive mean, so
-//    an isolated lucky point is not chosen.
+// RULE v3 (the same for every pair and timeframe)
+//  Candidates: at least 15 trades and a positive result in both halves of
+//    every dataset above. Pick: the best by worst half, on a plateau (at
+//    least 5 grid neighbours with a positive mean worst half). The pick is
+//    adopted only if (1) selecting on the first halves and scoring the second
+//    halves works: the 40 best are at least 60% positive with a positive
+//    mean, and that mean beats 95% of 2,000 random 40-setting draws from the
+//    same pool; (2) the reverse direction (select on the second halves) also
+//    beats 95% of such random draws; (3) the pick stays positive on every
+//    dataset under stressed costs. Otherwise the strategy's general set is
+//    used if it is positive in both halves of every dataset with PF >= 1.10
+//    and positive under stressed costs; otherwise no file is published for
+//    the timeframe.
 //
-// THE PER-TIMEFRAME PICK (by the rule above)
+// THIS TIMEFRAME
+//  19,609 candidates.
+//  Forward (select on first halves): the 40 best settings by the selection
+//    half score +30.4R on average on the other half, 78% positive; settings
+//    from the same pool average +12.2R (73% positive), and 95% of random
+//    40-setting draws stay below +18.0R (share of draws at or above the top
+//    40: 0.000). PASSED.
+//  Reverse (select on second halves): the 40 best settings by the selection
+//    half score -23.1R on average on the other half, 65% positive; settings
+//    from the same pool average -21.8R (13% positive), and 95% of random
+//    40-setting draws stay below -15.0R (share of draws at or above the top
+//    40: 0.627). FAILED.
+//  Stress test of the pick: PASSED.
+//  DECISION: the per-timeframe rule is not trusted here, so this file carries
+//    the all-timeframe profile (fallback). It was NOT selected for this
+//    timeframe.
+//  Where that set comes from: picked jointly on the seven VANTAGE XAUUSD
+//    timeframes 10m-240m (in-sample there); out of sample on OANDA gold and
+//    BTC.
+//
+// THE DEFAULTS IN THIS FILE
+//    EMA 5 / 13, trend EMA 200, RSI filter on, pre-candle Stop Next Candle,
+//    radar Chart, min vol score 0, vol rise 1, close location 0.65, trend
+//    direction on, SL 1.5 x ATR(14), TP 5R, no trail, no time stop, no $
+//    daily lock, max 3 losing trades per day (Pine default, kept), direction
+//    filter off
+//    VANTAGE XAUUSD: +130.4R, 601 trades, PF 1.27, win 21%, max DD 34.0R,
+//      halves +25.0 / +105.4, thirds -16.3 / +86.0 / +60.7, 21 of 34 months
+//      positive, best 2 months = 46% of the total, worst month -17.4R,
+//      longest losing streak 22 trades, without the 5 biggest winners +105.4R
+//    VANTAGE XAUUSD: spread $0.50 + 1 tick/side +118.5R (halves +16.4 /
+//      +102.1); spread $1.00 + 1 tick/side +91.6R; best-case intrabar fills
+//      +130.4R; with the 3-losing-trades daily lock OFF +110.2R (609 trades)
+//    VANTAGE XAUUSD: 12% of the trades (+37.8R) come from the EMA-cross
+//      entry. That entry is not limited to closed bars while the script
+//      calculates on every tick, so live it can fire mid-bar; the backtest
+//      fills it at the bar close.
+//
+// THE REJECTED PER-TIMEFRAME PICK (reference only, not used)
 //    EMA 8 / 21, trend EMA 200, RSI filter on, pre-candle Market Next Candle,
 //    radar Chart, min vol score 40, vol rise 1, close location 0.65, trend
 //    direction on, SL 1 x ATR(14), TP 5R, no trail, no time stop, no $ daily
-//    lock, direction filter off
-//    VANTAGE XAUUSD: +153.0R, 667 trades, PF 1.28, win 21%, max DD 39.4R,
-//      halves +70.3 / +82.7
-//    Plateau: worst half +70.3R; 13 grid neighbours, their mean worst half
-//    +26.9R.
+//    lock, max 3 losing trades per day (Pine default, kept), direction filter
+//    off
+//    VANTAGE XAUUSD: +153.0R, 667 trades, PF 1.28, halves +70.3 / +82.7
+//      (in-sample)
 //
-// HOLD-OUT OF THE RULE (how much of this survives out of sample)
-//  The same rule run on the FIRST halves only picked EMA 8 / 21, trend EMA
-//    50, RSI filter on, pre-candle Market Next Candle, radar Chart, min vol
-//    score 40, vol rise 0, close location 0.75, trend direction on, SL 0.5 x
-//    ATR(14), TP 5R, trail: activate at 4 ATR of profit, distance 0.2 ATR,
-//    time stop 2 bars, $ daily lock 0.15R ($150 at 1% risk of $100k),
-//    direction filter off.
-//  Its second halves, never seen by that selection: VANTAGE XAUUSD -13.0R.
-//    The 40 best settings by first half average +34.3R in the second half
-//    (82% positive) against -31.2R (36% positive) for 300 random settings.
-//
-// TRUST RULE AND THE DEFAULTS IN THIS FILE
-//  The per-timeframe pick is adopted only if the rule shows an out-of-sample
-//    edge on this timeframe: at least 60% of the 40 best-by-first-half
-//    settings positive in the second half, that share at least 0.10 above
-//    random settings, and the mean second-half result of those 40 positive.
-//  RESULT: PASSED. The defaults in this file are the per-timeframe pick
-//    above.
-//
-// SENSITIVITY OF THE PER-TIMEFRAME PICK
-//    VANTAGE XAUUSD: spread x 1.5 +140.3R; spread x 2.0 +127.5R; best-case
-//      fills +153.0R; without the 3 biggest winners +138.0R
-//
-// AGAINST THE OTHER TWO INPUT SETS ON THE SAME DATA
-//  Master-file hourly defaults (EMA 8/21, trend 100, Market Next Candle, min
-//    vol 35, vol rise 1.0, close location 0.65, trend on, SL 1 ATR, TP 5R):
-//    VANTAGE XAUUSD +109.7R (PF 1.15, DD 46.8R)
-//  All-timeframe profile (EMA 5/13, trend 200, Stop Next Candle, min vol 0,
-//    vol rise 1.0, close location 0.65, trend on, SL 1.5 ATR, TP 5R): VANTAGE
-//    XAUUSD +130.4R (PF 1.27, DD 34.0R)
-//
-// RUNNERS-UP (next best by the same rule)
-//    EMA 8 / 21, trend EMA 200, RSI filter off, pre-candle Market Next
-//      Candle, radar Chart, min vol score 40, vol rise 1, close location
-//      0.65, trend direction on, SL 1 x ATR(14), TP 5R, no trail, no time
-//      stop, no $ daily lock, direction filter off -> worst half +69.2R,
-//      neighbour mean +26.3R
-//    EMA 8 / 21, trend EMA 200, RSI filter on, pre-candle Market Next Candle,
-//      radar Chart, min vol score 40, vol rise 1, close location 0.55, trend
-//      direction on, SL 1 x ATR(14), TP 5R, no trail, no time stop, no $
-//      daily lock, direction filter off -> worst half +59.7R, neighbour mean
-//      +25.3R
-//    EMA 8 / 21, trend EMA 200, RSI filter off, pre-candle Market Next
-//      Candle, radar Chart, min vol score 40, vol rise 1, close location
-//      0.55, trend direction on, SL 1 x ATR(14), TP 5R, no trail, no time
-//      stop, no $ daily lock, direction filter off -> worst half +58.7R,
-//      neighbour mean +24.8R
-//    EMA 5 / 13, trend EMA 50, RSI filter on, pre-candle Market Next Candle,
-//      radar Chart, min vol score 0, vol rise 0, close location 0.75, trend
-//      direction on, SL 2 x ATR(14), TP 5R, no trail, no time stop, no $
-//      daily lock, direction filter off -> worst half +59.4R, neighbour mean
-//      +22.0R
+// OTHER INPUT SETS ON THE SAME DATA
+//  Master-file hourly defaults: VANTAGE XAUUSD +109.7R (888 trades, PF 1.15)
 //
 // CAVEATS
-//  The pick's own numbers are in-sample (the rule saw all the data); the
-//    hold-out block is the honest expectation. Win rate is low by design with
-//    a far target: expect runs of 10+ losers. The direction filter is off: on
-//    OANDA hourly gold it halved trades and profit; it is untested on VANTAGE
-//    and BTC (no filter columns in that data). Not modelled: slippage, the
-//    Max Quantity / margin caps, Polymarket settlement. Re-check with Bar
-//    Magnifier and on new data before trading live.
+//  Every result above is from the full dataset the rule saw, so it is
+//    in-sample; the hold-out lines are the honest guide to what selection
+//    delivers out of sample. Not modelled: the Max Quantity and margin caps
+//    (results are per R), Polymarket settlement. Re-check with Bar Magnifier
+//    and on new data before trading live.
 // ============================================================================
-strategy("GVLiveV2 FGF | XAUUSD 45m calibrated", shorttitle="GV2 XAU 45m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
+strategy("GVLiveV2 FGF | XAUUSD 45m (fallback, not calibrated for this TF)", shorttitle="GV2 XAU 45m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
 //==============================================================================
 // Volatility Filter (DEVMA)
@@ -113,15 +102,15 @@ slowVoVixLen = input.int(30, "Slow VoVix Length", minval=15, group=group_devma)
 // Directional Trend Logic
 //==============================================================================
 group_trend = "Directional Trend"
-fastEmaLen = input.int(8, "Fast EMA", group=group_trend, tooltip="Calibrated for XAUUSD 45m (see the header).")
-slowEmaLen = input.int(21, "Slow EMA", group=group_trend, tooltip="Calibrated for XAUUSD 45m (see the header).")
-trendFilterLen = input.int(200, "Trend Filter EMA", group=group_trend, tooltip="Calibrated for XAUUSD 45m (see the header).")
+fastEmaLen = input.int(5, "Fast EMA", group=group_trend, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
+slowEmaLen = input.int(13, "Slow EMA", group=group_trend, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
+trendFilterLen = input.int(200, "Trend Filter EMA", group=group_trend, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
 
 //==============================================================================
 // Momentum Filter
 //==============================================================================
 group_mom = "Momentum Filter"
-useRsiFilter = input.bool(true, "Use RSI Filter", group=group_mom, tooltip="Calibrated for XAUUSD 45m (see the header).")
+useRsiFilter = input.bool(true, "Use RSI Filter", group=group_mom, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
 rsiLen = input.int(14, "RSI Length", group=group_mom)
 rsiOverbought = input.int(70, "RSI Overbought", group=group_mom)
 rsiOversold = input.int(30, "RSI Oversold", group=group_mom)
@@ -134,18 +123,18 @@ brokerPreset = input.string("Manual / custom", "Point-Value Preset", options=["M
 manualPointValue = input.float(1.0, "Manual Point Value", minval=0.01, step=0.01, group=group_execution)
 
 gS2 = "S2. Exits"
-ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (calibrated). Points: fixed distances in points (mintick units); the Points defaults below are the ATR defaults converted with this timeframe's median ATR, for a 0.01-tick symbol.")
-slPoints       = input.float(808, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="1 x the median ATR(14) of VANTAGE XAUUSD 45m ($8.08) in 0.01-tick points; on a 0.001-tick symbol (OANDA) multiply by 10.")
-tpPoints       = input.float(4040, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="5 x the stop distance in points. 0 = no target.")
+ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (the tested mode). Points: fixed distances in points (mintick units); the Points defaults below are the ATR defaults converted with this timeframe's median ATR.")
+slPoints       = input.float(1212, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="1.5 x the median ATR(14) of VANTAGE XAUUSD 45m ($8.08) in 0.01-tick points. On a 0.001-tick symbol (OANDA) multiply by 10.")
+tpPoints       = input.float(6062, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="5 x the stop distance in points. 0 = no target.")
 atrLen         = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
-slAtrMult      = input.float(1.0, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Calibrated for XAUUSD 45m (see the header).")
-tpR            = input.float(5.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Calibrated for XAUUSD 45m (see the header).")
-useTrail       = input.bool(false, "Trailing stop", group=gS2, tooltip="Calibrated for XAUUSD 45m (see the header).")
+slAtrMult      = input.float(1.5, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
+tpR            = input.float(5.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header). 0 = no target.")
+useTrail       = input.bool(false, "Trailing stop", group=gS2, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
 trailActPoints = input.float(99000, "Trail activation, pts of profit (Points mode)", minval=0.0, step=1.0, group=gS2)
 trailPoints    = input.float(16500, "Trail distance, pts (Points mode)", minval=1.0, step=1.0, group=gS2)
 trailActAtr    = input.float(6.0, "Trail activation, ATR mult (ATR mode)", minval=0.0, step=0.05, group=gS2)
 trailDstAtr    = input.float(1.0, "Trail distance, ATR mult (ATR mode)", minval=0.005, step=0.005, group=gS2)
-maxBarsHeld    = input.int(0, "Time stop, bars (0 = off)", minval=0, group=gS2, tooltip="Calibrated for XAUUSD 45m (see the header). 0 = off.")
+maxBarsHeld    = input.int(0, "Time stop, bars (0 = off)", minval=0, group=gS2, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header). 0 = off.")
 
 gS3 = "S3. Sizing"
 QtyMode    = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3)
@@ -158,10 +147,10 @@ marginPct  = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.
 riskPercent = riskPct
 
 group_risk = "Paper Safety Layer"
-useMaxBarsExit = input.bool(false, "Close If Still Open After N Bars", group=group_risk, tooltip="Off (the S2 time stop is the calibrated bar exit). Turn on only for Polymarket reset use.")
+useMaxBarsExit = input.bool(false, "Close If Still Open After N Bars", group=group_risk, tooltip="Off (the S2 time stop is the tested bar exit). Turn on only for Polymarket reset use.")
 maxBarsInTrade = input.int(1, "Max Signal Bars In Trade", minval=1, group=group_risk, tooltip="This only resets the TradingView strategy position so another later window can signal. Polymarket paper exits are handled by market settlement.")
 useDailyLossLock = input.bool(true, "Use Daily Loss Lock", group=group_risk)
-maxDailyLossCurrency = input.float(0.0, "Max Daily Loss ($)", minval=0.0, step=10.0, group=group_risk, tooltip="Calibrated for XAUUSD 45m (see the header). 0 = off.")
+maxDailyLossCurrency = input.float(0.0, "Max Daily Loss ($)", minval=0.0, step=10.0, group=group_risk, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header). 0 = off.")
 maxDailyLosses = input.int(3, "Max Losing Trades Per Day", minval=1, group=group_risk)
 useMaxStopDistance = input.bool(false, "Block Entries If ATR Stop Is Too Wide", group=group_risk)
 maxStopDistancePoints = input.float(8.0, "Max Stop Distance In Price Points", minval=0.1, step=0.1, group=group_risk)
@@ -181,14 +170,14 @@ sendExitAlertsToWebhook = input.bool(false, "Send Exit/Close Alerts To Webhook",
 allowWeekendEntries = input.bool(true, "Allow Weekend Entries", group=group_poly, tooltip="This seconds-test variant defaults to 24/7 paper testing. Turn off to match the weekday-filtered validation exports.")
 
 group_pre = "Pre-Candle Early Confirmation"
-usePreCandleArm = input.bool(true, "Use Pre-Candle Arm", group=group_pre, tooltip="Calibrated for XAUUSD 45m (see the header).")
-preCandleEntryMode = input.string("Market Next Candle", "Pre-Candle Entry Mode", options=["Signal Only", "Market Next Candle", "Stop Next Candle"], group=group_pre, tooltip="Calibrated for XAUUSD 45m (see the header).")
-radarTimeframeMode = input.string("Chart", "Radar Timeframe", options=["Auto", "Chart", "1", "3", "5", "15", "30", "60", "120", "240"], group=group_pre, tooltip="Calibrated for XAUUSD 45m (see the header).")
+usePreCandleArm = input.bool(true, "Use Pre-Candle Arm", group=group_pre, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
+preCandleEntryMode = input.string("Stop Next Candle", "Pre-Candle Entry Mode", options=["Signal Only", "Market Next Candle", "Stop Next Candle"], group=group_pre, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
+radarTimeframeMode = input.string("Chart", "Radar Timeframe", options=["Auto", "Chart", "1", "3", "5", "15", "30", "60", "120", "240"], group=group_pre, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
 preMinScore = input.int(60, "Minimum Pre-Candle Score", minval=0, maxval=100, group=group_pre)
-preMinVolScore = input.float(40.0, "Minimum Radar Vol Score", minval=0.0, maxval=100.0, step=1.0, group=group_pre, tooltip="Calibrated for XAUUSD 45m (see the header).")
-preMinVolRise = input.float(1.0, "Minimum Radar Vol Rise", minval=0.0, step=0.5, group=group_pre, tooltip="Calibrated for XAUUSD 45m (see the header).")
-preCloseLocation = input.float(0.65, "Close Location Pressure", minval=0.50, maxval=0.95, step=0.05, group=group_pre, tooltip="Calibrated for XAUUSD 45m (see the header).")
-preUseTrend = input.bool(true, "Use Trend Direction", group=group_pre, tooltip="Calibrated for XAUUSD 45m (see the header).")
+preMinVolScore = input.float(0.0, "Minimum Radar Vol Score", minval=0.0, maxval=100.0, step=1.0, group=group_pre, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
+preMinVolRise = input.float(1.0, "Minimum Radar Vol Rise", minval=0.0, step=0.5, group=group_pre, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
+preCloseLocation = input.float(0.65, "Close Location Pressure", minval=0.50, maxval=0.95, step=0.05, group=group_pre, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
+preUseTrend = input.bool(true, "Use Trend Direction", group=group_pre, tooltip="Fallback general set, NOT calibrated for XAUUSD 45m (see the header).")
 preUseEmaSlope = input.bool(false, "Use Radar EMA Slope", group=group_pre)
 preUseRvol = input.bool(false, "Use Radar Relative Volume", group=group_pre)
 preRvolLength = input.int(20, "Radar RVOL Length", minval=1, group=group_pre)
@@ -221,7 +210,7 @@ flat_session = input.session("0930-1545", "Must Be Flat Outside This NY Session"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (calibrated): on OANDA hourly gold the filter halved trades and profit; untested on VANTAGE gold and on BTC.")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the filter can only be tested on the OANDA exports (see the header for its effect there).")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")

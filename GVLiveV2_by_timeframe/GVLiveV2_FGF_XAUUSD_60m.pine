@@ -1,112 +1,102 @@
 //@version=6
 // ============================================================================
-// GVLiveV2 + FlashGold Direction Filter (FGF build)
-// CALIBRATED DEFAULTS FOR XAUUSD 60m  (one file per pair and timeframe, 2026-10-25)
+// GVLiveV2 FGF: XAUUSD 60m
+// STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (hold-out passed both ways)
 // ----------------------------------------------------------------------------
 // Same code as GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine (the master
-// file, whose defaults are the two-market hourly set). Only the input
-// defaults below and this record differ: they were chosen for XAUUSD on a
-// 60-minute chart by the rule written down here.
+// file). Only this record, the strategy title and the input defaults listed
+// below differ. Record date 2026-10-25, rule v3.
 //
-// DATA
+// DATA AND COSTS
 //  - OANDA XAUUSD 60m: 4,751 bars, 2025-12-23 to 2026-10-14 (9.7 months)
 //  - VANTAGE XAUUSD 60m: 10,725 bars, 2025-01-01 to 2026-10-23 (21.6 months)
-//  Costs: $0.30 spread per round trip, no commission, no slippage. Fills:
-//    market entries at the next open (or the stop level for Stop Next
-//    Candle), stop first when a bar touches both stop and target. R = the
-//    stop distance (what Risk % sizing risks per trade). Python replica of
-//    this script (entries, exits, S2/S3), same engine as the master-file
-//    calibration.
+//  The OANDA window lies inside the VANTAGE window, so the two datasets
+//    overlap from Dec 2025 to Oct 2026; their halves are not independent
+//    periods. VANTAGE Jan to Nov 2025 is the only slice the OANDA data does
+//    not cover.
+//  Costs: $0.30 spread per round trip, no commission, no slippage. Stop first
+//    when a bar touches both stop and target. R = the stop distance.
+//  Python replica of this script, swept over 730,944 input settings per
+//    dataset after cleaning (271,233 with distinct results). Dropped before
+//    ranking: 307,296 settings whose trail activation lies at or beyond the
+//    target (in the Pine the target always fills first) and 43,650 with no
+//    exit rule.
 //
-// SELECTION RULE (the same for every pair and timeframe, fixed before looking)
-//  Full input grid of 1,002,240 settings per dataset. Candidates: settings
-//    with at least 15 trades in BOTH halves of EVERY dataset above and a
-//    positive result in every one of those halves (23,423 settings qualify).
-//    Score = the WORST half (the setting is judged by its weakest period).
-//    Plateau: for the 40 best by score, the mean score of the grid neighbours
-//    (each input moved one grid step); the pick maximises 0.5 x score + 0.5 x
-//    neighbour mean and needs at least 5 neighbours with a positive mean, so
-//    an isolated lucky point is not chosen.
+// RULE v3 (the same for every pair and timeframe)
+//  Candidates: at least 15 trades and a positive result in both halves of
+//    every dataset above. Pick: the best by worst half, on a plateau (at
+//    least 5 grid neighbours with a positive mean worst half). The pick is
+//    adopted only if (1) selecting on the first halves and scoring the second
+//    halves works: the 40 best are at least 60% positive with a positive
+//    mean, and that mean beats 95% of 2,000 random 40-setting draws from the
+//    same pool; (2) the reverse direction (select on the second halves) also
+//    beats 95% of such random draws; (3) the pick stays positive on every
+//    dataset under stressed costs. Otherwise the strategy's general set is
+//    used if it is positive in both halves of every dataset with PF >= 1.10
+//    and positive under stressed costs; otherwise no file is published for
+//    the timeframe.
 //
-// THE PER-TIMEFRAME PICK (by the rule above)
+// THIS TIMEFRAME
+//  7,817 candidates.
+//  Forward (select on first halves): the 40 best settings by the selection
+//    half score +52.8R on average on the other half, 93% positive; settings
+//    from the same pool average -4.6R (38% positive), and 95% of random
+//    40-setting draws stay below +0.7R (share of draws at or above the top
+//    40: 0.000). PASSED.
+//  Reverse (select on second halves): the 40 best settings by the selection
+//    half score +11.8R on average on the other half, 62% positive; settings
+//    from the same pool average -3.3R (36% positive), and 95% of random
+//    40-setting draws stay below +3.6R (share of draws at or above the top
+//    40: 0.000). PASSED.
+//  Stress test of the pick: PASSED.
+//  DECISION: the per-timeframe pick is the default set in this file.
+//
+// THE DEFAULTS IN THIS FILE
 //    EMA 5 / 13, trend EMA 200, RSI filter off, pre-candle Market Next
 //    Candle, radar Chart, min vol score 35, vol rise 1, close location 0.75,
 //    trend direction off, SL 1 x ATR(14), TP 5R, no trail, no time stop, no $
-//    daily lock, direction filter off
+//    daily lock, max 3 losing trades per day (Pine default, kept), direction
+//    filter off
 //    OANDA XAUUSD: +75.9R, 194 trades, PF 1.5, win 24%, max DD 16.5R, halves
-//      +42.7 / +33.2
+//      +42.7 / +33.2, thirds +46.0 / -7.9 / +37.8, 6 of 11 months positive,
+//      best 2 months = 84% of the total, worst month -7.3R, longest losing
+//      streak 16 trades, without the 5 biggest winners +47.2R
 //    VANTAGE XAUUSD: +132.3R, 490 trades, PF 1.33, win 22%, max DD 17.7R,
-//      halves +59.6 / +72.7
-//    Plateau: worst half +33.2R; 13 grid neighbours, their mean worst half
-//    +9.6R.
+//      halves +59.6 / +72.7, thirds +46.5 / +49.0 / +36.9, 15 of 22 months
+//      positive, best 2 months = 40% of the total, worst month -5.1R, longest
+//      losing streak 16 trades, without the 5 biggest winners +107.3R
+//    OANDA XAUUSD: spread $0.50 + 1 tick/side +74.1R (halves +42.0 / +32.1);
+//      spread $1.00 + 1 tick/side +69.6R; best-case intrabar fills +75.9R;
+//      with the 3-losing-trades daily lock OFF +72.9R (197 trades); with the
+//      direction filter ON (OANDA export columns) +10.8R, 106 trades, PF 1.12
+//    VANTAGE XAUUSD: spread $0.50 + 1 tick/side +124.4R (halves +54.2 /
+//      +70.2); spread $1.00 + 1 tick/side +106.3R; best-case intrabar fills
+//      +132.3R; with the 3-losing-trades daily lock OFF +130.2R (498 trades)
+//    OANDA XAUUSD: 28% of the trades (+36.0R) come from the EMA-cross entry.
+//      That entry is not limited to closed bars while the script calculates
+//      on every tick, so live it can fire mid-bar; the backtest fills it at
+//      the bar close.
+//    VANTAGE XAUUSD: 24% of the trades (+59.3R) come from the EMA-cross
+//      entry. That entry is not limited to closed bars while the script
+//      calculates on every tick, so live it can fire mid-bar; the backtest
+//      fills it at the bar close.
+//    Plateau: worst half +33.2R; 13 grid neighbours, mean worst half +9.6R,
+//    69% of them positive in every half.
 //
-// HOLD-OUT OF THE RULE (how much of this survives out of sample)
-//  The same rule run on the FIRST halves only picked EMA 8 / 21, trend EMA
-//    100, RSI filter on, pre-candle Market Next Candle, radar Chart, min vol
-//    score 35, vol rise 0, close location 0.75, trend direction on, SL 1 x
-//    ATR(14), TP 5R, no trail, no time stop, no $ daily lock, direction
-//    filter off.
-//  Its second halves, never seen by that selection: OANDA XAUUSD +12.6R,
-//    VANTAGE XAUUSD +64.4R. The 40 best settings by first half average +59.5R
-//    in the second half (95% positive) against -33.5R (19% positive) for 300
-//    random settings.
-//
-// TRUST RULE AND THE DEFAULTS IN THIS FILE
-//  The per-timeframe pick is adopted only if the rule shows an out-of-sample
-//    edge on this timeframe: at least 60% of the 40 best-by-first-half
-//    settings positive in the second half, that share at least 0.10 above
-//    random settings, and the mean second-half result of those 40 positive.
-//  RESULT: PASSED. The defaults in this file are the per-timeframe pick
-//    above.
-//
-// SENSITIVITY OF THE PER-TIMEFRAME PICK
-//    OANDA XAUUSD: spread x 1.5 +74.5R; spread x 2.0 +73.2R; best-case fills
-//      +75.9R; without the 3 biggest winners +57.2R
-//    VANTAGE XAUUSD: spread x 1.5 +126.9R; spread x 2.0 +121.5R; best-case
-//      fills +132.3R; without the 3 biggest winners +117.2R
-//
-// AGAINST THE OTHER TWO INPUT SETS ON THE SAME DATA
-//  Master-file hourly defaults (EMA 8/21, trend 100, Market Next Candle, min
-//    vol 35, vol rise 1.0, close location 0.65, trend on, SL 1 ATR, TP 5R):
-//    OANDA XAUUSD +43.8R (PF 1.33, DD 32.5R), VANTAGE XAUUSD +76.9R (PF 1.22,
-//    DD 47.3R)
-//  All-timeframe profile (EMA 5/13, trend 200, Stop Next Candle, min vol 0,
-//    vol rise 1.0, close location 0.65, trend on, SL 1.5 ATR, TP 5R): OANDA
-//    XAUUSD +9.3R (PF 1.09, DD 29.8R), VANTAGE XAUUSD +79.8R (PF 1.34, DD
-//    34.7R)
-//
-// RUNNERS-UP (next best by the same rule)
-//    EMA 5 / 13, trend EMA 200, RSI filter on, pre-candle Market Next Candle,
-//      radar Chart, min vol score 35, vol rise 1, close location 0.75, trend
-//      direction off, SL 1 x ATR(14), TP 5R, no trail, no time stop, no $
-//      daily lock, direction filter off -> worst half +33.2R, neighbour mean
-//      +9.2R
-//    EMA 5 / 13, trend EMA 200, RSI filter off, pre-candle Market Next
-//      Candle, radar Chart, min vol score 35, vol rise 0, close location
-//      0.75, trend direction off, SL 1 x ATR(14), TP 5R, no trail, no time
-//      stop, no $ daily lock, direction filter off -> worst half +30.5R,
-//      neighbour mean +10.0R
-//    EMA 5 / 13, trend EMA 200, RSI filter on, pre-candle Market Next Candle,
-//      radar Chart, min vol score 35, vol rise 0, close location 0.75, trend
-//      direction off, SL 1 x ATR(14), TP 5R, no trail, no time stop, no $
-//      daily lock, direction filter off -> worst half +30.5R, neighbour mean
-//      +9.6R
-//    EMA 8 / 21, trend EMA 100, RSI filter on, pre-candle Market Next Candle,
-//      radar Chart, min vol score 35, vol rise 0, close location 0.75, trend
-//      direction off, SL 1 x ATR(14), TP 5R, no trail, no time stop, no $
-//      daily lock, direction filter off -> worst half +30.9R, neighbour mean
-//      +8.5R
+// OTHER INPUT SETS ON THE SAME DATA
+//  Master-file hourly defaults: OANDA XAUUSD +43.8R (163 trades, PF 1.33),
+//    VANTAGE XAUUSD +76.9R (422 trades, PF 1.22)
+//  All-timeframe profile: OANDA XAUUSD +9.3R (127 trades, PF 1.09), VANTAGE
+//    XAUUSD +79.8R (293 trades, PF 1.34)
 //
 // CAVEATS
-//  The pick's own numbers are in-sample (the rule saw all the data); the
-//    hold-out block is the honest expectation. Win rate is low by design with
-//    a far target: expect runs of 10+ losers. The direction filter is off: on
-//    OANDA hourly gold it halved trades and profit; it is untested on VANTAGE
-//    and BTC (no filter columns in that data). Not modelled: slippage, the
-//    Max Quantity / margin caps, Polymarket settlement. Re-check with Bar
-//    Magnifier and on new data before trading live.
+//  Every result above is from the full dataset the rule saw, so it is
+//    in-sample; the hold-out lines are the honest guide to what selection
+//    delivers out of sample. Not modelled: the Max Quantity and margin caps
+//    (results are per R), Polymarket settlement. Re-check with Bar Magnifier
+//    and on new data before trading live.
 // ============================================================================
-strategy("GVLiveV2 FGF | XAUUSD 60m calibrated", shorttitle="GV2 XAU 60m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
+strategy("GVLiveV2 FGF | XAUUSD 60m (calibrated)", shorttitle="GV2 XAU 60m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
 //==============================================================================
 // Volatility Filter (DEVMA)
@@ -141,12 +131,12 @@ brokerPreset = input.string("Manual / custom", "Point-Value Preset", options=["M
 manualPointValue = input.float(1.0, "Manual Point Value", minval=0.01, step=0.01, group=group_execution)
 
 gS2 = "S2. Exits"
-ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (calibrated). Points: fixed distances in points (mintick units); the Points defaults below are the ATR defaults converted with this timeframe's median ATR, for a 0.01-tick symbol.")
-slPoints       = input.float(1502, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="1 x the median ATR(14) of VANTAGE XAUUSD 60m ($15.02) in 0.01-tick points; on a 0.001-tick symbol (OANDA) multiply by 10.")
+ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (the tested mode). Points: fixed distances in points (mintick units); the Points defaults below are the ATR defaults converted with this timeframe's median ATR.")
+slPoints       = input.float(1502, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="1 x the median ATR(14) of VANTAGE XAUUSD 60m ($15.02) in 0.01-tick points. On a 0.001-tick symbol (OANDA) multiply by 10.")
 tpPoints       = input.float(7510, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="5 x the stop distance in points. 0 = no target.")
 atrLen         = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
 slAtrMult      = input.float(1.0, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Calibrated for XAUUSD 60m (see the header).")
-tpR            = input.float(5.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Calibrated for XAUUSD 60m (see the header).")
+tpR            = input.float(5.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Calibrated for XAUUSD 60m (see the header). 0 = no target.")
 useTrail       = input.bool(false, "Trailing stop", group=gS2, tooltip="Calibrated for XAUUSD 60m (see the header).")
 trailActPoints = input.float(99000, "Trail activation, pts of profit (Points mode)", minval=0.0, step=1.0, group=gS2)
 trailPoints    = input.float(16500, "Trail distance, pts (Points mode)", minval=1.0, step=1.0, group=gS2)
@@ -165,7 +155,7 @@ marginPct  = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.
 riskPercent = riskPct
 
 group_risk = "Paper Safety Layer"
-useMaxBarsExit = input.bool(false, "Close If Still Open After N Bars", group=group_risk, tooltip="Off (the S2 time stop is the calibrated bar exit). Turn on only for Polymarket reset use.")
+useMaxBarsExit = input.bool(false, "Close If Still Open After N Bars", group=group_risk, tooltip="Off (the S2 time stop is the tested bar exit). Turn on only for Polymarket reset use.")
 maxBarsInTrade = input.int(1, "Max Signal Bars In Trade", minval=1, group=group_risk, tooltip="This only resets the TradingView strategy position so another later window can signal. Polymarket paper exits are handled by market settlement.")
 useDailyLossLock = input.bool(true, "Use Daily Loss Lock", group=group_risk)
 maxDailyLossCurrency = input.float(0.0, "Max Daily Loss ($)", minval=0.0, step=10.0, group=group_risk, tooltip="Calibrated for XAUUSD 60m (see the header). 0 = off.")
@@ -228,7 +218,7 @@ flat_session = input.session("0930-1545", "Must Be Flat Outside This NY Session"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (calibrated): on OANDA hourly gold the filter halved trades and profit; untested on VANTAGE gold and on BTC.")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the filter can only be tested on the OANDA exports (see the header for its effect there).")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")

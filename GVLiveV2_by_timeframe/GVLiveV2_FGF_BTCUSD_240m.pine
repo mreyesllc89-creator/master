@@ -1,105 +1,86 @@
 //@version=6
 // ============================================================================
-// GVLiveV2 + FlashGold Direction Filter (FGF build)
-// CALIBRATED DEFAULTS FOR BTCUSD 240m  (one file per pair and timeframe, 2026-10-25)
+// GVLiveV2 FGF: BTCUSD 240m
+// STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (hold-out passed both ways)
 // ----------------------------------------------------------------------------
 // Same code as GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine (the master
-// file, whose defaults are the two-market hourly set). Only the input
-// defaults below and this record differ: they were chosen for BTCUSD on a
-// 240-minute chart by the rule written down here.
+// file). Only this record, the strategy title and the input defaults listed
+// below differ. Record date 2026-10-25, rule v3.
 //
-// DATA
+// DATA AND COSTS
 //  - Bitfinex BTCUSD 240m: 4,380 bars, 2018-01-01 to 2019-12-31 (23.9 months)
-//  Costs: 0.02% fee per side + $0.20 spread per round trip, no slippage.
-//    Fills: market entries at the next open (or the stop level for Stop Next
-//    Candle), stop first when a bar touches both stop and target. R = the
-//    stop distance. Python replica of this script (entries, exits, S2/S3),
-//    same engine as the master-file calibration. The BTC data is 2018-2019
-//    (older regime; public dataset).
+//  Costs: 0.02% fee per side + $0.20 spread per round trip, no slippage. Stop
+//    first when a bar touches both stop and target. R = the stop distance.
+//    One sample only: Bitfinex 2018-2019 (no later BTC data was tested).
+//  Python replica of this script, swept over 939,348 input settings per
+//    dataset after cleaning (368,073 with distinct results). Dropped before
+//    ranking: 265,392 settings whose trail activation lies at or beyond the
+//    target (in the Pine the target always fills first) and 52,380 with no
+//    exit rule.
 //
-// SELECTION RULE (the same for every pair and timeframe, fixed before looking)
-//  Full input grid of 1,257,120 settings per dataset. Candidates: settings
-//    with at least 8 trades in BOTH halves of EVERY dataset above and a
-//    positive result in every one of those halves (415,079 settings qualify).
-//    Score = the WORST half (the setting is judged by its weakest period).
-//    Plateau: for the 40 best by score, the mean score of the grid neighbours
-//    (each input moved one grid step); the pick maximises 0.5 x score + 0.5 x
-//    neighbour mean and needs at least 5 neighbours with a positive mean, so
-//    an isolated lucky point is not chosen.
+// RULE v3 (the same for every pair and timeframe)
+//  Candidates: at least 8 trades and a positive result in both halves of
+//    every dataset above. Pick: the best by worst half, on a plateau (at
+//    least 5 grid neighbours with a positive mean worst half). The pick is
+//    adopted only if (1) selecting on the first halves and scoring the second
+//    halves works: the 40 best are at least 60% positive with a positive
+//    mean, and that mean beats 95% of 2,000 random 40-setting draws from the
+//    same pool; (2) the reverse direction (select on the second halves) also
+//    beats 95% of such random draws; (3) the pick stays positive on every
+//    dataset under stressed costs. Otherwise the strategy's general set is
+//    used if it is positive in both halves of every dataset with PF >= 1.10
+//    and positive under stressed costs; otherwise no file is published for
+//    the timeframe.
 //
-// THE PER-TIMEFRAME PICK (by the rule above)
+// THIS TIMEFRAME
+//  154,923 candidates.
+//  Forward (select on first halves): the 40 best settings by the selection
+//    half score +125.6R on average on the other half, 100% positive; settings
+//    from the same pool average +5.2R (69% positive), and 95% of random
+//    40-setting draws stay below +8.4R (share of draws at or above the top
+//    40: 0.000). PASSED.
+//  Reverse (select on second halves): the 40 best settings by the selection
+//    half score +88.9R on average on the other half, 100% positive; settings
+//    from the same pool average +6.1R (80% positive), and 95% of random
+//    40-setting draws stay below +8.8R (share of draws at or above the top
+//    40: 0.000). PASSED.
+//  Stress test of the pick: PASSED.
+//  DECISION: the per-timeframe pick is the default set in this file.
+//
+// THE DEFAULTS IN THIS FILE
 //    EMA 8 / 21, trend EMA 50, RSI filter off, pre-candle Market Next Candle,
 //    radar Chart, min vol score 0, vol rise 1, close location 0.75, trend
 //    direction off, SL 0.5 x ATR(14), no target, no trail, time stop 4 bars,
-//    no $ daily lock, direction filter off
+//    no $ daily lock, max 3 losing trades per day (Pine default, kept),
+//    direction filter off
 //    Bitfinex BTCUSD: +224.9R, 423 trades, PF 1.8, win 34%, max DD 15.3R,
-//      halves +105.9 / +118.9
-//    Plateau: worst half +105.9R; 11 grid neighbours, their mean worst half
-//    +67.2R.
+//      halves +105.9 / +118.9, thirds +77.8 / +74.5 / +72.5, 19 of 24 months
+//      positive, best 2 months = 27% of the total, worst month -10.6R,
+//      longest losing streak 10 trades, without the 5 biggest winners +108.5R
+//    Bitfinex BTCUSD: fee 0.035%/side + 1 tick +207.9R (halves +98.1 /
+//      +109.8); fee 0.05%/side + 1 tick +192.7R; best-case intrabar fills
+//      +224.9R; with the 3-losing-trades daily lock OFF +223.8R (424 trades)
+//    Bitfinex BTCUSD: 11% of the trades (+57.9R) come from the EMA-cross
+//      entry. That entry is not limited to closed bars while the script
+//      calculates on every tick, so live it can fire mid-bar; the backtest
+//      fills it at the bar close.
+//    Bitfinex BTCUSD: the 5 biggest trades are 52% of the total (2019-04-02,
+//      2018-11-14, 2018-06-10, 2018-07-17, 2018-10-15).
+//    Plateau: worst half +105.9R; 10 grid neighbours, mean worst half +66.1R,
+//    80% of them positive in every half.
 //
-// HOLD-OUT OF THE RULE (how much of this survives out of sample)
-//  The same rule run on the FIRST halves only picked EMA 8 / 21, trend EMA
-//    50, RSI filter on, pre-candle Market Next Candle, radar Chart, min vol
-//    score 0, vol rise 1, close location 0.75, trend direction off, SL 0.5 x
-//    ATR(14), no target, no trail, time stop 4 bars, no $ daily lock,
-//    direction filter off.
-//  Its second halves, never seen by that selection: Bitfinex BTCUSD +114.5R.
-//    The 40 best settings by first half average +127.9R in the second half
-//    (100% positive) against -4.6R (38% positive) for 300 random settings.
-//
-// TRUST RULE AND THE DEFAULTS IN THIS FILE
-//  The per-timeframe pick is adopted only if the rule shows an out-of-sample
-//    edge on this timeframe: at least 60% of the 40 best-by-first-half
-//    settings positive in the second half, that share at least 0.10 above
-//    random settings, and the mean second-half result of those 40 positive.
-//  RESULT: PASSED. The defaults in this file are the per-timeframe pick
-//    above.
-//
-// SENSITIVITY OF THE PER-TIMEFRAME PICK
-//    Bitfinex BTCUSD: fee 0.035% per side +209.6R; fee 0.050% per side
-//      +194.3R; best-case fills +224.9R; without the 3 biggest winners
-//      +136.3R
-//
-// AGAINST THE OTHER TWO INPUT SETS ON THE SAME DATA
-//  Master-file hourly defaults (EMA 8/21, trend 100, Market Next Candle, min
-//    vol 35, vol rise 1.0, close location 0.65, trend on, SL 1 ATR, TP 5R):
-//    Bitfinex BTCUSD +36.7R (PF 1.34, DD 20.4R)
-//  All-timeframe profile (EMA 5/13, trend 200, Stop Next Candle, min vol 0,
-//    vol rise 1.0, close location 0.65, trend on, SL 1.5 ATR, TP 5R):
-//    Bitfinex BTCUSD +29.5R (PF 1.45, DD 10.2R)
-//
-// RUNNERS-UP (next best by the same rule)
-//    EMA 8 / 21, trend EMA 50, RSI filter on, pre-candle Market Next Candle,
-//      radar Chart, min vol score 0, vol rise 1, close location 0.75, trend
-//      direction off, SL 0.5 x ATR(14), no target, no trail, time stop 4
-//      bars, no $ daily lock, direction filter off -> worst half +105.9R,
-//      neighbour mean +65.4R
-//    EMA 8 / 21, trend EMA 50, RSI filter on, pre-candle Market Next Candle,
-//      radar Chart, min vol score 0, vol rise 1, close location 0.55, trend
-//      direction off, SL 0.5 x ATR(14), no target, no trail, time stop 4
-//      bars, no $ daily lock, direction filter off -> worst half +110.2R,
-//      neighbour mean +57.2R
-//    EMA 8 / 21, trend EMA 50, RSI filter off, pre-candle Market Next Candle,
-//      radar Chart, min vol score 0, vol rise 1, close location 0.55, trend
-//      direction off, SL 0.5 x ATR(14), no target, no trail, time stop 4
-//      bars, no $ daily lock, direction filter off -> worst half +110.2R,
-//      neighbour mean +57.1R
-//    EMA 8 / 21, trend EMA 50, RSI filter on, pre-candle Market Next Candle,
-//      radar Chart, min vol score 0, vol rise 1, close location 0.65, trend
-//      direction off, SL 0.5 x ATR(14), no target, no trail, time stop 4
-//      bars, no $ daily lock, direction filter off -> worst half +103.1R,
-//      neighbour mean +63.0R
+// OTHER INPUT SETS ON THE SAME DATA
+//  Master-file hourly defaults: Bitfinex BTCUSD +36.7R (134 trades, PF 1.34)
+//  All-timeframe profile: Bitfinex BTCUSD +29.5R (85 trades, PF 1.45)
 //
 // CAVEATS
-//  The pick's own numbers are in-sample (the rule saw all the data); the
-//    hold-out block is the honest expectation. Win rate is low by design with
-//    a far target: expect runs of 10+ losers. The direction filter is off: on
-//    OANDA hourly gold it halved trades and profit; it is untested on VANTAGE
-//    and BTC (no filter columns in that data). Not modelled: slippage, the
-//    Max Quantity / margin caps, Polymarket settlement. Re-check with Bar
-//    Magnifier and on new data before trading live.
+//  Every result above is from the full dataset the rule saw, so it is
+//    in-sample; the hold-out lines are the honest guide to what selection
+//    delivers out of sample. Not modelled: the Max Quantity and margin caps
+//    (results are per R), Polymarket settlement. Re-check with Bar Magnifier
+//    and on new data before trading live.
 // ============================================================================
-strategy("GVLiveV2 FGF | BTCUSD 240m calibrated", shorttitle="GV2 BTC 240m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
+strategy("GVLiveV2 FGF | BTCUSD 240m (calibrated)", shorttitle="GV2 BTC 240m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
 //==============================================================================
 // Volatility Filter (DEVMA)
@@ -134,8 +115,8 @@ brokerPreset = input.string("Manual / custom", "Point-Value Preset", options=["M
 manualPointValue = input.float(1.0, "Manual Point Value", minval=0.01, step=0.01, group=group_execution)
 
 gS2 = "S2. Exits"
-ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (calibrated). Points: fixed distances in points (mintick units); the Points defaults below are the ATR defaults converted with this timeframe's median ATR, for a 0.01-tick symbol.")
-slPoints       = input.float(6785, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Not calibrated for today's BTC: the data is 2018-2019 (median ATR(14) $136 on this timeframe). Use ATR mode.")
+ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (the tested mode). Points: fixed distances in points (mintick units); the Points defaults below are the ATR defaults converted with this timeframe's median ATR.")
+slPoints       = input.float(6783, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0.5 x the median ATR(14) of Bitfinex BTCUSD 240m ($135.66) in 0.01-tick points. BTC data is 2018-2019: use ATR mode.")
 tpPoints       = input.float(0, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="0 x the stop distance in points. 0 = no target.")
 atrLen         = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
 slAtrMult      = input.float(0.5, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Calibrated for BTCUSD 240m (see the header).")
@@ -158,7 +139,7 @@ marginPct  = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.
 riskPercent = riskPct
 
 group_risk = "Paper Safety Layer"
-useMaxBarsExit = input.bool(false, "Close If Still Open After N Bars", group=group_risk, tooltip="Off (the S2 time stop is the calibrated bar exit). Turn on only for Polymarket reset use.")
+useMaxBarsExit = input.bool(false, "Close If Still Open After N Bars", group=group_risk, tooltip="Off (the S2 time stop is the tested bar exit). Turn on only for Polymarket reset use.")
 maxBarsInTrade = input.int(1, "Max Signal Bars In Trade", minval=1, group=group_risk, tooltip="This only resets the TradingView strategy position so another later window can signal. Polymarket paper exits are handled by market settlement.")
 useDailyLossLock = input.bool(true, "Use Daily Loss Lock", group=group_risk)
 maxDailyLossCurrency = input.float(0.0, "Max Daily Loss ($)", minval=0.0, step=10.0, group=group_risk, tooltip="Calibrated for BTCUSD 240m (see the header). 0 = off.")
@@ -221,7 +202,7 @@ flat_session = input.session("0930-1545", "Must Be Flat Outside This NY Session"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (calibrated): on OANDA hourly gold the filter halved trades and profit; untested on VANTAGE gold and on BTC.")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the filter can only be tested on the OANDA exports (see the header for its effect there).")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")

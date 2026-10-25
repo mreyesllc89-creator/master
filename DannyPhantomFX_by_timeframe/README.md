@@ -1,0 +1,36 @@
+# Danny Phantom FX V10.21.1 LiveSafe FGF: one file per pair and timeframe
+
+Same code as `DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine`; only the input defaults differ. Each file's header carries its full record: data, costs, the rule, the hold-out in both directions, stressed costs, monthly spread, losing streaks and the sets it was compared with.
+
+**Rule v3.** A setting is picked per pair and timeframe (positive in both halves of every dataset, judged by its worst half, on a plateau of neighbouring settings). It becomes the file's defaults only if choosing settings on one half and testing them on the other works in both directions (the 40 best beat 95% of random 40-setting draws from the same pool; forward also at least 60% positive with a positive mean), and the pick survives stressed costs. Otherwise the strategy's general set is used if it passes its own robustness check, and the file says so in its title. Otherwise no file is published for that timeframe.
+
+Costs: gold $0.30 spread per round trip; BTC 0.02% per side + $0.20; no slippage. Stressed: gold $0.50 + 1 tick per side; BTC 0.035% per side + 1 tick. R = one stop distance. Results are in-sample; the hold-out columns are the out-of-sample guide.
+
+## XAUUSD
+
+| TF | File | Defaults | Result on the data | Stressed costs | Forward hold-out (top 40 by 1st halves, scored on 2nd) | Reverse hold-out |
+|---|---|---|---|---|---|---|
+| 10m | **no file** | no defensible setting (see below) | | | 85% positive, +5.4R vs random 95th pct +0.8R: pass | 40% positive, -16.3R vs random 95th pct -1.8R: FAIL |
+| 15m | **no file** | no defensible setting (see below) | | | 0% positive, -116.1R vs random 95th pct -7.4R: FAIL | 15% positive, -20.5R vs random 95th pct -4.4R: FAIL |
+| 30m | [DannyPhantomFX_FGF_XAUUSD_30m.pine](https://github.com/mreyesllc89-creator/master/blob/claude/exciting-tesla-xk8lqw/DannyPhantomFX_by_timeframe/DannyPhantomFX_FGF_XAUUSD_30m.pine) | **calibrated for this timeframe**: preset Auto (manual path on this chart), direction ORIGINAL (not inverted), S2 ATR mode: SL 0.8 x ATR(14), no target, no trail, time stop 50 bars, dead exit on, 15 bars, EMA filter on, length 100, delta threshold 1, zone length 50, cooldown off, one entry per zone off, direction filter off | VANTAGE XAUUSD +288.1R, 1287 trades, PF 1.27, DD 42.8R | +247.8R | 90% positive, +31.0R vs random 95th pct +13.0R: pass | 100% positive, +120.9R vs random 95th pct +24.4R: pass |
+| 45m | [DannyPhantomFX_FGF_XAUUSD_45m.pine](https://github.com/mreyesllc89-creator/master/blob/claude/exciting-tesla-xk8lqw/DannyPhantomFX_by_timeframe/DannyPhantomFX_FGF_XAUUSD_45m.pine) | **calibrated for this timeframe**: preset Auto (manual path on this chart), direction ORIGINAL (not inverted), S2 ATR mode: SL 0.8 x ATR(14), no target, no trail, time stop 50 bars, dead exit on, 30 bars, EMA filter on, length 200, delta threshold 1, zone length 100, cooldown off, one entry per zone off, direction filter off | VANTAGE XAUUSD +260.9R, 1235 trades, PF 1.24, DD 64.6R | +213.9R | 95% positive, +72.0R vs random 95th pct +27.4R: pass | 85% positive, +40.8R vs random 95th pct -2.2R: pass |
+| 60m | **no file** | no defensible setting (see below) | | | 100% positive, +64.1R vs random 95th pct +17.2R: pass | 3% positive, -42.1R vs random 95th pct -1.3R: FAIL |
+| 120m | [DannyPhantomFX_FGF_XAUUSD_120m.pine](https://github.com/mreyesllc89-creator/master/blob/claude/exciting-tesla-xk8lqw/DannyPhantomFX_by_timeframe/DannyPhantomFX_FGF_XAUUSD_120m.pine) | **calibrated for this timeframe**: preset Auto (manual path on this chart), direction ORIGINAL (not inverted), S2 ATR mode: SL 0.8 x ATR(14), no target, no trail, time stop 25 bars, dead exit off, EMA filter on, length 100, delta threshold 1.5, zone length 100, cooldown on, 10 bars, one entry per zone on, direction filter off | OANDA XAUUSD +35.1R, 190 trades, PF 1.31, DD 14.2R; VANTAGE XAUUSD +73.1R, 322 trades, PF 1.31, DD 41.1R | +33.3R; +65.5R | 85% positive, +11.5R vs random 95th pct +7.4R: pass | 100% positive, +63.5R vs random 95th pct +35.6R: pass |
+| 240m | [DannyPhantomFX_FGF_XAUUSD_240m.pine](https://github.com/mreyesllc89-creator/master/blob/claude/exciting-tesla-xk8lqw/DannyPhantomFX_by_timeframe/DannyPhantomFX_FGF_XAUUSD_240m.pine) | **calibrated for this timeframe**: preset Auto (manual path on this chart), direction ORIGINAL (not inverted), S2 ATR mode: SL 0.8 x ATR(14), TP 6R, no trail, time stop 50 bars, dead exit off, EMA filter on, length 200, delta threshold 1, zone length 50, cooldown on, 10 bars, one entry per zone on, direction filter off | OANDA XAUUSD +47.2R, 274 trades, PF 1.39, DD 7.8R; VANTAGE XAUUSD +75.0R, 218 trades, PF 1.5, DD 27.9R | +44.9R; +72.7R | 100% positive, +66.1R vs random 95th pct +34.5R: pass | 100% positive, +38.6R vs random 95th pct +21.3R: pass |
+
+## BTCUSD
+
+| TF | File | Defaults | Result on the data | Stressed costs | Forward hold-out (top 40 by 1st halves, scored on 2nd) | Reverse hold-out |
+|---|---|---|---|---|---|---|
+
+## Timeframes without a file
+
+- **XAUUSD 10m**: the reverse hold-out failed, no pair-wide general set exists.
+- **XAUUSD 15m**: the forward hold-out failed, the reverse hold-out failed, no pair-wide general set exists.
+- **XAUUSD 60m**: the reverse hold-out failed, no pair-wide general set exists.
+
+## Revision history
+
+- v1: per-timeframe pick, single first-half hold-out.
+- v2: trust rule on the 40 best by first half against random settings.
+- v3 (this version), after an adversarial review: the engine booked trail exits beyond the target when the trail activation lay at or beyond it (the Pine fills the target first), so those settings are dropped and the engine is fixed; settings with no exit rule are dropped; the random baseline is drawn from the same pool as the ranked settings and applied as a permutation test (a 10-point share margin was drafted and dropped before publishing because it cannot be met when random settings are already above 90% positive); the hold-out must pass in both directions; the pick must survive stressed costs; fallback sets must pass their own check; fallback files say so in the title and tooltips.
