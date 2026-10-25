@@ -14,13 +14,13 @@
 //    -3.9), without the 10 best entry days +6.1R; fee break-even 0.1274% per
 //    side; the file's strategy() properties add 75 ticks of slippage per fill
 //    and 0.001% commission, so TradingView's report depends on the symbol's
-//    tick: 0.01 tick $0.75 per fill +205.3R, 0.1 tick $7.5 per fill -28.4R, 1
-//    tick $75 per fill -2137.1R; long trades +98.1R, short trades +131.2R; 2
-//    trades held over a weekend -2.0R, all other trades +231.4R; closing
-//    before every weekend (approximation) +231.2R; exits: stop 368 (-395.5R),
-//    blackout close 188 (+629.1R), dead exit 7 (-2.0R), reversal 4 (-2.1R),
-//    end of data 1 (-0.1R); the 25-bar time stop never fires (longest hold 23
-//    bars).
+//    tick (replica with TradingView's fill model): 0.01 tick ($0.75 per fill)
+//    +196.2R, 0.1 tick ($7.5 per fill) -75.8R, 1 tick ($75 per fill)
+//    -2856.7R; long trades +98.1R, short trades +131.2R; 2 trades held over a
+//    weekend -2.0R, all other trades +231.4R; closing before every weekend
+//    (approximation) +231.2R; exits: stop 368 (-395.5R), blackout close 188
+//    (+629.1R), dead exit 7 (-2.0R), reversal 4 (-2.1R), end of data 1
+//    (-0.1R); the 25-bar time stop never fires (longest hold 23 bars).
 //
 // DATA AND COSTS
 //  - Bitfinex BTCUSD 60m: 17,513 bars, 2018-01-01 to 2019-12-31 (23.9 months)
@@ -84,27 +84,43 @@
 // S2 POINTS MODE (switch 'SL / TP / trail unit' to Points; the trail switch and time stop are shared)
 //  Stop $48.80 (4,880 points at a 0.01 tick), no target: converted from the
 //    primary distances at the median ATR (not separately calibrated).
-//    Bitfinex BTCUSD: +40.3R, 574 trades, PF 1.1, halves +9.4 / +30.8
+//    Bitfinex BTCUSD: +40.3R, 574 trades, PF 1.1, halves +9.4 / +30.8; under
+//      stressed costs +10.0R
 //  Exit grid of 104 settings (104 distinct), 56 positive in both halves of
-//    every dataset. Forward: the 10 best by first half average +35.3R on the
-//    second (random 10-setting draws, 95th percentile +26.9R). Reverse:
-//    +40.2R (95th percentile +41.8R). Stressed costs: Bitfinex BTCUSD +85.9R.
-//  WARNING: these dollar distances come from 2018-2019 BTC prices
-//    ($3,200-$13,800, median about $7,350). At today's prices they are far
-//    too tight; use ATR mode, or scale the points by today's price / 7,350.
-//  Points are written for a 0.01-tick symbol. On another tick size, points =
-//    the dollar amount / your symbol's tick (gold on OANDA: 0.001, so x10).
+//    every dataset. Hold-out of the whole pick procedure: run on the first
+//    halves it picks a setting that scores +29.4R on the second halves
+//    (median of that pool +12.0R): pass; run on the second halves it picks a
+//    setting that scores +23.7R on the first halves (median of that pool
+//    +29.9R): FAIL. Not calibrated because run on the second halves it scored
+//    +23.7R on the first halves (pool median +29.9R).
+//  WARNING: these dollar distances come from 2018-2019 BTC prices (closes
+//    $3,230-$17,169, median about $7,352). At today's prices they are far too
+//    tight; use ATR mode, or scale the points by today's price / 7,350.
+//  Points are written for a 0.01-tick symbol (Binance, Coinbase, MEXC BTCUSDT
+//    style). Points = dollars / your symbol's tick: on a 0.1-tick feed (the
+//    Bitfinex data used here) divide them by 10, on a 1-tick feed by 100.
 //
 // S3 SIZING (Risk %, compounded from the strategy's $2,000 initial capital)
-//  Rule: the largest of 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2% risk per trade whose
-//    maximum drawdown stays within 20% on every dataset. Default here: 0.75%.
-//    Bitfinex BTCUSD: 0.25% -> x1.72, max DD 6.7%; 0.5% -> x2.83, max DD
-//      13.1%; 0.75% -> x4.44, max DD 19.1%; 1.0% -> x6.68, max DD 25%; 1.5%
-//      -> x13.63, max DD 35.9%; 2.0% -> x24.49, max DD 45.7% (Max quantity /
-//      margin cap bound on 0% of trades at 1%)
-//    Fixed quantity equivalent: 0.29 units (the default risk at the median
-//      stop of $52.16); Bitfinex BTCUSD +2,520 USD, max DD 511 USD, no
-//      compounding.
+//  Rule: the largest of 0.1 / 0.15 / 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2% risk
+//    per trade whose 95th-percentile maximum drawdown, over 1,000 random
+//    reorderings of the trades at stressed costs, stays within 20% on every
+//    dataset. Default here: 0.25%.
+//  1% risk, the master file's default, for comparison: Bitfinex BTCUSD max DD
+//    25%, 95th pct of reorderings at stressed costs 45.9%.
+//    Bitfinex BTCUSD: 0.1% -> x1.25, max DD 2.7% (stressed 3.4%, 95th pct of
+//      reorderings 5.6%); 0.15% -> x1.39, max DD 4.1% (stressed 5%, 95th pct
+//      of reorderings 8.4%); 0.25% -> x1.72, max DD 6.7% (stressed 8.3%, 95th
+//      pct of reorderings 13.8%); 0.5% -> x2.83, max DD 13.1% (stressed
+//      16.1%, 95th pct of reorderings 25.8%); 0.75% -> x4.44, max DD 19.1%
+//      (stressed 23.5%, 95th pct of reorderings 36.5%); 1.0% -> x6.68, max DD
+//      25% (stressed 30.4%, 95th pct of reorderings 45.9%). The Max quantity
+//      / margin cap bound on 0% of trades at 1%.
+//    These figures exclude the file's strategy() slippage property. With 75
+//      ticks per fill at this data's tick and 0.001% commission (what
+//      TradingView would apply): Bitfinex BTCUSD at 0.25% -> x0.81, max DD
+//      35%.
+//    Fixed quantity equivalent: 0.1 BTC (the default risk at the median stop
+//      of $52.16); Bitfinex BTCUSD +869 USD, max DD 176 USD, no compounding.
 //
 // OTHER INPUT SETS ON THE SAME DATA
 //  The file's original defaults (filter off): Bitfinex BTCUSD -65.4R (843
@@ -254,12 +270,12 @@ timeStopBars   = input.int(25, "Time stop, bars (0 = off)", minval=0, group=gS2,
 
 gS3 = "S3. Sizing"
 QtyMode    = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3, tooltip="Backtest sizing (strategy.entry qty). The live MT4 lot in the alert text is sized by the MT4 Lot Sizing group below.")
-fixedQtyS3 = input.float(0.29, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3, tooltip="Fixed mode: the quantity that risks the default Risk % of $2,000 at the median stop (see the header).")
-riskPctS3  = input.float(0.75, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Calibrated: the largest tested risk whose compounded max drawdown stays within 20% on this timeframe's data (see the header).")
+fixedQtyS3 = input.float(0.1, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3, tooltip="Fixed mode, in BTC: the quantity that risks the default Risk % of $2,000 at the median stop (see the header).")
+riskPctS3  = input.float(0.25, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Calibrated: the largest tested risk whose 95th-percentile drawdown over reordered trades at stressed costs stays within 20% (see the header).")
 maxQtyS3   = input.float(50, "Max quantity", minval=0.0, group=gS3)
 qtyStepS3  = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
 capMarginS3 = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
-marginPctS3 = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.0, step=0.5, group=gS3)
+marginPctS3 = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.0, step=0.5, group=gS3, tooltip="Margin % used for the quantity cap. 1% is more conservative than the strategy Properties margin of 0.2%; the cap rarely binds at these risk levels (see the header).")
 
 groupSession = "Session Filter"
 useSessionFilter = input.bool(false, "Use NY Cash Session Filter", group=groupSession)

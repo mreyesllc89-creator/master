@@ -14,14 +14,15 @@
 //    +68.3), without the 10 best entry days +95.1R; cost break-even $1.2
 //    extra per round trip; the file's strategy() properties add 75 ticks of
 //    slippage per fill and 0.001% commission, so TradingView's report depends
-//    on the symbol's tick: 0.001 tick $0.075 per fill +216.5R, 0.01 tick
-//    $0.75 per fill -81.0R; long trades +299.8R, short trades -38.8R; 123
-//    trades held over a weekend +469.1R, all other trades -208.1R; closing
-//    before every weekend (approximation) +130.6R; exits: stop 966
-//    (-1028.8R), time stop 173 (+1331.6R), reversal 71 (-36.8R), dead exit 24
-//    (-7.6R), end of data 1 (+2.7R); no bar of this chart opens in the
-//    16:45-18:00 NY window, so the daily and weekend blackout closes never
-//    fire and positions are held through the daily break and over weekends.
+//    on the symbol's tick (replica with TradingView's fill model): 0.001 tick
+//    ($0.075 per fill) +192.9R, 0.01 tick ($0.75 per fill) -115.9R; long
+//    trades +299.8R, short trades -38.8R; 123 trades held over a weekend
+//    +469.1R, all other trades -208.1R; closing before every weekend
+//    (approximation) +130.6R; exits: stop 966 (-1028.8R), time stop 173
+//    (+1331.6R), reversal 71 (-36.8R), dead exit 24 (-7.6R), end of data 1
+//    (+2.7R); no bar of this chart opens in the 16:45-18:00 NY window, so the
+//    daily and weekend blackout closes never fire and positions are held
+//    through the daily break and over weekends.
 //
 // DATA AND COSTS
 //  - VANTAGE XAUUSD 45m: 22,410 bars, 2024-01-01 to 2026-10-23 (33.7 months)
@@ -85,30 +86,41 @@
 //    settings, 53% positive in every half, mean worst half -16.3R.
 //
 // S2 POINTS MODE (switch 'SL / TP / trail unit' to Points; the trail switch and time stop are shared)
-//  Stop $11.34 (1,134 points at a 0.01 tick), target $68.04 (6,804 points):
-//    calibrated for this file's signal inputs.
-//    VANTAGE XAUUSD: +104.8R, 1350 trades, PF 1.1, halves +58.8 / +46.0
-//    For comparison, the ATR distances converted at the median ATR (0.8 x
-//      $8.10 stop, no target): VANTAGE XAUUSD +352.0R, PF 1.3, halves +50.3 /
-//      +301.7. Not used because its grid neighbours average -117.2R in their
-//      worst half (3 clone-free neighbours), so it is not on a plateau.
+//  Stop $6.48 (648 points at a 0.01 tick), no target: converted from the
+//    primary distances at the median ATR (not separately calibrated).
+//    VANTAGE XAUUSD: +352.0R, 1333 trades, PF 1.3, halves +50.3 / +301.7;
+//      under stressed costs +306.8R
 //  Exit grid of 104 settings (104 distinct), 46 positive in both halves of
-//    every dataset. Forward: the 10 best by first half average +139.3R on the
-//    second (random 10-setting draws, 95th percentile +103.7R). Reverse:
-//    +53.7R (95th percentile +46.5R). Stressed costs: VANTAGE XAUUSD +78.6R.
-//  Points are written for a 0.01-tick symbol. On another tick size, points =
-//    the dollar amount / your symbol's tick (gold on OANDA: 0.001, so x10).
+//    every dataset. Hold-out of the whole pick procedure: run on the first
+//    halves it picks a setting that scores +31.2R on the second halves
+//    (median of that pool +35.9R): FAIL; run on the second halves it picks a
+//    setting that scores +98.8R on the first halves (median of that pool
+//    +29.7R): pass. Not calibrated because the pick procedure run on the
+//    first halves scored +31.2R on the second halves (pool median +35.9R).
+//  Points are written for a 0.01-tick symbol (VANTAGE). Points = dollars /
+//    your symbol's tick: on OANDA (0.001) multiply them by 10.
 //
 // S3 SIZING (Risk %, compounded from the strategy's $2,000 initial capital)
-//  Rule: the largest of 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2% risk per trade whose
-//    maximum drawdown stays within 20% on every dataset. Default here: 0.25%.
-//    VANTAGE XAUUSD: 0.25% -> x1.83, max DD 14.9%; 0.5% -> x3.08, max DD
-//      27.7%; 0.75% -> x4.76, max DD 38.6%; 1.0% -> x6.79, max DD 47.9%; 1.5%
-//      -> x11.06, max DD 62.6%; 2.0% -> x15.83, max DD 73.3% (Max quantity /
-//      margin cap bound on 0% of trades at 1%)
-//    Fixed quantity equivalent: 0.78 units (the default risk at the median
-//      stop of $6.44); VANTAGE XAUUSD +1,365 USD, max DD 461 USD, no
-//      compounding.
+//  Rule: the largest of 0.1 / 0.15 / 0.25 / 0.5 / 0.75 / 1 / 1.5 / 2% risk
+//    per trade whose 95th-percentile maximum drawdown, over 1,000 random
+//    reorderings of the trades at stressed costs, stays within 20% on every
+//    dataset. Default here: 0.15%.
+//  1% risk, the master file's default, for comparison: VANTAGE XAUUSD max DD
+//    47.9%, 95th pct of reorderings at stressed costs 72.6%.
+//    VANTAGE XAUUSD: 0.1% -> x1.29, max DD 6.3% (stressed 6.9%, 95th pct of
+//      reorderings 11.4%); 0.15% -> x1.45, max DD 9.2% (stressed 10.1%, 95th
+//      pct of reorderings 16.7%); 0.25% -> x1.83, max DD 14.9% (stressed
+//      16.3%, 95th pct of reorderings 26.3%); 0.5% -> x3.08, max DD 27.7%
+//      (stressed 30%, 95th pct of reorderings 46.5%); 0.75% -> x4.76, max DD
+//      38.6% (stressed 41.6%, 95th pct of reorderings 61.8%); 1.0% -> x6.79,
+//      max DD 47.9% (stressed 51.3%, 95th pct of reorderings 72.6%). The Max
+//      quantity / margin cap bound on 0% of trades at 1%.
+//    These figures exclude the file's strategy() slippage property. With 75
+//      ticks per fill at this data's tick and 0.001% commission (what
+//      TradingView would apply): VANTAGE XAUUSD at 0.15% -> x0.83, max DD
+//      31%.
+//    Fixed quantity equivalent: 0.47 oz (the default risk at the median stop
+//      of $6.44); VANTAGE XAUUSD +822 USD, max DD 278 USD, no compounding.
 //
 // OTHER INPUT SETS ON THE SAME DATA
 //  The file's original defaults (filter off): VANTAGE XAUUSD -23.3R (1396
@@ -244,8 +256,8 @@ manualEntryMode = input.string("Normal Retest Touch", "Entry Mode", options=["No
 
 gS2 = "S2. Exits"
 ExitMode       = input.string("ATR", "SL / TP / trail unit", options=["Points", "ATR"], group=gS2, tooltip="ATR (the tested mode).")
-slPointsIn     = input.float(1134, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode: calibrated for this file's signal inputs; $11.34 at a 0.01 tick (points = dollars / tick).")
-tpPointsIn     = input.float(6804, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode target: $68.04.")
+slPointsIn     = input.float(648, "Stop loss, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode: converted from the primary distances at the median ATR (not separately calibrated); $6.48 at a 0.01 tick (points = dollars / tick).")
+tpPointsIn     = input.float(0, "Take profit, pts (Points mode)", minval=0.0, step=1.0, group=gS2, tooltip="Points mode target (0 = no target).")
 atrLenS2       = input.int(14, "ATR length (ATR mode)", minval=1, group=gS2)
 slAtrMultS2    = input.float(0.8, "Stop loss, ATR mult (ATR mode)", minval=0.01, step=0.05, group=gS2, tooltip="Calibrated for XAUUSD 45m (see the header).")
 tpRS2          = input.float(0.0, "Take profit, R multiple of SL (ATR mode)", minval=0.0, step=0.25, group=gS2, tooltip="Calibrated for XAUUSD 45m (see the header). 0 = no target.")
@@ -258,12 +270,12 @@ timeStopBars   = input.int(50, "Time stop, bars (0 = off)", minval=0, group=gS2,
 
 gS3 = "S3. Sizing"
 QtyMode    = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3, tooltip="Backtest sizing (strategy.entry qty). The live MT4 lot in the alert text is sized by the MT4 Lot Sizing group below.")
-fixedQtyS3 = input.float(0.78, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3, tooltip="Fixed mode: the quantity that risks the default Risk % of $2,000 at the median stop (see the header).")
-riskPctS3  = input.float(0.25, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Calibrated: the largest tested risk whose compounded max drawdown stays within 20% on this timeframe's data (see the header).")
+fixedQtyS3 = input.float(0.47, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3, tooltip="Fixed mode, in oz of gold (100 = 1 lot): the quantity that risks the default Risk % of $2,000 at the median stop (see the header).")
+riskPctS3  = input.float(0.15, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Calibrated: the largest tested risk whose 95th-percentile drawdown over reordered trades at stressed costs stays within 20% (see the header).")
 maxQtyS3   = input.float(50, "Max quantity", minval=0.0, group=gS3)
 qtyStepS3  = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
 capMarginS3 = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
-marginPctS3 = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.0, step=0.5, group=gS3)
+marginPctS3 = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.0, step=0.5, group=gS3, tooltip="Margin % used for the quantity cap. 1% is more conservative than the strategy Properties margin of 0.2%; the cap rarely binds at these risk levels (see the header).")
 
 groupSession = "Session Filter"
 useSessionFilter = input.bool(false, "Use NY Cash Session Filter", group=groupSession)

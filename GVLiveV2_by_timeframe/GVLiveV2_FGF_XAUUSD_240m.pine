@@ -24,11 +24,12 @@
 //  - OANDA XAUUSD 240m: 2,206 bars, 2025-05-13 to 2026-10-14 (17.0 months)
 //  - VANTAGE XAUUSD 240m: 2,900 bars, 2025-01-01 to 2026-10-23 (21.7 months)
 //  The OANDA data (2025-05-13 to 2026-10-14) lies inside the VANTAGE data
-//    (2025-01-01 to 2026-10-23); only VANTAGE 2025-01-01 to 2025-05-13 is not
-//    covered by OANDA. The halves are not calendar-disjoint: OANDA's halves
-//    split at 2026-01-28, VANTAGE's at 2025-11-26, so part of the months used
-//    to select on one dataset are scored on the other; the hold-out lines
-//    below therefore overstate the out-of-sample evidence.
+//    (2025-01-01 to 2026-10-23); VANTAGE 2025-01-01 to 2025-05-13 and
+//    2026-10-14 to 2026-10-23 are not covered by OANDA. The halves are not
+//    calendar-disjoint: OANDA's halves split at 2026-01-28, VANTAGE's at
+//    2025-11-26, so part of the months used to select on one dataset are
+//    scored on the other; the hold-out lines below therefore overstate the
+//    out-of-sample evidence.
 //  Costs: $0.30 spread per round trip, no commission, no slippage. Stop first
 //    when a bar touches both stop and target. R = the stop distance.
 //  Python replica of this script, swept over every setting of its input grid:
