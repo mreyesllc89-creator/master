@@ -128,6 +128,33 @@
 //    (0.06-0.07% on XAU120 / 240, 0.075-0.14% on BTC); at 0.02% per side XAU60
 //    drops to +27R and at 0.03% to -1R, and 8-13% of BEST's trades enter and
 //    are stopped on the same bar (all losers, about -1R each).
+//    Bar Magnifier (BTC only: the 60m / 120m / 240m / 5m sets are built from
+//    the same Bitfinex 1m file; XAU has no sub-bar data): BEST's chart-bar
+//    decisions (signal, stop entry, 3-bar validity, breakeven flag, 12-bar
+//    time stop, all at the chart close as calc_on_every_tick = false) replayed
+//    with 1-minute execution, TradingView's rule inside each minute. Checks:
+//    fed the chart bars as "minutes" the executor reproduces the replica trade
+//    for trade (stop-first and TV path), and 0 of 240,528 chart bars differ
+//    from their minute aggregate. Result: the stop-first model is NOT a lower
+//    bound for BEST. BTC60 +320.3R vs +342.7R (-6.5%, PF 1.245 vs 1.258),
+//    BTC120 +171.7R vs +202.7R (-15%, worst half +6.0R vs +24.5R), BTC240
+//    +49.6R vs +77.0R (-36%, DD 39R vs 24R); BTC5 +8,125R vs +4,664.6R (there
+//    a 1 ATR stop spans ~3 minute ranges, so the chart-bar model was the
+//    pessimistic one). The gap is the 2.5 ATR runner trail: the chart-bar
+//    model books it at the trail level, the minute replay at the first minute
+//    that crosses it (BTC60 trail exits net -96R against the replica, stops
+//    +61R). Minute-path bracket, adverse-first / favourable-first: +316.6 /
+//    +153.3R, +171.7 / +101.4R, +49.4 / +31.8R (favourable-first is the
+//    trail's adverse order). The 20 biggest winners are 74% / 118% / 297% of
+//    each total and 17 / 12 / 3 of them contain a minute wider than the trail
+//    distance. Without the trail (breakeven + time stop only) all models agree
+//    within 3%: BTC60 +349.5R chart-bar / +358.6R 1m, BTC120 +255.8 / +264.2R,
+//    BTC240 +88.8 / +88.8R, worst halves +67.0R / +56.2R; on XAU the same
+//    change gives +83.6 / +79.8 / +48.9R, where the trail exits carry +109 /
+//    +47 / +55R of +82 / +64 / +44R and the top 15-17% of trades carry +206 /
+//    +97 / +70R against -124 / -33 / -27R for the rest. So the calibrated
+//    numbers overstate BEST by 7-36% on hourly BTC and lean on the trail's
+//    fill; the unchecked XAU numbers lean on it even more.
 //  - DIRECTION FILTER (only XAU has real filter columns; on BTC it is inert):
 //    at BEST, filter off vs on: 60m +82.0R vs -14.0R (445 trades, PF 0.95,
 //    halves -28.7 / +14.7, DD 44R), 120m +64.5R vs +13.7R (207 trades, PF 1.12,
@@ -182,8 +209,9 @@
 //    exactly as in the Pine; tick behaviour beyond bar data not replicated.
 //    Sample: XAU 2025-26 only, BTC 2018-19 only (a different regime and price
 //    level: today a 30-pip BTC stop is 0.03% of price, so fixed pips do not
-//    port); nothing in between. Re-check with Bar Magnifier and on new data
-//    before trading. To try BEST, set by hand: ATR unit, SL 1.0 ATR, TP 1.5R,
+//    port); nothing in between. Re-check with Bar Magnifier on XAUUSD (the BTC
+//    check above used the 1m bars) and on new data before trading. To try
+//    BEST, set by hand: ATR unit, SL 1.0 ATR, TP 1.5R,
 //    partial 0%, runner trail 2.5 ATR, time stop 12, entry distance 0 ATR,
 //    burst 0.3 ATR, Minimum child zones aligned 1, reverse off, filter off.
 //
