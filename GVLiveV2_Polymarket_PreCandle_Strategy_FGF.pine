@@ -30,6 +30,17 @@
 //    so TradingView booked exits at the bar extreme. S2 now converts to ticks.
 //  - Win rate is low (~23%) by design (5R target): expect runs of 10+
 //    losers; a 1% risk saw drawdowns of 15-17%. Consider 0.5%.
+//  - CYCLE GATE (2026-10-25): tested and NOT added. Four causal dominant-cycle
+//    estimators (Ehlers homodyne, autocorrelation periodogram, DFT bank,
+//    adaptive band-pass; all pass synthetic tests) drove 1,485 gate settings
+//    each (resonance threshold, phase window, 2x-timeframe sync, 3 period
+//    bands) on top of these defaults. On the BEST settings 0 of 297 gate
+//    settings per estimator improved every half of every timeframe; the best
+//    totals (+3 to +14R) were below what 20 RANDOM gates reached on the same
+//    grid (median +24R, max +50R), and out of sample every estimator roughly
+//    halved the ungated +12 to +15R. On real XAUUSD the measured phase is
+//    near-random relative to the actual swings (resultant 0.04-0.23 vs 0.99
+//    on a clean sine), so there is no cycle structure here to gate on.
 //  - Not calibrated: BTCUSDT (only 1 day of 30s and 3 hours of 15s data,
 //    a handful of trades), Polymarket settlement odds, the Max Quantity /
 //    margin caps (results are per R), the radar on a lower timeframe.
