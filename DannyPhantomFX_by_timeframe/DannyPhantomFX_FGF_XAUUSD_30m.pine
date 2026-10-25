@@ -125,6 +125,30 @@
 //    Fixed quantity equivalent: 0.36 oz (the default risk at the median stop
 //      of $8.24); VANTAGE XAUUSD +751 USD, max DD 184 USD, no compounding.
 //
+// DIRECTION FILTER (FlashGold Direction Filter v1.2, rebuilt in Python and swept)
+//  DECISION: OFF (tested; it did not pass the adoption rule here). Sweep
+//    decision kept (no sceptic refuted it). The forward hold-out fails: the
+//    filter chosen on the first half made 47.88R on the second half vs
+//    142.56R with the filter off.
+//  - Filter off (adopted Danny settings, XAUV30): 1287 trades, 288.1R (first
+//    half 145.54R, second half 142.56R), PF 1.274, 247.76R at stressed costs.
+//  - Best in-sample filter (F120, parent 480, zones 240/480, min aligned 1,
+//    burst off, Entry price, band 0): 1026 trades, 449.14R (210.27/238.87),
+//    PF 1.539, 416.63R stressed. Not adopted.
+//  - The full-data pick (same, min aligned 2, Candles 24, RSI 18) made
+//    398.27R (188.59/209.68), 365.33R stressed, allowing buys on 50.3% and
+//    sells on 48.1% of bars.
+//  - Forward hold-out FAILS: the filter picked on the first half made 47.88R
+//    on the second half vs 142.56R with the filter off (it allowed buys only,
+//    0% sells).
+//  - Reverse hold-out passes (214.25R vs 145.54R on the first half), but one
+//    failed hold-out keeps the filter off under the rule.
+//  - The parent 480 above filter 120 in the best setting reads a forming bar
+//    live, so its history result can repaint.
+//  - Caveat: VANTAGE gold has no TradingView filter export, so filter TFs
+//    other than the OANDA defaults are not verified against TradingView; the
+//    VANTAGE higher-TF anchor (18:00 ET) is inferred.
+//
 // OTHER INPUT SETS ON THE SAME DATA
 //  The file's original defaults (filter off): VANTAGE XAUUSD -94.0R (1341
 //    trades, PF 0.89)
@@ -356,7 +380,7 @@ tradeOriginalDirection = input.bool(true, "Trade Original (Un-Inverted) Signals"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (the tested setting). Its effect could not be tested on this data (no filter columns), so it stays off.")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the rebuilt filter was swept on this timeframe and did not pass the adoption rule (see the DIRECTION FILTER block in the header).")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")

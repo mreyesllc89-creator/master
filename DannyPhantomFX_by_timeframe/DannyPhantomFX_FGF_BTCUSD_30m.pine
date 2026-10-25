@@ -125,6 +125,23 @@
 //    Fixed quantity equivalent: 0.09 BTC (the default risk at the median stop
 //      of $34.56); Bitfinex BTCUSD +446 USD, max DD 366 USD, no compounding.
 //
+// DIRECTION FILTER (FlashGold Direction Filter v1.2, rebuilt in Python and swept)
+//  DECISION: OFF (tested; it did not pass the adoption rule here). Sweep
+//    decision kept. No full-data pick on a plateau; the reverse hold-out
+//    makes 19.63R vs 185.08R with the filter off.
+//  - Filter off (adopted Danny settings, BTC30): 1663 trades, 370.81R
+//    (185.08/185.72), PF 1.265, 215.58R at stressed costs.
+//  - Best in-sample filter (F60, zones off, burst on, Entry price, band 0,
+//    Candles 12): 1146 trades, 449.64R (198.78/250.86), PF 1.47, 352.27R
+//    stressed; buys 49.0%, sells 49.6% of bars. Not adopted.
+//  - No filter setting passed the plateau test, so there is no full-data pick
+//    and no forward hold-out pick.
+//  - Reverse hold-out FAILS: the second-half pick made 19.63R on the first
+//    half vs 185.08R with the filter off (-2.75R vs 108.04R stressed); it
+//    allowed only about 7.5% of bars.
+//  - Caveat: BTC data is a Bitfinex 1m set (2018-2019) with gaps, not
+//    TradingView's feed; no BTC filter TF is verified against TradingView.
+//
 // OTHER INPUT SETS ON THE SAME DATA
 //  The file's original defaults (filter off): Bitfinex BTCUSD -52.9R (1355
 //    trades, PF 0.94)
@@ -359,7 +376,7 @@ tradeOriginalDirection = input.bool(true, "Trade Original (Un-Inverted) Signals"
 FGF_FORCE_OVERLAY = false
 
 GRP_FGF = "Direction filter"
-fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off (the tested setting). Its effect could not be tested on this data (no filter columns), so it stays off.")
+fgfOn        = input.bool(false, "Enable filter", group=GRP_FGF, tooltip="Off: the rebuilt filter was swept on this timeframe and did not pass the adoption rule (see the DIRECTION FILTER block in the header).")
 fgfTf        = input.timeframe("60", "Filter timeframe", group=GRP_FGF, tooltip="The FlashGold signal runs on this timeframe's candles, and any chart (or strategy) using the filter gets the answer that timeframe's own chart shows at that moment: 1 hour on a 1m chart = the 1H view. Only closed candles are read, so nothing repaints. 'Chart' = this chart's own candles.")
 fgfLvMode    = input.string("Entry price", "Level", options=["Entry price", "Signal close"], group=GRP_FGF, tooltip="Entry price: the FlashGold entry price of the signal (ask + entry distance for a BUY, bid - entry distance for a SELL). Signal close: the close of the signal candle.")
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
