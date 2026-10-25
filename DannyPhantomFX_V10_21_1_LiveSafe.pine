@@ -1,0 +1,819 @@
+//@version=6
+//@strategy_alert_message {{strategy.order.alert_message}}
+//====================================================//
+// Danny Phantom FX V10.21.1 LiveSafe
+//====================================================//
+// Markets: XAUUSD 5m, XAGUSD 5m, NAS100 5m
+//
+// This version preserves the V10.21 trading model:
+//   - same signal, profile, filter, SL/TP and session logic
+//   - calc_on_order_fills = true
+//   - process_orders_on_close = true
+//   - V10.21 NAS100 adaptive 10/12-bar dead exit
+//
+// LiveSafe hardening:
+//   1) one entry/reversal decision per chart bar
+//   2) one forced-flat order per chart bar
+//   3) deterministic priority for blackout/dead/time closes
+//   4) reversals remain atomic BUY/SELL orders
+//   5) optional audit ID and reason fields, OFF by default for copier safety
+//   6) prefilled strategy order-fill alert placeholder
+//
+// IMPORTANT:
+//   Pine can reduce duplicate or conflicting order messages, but it cannot
+//   guarantee webhook delivery, Discord delivery, copier parsing or broker
+//   acceptance. Validate end-to-end at minimum lot before increasing risk.
+//====================================================//
+
+strategy("OF S/D Robust — Inverted FX Top 3 V10.21.1 LiveSafe", shorttitle="DPFX10.211", overlay=true, pyramiding=0, initial_capital=2000, default_qty_type=strategy.fixed, default_qty_value=1, calc_on_every_tick=false, calc_on_order_fills=true, process_orders_on_close=true, commission_type=strategy.commission.percent, commission_value=0.001, slippage=75, margin_long=0.2, margin_short=0.2)
+
+//====================================================//
+// PRESET MODE
+//====================================================//
+
+groupPreset = "Preset"
+
+presetMode = input.string("Auto", "Preset Mode", options=["Auto", "AUDJPY 2m", "EURGBP 3m", "USDCAD 5m", "XAGUSD 5m", "XAUUSD 5m", "NAS100 5m", "Manual"], group=groupPreset, tooltip="Auto detects presets from the symbol and timeframe. Force a preset manually if your broker ticker name is not detected.")
+
+v2Source = input.string("Auto Optimized Profile", "V2 Settings Source", options=["Auto Optimized Profile", "Manual V2 Toggles"], group=groupPreset, tooltip="Auto Optimized Profile loads the validated symbol profile. Manual V2 Toggles is honored only when Lock Auto Safety Profile is OFF or Preset Mode is Manual.")
+
+lockAutoProfile = input.bool(true, "Lock Auto Safety Profile", group=groupPreset, tooltip="Keep the optimized max-hold, dead-trade, blackout buffer, Sunday and re-entry guards active on supported presets.")
+
+useV106GrowthSlTp = input.bool(true, "Use V10.6 Growth-Optimized SL/TP Candidates", group=groupPreset, tooltip="Keep ON for V10.21: XAUUSD and NAS100 use 1.2 ATR SL / 5.0 ATR TP; XAGUSD uses 1.2 ATR SL / 4.0 ATR TP.")
+
+useV1021NasAdaptiveDead = input.bool(true, "Use V10.21 NAS100 Adaptive 10/12-Bar Dead Exit", group=groupPreset, tooltip="At NAS100 bar 10, close an unprofitable trade whose maximum run-up stayed below the threshold. Otherwise allow it through bar 12.")
+
+nasAdaptiveRunupAtr = input.float(2.0, "    NAS100 Extension Run-Up Threshold (ATR)", minval=0.5, maxval=5.0, step=0.25, group=groupPreset)
+
+riskPercent = input.float(1.0, "Risk % Per Trade", minval=0.1, step=0.1, group=groupPreset, tooltip="Simulation-only compounding risk when ATR Risk Sizing is ON.")
+
+useRiskSizing = input.bool(false, "Use 1% ATR Risk Sizing (SIMULATION ONLY)", group=groupPreset, tooltip="Backtest-only. It does not control the live MT4 lot field.")
+
+fixedQty = input.float(1.0, "Fixed Qty If Risk Sizing Off", minval=0.01, step=0.01, group=groupPreset)
+
+//====================================================//
+// LIVE EXECUTION SAFETY
+//====================================================//
+
+groupExecutionSafety = "V10.21.1 LiveSafe"
+
+limitOneDecisionPerBar = input.bool(true, "Limit To One Entry/Reversal Per Chart Bar", group=groupExecutionSafety, tooltip="Critical V10.4/V10.21 safety guard. Do not disable for live alerts.")
+
+limitOneFlatExitPerBar = input.bool(true, "Limit To One Forced CLOSE Per Chart Bar", group=groupExecutionSafety, tooltip="Prevents dead, time and blackout logic from submitting repeated flat orders during order-fill recalculation.")
+
+appendLiveSafeId = input.bool(false, "Append Unique id= To Webhook Messages", group=groupExecutionSafety, tooltip="OFF preserves the existing copier format. Enable only after confirming your copier ignores or supports the extra id field.")
+
+appendExitReason = input.bool(false, "Append reason= To CLOSE Messages", group=groupExecutionSafety, tooltip="OFF preserves the existing copier format. When ON, CLOSE messages identify protective, dead, time or blackout exits.")
+
+//====================================================//
+// V2 OPTIMIZATIONS — MANUAL TOGGLES
+//====================================================//
+
+groupV2 = "V2 Optimizations (Manual)"
+
+useV2MaxBars = input.bool(true, "(1) Use Reduced Max Bars In Trade", group=groupV2)
+v2MaxBars = input.int(50, "    Max Bars In Trade (V2)", minval=1, group=groupV2)
+
+useDeadExit = input.bool(true, "(2) Scratch Trades Not In Profit After N Bars", group=groupV2)
+deadBarsIn = input.int(15, "    Dead Trade Bars", minval=1, group=groupV2)
+
+useSlTpOverride = input.bool(false, "(3) Override SL/TP ATR Multipliers", group=groupV2)
+slOverride = input.float(1.2, "    SL ATR Override", minval=0.1, step=0.1, group=groupV2)
+tpOverride = input.float(4.0, "    TP ATR Override", minval=0.1, step=0.1, group=groupV2)
+
+useBreakeven = input.bool(false, "(4) Move Stop To Breakeven", group=groupV2)
+beTriggerAtr = input.float(1.0, "    Breakeven Trigger (ATR)", minval=0.1, step=0.1, group=groupV2)
+
+useEntryBuffer = input.bool(true, "(5) Block Entries Before Blackout Window", group=groupV2)
+entryBufferIn = input.int(60, "    Buffer Minutes Before Blackout", minval=5, step=5, group=groupV2)
+
+useSundayBlock = input.bool(true, "(6) Block All Sunday Entries (NY Time)", group=groupV2)
+
+useEntryWindow = input.bool(false, "(7) Use Entry Time Window", group=groupV2)
+entryWindowIn = input.session("0800-1200", "    Entry Window", group=groupV2)
+
+useOnePerZone = input.bool(true, "(8) One Entry Per Zone", group=groupV2)
+
+useCooldown = input.bool(true, "(9) Re-Entry Cooldown After Dead/Time Exit", group=groupV2)
+cooldownIn = input.int(10, "    Cooldown Bars", minval=1, group=groupV2)
+
+//====================================================//
+// MANUAL INPUTS
+//====================================================//
+
+groupZones = "Manual Supply / Demand Settings"
+manualShowZones = input.bool(true, "Show Supply/Demand Zones", group=groupZones)
+manualZoneLength = input.int(50, "Zone Lookback Length", minval=2, group=groupZones)
+manualDeltaThreshold = input.float(1.5, "Volume Delta Spike Multiplier", step=0.1, group=groupZones)
+manualMinRetestBars = input.int(1, "Minimum Bars Before Retest", minval=1, group=groupZones)
+manualMaxZoneAge = input.int(200, "Max Zone Age In Bars", minval=5, group=groupZones)
+manualInvalidate = input.bool(true, "Invalidate Broken Zones", group=groupZones)
+
+groupTrend = "Manual Trend Filter"
+manualUseEmaFilter = input.bool(true, "Use EMA Trend Filter", group=groupTrend)
+manualEmaLength = input.int(100, "EMA Length", minval=1, group=groupTrend)
+manualZoneTrend = input.bool(false, "Only Create Zones With EMA Trend", group=groupTrend)
+
+groupEntry = "Manual Entry Filter"
+manualEntryMode = input.string("Normal Retest Touch", "Entry Mode", options=["Normal Retest Touch", "Close Beyond Key Zone"], group=groupEntry)
+
+groupRisk = "Manual Risk Management"
+manualAtrLength = input.int(14, "ATR Length", minval=1, group=groupRisk)
+manualSlAtrMult = input.float(3.0, "Stop Loss ATR Multiplier", step=0.1, group=groupRisk)
+manualTpAtrMult = input.float(6.0, "Take Profit ATR Multiplier", step=0.1, group=groupRisk)
+manualUseTrailing = input.bool(false, "Use Trailing Stop", group=groupRisk)
+manualTrailAtrMult = input.float(2.0, "Trailing Stop ATR Multiplier", step=0.1, group=groupRisk)
+manualMaxBarsInTrade = input.int(200, "Max Bars In Trade (Legacy)", minval=1, group=groupRisk)
+
+groupSession = "Session Filter"
+useSessionFilter = input.bool(false, "Use NY Cash Session Filter", group=groupSession)
+nySession = input.session("0930-1600", "NY Cash Session", group=groupSession)
+
+//====================================================//
+// QUALITY FILTERS
+//====================================================//
+
+groupQuality = "V10.5 Robust Quality Filters"
+
+useRobustHourFilter = input.bool(true, "Block Robustly Losing NY Hours", group=groupQuality)
+useDirectionalMicroFilter = input.bool(true, "Block Quarter-Robust Directional 15-Minute Windows", group=groupQuality)
+useV105DirectionalFilter = input.bool(true, "Block V10.5 Quarter-Robust Directional Windows", group=groupQuality)
+useV1010PfFilter = input.bool(true, "Block V10.10 Quarter-Robust Profit-Factor Windows", group=groupQuality)
+
+useV1011LossClusterPause = input.bool(true, "Pause Entries After Consecutive Loss Cluster", group=groupQuality, tooltip="XAUUSD 5 losses/12 bars; NAS100 8/10; XAGUSD 3/3.")
+manualLossClusterCount = input.int(5, "    Manual Losses Before Pause", minval=2, maxval=20, group=groupQuality)
+manualLossClusterPauseBars = input.int(12, "    Manual Pause Bars", minval=1, maxval=100, group=groupQuality)
+
+groupEfficiency = "V10.13 Volatility / Cost Efficiency"
+useV1013VolCostFilter = input.bool(true, "Block Entries When ATR Stop Is Too Small Versus Costs", group=groupEfficiency)
+minStopToCostRatio = input.float(4.0, "Minimum Stop Distance / Round-Trip Cost", minval=1.0, maxval=20.0, step=0.25, group=groupEfficiency)
+modeledSlippageTicksOverride = input.int(0, "Modeled Slippage Ticks Override (0 = Auto)", minval=0, step=1, group=groupEfficiency)
+
+//====================================================//
+// BLACKOUT
+//====================================================//
+
+groupBlackout = "Weekend & Daily Blackout Filter (NY Time)"
+useWeekendBlackout = input.bool(true, "Enable Weekend Close/Block (Fri 4:55pm NY - Sun 6:00pm NY)", group=groupBlackout)
+useDailyBlackout = input.bool(true, "Enable Daily Intraday Hold Filter (Mon-Thu 4:55pm-6:00pm NY)", group=groupBlackout)
+closeLeadMin = input.int(10, "Blackout Close Lead Minutes", minval=5, step=5, group=groupBlackout)
+
+//====================================================//
+// WEBHOOK / COPIER SETTINGS
+//====================================================//
+
+groupWebhook = "Webhook / Copier Settings"
+webhookPointSizeInput = input.float(0.0, "Webhook Point Size (0 = Auto)", minval=0.0, step=0.001, group=groupWebhook)
+float webhookPointSize = webhookPointSizeInput > 0.0 ? webhookPointSizeInput : syminfo.mintick
+
+//====================================================//
+// MT4 LOT SIZING
+//====================================================//
+
+groupLots = "MT4 Lot Sizing (V8)"
+useLotInAlert = input.bool(true, "Append lots= To Entry Alerts", group=groupLots)
+mt4Balance = input.float(10000.0, "MT4 Account Balance (USD)", minval=1.0, step=100.0, group=groupLots)
+mt4RiskPct = input.float(1.0, "MT4 Risk % Per Trade", minval=0.05, step=0.05, group=groupLots)
+lotStep = input.float(0.01, "Broker Lot Step", minval=0.001, step=0.001, group=groupLots)
+minLot = input.float(0.01, "Broker Minimum Lot", minval=0.001, step=0.001, group=groupLots)
+maxLot = input.float(2.0, "Max Lot Clamp (Safety)", minval=0.01, step=0.01, group=groupLots)
+contractOverride = input.float(0.0, "Contract Size Override (0 = Auto From Profile)", minval=0.0, group=groupLots)
+quoteUsd = input.float(1.0, "Quote Currency -> USD Rate", minval=0.0001, step=0.0001, group=groupLots)
+
+//====================================================//
+// STYLE
+//====================================================//
+
+groupStyle = "Style"
+demandColor = input.color(color.new(#089981, 85), "Demand Zone Color", group=groupStyle)
+demandKeyColor = input.color(color.new(#089981, 60), "Demand Key Entry Zone", group=groupStyle)
+supplyColor = input.color(color.new(#f23645, 85), "Supply Zone Color", group=groupStyle)
+supplyKeyColor = input.color(color.new(#f23645, 60), "Supply Key Entry Zone", group=groupStyle)
+buySignalColor = input.color(#089981, "Inverted Buy Signal Color", group=groupStyle)
+sellSignalColor = input.color(#f23645, "Inverted Sell Signal Color", group=groupStyle)
+showOriginalSignals = input.bool(false, "Show Original Non-Inverted Signals", group=groupStyle)
+showRawActiveSignals = input.bool(false, "Show Raw Active Signals (Diagnostic)", group=groupStyle)
+tradeOriginalDirection = input.bool(false, "Trade Original (Un-Inverted) Signals", group=groupStyle)
+
+//====================================================//
+// SYMBOL / TIMEFRAME DETECTION
+//====================================================//
+
+string tickerUpper = str.upper(syminfo.ticker)
+bool isAUDJPY = str.contains(tickerUpper, "AUDJPY")
+bool isEURGBP = str.contains(tickerUpper, "EURGBP")
+bool isUSDCAD = str.contains(tickerUpper, "USDCAD")
+bool isXAGUSD = str.contains(tickerUpper, "XAGUSD") or str.contains(tickerUpper, "SILVER")
+bool isXAUUSD = str.contains(tickerUpper, "XAUUSD") or str.contains(tickerUpper, "GOLD")
+bool isNAS100 = str.contains(tickerUpper, "NAS100") or str.contains(tickerUpper, "US100") or str.contains(tickerUpper, "NDX") or str.contains(tickerUpper, "USTEC")
+
+int tfMin = timeframe.isminutes ? timeframe.multiplier : 0
+bool autoAudJpy2 = isAUDJPY and tfMin == 2
+bool autoEurGbp3 = isEURGBP and tfMin == 3
+bool autoUsdCad5 = isUSDCAD and tfMin == 5
+bool autoXagUsd5 = isXAGUSD and tfMin == 5
+bool autoXauUsd5 = isXAUUSD and tfMin == 5
+bool autoNas1005 = isNAS100 and tfMin == 5
+
+bool presetAUDJPY = presetMode == "AUDJPY 2m" or (presetMode == "Auto" and autoAudJpy2)
+bool presetEURGBP = presetMode == "EURGBP 3m" or (presetMode == "Auto" and autoEurGbp3)
+bool presetUSDCAD = presetMode == "USDCAD 5m" or (presetMode == "Auto" and autoUsdCad5)
+bool presetXAGUSD = presetMode == "XAGUSD 5m" or (presetMode == "Auto" and autoXagUsd5)
+bool presetXAUUSD = presetMode == "XAUUSD 5m" or (presetMode == "Auto" and autoXauUsd5)
+bool presetNAS100 = presetMode == "NAS100 5m" or (presetMode == "Auto" and autoNas1005)
+
+bool usingFxPreset = presetAUDJPY or presetEURGBP or presetUSDCAD or presetXAGUSD or presetXAUUSD or presetNAS100
+bool topThreePreset = presetXAGUSD or presetXAUUSD or presetNAS100
+bool useProfile = usingFxPreset and (lockAutoProfile or v2Source == "Auto Optimized Profile")
+
+//====================================================//
+// PER-SYMBOL PROFILES
+//====================================================//
+
+float legacyProfSl = presetAUDJPY ? 1.8 : presetEURGBP ? 1.5 : presetUSDCAD ? 1.8 : topThreePreset ? 2.0 : manualSlAtrMult
+float profSl = useV106GrowthSlTp and topThreePreset ? 1.2 : legacyProfSl
+float profTp = presetAUDJPY ? 3.6 : presetEURGBP ? 4.5 : presetUSDCAD ? 4.5 : presetXAGUSD ? 4.0 : (presetXAUUSD or presetNAS100) ? 5.0 : manualTpAtrMult
+
+bool profTrailOn = presetXAGUSD
+float profTrailAtr = presetXAGUSD ? 2.5 : manualTrailAtrMult
+int profMaxBars = topThreePreset ? 50 : 25
+bool profDeadOn = not presetXAUUSD
+int profDeadBars = presetNAS100 ? 10 : 15
+bool profBeOn = false
+float profBeTrigger = 1.0
+bool profBufferOn = true
+int profBufferMin = 60
+bool profSundayBlock = presetNAS100 or presetXAUUSD
+bool profWindowOn = false
+string profWindow = "0800-1200"
+bool profOnePerZone = true
+bool profCooldownOn = true
+int profCooldown = 10
+
+//====================================================//
+// ACTIVE SETTINGS
+//====================================================//
+
+int zoneLengthInput = usingFxPreset ? 50 : manualZoneLength
+float deltaThresholdInput = usingFxPreset ? 1.5 : manualDeltaThreshold
+int emaLength = usingFxPreset ? 100 : manualEmaLength
+
+float baseSl = useProfile ? profSl : (usingFxPreset ? profSl : manualSlAtrMult)
+float baseTp = useProfile ? profTp : (usingFxPreset ? profTp : manualTpAtrMult)
+float slAtrMult = useSlTpOverride ? slOverride : baseSl
+float tpAtrMult = useSlTpOverride ? tpOverride : baseTp
+
+bool useTrailing = useProfile ? profTrailOn : (presetXAGUSD ? true : manualUseTrailing)
+float trailAtrMult = useProfile ? profTrailAtr : (presetXAGUSD ? 2.5 : manualTrailAtrMult)
+
+int legacyMaxBars = usingFxPreset ? 200 : manualMaxBarsInTrade
+int maxBarsInTrade = useProfile ? profMaxBars : (useV2MaxBars ? v2MaxBars : legacyMaxBars)
+bool deadExitActive = useProfile ? profDeadOn : useDeadExit
+int deadBars = useProfile ? profDeadBars : deadBarsIn
+bool breakevenActive = useProfile ? profBeOn : useBreakeven
+float beTrigger = useProfile ? profBeTrigger : beTriggerAtr
+bool entryBufferActive = useProfile ? profBufferOn : useEntryBuffer
+int entryBufferMin = useProfile ? profBufferMin : entryBufferIn
+bool sundayBlockActive = useProfile ? profSundayBlock : useSundayBlock
+bool entryWindowActive = useProfile ? profWindowOn : useEntryWindow
+string entryWindow = useProfile ? profWindow : entryWindowIn
+bool onePerZoneActive = useProfile ? profOnePerZone : useOnePerZone
+bool cooldownActive = useProfile ? profCooldownOn : useCooldown
+int cooldownBars = useProfile ? profCooldown : cooldownIn
+string entryMode = usingFxPreset ? "Normal Retest Touch" : manualEntryMode
+bool showZonesInput = manualShowZones
+bool useEmaFilter = manualUseEmaFilter
+bool zoneTrendFilter = presetMode == "Manual" ? manualZoneTrend : false
+bool invalidateZones = manualInvalidate
+int minRetestBars = manualMinRetestBars
+int maxZoneAge = manualMaxZoneAge
+int atrLength = manualAtrLength
+
+float contractSize = contractOverride > 0.0 ? contractOverride : presetXAUUSD ? 100.0 : presetXAGUSD ? 5000.0 : presetNAS100 ? 1.0 : (presetAUDJPY or presetEURGBP or presetUSDCAD) ? 100000.0 : 1.0
+
+bool lossClusterProfileActive = useV1011LossClusterPause
+int lossClusterTrigger = presetXAGUSD ? 3 : presetXAUUSD ? 5 : presetNAS100 ? 8 : manualLossClusterCount
+int lossClusterPauseBars = presetXAGUSD ? 3 : presetXAUUSD ? 12 : presetNAS100 ? 10 : manualLossClusterPauseBars
+
+//====================================================//
+// SESSION / TIME FILTERS
+//====================================================//
+
+bool inSession = not useSessionFilter or not na(time(timeframe.period, nySession))
+bool inEntryWindow = not entryWindowActive or not na(time(timeframe.period, entryWindow))
+
+int dowNY = dayofweek(time, "America/New_York")
+int hourNY = hour(time, "America/New_York")
+int minuteNY = minute(time, "America/New_York")
+int minutesNY = hourNY * 60 + minuteNY
+
+bool robustHourBlock = useRobustHourFilter and (
+     (presetXAGUSD and (hourNY == 5 or hourNY == 10 or hourNY == 12 or hourNY == 23)) or
+     (presetXAUUSD and (hourNY == 3 or hourNY == 14 or hourNY == 18)) or
+     (presetNAS100 and (hourNY == 1 or hourNY == 4 or hourNY == 11 or hourNY == 12 or hourNY == 18 or hourNY == 21 or hourNY == 22))
+)
+
+bool longDirectionalBlock = useDirectionalMicroFilter and (
+     (presetXAUUSD and hourNY == 4 and minuteNY >= 0 and minuteNY < 15) or
+     (presetNAS100 and ((hourNY == 10 and minuteNY >= 30 and minuteNY < 45) or (hourNY == 23 and minuteNY >= 0 and minuteNY < 15))) or
+     (presetXAGUSD and hourNY == 20 and minuteNY >= 30 and minuteNY < 45)
+)
+
+bool shortDirectionalBlock = useDirectionalMicroFilter and (
+     (presetXAUUSD and hourNY == 9 and minuteNY >= 0 and minuteNY < 15) or
+     (presetNAS100 and ((hourNY == 7 and minuteNY >= 30 and minuteNY < 45) or (hourNY == 13 and minuteNY >= 0 and minuteNY < 15))) or
+     (presetXAGUSD and ((hourNY == 2 and minuteNY < 30) or (hourNY == 7 and minuteNY >= 45) or (hourNY == 11 and minuteNY < 15) or (hourNY == 20 and minuteNY < 15)))
+)
+
+bool v105LongBlock = useV105DirectionalFilter and (
+     (presetXAUUSD and ((hourNY == 10 and minuteNY >= 15 and minuteNY < 30) or (hourNY == 11 and minuteNY >= 30))) or
+     (presetNAS100 and hourNY == 2 and minuteNY >= 30 and minuteNY < 45) or
+     (presetXAGUSD and ((hourNY == 0 and minuteNY < 30) or (hourNY == 20 and minuteNY >= 45) or (hourNY == 21 and minuteNY >= 45)))
+)
+
+bool v105ShortBlock = useV105DirectionalFilter and (
+     (presetNAS100 and ((hourNY == 2 and minuteNY >= 45) or (hourNY == 9 and minuteNY >= 10 and minuteNY < 20))) or
+     (presetXAGUSD and ((hourNY == 4 and minuteNY >= 40) or (hourNY == 20 and minuteNY >= 15 and minuteNY < 30)))
+)
+
+bool v1010LongBlock = useV1010PfFilter and (
+     (presetXAUUSD and ((hourNY == 1 and minuteNY >= 15 and minuteNY < 30) or (hourNY == 4 and minuteNY >= 15 and minuteNY < 30))) or
+     (presetNAS100 and ((hourNY == 3 and minuteNY >= 45) or (hourNY == 19 and minuteNY < 15))) or
+     (presetXAGUSD and ((hourNY == 3 and minuteNY >= 30) or (hourNY == 7 and minuteNY >= 15 and minuteNY < 30) or (hourNY == 8 and minuteNY < 15) or (hourNY == 21 and minuteNY < 30)))
+)
+
+bool v1010ShortBlock = useV1010PfFilter and (
+     (presetXAUUSD and hourNY == 4 and minuteNY >= 45) or
+     (presetNAS100 and ((hourNY == 0 and minuteNY < 30) or (hourNY == 5 and minuteNY >= 30 and minuteNY < 45))) or
+     (presetXAGUSD and hourNY == 15 and minuteNY >= 30 and minuteNY < 45)
+)
+
+//====================================================//
+// BLACKOUT LOGIC
+//====================================================//
+
+int dailyStartMin = 16 * 60 + 55
+int dailyEndMin = 18 * 60
+
+bool weekendBlackout = useWeekendBlackout and (
+     (dowNY == dayofweek.friday and minutesNY >= dailyStartMin) or
+     dowNY == dayofweek.saturday or
+     (dowNY == dayofweek.sunday and minutesNY < dailyEndMin)
+)
+
+bool dailyBlackout = useDailyBlackout and dowNY >= dayofweek.monday and dowNY <= dayofweek.thursday and minutesNY >= dailyStartMin and minutesNY < dailyEndMin
+bool blackoutActive = weekendBlackout or dailyBlackout
+
+bool preBlackoutClose = (
+     (useWeekendBlackout and dowNY == dayofweek.friday and minutesNY >= dailyStartMin - closeLeadMin and minutesNY < dailyStartMin) or
+     (useDailyBlackout and dowNY >= dayofweek.monday and dowNY <= dayofweek.thursday and minutesNY >= dailyStartMin - closeLeadMin and minutesNY < dailyStartMin)
+)
+
+bool nearBlackout = entryBufferActive and dowNY >= dayofweek.monday and dowNY <= dayofweek.friday and minutesNY >= dailyStartMin - entryBufferMin and minutesNY < dailyEndMin
+bool sundayBlock = sundayBlockActive and dowNY == dayofweek.sunday
+
+//====================================================//
+// LOSS-CLUSTER / COOLDOWN STATE
+//====================================================//
+
+var int processedClosedTrades = 0
+var int consecutiveClosedLosses = 0
+var int lossClusterPauseUntilBar = na
+
+if strategy.closedtrades > processedClosedTrades
+    int firstClosedTradeToProcess = math.max(processedClosedTrades, strategy.closedtrades.first_index)
+    for closedTradeNum = firstClosedTradeToProcess to strategy.closedtrades - 1
+        float closedTradeProfit = strategy.closedtrades.profit(closedTradeNum)
+        if not na(closedTradeProfit)
+            if closedTradeProfit < 0
+                consecutiveClosedLosses += 1
+            else
+                consecutiveClosedLosses := 0
+            if lossClusterProfileActive and consecutiveClosedLosses >= lossClusterTrigger
+                lossClusterPauseUntilBar := bar_index + lossClusterPauseBars
+                consecutiveClosedLosses := 0
+    processedClosedTrades := strategy.closedtrades
+
+bool inLossClusterPause = lossClusterProfileActive and not na(lossClusterPauseUntilBar) and bar_index < lossClusterPauseUntilBar
+if lossClusterProfileActive and not na(lossClusterPauseUntilBar) and bar_index >= lossClusterPauseUntilBar
+    lossClusterPauseUntilBar := na
+
+var int cooldownUntilBar = na
+bool inCooldown = cooldownActive and not na(cooldownUntilBar) and bar_index < cooldownUntilBar
+
+//====================================================//
+// PROTECTION STATE
+//====================================================//
+
+var float longAtrAtEntry = na
+var float shortAtrAtEntry = na
+var float pendingLongAtr = na
+var float pendingShortAtr = na
+var bool beArmedLong = false
+var bool beArmedShort = false
+
+int curEntryBar = strategy.opentrades > 0 ? strategy.opentrades.entry_bar_index(strategy.opentrades - 1) : na
+int barsInTrade = not na(curEntryBar) ? bar_index - curEntryBar : na
+
+//====================================================//
+// ORDER FLOW / ATR / COST MODEL
+//====================================================//
+
+float priceRange = high - low
+float upFraction = 0.5
+if priceRange != 0
+    upFraction := (close - low) / priceRange
+else if close > nz(close[1], close)
+    upFraction := 1.0
+else if close < nz(close[1], close)
+    upFraction := 0.0
+
+float safeVolume = nz(volume, 1.0)
+float buyVolume = safeVolume * upFraction
+float sellVolume = safeVolume * (1.0 - upFraction)
+float volumeDelta = buyVolume - sellVolume
+float avgDelta = ta.sma(math.abs(volumeDelta), zoneLengthInput)
+
+float emaValue = ta.ema(close, emaLength)
+float atrValue = ta.atr(atrLength)
+
+bool topThreeCostProfile = topThreePreset
+int autoModeledSlippageTicks = presetXAGUSD ? 1000 : 75
+int modeledSlippageTicks = modeledSlippageTicksOverride > 0 ? modeledSlippageTicksOverride : autoModeledSlippageTicks
+float estimatedRoundTripSlippage = 2.0 * modeledSlippageTicks * syminfo.mintick
+float estimatedRoundTripCommission = close * 0.00002
+float estimatedRoundTripCost = estimatedRoundTripSlippage + estimatedRoundTripCommission
+float currentAtrStopDistance = atrValue * slAtrMult
+float stopToCostRatio = estimatedRoundTripCost > 0.0 ? currentAtrStopDistance / estimatedRoundTripCost : na
+bool volatilityCostBlock = useV1013VolCostFilter and topThreeCostProfile and not na(stopToCostRatio) and stopToCostRatio < minStopToCostRatio
+
+float activeEntryAtr = strategy.position_size > 0 ? longAtrAtEntry : strategy.position_size < 0 ? shortAtrAtEntry : na
+float activePointValue = syminfo.pointvalue > 0 ? syminfo.pointvalue : 1.0
+float activeTradeQty = math.abs(strategy.position_size)
+float openTradeMaxRunupCash = strategy.opentrades > 0 ? strategy.opentrades.max_runup(strategy.opentrades - 1) : 0.0
+float openTradeMaxRunupAtr = not na(activeEntryAtr) and activeEntryAtr > 0.0 and activeTradeQty > 0.0 ? openTradeMaxRunupCash / (activeEntryAtr * activePointValue * activeTradeQty) : 0.0
+
+bool positionLongNotProfitable = strategy.position_size > 0 and close <= strategy.position_avg_price
+bool positionShortNotProfitable = strategy.position_size < 0 and close >= strategy.position_avg_price
+
+bool nasAdaptiveEarlyExit = useV1021NasAdaptiveDead and presetNAS100 and not na(barsInTrade) and barsInTrade >= 10 and barsInTrade < 12 and openTradeMaxRunupAtr < nasAdaptiveRunupAtr
+bool nasAdaptiveFallbackExit = useV1021NasAdaptiveDead and presetNAS100 and not na(barsInTrade) and barsInTrade >= 12
+
+bool standardDeadLong = deadExitActive and positionLongNotProfitable and not na(barsInTrade) and barsInTrade >= deadBars
+bool standardDeadShort = deadExitActive and positionShortNotProfitable and not na(barsInTrade) and barsInTrade >= deadBars
+
+bool deadLong = presetNAS100 and useV1021NasAdaptiveDead ? positionLongNotProfitable and (nasAdaptiveEarlyExit or nasAdaptiveFallbackExit) : standardDeadLong
+bool deadShort = presetNAS100 and useV1021NasAdaptiveDead ? positionShortNotProfitable and (nasAdaptiveEarlyExit or nasAdaptiveFallbackExit) : standardDeadShort
+bool timeExit = strategy.position_size != 0 and not na(barsInTrade) and barsInTrade >= maxBarsInTrade
+bool blackoutExitIntent = (blackoutActive or preBlackoutClose) and strategy.position_size != 0
+bool forcedExitThisBar = deadLong or deadShort or timeExit or blackoutExitIntent
+
+bool tradingAllowed = inSession and inEntryWindow and not blackoutActive and not nearBlackout and not sundayBlock and not robustHourBlock and not inCooldown and not inLossClusterPause and not forcedExitThisBar
+
+bool trendAllowsLong = not useEmaFilter or close > emaValue
+bool trendAllowsShort = not useEmaFilter or close < emaValue
+
+//====================================================//
+// ZONES
+//====================================================//
+
+bool rawDemandSpike = not na(avgDelta) and volumeDelta > avgDelta * deltaThresholdInput and close > open
+bool rawSupplySpike = not na(avgDelta) and volumeDelta < -avgDelta * deltaThresholdInput and close < open
+bool isDemandSpike = zoneTrendFilter ? rawDemandSpike and close > emaValue : rawDemandSpike
+bool isSupplySpike = zoneTrendFilter ? rawSupplySpike and close < emaValue : rawSupplySpike
+
+var float demandTop = na
+var float demandBottom = na
+var float demandKeyTop = na
+var float demandKeyBottom = na
+var int demandBar = na
+var float supplyTop = na
+var float supplyBottom = na
+var float supplyKeyTop = na
+var float supplyKeyBottom = na
+var int supplyBar = na
+
+if invalidateZones
+    if not na(demandBottom) and close < demandBottom
+        demandTop := na
+        demandBottom := na
+        demandKeyTop := na
+        demandKeyBottom := na
+        demandBar := na
+    if not na(supplyTop) and close > supplyTop
+        supplyTop := na
+        supplyBottom := na
+        supplyKeyTop := na
+        supplyKeyBottom := na
+        supplyBar := na
+
+int demandAge = not na(demandBar) ? bar_index - demandBar : na
+int supplyAge = not na(supplyBar) ? bar_index - supplyBar : na
+bool demandZoneValid = not na(demandKeyTop) and not na(demandKeyBottom) and demandAge >= minRetestBars and demandAge <= maxZoneAge
+bool supplyZoneValid = not na(supplyKeyTop) and not na(supplyKeyBottom) and supplyAge >= minRetestBars and supplyAge <= maxZoneAge
+bool normalDemandRetest = demandZoneValid and low <= demandKeyTop and close >= demandKeyBottom
+bool normalSupplyRetest = supplyZoneValid and high >= supplyKeyBottom and close <= supplyKeyTop
+bool closeBeyondDemand = normalDemandRetest and close > demandKeyTop
+bool closeBeyondSupply = normalSupplyRetest and close < supplyKeyBottom
+bool inDemandKey = entryMode == "Close Beyond Key Zone" ? closeBeyondDemand : normalDemandRetest
+bool inSupplyKey = entryMode == "Close Beyond Key Zone" ? closeBeyondSupply : normalSupplyRetest
+
+bool originalBuySignal = inDemandKey and close > open and close > close[1] and trendAllowsLong and tradingAllowed and not volatilityCostBlock
+bool originalSellSignal = inSupplyKey and close < open and close < close[1] and trendAllowsShort and tradingAllowed and not volatilityCostBlock
+bool activeBuySignalBase = tradeOriginalDirection ? originalBuySignal : originalSellSignal
+bool activeSellSignalBase = tradeOriginalDirection ? originalSellSignal : originalBuySignal
+bool invertedBuySignal = activeBuySignalBase and not longDirectionalBlock and not v105LongBlock and not v1010LongBlock
+bool invertedSellSignal = activeSellSignalBase and not shortDirectionalBlock and not v105ShortBlock and not v1010ShortBlock
+
+// Check signals before adding the current bar's new zone.
+if isDemandSpike
+    demandTop := high
+    demandBottom := low
+    demandKeyTop := close
+    demandKeyBottom := open
+    demandBar := bar_index
+
+if isSupplySpike
+    supplyTop := high
+    supplyBottom := low
+    supplyKeyTop := open
+    supplyKeyBottom := close
+    supplyBar := bar_index
+
+//====================================================//
+// POSITION SIZE / ALERT HELPERS
+//====================================================//
+
+f_qty(float atrForStop) =>
+    float stopDistance = atrForStop * slAtrMult
+    float riskCash = strategy.equity * riskPercent / 100.0
+    float pointValue = syminfo.pointvalue > 0 ? syminfo.pointvalue : 1.0
+    float rawQty = stopDistance > syminfo.mintick ? riskCash / (stopDistance * pointValue) : fixedQty
+    useRiskSizing ? math.max(rawQty, 0.0) : fixedQty
+
+f_audit_suffix(string action, string reason) =>
+    string idPart = appendLiveSafeId ? " | id=" + str.upper(syminfo.ticker) + "-" + str.tostring(time) + "-" + action : ""
+    string reasonPart = appendExitReason and reason != "" ? " | reason=" + reason : ""
+    idPart + reasonPart
+
+int slPoints = math.round((atrValue * slAtrMult) / webhookPointSize)
+int tpPoints = math.round((atrValue * tpAtrMult) / webhookPointSize)
+float slPriceDist = atrValue * slAtrMult
+float usdPerLotPerPoint = contractSize * quoteUsd
+float rawLots = slPriceDist > 0 and usdPerLotPerPoint > 0 ? (mt4Balance * mt4RiskPct / 100.0) / (slPriceDist * usdPerLotPerPoint) : minLot
+float mt4Lots = math.max(minLot, math.min(maxLot, math.floor(rawLots / lotStep) * lotStep))
+string lotSuffix = useLotInAlert ? " | lots=" + str.tostring(mt4Lots, "#.##") : ""
+
+string buyAlertMsg = "BUY " + syminfo.ticker + " | SL=" + str.tostring(slPoints) + " | TP=" + str.tostring(tpPoints) + lotSuffix + f_audit_suffix("BUY", "ENTRY")
+string sellAlertMsg = "SELL " + syminfo.ticker + " | SL=" + str.tostring(slPoints) + " | TP=" + str.tostring(tpPoints) + lotSuffix + f_audit_suffix("SELL", "ENTRY")
+string closeProtectiveMsg = "CLOSE " + syminfo.ticker + f_audit_suffix("CLOSE", "PROTECTIVE")
+string closeDeadMsg = "CLOSE " + syminfo.ticker + f_audit_suffix("CLOSE", "DEAD")
+string closeTimeMsg = "CLOSE " + syminfo.ticker + f_audit_suffix("CLOSE", "TIME")
+string closeBlackoutMsg = "CLOSE " + syminfo.ticker + f_audit_suffix("CLOSE", "BLACKOUT")
+
+//====================================================//
+// LIVE-SAFE ACTION LOCKS
+//====================================================//
+
+varip int lastEntryDecisionBar = na
+varip int lastEntryDecisionTime = na
+varip int lastLongSubmissionBar = na
+varip int lastLongSubmissionTime = na
+varip int lastShortSubmissionBar = na
+varip int lastShortSubmissionTime = na
+varip int lastFlatExitDecisionBar = na
+varip int lastFlatExitDecisionTime = na
+varip string lastLiveSafeAction = "NONE"
+
+bool sameEntryDecisionChartBar = (not na(lastEntryDecisionBar) and lastEntryDecisionBar == bar_index) or (not na(lastEntryDecisionTime) and lastEntryDecisionTime == time)
+bool sameFlatExitDecisionChartBar = (not na(lastFlatExitDecisionBar) and lastFlatExitDecisionBar == bar_index) or (not na(lastFlatExitDecisionTime) and lastFlatExitDecisionTime == time)
+bool canSubmitEntryThisBar = (not limitOneDecisionPerBar or not sameEntryDecisionChartBar) and not sameFlatExitDecisionChartBar
+bool canSubmitFlatExitThisBar = not limitOneFlatExitPerBar or not sameFlatExitDecisionChartBar
+bool longEntrySubmittedThisBar = (not na(lastLongSubmissionBar) and lastLongSubmissionBar == bar_index) or (not na(lastLongSubmissionTime) and lastLongSubmissionTime == time)
+bool shortEntrySubmittedThisBar = (not na(lastShortSubmissionBar) and lastShortSubmissionBar == bar_index) or (not na(lastShortSubmissionTime) and lastShortSubmissionTime == time)
+
+//====================================================//
+// ENTRY / ATOMIC REVERSAL EXECUTION
+//====================================================//
+
+if canSubmitEntryThisBar and invertedBuySignal and strategy.position_size <= 0
+    float qtyLong = f_qty(atrValue)
+    pendingLongAtr := atrValue
+    pendingShortAtr := na
+    strategy.entry("Inverted Long", strategy.long, qty=qtyLong, alert_message=buyAlertMsg)
+    lastLongSubmissionBar := bar_index
+    lastLongSubmissionTime := time
+    lastEntryDecisionBar := bar_index
+    lastEntryDecisionTime := time
+    lastLiveSafeAction := strategy.position_size < 0 ? "ATOMIC REVERSE TO BUY" : "BUY"
+    if onePerZoneActive
+        if tradeOriginalDirection
+            demandTop := na
+            demandBottom := na
+            demandKeyTop := na
+            demandKeyBottom := na
+            demandBar := na
+        else
+            supplyTop := na
+            supplyBottom := na
+            supplyKeyTop := na
+            supplyKeyBottom := na
+            supplyBar := na
+else if canSubmitEntryThisBar and invertedSellSignal and strategy.position_size >= 0
+    float qtyShort = f_qty(atrValue)
+    pendingShortAtr := atrValue
+    pendingLongAtr := na
+    strategy.entry("Inverted Short", strategy.short, qty=qtyShort, alert_message=sellAlertMsg)
+    lastShortSubmissionBar := bar_index
+    lastShortSubmissionTime := time
+    lastEntryDecisionBar := bar_index
+    lastEntryDecisionTime := time
+    lastLiveSafeAction := strategy.position_size > 0 ? "ATOMIC REVERSE TO SELL" : "SELL"
+    if onePerZoneActive
+        if tradeOriginalDirection
+            supplyTop := na
+            supplyBottom := na
+            supplyKeyTop := na
+            supplyKeyBottom := na
+            supplyBar := na
+        else
+            demandTop := na
+            demandBottom := na
+            demandKeyTop := na
+            demandKeyBottom := na
+            demandBar := na
+
+//====================================================//
+// CONFIRMED FILL / ATR STATE
+//====================================================//
+
+if strategy.position_size > 0 and na(longAtrAtEntry)
+    longAtrAtEntry := not na(pendingLongAtr) ? pendingLongAtr : atrValue
+    shortAtrAtEntry := na
+    pendingLongAtr := na
+    pendingShortAtr := na
+    beArmedLong := false
+    beArmedShort := false
+
+if strategy.position_size < 0 and na(shortAtrAtEntry)
+    shortAtrAtEntry := not na(pendingShortAtr) ? pendingShortAtr : atrValue
+    longAtrAtEntry := na
+    pendingLongAtr := na
+    pendingShortAtr := na
+    beArmedLong := false
+    beArmedShort := false
+
+if strategy.position_size == 0
+    longAtrAtEntry := na
+    shortAtrAtEntry := na
+    beArmedLong := false
+    beArmedShort := false
+
+//====================================================//
+// PROTECTIVE EXITS
+//====================================================//
+
+var float trailStopLong = na
+var float trailStopShort = na
+
+if strategy.position_size > 0 and not na(longAtrAtEntry)
+    float longStop = strategy.position_avg_price - longAtrAtEntry * slAtrMult
+    float longTarget = strategy.position_avg_price + longAtrAtEntry * tpAtrMult
+    if useTrailing
+        float newTrail = close - atrValue * trailAtrMult
+        trailStopLong := na(trailStopLong) ? longStop : math.max(trailStopLong, newTrail)
+        longStop := trailStopLong
+    if breakevenActive
+        if close >= strategy.position_avg_price + longAtrAtEntry * beTrigger
+            beArmedLong := true
+        if beArmedLong
+            longStop := math.max(longStop, strategy.position_avg_price)
+    strategy.exit("Inverted Long Exit", "Inverted Long", stop=longStop, limit=longTarget, alert_message=closeProtectiveMsg)
+else
+    trailStopLong := na
+
+if strategy.position_size < 0 and not na(shortAtrAtEntry)
+    float shortStop = strategy.position_avg_price + shortAtrAtEntry * slAtrMult
+    float shortTarget = strategy.position_avg_price - shortAtrAtEntry * tpAtrMult
+    if useTrailing
+        float newTrail = close + atrValue * trailAtrMult
+        trailStopShort := na(trailStopShort) ? shortStop : math.min(trailStopShort, newTrail)
+        shortStop := trailStopShort
+    if breakevenActive
+        if close <= strategy.position_avg_price - shortAtrAtEntry * beTrigger
+            beArmedShort := true
+        if beArmedShort
+            shortStop := math.min(shortStop, strategy.position_avg_price)
+    strategy.exit("Inverted Short Exit", "Inverted Short", stop=shortStop, limit=shortTarget, alert_message=closeProtectiveMsg)
+else
+    trailStopShort := na
+
+//====================================================//
+// LIVE-SAFE FORCED-FLAT PRIORITY
+// Priority: blackout > dead trade > time exit
+//====================================================//
+
+if canSubmitFlatExitThisBar
+    if blackoutExitIntent
+        strategy.close_all(comment="Blackout Close", alert_message=closeBlackoutMsg)
+        lastFlatExitDecisionBar := bar_index
+        lastFlatExitDecisionTime := time
+        lastLiveSafeAction := "CLOSE BLACKOUT"
+    else if deadLong
+        strategy.close("Inverted Long", comment="Dead Trade", alert_message=closeDeadMsg)
+        cooldownUntilBar := bar_index + cooldownBars
+        lastFlatExitDecisionBar := bar_index
+        lastFlatExitDecisionTime := time
+        lastLiveSafeAction := "CLOSE DEAD LONG"
+    else if deadShort
+        strategy.close("Inverted Short", comment="Dead Trade", alert_message=closeDeadMsg)
+        cooldownUntilBar := bar_index + cooldownBars
+        lastFlatExitDecisionBar := bar_index
+        lastFlatExitDecisionTime := time
+        lastLiveSafeAction := "CLOSE DEAD SHORT"
+    else if timeExit and strategy.position_size > 0
+        strategy.close("Inverted Long", comment="Time Exit", alert_message=closeTimeMsg)
+        cooldownUntilBar := bar_index + cooldownBars
+        lastFlatExitDecisionBar := bar_index
+        lastFlatExitDecisionTime := time
+        lastLiveSafeAction := "CLOSE TIME LONG"
+    else if timeExit and strategy.position_size < 0
+        strategy.close("Inverted Short", comment="Time Exit", alert_message=closeTimeMsg)
+        cooldownUntilBar := bar_index + cooldownBars
+        lastFlatExitDecisionBar := bar_index
+        lastFlatExitDecisionTime := time
+        lastLiveSafeAction := "CLOSE TIME SHORT"
+
+//====================================================//
+// PLOTS
+//====================================================//
+
+plot(useEmaFilter ? emaValue : na, "EMA Filter", color=color.orange)
+
+pDemandTop = plot(showZonesInput ? demandTop : na, "Demand Top", color=color.new(demandColor, 100), style=plot.style_linebr)
+pDemandBot = plot(showZonesInput ? demandBottom : na, "Demand Bottom", color=color.new(demandColor, 100), style=plot.style_linebr)
+fill(pDemandTop, pDemandBot, color=demandColor)
+pDemandKeyTop = plot(showZonesInput ? demandKeyTop : na, "Demand Key Top", color=color.new(demandKeyColor, 100), style=plot.style_linebr)
+pDemandKeyBot = plot(showZonesInput ? demandKeyBottom : na, "Demand Key Bottom", color=color.new(demandKeyColor, 100), style=plot.style_linebr)
+fill(pDemandKeyTop, pDemandKeyBot, color=demandKeyColor)
+
+pSupplyTop = plot(showZonesInput ? supplyTop : na, "Supply Top", color=color.new(supplyColor, 100), style=plot.style_linebr)
+pSupplyBot = plot(showZonesInput ? supplyBottom : na, "Supply Bottom", color=color.new(supplyColor, 100), style=plot.style_linebr)
+fill(pSupplyTop, pSupplyBot, color=supplyColor)
+pSupplyKeyTop = plot(showZonesInput ? supplyKeyTop : na, "Supply Key Top", color=color.new(supplyKeyColor, 100), style=plot.style_linebr)
+pSupplyKeyBot = plot(showZonesInput ? supplyKeyBottom : na, "Supply Key Bottom", color=color.new(supplyKeyColor, 100), style=plot.style_linebr)
+fill(pSupplyKeyTop, pSupplyKeyBot, color=supplyKeyColor)
+
+plotshape(longEntrySubmittedThisBar, title="Submitted Buy", style=shape.triangleup, location=location.belowbar, color=buySignalColor, size=size.tiny, text="BUY")
+plotshape(shortEntrySubmittedThisBar, title="Submitted Sell", style=shape.triangledown, location=location.abovebar, color=sellSignalColor, size=size.tiny, text="SELL")
+plotshape(showRawActiveSignals and invertedBuySignal, title="Raw Active Buy", style=shape.circle, location=location.belowbar, color=color.new(buySignalColor, 55), size=size.tiny)
+plotshape(showRawActiveSignals and invertedSellSignal, title="Raw Active Sell", style=shape.circle, location=location.abovebar, color=color.new(sellSignalColor, 55), size=size.tiny)
+plotshape(showOriginalSignals and originalBuySignal, title="Original Buy", style=shape.square, location=location.belowbar, color=color.new(color.blue, 25), size=size.tiny)
+plotshape(showOriginalSignals and originalSellSignal, title="Original Sell", style=shape.square, location=location.abovebar, color=color.new(color.purple, 25), size=size.tiny)
+
+//====================================================//
+// LIVE-SAFE STATUS PANEL
+//====================================================//
+
+var table infoTable = table.new(position.top_right, 2, 18, border_width=1)
+if barstate.islast
+    color headerBg = color.new(color.black, 15)
+    color cellBg = color.new(color.gray, 75)
+    color goodBg = color.new(#089981, 65)
+    color warnBg = color.new(color.orange, 60)
+    table.cell(infoTable, 0, 0, "Danny Phantom FX", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 0, "V10.21.1 LiveSafe", text_color=color.white, bgcolor=goodBg)
+    table.cell(infoTable, 0, 1, "Preset", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 1, presetXAUUSD ? "XAUUSD 5m" : presetXAGUSD ? "XAGUSD 5m" : presetNAS100 ? "NAS100 5m" : "Manual/Other", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 2, "Direction", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 2, tradeOriginalDirection ? "ORIGINAL" : "INVERTED", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 3, "SL / TP", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 3, str.tostring(slAtrMult, "#.##") + " / " + str.tostring(tpAtrMult, "#.##") + " ATR", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 4, "MT4 Lot", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 4, str.tostring(mt4Lots, "#.##") + " lots", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 5, "Entry Lock", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 5, limitOneDecisionPerBar ? (sameEntryDecisionChartBar ? "LOCKED THIS BAR" : "READY") : "OFF — UNSAFE", text_color=color.white, bgcolor=limitOneDecisionPerBar ? cellBg : warnBg)
+    table.cell(infoTable, 0, 6, "Flat-Exit Lock", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 6, limitOneFlatExitPerBar ? (sameFlatExitDecisionChartBar ? "LOCKED THIS BAR" : "READY") : "OFF", text_color=color.white, bgcolor=limitOneFlatExitPerBar ? cellBg : warnBg)
+    table.cell(infoTable, 0, 7, "Last Action", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 7, lastLiveSafeAction, text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 8, "ATR Protection", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 8, strategy.position_size > 0 ? (not na(longAtrAtEntry) ? "LONG ARMED" : "LONG NOT ARMED") : strategy.position_size < 0 ? (not na(shortAtrAtEntry) ? "SHORT ARMED" : "SHORT NOT ARMED") : "FLAT", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 9, "Loss Cluster", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 9, inLossClusterPause ? "PAUSED" : str.tostring(consecutiveClosedLosses) + "/" + str.tostring(lossClusterTrigger), text_color=color.white, bgcolor=inLossClusterPause ? warnBg : cellBg)
+    table.cell(infoTable, 0, 10, "Cost Filter", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 10, volatilityCostBlock ? "BLOCKED " + str.tostring(stopToCostRatio, "#.##") : "ON " + str.tostring(stopToCostRatio, "#.##"), text_color=color.white, bgcolor=volatilityCostBlock ? warnBg : cellBg)
+    table.cell(infoTable, 0, 11, "NAS Adaptive", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 11, presetNAS100 and useV1021NasAdaptiveDead ? "10/12 ON" : "N/A", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 12, "Audit ID", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 12, appendLiveSafeId ? "ON" : "OFF — COPIER SAFE", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 13, "Exit Reason", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 13, appendExitReason ? "ON" : "OFF — COPIER SAFE", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 14, "Alert Mode", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 14, "ORDER FILLS", text_color=color.white, bgcolor=goodBg)
+    table.cell(infoTable, 0, 15, "Order Timing", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 15, "V10.21 SAME-BAR CLOSE", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 0, 16, "Slippage", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 16, presetXAGUSD ? "SET 1000 TICKS" : "75 TICKS", text_color=color.white, bgcolor=presetXAGUSD ? warnBg : cellBg)
+    table.cell(infoTable, 0, 17, "Validation", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 17, "MIN LOT / 50 TRADES", text_color=color.white, bgcolor=warnBg)
