@@ -74,14 +74,14 @@ def load_csv(path):
     bars.sort()
     return bars
 
-def synthetic(symbol, months=12, seed=7):
+def synthetic(symbol, months=12, seed=7, tf=None):
     """Random walk with volatility clustering. FORMAT DEMO ONLY."""
     import random
     rnd = random.Random(seed)
     p = PROFILES[symbol]
     price = 4000.0 if symbol == "XAUUSD" else 100000.0
-    base_vol = (0.00055 if symbol == "XAUUSD" else 0.0016)   # per-bar sigma
-    tf = p["tf_minutes"]
+    tf = tf or p["tf_minutes"]
+    base_vol = (0.00055 if symbol == "XAUUSD" else 0.0016) * math.sqrt(tf / p["tf_minutes"])   # per-bar sigma
     t = datetime(2025, 10, 27, 0, 0)
     end = t + timedelta(days=30 * months)
     bars, vol, drift = [], base_vol, 0.0
@@ -418,7 +418,7 @@ def main():
     if a.tp_r is not None: prof["tp_r"] = a.tp_r
     if a.tf is not None: prof["tf_minutes"] = a.tf
     if a.synthetic:
-        bars = synthetic(symbol, a.months, a.seed)
+        bars = synthetic(symbol, a.months, a.seed, prof["tf_minutes"])
         note = "*** SYNTHETIC RANDOM-WALK DATA: layout demo only, the numbers carry no information ***"
     else:
         if not a.csv: ap.error("--csv or --synthetic required")
