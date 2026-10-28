@@ -46,15 +46,25 @@ Exits: stop 110690 / tp 0 / dead 0 / time 2 / blackout 0 / reverse 26620.
 | Preset / direction | `tradeOriginalDirection` — Trade Original (Un-Inverted) Signals | **True** | False |
 | S2. Exits | `atrLenS2` — ATR length | **50** | 14 |
 | S2. Exits | `slAtrMultS2` — Stop loss, ATR mult | **2.0** | 0.5 |
+| S2. Exits | `tpRS2` — Take profit, R multiple of SL (0 = off) | **0** | 10 |
 | S2. Exits | `useTrailS2` — Trailing stop | **True** | False |
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **0.5** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **1.0** | 0.01 |
 | S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **100** | 50 |
+| V2 optimisations (Manual mode only) | `useDeadExit` — (2) Scratch trades not in profit after N bars | **False** | True |
+| V2 optimisations (Manual mode only) | `useEntryBuffer` — (5) Block entries before blackout window | **False** | True |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
 | V2 optimisations (Manual mode only) | `cooldownIn` — Cooldown bars | **20** | 10 |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **20** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.25** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **400** | 200 |
 | Supply / demand zones | `manualEntryMode` — Entry mode | **Close Beyond Key Zone** | Normal Retest Touch |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
+| Session & quality filters | `useV1013VolCostFilter` — Block entries when ATR stop is too small vs costs | **False** | True |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## BTCUSD M2 — `DPFX_BTCUSD_M2_calibrated.set`
 
@@ -77,12 +87,19 @@ Exits: stop 101603 / tp 1021 / dead 0 / time 0 / blackout 230 / reverse 10933.
 | S2. Exits | `useTrailS2` — Trailing stop | **True** | False |
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **0.5** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.5** | 0.01 |
+| S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **0** | 50 |
 | V2 optimisations (Manual mode only) | `deadBarsIn` — Dead trade bars | **10** | 15 |
+| V2 optimisations (Manual mode only) | `useEntryBuffer` — (5) Block entries before blackout window | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **150** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.0** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **400** | 200 |
 | Supply / demand zones | `manualEntryMode` — Entry mode | **Close Beyond Key Zone** | Normal Retest Touch |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **6.0** | 4.0 |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## BTCUSD M3 — `DPFX_BTCUSD_M3_calibrated.set`
 
@@ -106,16 +123,24 @@ Exits: stop 91421 / tp 584 / dead 0 / time 0 / blackout 0 / reverse 4594.
 | S2. Exits | `useTrailS2` — Trailing stop | **True** | False |
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **1.0** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.5** | 0.01 |
+| S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **0** | 50 |
 | V2 optimisations (Manual mode only) | `deadBarsIn` — Dead trade bars | **5** | 15 |
 | V2 optimisations (Manual mode only) | `useBreakeven` — (4) Move stop to breakeven | **True** | False |
 | V2 optimisations (Manual mode only) | `beTriggerAtr` — Breakeven trigger (ATR) | **0.5** | 1.0 |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
+| V2 optimisations (Manual mode only) | `useCooldown` — (9) Re-entry cooldown after dead/time exit | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **30** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.0** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **400** | 200 |
+| Supply / demand zones | `manualInvalidate` — Invalidate broken zones | **False** | True |
 | Supply / demand zones | `manualUseEmaFilter` — Use EMA trend filter | **True** | False |
 | Supply / demand zones | `manualEmaLength` — EMA length | **20** | 100 |
 | Supply / demand zones | `manualEntryMode` — Entry mode | **Close Beyond Key Zone** | Normal Retest Touch |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
 | Session & quality filters | `manualLossClusterPauseBars` — Pause bars | **6** | 12 |
+| Session & quality filters | `useV1013VolCostFilter` — Block entries when ATR stop is too small vs costs | **False** | True |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## BTCUSD M5 — `DPFX_BTCUSD_M5_calibrated.set`
 
@@ -134,17 +159,25 @@ Exits: stop 88412 / tp 0 / dead 0 / time 0 / blackout 5 / reverse 8061.
 | Preset / direction | `presetMode` — Preset Mode | **Manual** | XAUUSD 5m |
 | Preset / direction | `tradeOriginalDirection` — Trade Original (Un-Inverted) Signals | **True** | False |
 | S2. Exits | `atrLenS2` — ATR length | **30** | 14 |
+| S2. Exits | `tpRS2` — Take profit, R multiple of SL (0 = off) | **0** | 10 |
 | S2. Exits | `useTrailS2` — Trailing stop | **True** | False |
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **0.5** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.2** | 0.01 |
 | V2 optimisations (Manual mode only) | `deadBarsIn` — Dead trade bars | **10** | 15 |
 | V2 optimisations (Manual mode only) | `useBreakeven` — (4) Move stop to breakeven | **True** | False |
 | V2 optimisations (Manual mode only) | `beTriggerAtr` — Breakeven trigger (ATR) | **0.5** | 1.0 |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
+| V2 optimisations (Manual mode only) | `useOnePerZone` — (8) One entry per zone | **False** | True |
+| V2 optimisations (Manual mode only) | `useCooldown` — (9) Re-entry cooldown after dead/time exit | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **150** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.0** | 1.5 |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
 | Session & quality filters | `manualLossClusterCount` — Losses before pause | **3** | 5 |
 | Session & quality filters | `manualLossClusterPauseBars` — Pause bars | **6** | 12 |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **6.0** | 4.0 |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
 
 ## BTCUSD M10 — `DPFX_BTCUSD_M10_calibrated.set`
 
@@ -167,13 +200,19 @@ Exits: stop 43547 / tp 3154 / dead 0 / time 0 / blackout 7 / reverse 1661.
 | S2. Exits | `useTrailS2` — Trailing stop | **True** | False |
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **0.5** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.2** | 0.01 |
+| V2 optimisations (Manual mode only) | `useOnePerZone` — (8) One entry per zone | **False** | True |
 | V2 optimisations (Manual mode only) | `cooldownIn` — Cooldown bars | **5** | 10 |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **100** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.0** | 1.5 |
 | Supply / demand zones | `manualUseEmaFilter` — Use EMA trend filter | **True** | False |
 | Supply / demand zones | `manualEmaLength` — EMA length | **20** | 100 |
 | Supply / demand zones | `manualZoneTrend` — Only create zones with EMA trend | **True** | False |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **10.0** | 4.0 |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
 
 ## BTCUSD M15 — `DPFX_BTCUSD_M15_calibrated.set`
 
@@ -197,9 +236,19 @@ Exits: stop 43136 / tp 209 / dead 0 / time 0 / blackout 44 / reverse 9345.
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **0.5** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.2** | 0.01 |
 | S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **200** | 50 |
+| V2 optimisations (Manual mode only) | `useDeadExit` — (2) Scratch trades not in profit after N bars | **False** | True |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
+| V2 optimisations (Manual mode only) | `useOnePerZone` — (8) One entry per zone | **False** | True |
+| V2 optimisations (Manual mode only) | `useCooldown` — (9) Re-entry cooldown after dead/time exit | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **100** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.25** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **25** | 200 |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
+| Session & quality filters | `useV1013VolCostFilter` — Block entries when ATR stop is too small vs costs | **False** | True |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
 
 ## BTCUSD M30 — `DPFX_BTCUSD_M30_calibrated.set`
 
@@ -220,12 +269,19 @@ Exits: stop 20510 / tp 1908 / dead 0 / time 42 / blackout 0 / reverse 5930.
 | S2. Exits | `slAtrMultS2` — Stop loss, ATR mult | **0.3** | 0.5 |
 | S2. Exits | `tpRS2` — Take profit, R multiple of SL (0 = off) | **6.0** | 10 |
 | S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **10** | 50 |
+| V2 optimisations (Manual mode only) | `useDeadExit` — (2) Scratch trades not in profit after N bars | **False** | True |
 | V2 optimisations (Manual mode only) | `useBreakeven` — (4) Move stop to breakeven | **True** | False |
 | V2 optimisations (Manual mode only) | `beTriggerAtr` — Breakeven trigger (ATR) | **0.5** | 1.0 |
+| V2 optimisations (Manual mode only) | `useEntryBuffer` — (5) Block entries before blackout window | **False** | True |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
+| V2 optimisations (Manual mode only) | `useOnePerZone` — (8) One entry per zone | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **30** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.25** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **400** | 200 |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **2.0** | 4.0 |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## BTCUSD H1 — `DPFX_BTCUSD_M60_calibrated.set`
 
@@ -250,6 +306,12 @@ Exits: stop 454 / tp 41 / dead 0 / time 565 / blackout 0 / reverse 106.
 | Supply / demand zones | `manualUseEmaFilter` — Use EMA trend filter | **True** | False |
 | Session & quality filters | `useSessionFilter` — Use NY cash session filter | **True** | False |
 | Session & quality filters | `nySession` — NY session | **0200-1700** | 0930-1600 |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
+| Session & quality filters | `useV1013VolCostFilter` — Block entries when ATR stop is too small vs costs | **False** | True |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## BTCUSD H4 — `DPFX_BTCUSD_M240_calibrated.set`
 
@@ -274,11 +336,18 @@ Exits: stop 223 / tp 150 / dead 0 / time 4 / blackout 217 / reverse 509.
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **0.5** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **2.0** | 0.01 |
 | S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **20** | 50 |
+| V2 optimisations (Manual mode only) | `useDeadExit` — (2) Scratch trades not in profit after N bars | **False** | True |
 | V2 optimisations (Manual mode only) | `useBreakeven` — (4) Move stop to breakeven | **True** | False |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
+| V2 optimisations (Manual mode only) | `useCooldown` — (9) Re-entry cooldown after dead/time exit | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **30** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.0** | 1.5 |
+| Supply / demand zones | `manualInvalidate` — Invalidate broken zones | **False** | True |
 | Supply / demand zones | `manualEntryMode` — Entry mode | **Close Beyond Key Zone** | Normal Retest Touch |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **2.0** | 4.0 |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## XAUUSD M1 — `DPFX_XAUUSD_M1_calibrated.set`
 
@@ -301,10 +370,17 @@ Exits: stop 2273 / tp 4 / dead 0 / time 0 / blackout 0 / reverse 30.
 | S2. Exits | `useTrailS2` — Trailing stop | **True** | False |
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **3.0** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.5** | 0.01 |
+| S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **0** | 50 |
 | Supply / demand zones | `manualMinRetestBars` — Minimum bars before retest | **5** | 1 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **100** | 200 |
+| Supply / demand zones | `manualInvalidate` — Invalidate broken zones | **False** | True |
 | Supply / demand zones | `manualUseEmaFilter` — Use EMA trend filter | **True** | False |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **6.0** | 4.0 |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## XAUUSD M2 — `DPFX_XAUUSD_M2_calibrated.set`
 
@@ -321,7 +397,14 @@ Exits: stop 902 / tp 36 / dead 0 / time 0 / blackout 7 / reverse 287.
 | Group | Input | Value | Shipped |
 |---|---|---|---|
 | S2. Exits | `atrLenS2` — ATR length | **30** | 14 |
+| S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **0** | 50 |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **6.0** | 4.0 |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
 
 ## XAUUSD M3 — `DPFX_XAUUSD_M3_calibrated.set`
 
@@ -340,8 +423,12 @@ Exits: stop 3598 / tp 4 / dead 0 / time 0 / blackout 508 / reverse 1200.
 | S2. Exits | `atrLenS2` — ATR length | **7** | 14 |
 | S2. Exits | `slAtrMultS2` — Stop loss, ATR mult | **1.25** | 0.5 |
 | S2. Exits | `tpRS2` — Take profit, R multiple of SL (0 = off) | **15.0** | 10 |
+| S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **0** | 50 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **25** | 200 |
 | Supply / demand zones | `manualUseEmaFilter` — Use EMA trend filter | **True** | False |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **10.0** | 4.0 |
 
 ## XAUUSD M5 — `DPFX_XAUUSD_M5_calibrated.set`
@@ -366,13 +453,19 @@ Exits: stop 531 / tp 27 / dead 0 / time 0 / blackout 0 / reverse 5.
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **4.0** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **2.0** | 0.01 |
 | S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **200** | 50 |
+| V2 optimisations (Manual mode only) | `useDeadExit` — (2) Scratch trades not in profit after N bars | **False** | True |
 | V2 optimisations (Manual mode only) | `useEntryWindow` — (7) Use entry time window | **True** | False |
 | V2 optimisations (Manual mode only) | `entryWindowIn` — Entry window (NY time) | **0800-1700** | 0800-1200 |
+| V2 optimisations (Manual mode only) | `useOnePerZone` — (8) One entry per zone | **False** | True |
 | V2 optimisations (Manual mode only) | `cooldownIn` — Cooldown bars | **5** | 10 |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **30** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **4.0** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **25** | 200 |
+| Supply / demand zones | `manualInvalidate` — Invalidate broken zones | **False** | True |
 | Supply / demand zones | `manualZoneTrend` — Only create zones with EMA trend | **True** | False |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## XAUUSD M10 — `DPFX_XAUUSD_M10_calibrated.set`
 
@@ -392,17 +485,28 @@ Exits: stop 493 / tp 0 / dead 0 / time 193 / blackout 0 / reverse 2.
 | Preset / direction | `tradeOriginalDirection` — Trade Original (Un-Inverted) Signals | **True** | False |
 | S2. Exits | `atrLenS2` — ATR length | **7** | 14 |
 | S2. Exits | `slAtrMultS2` — Stop loss, ATR mult | **0.75** | 0.5 |
+| S2. Exits | `tpRS2` — Take profit, R multiple of SL (0 = off) | **0** | 10 |
 | S2. Exits | `useTrailS2` — Trailing stop | **True** | False |
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **4.0** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **2.0** | 0.01 |
 | S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **20** | 50 |
+| V2 optimisations (Manual mode only) | `useDeadExit` — (2) Scratch trades not in profit after N bars | **False** | True |
+| V2 optimisations (Manual mode only) | `useEntryBuffer` — (5) Block entries before blackout window | **False** | True |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
 | V2 optimisations (Manual mode only) | `useEntryWindow` — (7) Use entry time window | **True** | False |
+| V2 optimisations (Manual mode only) | `useCooldown` — (9) Re-entry cooldown after dead/time exit | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **150** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **4.0** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **50** | 200 |
+| Supply / demand zones | `manualInvalidate` — Invalidate broken zones | **False** | True |
 | Supply / demand zones | `manualUseEmaFilter` — Use EMA trend filter | **True** | False |
 | Supply / demand zones | `manualEmaLength` — EMA length | **20** | 100 |
 | Supply / demand zones | `manualEntryMode` — Entry mode | **Close Beyond Key Zone** | Normal Retest Touch |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
+| Session & quality filters | `useV1013VolCostFilter` — Block entries when ATR stop is too small vs costs | **False** | True |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## XAUUSD M15 — `DPFX_XAUUSD_M15_calibrated.set`
 
@@ -426,14 +530,23 @@ Exits: stop 496 / tp 1 / dead 0 / time 10 / blackout 46 / reverse 8.
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **2.0** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.2** | 0.01 |
 | S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **100** | 50 |
+| V2 optimisations (Manual mode only) | `useDeadExit` — (2) Scratch trades not in profit after N bars | **False** | True |
 | V2 optimisations (Manual mode only) | `useBreakeven` — (4) Move stop to breakeven | **True** | False |
 | V2 optimisations (Manual mode only) | `beTriggerAtr` — Breakeven trigger (ATR) | **2.0** | 1.0 |
+| V2 optimisations (Manual mode only) | `useEntryBuffer` — (5) Block entries before blackout window | **False** | True |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
+| V2 optimisations (Manual mode only) | `useCooldown` — (9) Re-entry cooldown after dead/time exit | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **100** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **4.0** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **400** | 200 |
 | Supply / demand zones | `manualZoneTrend` — Only create zones with EMA trend | **True** | False |
 | Supply / demand zones | `manualEntryMode` — Entry mode | **Close Beyond Key Zone** | Normal Retest Touch |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **2.0** | 4.0 |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## XAUUSD M30 — `DPFX_XAUUSD_M30_calibrated.set`
 
@@ -456,16 +569,25 @@ Exits: stop 1932 / tp 0 / dead 0 / time 0 / blackout 0 / reverse 8.
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **0.5** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.2** | 0.01 |
 | S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **100** | 50 |
+| V2 optimisations (Manual mode only) | `useDeadExit` — (2) Scratch trades not in profit after N bars | **False** | True |
 | V2 optimisations (Manual mode only) | `useBreakeven` — (4) Move stop to breakeven | **True** | False |
 | V2 optimisations (Manual mode only) | `beTriggerAtr` — Breakeven trigger (ATR) | **0.5** | 1.0 |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
 | V2 optimisations (Manual mode only) | `useEntryWindow` — (7) Use entry time window | **True** | False |
 | V2 optimisations (Manual mode only) | `entryWindowIn` — Entry window (NY time) | **0200-1000** | 0800-1200 |
+| V2 optimisations (Manual mode only) | `useOnePerZone` — (8) One entry per zone | **False** | True |
+| V2 optimisations (Manual mode only) | `useCooldown` — (9) Re-entry cooldown after dead/time exit | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **30** | 50 |
 | Supply / demand zones | `manualMinRetestBars` — Minimum bars before retest | **2** | 1 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **50** | 200 |
 | Supply / demand zones | `manualZoneTrend` — Only create zones with EMA trend | **True** | False |
 | Supply / demand zones | `manualEntryMode` — Entry mode | **Close Beyond Key Zone** | Normal Retest Touch |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
 | Session & quality filters | `manualLossClusterPauseBars` — Pause bars | **6** | 12 |
+| Session & quality filters | `useV1013VolCostFilter` — Block entries when ATR stop is too small vs costs | **False** | True |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## XAUUSD H1 — `DPFX_XAUUSD_M60_calibrated.set`
 
@@ -490,14 +612,25 @@ Exits: stop 966 / tp 75 / dead 0 / time 0 / blackout 0 / reverse 43.
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **1.0** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **0.5** | 0.01 |
 | V2 optimisations (Manual mode only) | `deadBarsIn` — Dead trade bars | **10** | 15 |
+| V2 optimisations (Manual mode only) | `useEntryBuffer` — (5) Block entries before blackout window | **False** | True |
+| V2 optimisations (Manual mode only) | `useSundayBlock` — (6) Block all Sunday entries (NY) | **False** | True |
 | V2 optimisations (Manual mode only) | `useEntryWindow` — (7) Use entry time window | **True** | False |
 | V2 optimisations (Manual mode only) | `entryWindowIn` — Entry window (NY time) | **1800-0200** | 0800-1200 |
+| V2 optimisations (Manual mode only) | `useOnePerZone` — (8) One entry per zone | **False** | True |
+| V2 optimisations (Manual mode only) | `useCooldown` — (9) Re-entry cooldown after dead/time exit | **False** | True |
 | Supply / demand zones | `manualZoneLength` — Zone lookback length | **75** | 50 |
 | Supply / demand zones | `manualDeltaThreshold` — Volume delta spike multiplier | **1.25** | 1.5 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **400** | 200 |
+| Supply / demand zones | `manualInvalidate` — Invalidate broken zones | **False** | True |
 | Supply / demand zones | `manualUseEmaFilter` — Use EMA trend filter | **True** | False |
 | Supply / demand zones | `manualEmaLength` — EMA length | **50** | 100 |
 | Supply / demand zones | `manualEntryMode` — Entry mode | **Close Beyond Key Zone** | Normal Retest Touch |
+| Session & quality filters | `useRobustHourFilter` — Block robustly losing NY hours | **False** | True |
+| Session & quality filters | `useV105DirectionalFilter` — Block V10.5 directional windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
+| Session & quality filters | `useV1013VolCostFilter` — Block entries when ATR stop is too small vs costs | **False** | True |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## XAUUSD H4 — `DPFX_XAUUSD_M240_calibrated.set`
 
@@ -520,11 +653,18 @@ Exits: stop 179 / tp 78 / dead 0 / time 0 / blackout 0 / reverse 0.
 | S2. Exits | `useTrailS2` — Trailing stop | **True** | False |
 | S2. Exits | `trailActAtr` — Trail activation, ATR mult | **0.5** | 0.01 |
 | S2. Exits | `trailDstAtr` — Trail distance, ATR mult | **1.0** | 0.01 |
+| S2. Exits | `timeStopBars` — Time stop, bars (0 = off) | **0** | 50 |
 | Supply / demand zones | `manualMinRetestBars` — Minimum bars before retest | **2** | 1 |
 | Supply / demand zones | `manualMaxZoneAge` — Max zone age in bars | **50** | 200 |
+| Supply / demand zones | `manualInvalidate` — Invalidate broken zones | **False** | True |
 | Supply / demand zones | `manualUseEmaFilter` — Use EMA trend filter | **True** | False |
 | Session & quality filters | `useSessionFilter` — Use NY cash session filter | **True** | False |
+| Session & quality filters | `useDirectionalMicroFilter` — Block directional 15-min windows | **False** | True |
+| Session & quality filters | `useV1010PfFilter` — Block V10.10 profit-factor windows | **False** | True |
+| Session & quality filters | `useV1011LossClusterPause` — Pause entries after consecutive loss cluster | **False** | True |
 | Session & quality filters | `minStopToCostRatio` — Minimum stop distance / round-trip cost | **10.0** | 4.0 |
+| Session & quality filters | `useWeekendBlackout` — Weekend close/block | **False** | True |
+| Session & quality filters | `useDailyBlackout` — Daily intraday hold filter (Mon-Thu 16:55-18:00 NY) | **False** | True |
 
 ## Mirroring a preset on TradingView
 

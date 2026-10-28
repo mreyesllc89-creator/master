@@ -161,7 +161,7 @@ def main():
             if not manual and group.startswith("V2") or not manual and group.startswith("Supply") and False:
                 continue
             for k in keys:
-                if k in cfg and cfg[k] != TESTER_SET.get(k) and c.get(DEPENDS.get(k, k), True):
+                if k in cfg and cfg[k] != TESTER_SET.get(k) and (k not in DEPENDS or c.get(DEPENDS[k])):
                     if not manual and k in ("manualZoneLength", "manualDeltaThreshold", "manualEmaLength", "manualZoneTrend",
                                             "manualEntryMode", "manualLossClusterCount", "manualLossClusterPauseBars"):
                         continue  # ignored by the XAUUSD 5m profile
