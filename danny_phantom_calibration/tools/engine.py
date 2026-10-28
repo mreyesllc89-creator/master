@@ -26,7 +26,7 @@ NAMES = [
     "cost_on", "min_stop_cost", "slip_ticks", "mintick",
     "weekend_on", "daily_on", "close_lead", "trade_original",
     "qty_risk", "fixed_qty", "risk_pct", "max_qty", "qty_step", "cap_margin", "margin_pct",
-    "initial_capital", "point_value", "extra_slip", "comm_pct",
+    "initial_capital", "point_value", "extra_slip", "comm_pct", "fill_close",
 ]
 IDX = {n: i for i, n in enumerate(NAMES)}
 NP = len(NAMES)
@@ -65,6 +65,7 @@ def run(bo, bh, bl, bc, ao, ah, al, ac, vol, dow, hour, minute, P,
     wk_on = P[49] > 0; dl_on = P[50] > 0; lead = P[51]; orig = P[52] > 0
     qty_risk = P[53] > 0; fixed_q = P[54]; risk = P[55]; max_q = P[56]; step = P[57]
     cap_m = P[58] > 0; m_pct = P[59]; equity0 = P[60]; pv = P[61]; xs = P[62]; comm = P[63] / 100.0
+    fill_close = P[64] > 0  # process_orders_on_close: market orders fill at the signal bar's close
 
     alpha = 2.0 / (ema_len + 1.0)
     ring = np.zeros(zl); dsum = 0.0; dcount = 0; cur = 0
@@ -80,15 +81,15 @@ def run(bo, bh, bl, bc, ao, ah, al, ac, vol, dow, hour, minute, P,
     closed_pnls = np.zeros(4); n_closed = 0
 
     for i in range(n):
-        n_closed = 0
         # ---- 1. orders submitted at the previous close fill at this open
         if p_kind != 0:
+            fb = bo[i]; fa = ao[i]; fbar = i
             if side != 0 and (p_kind != 1 or p_side != side):
-                px = (bo[i] - xs) if side > 0 else (ao[i] + xs)
+                px = (fb - xs) if side > 0 else (fa + xs)
                 pnl = (px - avg) * side * qty * pv - comm * px * qty * pv - e_cost
                 realized += pnl
                 if nt < maxt:
-                    t_in[nt] = e_idx; t_out[nt] = i; t_side[nt] = side; t_pnl[nt] = pnl
+                    t_in[nt] = e_idx; t_out[nt] = fbar; t_side[nt] = side; t_pnl[nt] = pnl
                     t_r[nt] = pnl / (e_sl * qty * pv) if e_sl > 0 else 0.0
                     t_reason[nt] = p_kind if p_kind > 2 else R_REVERSE
                     nt += 1
@@ -96,9 +97,9 @@ def run(bo, bh, bl, bc, ao, ah, al, ac, vol, dow, hour, minute, P,
                 side = 0
             if p_kind == 1 and side == 0 and p_qty > 0:
                 side = p_side; qty = p_qty
-                avg = (ao[i] + xs) if side > 0 else (bo[i] - xs)
+                avg = (fa + xs) if side > 0 else (fb - xs)
                 e_cost = comm * avg * qty * pv
-                e_idx = i; e_atr = p_atr; e_sl = p_sl; e_tp = p_tp
+                e_idx = fbar; e_atr = p_atr; e_sl = p_sl; e_tp = p_tp
                 armed = False; trail = np.nan; be = False
                 stop = avg - side * e_sl if e_sl > 0 else np.nan
                 target = avg + side * e_tp if e_tp == e_tp else np.nan
@@ -160,6 +161,7 @@ def run(bo, bh, bl, bc, ao, ah, al, ac, vol, dow, hour, minute, P,
                 consec = 0
             if loss_on and consec >= loss_cnt:
                 pause_until = i + int(loss_pause); consec = 0
+        n_closed = 0
         # ---- 4. DPFEngine.Push on the closed bar
         o = bo[i]; h = bh[i]; l = bl[i]; c = bc[i]
         dw = dow[i]; hr = hour[i]; mi = minute[i]; mny = hr * 60 + mi
@@ -281,6 +283,32 @@ def run(bo, bh, bl, bc, ao, ah, al, ac, vol, dow, hour, minute, P,
                 p_kind = R_TIME
             if p_kind == R_DEAD or p_kind == R_TIME:
                 cd_until = i + int(cd_bars)
+        # ---- 5b. process_orders_on_close: the order just submitted fills at this bar's close
+        if fill_close and p_kind != 0:
+            fb = bc[i]; fa = ac[i]; fbar = i
+            if side != 0 and (p_kind != 1 or p_side != side):
+                px = (fb - xs) if side > 0 else (fa + xs)
+                pnl = (px - avg) * side * qty * pv - comm * px * qty * pv - e_cost
+                realized += pnl
+                if nt < maxt:
+                    t_in[nt] = e_idx; t_out[nt] = fbar; t_side[nt] = side; t_pnl[nt] = pnl
+                    t_r[nt] = pnl / (e_sl * qty * pv) if e_sl > 0 else 0.0
+                    t_reason[nt] = p_kind if p_kind > 2 else R_REVERSE
+                    nt += 1
+                if n_closed < 4:
+                    closed_pnls[n_closed] = pnl; n_closed += 1
+                side = 0
+                # a close in the same bar feeds the loss cluster on the next bar (handled by step 3 ordering)
+            if p_kind == 1 and side == 0 and p_qty > 0:
+                side = p_side; qty = p_qty
+                avg = (fa + xs) if side > 0 else (fb - xs)
+                e_cost = comm * avg * qty * pv
+                e_idx = fbar; e_atr = p_atr; e_sl = p_sl; e_tp = p_tp
+                armed = False; trail = np.nan; be = False
+                stop = avg - side * e_sl if e_sl > 0 else np.nan
+                target = avg + side * e_tp if e_tp == e_tp else np.nan
+                submitted = False  # calc_on_order_fills: protection is evaluated for the new position now
+            p_kind = 0
         # ---- 6. DPFProtectionEvaluate for the open position
         if side != 0 and not submitted:
             st = avg - side * e_sl if e_sl > 0 else np.nan

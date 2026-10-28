@@ -9,24 +9,24 @@ July-August 2026 Octa export. Verdicts: RECOMMENDED > USABLE > PAPER-TRADE > NOT
 
 | Preset | Chart | Verdict | Trades/yr | PF | Win % | Return | Max DD | OOS t | 2026 |
 |---|---|---|---|---|---|---|---|---|---|
-| `DPFX_BTCUSD_M1_calibrated.set` | BTCUSD M1 | DO NOT TRADE | 27462 | 1.28 | 45 | 105,608 % | 10.8 % | 14.2 | 4404 tr, -0.24 R |
-| `DPFX_BTCUSD_M2_calibrated.set` | BTCUSD M2 | DO NOT TRADE | 22757 | 1.27 | 45 | 70,956 % | 7.7 % | 22.4 | 4086 tr, -0.18 R |
-| `DPFX_BTCUSD_M3_calibrated.set` | BTCUSD M3 | DO NOT TRADE | 19320 | 1.19 | 29 | 43,146 % | 17.5 % | 17.5 | 2682 tr, -0.38 R |
-| `DPFX_BTCUSD_M5_calibrated.set` | BTCUSD M5 | DO NOT TRADE | 19296 | 1.20 | 33 | 45,643 % | 8.0 % | 13.5 | 2468 tr, -0.41 R |
-| `DPFX_BTCUSD_M10_calibrated.set` | BTCUSD M10 | DO NOT TRADE | 9674 | 1.30 | 28 | 33,415 % | 5.6 % | 8.0 | 1767 tr, -0.33 R |
-| `DPFX_BTCUSD_M15_calibrated.set` | BTCUSD M15 | DO NOT TRADE | 10547 | 1.19 | 31 | 27,634 % | 12.5 % | 9.0 | 1793 tr, -0.23 R |
-| `DPFX_BTCUSD_M30_calibrated.set` | BTCUSD M30 | DO NOT TRADE | 5678 | 1.16 | 27 | 17,309 % | 13.7 % | 3.6 | 1040 tr, -0.18 R |
-| `DPFX_BTCUSD_M60_calibrated.set` | BTCUSD H1 | PAPER-TRADE FIRST | 233 | 1.43 | 43 | 1,754 % | 16.9 % | 2.9 | 37 tr, -0.17 R |
-| `DPFX_BTCUSD_M240_calibrated.set` | BTCUSD H4 | RECOMMENDED — rank 4 | 221 | 1.61 | 39 | 585 % | 8.1 % | 2.8 | 36 tr, +0.22 R |
-| `DPFX_XAUUSD_M1_calibrated.set` | XAUUSD M1 | NOT RECOMMENDED | 288 | 1.27 | 25 | 332 % | 13.2 % | 2.6 | 1036 tr, +0.10 R |
-| `DPFX_XAUUSD_M2_calibrated.set` | XAUUSD M2 | NOT RECOMMENDED | 154 | 1.44 | 27 | 266 % | 10.8 % | 1.4 | 1045 tr, -0.02 R |
-| `DPFX_XAUUSD_M3_calibrated.set` | XAUUSD M3 | NOT RECOMMENDED | 664 | 1.09 | 32 | 399 % | 37.2 % | 1.0 | 632 tr, -0.08 R |
-| `DPFX_XAUUSD_M5_calibrated.set` | XAUUSD M5 | USABLE — secondary | 70 | 1.55 | 34 | 220 % | 10.1 % | 1.8 | no trades |
-| `DPFX_XAUUSD_M10_calibrated.set` | XAUUSD M10 | USABLE — secondary | 86 | 1.46 | 29 | 206 % | 16.8 % | 1.1 | no trades |
-| `DPFX_XAUUSD_M15_calibrated.set` | XAUUSD M15 | RECOMMENDED — rank 3 | 70 | 1.54 | 61 | 157 % | 8.0 % | 2.3 | no trades |
-| `DPFX_XAUUSD_M30_calibrated.set` | XAUUSD M30 | RECOMMENDED — rank 2 | 242 | 1.22 | 59 | 229 % | 15.3 % | 2.3 | 24 tr, -0.03 R |
-| `DPFX_XAUUSD_M60_calibrated.set` | XAUUSD H1 | RECOMMENDED — rank 1 | 136 | 1.32 | 44 | 275 % | 12.2 % | 1.9 | 26 tr, +0.03 R |
-| `DPFX_XAUUSD_M240_calibrated.set` | XAUUSD H4 | USABLE — secondary | 32 | 1.76 | 51 | 125 % | 7.2 % | 1.4 | 2 tr, -0.59 R |
+| `DPFX_BTCUSD_M1_calibrated.set` | BTCUSD M1 | DO NOT TRADE | 27540 | 1.24 | 43 | 94,243 % | 83.4 % | 12.9 | 4409 tr, -0.23 R |
+| `DPFX_BTCUSD_M2_calibrated.set` | BTCUSD M2 | DO NOT TRADE | 22843 | 1.24 | 43 | 63,097 % | 97.8 % | 21.0 | 4045 tr, -0.18 R |
+| `DPFX_BTCUSD_M3_calibrated.set` | BTCUSD M3 | DO NOT TRADE | 3416 | 0.92 | 24 | -100 % | 100.0 % | 0.4 | 2687 tr, -0.38 R |
+| `DPFX_BTCUSD_M5_calibrated.set` | BTCUSD M5 | DO NOT TRADE | 19370 | 1.18 | 31 | 40,763 % | 88.1 % | 12.8 | 2466 tr, -0.41 R |
+| `DPFX_BTCUSD_M10_calibrated.set` | BTCUSD M10 | DO NOT TRADE | 9627 | 1.31 | 29 | 35,159 % | 6.0 % | 8.4 | 1767 tr, -0.31 R |
+| `DPFX_BTCUSD_M15_calibrated.set` | BTCUSD M15 | DO NOT TRADE | 10508 | 1.20 | 32 | 28,857 % | 11.6 % | 9.4 | 1792 tr, -0.19 R |
+| `DPFX_BTCUSD_M30_calibrated.set` | BTCUSD M30 | DO NOT TRADE | 5640 | 1.15 | 27 | 16,858 % | 14.6 % | 3.4 | 1037 tr, -0.15 R |
+| `DPFX_BTCUSD_M60_calibrated.set` | BTCUSD H1 | PAPER-TRADE FIRST | 236 | 1.38 | 42 | 1,199 % | 20.8 % | 2.4 | 37 tr, -0.16 R |
+| `DPFX_BTCUSD_M240_calibrated.set` | BTCUSD H4 | RECOMMENDED — rank 4 | 221 | 1.61 | 39 | 585 % | 8.1 % | 2.7 | 37 tr, +0.12 R |
+| `DPFX_XAUUSD_M1_calibrated.set` | XAUUSD M1 | NOT RECOMMENDED | 287 | 1.25 | 24 | 307 % | 13.8 % | 2.5 | 1038 tr, +0.11 R |
+| `DPFX_XAUUSD_M2_calibrated.set` | XAUUSD M2 | NOT RECOMMENDED | 154 | 1.42 | 26 | 260 % | 10.8 % | 1.0 | 1043 tr, -0.00 R |
+| `DPFX_XAUUSD_M3_calibrated.set` | XAUUSD M3 | NOT RECOMMENDED | 663 | 1.10 | 32 | 429 % | 37.3 % | 1.1 | 631 tr, -0.08 R |
+| `DPFX_XAUUSD_M5_calibrated.set` | XAUUSD M5 | USABLE — secondary | 70 | 1.56 | 34 | 224 % | 9.8 % | 1.7 | no trades |
+| `DPFX_XAUUSD_M10_calibrated.set` | XAUUSD M10 | USABLE — secondary | 86 | 1.47 | 29 | 207 % | 16.1 % | 1.3 | no trades |
+| `DPFX_XAUUSD_M15_calibrated.set` | XAUUSD M15 | RECOMMENDED — rank 3 | 70 | 1.54 | 61 | 158 % | 7.8 % | 2.1 | no trades |
+| `DPFX_XAUUSD_M30_calibrated.set` | XAUUSD M30 | RECOMMENDED — rank 2 | 243 | 1.21 | 59 | 227 % | 15.1 % | 2.3 | 24 tr, -0.03 R |
+| `DPFX_XAUUSD_M60_calibrated.set` | XAUUSD H1 | RECOMMENDED — rank 1 | 136 | 1.30 | 44 | 259 % | 13.7 % | 1.7 | 26 tr, +0.04 R |
+| `DPFX_XAUUSD_M240_calibrated.set` | XAUUSD H4 | USABLE — secondary | 32 | 1.69 | 50 | 111 % | 8.3 % | 1.1 | 2 tr, -0.60 R |
 
 ## BTCUSD M1 — `DPFX_BTCUSD_M1_calibrated.set`
 
@@ -34,9 +34,9 @@ July-August 2026 Octa export. Verdicts: RECOMMENDED > USABLE > PAPER-TRADE > NOT
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 20-bar volume-delta lookback with a 1.25x spike threshold, entry on a close beyond the key zone; EMA(20) trend filter off; stop 2 x ATR(50), no fixed target; trailing stop armed at 0.5 ATR profit, trailing 1 ATR behind; time stop after 100 bars; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2015-2019):** 137312 trades (27462/yr), PF 1.28, 45 % wins, avg +0.12 R, return 105,608 % with 10.8 % max drawdown; in-sample t 27.5, out-of-sample t 14.2 (68246 trades, +0.09 R). With the broker spread recorded at the time: 87,071 %; with no spread (TradingView default): 190,232 %. 2026 export: 4404 trades, -0.24 R.
+**History (2015-2019):** 137700 trades (27540/yr), PF 1.24, 43 % wins, avg +0.08 R, return 94,243 % with 83.4 % max drawdown; in-sample t 12.5, out-of-sample t 12.9 (68387 trades, +0.09 R). With the broker spread recorded at the time: -100 %; with no spread (TradingView default): 179,593 %. 2026 export: 4409 trades, -0.23 R.
 
-Exits: stop 110690 / tp 0 / dead 0 / time 2 / blackout 0 / reverse 26620.
+Exits: stop 111592 / tp 0 / dead 0 / time 2 / blackout 0 / reverse 26106.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -72,9 +72,9 @@ Exits: stop 110690 / tp 0 / dead 0 / time 2 / blackout 0 / reverse 26620.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 150-bar volume-delta lookback with a 1.0x spike threshold, entry on a close beyond the key zone; EMA(20) trend filter off; stop 1 x ATR(50), 10 R target; trailing stop armed at 0.5 ATR profit, trailing 0.5 ATR behind; dead-trade exit after 10 bars without profit; weekend blackout on, daily 16:55-18:00 blackout off.
 
-**History (2015-2019):** 113787 trades (22757/yr), PF 1.27, 45 % wins, avg +0.16 R, return 70,956 % with 7.7 % max drawdown; in-sample t 20.8, out-of-sample t 22.4 (58194 trades, +0.17 R). With the broker spread recorded at the time: 56,299 %; with no spread (TradingView default): 129,272 %. 2026 export: 4086 trades, -0.18 R.
+**History (2015-2019):** 114213 trades (22843/yr), PF 1.24, 43 % wins, avg +0.09 R, return 63,097 % with 97.8 % max drawdown; in-sample t 2.5, out-of-sample t 21.0 (58274 trades, +0.16 R). With the broker spread recorded at the time: -100 %; with no spread (TradingView default): 122,426 %. 2026 export: 4045 trades, -0.18 R.
 
-Exits: stop 101603 / tp 1021 / dead 0 / time 0 / blackout 230 / reverse 10933.
+Exits: stop 102424 / tp 1015 / dead 0 / time 0 / blackout 218 / reverse 10556.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -107,9 +107,9 @@ Exits: stop 101603 / tp 1021 / dead 0 / time 0 / blackout 230 / reverse 10933.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 30-bar volume-delta lookback with a 1.0x spike threshold, entry on a close beyond the key zone; EMA(20) trend filter on; stop 0.75 x ATR(50), 15 R target; trailing stop armed at 1 ATR profit, trailing 0.5 ATR behind; dead-trade exit after 5 bars without profit; breakeven at 0.5 ATR; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2015-2019):** 96599 trades (19320/yr), PF 1.19, 29 % wins, avg +0.18 R, return 43,146 % with 17.5 % max drawdown; in-sample t 17.7, out-of-sample t 17.5 (45896 trades, +0.19 R). With the broker spread recorded at the time: 32,207 %; with no spread (TradingView default): 89,929 %. 2026 export: 2682 trades, -0.38 R.
+**History (2015-2019):** 17081 trades (3416/yr), PF 0.92, 24 % wins, avg -0.14 R, return -100 % with 100.0 % max drawdown; in-sample t -8.4, out-of-sample t 0.4 (5 trades, +0.46 R). With the broker spread recorded at the time: -100 %; with no spread (TradingView default): 82,496 %. 2026 export: 2687 trades, -0.38 R.
 
-Exits: stop 91421 / tp 584 / dead 0 / time 0 / blackout 0 / reverse 4594.
+Exits: stop 15888 / tp 81 / dead 0 / time 0 / blackout 0 / reverse 1112.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -148,9 +148,9 @@ Exits: stop 91421 / tp 584 / dead 0 / time 0 / blackout 0 / reverse 4594.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 150-bar volume-delta lookback with a 1.0x spike threshold, entry on a retest touch; EMA(20) trend filter off; stop 0.5 x ATR(30), no fixed target; trailing stop armed at 0.5 ATR profit, trailing 0.2 ATR behind; time stop after 50 bars; dead-trade exit after 10 bars without profit; breakeven at 0.5 ATR; weekend blackout off, daily 16:55-18:00 blackout on.
 
-**History (2015-2019):** 96478 trades (19296/yr), PF 1.20, 33 % wins, avg +0.18 R, return 45,643 % with 8.0 % max drawdown; in-sample t 16.3, out-of-sample t 13.5 (44603 trades, +0.17 R). With the broker spread recorded at the time: 33,357 %; with no spread (TradingView default): 96,069 %. 2026 export: 2468 trades, -0.41 R.
+**History (2015-2019):** 96849 trades (19370/yr), PF 1.18, 31 % wins, avg +0.09 R, return 40,763 % with 88.1 % max drawdown; in-sample t 1.8, out-of-sample t 12.8 (44688 trades, +0.17 R). With the broker spread recorded at the time: -100 %; with no spread (TradingView default): 92,226 %. 2026 export: 2466 trades, -0.41 R.
 
-Exits: stop 88412 / tp 0 / dead 0 / time 0 / blackout 5 / reverse 8061.
+Exits: stop 89224 / tp 0 / dead 0 / time 0 / blackout 4 / reverse 7621.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -185,9 +185,9 @@ Exits: stop 88412 / tp 0 / dead 0 / time 0 / blackout 5 / reverse 8061.
 
 **Character:** inverted signals (as shipped); Manual profile; zones from a 100-bar volume-delta lookback with a 1.0x spike threshold, entry on a retest touch; EMA(20) trend filter on; stop 0.3 x ATR(30), 6 R target; trailing stop armed at 0.5 ATR profit, trailing 0.2 ATR behind; time stop after 50 bars; dead-trade exit after 15 bars without profit; weekend blackout off, daily 16:55-18:00 blackout on.
 
-**History (2015-2019):** 48369 trades (9674/yr), PF 1.30, 28 % wins, avg +0.14 R, return 33,415 % with 5.6 % max drawdown; in-sample t 12.5, out-of-sample t 8.0 (21350 trades, +0.11 R). With the broker spread recorded at the time: 28,319 %; with no spread (TradingView default): 55,037 %. 2026 export: 1767 trades, -0.33 R.
+**History (2015-2019):** 48133 trades (9627/yr), PF 1.31, 29 % wins, avg +0.20 R, return 35,159 % with 6.0 % max drawdown; in-sample t 18.0, out-of-sample t 8.4 (21327 trades, +0.12 R). With the broker spread recorded at the time: 30,302 %; with no spread (TradingView default): 55,894 %. 2026 export: 1767 trades, -0.31 R.
 
-Exits: stop 43547 / tp 3154 / dead 0 / time 0 / blackout 7 / reverse 1661.
+Exits: stop 43070 / tp 3366 / dead 0 / time 0 / blackout 6 / reverse 1691.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -220,9 +220,9 @@ Exits: stop 43547 / tp 3154 / dead 0 / time 0 / blackout 7 / reverse 1661.
 
 **Character:** inverted signals (as shipped); Manual profile; zones from a 100-bar volume-delta lookback with a 1.25x spike threshold, entry on a retest touch; EMA(50) trend filter off; stop 0.3 x ATR(50), 15 R target; trailing stop armed at 0.5 ATR profit, trailing 0.2 ATR behind; time stop after 200 bars; weekend blackout off, daily 16:55-18:00 blackout on.
 
-**History (2015-2019):** 52734 trades (10547/yr), PF 1.19, 31 % wins, avg +0.13 R, return 27,634 % with 12.5 % max drawdown; in-sample t 10.7, out-of-sample t 9.0 (23266 trades, +0.12 R). With the broker spread recorded at the time: 22,900 %; with no spread (TradingView default): 48,716 %. 2026 export: 1793 trades, -0.23 R.
+**History (2015-2019):** 52539 trades (10508/yr), PF 1.20, 32 % wins, avg +0.16 R, return 28,857 % with 11.6 % max drawdown; in-sample t 14.0, out-of-sample t 9.4 (23272 trades, +0.13 R). With the broker spread recorded at the time: 23,999 %; with no spread (TradingView default): 50,142 %. 2026 export: 1792 trades, -0.19 R.
 
-Exits: stop 43136 / tp 209 / dead 0 / time 0 / blackout 44 / reverse 9345.
+Exits: stop 42881 / tp 216 / dead 0 / time 0 / blackout 44 / reverse 9398.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -256,9 +256,9 @@ Exits: stop 43136 / tp 209 / dead 0 / time 0 / blackout 44 / reverse 9345.
 
 **Character:** inverted signals (as shipped); Manual profile; zones from a 30-bar volume-delta lookback with a 1.25x spike threshold, entry on a retest touch; EMA(20) trend filter off; stop 0.3 x ATR(50), 6 R target; time stop after 10 bars; breakeven at 0.5 ATR; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2015-2019):** 28390 trades (5678/yr), PF 1.16, 27 % wins, avg +0.11 R, return 17,309 % with 13.7 % max drawdown; in-sample t 9.3, out-of-sample t 3.6 (12454 trades, +0.06 R). With the broker spread recorded at the time: 14,659 %; with no spread (TradingView default): 28,769 %. 2026 export: 1040 trades, -0.18 R.
+**History (2015-2019):** 28202 trades (5640/yr), PF 1.15, 27 % wins, avg +0.13 R, return 16,858 % with 14.6 % max drawdown; in-sample t 10.9, out-of-sample t 3.4 (12405 trades, +0.06 R). With the broker spread recorded at the time: 13,896 %; with no spread (TradingView default): 28,521 %. 2026 export: 1037 trades, -0.15 R.
 
-Exits: stop 20510 / tp 1908 / dead 0 / time 42 / blackout 0 / reverse 5930.
+Exits: stop 20270 / tp 1935 / dead 0 / time 74 / blackout 0 / reverse 5923.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -289,9 +289,9 @@ Exits: stop 20510 / tp 1908 / dead 0 / time 42 / blackout 0 / reverse 5930.
 
 **Character:** un-inverted (original) signal direction; XAUUSD 5m auto profile; EMA(100) trend filter on; stop 2 x ATR(7), 6 R target; time stop after 20 bars; NY session filter 0200-1700; gold NY-time window filters: directional; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2015-2019):** 1167 trades (233/yr), PF 1.43, 43 % wins, avg +0.28 R, return 1,754 % with 16.9 % max drawdown; in-sample t 5.0, out-of-sample t 2.9 (481 trades, +0.22 R). With the broker spread recorded at the time: 1,709 %; with no spread (TradingView default): 1,909 %. 2026 export: 37 trades, -0.17 R.
+**History (2015-2019):** 1179 trades (236/yr), PF 1.38, 42 % wins, avg +0.24 R, return 1,199 % with 20.8 % max drawdown; in-sample t 4.5, out-of-sample t 2.4 (486 trades, +0.17 R). With the broker spread recorded at the time: 1,159 %; with no spread (TradingView default): 1,388 %. 2026 export: 37 trades, -0.16 R.
 
-Exits: stop 454 / tp 41 / dead 0 / time 565 / blackout 0 / reverse 106.
+Exits: stop 463 / tp 35 / dead 0 / time 581 / blackout 0 / reverse 99.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -319,9 +319,9 @@ Exits: stop 454 / tp 41 / dead 0 / time 565 / blackout 0 / reverse 106.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 30-bar volume-delta lookback with a 1.0x spike threshold, entry on a close beyond the key zone; EMA(20) trend filter off; stop 2 x ATR(7), 2 R target; trailing stop armed at 0.5 ATR profit, trailing 2 ATR behind; time stop after 20 bars; breakeven at 1 ATR; weekend blackout on, daily 16:55-18:00 blackout off.
 
-**History (2015-2019):** 1104 trades (221/yr), PF 1.61, 39 % wins, avg +0.18 R, return 585 % with 8.1 % max drawdown; in-sample t 5.2, out-of-sample t 2.8 (494 trades, +0.11 R). With the broker spread recorded at the time: 594 %; with no spread (TradingView default): 641 %. 2026 export: 36 trades, +0.22 R.
+**History (2015-2019):** 1103 trades (221/yr), PF 1.61, 39 % wins, avg +0.18 R, return 585 % with 8.1 % max drawdown; in-sample t 5.2, out-of-sample t 2.7 (493 trades, +0.10 R). With the broker spread recorded at the time: 594 %; with no spread (TradingView default): 636 %. 2026 export: 37 trades, +0.12 R.
 
-Exits: stop 223 / tp 150 / dead 0 / time 4 / blackout 217 / reverse 509.
+Exits: stop 222 / tp 150 / dead 0 / time 7 / blackout 215 / reverse 508.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -355,9 +355,9 @@ Exits: stop 223 / tp 150 / dead 0 / time 4 / blackout 217 / reverse 509.
 
 **Character:** un-inverted (original) signal direction; XAUUSD 5m auto profile; EMA(100) trend filter on; stop 1 x ATR(30), 15 R target; trailing stop armed at 3 ATR profit, trailing 0.5 ATR behind; gold NY-time window filters: all off; weekend blackout on, daily 16:55-18:00 blackout off.
 
-**History (2011-2018):** 2307 trades (288/yr), PF 1.27, 25 % wins, avg +0.20 R, return 332 % with 13.2 % max drawdown; in-sample t 3.7, out-of-sample t 2.6 (192 trades, +0.41 R). With the broker spread recorded at the time: -97 %; with no spread (TradingView default): 476 %. 2026 export: 1036 trades, +0.10 R.
+**History (2011-2018):** 2298 trades (287/yr), PF 1.25, 24 % wins, avg +0.19 R, return 307 % with 13.8 % max drawdown; in-sample t 3.4, out-of-sample t 2.5 (191 trades, +0.39 R). With the broker spread recorded at the time: -96 %; with no spread (TradingView default): 447 %. 2026 export: 1038 trades, +0.11 R.
 
-Exits: stop 2273 / tp 4 / dead 0 / time 0 / blackout 0 / reverse 30.
+Exits: stop 2266 / tp 3 / dead 0 / time 0 / blackout 0 / reverse 29.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -388,9 +388,9 @@ Exits: stop 2273 / tp 4 / dead 0 / time 0 / blackout 0 / reverse 30.
 
 **Character:** inverted signals (as shipped); XAUUSD 5m auto profile; EMA(100) trend filter off; stop 0.5 x ATR(30), 10 R target; gold NY-time window filters: all off; weekend blackout off, daily 16:55-18:00 blackout on.
 
-**History (2011-2018):** 1232 trades (154/yr), PF 1.44, 27 % wins, avg +0.32 R, return 266 % with 10.8 % max drawdown; in-sample t 3.9, out-of-sample t 1.4 (102 trades, +0.38 R). With the broker spread recorded at the time: 31 %; with no spread (TradingView default): 354 %. 2026 export: 1045 trades, -0.02 R.
+**History (2011-2018):** 1232 trades (154/yr), PF 1.42, 26 % wins, avg +0.31 R, return 260 % with 10.8 % max drawdown; in-sample t 4.0, out-of-sample t 1.0 (102 trades, +0.25 R). With the broker spread recorded at the time: 26 %; with no spread (TradingView default): 352 %. 2026 export: 1043 trades, -0.00 R.
 
-Exits: stop 902 / tp 36 / dead 0 / time 0 / blackout 7 / reverse 287.
+Exits: stop 904 / tp 36 / dead 0 / time 0 / blackout 7 / reverse 285.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -412,9 +412,9 @@ Exits: stop 902 / tp 36 / dead 0 / time 0 / blackout 7 / reverse 287.
 
 **Character:** inverted signals (as shipped); XAUUSD 5m auto profile; EMA(100) trend filter on; stop 1.25 x ATR(7), 15 R target; gold NY-time window filters: robust-hour, V10.10; weekend blackout on, daily 16:55-18:00 blackout on.
 
-**History (2011-2018):** 5310 trades (664/yr), PF 1.09, 32 % wins, avg +0.08 R, return 399 % with 37.2 % max drawdown; in-sample t 2.8, out-of-sample t 1.0 (716 trades, +0.08 R). With the broker spread recorded at the time: -94 %; with no spread (TradingView default): 740 %. 2026 export: 632 trades, -0.08 R.
+**History (2011-2018):** 5302 trades (663/yr), PF 1.10, 32 % wins, avg +0.08 R, return 429 % with 37.3 % max drawdown; in-sample t 2.9, out-of-sample t 1.1 (717 trades, +0.08 R). With the broker spread recorded at the time: -95 %; with no spread (TradingView default): 724 %. 2026 export: 631 trades, -0.08 R.
 
-Exits: stop 3598 / tp 4 / dead 0 / time 0 / blackout 508 / reverse 1200.
+Exits: stop 3589 / tp 4 / dead 0 / time 0 / blackout 508 / reverse 1201.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -437,7 +437,7 @@ Exits: stop 3598 / tp 4 / dead 0 / time 0 / blackout 508 / reverse 1200.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 30-bar volume-delta lookback with a 4.0x spike threshold, entry on a retest touch; EMA(100) trend filter off; stop 1.5 x ATR(14), 8 R target; trailing stop armed at 4 ATR profit, trailing 2 ATR behind; time stop after 200 bars; entries only 08:00-17:00 NY; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2011-2018):** 563 trades (70/yr), PF 1.55, 34 % wins, avg +0.42 R, return 220 % with 10.1 % max drawdown; in-sample t 3.6, out-of-sample t 1.8 (129 trades, +0.37 R). With the broker spread recorded at the time: 110 %; with no spread (TradingView default): 255 %. 2026 export: no trades in the short sample.
+**History (2011-2018):** 563 trades (70/yr), PF 1.56, 34 % wins, avg +0.42 R, return 224 % with 9.8 % max drawdown; in-sample t 3.8, out-of-sample t 1.7 (130 trades, +0.34 R). With the broker spread recorded at the time: 106 %; with no spread (TradingView default): 251 %. 2026 export: no trades in the short sample.
 
 Exits: stop 531 / tp 27 / dead 0 / time 0 / blackout 0 / reverse 5.
 
@@ -473,9 +473,9 @@ Exits: stop 531 / tp 27 / dead 0 / time 0 / blackout 0 / reverse 5.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 150-bar volume-delta lookback with a 4.0x spike threshold, entry on a close beyond the key zone; EMA(20) trend filter on; stop 0.75 x ATR(7), no fixed target; trailing stop armed at 4 ATR profit, trailing 2 ATR behind; time stop after 20 bars; entries only 08:00-12:00 NY; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2011-2018):** 688 trades (86/yr), PF 1.46, 29 % wins, avg +0.44 R, return 206 % with 16.8 % max drawdown; in-sample t 3.5, out-of-sample t 1.1 (115 trades, +0.39 R). With the broker spread recorded at the time: 90 %; with no spread (TradingView default): 237 %. 2026 export: no trades in the short sample.
+**History (2011-2018):** 690 trades (86/yr), PF 1.47, 29 % wins, avg +0.43 R, return 207 % with 16.1 % max drawdown; in-sample t 3.3, out-of-sample t 1.3 (115 trades, +0.43 R). With the broker spread recorded at the time: 100 %; with no spread (TradingView default): 239 %. 2026 export: no trades in the short sample.
 
-Exits: stop 493 / tp 0 / dead 0 / time 193 / blackout 0 / reverse 2.
+Exits: stop 494 / tp 0 / dead 0 / time 194 / blackout 0 / reverse 2.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -514,9 +514,9 @@ Exits: stop 493 / tp 0 / dead 0 / time 193 / blackout 0 / reverse 2.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 100-bar volume-delta lookback with a 4.0x spike threshold, entry on a close beyond the key zone; EMA(20) trend filter off; stop 3 x ATR(14), 8 R target; trailing stop armed at 2 ATR profit, trailing 0.2 ATR behind; time stop after 100 bars; breakeven at 2 ATR; weekend blackout on, daily 16:55-18:00 blackout off.
 
-**History (2011-2018):** 561 trades (70/yr), PF 1.54, 61 % wins, avg +0.17 R, return 157 % with 8.0 % max drawdown; in-sample t 3.8, out-of-sample t 2.3 (109 trades, +0.17 R). With the broker spread recorded at the time: 81 %; with no spread (TradingView default): 185 %. 2026 export: no trades in the short sample.
+**History (2011-2018):** 561 trades (70/yr), PF 1.54, 61 % wins, avg +0.17 R, return 158 % with 7.8 % max drawdown; in-sample t 3.8, out-of-sample t 2.1 (109 trades, +0.16 R). With the broker spread recorded at the time: 75 %; with no spread (TradingView default): 177 %. 2026 export: no trades in the short sample.
 
-Exits: stop 496 / tp 1 / dead 0 / time 10 / blackout 46 / reverse 8.
+Exits: stop 495 / tp 1 / dead 0 / time 11 / blackout 46 / reverse 8.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -554,9 +554,9 @@ Exits: stop 496 / tp 1 / dead 0 / time 10 / blackout 46 / reverse 8.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 30-bar volume-delta lookback with a 1.5x spike threshold, entry on a close beyond the key zone; EMA(200) trend filter off; stop 1.5 x ATR(14), 10 R target; trailing stop armed at 0.5 ATR profit, trailing 0.2 ATR behind; time stop after 100 bars; breakeven at 0.5 ATR; entries only 02:00-10:00 NY; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2011-2018):** 1940 trades (242/yr), PF 1.22, 59 % wins, avg +0.10 R, return 229 % with 15.3 % max drawdown; in-sample t 3.2, out-of-sample t 2.3 (653 trades, +0.09 R). With the broker spread recorded at the time: 47 %; with no spread (TradingView default): 349 %. 2026 export: 24 trades, -0.03 R.
+**History (2011-2018):** 1944 trades (243/yr), PF 1.21, 59 % wins, avg +0.09 R, return 227 % with 15.1 % max drawdown; in-sample t 3.1, out-of-sample t 2.3 (652 trades, +0.09 R). With the broker spread recorded at the time: 50 %; with no spread (TradingView default): 361 %. 2026 export: 24 trades, -0.03 R.
 
-Exits: stop 1932 / tp 0 / dead 0 / time 0 / blackout 0 / reverse 8.
+Exits: stop 1937 / tp 0 / dead 0 / time 0 / blackout 0 / reverse 7.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -595,9 +595,9 @@ Exits: stop 1932 / tp 0 / dead 0 / time 0 / blackout 0 / reverse 8.
 
 **Character:** un-inverted (original) signal direction; Manual profile; zones from a 75-bar volume-delta lookback with a 1.25x spike threshold, entry on a close beyond the key zone; EMA(50) trend filter on; stop 1 x ATR(10), 4.1667 R target; trailing stop armed at 1 ATR profit, trailing 0.5 ATR behind; time stop after 50 bars; dead-trade exit after 10 bars without profit; entries only 18:00-02:00 NY; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2011-2018):** 1084 trades (136/yr), PF 1.32, 44 % wins, avg +0.21 R, return 275 % with 12.2 % max drawdown; in-sample t 4.2, out-of-sample t 1.9 (414 trades, +0.14 R). With the broker spread recorded at the time: 138 %; with no spread (TradingView default): 308 %. 2026 export: 26 trades, +0.03 R.
+**History (2011-2018):** 1091 trades (136/yr), PF 1.30, 44 % wins, avg +0.19 R, return 259 % with 13.7 % max drawdown; in-sample t 3.9, out-of-sample t 1.7 (418 trades, +0.12 R). With the broker spread recorded at the time: 120 %; with no spread (TradingView default): 301 %. 2026 export: 26 trades, +0.04 R.
 
-Exits: stop 966 / tp 75 / dead 0 / time 0 / blackout 0 / reverse 43.
+Exits: stop 967 / tp 75 / dead 0 / time 0 / blackout 0 / reverse 49.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 
@@ -638,9 +638,9 @@ Exits: stop 966 / tp 75 / dead 0 / time 0 / blackout 0 / reverse 43.
 
 **Character:** un-inverted (original) signal direction; XAUUSD 5m auto profile; EMA(100) trend filter on; stop 1.25 x ATR(10), 2 R target; trailing stop armed at 0.5 ATR profit, trailing 1 ATR behind; NY session filter 0930-1600; gold NY-time window filters: robust-hour, V10.5; weekend blackout off, daily 16:55-18:00 blackout off.
 
-**History (2011-2018):** 257 trades (32/yr), PF 1.76, 51 % wins, avg +0.32 R, return 125 % with 7.2 % max drawdown; in-sample t 4.3, out-of-sample t 1.4 (103 trades, +0.16 R). With the broker spread recorded at the time: 63 %; with no spread (TradingView default): 126 %. 2026 export: 2 trades, -0.59 R.
+**History (2011-2018):** 257 trades (32/yr), PF 1.69, 50 % wins, avg +0.30 R, return 111 % with 8.3 % max drawdown; in-sample t 4.1, out-of-sample t 1.1 (103 trades, +0.13 R). With the broker spread recorded at the time: 52 %; with no spread (TradingView default): 123 %. 2026 export: 2 trades, -0.60 R.
 
-Exits: stop 179 / tp 78 / dead 0 / time 0 / blackout 0 / reverse 0.
+Exits: stop 181 / tp 76 / dead 0 / time 0 / blackout 0 / reverse 0.
 
 **Inputs that differ from the shipped Tester preset** (TradingView uses the same names):
 

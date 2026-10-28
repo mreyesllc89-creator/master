@@ -53,9 +53,12 @@ then a cost stress of the winners. Everything is reproducible with the commands 
   `DPFProtectionEvaluate` (fixed stop, R-multiple target, trailing stop, breakeven) were ported
   literally. The XAUUSD 5m auto profile and the Manual profile resolve exactly as in
   `DPFResolve`. Quantity follows `DPFS3Quantity` (Risk % of equity, 0.001 step, margin cap).
-* Execution: bar-close evaluation, market fills at the next bar's open (TradingView broker
-  emulator on history), protective orders live from the fill bar and resolved on the bar path
-  open → nearer extreme → farther extreme → close; a gap through a stop fills at the open.
+* Execution: bar-close evaluation, market fills at the signal bar's close (the Pine source runs
+  with `process_orders_on_close=true`; the MT5 EA fills on the first tick after the close),
+  protective orders live from the next bar and resolved on the bar path open → nearer extreme →
+  farther extreme → close; a gap through a stop fills at the open. The stage-1/2 sweeps were run
+  with next-open fills; switching the winners to close fills changes their results by less than
+  5 % (H1: +275 % → +259 %), so the ranking stands and the final tables below use close fills.
   Longs buy the ask and sell the bid, shorts the reverse, so the spread is the trading cost.
 * Timeframes: M1 M2 M3 M5 M10 M15 M30 M60 built from UTC-aligned M1 bars; H4 bars aligned to
   the 17:00 New York session boundary. New York clock with DST as in `DPFNewYork`.

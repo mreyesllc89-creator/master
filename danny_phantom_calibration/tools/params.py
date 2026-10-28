@@ -30,7 +30,7 @@ def _hhmm(s):
 
 
 def resolve(inputs, symbol="XAUUSD", tf=5, initial_capital=10000.0, mintick=None,
-            point_value=1.0, extra_slip=0.0, comm_pct=0.0):
+            point_value=1.0, extra_slip=0.0, comm_pct=0.0, fill_close=True):
     c = dict(TESTER_SET); c.update(inputs)
     is_xau = "XAU" in symbol.upper()
     auto = c["presetMode"] == "Auto"
@@ -76,4 +76,5 @@ def resolve(inputs, symbol="XAUUSD", tf=5, initial_capital=10000.0, mintick=None
     s("qty_risk", c["QtyMode"] == "Risk %"); s("fixed_qty", c["fixedQtyS3"]); s("risk_pct", c["riskPctS3"])
     s("max_qty", c["maxQtyS3"]); s("qty_step", c["qtyStepS3"]); s("cap_margin", c["capMarginS3"]); s("margin_pct", c["marginPctS3"])
     s("initial_capital", initial_capital); s("point_value", point_value); s("extra_slip", extra_slip); s("comm_pct", comm_pct)
+    s("fill_close", fill_close)
     return P
