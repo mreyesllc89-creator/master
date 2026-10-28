@@ -226,6 +226,7 @@ from the net-profit presets. The PF files also carry the two new score inputs
 | `MQL5/Include/XPW/OnTester_ProfitFactor.mqh` | copy to `MQL5/Include/XPW/` next to the other XPW includes |
 | `XPW_v092_FGF_XAUUSD_M5_PF.set` | XAUUSD, M5 chart |
 | `XPW_v092_FGF_BTCUSD_M15_PF.set` | BTCUSD, M15 chart (`SigTF=10` inside) |
+| `XPW_v092_FGF_XAUUSD_M5_PF_stockEA.set`, `XPW_v092_FGF_BTCUSD_M15_PF_stockEA.set` | same PF presets for the **unmodified shipped EA** (no recompile). Use criterion **Complex Criterion max**; the stock `OnTester` returns net profit, and the built-in "Profit Factor max" lets few-trade passes score infinity. |
 
 Target to accept a result: PF ≥ 1.6 on gold, ≥ 1.8 on BTC, with ≥ 100 trades in
 12 months, forward third also ≥ 1.3, and PF of neighbouring parameter steps within
