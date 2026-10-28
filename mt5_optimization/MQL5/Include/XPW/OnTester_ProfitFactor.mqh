@@ -1,12 +1,6 @@
 // Profit-factor optimization score for XPW_ShapeMap_v092_FGF_EA.mq5.
-//
-// HOW TO APPLY (2 edits in MQL5/Experts/XPW_ShapeMap_v092_FGF_EA.mq5):
-//   1. Add after the EnableTrading input line:
-//        #include <XPW/OnTester_ProfitFactor.mqh>
-//      (copy this file to MQL5/Include/XPW/ first)
-//   2. Replace the existing two-line OnTester() at the bottom of the EA with:
-//        double OnTester() { return XpwPfTesterScore(g_v92_runtime.ExportTesterLedger()); }
-//   Then in the Strategy Tester choose Optimization criterion = "Custom max".
+// Included by the patched EA after its EnableTrading input; OnTester() returns
+// XpwPfTesterScore(). In the Strategy Tester choose Optimization criterion = "Custom max".
 //
 // Score = min(PF, PfCap) x trade-count weight x drawdown damping.
 //  - Passes with fewer than PfMinTrades trades or non-positive net profit score 0,
@@ -16,10 +10,13 @@
 //  - Relative equity drawdown damps the score: 100/(100+DD%).
 #ifndef XPW_ONTESTER_PROFIT_FACTOR_MQH
 #define XPW_ONTESTER_PROFIT_FACTOR_MQH
+#ifndef XPW_V92_INPUT
+#define XPW_V92_INPUT input
+#endif
 
 input group "Optimization score (PF)"
-input int    PfMinTrades = 60;    // Minimum trades for a non-zero score
-input double PfCap       = 8.0;   // Profit-factor cap
+XPW_V92_INPUT int    PfMinTrades = 60;    // Minimum trades for a non-zero score
+XPW_V92_INPUT double PfCap       = 8.0;   // Profit-factor cap
 
 double XpwPfTesterScore(const bool ledgerExported)
   {

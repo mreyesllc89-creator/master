@@ -194,8 +194,10 @@ clocks that pushes both symbols to the **slowest pair the EA allows**:
 
 `OnTester()` returns `STAT_PROFIT`, so "Custom max" = net profit. The tester's built-in
 "Profit Factor max" is also unsafe: a pass with 3 winners and no losers has PF = ∞ and
-wins every time. Use `OnTester_ProfitFactor.mqh` (two edits, instructions inside) and
-select **Custom max**. It scores `min(PF, 8) × trade-count weight × drawdown damping`
+wins every time. Use the patched EA in `MQL5/Experts/XPW_ShapeMap_v092_FGF_EA.mq5` (it
+includes `MQL5/Include/XPW/OnTester_ProfitFactor.mqh`; the only changes versus the
+shipped EA are that include line and the two-line `OnTester()` body) and select
+**Custom max**. It scores `min(PF, 8) × trade-count weight × drawdown damping`
 and returns 0 below 60 trades.
 
 ### Settings that raise PF (already the defaults in the `*_PF.set` files)
@@ -213,13 +215,15 @@ and returns 0 below 60 trades.
 | `fgfBandAtr` | 0.25, range 0–0.5 (Y) | wider no-trade band around the level |
 
 Everything else (sizing, ATR exits, visuals off, `EnableTrading=true`) is unchanged
-from the net-profit presets.
+from the net-profit presets. The PF files also carry the two new score inputs
+`PfMinTrades=60` and `PfCap=8.0` (not optimized).
 
 ### PF files
 
 | File | Use |
 |------|-----|
-| `OnTester_ProfitFactor.mqh` | copy to `MQL5/Include/XPW/`, apply the two edits in its header |
+| `MQL5/Experts/XPW_ShapeMap_v092_FGF_EA.mq5` | patched EA: copy over the shipped one, recompile |
+| `MQL5/Include/XPW/OnTester_ProfitFactor.mqh` | copy to `MQL5/Include/XPW/` next to the other XPW includes |
 | `XPW_v092_FGF_XAUUSD_M5_PF.set` | XAUUSD, M5 chart |
 | `XPW_v092_FGF_BTCUSD_M15_PF.set` | BTCUSD, M15 chart (`SigTF=10` inside) |
 
