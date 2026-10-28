@@ -9,10 +9,19 @@ import os
 import numpy as np
 import pandas as pd
 
-SEGMENTS = {
-    "XAUUSD": [("2011-2018", range(2011, 2019)), ("2026", [2026])],
-    "BTCUSD": [("2015-2019", range(2015, 2020)), ("2026", [2026])],
-}
+def segments(data_dir, symbol):
+    """Contiguous runs of available years, e.g. [("2011-2018", [...]), ("2026", [2026])].
+    Drop a 2019-2025 Octa export into data_dir and the long segment extends automatically."""
+    years = sorted(int(os.path.basename(f).split("_")[-1][:4])
+                   for f in glob.glob(os.path.join(data_dir, f"{symbol.lower()}_m1_*.npz")))
+    runs, cur = [], []
+    for y in years:
+        if cur and y != cur[-1] + 1:
+            runs.append(cur); cur = []
+        cur.append(y)
+    if cur:
+        runs.append(cur)
+    return [(f"{r[0]}-{r[-1]}" if len(r) > 1 else str(r[0]), r) for r in runs]
 
 
 def load_m1(data_dir, symbol, years):
@@ -90,7 +99,7 @@ def with_spread(bars, symbol, model):
 
 def load_bars(data_dir, symbol, tf, cache_dir=None):
     segs = []
-    for name, years in SEGMENTS[symbol]:
+    for name, years in segments(data_dir, symbol):
         cf = cache_dir and os.path.join(cache_dir, f"{symbol}_{name}_{tf}.npz")
         if cf and os.path.exists(cf):
             z = np.load(cf)
