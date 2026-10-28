@@ -46,14 +46,12 @@ def fmt(k, v):
     return str(v)
 
 
-def write_set(path, cfg, symbol, note=""):
+def write_set(path, cfg, symbol, note=""):  # note kept for API compatibility; .set files carry no comments
     full = dict(TESTER_SET); full.update(EXTRA); full.update(cfg)
     if symbol == "BTCUSD":
         full["ReferenceTickSize"] = 0.01
         full["contractOverride"] = 1.0
     full["RecoverySession"] = "DPFX_CALIB_" + os.path.splitext(os.path.basename(path))[0][:40]
     lines = [f"{k}={fmt(k, full[k])}" for k in ORDER]
-    if note:
-        lines.insert(0, "; " + note)
     with open(path, "wb") as f:
         f.write(b"\xff\xfe" + ("\r\n".join(lines) + "\r\n").encode("utf-16-le"))
