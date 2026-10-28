@@ -175,3 +175,54 @@ move the result much on BTC.
 Both files keep every input of the shipped default `.set`, set `EnableTrading=true`,
 turn visuals off, use ATR exits and Risk-% sizing, and carry pass-1 optimization
 flags with all pass-2/3 ranges stored but switched to `N`.
+
+---
+
+## 7. Optimizing for profit factor (PF) instead of net profit
+
+### Timeframe call when PF is the target
+
+PF rewards fewer, cleaner trades and punishes spread. Within the EA's admitted
+clocks that pushes both symbols to the **slowest pair the EA allows**:
+
+| Symbol  | PF-first choice                 | Why |
+|---------|---------------------------------|-----|
+| XAUUSD  | **M5 chart, `SigTF` blank** (keep) | M1 roughly doubles trade count and spread drag for the same RSI-turn signal; M10/M15 cut gold's trade count too far for a 12-month sample. M5 is the PF sweet spot. |
+| BTCUSD  | **M15 chart, `SigTF=10`**, M10 as second | Your own BTC calibration shows PF rising with period: 60m PF 2.8, 120m PF 5.4, 240m PF 3.7 (PF 9.5 with TP 3R). The trend says "go slower"; M15 is the slowest this EA accepts. |
+
+### Why the stock criterion is wrong for PF
+
+`OnTester()` returns `STAT_PROFIT`, so "Custom max" = net profit. The tester's built-in
+"Profit Factor max" is also unsafe: a pass with 3 winners and no losers has PF = ∞ and
+wins every time. Use `OnTester_ProfitFactor.mqh` (two edits, instructions inside) and
+select **Custom max**. It scores `min(PF, 8) × trade-count weight × drawdown damping`
+and returns 0 below 60 trades.
+
+### Settings that raise PF (already the defaults in the `*_PF.set` files)
+
+| Input        | PF default | Reason |
+|--------------|------------|--------|
+| `EnterTick`  | false (Y)  | wait for candle close; removes intrabar fake-outs |
+| `TurnEntry`  | 2 after-hold (Y) | enters only once the cross held `TurnHold` bars |
+| `OppMode`    | 1 close-only (Y) | reversal entries are the lowest-quality trades |
+| `TrailOn`    | false (Y)  | author's BTC tests: no trail improved worst-case PF |
+| `TpR`        | 3 gold / 4 BTC, range 1.5–6 | PF scales with R once win rate is stable |
+| `TimeStop`   | 0–72 bars (Y) | cuts dead trades that drift into the stop |
+| `LossRevOn`  | false (Y)  | loss-reversal adds a second trade after every loser |
+| `fgfOn` / `fgfAgainst` | on / false (Y) | trade only with the H1 filter direction |
+| `fgfBandAtr` | 0.25, range 0–0.5 (Y) | wider no-trade band around the level |
+
+Everything else (sizing, ATR exits, visuals off, `EnableTrading=true`) is unchanged
+from the net-profit presets.
+
+### PF files
+
+| File | Use |
+|------|-----|
+| `OnTester_ProfitFactor.mqh` | copy to `MQL5/Include/XPW/`, apply the two edits in its header |
+| `XPW_v092_FGF_XAUUSD_M5_PF.set` | XAUUSD, M5 chart |
+| `XPW_v092_FGF_BTCUSD_M15_PF.set` | BTCUSD, M15 chart (`SigTF=10` inside) |
+
+Target to accept a result: PF ≥ 1.6 on gold, ≥ 1.8 on BTC, with ≥ 100 trades in
+12 months, forward third also ≥ 1.3, and PF of neighbouring parameter steps within
+±0.3 (a plateau, not a spike).
