@@ -1,0 +1,1037 @@
+//@version=6
+// ─────────────────────────────────────────────────────────────────────────────
+// MTF Fractals + Stage · v6 · STRATEGY · calibrated for XAUUSD and BTCUSD
+//
+// Strategy profile (calibrated on OANDA:XAUUSD 30m / 4H / D / W, see STRATEGY.md)
+//   • Auto on gold: "Intraday fade" below 4H (tick, seconds and 1m to 3H
+//     charts), "Trend" on 4H and above. On other symbols Auto = Custom (every
+//     input as set). Only the two profiles are calibrated; the Custom defaults
+//     are the earlier, uncalibrated ones.
+//   • Both profiles fix the engine as calibrated: ATR band mode, ATR 14, tied
+//     left extremes allowed, min break buffer 0.012 %, levels never expire,
+//     max breakout extension 1.5 ATR, breakeven off, exit on the opposite
+//     chart-TF break on. The engine and entry / exit inputs then only act in
+//     Custom; Direction, session, rollover, backtest range, stop placement,
+//     min / max stop and sizing inputs still apply, and so does a Trailing
+//     stop set to anything but "Profile".
+//   • Intraday fade: short a swing high whose break failed (this TF closed back
+//     below it by the buffer), long a failed swing-low break; 2/2 fractal,
+//     retest band 0.5 ATR, break buffer 0.05 ATR, stop 1.5 ATR from the entry,
+//     target 1 R, no trailing, no higher-TF filter.
+//   • Trend: long only, breakouts and flip retests of 3/3 swings, retest band
+//     0.35 ATR, break buffer 0.15 ATR; breakout stop the wider of 1 ATR and the
+//     level's retest zone (level − 0.5 ATR), so 1-2 ATR; flip-retest stop at
+//     level − 0.5 ATR; no target, chandelier trail 4 ATR from +1 R; higher-TF
+//     bias filter on every valid higher-TF row, even rows hidden in the table.
+//   • Direction always applies on top of the profile (e.g. Long only).
+//   The rules below describe the Custom inputs.
+//
+// Trading rules (see STRATEGY.md)
+//   • Breakout entry: the chart-TF swing high (low) turns Broken on the bar
+//     close, not more than 1.5 × ATR beyond the level (no chasing).
+//   • Flip-retest entry: the chart-TF level is in Flip retest and the bar closes
+//     back on the broken side (old resistance holding as support, or the
+//     reverse); one entry per level.
+//   • Fade entry (off by default): short when the chart-TF swing high turns
+//     Failed break (broken, then this TF closed back below it by the buffer),
+//     long on a failed swing-low break; stop "Breakout stop" × ATR from entry.
+//   • With the bias filter on, entries need the net higher-TF bias (sum of the
+//     visible higher-TF rows, Chart row excluded) to be ≥ "Min net higher-TF
+//     bias" in the trade direction. When long and short both qualify on the
+//     same bar (with the filter on, only possible at net bias 0): when flat both
+//     are skipped; in a position only the same-direction signal is dropped, so
+//     an opposite-break reversal still goes through.
+//   • Stops sit beyond the level's retest zone (retest band + break buffer):
+//     breakout = the wider of entry − 1.5 × ATR and that zone (or the opposite
+//     swing in Structure mode); flip retest = just beyond the zone. Every stop
+//     is at least 0.5 × ATR from the entry. Target 2 R, stop to breakeven at
+//     +1 R (on a bar that reaches +1 R and closes beyond the entry), optional
+//     trailing stop (Swing, Chandelier or From close; distance and start in
+//     ATR / R, price points or ticks) and time stop. An opposite chart-TF
+//     break closes the trade, or reverses it when the opposite entry passes
+//     its filters.
+//   • Position size: equity × risk % ÷ (stop distance × point value), capped
+//     at "Max position size" × equity and rounded to the lot step (whole
+//     contracts on futures), so every trade risks the same fraction of the
+//     account on gold and on bitcoin.
+//   • No entries in the gold rollover window (rollover filter on, charts up to
+//     1H), outside the trading session, or outside the backtest range. Entries and market exits fill on the signal
+//     bar's close (process_orders_on_close); stops and targets are resting
+//     orders from the next bar. No margin check (margin 0): leverage is
+//     controlled by "Max position size".
+//   • Costs: 0.02 % commission and 2 ticks slippage per side by default. Set
+//     your venue's numbers in Properties (STRATEGY.md section 4): gold CFD
+//     ≈ 0.005 %, BTC spot 0.1 %, BTC perpetual 0.05 %.
+//   The indicator part below is mtf_fractals_stage_v6.pine with its
+//   alertcondition() calls removed (strategies alert on order fills instead).
+//
+// What it does
+//   • Williams fractals (swing highs / swing lows) on the chart TF and on
+//     5s / 10s / 15s / 30s / 1m / 5m / 15m / 1H / 4H / D / W. A row is shown
+//     only when it is higher than the chart TF, so on a 1s chart every row is
+//     available and the Chart row is the 1s row (nothing is lower than 1s);
+//     on a 5m chart the rows are 15m and up. Right side strict, so a fractal
+//     can never be broken on the bar that confirms it; equal extremes allowed
+//     on the left (input) so double tops / bottoms at a tied price register.
+//
+// How to read the table (one row per timeframe)
+//     Swing hi  – price of the last swing high of that TF (resistance)
+//     Stage     – what price has done with that level since it printed
+//     Swing lo  – price of the last swing low of that TF (support)
+//     Bias      – +1 when the swing high is broken, −1 when the swing low is
+//                 broken, 0 otherwise; the Σ row sums the enabled, visible rows
+//     Hover a level for its ATR, retest band, break buffer and age; hover a
+//     stage for what it means. Chart-row levels are also drawn as lines and
+//     labelled on the right edge of the chart.
+//   • The most recent fractal of each side on each TF gets a stage (the table
+//     always shows the latest swing of each side, so a new fractal replaces the
+//     previous level and restarts its stage at Confirmed):
+//       Confirmed    – fractal confirmed on this TF's latest bar (Chart row with
+//                      bar-close gating: also on the bar after; higher TFs: on the
+//                      previous closed bar of that TF; in both cases the row
+//                      shows Retest instead when the chart bar has left the band
+//                      and is back in it)
+//       Holding      – no close through the level yet; chart price is outside the
+//                      retest band or has not left it since the fractal printed
+//       Retest       – level intact, the chart bar's range reaches into the retest
+//                      band after a bar has been entirely outside it at least once
+//                      (also shown after a failed break)
+//       Broken       – this TF's close went through the level by more than the
+//                      break buffer; stays until this TF closes back through the
+//                      level by the buffer (Failed break), the next fractal, or
+//                      the level expires (Expire level input)
+//       Flip retest  – level broken earlier, a chart bar has left the band and the
+//                      current bar's range is back inside it (support ⇄ resistance)
+//       Failed break – level was broken, then this TF's close went back through it
+//                      by more than the break buffer; stays until the level is
+//                      broken again or the next fractal (shows Retest whenever
+//                      the chart bar is inside the band). A re-break counts as a
+//                      new break.
+//   • Every higher-TF value (level, ATR, break state, age) comes from COMPLETED
+//     bars of that TF ([1] offset + lookahead_on), so the table is identical on
+//     history and in real time. Break / Failed break are judged on that TF's own
+//     close; Retest / Flip retest use the chart bar's range.
+//   • The strategy runs on the bar close, the bar it acts on: the Chart row
+//     confirms fractals and updates its level and break state there.
+//   • Defaults differ from v5: every row is on (rows below the chart TF are
+//     simply hidden), Weekly is on (the only higher-TF row a D chart can show),
+//     and tied double tops / bottoms now print a fractal (input tieLeft).
+//   • Bias (data window, table column, optional tint): +1 per enabled, visible
+//     TF whose last swing high is Broken / Flip retest, −1 per TF whose last
+//     swing low is Broken / Flip retest; intact levels, Retest and Failed break
+//     count 0.
+//     NOTE: opposite sign to the v5 script, which scored intact levels and so
+//     read bearish on an upside breakout. Re-create anything built on the old
+//     "MTF fractal bias" value.
+//   • Rows whose TF is lower than the chart TF, equal to it, or not a whole
+//     multiple of it are hidden (request.security cannot return them reliably);
+//     the Σ row tooltip lists them. Tick charts hide all higher-TF rows and skip
+//     the rollover filter.
+//
+// Calibration
+//   Distances are measured in ATR(14) of the timeframe they belong to, so one
+//   multiplier means the same thing on $4,000 gold and $80,000 bitcoin and on
+//   5m as on D. The v5 fixed 0.15 % band equalled ~0.5 × ATR on 1H gold and was
+//   far too tight on BTC and on D / W. Its fixed-percent width survives as
+//   "Percent" mode; the stage logic above is the same in both modes.
+//       retest band   ±0.50 × √(row ATR × chart ATR), never narrower than the
+//                     break buffer   a pullback to the level, not every bar; on
+//                     the Chart row this is 0.5 × ATR, and a D level seen from a
+//                     5m chart gets a band a few 5m-ATRs wide instead of half a
+//                     daily range
+//       break buffer   0.15 × row ATR, floored at 0.012 % of the level (≈ $0.50
+//                     on gold, one quiet-hours spread) so a close inside the
+//                     spread never counts as Broken in thin sessions
+//       fractal        2 / 2   Williams, right side strict; equal extremes on
+//                              the left allowed (input; Off = the strict v5 test)
+//   After ATR normalisation XAUUSD and BTCUSD need the same multipliers, so the
+//   inputs apply to every symbol (in the Custom strategy profile; the gold
+//   strategy profiles set their own, see above). The symbol profile ("Auto" detects it) sets
+//   what genuinely differs: gold CFDs and COMEX halt 17:00–18:00 New York, so on
+//   timeframes up to 1H the XAUUSD profile ignores fractals whose centre bar
+//   opens in the 16:40–18:20 New York window (16:30–18:20 for 30m / 45m bars,
+//   16:00–18:20 for 1H bars, so the bar that closes into the 17:00 halt is
+//   always included; not on crypto venues, where tokenised gold and BTC trade
+//   24/7); gold prints 2 decimals, BTC whole dollars.
+// ─────────────────────────────────────────────────────────────────────────────
+strategy("MTF Fractals + Stage v6 Strategy", shorttitle = "MTF Fractals Strat", overlay = true, pyramiding = 0, initial_capital = 10000, default_qty_type = strategy.fixed, default_qty_value = 1, commission_type = strategy.commission.percent, commission_value = 0.02, slippage = 2, margin_long = 0, margin_short = 0, process_orders_on_close = true, max_lines_count = 50, max_labels_count = 50)
+
+// ── Inputs ───────────────────────────────────────────────────────────────────
+string G_PROF  = "Symbol profile"
+string G_FRACT = "Fractal"
+string G_STAGE = "Stage calibration"
+string G_TF    = "Timeframes"
+string G_DISP  = "Display"
+
+profile = input.string("Auto", "Symbol profile", options = ["Auto", "XAUUSD", "BTCUSD", "Generic"], group = G_PROF,
+     tooltip = "Auto detects XAU / GOLD / GC futures and BTC / XBT symbols. The profile only sets what differs between the markets: the gold rollover filter and the price format (gold 2 decimals, BTC whole dollars). The calibration inputs below apply to every symbol profile; the Strategy profile below can override them (Intraday fade and Trend fix them as calibrated, Custom uses them as set).")
+
+stratProfile = input.string("Auto", "Strategy profile", options = ["Auto", "Intraday fade", "Trend", "Custom"], group = G_PROF,
+     tooltip = "Calibrated on OANDA:XAUUSD (30m, 4H, D and W exports, 0.005 % commission). Auto on gold: Intraday fade below 4H (tick, seconds and 1m to 3H charts), Trend on 4H and above; on other symbols Auto = Custom. Intraday fade: trade against failed breaks of the chart-TF swing (2/2 fractal, retest band 0.5 ATR, break buffer 0.05 ATR, stop 1.5 ATR from the entry, target 1 R, no trailing, no higher-TF filter). Trend: breakouts and flip retests, long only, 3/3 fractal, retest band 0.35 ATR, break buffer 0.15 ATR, breakout stop 1-2 ATR (the wider of 1 ATR and level − 0.5 ATR), flip-retest stop level − 0.5 ATR, no target, chandelier trail 4 ATR from +1 R, higher-TF bias on every valid higher-TF row (even hidden ones). Both profiles also force ATR band mode, ATR 14, tied left extremes, min buffer 0.012 %, no level expiry, max extension 1.5 ATR, breakeven off and exit on the opposite break, so the Fractal, Stage calibration and entry / exit inputs only act in Custom. Direction, session, rollover, backtest range, stop placement, min / max stop, sizing and a Trailing stop other than Profile still apply. Custom uses every input as set (uncalibrated defaults).")
+leftBarsIn     = input.int(2, "Bars left",            minval = 1, maxval = 10, group = G_FRACT, tooltip = "Custom strategy profile only; Intraday fade uses 2 / 2, Trend 3 / 3.")
+rightBarsIn    = input.int(2, "Bars right (confirm)", minval = 1, maxval = 10, group = G_FRACT, tooltip = "Custom strategy profile only; Intraday fade uses 2 / 2, Trend 3 / 3.")
+tieLeftIn      = input.bool(true, "Allow equal highs / lows on the left side", group = G_FRACT,
+     tooltip = "On: equal highs / lows are tolerated anywhere in the left window, so the newest bar of a plateau or of a tight double top / bottom tied to the tick registers as the fractal (looser than the built-in Williams Fractal, which caps the plateau at 4 bars). Off: strict on both sides, as in the v5 script, so a tied extreme never prints a fractal. Custom strategy profile only; the calibrated profiles keep it on.")
+rolloverMode   = input.string("Auto", "Ignore gold rollover-window fractals", options = ["Auto", "On", "Off"], group = G_FRACT,
+     tooltip = "Gold CFDs and COMEX halt 17:00-18:00 New York; bars around the halt and the Sunday open print isolated extremes that are not tradable levels. On timeframes up to 1H, fractals whose centre bar opens in the 16:40-18:20 New York window are ignored (16:30-18:20 for 30m / 45m bars, 16:00-18:20 for 1H bars, so the bar that closes into the 17:00 halt is always included). Auto = on for the XAUUSD profile on venues that halt (not tokenised gold on crypto exchanges); bitcoin stays off. Select On if your feed halts in this window. In the strategy the same window (on the chart bar, charts up to 1H) also blocks new entries.")
+chartCloseOnly = input.bool(true, "Chart-TF signals on bar close only", group = G_FRACT,
+     tooltip = "On: the Chart row confirms a fractal and updates its level and Broken / Failed break state only on the bar close; the strategy evaluates its entries and exits on that close. Off: only matters with 'Recalculate on every tick' in Properties, where fractals and breaks are then judged intrabar and can vanish before the bar closes (not recommended for backtesting). Higher-TF rows always use completed bars.")
+
+bandMode   = input.string("ATR", "Band mode", options = ["ATR", "Percent"], group = G_STAGE,
+     tooltip = "ATR: bands are multiples of ATR (recommended). Percent: band and buffer are a fixed % of the level on every timeframe (the v5 width); the retest and break logic is the same in both modes. Custom strategy profile only; Intraday fade and Trend always use ATR.")
+atrLenIn   = input.int(14,    "ATR length",            minval = 2,    maxval = 100,              group = G_STAGE, tooltip = "Custom strategy profile only; the calibrated profiles use 14.")
+retestMulIn = input.float(0.50, "Retest band (× ATR)",  minval = 0.05, maxval = 5.0, step = 0.05, group = G_STAGE,
+     tooltip = "Multiplied by the geometric mean of the row's ATR and the chart ATR, so higher-TF bands shrink toward the chart's scale; never narrower than the row's break buffer. On the Chart row it is simply × ATR. Custom strategy profile only; Intraday fade uses 0.50, Trend 0.35.")
+breakMulIn = input.float(0.15, "Break buffer (× ATR)", minval = 0.0,  maxval = 2.0, step = 0.05, group = G_STAGE,
+     tooltip = "This TF's close must exceed the level by this much (of the row's own ATR) to count as Broken, and must close back through it by the same amount for a Failed break. Custom strategy profile only; Intraday fade uses 0.05, Trend 0.15.")
+minBufPctIn = input.float(0.012, "Min break buffer (% of level, ATR mode)", minval = 0.0, step = 0.002, group = G_STAGE,
+     tooltip = "Floor under the ATR break buffer so a close inside the spread never counts as Broken when ATR collapses in thin sessions. 0.012 % ≈ $0.50 on $4,200 gold, ≈ $9 on $77,000 BTC (negligible next to its ATR buffer). Custom strategy profile only; the calibrated profiles use 0.012.")
+retestPct  = input.float(0.15,  "Retest band % (Percent mode)",  minval = 0.01, step = 0.01,  group = G_STAGE,
+     tooltip = "Fixed % of the level for every row, so one value cannot fit every timeframe: 0.15 % is about half an hourly ATR on gold (the v5 setting), a tenth of a daily ATR, and on BTC about half of that again. Roughly 0.3 % for BTC intraday and 0.5 % or more for daily levels. ATR mode scales this automatically.")
+breakPct   = input.float(0.045, "Break buffer % (Percent mode)", minval = 0.0,  step = 0.005, group = G_STAGE,
+     tooltip = "Fixed % of the level on every timeframe (3/10 of the Percent retest band, the same ratio as the ATR defaults). Set 0 for any close through the level to count (v5 had no buffer; Broken still stays until a Failed break or a new fractal).")
+maxAgeIn   = input.int(0, "Expire level N bars after confirmation (0 = never)", minval = 0, group = G_STAGE,
+     tooltip = "Counted in bars of the level's own timeframe, starting at the bar that confirms the fractal; the level is removed on the Nth bar. The table tooltip shows age from the fractal's centre bar (for higher-TF rows, as of that TF's last completed bar), which is 'Bars right' larger. Custom strategy profile only; the calibrated profiles never expire levels.")
+
+useChart = input.bool(true, "Chart TF", group = G_TF, inline = "tf0")
+use5S    = input.bool(true, "5s",       group = G_TF, inline = "tf0")
+use10S   = input.bool(true, "10s",      group = G_TF, inline = "tf0")
+use15S   = input.bool(true, "15s",      group = G_TF, inline = "tf0")
+use30S   = input.bool(true, "30s",      group = G_TF, inline = "tf0", tooltip = "Seconds rows appear only on seconds charts below them (1s chart: all four; 5s chart: 10s / 15s / 30s; 10s chart: 30s; 15s chart: 30s). On a 1s chart the Chart row is the 1s row: nothing is lower than 1s, so no separate 1s row exists. Seconds data needs a TradingView plan that offers seconds charts.")
+use1     = input.bool(true, "1m",       group = G_TF, inline = "tf1")
+use5     = input.bool(true, "5m",       group = G_TF, inline = "tf1")
+use15    = input.bool(true, "15m",      group = G_TF, inline = "tf1", tooltip = "A row is shown only when its length is above the chart length and a whole multiple of it. 1m: on seconds charts. 5m: on 1m and seconds charts that divide 5 minutes (hidden on 2m / 3m / 4m). 15m: on 1m, 3m, 5m and such seconds charts (hidden on 2m, 4m, 10m). Hidden rows are summarised in the Σ row tooltip.")
+use60    = input.bool(true, "1H",       group = G_TF, inline = "tf2")
+use240   = input.bool(true, "4H",       group = G_TF, inline = "tf2")
+useD     = input.bool(true, "Daily",    group = G_TF, inline = "tf2")
+useW     = input.bool(true, "Weekly",   group = G_TF, inline = "tf2", tooltip = "1H: hidden on 45m charts. 4H: hidden on 45m and 3H charts. Weekly is the only higher-TF row available on a D chart and needs 'Bars left' + 'Bars right' + 1 completed weekly bars (5 with 2 / 2, 7 with the Trend profile's 3 / 3) before it can show a level. On seconds charts the loaded history is short, so D and W rows may say 'only N bars'.")
+
+showMarks    = input.bool(true,  "Plot fractal marks",             group = G_DISP, inline = "marks")
+bigMarks     = input.bool(true,  "large",                          group = G_DISP, inline = "marks", tooltip = "Triangle marks on confirmed chart-TF fractals: large (normal size) or small (tiny).")
+showStageTbl = input.bool(true,  "Stage table",                    group = G_DISP)
+showLabels   = input.bool(true,  "Labels on last chart fractals",  group = G_DISP)
+showLines    = input.bool(true,  "Level lines (chart TF)",         group = G_DISP)
+showHtfLines = input.bool(false, "Level lines (higher TFs)",       group = G_DISP)
+showBiasBg   = input.bool(false, "Background tint from MTF bias",  group = G_DISP)
+labelSize    = input.string("large",  "Label size",      options = ["small", "normal", "large", "huge"], group = G_DISP, inline = "size")
+tblSize      = input.string("normal", "Table text size", options = ["tiny", "small", "normal", "large"], group = G_DISP, inline = "size")
+tblPos       = input.string("top_right", "Table position", options = ["top_left", "top_right", "bottom_left", "bottom_right"], group = G_DISP)
+bullCol      = input.color(color.new(color.teal, 0), "Bull", group = G_DISP, inline = "col")
+bearCol      = input.color(color.new(color.red, 0),  "Bear", group = G_DISP, inline = "col")
+
+// ── Profile resolution (all "simple" values: fixed for the whole run) ────────
+string tick     = str.upper(syminfo.ticker)
+string root     = str.upper(syminfo.root)
+bool   isFut    = syminfo.type == "futures"
+bool   isEq     = syminfo.type == "stock" or syminfo.type == "fund"
+bool   symGold  = str.contains(tick, "XAU") or (str.contains(tick, "GOLD") and not isEq) or (isFut and (root == "GC" or root == "MGC"))
+bool   symBtc   = ((str.startswith(tick, "BTC") or str.startswith(tick, "XBT")) and not isEq and not str.endswith(tick, ".D")) or (isFut and (root == "BTC" or root == "MBT"))
+string resolved = profile == "Auto" ? (symGold ? "XAUUSD" : symBtc ? "BTCUSD" : "Generic") : profile
+bool   isCrypto = syminfo.type == "crypto"
+bool   rollOn   = rolloverMode == "On" or (rolloverMode == "Auto" and resolved == "XAUUSD" and not isCrypto)
+// pxFmt follows each bar's close (table and labels on the last bar, order alert
+// texts on order bars); a BTC-prefixed product priced below 1,000 (leveraged
+// token, ETN) keeps its own tick format.
+string pxFmt    = resolved == "XAUUSD" ? "0.00" : resolved == "BTCUSD" and close >= 1000 ? "0" : format.mintick
+// timeframe.main_period is the chart's timeframe even inside request.security(),
+// so the profile (and the engine settings below) resolve the same in every context.
+string mainTf    = timeframe.main_period
+bool   mainTicks = str.endswith(mainTf, "T")
+int    chartSec  = timeframe.in_seconds(mainTicks ? "1" : mainTf)
+
+// ── Strategy profile (calibrated on gold; simple values) ──────────────────────
+string stratRes = stratProfile == "Auto" ? (resolved == "XAUUSD" ? (chartSec < 14400 ? "Intraday fade" : "Trend") : "Custom") : stratProfile
+bool   isFadeP  = stratRes == "Intraday fade"
+bool   isTrendP = stratRes == "Trend"
+int    leftBars  = isFadeP ? 2 : isTrendP ? 3 : leftBarsIn
+int    rightBars = isFadeP ? 2 : isTrendP ? 3 : rightBarsIn
+float  breakMul  = isFadeP ? 0.05 : isTrendP ? 0.15 : breakMulIn
+float  retestMul = isFadeP ? 0.50 : isTrendP ? 0.35 : retestMulIn
+// The calibrated profiles also fix the rest of the engine as it was calibrated.
+bool   calP       = isFadeP or isTrendP
+bool   useAtrBand = calP or bandMode == "ATR"
+bool   tieLeft    = calP or tieLeftIn
+int    atrLen     = calP ? 14 : atrLenIn
+float  minBufPct  = calP ? 0.012 : minBufPctIn
+int    maxAge     = calP ? 0 : maxAgeIn
+
+// ── Band helpers (price units) ───────────────────────────────────────────────
+breakBuf(float lvl, float atrV) =>
+    useAtrBand ? math.max(breakMul * atrV, lvl * minBufPct / 100.0) : lvl * breakPct / 100.0
+
+retestBand(float lvl, float bandAtr) =>
+    useAtrBand ? retestMul * bandAtr : lvl * retestPct / 100.0
+
+// ── Williams fractal ─────────────────────────────────────────────────────────
+isUpFractal() =>
+    bool ok = bar_index >= leftBars + rightBars
+    float mid = high[rightBars]
+    if ok
+        for i = 0 to leftBars + rightBars
+            if i < rightBars and high[i] >= mid
+                ok := false
+            if i > rightBars and (tieLeft ? high[i] > mid : high[i] >= mid)
+                ok := false
+    ok
+
+isDnFractal() =>
+    bool ok = bar_index >= leftBars + rightBars
+    float mid = low[rightBars]
+    if ok
+        for i = 0 to leftBars + rightBars
+            if i < rightBars and low[i] <= mid
+                ok := false
+            if i > rightBars and (tieLeft ? low[i] < mid : low[i] <= mid)
+                ok := false
+    ok
+
+// ── Per-TF level engine (runs inside each request.security context) ──────────
+// Returns, for the bar `off` bars ago: the last fractal level of each side, this
+// TF's ATR, whether a fractal confirmed on that bar, the age of each level in
+// bars of this TF (from the fractal's centre bar), the open time of each
+// fractal's centre bar, the break state of each level judged on this TF's own
+// close (0 intact · 1 broken · 2 failed break), and how many bars this context
+// has. off = 1 together with lookahead_on is the standard non-repainting
+// higher-TF pattern. tfSec is the TF length in seconds, passed in so the
+// rollover filter never depends on how timeframe.in_seconds() behaves inside a
+// request. gate = false postpones both the fractal confirmation and the break /
+// failed-break judgement (used by the Chart row to wait for the bar close);
+// history is unaffected because every historical bar is confirmed.
+tfEngine(simple int off, simple int tfSec, bool gate) =>
+    float atrRma  = ta.atr(atrLen)
+    float atrSeed = ta.cum(ta.tr(true)) / (bar_index + 1)   // expanding mean while the RMA warms up
+    float atrV    = na(atrRma) ? atrSeed : atrRma
+    int   nBars   = bar_index + 1
+    // Window starts at the open of the bar that closes into the 17:00 halt:
+    // 16:00 for 1H bars, 16:30 for 30m / 45m, 16:40 for 15m and below.
+    string rollSess = tfSec >= 3600 ? "1600-1820:1234567" : tfSec >= 1800 ? "1630-1820:1234567" : "1640-1820:1234567"
+    int   rollT   = na
+    if rollOn and tfSec <= 3600 and not timeframe.isticks
+        rollT := time(timeframe.period, rollSess, "America/New_York")
+    bool  inRoll  = not na(rollT)
+    bool  upNow   = isUpFractal() and not inRoll[rightBars] and gate
+    bool  dnNow   = isDnFractal() and not inRoll[rightBars] and gate
+    var float lastUp = na
+    var float lastDn = na
+    var int   upAge  = 0
+    var int   dnAge  = 0
+    var int   upT    = na
+    var int   dnT    = na
+    var int   upB    = 0
+    var int   dnB    = 0
+    if upNow
+        lastUp := high[rightBars]
+        upAge  := rightBars
+        upT    := time[rightBars]
+        upB    := 0
+    else
+        upAge += 1
+    if dnNow
+        lastDn := low[rightBars]
+        dnAge  := rightBars
+        dnT    := time[rightBars]
+        dnB    := 0
+    else
+        dnAge += 1
+    if maxAge > 0
+        if upAge - rightBars >= maxAge
+            lastUp := na
+            upT    := na
+            upB    := 0
+        if dnAge - rightBars >= maxAge
+            lastDn := na
+            dnT    := na
+            dnB    := 0
+    if not upNow and not na(lastUp) and gate
+        float bufUp = breakBuf(lastUp, atrV)
+        if close > lastUp + bufUp
+            upB := 1
+        else if upB == 1 and close < lastUp - bufUp
+            upB := 2
+    if not dnNow and not na(lastDn) and gate
+        float bufDn = breakBuf(lastDn, atrV)
+        if close < lastDn - bufDn
+            dnB := 1
+        else if dnB == 1 and close > lastDn + bufDn
+            dnB := 2
+    [lastUp[off], lastDn[off], atrV[off], upNow[off], dnNow[off], upAge[off], dnAge[off], upT[off], dnT[off], upB[off], dnB[off], nBars[off]]
+
+// ── Stage machine (chart side, one independent instance per call site) ───────
+//   st     : 0 none · 1 Confirmed · 2 Retest · 3 Broken · 4 Holding · 5 Flip retest · 6 Failed break
+//   bstate : break state from the engine (this TF's close vs level ± buffer)
+//   armed  : after a break, a chart bar has been entirely outside the retest band at least once
+//   away   : since the level printed, a chart bar has been entirely outside the band at least once (a break also counts)
+//   t      : open time of the fractal's centre bar; a change means a new level
+sideStage(float lvl, float atrV, float chartAtr, bool hit, int t, int bstate) =>
+    var bool armed = false
+    var bool away  = false
+    bool fresh = not na(t) and (na(t[1]) or t != t[1])
+    if fresh or na(lvl)
+        armed := false
+        away  := false
+    int st = 0
+    if not na(lvl)
+        float buf  = breakBuf(lvl, atrV)
+        float band = math.max(retestBand(lvl, math.sqrt(atrV * chartAtr)), buf)   // the near zone always covers the buffer zone
+        bool near  = high >= lvl - band and low <= lvl + band                     // chart bar range reaches into the band
+        bool newBreak = bstate == 1 and bstate[1] != 1
+        if newBreak
+            armed := false
+        if bstate == 1 and not near
+            armed := true
+        if not near or bstate != 0
+            away := true
+        if bstate == 1
+            st := armed and near ? 5 : 3
+        else if bstate == 2
+            st := near ? 2 : 6
+        else if hit and not (near and away)
+            st := 1
+        else if near and away
+            st := 2
+        else
+            st := 4
+    st
+
+stageName(int s) =>
+    switch s
+        1 => "Confirmed"
+        2 => "Retest"
+        3 => "Broken"
+        4 => "Holding"
+        5 => "Flip retest"
+        6 => "Failed break"
+        => "—"
+
+stageColor(int s) =>
+    switch s
+        1 => color.yellow
+        2 => color.orange
+        3 => color.red
+        4 => color.lime
+        5 => color.fuchsia
+        6 => color.gray
+        => color.gray
+
+// Plain-language meaning of each stage, shown in label and table tooltips.
+stageDesc(int s) =>
+    switch s
+        1 => "Confirmed: the fractal has just been confirmed on this timeframe. The level is fresh and untested."
+        2 => "Retest: the level is intact and the current chart bar reaches back into the retest band after having been away from it. Watch for rejection (level holds) or a close through it (break)."
+        3 => "Broken: this timeframe closed through the level by more than the break buffer. A broken swing high counts +1 to the bias, a broken swing low −1."
+        4 => "Holding: no close through the level yet and price is away from it (or has not left the band since the fractal printed)."
+        5 => "Flip retest: the level was broken, price moved away and the current chart bar is back at it from the other side. The old resistance is being tested as support, or the old support as resistance."
+        6 => "Failed break: the level was broken but this timeframe then closed back through it by more than the buffer. The break did not hold; the level is in play again."
+        => "No level: no fractal of this side has been confirmed on this timeframe within the loaded history, or the level expired (Expire level input)."
+
+sizeOf(string s) =>
+    switch s
+        "tiny"   => size.tiny
+        "small"  => size.small
+        "normal" => size.normal
+        "large"  => size.large
+        "huge"   => size.huge
+        => size.normal
+
+string lblSz = sizeOf(labelSize)
+string tblSz = sizeOf(tblSize)
+
+// Rows lower than the chart TF would only see the last intrabar of each chart
+// bar; a row equal to the chart TF would be the Chart row one bar late (the
+// engine runs on completed bars); a row that is not a whole multiple of the
+// chart TF can differ between history and real time on the chart bar that
+// straddles its close; tick charts have no time length to compare.
+tfNote(simple string tf) =>
+    int s = timeframe.in_seconds(tf)
+    mainTicks ? "tick chart" : s < chartSec ? "< chart" : s == chartSec ? "= chart" : s % chartSec != 0 ? "not a multiple" : ""
+
+string n5S  = tfNote("5S")
+string n10S = tfNote("10S")
+string n15S = tfNote("15S")
+string n30S = tfNote("30S")
+string n1   = tfNote("1")
+string n5   = tfNote("5")
+string n15  = tfNote("15")
+string n60  = tfNote("60")
+string n240 = tfNote("240")
+string nD   = tfNote("D")
+string nW   = tfNote("W")
+bool   v5S  = n5S == ""
+bool   v10S = n10S == ""
+bool   v15S = n15S == ""
+bool   v30S = n30S == ""
+bool   v1   = n1 == ""
+bool   v5   = n5 == ""
+bool   v15  = n15 == ""
+bool   v60  = n60 == ""
+bool   v240 = n240 == ""
+bool   vD   = nD == ""
+bool   vW   = nW == ""
+
+// A row that is off or hidden is never read, so its request is pointed at the
+// weekly series (a few hundred bars on any symbol) instead of loading and
+// processing the full intraday history for nothing. All gates are simple, so
+// each request runs on every bar or never, and the engine state stays consistent.
+string tf5S  = (use5S or isTrendP) and v5S  ? "5S"  : "W"
+string tf10S = (use10S or isTrendP) and v10S ? "10S" : "W"
+string tf15S = (use15S or isTrendP) and v15S ? "15S" : "W"
+string tf30S = (use30S or isTrendP) and v30S ? "30S" : "W"
+string tf1   = (use1  or isTrendP) and v1   ? "1"   : "W"
+string tf5   = (use5  or isTrendP) and v5   ? "5"   : "W"
+string tf15  = (use15 or isTrendP) and v15  ? "15"  : "W"
+string tf60  = (use60 or isTrendP) and v60  ? "60"  : "W"
+string tf240 = (use240 or isTrendP) and v240 ? "240" : "W"
+string tfD   = (useD  or isTrendP) and vD   ? "D"   : "W"
+
+// ── Chart TF ─────────────────────────────────────────────────────────────────
+bool chartGate = not chartCloseOnly or barstate.isconfirmed
+[cUpL, cDnL, cAtr, cUpHit, cDnHit, cUpAge, cDnAge, cUpT, cDnT, cUpB, cDnB, cN] = tfEngine(0, chartSec, chartGate)
+// With bar-close gating the confirming tick is immediately followed by the next
+// bar, so "Confirmed" is also shown on that next bar (cUpHit[1] is the committed
+// closing value: identical on history and in real time).
+int cUpSt = sideStage(cUpL, cAtr, cAtr, cUpHit or (chartCloseOnly and cUpHit[1]), cUpT, cUpB)
+int cDnSt = sideStage(cDnL, cAtr, cAtr, cDnHit or (chartCloseOnly and cDnHit[1]), cDnT, cDnB)
+
+plotshape(showMarks and bigMarks and cUpHit,     title = "Up fractal",         style = shape.triangleup,   location = location.abovebar, color = bullCol, size = size.normal, offset = -rightBars)
+plotshape(showMarks and bigMarks and cDnHit,     title = "Dn fractal",         style = shape.triangledown, location = location.belowbar, color = bearCol, size = size.normal, offset = -rightBars)
+plotshape(showMarks and not bigMarks and cUpHit, title = "Up fractal (small)", style = shape.triangleup,   location = location.abovebar, color = bullCol, size = size.tiny,   offset = -rightBars)
+plotshape(showMarks and not bigMarks and cDnHit, title = "Dn fractal (small)", style = shape.triangledown, location = location.belowbar, color = bearCol, size = size.tiny,   offset = -rightBars)
+
+// ── Higher TFs (completed bars only) ─────────────────────────────────────────
+[u5S,  d5S,  a5S,  uh5S,  dh5S,  ua5S,  da5S,  ut5S,  dt5S,  ub5S,  db5S,  n5Sb]  = request.security(syminfo.tickerid, tf5S,  tfEngine(1, timeframe.in_seconds(tf5S),  true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u10S, d10S, a10S, uh10S, dh10S, ua10S, da10S, ut10S, dt10S, ub10S, db10S, n10Sb] = request.security(syminfo.tickerid, tf10S, tfEngine(1, timeframe.in_seconds(tf10S), true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u15S, d15S, a15S, uh15S, dh15S, ua15S, da15S, ut15S, dt15S, ub15S, db15S, n15Sb] = request.security(syminfo.tickerid, tf15S, tfEngine(1, timeframe.in_seconds(tf15S), true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u30S, d30S, a30S, uh30S, dh30S, ua30S, da30S, ut30S, dt30S, ub30S, db30S, n30Sb] = request.security(syminfo.tickerid, tf30S, tfEngine(1, timeframe.in_seconds(tf30S), true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u1,   d1,   a1,   uh1,   dh1,   ua1,   da1,   ut1,   dt1,   ub1,   db1,   n1b]   = request.security(syminfo.tickerid, tf1,   tfEngine(1, timeframe.in_seconds(tf1),   true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u5,   d5,   a5,   uh5,   dh5,   ua5,   da5,   ut5,   dt5,   ub5,   db5,   n5b]   = request.security(syminfo.tickerid, tf5,   tfEngine(1, timeframe.in_seconds(tf5),   true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u15,  d15,  a15,  uh15,  dh15,  ua15,  da15,  ut15,  dt15,  ub15,  db15,  n15b]  = request.security(syminfo.tickerid, tf15,  tfEngine(1, timeframe.in_seconds(tf15),  true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u60,  d60,  a60,  uh60,  dh60,  ua60,  da60,  ut60,  dt60,  ub60,  db60,  n60b]  = request.security(syminfo.tickerid, tf60,  tfEngine(1, timeframe.in_seconds(tf60),  true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[u240, d240, a240, uh240, dh240, ua240, da240, ut240, dt240, ub240, db240, n240b] = request.security(syminfo.tickerid, tf240, tfEngine(1, timeframe.in_seconds(tf240), true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[uD,   dD,   aD,   uhD,   dhD,   uaD,   daD,   utD,   dtD,   ubD,   dbD,   nDb]   = request.security(syminfo.tickerid, tfD,   tfEngine(1, timeframe.in_seconds(tfD),   true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+[uW,   dW,   aW,   uhW,   dhW,   uaW,   daW,   utW,   dtW,   ubW,   dbW,   nWb]   = request.security(syminfo.tickerid, "W",   tfEngine(1, timeframe.in_seconds("W"),   true), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_on)
+
+int us5S  = sideStage(u5S,  a5S,  cAtr, uh5S,  ut5S,  ub5S)
+int ds5S  = sideStage(d5S,  a5S,  cAtr, dh5S,  dt5S,  db5S)
+int us10S = sideStage(u10S, a10S, cAtr, uh10S, ut10S, ub10S)
+int ds10S = sideStage(d10S, a10S, cAtr, dh10S, dt10S, db10S)
+int us15S = sideStage(u15S, a15S, cAtr, uh15S, ut15S, ub15S)
+int ds15S = sideStage(d15S, a15S, cAtr, dh15S, dt15S, db15S)
+int us30S = sideStage(u30S, a30S, cAtr, uh30S, ut30S, ub30S)
+int ds30S = sideStage(d30S, a30S, cAtr, dh30S, dt30S, db30S)
+int us1   = sideStage(u1,   a1,   cAtr, uh1,   ut1,   ub1)
+int ds1   = sideStage(d1,   a1,   cAtr, dh1,   dt1,   db1)
+int us5   = sideStage(u5,   a5,   cAtr, uh5,   ut5,   ub5)
+int ds5   = sideStage(d5,   a5,   cAtr, dh5,   dt5,   db5)
+int us15  = sideStage(u15,  a15,  cAtr, uh15,  ut15,  ub15)
+int ds15  = sideStage(d15,  a15,  cAtr, dh15,  dt15,  db15)
+int us60  = sideStage(u60,  a60,  cAtr, uh60,  ut60,  ub60)
+int ds60  = sideStage(d60,  a60,  cAtr, dh60,  dt60,  db60)
+int us240 = sideStage(u240, a240, cAtr, uh240, ut240, ub240)
+int ds240 = sideStage(d240, a240, cAtr, dh240, dt240, db240)
+int usD   = sideStage(uD,   aD,   cAtr, uhD,   utD,   ubD)
+int dsD   = sideStage(dD,   aD,   cAtr, dhD,   dtD,   dbD)
+int usW   = sideStage(uW,   aW,   cAtr, uhW,   utW,   ubW)
+int dsW   = sideStage(dW,   aW,   cAtr, dhW,   dtW,   dbW)
+
+// ── Row model ────────────────────────────────────────────────────────────────
+type Row
+    string name
+    bool   on
+    bool   valid
+    string note
+    float  upL
+    float  dnL
+    float  atr
+    int    upSt
+    int    dnSt
+    int    upAge
+    int    dnAge
+    int    upT
+    int    dnT
+    int    nBars
+
+rows = array.new<Row>()
+array.push(rows, Row.new("Chart", useChart, true, "",   cUpL, cDnL, cAtr, cUpSt, cDnSt, cUpAge, cDnAge, cUpT, cDnT, cN))
+array.push(rows, Row.new("5s",    use5S,    v5S,  n5S,  u5S,  d5S,  a5S,  us5S,  ds5S,  ua5S,  da5S,  ut5S,  dt5S,  n5Sb))
+array.push(rows, Row.new("10s",   use10S,   v10S, n10S, u10S, d10S, a10S, us10S, ds10S, ua10S, da10S, ut10S, dt10S, n10Sb))
+array.push(rows, Row.new("15s",   use15S,   v15S, n15S, u15S, d15S, a15S, us15S, ds15S, ua15S, da15S, ut15S, dt15S, n15Sb))
+array.push(rows, Row.new("30s",   use30S,   v30S, n30S, u30S, d30S, a30S, us30S, ds30S, ua30S, da30S, ut30S, dt30S, n30Sb))
+array.push(rows, Row.new("1m",    use1,     v1,   n1,   u1,   d1,   a1,   us1,   ds1,   ua1,   da1,   ut1,   dt1,   n1b))
+array.push(rows, Row.new("5m",    use5,     v5,   n5,   u5,   d5,   a5,   us5,   ds5,   ua5,   da5,   ut5,   dt5,   n5b))
+array.push(rows, Row.new("15m",   use15,    v15,  n15,  u15,  d15,  a15,  us15,  ds15,  ua15,  da15,  ut15,  dt15,  n15b))
+array.push(rows, Row.new("1H",    use60,    v60,  n60,  u60,  d60,  a60,  us60,  ds60,  ua60,  da60,  ut60,  dt60,  n60b))
+array.push(rows, Row.new("4H",    use240,   v240, n240, u240, d240, a240, us240, ds240, ua240, da240, ut240, dt240, n240b))
+array.push(rows, Row.new("D",     useD,     vD,   nD,   uD,   dD,   aD,   usD,   dsD,   uaD,   daD,   utD,   dtD,   nDb))
+array.push(rows, Row.new("W",     useW,     vW,   nW,   uW,   dW,   aW,   usW,   dsW,   uaW,   daW,   utW,   dtW,   nWb))
+
+// ── MTF bias ─────────────────────────────────────────────────────────────────
+// +1 per TF whose last swing HIGH is broken (price above resistance),
+// −1 per TF whose last swing LOW is broken (price below support).
+// Intact levels, Retest and Failed break contribute 0.
+biasOf(int upS, int dnS) =>
+    int b = 0
+    if upS == 3 or upS == 5
+        b += 1
+    if dnS == 3 or dnS == 5
+        b -= 1
+    b
+
+int    bias      = 0
+int    nScore    = 0
+int    nBelow    = 0
+string hiddenTxt = ""
+for r in rows
+    if r.on and r.valid
+        bias   += biasOf(r.upSt, r.dnSt)
+        nScore += 1
+    else if r.on
+        if r.note == "< chart"
+            nBelow += 1
+        else
+            hiddenTxt += (hiddenTxt == "" ? "" : ", ") + r.name + " (" + r.note + ")"
+if nBelow > 0
+    hiddenTxt := str.tostring(nBelow) + " row(s) below the chart TF" + (hiddenTxt == "" ? "" : ", " + hiddenTxt)
+
+plot(bias, "MTF fractal bias", display = display.data_window)
+bgcolor(showBiasBg and bias > 0 ? color.new(bullCol, 92) : showBiasBg and bias < 0 ? color.new(bearCol, 92) : na, title = "Bias tint")
+
+// ── Stage table ──────────────────────────────────────────────────────────────
+pos = switch tblPos
+    "top_left"     => position.top_left
+    "top_right"    => position.top_right
+    "bottom_left"  => position.bottom_left
+    => position.bottom_right
+var table t = table.new(pos, 6, 14, bgcolor = color.new(#0d1117, 15), border_width = 1, border_color = color.new(color.gray, 60))
+
+fmtPx(float x) =>
+    na(x) ? "—" : str.tostring(x, pxFmt)
+
+bandText(float lvl, float atrV) =>
+    float buf  = breakBuf(lvl, atrV)
+    float band = math.max(retestBand(lvl, math.sqrt(atrV * cAtr)), buf)
+    "ATR " + fmtPx(atrV) + "  ·  retest ±" + fmtPx(band) + "  ·  break buffer " + fmtPx(buf)
+
+paintRow(int row, Row r) =>
+    int b = biasOf(r.upSt, r.dnSt)
+    bool tooShort = r.nBars < leftBars + rightBars + 1
+    string shortTxt = "only " + str.tostring(r.nBars) + " bars"
+    string ageNote  = r.name == "Chart" ? " bars" : " bars (as of last closed " + r.name + " bar)"
+    string rowTip   = r.name == "Chart" ? (chartCloseOnly ? "The chart's own timeframe. Level and break state update on the bar close; Retest follows the live bar." : "The chart's own timeframe. 'Chart-TF signals on bar close only' is Off: with 'Recalculate on every tick' the level and break state can change until the bar closes.") : "Levels and break state from completed " + r.name + " bars (no repainting); Retest follows the live chart bar."
+    string noLvlTip = tooShort ? "Fewer completed bars than Bars left + Bars right + 1; a fractal cannot be confirmed yet." : stageDesc(0)
+    table.cell(t, 0, row, r.name, text_color = color.silver, text_size = tblSz, tooltip = rowTip)
+    table.cell(t, 1, row, fmtPx(r.upL), text_color = bullCol, text_size = tblSz, tooltip = na(r.upL) ? "" : "Last swing high (resistance)  ·  " + bandText(r.upL, r.atr) + "  ·  age " + str.tostring(r.upAge) + ageNote)
+    table.cell(t, 2, row, na(r.upL) and tooShort ? shortTxt : stageName(r.upSt), text_color = stageColor(r.upSt), text_size = tblSz, tooltip = na(r.upL) ? noLvlTip : stageDesc(r.upSt))
+    table.cell(t, 3, row, fmtPx(r.dnL), text_color = bearCol, text_size = tblSz, tooltip = na(r.dnL) ? "" : "Last swing low (support)  ·  " + bandText(r.dnL, r.atr) + "  ·  age " + str.tostring(r.dnAge) + ageNote)
+    table.cell(t, 4, row, na(r.dnL) and tooShort ? shortTxt : stageName(r.dnSt), text_color = stageColor(r.dnSt), text_size = tblSz, tooltip = na(r.dnL) ? noLvlTip : stageDesc(r.dnSt))
+    table.cell(t, 5, row, b > 0 ? "+1" : b < 0 ? "−1" : "0", text_color = b > 0 ? bullCol : b < 0 ? bearCol : color.gray, text_size = tblSz, tooltip = "+1: swing high broken (price above resistance). −1: swing low broken (price below support). 0: both levels intact, or a failed break.")
+
+if showStageTbl and barstate.islast
+    table.cell(t, 0, 0, "TF",       text_color = color.gray, text_size = tblSz, tooltip = "Timeframe of the row. Rows below the chart timeframe, equal to it, or not a whole multiple of it are hidden.")
+    table.cell(t, 1, 0, "Swing hi", text_color = color.gray, text_size = tblSz, tooltip = "Last confirmed swing high of that timeframe: resistance until broken.")
+    table.cell(t, 2, 0, "Stage",    text_color = color.gray, text_size = tblSz, tooltip = "Confirmed · Holding · Retest · Broken · Flip retest · Failed break. Hover a stage for its meaning.")
+    table.cell(t, 3, 0, "Swing lo", text_color = color.gray, text_size = tblSz, tooltip = "Last confirmed swing low of that timeframe: support until broken.")
+    table.cell(t, 4, 0, "Stage",    text_color = color.gray, text_size = tblSz, tooltip = "Confirmed · Holding · Retest · Broken · Flip retest · Failed break. Hover a stage for its meaning.")
+    table.cell(t, 5, 0, "Bias",     text_color = color.gray, text_size = tblSz, tooltip = "+1 broken swing high, −1 broken swing low, 0 otherwise. The Σ row sums the visible rows.")
+    int rowIdx = 1
+    for r in rows
+        if r.on and r.valid
+            paintRow(rowIdx, r)
+            rowIdx += 1
+    string profTxt = resolved + " · " + stratRes + (rollOn ? " · rollover filter" : "") + "  L" + str.tostring(leftBars) + "/R" + str.tostring(rightBars) + (useAtrBand ? "  ATR" + str.tostring(atrLen) + " ×" + str.tostring(retestMul) + "/" + str.tostring(breakMul) : "  " + str.tostring(retestPct) + "%/" + str.tostring(breakPct) + "%")
+    string sumTip  = "Sum of the per-TF bias over the enabled, usable timeframes (bias / rows counted). Positive: more timeframes have broken above resistance than below support." + (hiddenTxt == "" ? "" : "  Hidden: " + hiddenTxt + ". A row must be higher than the chart timeframe and a whole multiple of it; the Chart row covers the chart timeframe.")
+    table.cell(t, 0, rowIdx, "Σ", text_color = color.gray, text_size = tblSz)
+    table.cell(t, 1, rowIdx, profTxt, text_color = color.silver, text_size = tblSz, tooltip = "Symbol profile" + (rollOn ? " (rollover filter on)" : "") + " · strategy profile" + (isTrendP ? " (its bias filter counts every valid higher-TF row, shown or not; this Σ counts only the shown rows)" : "") + " · fractal left/right · " + (useAtrBand ? "ATR length × retest multiplier / break multiplier" : "retest band % / break buffer % (Percent mode)"))
+    table.cell(t, 2, rowIdx, "", text_size = tblSz)
+    table.cell(t, 3, rowIdx, "", text_size = tblSz)
+    table.cell(t, 4, rowIdx, "", text_size = tblSz)
+    table.cell(t, 5, rowIdx, (bias > 0 ? "+" : "") + str.tostring(bias) + " / " + str.tostring(nScore), text_color = bias > 0 ? bullCol : bias < 0 ? bearCol : color.gray, text_size = tblSz, tooltip = sumTip)
+
+// ── Labels on last chart fractals ────────────────────────────────────────────
+var label upLab = na
+var label dnLab = na
+if showLabels and barstate.islast
+    label.delete(upLab)
+    label.delete(dnLab)
+    if not na(cUpL)
+        upLab := label.new(bar_index + 1, cUpL, "▲ Swing high " + fmtPx(cUpL) + "\n" + stageName(cUpSt) + " · " + str.tostring(cUpAge) + " bars", xloc = xloc.bar_index, style = label.style_label_left, color = color.new(bullCol, 75), textcolor = bullCol, size = lblSz, tooltip = stageDesc(cUpSt) + "\n" + bandText(cUpL, cAtr))
+    if not na(cDnL)
+        dnLab := label.new(bar_index + 1, cDnL, "▼ Swing low " + fmtPx(cDnL) + "\n" + stageName(cDnSt) + " · " + str.tostring(cDnAge) + " bars", xloc = xloc.bar_index, style = label.style_label_left, color = color.new(bearCol, 75), textcolor = bearCol, size = lblSz, tooltip = stageDesc(cDnSt) + "\n" + bandText(cDnL, cAtr))
+
+// ── Level lines ──────────────────────────────────────────────────────────────
+var line cUpLine = na
+var line cDnLine = na
+if showLines and barstate.islast
+    line.delete(cUpLine)
+    line.delete(cDnLine)
+    if not na(cUpL) and not na(cUpT)
+        cUpLine := line.new(cUpT, cUpL, time + chartSec * 1000, cUpL, xloc = xloc.bar_time, color = color.new(bullCol, 30), style = line.style_solid, width = 1)
+    if not na(cDnL) and not na(cDnT)
+        cDnLine := line.new(cDnT, cDnL, time + chartSec * 1000, cDnL, xloc = xloc.bar_time, color = color.new(bearCol, 30), style = line.style_solid, width = 1)
+
+// Higher-TF lines start at the open time of the fractal's centre bar.
+var array<line> htfLines = array.new<line>()
+if showHtfLines and barstate.islast
+    for l in htfLines
+        line.delete(l)
+    array.clear(htfLines)
+    int tEnd = time + chartSec * 1000 * 2
+    for r in rows
+        if r.on and r.valid and r.name != "Chart"
+            if not na(r.upL) and not na(r.upT)
+                array.push(htfLines, line.new(r.upT, r.upL, tEnd, r.upL, xloc = xloc.bar_time, color = color.new(bullCol, 55), style = line.style_dashed, width = 1))
+            if not na(r.dnL) and not na(r.dnT)
+                array.push(htfLines, line.new(r.dnT, r.dnL, tEnd, r.dnL, xloc = xloc.bar_time, color = color.new(bearCol, 55), style = line.style_dashed, width = 1))
+
+// ── Alerts ───────────────────────────────────────────────────────────────────
+// Every helper is evaluated unconditionally at global scope so its [1] history
+// is complete (v6 and/or short-circuit would otherwise skip calls).
+enteredBroken(int st) =>
+    (st == 3 or st == 5) and not (st[1] == 3 or st[1] == 5)
+enteredRetest(int st) =>
+    (st == 2 or st == 5) and not (st[1] == 2 or st[1] == 5)
+
+bool cUpBrk = enteredBroken(cUpSt) and chartGate
+bool cDnBrk = enteredBroken(cDnSt) and chartGate
+bool cUpRt  = enteredRetest(cUpSt)
+bool cDnRt  = enteredRetest(cDnSt)
+bool b5Su   = enteredBroken(us5S)
+bool b5Sd   = enteredBroken(ds5S)
+bool b10Su  = enteredBroken(us10S)
+bool b10Sd  = enteredBroken(ds10S)
+bool b15Su  = enteredBroken(us15S)
+bool b15Sd  = enteredBroken(ds15S)
+bool b30Su  = enteredBroken(us30S)
+bool b30Sd  = enteredBroken(ds30S)
+bool b1u    = enteredBroken(us1)
+bool b1d    = enteredBroken(ds1)
+bool b5u    = enteredBroken(us5)
+bool b5d    = enteredBroken(ds5)
+bool b15u   = enteredBroken(us15)
+bool b15d   = enteredBroken(ds15)
+bool b60u   = enteredBroken(us60)
+bool b60d   = enteredBroken(ds60)
+bool b240u  = enteredBroken(us240)
+bool b240d  = enteredBroken(ds240)
+bool bDu    = enteredBroken(usD)
+bool bDd    = enteredBroken(dsD)
+bool bWu    = enteredBroken(usW)
+bool bWd    = enteredBroken(dsW)
+
+bool htfUpBreak = (use5S and v5S and b5Su) or (use10S and v10S and b10Su) or (use15S and v15S and b15Su) or (use30S and v30S and b30Su) or (use1 and v1 and b1u) or (use5 and v5 and b5u) or (use15 and v15 and b15u) or (use60 and v60 and b60u) or (use240 and v240 and b240u) or (useD and vD and bDu) or (useW and vW and bWu)
+bool htfDnBreak = (use5S and v5S and b5Sd) or (use10S and v10S and b10Sd) or (use15S and v15S and b15Sd) or (use30S and v30S and b30Sd) or (use1 and v1 and b1d) or (use5 and v5 and b5d) or (use15 and v15 and b15d) or (use60 and v60 and b60d) or (use240 and v240 and b240d) or (useD and vD and bDd) or (useW and vW and bWd)
+
+// Strategies cannot create alertcondition() alerts; the order fills carry
+// alert messages instead (Strategy alert in the alert dialog).
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Strategy
+// ═════════════════════════════════════════════════════════════════════════════
+string G_STRAT = "Strategy entries (Custom profile; Direction, session and dates always apply)"
+string G_RISK  = "Risk and exits (stop and target: Custom profile; trailing: any profile)"
+
+dirMode    = input.string("Both", "Direction", options = ["Both", "Long only", "Short only"], group = G_STRAT,
+     tooltip = "Long only for spot accounts that cannot short (e.g. Bitstamp / Coinbase BTC).")
+useBreakIn = input.bool(true, "Enter on chart-TF swing break", group = G_STRAT,
+     tooltip = "Long when the chart-TF swing high turns Broken (close above the level by more than the break buffer), short when the swing low turns Broken. Includes a re-break after a failed break.")
+maxExtIn   = input.float(1.5, "Max breakout extension (× chart ATR, 0 = off)", minval = 0, maxval = 10, step = 0.25, group = G_STRAT,
+     tooltip = "Skip a breakout whose close is further than this beyond the level: the stop has to sit beyond the level's retest zone, so a very extended entry means a very wide stop and a small position.")
+useFlipIn  = input.bool(true, "Enter on flip retest", group = G_STRAT,
+     tooltip = "Long when the chart-TF swing high is in Flip retest (broken earlier, price left and came back to it from above) and the bar closes above the level; short mirrored on the swing low. One entry per level.")
+useFadeIn  = input.bool(false, "Enter on failed break (fade)", group = G_STRAT,
+     tooltip = "Short when the chart-TF swing high was broken and this TF then closed back below it by more than the break buffer (Failed break); long mirrored on the swing low. The stop is 'Breakout stop' × ATR from the entry. This is the entry the Intraday fade profile uses.")
+useBiasIn  = input.bool(true, "Use higher-TF bias filter", group = G_STRAT,
+     tooltip = "Off: higher-TF rows are shown but do not filter entries. Intraday fade turns it off, Trend keeps it on.")
+biasMinIn  = input.int(0, "Min net higher-TF bias in trade direction", minval = 0, maxval = 11, group = G_STRAT,
+     tooltip = "Net sum of the bias of the visible higher-TF rows (Chart row excluded): +1 per row whose swing high is Broken / Flip retest, −1 per row whose swing low is. Longs need the net sum >= this value, shorts <= minus it. 0 = the net higher-TF bias must not be against the trade (one row for and one against still passes); 1 = net at least one row in the trade direction. A value above the number of higher-TF rows visible on the chart (1H chart: 3, D chart: 1) blocks every entry.")
+allowRev   = input.bool(false, "Allow reversal on any opposite signal", group = G_STRAT,
+     tooltip = "On: any opposite entry signal (break or flip retest) closes the position and opens the other direction. Off: only the opposite chart-TF break reverses, and only when 'Exit on opposite break' is on.")
+exitOnOppIn = input.bool(true, "Exit on opposite chart-TF break (reverse if it qualifies)", group = G_STRAT,
+     tooltip = "A long is closed when the chart-TF swing low turns Broken, a short when the swing high turns Broken. If that break also passes the entry filters, the position is reversed instead of closed, so the breakout is not lost.")
+maxBars    = input.int(0, "Time stop: close after N bars (0 = off)", minval = 0, group = G_STRAT)
+sessIn     = input.session("0000-0000", "Trading session (New York time)", group = G_STRAT,
+     tooltip = "Entries only inside this session on intraday charts; ignored on D and above. 0000-0000 = always. Exits are always active.")
+startDate  = input.time(timestamp("2000-01-01T00:00:00"), "Backtest start", group = G_STRAT)
+endDate    = input.time(timestamp("2030-12-31T00:00:00"), "Backtest end",   group = G_STRAT)
+
+stopMode   = input.string("ATR", "Breakout stop placement", options = ["ATR", "Structure"], group = G_RISK,
+     tooltip = "ATR: the wider of entry − 'Breakout stop' × ATR and the far edge of the broken level's retest zone (level − retest band − break buffer), so a normal retest does not stop the trade. Structure: beyond the opposite chart-TF swing plus its buffer, but never inside the retest zone (a swing inside the zone gives the zone edge); falls back to ATR when that swing is missing, at or beyond the entry, or the stop would be further than 'Max structure stop'. Flip-retest entries always stop just beyond the retested level's zone.")
+stopAtrIn  = input.float(1.5, "Breakout stop (× chart ATR)", minval = 0.25, maxval = 10, step = 0.25, group = G_RISK,
+     tooltip = "1.5 × ATR: about $25 on 1H gold (autumn 2026), $780 on 1H BTC.")
+minStopAtr = input.float(0.5, "Min stop distance (× chart ATR)", minval = 0.1, maxval = 5, step = 0.05, group = G_RISK,
+     tooltip = "Safety floor on every initial stop distance. With the default ATR band the retest zone (about 0.65 × ATR) is already wider, so this only acts with a retest band below about 0.35 × ATR or in Percent band mode, where the zone can be much narrower than 0.5 × ATR. It is also the closest a Chandelier trailing stop can get to the close, in any trail unit.")
+maxStopAtr = input.float(4.0, "Max structure stop (× chart ATR)", minval = 1, maxval = 20, step = 0.5, group = G_RISK)
+rrTargetIn = input.float(2.0, "Target (R multiple, 0 = none)", minval = 0, maxval = 20, step = 0.25, group = G_RISK)
+beRIn      = input.float(1.0, "Move stop to breakeven at (R, 0 = off)", minval = 0, maxval = 10, step = 0.25, group = G_RISK,
+     tooltip = "Once a bar has reached this many R in favour and closed beyond the entry price, the stop moves to the entry price.")
+trailModeIn = input.string("Profile", "Trailing stop", options = ["Profile", "Off", "Swing", "Chandelier", "From close"], group = G_RISK,
+     tooltip = "Profile: the strategy profile's trailing (Trend: Chandelier 4 ATR from +1 R; Intraday fade and Custom: off). Any other choice applies on top of every profile, including the calibrated ones (their backtest results assume Profile). Swing: the stop steps behind each new chart-TF swing that forms after the entry (long: under each new swing low minus the break buffer; short: above each new swing high). Chandelier: best price since entry − distance. From close: close − distance (long; mirrored for shorts). The stop moves on the bar close and only ratchets toward price. Combine with Target 0 to let winners run.")
+trailUnitIn = input.string("ATR", "Trail units", options = ["ATR", "Points", "Ticks"], group = G_RISK,
+     tooltip = "Units of 'Trail distance' and 'Start trailing at'. ATR: distance in × chart ATR, start in R (multiples of the initial stop distance). Points: both in price units (1 point = $1 on XAUUSD, 1 point = $1 on BTCUSD; on futures 1 point is worth the contract's point value). Ticks: both in the chart symbol's minimum price step (syminfo.mintick; Pine's own trail_points also uses ticks): 0.001 on OANDA:XAUUSD, so $5 = 5000 ticks there, 0.01 on 2-decimal gold CFDs (500 ticks), 0.1 on GC / MGC (50 ticks). Ticks equal MetaTrader points only when your MetaTrader symbol has as many decimals as the chart symbol; Points avoids the question. The Data Window shows the trail distance in price.")
+trailDistIn = input.float(3.0, "Trail distance", minval = 0.0001, step = 0.25, group = G_RISK,
+     tooltip = "Used by Chandelier and From close, in 'Trail units'. ATR: 3 ≈ $50 on 1H gold. Points: e.g. 5 = $5 on gold, 500 = $500 on BTC. Ticks: e.g. 5000 ticks = $5 on OANDA:XAUUSD (tick 0.001). One ATR(14) on OANDA gold, Sep-Oct 2026: 1m ≈ $2 and 5m ≈ $4.5 (estimated), 30m ≈ $11-13, 1H ≈ $16-19, 4H ≈ $36-38, D ≈ $95-105, W ≈ $225-245; it was about 3-9 times smaller in 2015-2020, so a fixed point distance only suits short backtests (it does not follow volatility). Chandelier never puts the stop closer to the close than 'Min stop distance' × ATR (0.5 ATR ≈ $1 on 1m, $2.3 on 5m, $6 on 30m, $8 on 1H gold), in every unit, so a smaller Chandelier distance acts like close − that floor (it cannot trail tighter); From close has no such floor.")
+trailStartIn = input.float(0.0, "Start trailing at", minval = 0, step = 0.25, group = G_RISK,
+     tooltip = "Trailing starts once the best price since entry has been this far in profit: R with ATR units, price points with Points, ticks with Ticks (5000 = $5 on OANDA:XAUUSD). 0 = trailing is active at once (the stop can first move on the bar after entry).")
+riskPct    = input.float(1.0, "Risk per trade (% of equity)", minval = 0.05, maxval = 10, step = 0.05, group = G_RISK,
+     tooltip = "Size = equity × risk % ÷ (stop distance × point value): ounces / BTC on CFD and spot symbols, contracts on futures (GC, MGC, BTC, MBT). The same 1 % means the same account risk on gold and on bitcoin. Commission and slippage come on top. Futures need enough equity for one whole contract: at 1 % on 1H about $25k for MGC, $250k for GC and $400k for CME BTC; smaller sizes round to 0 and the signal is skipped (counted in the Data Window).")
+maxLev     = input.float(10, "Max position size (× equity)", minval = 0.1, maxval = 100, step = 0.5, group = G_RISK,
+     tooltip = "Caps the notional at this multiple of equity. 1 % risk with a 1.5-ATR breakout stop needs about 2× on 1H gold and 4-6× on 5m-15m gold; flip-retest stops are tighter (0.65-1.15 ATR) and need about 2-4× on 1H gold and 8-14× on 5m gold (gold near $4,200, Sep-Oct 2026 ATR). 10 suits a gold CFD or BTC perpetual account; set 1 for spot BTC without leverage. When the cap binds, the trade risks less than 'Risk per trade'.")
+qtyStep    = input.float(0, "Quantity step (0 = no rounding)", minval = 0, step = 0.0001, group = G_RISK,
+     tooltip = "Round the size down to your broker's lot step: 1 for OANDA gold (whole ounces), 0.01 for many gold CFDs, 0.0001 for BTC. Futures are always rounded down to whole contracts. A size that rounds to 0 skips the trade.")
+
+// Effective strategy settings: the calibrated profile overrides the inputs above.
+bool   useBreak    = isFadeP ? false : isTrendP ? true  : useBreakIn
+bool   useFlip     = isFadeP ? false : isTrendP ? true  : useFlipIn
+bool   useFade     = isFadeP ? true  : isTrendP ? false : useFadeIn
+bool   useBias     = isFadeP ? false : isTrendP ? true  : useBiasIn
+int    biasMin     = isFadeP or isTrendP ? 0 : biasMinIn
+float  maxExt      = isFadeP or isTrendP ? 1.5 : maxExtIn
+bool   exitOnOpp   = isFadeP or isTrendP ? true : exitOnOppIn
+float  stopAtr     = isFadeP ? 1.5 : isTrendP ? 1.0 : stopAtrIn
+float  rrTarget    = isFadeP ? 1.0 : isTrendP ? 0.0 : rrTargetIn
+float  beR         = isFadeP or isTrendP ? 0.0 : beRIn
+// Trailing: "Profile" keeps the profile's own (Trend: chandelier 4 ATR from +1 R,
+// otherwise off); any other choice overrides every profile with the inputs.
+bool   trailProf   = trailModeIn == "Profile"
+string trailMode   = trailProf ? (isTrendP ? "Chandelier" : "Off") : trailModeIn
+string trailUnit   = trailProf ? "ATR" : trailUnitIn
+float  trailDist   = trailProf ? 4.0 : trailDistIn
+float  trailStart  = trailProf ? 1.0 : trailStartIn
+bool   profShortOk = not isTrendP           // the gold Trend profile is long only
+
+// ── Filters ──────────────────────────────────────────────────────────────────
+// Higher-TF bias only: the chart row's own break is the trigger, not the filter.
+// Trend filters on every valid higher-TF row (as calibrated), even rows hidden
+// in the table; Custom keeps using the rows that are switched on.
+int  htfBiasAll = (v5S ? biasOf(us5S, ds5S) : 0) + (v10S ? biasOf(us10S, ds10S) : 0) + (v15S ? biasOf(us15S, ds15S) : 0) + (v30S ? biasOf(us30S, ds30S) : 0) + (v1 ? biasOf(us1, ds1) : 0) + (v5 ? biasOf(us5, ds5) : 0) + (v15 ? biasOf(us15, ds15) : 0) + (v60 ? biasOf(us60, ds60) : 0) + (v240 ? biasOf(us240, ds240) : 0) + (vD ? biasOf(usD, dsD) : 0) + (vW ? biasOf(usW, dsW) : 0)
+int  htfBias = isTrendP ? htfBiasAll : bias - (useChart ? biasOf(cUpSt, cDnSt) : 0)
+bool inRange = time >= startDate and time <= endDate
+bool inSess  = timeframe.isdwm or sessIn == "0000-0000" or not na(time(timeframe.period, sessIn, "America/New_York"))
+
+// Same rollover window as the fractal filter, applied to the chart bar.
+string chartRollSess = chartSec >= 3600 ? "1600-1820:1234567" : chartSec >= 1800 ? "1630-1820:1234567" : "1640-1820:1234567"
+int    chartRollT    = na
+if rollOn and chartSec <= 3600 and not timeframe.isticks
+    chartRollT := time(timeframe.period, chartRollSess, "America/New_York")
+bool   chartRoll     = not na(chartRollT)
+
+bool isLong   = strategy.position_size > 0
+bool isShort  = strategy.position_size < 0
+bool flat     = strategy.position_size == 0
+bool canEnter = inRange and inSess and not chartRoll
+
+// ── Signals ──────────────────────────────────────────────────────────────────
+var int lastFlipUpT = na
+var int lastFlipDnT = na
+
+bool longBreakSig  = useBreak and cUpBrk and (maxExt == 0 or close - cUpL <= maxExt * cAtr)
+bool shortBreakSig = useBreak and cDnBrk and (maxExt == 0 or cDnL - close <= maxExt * cAtr)
+bool longFlipSig   = useFlip and cUpSt == 5 and close > cUpL and (na(lastFlipUpT) or cUpT != lastFlipUpT)
+bool shortFlipSig  = useFlip and cDnSt == 5 and close < cDnL and (na(lastFlipDnT) or cDnT != lastFlipDnT)
+// Failed break of the chart-TF swing (this TF closed back through the level by the buffer)
+bool longFadeSig   = useFade and cDnB == 2 and cDnB[1] == 1   // swing low broke and failed: long
+bool shortFadeSig  = useFade and cUpB == 2 and cUpB[1] == 1   // swing high broke and failed: short
+bool wantLong      = (longBreakSig or longFlipSig or longFadeSig) and (not useBias or htfBias >= biasMin) and dirMode != "Short only"
+bool wantShort     = (shortBreakSig or shortFlipSig or shortFadeSig) and (not useBias or htfBias <= -biasMin) and dirMode != "Long only" and profShortOk
+// Both directions on one bar (the close sits between a swing high that lies
+// below a swing low) can only pass the bias filter when the net bias is 0.
+// In a position, the signal in its own direction cannot trade anyway, so only
+// that one is dropped and an opposite-break reversal still goes through; when
+// flat the direction is ambiguous and both are skipped.
+if wantLong and wantShort
+    if isLong
+        wantLong := false
+    else if isShort
+        wantShort := false
+    else
+        wantLong  := false
+        wantShort := false
+
+bool oppL     = exitOnOpp and isLong and cDnBrk     // swing low broke while long
+bool oppS     = exitOnOpp and isShort and cUpBrk    // swing high broke while short
+bool canLong  = canEnter and wantLong  and (flat or (isShort and (allowRev or (oppS and longBreakSig))))
+bool canShort = canEnter and wantShort and (flat or (isLong and (allowRev or (oppL and shortBreakSig))))
+
+// ── Stops and sizing ─────────────────────────────────────────────────────────
+// The retest zone of a level: retest band + break buffer beyond it.
+zoneOf(float lvl) =>
+    float buf = breakBuf(lvl, cAtr)
+    math.max(retestBand(lvl, cAtr), buf) + buf
+
+longStopFor(bool isBreak) =>
+    float zoneStp = cUpL - zoneOf(cUpL)
+    float st = zoneStp
+    if isBreak
+        float atrStp    = math.min(close - stopAtr * cAtr, zoneStp)
+        float rawStp    = na(cDnL) ? na : cDnL - breakBuf(cDnL, cAtr)
+        float structStp = na(rawStp) ? na : math.min(rawStp, zoneStp)
+        bool  structOk  = stopMode == "Structure" and not na(cDnL) and cDnL < close and close - structStp <= maxStopAtr * cAtr
+        st := structOk ? structStp : atrStp
+    math.min(st, close - minStopAtr * cAtr)
+
+shortStopFor(bool isBreak) =>
+    float zoneStp = cDnL + zoneOf(cDnL)
+    float st = zoneStp
+    if isBreak
+        float atrStp    = math.max(close + stopAtr * cAtr, zoneStp)
+        float rawStp    = na(cUpL) ? na : cUpL + breakBuf(cUpL, cAtr)
+        float structStp = na(rawStp) ? na : math.max(rawStp, zoneStp)
+        bool  structOk  = stopMode == "Structure" and not na(cUpL) and cUpL > close and structStp - close <= maxStopAtr * cAtr
+        st := structOk ? structStp : atrStp
+    math.max(st, close + minStopAtr * cAtr)
+
+float riskCash = strategy.equity * riskPct / 100.0
+bool  isFutSym = syminfo.type == "futures"
+
+qtyFor(float stopDist) =>
+    float q = stopDist > 0 and riskCash > 0 ? riskCash / (stopDist * syminfo.pointvalue) : na
+    if not na(q)
+        q := math.min(q, strategy.equity * maxLev / (close * syminfo.pointvalue))
+        if isFutSym
+            q := math.floor(q)
+        else if qtyStep > 0
+            q := math.floor(q / qtyStep) * qtyStep
+    q
+
+msgOf(string what) =>
+    "MTF Fractals: " + what + " " + syminfo.ticker + " at " + fmtPx(close)
+
+var float lStop    = na
+var float lTp      = na
+var float lRisk    = na
+var float sStop    = na
+var float sTp      = na
+var float sRisk    = na
+var int   entryBar = na
+var int   entryT   = na     // open time of the entry bar (swings after it can trail)
+var float lBest    = na     // highest high since a long entry
+var float sBest    = na     // lowest low since a short entry
+var bool  lTrailOn = false
+var bool  sTrailOn = false
+var bool  lTrailed = false  // the trail has moved the stop (exit labelled "trail")
+var bool  sTrailed = false
+var int   nSkipped = 0      // signals dropped because the size rounded to 0
+var int   skipFlipUpT = na  // flip level already counted as skipped
+var int   skipFlipDnT = na
+
+// ── Entries (a reversal closes the open position in the same order) ─────────
+bool didLong  = false
+bool didShort = false
+if canLong
+    bool  lFadeOnly = not longBreakSig and not longFlipSig
+    float st   = lFadeOnly ? close - math.max(stopAtr, minStopAtr) * cAtr : longStopFor(longBreakSig)
+    float dist = close - st
+    float q    = qtyFor(dist)
+    if na(q) or q <= 0
+        if longBreakSig or lFadeOnly or na(skipFlipUpT) or cUpT != skipFlipUpT
+            nSkipped += 1
+        if longFlipSig and not longBreakSig
+            skipFlipUpT := cUpT
+    else
+        lStop    := st
+        lRisk    := dist
+        entryT   := time
+        lBest    := na
+        lTrailOn := false
+        lTrailed := false
+        lTp      := rrTarget > 0 ? close + rrTarget * dist : na
+        entryBar := bar_index
+        didLong  := true
+        if longFlipSig and not longBreakSig
+            lastFlipUpT := cUpT
+        strategy.entry("L", strategy.long, qty = q, comment = longBreakSig ? "L break" : longFlipSig ? "L flip" : "L fade", alert_message = msgOf(isShort ? "REVERSE short to LONG" : "LONG") + " · position " + str.tostring(q) + " · stop " + fmtPx(lStop) + " · target " + fmtPx(lTp))
+        strategy.exit("L-X", "L", stop = lStop, limit = lTp, comment_loss = "L stop", comment_profit = "L target", alert_message = "MTF Fractals: long exit " + syminfo.ticker + " (stop " + fmtPx(lStop) + ", target " + fmtPx(lTp) + ")")
+
+if canShort
+    bool  sFadeOnly = not shortBreakSig and not shortFlipSig
+    float st   = sFadeOnly ? close + math.max(stopAtr, minStopAtr) * cAtr : shortStopFor(shortBreakSig)
+    float dist = st - close
+    float q    = qtyFor(dist)
+    if na(q) or q <= 0
+        if shortBreakSig or sFadeOnly or na(skipFlipDnT) or cDnT != skipFlipDnT
+            nSkipped += 1
+        if shortFlipSig and not shortBreakSig
+            skipFlipDnT := cDnT
+    else
+        sStop    := st
+        sRisk    := dist
+        entryT   := time
+        sBest    := na
+        sTrailOn := false
+        sTrailed := false
+        sTp      := rrTarget > 0 ? close - rrTarget * dist : na
+        entryBar := bar_index
+        didShort := true
+        if shortFlipSig and not shortBreakSig
+            lastFlipDnT := cDnT
+        strategy.entry("S", strategy.short, qty = q, comment = shortBreakSig ? "S break" : shortFlipSig ? "S flip" : "S fade", alert_message = msgOf(isLong ? "REVERSE long to SHORT" : "SHORT") + " · position " + str.tostring(q) + " · stop " + fmtPx(sStop) + " · target " + fmtPx(sTp))
+        strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
+
+// ── Exit management while in a position (skipped on a reversal bar) ──────────
+// Trail distance and start threshold in price, from the chosen units.
+float trailPx = trailUnit == "Points" ? trailDist : trailUnit == "Ticks" ? trailDist * syminfo.mintick : trailDist * cAtr
+
+trailStartPx(float risk) =>
+    trailUnit == "Points" ? trailStart : trailUnit == "Ticks" ? trailStart * syminfo.mintick : trailStart * risk
+
+if isLong and not didShort
+    float ep = strategy.position_avg_price
+    if beR > 0 and not na(lRisk) and high >= ep + beR * lRisk and close > ep
+        lStop := math.max(lStop, ep)
+    lBest := na(lBest) ? high : math.max(lBest, high)
+    if trailMode != "Off" and not lTrailOn and not na(lRisk) and lBest - ep >= trailStartPx(lRisk)
+        lTrailOn := true
+    if lTrailOn
+        float lPrev = lStop
+        if trailMode == "From close"
+            lStop := math.max(lStop, close - trailPx)
+        else if trailMode == "Chandelier"
+            lStop := math.max(lStop, math.min(lBest - trailPx, close - minStopAtr * cAtr))
+        else if trailMode == "Swing" and cDnHit and not na(cDnT) and cDnT > entryT
+            float swStp = cDnL - breakBuf(cDnL, cAtr)
+            if swStp < close
+                lStop := math.max(lStop, swStp)
+        if lStop > lPrev
+            lTrailed := true
+    strategy.exit("L-X", "L", stop = lStop, limit = lTp, comment_loss = lTrailed ? "L trail" : "L stop", comment_profit = "L target", alert_message = "MTF Fractals: long exit " + syminfo.ticker + " (stop " + fmtPx(lStop) + ", target " + fmtPx(lTp) + ")")
+    bool timeL = maxBars > 0 and not na(entryBar) and bar_index - entryBar >= maxBars
+    if oppL or timeL
+        strategy.close("L", comment = oppL ? "L opp break" : "L time", alert_message = msgOf("long closed"))
+
+if isShort and not didLong
+    float ep = strategy.position_avg_price
+    if beR > 0 and not na(sRisk) and low <= ep - beR * sRisk and close < ep
+        sStop := math.min(sStop, ep)
+    sBest := na(sBest) ? low : math.min(sBest, low)
+    if trailMode != "Off" and not sTrailOn and not na(sRisk) and ep - sBest >= trailStartPx(sRisk)
+        sTrailOn := true
+    if sTrailOn
+        float sPrev = sStop
+        if trailMode == "From close"
+            sStop := math.min(sStop, close + trailPx)
+        else if trailMode == "Chandelier"
+            sStop := math.min(sStop, math.max(sBest + trailPx, close + minStopAtr * cAtr))
+        else if trailMode == "Swing" and cUpHit and not na(cUpT) and cUpT > entryT
+            float swStp = cUpL + breakBuf(cUpL, cAtr)
+            if swStp > close
+                sStop := math.min(sStop, swStp)
+        if sStop < sPrev
+            sTrailed := true
+    strategy.exit("S-X", "S", stop = sStop, limit = sTp, comment_loss = sTrailed ? "S trail" : "S stop", comment_profit = "S target", alert_message = "MTF Fractals: short exit " + syminfo.ticker + " (stop " + fmtPx(sStop) + ", target " + fmtPx(sTp) + ")")
+    bool timeS = maxBars > 0 and not na(entryBar) and bar_index - entryBar >= maxBars
+    if oppS or timeS
+        strategy.close("S", comment = oppS ? "S opp break" : "S time", alert_message = msgOf("short closed"))
+
+// ── Stop / target lines while in a trade ─────────────────────────────────────
+plot(strategy.position_size > 0 ? lStop : na, "Long stop",    color = color.new(color.red, 0),   style = plot.style_linebr, linewidth = 1)
+plot(strategy.position_size > 0 ? lTp   : na, "Long target",  color = color.new(color.green, 0), style = plot.style_linebr, linewidth = 1)
+plot(strategy.position_size < 0 ? sStop : na, "Short stop",   color = color.new(color.red, 0),   style = plot.style_linebr, linewidth = 1)
+plot(strategy.position_size < 0 ? sTp   : na, "Short target", color = color.new(color.green, 0), style = plot.style_linebr, linewidth = 1)
+
+// ── Skipped signals ──────────────────────────────────────────────────────────
+plot(nSkipped, "Signals skipped (size 0)", display = display.data_window)
+plot(trailMode == "Chandelier" or trailMode == "From close" ? trailPx : na, "Trail distance (price)", display = display.data_window)
+var label skipLab = na
+if barstate.islast
+    label.delete(skipLab)
+    if nSkipped > 0
+        skipLab := label.new(bar_index, high, str.tostring(nSkipped) + " signal(s) skipped: size rounded to 0" + (isFutSym ? " contracts" : "") + ".\nRaise Initial capital, Risk per trade or Max position size.", xloc = xloc.bar_index, yloc = yloc.abovebar, style = label.style_label_down, color = color.new(color.orange, 20), textcolor = color.white, size = lblSz)
