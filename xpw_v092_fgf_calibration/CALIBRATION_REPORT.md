@@ -6,18 +6,18 @@ Presets in `presets/` are the input combinations that stayed profitable in-sampl
 
 | Symbol | TF | Bars | Data window | Combos evaluated | Pass IS+OOS | Pass 2x-cost stress | Saved presets | Reference-preset net (USD/0.01 lot) |
 |---|---|---:|---|---:|---:|---:|---:|---:|
-| BTCUSD | H1 | 33599 | 2023-01..2026-10 | 2001 | 67 | 56 | 3 | -699.26 (1982 trades, PF 0.768) |
-| BTCUSD | H4 | 8401 | 2023-01..2026-10 | 1846 | 223 | 80 | 3 | -1.37 (499 trades, PF 0.998) |
-| BTCUSD | M1 | 2015920 | 2023-01..2026-10 | 680 | 0 | 0 | 0 | -3534.65 (15476 trades, PF 0.839) |
-| BTCUSD | M15 | 134395 | 2023-01..2026-10 | 2009 | 51 | 45 | 3 | -757.8 (4130 trades, PF 0.871) |
-| BTCUSD | M30 | 67198 | 2023-01..2026-10 | 2072 | 155 | 80 | 3 | -689.46 (2854 trades, PF 0.836) |
-| BTCUSD | M5 | 403184 | 2023-01..2026-10 | 1331 | 52 | 48 | 3 | -1086.36 (7057 trades, PF 0.891) |
-| XAUUSD | H1 | 22999 | 2023-01..2026-10 | 1793 | 75 | 75 | 3 | -1152.86 (920 trades, PF 0.859) |
-| XAUUSD | H4 | 6000 | 2023-01..2026-10 | 2093 | 539 | 80 | 3 | 324.67 (268 trades, PF 1.158) |
-| XAUUSD | M1 | 540900 | 2025-05..2026-10 (cent-precision gold proxy only) | 590 | 113 | 13 | 3 | 1047.82 (2929 trades, PF 1.052) |
-| XAUUSD | M15 | 36060 | 2025-05..2026-10 (cent-precision gold proxy only) | 2047 | 104 | 80 | 3 | 179.14 (802 trades, PF 1.027) |
-| XAUUSD | M30 | 45998 | 2023-01..2026-10 | 1745 | 55 | 53 | 3 | -0.84 (1304 trades, PF 1.0) |
-| XAUUSD | M5 | 108180 | 2025-05..2026-10 (cent-precision gold proxy only) | 1390 | 133 | 80 | 3 | -230.97 (1320 trades, PF 0.979) |
+| BTCUSD | H1 | 33599 | 2023-01..2026-10 | 1946 | 110 | 80 | 3 | -699.26 (1982 trades, PF 0.768) |
+| BTCUSD | H4 | 8401 | 2023-01..2026-10 | 1845 | 270 | 80 | 3 | -1.37 (499 trades, PF 0.998) |
+| BTCUSD | M1 | 2015920 | 2023-01..2026-10 | 677 | 0 | 0 | 0 | -3534.65 (15476 trades, PF 0.839) |
+| BTCUSD | M15 | 134395 | 2023-01..2026-10 | 2122 | 58 | 50 | 3 | -757.8 (4130 trades, PF 0.871) |
+| BTCUSD | M30 | 67198 | 2023-01..2026-10 | 2009 | 205 | 80 | 3 | -689.46 (2854 trades, PF 0.836) |
+| BTCUSD | M5 | 403184 | 2023-01..2026-10 | 1348 | 12 | 11 | 3 | -1086.36 (7057 trades, PF 0.891) |
+| XAUUSD | H1 | 22999 | 2023-01..2026-10 | 1768 | 59 | 59 | 3 | -1152.86 (920 trades, PF 0.859) |
+| XAUUSD | H4 | 6000 | 2023-01..2026-10 | 1950 | 383 | 80 | 3 | 324.67 (268 trades, PF 1.158) |
+| XAUUSD | M1 | 540900 | 2025-05..2026-10 (cent-precision gold proxy only) | 609 | 116 | 10 | 3 | 1047.82 (2929 trades, PF 1.052) |
+| XAUUSD | M15 | 36060 | 2025-05..2026-10 (cent-precision gold proxy only) | 2040 | 151 | 78 | 3 | 179.14 (802 trades, PF 1.027) |
+| XAUUSD | M30 | 45998 | 2023-01..2026-10 | 1736 | 40 | 40 | 3 | -0.84 (1304 trades, PF 1.0) |
+| XAUUSD | M5 | 108180 | 2025-05..2026-10 (cent-precision gold proxy only) | 1294 | 98 | 80 | 3 | -230.97 (1320 trades, PF 0.979) |
 
 ## Accepted presets
 
@@ -25,75 +25,75 @@ Profit figures are USD per 0.01 lot (gold: 1 oz; BTC: 0.01 BTC) after modeled sp
 
 | Preset | Clock | IS trades | IS net | IS PF | IS win | IS maxDD | OOS trades | OOS net | OOS PF | OOS win | OOS maxDD | 2x-cost net | 2x PF | Avg/trade | Note |
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| `BTCUSD_H1_rank1.set` | tester-only | 265 | 715 | 1.38 | 0.35 | 171 | 200 | 479 | 1.36 | 0.40 | 145 | 913 | 1.27 | 2.57 |  |
-| `BTCUSD_H1_rank2.set` | tester-only | 284 | 700 | 1.37 | 0.50 | 231 | 153 | 396 | 1.32 | 0.50 | 141 | 1042 | 1.33 | 2.51 |  |
-| `BTCUSD_H1_rank3.set` | tester-only | 470 | 729 | 1.30 | 0.32 | 185 | 271 | 371 | 1.20 | 0.37 | 237 | 669 | 1.15 | 1.49 |  |
-| `BTCUSD_H4_rank1.set` | tester-only | 35 | 843 | 2.69 | 0.54 | 121 | 20 | 641 | 2.38 | 0.50 | 256 | 1472 | 2.52 | 26.98 |  |
-| `BTCUSD_H4_rank2.set` | tester-only | 39 | 925 | 2.65 | 0.54 | 108 | 19 | 456 | 2.10 | 0.42 | 174 | 1368 | 2.40 | 23.80 |  |
-| `BTCUSD_H4_rank3.set` | tester-only | 50 | 753 | 2.36 | 0.60 | 105 | 24 | 650 | 3.10 | 0.58 | 91 | 1385 | 2.60 | 18.96 |  |
-| `BTCUSD_M15_rank1.set` | tester-only | 286 | 513 | 1.27 | 0.44 | 318 | 169 | 346 | 1.23 | 0.41 | 223 | 591 | 1.17 | 1.89 |  |
-| `BTCUSD_M15_rank2.set` | tester-only | 322 | 424 | 1.25 | 0.42 | 210 | 190 | 257 | 1.21 | 0.45 | 206 | 424 | 1.13 | 1.33 |  |
-| `BTCUSD_M15_rank3.set` | tester-only | 361 | 442 | 1.22 | 0.43 | 211 | 221 | 420 | 1.30 | 0.43 | 163 | 802 | 1.23 | 1.48 |  |
-| `BTCUSD_M30_rank1.set` | tester-only | 112 | 779 | 1.57 | 0.34 | 304 | 58 | 706 | 1.92 | 0.31 | 192 | 1407 | 1.65 | 8.73 |  |
-| `BTCUSD_M30_rank2.set` | tester-only | 196 | 671 | 1.94 | 0.37 | 79 | 101 | 348 | 1.73 | 0.32 | 44 | 939 | 1.76 | 3.43 |  |
-| `BTCUSD_M30_rank3.set` | tester-only | 105 | 796 | 1.73 | 0.30 | 150 | 54 | 363 | 1.45 | 0.26 | 273 | 1128 | 1.59 | 7.29 |  |
-| `BTCUSD_M5_rank1.set` | live | 407 | 879 | 1.27 | 0.20 | 232 | 251 | 827 | 1.42 | 0.22 | 256 | 1481 | 1.28 | 2.59 |  |
-| `BTCUSD_M5_rank2.set` | live | 447 | 775 | 1.21 | 0.20 | 213 | 255 | 607 | 1.30 | 0.21 | 173 | 802 | 1.14 | 1.97 |  |
-| `BTCUSD_M5_rank3.set` | live | 436 | 766 | 1.22 | 0.20 | 264 | 268 | 596 | 1.28 | 0.20 | 224 | 1061 | 1.18 | 1.93 |  |
-| `XAUUSD_H1_rank1.set` | tester-only | 59 | 1246 | 1.80 | 0.47 | 202 | 101 | 844 | 1.27 | 0.39 | 513 | 2083 | 1.44 | 13.06 |  |
-| `XAUUSD_H1_rank2.set` | tester-only | 166 | 1140 | 1.50 | 0.23 | 283 | 157 | 1585 | 1.33 | 0.21 | 864 | 2861 | 1.41 | 8.43 |  |
-| `XAUUSD_H1_rank3.set` | tester-only | 319 | 936 | 1.46 | 0.49 | 233 | 133 | 1175 | 1.50 | 0.52 | 308 | 1953 | 1.44 | 4.67 |  |
-| `XAUUSD_H4_rank1.set` | tester-only | 151 | 1889 | 2.60 | 0.45 | 179 | 103 | 4316 | 3.20 | 0.48 | 534 | 6143 | 2.93 | 24.43 |  |
-| `XAUUSD_H4_rank2.set` | tester-only | 124 | 1883 | 2.77 | 0.43 | 171 | 86 | 3240 | 2.61 | 0.45 | 638 | 5076 | 2.64 | 24.40 |  |
-| `XAUUSD_H4_rank3.set` | tester-only | 140 | 1851 | 2.51 | 0.48 | 180 | 101 | 4268 | 3.14 | 0.47 | 541 | 6045 | 2.85 | 25.39 |  |
-| `XAUUSD_M1_rank1.set` | live | 7005 | 2632 | 1.20 | 0.60 | 275 | 5243 | 1759 | 1.24 | 0.60 | 112 | 929 | 1.04 | 0.36 | cost-fragile |
-| `XAUUSD_M1_rank2.set` | live | 439 | 2752 | 1.67 | 0.08 | 876 | 202 | 1104 | 1.57 | 0.08 | 1165 | 3823 | 1.62 | 6.01 |  |
-| `XAUUSD_M1_rank3.set` | live | 2363 | 2299 | 1.37 | 0.63 | 305 | 1545 | 1253 | 1.50 | 0.65 | 52 | 2623 | 1.27 | 0.91 |  |
-| `XAUUSD_M15_rank1.set` | tester-only | 1272 | 1884 | 1.30 | 0.30 | 296 | 906 | 1186 | 1.25 | 0.26 | 345 | 2596 | 1.23 | 1.41 |  |
-| `XAUUSD_M15_rank2.set` | tester-only | 129 | 1136 | 1.55 | 0.63 | 456 | 84 | 1004 | 1.77 | 0.73 | 261 | 2164 | 1.64 | 10.05 |  |
-| `XAUUSD_M15_rank3.set` | tester-only | 535 | 1847 | 1.27 | 0.44 | 642 | 352 | 868 | 1.20 | 0.47 | 315 | 2267 | 1.20 | 3.06 |  |
-| `XAUUSD_M30_rank1.set` | tester-only | 231 | 1615 | 1.80 | 0.24 | 178 | 185 | 1427 | 1.40 | 0.23 | 595 | 2805 | 1.50 | 7.31 |  |
-| `XAUUSD_M30_rank2.set` | tester-only | 163 | 1134 | 1.87 | 0.24 | 190 | 104 | 1579 | 1.83 | 0.26 | 313 | 2441 | 1.75 | 10.16 |  |
-| `XAUUSD_M30_rank3.set` | tester-only | 370 | 1854 | 1.77 | 0.44 | 159 | 253 | 872 | 1.22 | 0.40 | 346 | 2575 | 1.40 | 4.38 |  |
-| `XAUUSD_M5_rank1.set` | live | 916 | 2611 | 1.29 | 0.28 | 505 | 559 | 1492 | 1.25 | 0.29 | 337 | 3504 | 1.23 | 2.78 |  |
-| `XAUUSD_M5_rank2.set` | live | 1322 | 2589 | 1.26 | 0.50 | 355 | 860 | 1488 | 1.23 | 0.50 | 293 | 3087 | 1.18 | 1.87 |  |
-| `XAUUSD_M5_rank3.set` | live | 1322 | 2530 | 1.25 | 0.50 | 346 | 860 | 1488 | 1.23 | 0.50 | 293 | 3028 | 1.17 | 1.84 |  |
+| `BTCUSD_H1_rank1.set` | tester-only | 317 | 805 | 1.37 | 0.40 | 291 | 199 | 407 | 1.25 | 0.43 | 192 | 1105 | 1.29 | 2.35 |  |
+| `BTCUSD_H1_rank2.set` | tester-only | 88 | 442 | 1.96 | 0.59 | 89 | 35 | 309 | 2.28 | 0.60 | 74 | 789 | 2.09 | 6.11 |  |
+| `BTCUSD_H1_rank3.set` | tester-only | 158 | 645 | 1.78 | 0.54 | 123 | 77 | 295 | 1.51 | 0.53 | 188 | 858 | 1.60 | 4.00 |  |
+| `BTCUSD_H4_rank1.set` | tester-only | 25 | 1076 | 5.44 | 0.64 | 102 | 16 | 617 | 3.07 | 0.56 | 105 | 1684 | 4.11 | 41.29 |  |
+| `BTCUSD_H4_rank2.set` | tester-only | 28 | 1118 | 4.50 | 0.68 | 81 | 18 | 633 | 2.79 | 0.61 | 125 | 1741 | 3.58 | 38.06 |  |
+| `BTCUSD_H4_rank3.set` | tester-only | 28 | 1118 | 4.50 | 0.68 | 81 | 17 | 625 | 2.78 | 0.59 | 125 | 1734 | 3.58 | 38.73 |  |
+| `BTCUSD_M15_rank1.set` | tester-only | 341 | 457 | 1.24 | 0.43 | 192 | 208 | 524 | 1.44 | 0.43 | 128 | 864 | 1.27 | 1.79 |  |
+| `BTCUSD_M15_rank2.set` | tester-only | 324 | 444 | 1.27 | 0.43 | 210 | 190 | 257 | 1.21 | 0.45 | 206 | 444 | 1.14 | 1.36 |  |
+| `BTCUSD_M15_rank3.set` | tester-only | 186 | 593 | 2.06 | 0.61 | 73 | 99 | 203 | 1.42 | 0.53 | 90 | 745 | 1.70 | 2.79 |  |
+| `BTCUSD_M30_rank1.set` | tester-only | 236 | 709 | 1.65 | 0.34 | 129 | 116 | 345 | 1.55 | 0.28 | 76 | 962 | 1.55 | 2.99 |  |
+| `BTCUSD_M30_rank2.set` | tester-only | 165 | 548 | 1.67 | 0.32 | 129 | 86 | 340 | 1.72 | 0.27 | 54 | 782 | 1.59 | 3.54 |  |
+| `BTCUSD_M30_rank3.set` | tester-only | 217 | 823 | 1.83 | 0.35 | 122 | 104 | 311 | 1.55 | 0.27 | 68 | 1040 | 1.65 | 3.53 |  |
+| `BTCUSD_M5_rank1.set` | live | 446 | 725 | 1.20 | 0.20 | 243 | 252 | 697 | 1.35 | 0.21 | 235 | 486 | 1.08 | 2.04 |  |
+| `BTCUSD_M5_rank2.set` | live | 443 | 696 | 1.19 | 0.19 | 243 | 261 | 546 | 1.26 | 0.20 | 196 | 518 | 1.08 | 1.76 |  |
+| `BTCUSD_M5_rank3.set` | live | 451 | 675 | 1.18 | 0.19 | 294 | 252 | 517 | 1.25 | 0.20 | 246 | 376 | 1.06 | 1.70 |  |
+| `XAUUSD_H1_rank1.set` | tester-only | 179 | 787 | 1.67 | 0.48 | 119 | 63 | 958 | 1.55 | 0.43 | 391 | 1651 | 1.56 | 7.21 |  |
+| `XAUUSD_H1_rank2.set` | tester-only | 64 | 769 | 1.40 | 0.41 | 500 | 115 | 1050 | 1.30 | 0.39 | 301 | 2062 | 1.38 | 10.16 |  |
+| `XAUUSD_H1_rank3.set` | tester-only | 153 | 693 | 1.37 | 0.52 | 381 | 66 | 1526 | 1.82 | 0.56 | 306 | 2201 | 1.59 | 10.13 |  |
+| `XAUUSD_H4_rank1.set` | tester-only | 28 | 1665 | 7.21 | 0.89 | 115 | 21 | 1582 | 3.00 | 0.76 | 292 | 3236 | 4.05 | 66.28 |  |
+| `XAUUSD_H4_rank2.set` | tester-only | 26 | 1607 | 9.21 | 0.89 | 79 | 16 | 1687 | 4.88 | 0.88 | 328 | 3286 | 6.21 | 78.45 |  |
+| `XAUUSD_H4_rank3.set` | tester-only | 36 | 1576 | 4.00 | 0.83 | 142 | 18 | 1437 | 3.38 | 0.78 | 199 | 3001 | 3.65 | 55.80 |  |
+| `XAUUSD_M1_rank1.set` | live | 9876 | 3050 | 1.30 | 0.70 | 263 | 7125 | 2088 | 1.29 | 0.70 | 66 | 632 | 1.03 | 0.30 | cost-fragile |
+| `XAUUSD_M1_rank2.set` | live | 11493 | 2621 | 1.27 | 0.49 | 122 | 8443 | 1963 | 1.32 | 0.49 | 72 | 231 | 1.01 | 0.23 | cost-fragile |
+| `XAUUSD_M1_rank3.set` | live | 9289 | 2429 | 1.27 | 0.45 | 182 | 6910 | 1853 | 1.34 | 0.44 | 63 | 742 | 1.04 | 0.26 | cost-fragile |
+| `XAUUSD_M15_rank1.set` | tester-only | 106 | 1989 | 1.94 | 0.23 | 555 | 62 | 1362 | 1.97 | 0.31 | 311 | 3397 | 1.97 | 19.95 |  |
+| `XAUUSD_M15_rank2.set` | tester-only | 152 | 1719 | 1.78 | 0.65 | 380 | 106 | 1120 | 1.75 | 0.72 | 229 | 2754 | 1.73 | 11.00 |  |
+| `XAUUSD_M15_rank3.set` | tester-only | 384 | 2930 | 1.76 | 0.50 | 389 | 238 | 1019 | 1.36 | 0.49 | 355 | 3710 | 1.54 | 6.35 |  |
+| `XAUUSD_M30_rank1.set` | tester-only | 685 | 1180 | 1.50 | 0.81 | 170 | 321 | 569 | 1.24 | 0.84 | 529 | 1529 | 1.32 | 1.74 |  |
+| `XAUUSD_M30_rank2.set` | tester-only | 230 | 932 | 1.43 | 0.54 | 166 | 142 | 803 | 1.29 | 0.53 | 353 | 1609 | 1.32 | 4.66 |  |
+| `XAUUSD_M30_rank3.set` | tester-only | 88 | 622 | 1.75 | 0.66 | 254 | 49 | 830 | 2.11 | 0.63 | 154 | 1464 | 1.94 | 10.59 |  |
+| `XAUUSD_M5_rank1.set` | live | 782 | 2653 | 1.35 | 0.20 | 834 | 398 | 1560 | 1.38 | 0.21 | 225 | 3580 | 1.30 | 3.57 |  |
+| `XAUUSD_M5_rank2.set` | live | 788 | 2580 | 1.34 | 0.20 | 834 | 398 | 1560 | 1.38 | 0.21 | 225 | 3535 | 1.29 | 3.49 |  |
+| `XAUUSD_M5_rank3.set` | live | 174 | 1737 | 1.75 | 0.12 | 582 | 103 | 1038 | 1.76 | 0.12 | 256 | 2706 | 1.72 | 10.02 |  |
 
 ### What each preset does
 
-- **BTCUSD_H1_rank1.set**: Turn / predict stop; opp reverse; SL 3.0xATR / TP 5.0R, no trail; no loss-rev; RSI 14 fast 3 slow 21, turnMax 24 hold 3, allOn=True; FGF off
-- **BTCUSD_H1_rank2.set**: BOT/TOP square; opp ignore; SL 250000 / TP 1000000 pts, no trail, time stop 48 bars; loss-rev x3; RSI 9 fast 1 slow 13, turnMax 12 hold 2, allOn=True; FGF on: filter H1, parent H1, zones H1/120min/H4, band 0.25xATR, burst 1.0xATR, minAligned 2, against=True, window=next signal
-- **BTCUSD_H1_rank3.set**: Turn / predict stop; opp reverse; SL 3.0xATR / TP 5.0R, no trail; loss-rev x1; RSI 14 fast 3 slow 21, turnMax 24 hold 3, allOn=True; FGF off
-- **BTCUSD_H4_rank1.set**: BOT/TOP square; opp reverse; SL 6.0xATR / TP 5.0R, no trail; no loss-rev; RSI 14 fast 2 slow 9, turnMax 12 hold 2, allOn=False; FGF off
-- **BTCUSD_H4_rank2.set**: BOT/TOP square; opp reverse; SL 6.0xATR / TP 5.0R, no trail; no loss-rev; RSI 14 fast 1 slow 9, turnMax 12 hold 2, allOn=False; FGF off
-- **BTCUSD_H4_rank3.set**: Turn / after hold; opp close only; SL 6.0xATR / TP 5.0R, no trail; no loss-rev; RSI 9 fast 2 slow 9, turnMax 24 hold 2, allOn=False; FGF off
-- **BTCUSD_M15_rank1.set**: CONT / at close; opp close only; SL 350000 / TP 1000000 pts, no trail; loss-rev x3; RSI 9 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter M30, parent H1, zones H1/120min/H4, band 0.0xATR, burst 1.0xATR, minAligned 2, against=True, window=minutes
-- **BTCUSD_M15_rank2.set**: CONT / stop past candle; opp close only; SL 350000 / TP 1000000 pts, no trail; loss-rev x3; RSI 9 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter M30, parent H1, zones H1/120min/H4, band 0.0xATR, burst 0.25xATR, minAligned 2, against=True, window=minutes
-- **BTCUSD_M15_rank3.set**: CONT / stop past candle; opp close only; SL 350000 / TP 1000000 pts, no trail; loss-rev x3; RSI 9 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter M15, parent H1, zones H1/120min/H4, band 0.0xATR, burst 1.0xATR, minAligned 2, against=True, window=minutes
-- **BTCUSD_M30_rank1.set**: CONT / at close; opp ignore; SL 6.0xATR / TP 5.0R, no trail; no loss-rev; RSI 9 fast 3 slow 13, turnMax 12 hold 2, allOn=True; FGF off
-- **BTCUSD_M30_rank2.set**: Turn / at cross; opp reverse; SL 75000 / TP 500000 pts, no trail; no loss-rev; RSI 9 fast 3 slow 21, turnMax 24 hold 1, allOn=False; FGF on: filter M30, parent H1, zones M15/M30/H1, band 0.25xATR, burst 0.5xATR, minAligned 2, against=True, window=next signal
-- **BTCUSD_M30_rank3.set**: BOT/TOP tick; opp ignore; SL 6.0xATR / TP 5.0R, no trail; no loss-rev; RSI 9 fast 3 slow 13, turnMax 12 hold 2, allOn=True; FGF on: filter 120min, parent 120min, zones H1/120min/H4, band 0.25xATR, burst 0.25xATR, minAligned 1, against=True, window=minutes
-- **BTCUSD_M5_rank1.set**: Turn / after hold; opp ignore; SL 100000 / TP 500000 pts, no trail; loss-rev x1; RSI 14 fast 1 slow 7, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H4, zones H1/120min/H4, band 0.1xATR, burst 1.0xATR, minAligned 1, against=True, window=next signal
+- **BTCUSD_H1_rank1.set**: Turn / predict stop; opp reverse; SL 3.0xATR / TP 3.0R, no trail; no loss-rev; RSI 9 fast 3 slow 5, turnMax 6 hold 1, allOn=True; FGF on: filter H4, parent H1, zones H1/120min/H4, band 0.1xATR, burst 0.75xATR, minAligned 2, against=True, window=next signal
+- **BTCUSD_H1_rank2.set**: BOT/TOP square; opp ignore; SL 250000 / TP 2500000 pts, no trail, time stop 48 bars; loss-rev x3; RSI 14 fast 1 slow 13, turnMax 12 hold 2, allOn=True; FGF on: filter H1, parent H1, zones H1/120min/H4, band 0.5xATR, burst 0.75xATR, minAligned 2, against=True, window=next signal
+- **BTCUSD_H1_rank3.set**: BOT/TOP square; opp ignore; SL 250000 / TP 2500000 pts, no trail, time stop 48 bars; loss-rev x3; RSI 14 fast 1 slow 13, turnMax 12 hold 2, allOn=True; FGF on: filter H1, parent H1, zones H1/120min/H4, band 0.5xATR, burst 1.0xATR, minAligned 2, against=True, window=next signal
+- **BTCUSD_H4_rank1.set**: Turn / after hold; opp close only; SL 6.0xATR / TP 5.0R, no trail; no loss-rev; RSI 14 fast 2 slow 9, turnMax 24 hold 1, allOn=False; FGF off
+- **BTCUSD_H4_rank2.set**: Turn / at cross; opp close only; SL 6.0xATR / TP 5.0R, no trail; no loss-rev; RSI 14 fast 2 slow 9, turnMax 12 hold 3, allOn=False; FGF off
+- **BTCUSD_H4_rank3.set**: Turn / at cross; opp close only; SL 6.0xATR / TP 5.0R, no trail; no loss-rev; RSI 14 fast 2 slow 9, turnMax 12 hold 3, allOn=False; FGF off
+- **BTCUSD_M15_rank1.set**: CONT / stop past candle; opp close only; SL 350000 / TP 1000000 pts, no trail; loss-rev x1; RSI 9 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter M30, parent H1, zones H1/120min/H4, band 0.0xATR, burst 1.0xATR, minAligned 2, against=True, window=minutes
+- **BTCUSD_M15_rank2.set**: CONT / stop past candle; opp close only; SL 350000 / TP 1000000 pts, no trail; loss-rev x3; RSI 9 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter M30, parent H1, zones H1/120min/H4, band 0.0xATR, burst 1.0xATR, minAligned 2, against=True, window=minutes
+- **BTCUSD_M15_rank3.set**: Turn / at cross; opp close only; SL 6.0xATR / TP 1.5R, no trail; loss-rev x1; RSI 14 fast 1 slow 5, turnMax 12 hold 2, allOn=False; FGF on: filter H1, parent H1, zones H1/120min/H4, band 0.25xATR, burst 0.25xATR, minAligned 2, against=False, window=minutes
+- **BTCUSD_M30_rank1.set**: Turn / after hold; opp reverse; SL 75000 / TP 500000 pts, no trail; no loss-rev; RSI 9 fast 3 slow 21, turnMax 24 hold 1, allOn=False; FGF on: filter M30, parent H1, zones H1/120min/H4, band 0.25xATR, burst 0.5xATR, minAligned 2, against=True, window=next signal
+- **BTCUSD_M30_rank2.set**: Turn / at cross; opp reverse; SL 75000 / TP 500000 pts, no trail; no loss-rev; RSI 9 fast 3 slow 21, turnMax 6 hold 2, allOn=False; FGF on: filter M30, parent H1, zones H1/120min/H4, band 0.25xATR, burst 0.5xATR, minAligned 2, against=True, window=next signal
+- **BTCUSD_M30_rank3.set**: Turn / after hold; opp reverse; SL 75000 / TP 500000 pts, no trail; no loss-rev; RSI 9 fast 3 slow 21, turnMax 24 hold 1, allOn=False; FGF on: filter M30, parent H1, zones H1/120min/H4, band 0.25xATR, burst 0.5xATR, minAligned 2, against=True, window=next signal
+- **BTCUSD_M5_rank1.set**: Turn / after hold; opp ignore; SL 100000 / TP 500000 pts, no trail; loss-rev x1; RSI 14 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H4, zones H1/120min/H4, band 0.1xATR, burst 1.0xATR, minAligned 1, against=True, window=next signal
 - **BTCUSD_M5_rank2.set**: Turn / after hold; opp ignore; SL 100000 / TP 500000 pts, no trail; loss-rev x1; RSI 14 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H4, zones H1/120min/H4, band 0.1xATR, burst 1.0xATR, minAligned 1, against=True, window=next signal
-- **BTCUSD_M5_rank3.set**: Turn / after hold; opp ignore; SL 100000 / TP 500000 pts, no trail; loss-rev x1; RSI 21 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H4, zones H1/120min/H4, band 0.1xATR, burst 1.0xATR, minAligned 1, against=True, window=next signal
-- **XAUUSD_H1_rank1.set**: BOT/TOP square; opp ignore; SL 5000 / TP 10000 pts, no trail; loss-rev x2; RSI 7 fast 3 slow 9, turnMax 12 hold 2, allOn=False; FGF off
-- **XAUUSD_H1_rank2.set**: CONT / at close; opp ignore; SL 2.0xATR / TP 5.0R, no trail; loss-rev x2; RSI 14 fast 3 slow 13, turnMax 12 hold 2, allOn=True; FGF on: filter 120min, parent H1, zones H1/120min/H4, band 0.1xATR, burst 0.5xATR, minAligned 2, against=True, window=next signal
-- **XAUUSD_H1_rank3.set**: BOT/TOP tick; opp close only; SL 4.0xATR / TP 1.5R, no trail, time stop 96 bars; no loss-rev; RSI 7 fast 3 slow 7, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent 480min, zones H4/480min/1440min, band 0.0xATR, burst 0.5xATR, minAligned 1, against=False, window=next signal
-- **XAUUSD_H4_rank1.set**: Turn / predict stop; opp reverse; SL 6.0xATR / TP 1.5R, trail act 4.0xATR dist 2.0xATR; loss-rev x3; RSI 9 fast 3 slow 9, turnMax 24 hold 1, allOn=True; FGF on: filter H4, parent H1, zones H1/120min/H4, band 0.25xATR, burst 1.0xATR, minAligned 2, against=True, window=next signal
-- **XAUUSD_H4_rank2.set**: Turn / predict stop; opp reverse; SL 6.0xATR / TP 1.5R, trail act 4.0xATR dist 2.0xATR; loss-rev x3; RSI 9 fast 3 slow 9, turnMax 24 hold 1, allOn=True; FGF on: filter H4, parent H1, zones H1/120min/H4, band 0.25xATR, burst 1.0xATR, minAligned 2, against=True, window=next signal
-- **XAUUSD_H4_rank3.set**: Turn / predict stop; opp reverse; SL 6.0xATR / TP 1.5R, trail act 4.0xATR dist 2.0xATR; loss-rev x3; RSI 9 fast 3 slow 9, turnMax 24 hold 1, allOn=True; FGF on: filter H4, parent H1, zones H1/120min/H4, band 0.25xATR, burst 1.0xATR, minAligned 2, against=True, window=next signal
-- **XAUUSD_M1_rank1.set**: Turn / predict stop; opp reverse; SL 2.0xATR / TP 5.0R, trail act 1.0xATR dist 0.2xATR; loss-rev x3; RSI 21 fast 3 slow 5, turnMax 12 hold 2, allOn=False; FGF on: filter 120min, parent 480min, zones H4/480min/1440min, band 0.5xATR, burst 0.25xATR, minAligned 2, against=True, window=next signal
-- **XAUUSD_M1_rank2.set**: BOT/TOP tick; opp ignore; SL 1000 / TP 20000 pts, no trail; no loss-rev; RSI 9 fast 2 slow 13, turnMax 12 hold 2, allOn=True; FGF off
-- **XAUUSD_M1_rank3.set**: Turn / predict stop; opp reverse; SL 2.0xATR / TP 5.0R, trail act 1.0xATR dist 0.2xATR; loss-rev x3; RSI 21 fast 1 slow 9, turnMax 12 hold 2, allOn=False; FGF on: filter 120min, parent 480min, zones H4/480min/1440min, band 0.5xATR, burst 0.25xATR, minAligned 2, against=True, window=next signal
-- **XAUUSD_M15_rank1.set**: BOT/TOP square; opp reverse; SL 700 / TP 10000 pts, no trail; loss-rev x3; RSI 14 fast 2 slow 21, turnMax 12 hold 2, allOn=True; FGF off
-- **XAUUSD_M15_rank2.set**: CONT / at close; opp ignore; SL 6.0xATR / TP 0.0R, trail act 4.0xATR dist 2.0xATR; no loss-rev; RSI 14 fast 3 slow 7, turnMax 12 hold 2, allOn=True; FGF on: filter 120min, parent H1, zones H1/120min/H4, band 0.1xATR, burst 0.25xATR, minAligned 2, against=False, window=next signal
-- **XAUUSD_M15_rank3.set**: CONT / at close; opp reverse; SL 3000 / TP 10000 pts, no trail; loss-rev x3; RSI 14 fast 2 slow 21, turnMax 12 hold 2, allOn=True; FGF off
-- **XAUUSD_M30_rank1.set**: BOT/TOP square; opp ignore; SL 2.0xATR / TP 5.0R, no trail; loss-rev x1; RSI 9 fast 2 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter 120min, parent H1, zones H1/120min/H4, band 0.0xATR, burst 0.25xATR, minAligned 2, against=False, window=next signal
-- **XAUUSD_M30_rank2.set**: BOT/TOP square; opp ignore; SL 2.0xATR / TP 5.0R, no trail; loss-rev x1; RSI 9 fast 2 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H1, zones H1/120min/H4, band 0.0xATR, burst 0.25xATR, minAligned 2, against=False, window=candles
-- **XAUUSD_M30_rank3.set**: BOT/TOP square; opp ignore; SL 2.0xATR / TP 5.0R, trail act 4.0xATR dist 0.2xATR; loss-rev x1; RSI 9 fast 2 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H1, zones H1/120min/H4, band 0.0xATR, burst 0.25xATR, minAligned 2, against=False, window=candles
-- **XAUUSD_M5_rank1.set**: BOT/TOP tick; opp ignore; SL 3.0xATR / TP 3.0R, no trail; loss-rev x3; RSI 21 fast 2 slow 7, turnMax 12 hold 2, allOn=True; FGF off
-- **XAUUSD_M5_rank2.set**: CONT / stop past candle; opp reverse; SL 4.0xATR / TP 0.0R, trail act 4.0xATR dist 2.0xATR; loss-rev x1; RSI 21 fast 2 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H4, zones H1/120min/H4, band 0.0xATR, burst 0.5xATR, minAligned 3, against=True, window=next signal
-- **XAUUSD_M5_rank3.set**: CONT / stop past candle; opp reverse; SL 4.0xATR / TP 5.0R, trail act 4.0xATR dist 2.0xATR; loss-rev x1; RSI 21 fast 2 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H4, zones H1/120min/H4, band 0.0xATR, burst 0.5xATR, minAligned 3, against=True, window=next signal
+- **BTCUSD_M5_rank3.set**: Turn / after hold; opp ignore; SL 100000 / TP 500000 pts, no trail; loss-rev x1; RSI 14 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H1, zones H1/120min/H4, band 0.1xATR, burst 1.0xATR, minAligned 2, against=True, window=next signal
+- **XAUUSD_H1_rank1.set**: BOT/TOP tick; opp reverse; SL 4.0xATR / TP 3.0R, no trail; no loss-rev; RSI 9 fast 3 slow 13, turnMax 12 hold 2, allOn=True; FGF on: filter H4, parent H4, zones H1/120min/H4, band 0.5xATR, burst 1.0xATR, minAligned 3, against=True, window=next signal
+- **XAUUSD_H1_rank2.set**: BOT/TOP square; opp ignore; SL 5000 / TP 10000 pts, no trail; loss-rev x2; RSI 7 fast 2 slow 7, turnMax 12 hold 2, allOn=False; FGF off
+- **XAUUSD_H1_rank3.set**: Turn / after hold; opp reverse; SL 4.0xATR / TP 1.5R, no trail; loss-rev x1; RSI 14 fast 2 slow 21, turnMax 12 hold 2, allOn=False; FGF off
+- **XAUUSD_H4_rank1.set**: BOT/TOP square; opp ignore; SL 6.0xATR / TP 0.0R, trail act 4.0xATR dist 2.0xATR; loss-rev x1; RSI 7 fast 2 slow 5, turnMax 12 hold 2, allOn=False; FGF off
+- **XAUUSD_H4_rank2.set**: BOT/TOP square; opp ignore; SL 6.0xATR / TP 1.5R, trail act 4.0xATR dist 2.0xATR; loss-rev x1; RSI 7 fast 2 slow 5, turnMax 12 hold 2, allOn=False; FGF off
+- **XAUUSD_H4_rank3.set**: BOT/TOP square; opp ignore; SL 6.0xATR / TP 0.0R, trail act 4.0xATR dist 2.0xATR; loss-rev x1; RSI 7 fast 2 slow 5, turnMax 12 hold 2, allOn=False; FGF off
+- **XAUUSD_M1_rank1.set**: CONT / stop past candle; opp reverse; SL 3.0xATR / TP 3.0R, trail act 1.0xATR dist 0.5xATR; no loss-rev; RSI 14 fast 1 slow 5, turnMax 12 hold 2, allOn=True; FGF off
+- **XAUUSD_M1_rank2.set**: CONT / stop past candle; opp close only; SL 1.0xATR / TP 1.5R, no trail, time stop 96 bars; no loss-rev; RSI 14 fast 1 slow 9, turnMax 12 hold 2, allOn=True; FGF off
+- **XAUUSD_M1_rank3.set**: CONT / stop past candle; opp close only; SL 1.0xATR / TP 2.0R, no trail, time stop 96 bars; no loss-rev; RSI 9 fast 1 slow 9, turnMax 12 hold 2, allOn=True; FGF off
+- **XAUUSD_M15_rank1.set**: Turn / predict stop; opp ignore; SL 4.0xATR / TP 5.0R, no trail; no loss-rev; RSI 14 fast 1 slow 9, turnMax 12 hold 2, allOn=True; FGF on: filter H1, parent 480min, zones H1/120min/H4, band 0.5xATR, burst 0.75xATR, minAligned 2, against=True, window=next signal
+- **XAUUSD_M15_rank2.set**: CONT / at close; opp ignore; SL 6.0xATR / TP 0.0R, trail act 4.0xATR dist 2.0xATR; no loss-rev; RSI 14 fast 3 slow 7, turnMax 12 hold 2, allOn=True; FGF on: filter 120min, parent H1, zones H1/120min/H4, band 0.1xATR, burst 0.5xATR, minAligned 2, against=False, window=next signal
+- **XAUUSD_M15_rank3.set**: Turn / predict stop; opp ignore; SL 6.0xATR / TP 0.0R, trail act 4.0xATR dist 2.0xATR; no loss-rev; RSI 14 fast 3 slow 7, turnMax 24 hold 2, allOn=True; FGF on: filter 120min, parent H1, zones H1/120min/H4, band 0.1xATR, burst 0.25xATR, minAligned 2, against=False, window=next signal
+- **XAUUSD_M30_rank1.set**: BOT/TOP tick; opp close only; SL 6.0xATR / TP 1.0R, trail act 1.0xATR dist 0.2xATR; loss-rev x1; RSI 7 fast 3 slow 7, turnMax 12 hold 2, allOn=True; FGF on: filter M30, parent H1, zones H4/480min/1440min, band 0.5xATR, burst 1.0xATR, minAligned 3, against=True, window=next signal
+- **XAUUSD_M30_rank2.set**: BOT/TOP square; opp ignore; SL 4.0xATR / TP 3.0R, trail act 4.0xATR dist 0.2xATR; loss-rev x3; RSI 7 fast 2 slow 13, turnMax 12 hold 2, allOn=True; FGF on: filter H1, parent 480min, zones H1/120min/H4, band 1.0xATR, burst 1.0xATR, minAligned 3, against=True, window=next signal
+- **XAUUSD_M30_rank3.set**: BOT/TOP square; opp ignore; SL 4.0xATR / TP 1.0R, no trail; loss-rev x1; RSI 7 fast 1 slow 9, turnMax 12 hold 2, allOn=True; FGF on: filter 120min, parent H4, zones H4/480min/1440min, band 0.0xATR, burst 0.25xATR, minAligned 3, against=False, window=next signal
+- **XAUUSD_M5_rank1.set**: BOT/TOP tick; opp ignore; SL 3.0xATR / TP 5.0R, no trail; loss-rev x3; RSI 21 fast 2 slow 21, turnMax 12 hold 2, allOn=True; FGF off
+- **XAUUSD_M5_rank2.set**: BOT/TOP tick; opp ignore; SL 3.0xATR / TP 5.0R, no trail; loss-rev x3; RSI 21 fast 2 slow 7, turnMax 12 hold 2, allOn=True; FGF off
+- **XAUUSD_M5_rank3.set**: BOT/TOP square; opp ignore; SL 1500 / TP 20000 pts, no trail; loss-rev x1; RSI 14 fast 2 slow 21, turnMax 12 hold 2, allOn=True; FGF on: filter H1, parent H1, zones H1/120min/H4, band 0.25xATR, burst 0.5xATR, minAligned 2, against=True, window=next signal
 
 ## Method
 
@@ -111,7 +111,7 @@ Profit figures are USD per 0.01 lot (gold: 1 oz; BTC: 0.01 BTC) after modeled sp
 - **Overfitting risk.** Thousands of combinations were tried per symbol/timeframe; even with an out-of-sample window and cost stress, the accepted presets are the survivors of a search and will degrade. Treat the OOS and 2x-cost columns as the realistic expectation, not the IS column.
 - **Clocks.** The EA admits only M1/M5 charts with SigTF 1 or 5 (and M10/M15 with 10) outside the Strategy Tester (`XpwV92ClockPairAdmitted`). M15/M30/H1/H4 presets here are tester-only and were produced because the calibration brief covered six timeframes.
 - **Sizing fix.** The reference presets carried `QtyFixed=0.01` (gold, oz) and `0.0001` (BTC), which the EA floors to 0 lots, and the cent gate requires exactly 0.01 lots. All calibrated presets use `QtyFixed=1.0` (gold, 100 oz contract) and `0.01` (BTC, 1 BTC contract) so the source quantity maps to 0.01 lots; verify the broker contract sizes.
-- **Port review.** The port was reviewed against the MQL5 sources by seven independent reviewers with adversarial verification; confirmed discrepancies (SMA floating-point drift, pending-stop clearing on market fills, stop-fill reversal pricing, `enteredThisBar` on market fills, the 499-bar ATR re-anchor, loss-reversal command precedence) were fixed before the final search. Two low-impact deviations remain by design: bar ends are nominal `open + period` (the indicator clips them to the broker quote session, which only matters when a session ends inside a bar), and ATR exit distances use the confirmed entry-bar ATR rather than the forming first-tick value.
+- **Port review.** The port was reviewed against the MQL5 sources by seven independent reviewers, each claim checked by three adversarial verifiers (37 agents). All confirmed discrepancies were fixed before the final search: SMA floating-point drift, same-side-only clearing of pending virtual stops on market fills, frozen stop transaction units (a stop placed while flat only flattens an opposite position and triggers regardless of OppMode), stop-fill reversal pricing, `enteredThisBar` on any fill, the 499-bar ATR re-anchor, loss-reversal command precedence over a same-plan catch-up entry, and the exit-ATR anchor at the EA's effective first-tick value. One low-impact deviation remains by design: bar ends are nominal `open + period`, whereas the indicator clips them to the broker quote session, which only matters when a session ends inside a bar.
 - **Risk gates untouched.** `EnableTrading`, `FenceAllowExecution`, the fence capital and the cent-gate limits are exactly as in the handoff package. Nothing here is approval to trade.
 
 ## Reproduce
