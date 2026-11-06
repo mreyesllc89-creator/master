@@ -34,7 +34,7 @@ def indicators(o, h, l, c, rsiLen, fastLen, slowLen, invertFill, areaLook, atrLe
     fast = np.full(n, EMPTY); slow = np.full(n, EMPTY)
     validFast = np.zeros(n, np.uint8); validSlow = np.zeros(n, np.uint8); isRed = np.zeros(n, np.uint8)
     atr = np.full(n, EMPTY); validAtr = np.zeros(n, np.uint8); pos = np.full(n, 0.5)
-    exAtr = np.full(n, EMPTY); validExAtr = np.zeros(n, np.uint8)
+    exAtr = np.full(n, EMPTY); validExAtr = np.zeros(n, np.uint8); exAtrOpen = np.full(n, EMPTY)
     sumF = 0.0; sumS = 0.0
     for i in range(n):
         if rsiLen >= 2 and i >= rsiLen:
@@ -91,6 +91,12 @@ def indicators(o, h, l, c, rsiLen, fastLen, slowLen, invertFill, areaLook, atrLe
                 tr = max(h[i] - l[i], max(abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1])))
                 exAtr[i] = (exAtr[i - 1] * (exAtrLen - 1) + tr) / exAtrLen
             validExAtr[i] = 1
+            # bracket anchor the EA effectively uses: forming first-tick value (h=l=o), never loosened afterwards
+            if i >= 1 and validExAtr[i - 1] == 1:
+                aFirst = (exAtr[i - 1] * (exAtrLen - 1) + abs(o[i] - c[i - 1])) / exAtrLen
+                exAtrOpen[i] = min(exAtr[i - 1], aFirst, exAtr[i])
+            else:
+                exAtrOpen[i] = exAtr[i]
         if validSlow[i] and areaLook > 0:
             hi = -EMPTY; lo = EMPTY
             k0 = i - areaLook + 1
@@ -101,7 +107,7 @@ def indicators(o, h, l, c, rsiLen, fastLen, slowLen, invertFill, areaLook, atrLe
                     if slow[k] < lo: lo = slow[k]
             rng = hi - lo
             pos[i] = (slow[i] - lo) / rng if rng > 0.0 else 0.5
-    return rsi, up, dn, validRsi, fast, slow, validFast, validSlow, isRed, atr, validAtr, pos, exAtr, validExAtr
+    return rsi, up, dn, validRsi, fast, slow, validFast, validSlow, isRed, atr, validAtr, pos, exAtr, validExAtr, exAtrOpen
 
 
 @njit(cache=True)
@@ -512,7 +518,7 @@ def _half_spread(price, spreadPts, spreadPct, tick):
 
 @njit(cache=True)
 def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
-             exAtr, validExAtr, fast, slow, validFast, validSlow,
+             exAtr, exAtrOpen, validExAtr, fast, slow, validFast, validSlow,
              botSq, topSq, turnUp, turnDn, botCross, topCross, crossUp, crossDn, armL, armS,
              botTick, topTick, contUp, contDn, xPx, validPred, fgfBuy, fgfSell,
              sigMode, tradeDir, turnEntry, failExit, oppMode, armEvery, predBuf, catchUp, maxChase,
@@ -536,6 +542,7 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
     qClose = False; qCloseReason = 0
     qEntrySide = 0; qEntryKind = 0
     pendL = False; pendLpx = 0.0; pendS = False; pendSpx = 0.0; pendKind = 0
+    pendLunits = 1; pendSunits = 1
     contStopBar = -10000; contStopDir = 0
     lossRevSeen = 0; lossRevChain = 0; closedCount = 0
     lastPnl = 0.0; lastSide = 0; lastEntryPx = 0.0; lastExitPx = 0.0; lastKind = 0; lastReason = 0
@@ -577,7 +584,7 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
                     hasSL = slTk > 0; hasTP = tpTk > 0; hasTrail = trailOn and tdTk > 0
                 else:
                     if validExAtr[i] == 1:
-                        a = exAtr[i]; slTk = slAtrM * a / tick; tpTk = tpR * slTk; taTk = trActAtr * a / tick; tdTk = trDisAtr * a / tick
+                        a = exAtrOpen[i]; slTk = slAtrM * a / tick; tpTk = tpR * slTk; taTk = trActAtr * a / tick; tdTk = trDisAtr * a / tick
                         hasSL = slTk > 0; hasTP = tpTk > 0; hasTrail = trailOn and tdTk > 0
                     else:
                         hasSL = False; hasTP = False; hasTrail = False
@@ -591,8 +598,9 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
             ck = commPts * tick + commPct * so[k]
             filledNow = False
             if pendL or pendS:
-                fillL = pendL and (pos == 0 or (pos < 0 and oppMode == 0)) and sh[k] >= pendLpx - hk
-                fillS = pendS and (pos == 0 or (pos > 0 and oppMode == 0)) and sl_[k] <= pendSpx + hk
+                # MQL triggers do not consult oppMode: they only refuse a same-side position
+                fillL = pendL and pos <= 0 and sh[k] >= pendLpx - hk
+                fillS = pendS and pos >= 0 and sl_[k] <= pendSpx + hk
                 side = 0
                 if fillL and fillS:
                     side = 1 if abs(pendLpx - so[k]) <= abs(pendSpx - so[k]) else -1
@@ -600,6 +608,8 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
                 elif fillS: side = -1
                 if side != 0:
                     fillPx = max(pendLpx, so[k] + hk) if side > 0 else min(pendSpx, so[k] - hk)
+                    units = pendLunits if side > 0 else pendSunits
+                    openNew = True
                     if pos != 0 and pos != side:
                         ex = fillPx
                         pnl = (ex - entryPx) * pos - ck
@@ -609,6 +619,12 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
                         realized += pnl; closedCount += 1
                         lastPnl = pnl; lastSide = pos; lastEntryPx = entryPx; lastExitPx = ex; lastKind = posKind; lastReason = 5
                         pos = 0
+                        # a stop placed while flat carries one unit: it only flattens the opposite inventory
+                        if units <= 1: openNew = False
+                    if side > 0: pendL = False
+                    else: pendS = False
+                    if pendKind == 2: contStopDir = 0
+                if side != 0 and openNew:
                     pos = side; entryPx = fillPx; entryI = i; best = entryPx; trailStop = 0.0; trailActive = False
                     posKind = pendKind; enteredThisBar = True; filledNow = True
                     if exitUnit == 0:
@@ -616,12 +632,10 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
                         hasSL = slTk > 0; hasTP = tpTk > 0; hasTrail = trailOn and tdTk > 0
                     else:
                         if validExAtr[i] == 1:
-                            a = exAtr[i]; slTk = slAtrM * a / tick; tpTk = tpR * slTk; taTk = trActAtr * a / tick; tdTk = trDisAtr * a / tick
+                            a = exAtrOpen[i]; slTk = slAtrM * a / tick; tpTk = tpR * slTk; taTk = trActAtr * a / tick; tdTk = trDisAtr * a / tick
                             hasSL = slTk > 0; hasTP = tpTk > 0; hasTrail = trailOn and tdTk > 0
                         else:
                             hasSL = False; hasTP = False; hasTrail = False
-                    pendL = False; pendS = False
-                    if pendKind == 2: contStopDir = 0
             if pos != 0:
                 slv = entryPx - pos * slTk * tick if hasSL else 0.0
                 tpv = entryPx + pos * tpTk * tick if hasTP else 0.0
@@ -692,10 +706,10 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
             if pos != 0: contStopDir = 0
             cu = contUp[i] == 1; cd = contDn[i] == 1
             if cu and canL and (pos == 0 or (pos < 0 and oppMode == 0)) and fb:
-                pendS = False; pendL = True; pendLpx = h[i] + contStopBuf * tick; pendKind = 2
+                pendS = False; pendL = True; pendLpx = h[i] + contStopBuf * tick; pendKind = 2; pendLunits = 2 if pos < 0 else 1
                 contStopBar = i; contStopDir = 1
             elif cd and canS and (pos == 0 or (pos > 0 and oppMode == 0)) and fs:
-                pendL = False; pendS = True; pendSpx = l[i] - contStopBuf * tick; pendKind = 2
+                pendL = False; pendS = True; pendSpx = l[i] - contStopBuf * tick; pendKind = 2; pendSunits = 2 if pos > 0 else 1
                 contStopBar = i; contStopDir = -1
             elif contStopDir != 0 and i - contStopBar >= contStopBars:
                 pendL = False; pendS = False; contStopDir = 0
@@ -712,9 +726,9 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
             aL = armL[i] == 1; aS = armS[i] == 1
             wantL = vl and aL and fast[i] < slow[i] and canL and vp and pos <= 0 and (pos == 0 or oppMode == 0) and fb
             wantS = vl and aS and fast[i] > slow[i] and canS and vp and pos >= 0 and (pos == 0 or oppMode == 0) and fs
-            if wantL: pendL = True; pendLpx = stopL; pendKind = 1
+            if wantL: pendL = True; pendLpx = stopL; pendKind = 1; pendLunits = 2 if pos < 0 else 1
             else: pendL = False
-            if wantS: pendS = True; pendSpx = stopS; pendKind = 1
+            if wantS: pendS = True; pendSpx = stopS; pendKind = 1; pendSunits = 2 if pos > 0 else 1
             else: pendS = False
             if catchUp and not enteredThisBar:
                 chaseL = maxChase <= 0 or (not prevValid) or c[i] - prevStopL <= maxChase * tick
@@ -750,7 +764,7 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
                 side = 0
                 if lastSide > 0 and canS and fs: side = -1
                 elif lastSide < 0 and canL and fb: side = 1
-                if side != 0 and (qEntrySide == 0 or (qEntrySide != side and oppMode == 0) or qEntrySide == side):
+                if side != 0:  # the loss-rev ENTRY is the last command of the plan and replaces/reverses an earlier catch-up entry
                     qEntrySide = side; qEntryKind = 4 if tiny else 3
                     lossRevChain += 1
     if pos != 0:

@@ -97,7 +97,7 @@ class Market:
         if key not in self._evt:
             if len(self._evt) > 6: self._evt.clear()
             bt, bo, bh, bl, bc = self.bars(minutes)
-            rsi, up, dn, validRsi, fast, slow, validFast, validSlow, isRed, atr, validAtr, pos, exAtr, validExAtr = self.indicators(minutes, p)
+            rsi, up, dn, validRsi, fast, slow, validFast, validSlow, isRed, atr, validAtr, pos, exAtr, validExAtr, exAtrOpen = self.indicators(minutes, p)
             self._evt[key] = E.events(bo, bh, bl, bc, rsi, up, dn, validRsi, fast, slow, validFast, validSlow, isRed, atr, validAtr, pos,
                                       int(p["RsiLen"]), int(p["FastLen"]), int(p["SlowLen"]), float(p["LoFrac"]), float(p["HiFrac"]),
                                       bool(p["AllOn"]), int(p["AllCtx"]),
@@ -149,11 +149,11 @@ class Market:
         bt, bo, bh, bl, bc = self.bars(minutes)
         s0, s1 = self.subranges(minutes)
         mt, mo, mh, ml, mc = self.m1
-        rsi, up, dn, validRsi, fast, slow, validFast, validSlow, isRed, atr, validAtr, pos, exAtr, validExAtr = self.indicators(minutes, p)
+        rsi, up, dn, validRsi, fast, slow, validFast, validSlow, isRed, atr, validAtr, pos, exAtr, validExAtr, exAtrOpen = self.indicators(minutes, p)
         ev = self.events(minutes, p)
         fb, fs = self.fgf(minutes, p)
         s = self.spec
-        res = E.simulate(bo, bh, bl, bc, s0, s1, mo, mh, ml, mc, exAtr, validExAtr, fast, slow, validFast, validSlow, *ev, fb, fs,
+        res = E.simulate(bo, bh, bl, bc, s0, s1, mo, mh, ml, mc, exAtr, exAtrOpen, validExAtr, fast, slow, validFast, validSlow, *ev, fb, fs,
                          int(p["SigMode"]), int(p["TradeDir"]), int(p["TurnEntry"]), bool(p["FailExit"]), int(p["OppMode"]), int(p["ArmMode"]) == 1,
                          float(p["PredBuf"]), bool(p["CatchUp"]), float(p["MaxChase"]), int(p["ContEntry"]), float(p["ContStopBuf"]), int(p["ContStopBars"]),
                          int(p["ExitUnit"]), float(p["SlPts"]), float(p["TpPts"]), float(p["SlAtrM"]), float(p["TpR"]), bool(p["TrailOn"]),
