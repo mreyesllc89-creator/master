@@ -53,14 +53,17 @@ def indicators(o, h, l, c, rsiLen, fastLen, slowLen, invertFill, areaLook, atrLe
             elif up[i] == 0.0: rsi[i] = 0.0
             else: rsi[i] = 100.0 - 100.0 / (1.0 + up[i] / dn[i])
             validRsi[i] = 1
-            # NA-skipping SMA == plain SMA over the contiguous valid RSI run
+            # NA-skipping SMA == plain SMA over the contiguous valid RSI run; fresh
+            # window sums (as XpwV7Sma) so exact equalities match the MQL5 arithmetic
             cnt = i - rsiLen + 1
-            sumF += rsi[i]
-            if cnt > fastLen: sumF -= rsi[i - fastLen]
-            if cnt >= fastLen: fast[i] = sumF / fastLen; validFast[i] = 1
-            sumS += rsi[i]
-            if cnt > slowLen: sumS -= rsi[i - slowLen]
-            if cnt >= slowLen: slow[i] = sumS / slowLen; validSlow[i] = 1
+            if cnt >= fastLen:
+                sumF = 0.0
+                for k in range(i, i - fastLen, -1): sumF += rsi[k]
+                fast[i] = sumF / fastLen; validFast[i] = 1
+            if cnt >= slowLen:
+                sumS = 0.0
+                for k in range(i, i - slowLen, -1): sumS += rsi[k]
+                slow[i] = sumS / slowLen; validSlow[i] = 1
         if validFast[i] and validSlow[i]:
             isRed[i] = 1 if ((fast[i] > slow[i]) if invertFill else (fast[i] < slow[i])) else 0
         # ATR (ta.atr): TR at bar0 = high-low, SMA seed at length-1 then Wilder
@@ -578,7 +581,9 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
                         hasSL = slTk > 0; hasTP = tpTk > 0; hasTrail = trailOn and tdTk > 0
                     else:
                         hasSL = False; hasTP = False; hasTrail = False
-                pendL = False; pendS = False
+                enteredThisBar = True
+                if pos > 0: pendL = False
+                else: pendS = False
             qEntrySide = 0
         # ---- sub-bar loop: stop fills and exit management
         for k in range(k0, k1):
@@ -596,7 +601,7 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
                 if side != 0:
                     fillPx = max(pendLpx, so[k] + hk) if side > 0 else min(pendSpx, so[k] - hk)
                     if pos != 0 and pos != side:
-                        ex = fillPx - 2 * hk if pos > 0 else fillPx + 2 * hk
+                        ex = fillPx
                         pnl = (ex - entryPx) * pos - ck
                         if nt < maxTrades:
                             tEntryI[nt] = entryI; tExitI[nt] = i; tSide[nt] = pos; tEntryPx[nt] = entryPx; tExitPx[nt] = ex
@@ -722,6 +727,9 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
                 if pos < 0 and aL and crossUp[i] == 1: qClose = True; qCloseReason = 4
                 if pos > 0 and aS and crossDn[i] == 1: qClose = True; qCloseReason = 4
             prevValid = vp; prevStopL = stopL; prevStopS = stopS
+        if pos != 0 and exitUnit == 1 and i - entryI > 499 and validExAtr[i - 499] == 1:
+            a = exAtr[i - 499]; slTk = slAtrM * a / tick; tpTk = tpR * slTk; taTk = trActAtr * a / tick; tdTk = trDisAtr * a / tick
+            hasSL = slTk > 0; hasTP = tpTk > 0; hasTrail = trailOn and tdTk > 0
         if pos != 0:
             held = i - entryI
             if failExit and (predict or atCross) and validFast[i] == 1 and validSlow[i] == 1 and held <= turnHold:
@@ -738,11 +746,11 @@ def simulate(o, h, l, c, sub_start, sub_end, so, sh, sl_, sc,
             counts = lossRevWhat == 0 or lastReason == 1 or lastReason == 3
             chain = lossRevMax <= 0 or lossRevChain < lossRevMax
             flat = pos == 0 and not hasMarketSig
-            if lossRevOn and loss and counts and chain and flat and qEntrySide == 0:
+            if lossRevOn and loss and counts and chain and flat:
                 side = 0
                 if lastSide > 0 and canS and fs: side = -1
                 elif lastSide < 0 and canL and fb: side = 1
-                if side != 0:
+                if side != 0 and (qEntrySide == 0 or (qEntrySide != side and oppMode == 0) or qEntrySide == side):
                     qEntrySide = side; qEntryKind = 4 if tiny else 3
                     lossRevChain += 1
     if pos != 0:

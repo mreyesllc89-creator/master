@@ -208,8 +208,13 @@ def job(args):
     elapsed = time.time() - t0
     # acceptance: profitable IS and OOS, enough trades, PF >= 1.05 both
     candidates = [r for r in rows if r["is_"]["trades"] >= min_is and r["oos"]["trades"] >= min_oos
-                  and r["is_"]["net"] > 0 and r["oos"]["net"] > 0 and r["is_"]["pf"] >= 1.05 and r["oos"]["pf"] >= 1.05]
-    candidates.sort(key=lambda r: (r["all"]["rf"] if r["all"]["maxdd"] > 0 else 0) * r["all"]["net"], reverse=True)
+                  and r["is_"]["net"] > 0 and r["oos"]["net"] > 0 and r["is_"]["pf"] >= 1.15 and r["oos"]["pf"] >= 1.15]
+    # balanced rank: the weaker of the annualised IS / OOS profits, weighted by the weaker profit factor
+    yr_is = (is_hi - is_lo) / (365.25 * 86400); yr_oos = (oos_hi - oos_lo) / (365.25 * 86400)
+    def balanced(r):
+        return min(r["is_"]["net"] / yr_is, r["oos"]["net"] / yr_oos) * min(r["is_"]["pf"], r["oos"]["pf"], 3.0) * min(1.0, (r["all"]["rf"] if r["all"]["maxdd"] > 0 else 0) / 3.0)
+    for r in rows: r["balanced"] = balanced(r) if r in candidates else 0.0
+    candidates.sort(key=balanced, reverse=True)
     uniq = []; sigs = set()
     for r in candidates:
         sg = (r["all"]["trades"], round(r["all"]["net"], 4), r["is_"]["trades"], round(r["is_"]["net"], 4))
@@ -219,7 +224,7 @@ def job(args):
     # cost stress: spread and commission doubled must still leave a profit in both windows
     accepted = []
     usd = mk.spec["usd_per_unit"]
-    for r in candidates[:60]:
+    for r in candidates[:80]:
         rr = mk.run(r["params"], cost_mult=2.0)
         si = R.metrics(rr, is_lo, is_hi); so_ = R.metrics(rr, oos_lo, oos_hi); sa = R.metrics(rr, is_lo, oos_hi)
         for m in (si, so_, sa):
@@ -233,7 +238,7 @@ def job(args):
     out = dict(symbol=symbol, tf=tf, tf_label=TF_LABEL[tf], bars=bars, window=window,
                is_window=[is_lo, is_hi], oos_window=[oos_lo, oos_hi], evaluated=len(rows), accepted=len(accepted),
                elapsed_s=elapsed, min_is_trades=min_is, min_oos_trades=min_oos,
-               baseline=rows[0], top=accepted[:10], candidates_before_stress=len(candidates),
+               baseline=rows[0], top=accepted[:40], candidates_before_stress=len(candidates),
                all_rows=[dict(gen=r["gen"], score=r["score"], is_=r["is_"], oos=r["oos"], all=r["all"]) for r in rows])
     with open(os.path.join(OUT, f"{symbol}_{TF_LABEL[tf]}.json"), "w") as f:
         json.dump(out, f, default=str)
