@@ -7,6 +7,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 RESULTS = os.path.join(HERE, "results")
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "out")
 TOP_N = 3
+MIN_WINNERS_IS = 15
+MIN_WINNERS_OOS = 8
+# modeled round-trip cost per 0.01 lot in USD (gold: 28 pts on 1 oz; BTC: ~0.04 % of ~100k on 0.01 BTC)
+COST_RT_USD = {"XAUUSD": 0.28, "BTCUSD": 0.40}
 TF_LABEL = {1: "M1", 5: "M5", 15: "M15", 30: "M30", 60: "H1", 240: "H4"}
 LIVE_ADMITTED = {1, 5}  # XpwV92ClockPairAdmitted: live charts admit M1->1/5, M5->1/5 (and M10/M15->10); others tester-only
 ENUM_TF = R.ENUM_TF
@@ -58,8 +62,13 @@ def main():
                 w.writerow([r["gen"], round(r["score"], 2), r["is_"]["trades"], round(r["is_"]["net"], 2), round(r["is_"]["pf"], 3), round(r["is_"]["maxdd"], 2),
                             r["oos"]["trades"], round(r["oos"]["net"], 2), round(r["oos"]["pf"], 3), round(r["oos"]["maxdd"], 2),
                             r["all"]["trades"], round(r["all"]["net"], 2), round(r["all"]["pf"], 3), round(r["all"]["maxdd"], 2)])
-        for rank, r in enumerate(j["top"][:TOP_N], 1):
+        # statistical sanity: enough winning trades in both windows (no lottery-ticket presets)
+        sane = [r for r in j["top"] if r["is_"]["win"] * r["is_"]["trades"] >= MIN_WINNERS_IS and r["oos"]["win"] * r["oos"]["trades"] >= MIN_WINNERS_OOS]
+        summary[-1]["dropped_too_few_winners"] = len(j["top"]) - len(sane)
+        for rank, r in enumerate(sane[:TOP_N], 1):
             p = r["params"]
+            cost_rt = COST_RT_USD[sym]
+            fragile = r["all"]["avg"] < 2.0 * cost_rt
             tag = f"CAL20261106_{sym}_{lab}_r{rank}"
             name = f"{sym}_{lab}_rank{rank}.set"
             live = "live-admitted chart/signal clock" if tf in LIVE_ADMITTED else "TESTER-ONLY clock (EA refuses this SigTF on a live chart)"
@@ -71,9 +80,9 @@ def main():
                 f"Out-of-sample {d(j['oos_window'][0])}..{d(j['oos_window'][1])}: {r['oos']['trades']} trades, net {r['oos']['net']:.0f} USD, PF {r['oos']['pf']:.2f}, maxDD {r['oos']['maxdd']:.0f} USD.",
                 f"2x-cost stress (full period): net {r['stress_all']['net']:.0f} USD, PF {r['stress_all']['pf']:.2f}.",
                 f"Live execution DISABLED (EnableTrading=false, FenceAllowExecution=false). Native MT5 performance NOT verified. Profit per 0.01 lot.",
-            ]
+            ] + ([f"WARNING: average profit per trade ({r['all']['avg']:.2f} USD) is below 2x the modeled round-trip cost; very sensitive to real spread/commission."] if fragile else [])
             P.write_set(os.path.join(OUT, "presets", name), p, sym, tf, tag, header)
-            accepted_rows.append(dict(symbol=sym, tf=lab, rank=rank, preset=name, live_clock=tf in LIVE_ADMITTED,
+            accepted_rows.append(dict(symbol=sym, tf=lab, rank=rank, preset=name, live_clock=tf in LIVE_ADMITTED, cost_fragile=fragile,
                                       is_trades=r["is_"]["trades"], is_net_usd=round(r["is_"]["net"], 2), is_pf=round(r["is_"]["pf"], 3), is_win=round(r["is_"]["win"], 3), is_maxdd_usd=round(r["is_"]["maxdd"], 2),
                                       oos_trades=r["oos"]["trades"], oos_net_usd=round(r["oos"]["net"], 2), oos_pf=round(r["oos"]["pf"], 3), oos_win=round(r["oos"]["win"], 3), oos_maxdd_usd=round(r["oos"]["maxdd"], 2),
                                       all_trades=r["all"]["trades"], all_net_usd=round(r["all"]["net"], 2), all_pf=round(r["all"]["pf"], 3), all_maxdd_usd=round(r["all"]["maxdd"], 2), all_avg_usd=round(r["all"]["avg"], 3),
@@ -90,17 +99,18 @@ def main():
     L.append("Presets in `presets/` are the input combinations that stayed profitable in-sample, out-of-sample and under doubled trading costs in a Python replica of the EA's decision logic. "
              "This is **not** an MT5 Strategy Tester result and **not** live-broker evidence; all live gates in the presets remain disabled (`EnableTrading=false`, `FenceAllowExecution=false`).\n")
     L.append("## Search summary\n")
-    L.append("| Symbol | TF | Bars | Data window | Combos evaluated | Pass IS+OOS | Pass 2x-cost stress | Reference-preset net (USD/0.01 lot) | Best accepted net (USD/0.01 lot) |")
+    L.append("| Symbol | TF | Bars | Data window | Combos evaluated | Pass IS+OOS | Pass 2x-cost stress | Saved presets | Reference-preset net (USD/0.01 lot) |")
     L.append("|---|---|---:|---|---:|---:|---:|---:|---:|")
     for s in summary:
-        L.append(f"| {s['symbol']} | {s['tf']} | {s['bars']} | {s['window']} | {s['evaluated']} | {s['candidates_is_oos']} | {s['accepted']} | {s['baseline_net_usd']} ({s['baseline_trades']} trades, PF {s['baseline_pf']}) | {s['best_net_usd']} |")
+        saved = sum(1 for a in accepted_rows if a["symbol"] == s["symbol"] and a["tf"] == s["tf"])
+        L.append(f"| {s['symbol']} | {s['tf']} | {s['bars']} | {s['window']} | {s['evaluated']} | {s['candidates_is_oos']} | {s['accepted']} | {saved} | {s['baseline_net_usd']} ({s['baseline_trades']} trades, PF {s['baseline_pf']}) |")
     L.append("")
     L.append("## Accepted presets\n")
     L.append("Profit figures are USD per 0.01 lot (gold: 1 oz; BTC: 0.01 BTC) after modeled spread and commission. IS = in-sample selection window, OOS = out-of-sample validation window, 2x = full period with spread and commission doubled.\n")
-    L.append("| Preset | Clock | IS trades | IS net | IS PF | IS maxDD | OOS trades | OOS net | OOS PF | OOS maxDD | 2x-cost net | 2x PF | Avg/trade |")
-    L.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    L.append("| Preset | Clock | IS trades | IS net | IS PF | IS win | IS maxDD | OOS trades | OOS net | OOS PF | OOS win | OOS maxDD | 2x-cost net | 2x PF | Avg/trade | Note |")
+    L.append("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|")
     for a in accepted_rows:
-        L.append(f"| `{a['preset']}` | {'live' if a['live_clock'] else 'tester-only'} | {a['is_trades']} | {a['is_net_usd']:.0f} | {a['is_pf']:.2f} | {a['is_maxdd_usd']:.0f} | {a['oos_trades']} | {a['oos_net_usd']:.0f} | {a['oos_pf']:.2f} | {a['oos_maxdd_usd']:.0f} | {a['stress2x_net_usd']:.0f} | {a['stress2x_pf']:.2f} | {a['all_avg_usd']:.2f} |")
+        L.append(f"| `{a['preset']}` | {'live' if a['live_clock'] else 'tester-only'} | {a['is_trades']} | {a['is_net_usd']:.0f} | {a['is_pf']:.2f} | {a['is_win']:.2f} | {a['is_maxdd_usd']:.0f} | {a['oos_trades']} | {a['oos_net_usd']:.0f} | {a['oos_pf']:.2f} | {a['oos_win']:.2f} | {a['oos_maxdd_usd']:.0f} | {a['stress2x_net_usd']:.0f} | {a['stress2x_pf']:.2f} | {a['all_avg_usd']:.2f} | {'cost-fragile' if a['cost_fragile'] else ''} |")
     L.append("")
     L.append("### What each preset does\n")
     for a in accepted_rows:
@@ -113,7 +123,7 @@ def main():
 3. **Fills.** Signals are evaluated on closed bars (`EnterTick=false` in every preset, matching the backtest). Market orders fill at the next bar open, virtual stop entries at max(stop, open) inside the 1-minute sub-bar that reaches them, SL/TP/trailing are resolved on 1-minute sub-bars with the stop loss assumed first when both are reachable and the pessimistic high-then-low order for trailing. One position at a time, fixed 0.01 lot (the cent gate rejects any other volume).
 4. **Costs.** XAUUSD: 25-point spread + 3-point commission per trade (0.28 USD per oz round trip). BTCUSD: 0.03 % spread + 0.01 % commission of price. Acceptance additionally requires profit with both doubled.
 5. **Search.** Per symbol and timeframe: the reference preset, then random sampling over the input grid in `tools/xpw_search.py` (signal mode, turn/CONT entry style, opposite-signal mode, exits in points or ATR, trailing, time stop, loss reversal, RSI/MA lengths, square geometry, wick and CONT thresholds, FlashGold filter on/off and its timeframes, band, burst, zones), followed by 3-5 rounds of mutating the best in-sample candidates.
-6. **Acceptance.** In-sample net > 0 and PF >= 1.05 with a minimum trade count, out-of-sample net > 0 and PF >= 1.05, and full-period net > 0 in both windows with 2x costs. Ranked by net profit x recovery factor over the full period. Up to 3 presets per symbol/timeframe are saved.
+6. **Acceptance.** In-sample net > 0 and PF >= 1.15 with a minimum trade count, out-of-sample net > 0 and PF >= 1.15, net > 0 in both windows with 2x costs, and at least 15 (IS) / 8 (OOS) winning trades so a handful of outliers cannot carry a preset. Ranked by the weaker of the annualised IS and OOS profits, weighted by the weaker profit factor and the recovery factor. Up to 3 distinct presets per symbol/timeframe are saved. "cost-fragile" marks presets whose average profit per trade is below twice the modeled round-trip cost.
 
 ## Caveats (read before using)
 
