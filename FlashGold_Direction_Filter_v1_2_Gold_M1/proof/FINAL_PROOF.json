@@ -1,0 +1,1349 @@
+{
+  "schema_version": 1,
+  "title": "FlashGold Direction Filter v1.2 — final bounded engineering proof",
+  "status": "ENGINEERING_CHECKS_PASS_RELEASE_ADOPTION_SEPARATE",
+  "component": "flashgold-direction-filter-v12-20261013",
+  "run_id": "FG12HOST013",
+  "intended_target": "Gold M1 on Octa or VT MT5; the tested replay uses identical frozen OANDA data, not those brokers live feeds",
+  "product_kind": "indicator_only_no_trading_operations",
+  "source_sha256": "4986a48dd9d5e791141b824b457eae8a4fb4c19662f2a7008007d82f371faae1",
+  "pine_sha256": "387f49dc5c4b7a1050a85407b9e70dded367cffeeb15d24078d4cca63bbb204f",
+  "indicator_ex5_sha256": "ba815178b400a42f623d07da477ab8cb4a5258cb42a006cf53060b4bbbe49628",
+  "delivery_payload": [
+    {
+      "relative_path": "MQL5/Indicators/FlashGold_Direction_Filter_v1_2.mq5",
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\worktree\\MQL5\\Indicators\\FlashGold_Direction_Filter_v1_2.mq5",
+      "bytes": 22415,
+      "sha256": "484ecfbe8ebdaff9432cef47e2752b2de0f7959428bd1c95a44d1fb50ae6eb39"
+    },
+    {
+      "relative_path": "MQL5/Indicators/FlashGold_Direction_Filter_v1_2.ex5",
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\binaries\\FlashGold_Direction_Filter_v1_2.ex5",
+      "bytes": 117538,
+      "sha256": "ba815178b400a42f623d07da477ab8cb4a5258cb42a006cf53060b4bbbe49628"
+    },
+    {
+      "relative_path": "MQL5/Include/FlashGold/DirectionFilterCore.mqh",
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\worktree\\MQL5\\Include\\FlashGold\\DirectionFilterCore.mqh",
+      "bytes": 17562,
+      "sha256": "5baa1f7ddfea7965e1da802edbb85ba88bec5c777730da7cb56a5434d7fb8978"
+    },
+    {
+      "relative_path": "MQL5/Include/FlashGold/DirectionFilterClock.mqh",
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\worktree\\MQL5\\Include\\FlashGold\\DirectionFilterClock.mqh",
+      "bytes": 6795,
+      "sha256": "997336e20521f7b8db140b21e13a69d8a26e1bb9cf6848996d755bf240397b78"
+    },
+    {
+      "relative_path": "MQL5/Include/FlashGold/DirectionFilterRender.mqh",
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\worktree\\MQL5\\Include\\FlashGold\\DirectionFilterRender.mqh",
+      "bytes": 32995,
+      "sha256": "e0319a229c19f27bca9b834999acc3e4912694500f2ce652554ca6dddf0e3460"
+    },
+    {
+      "relative_path": "presets/FlashGold_Direction_Filter_v1_2_Default.set",
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\worktree\\presets\\FlashGold_Direction_Filter_v1_2_Default.set",
+      "bytes": 1990,
+      "sha256": "3b647d715f0e224847cb768fc40bc47477c2baff87685fd6b0e105396915462d"
+    }
+  ],
+  "all_53_defaults": {
+    "fgfOn": "true",
+    "fgfTf": "16385",
+    "fgfLvMode": "0",
+    "fgfLast": "0",
+    "fgfMinutes": "60",
+    "fgfBars": "1",
+    "fgfCheck": "0",
+    "fgfBandAtr": "0.25",
+    "fgfAgainst": "true",
+    "fgfAllowBuy": "true",
+    "fgfAllowSell": "true",
+    "fgfShowBg": "true",
+    "fgfShowLv": "true",
+    "fgfSigMark": "true",
+    "fgfShowTbl": "true",
+    "fgfTblPos": "0",
+    "fgsShow": "false",
+    "fgsWin": "500",
+    "fgsH": "10",
+    "fgfSpreadPts": "25.0",
+    "fgfEntryDistPts": "50.0",
+    "fgfHoldBars": "0",
+    "fgfHoldFavPts": "5.0",
+    "fgfOnePerBar": "true",
+    "fgfDistUnit": "0",
+    "fgfBurstAtr": "0.5",
+    "fgfEntryDistAtr": "0.25",
+    "fgfHoldFavAtr": "0.1",
+    "fgfBurstPts": "172.0",
+    "fgfUseBurst": "true",
+    "fgfAnyCombo": "false",
+    "fgfDriftBars": "60",
+    "fgfUseDrift": "false",
+    "fgfUseZones": "true",
+    "fgfParentTf": "16385",
+    "fgfRsiLen": "14",
+    "fgfFastLen": "2",
+    "fgfMinAligned": "2",
+    "fgfFlatParent": "false",
+    "fgfIgnoreNa": "true",
+    "fgfHtfClosed": "true",
+    "fgfUseZ1": "true",
+    "fgfZTf1": "16385",
+    "fgfUseZ2": "true",
+    "fgfZTf2": "16386",
+    "fgfUseZ3": "true",
+    "fgfZTf3": "16388",
+    "fgfUseZ4": "false",
+    "fgfZTf4": "16392",
+    "fgfUseZ5": "false",
+    "fgfZTf5": "1",
+    "fgfUseZ6": "false",
+    "fgfZTf6": "2"
+  },
+  "input_metadata": {
+    "native_default_values_and_types": 53,
+    "serialized_groups": 5,
+    "exact_indicator_path": true,
+    "native_assertion": "gold_all_53_default_inputs_and_five_groups"
+  },
+  "build": {
+    "status": "PASS",
+    "targets": [
+      {
+        "name": "FlashGold_Direction_Filter_v1_2",
+        "kind": "indicator",
+        "status": "passed",
+        "errors": 0,
+        "warnings": 0,
+        "command": [
+          "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MetaEditor64.exe",
+          "/portable",
+          "/compile:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MQL5\\Indicators\\FlashGold_Direction_Filter_v1_2.mq5\"",
+          "/log:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\logs\\FlashGold_Direction_Filter_v1_2.compile.log\"",
+          "/inc:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MQL5\""
+        ],
+        "binary": {
+          "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\binaries\\FlashGold_Direction_Filter_v1_2.ex5",
+          "sha256": "ba815178b400a42f623d07da477ab8cb4a5258cb42a006cf53060b4bbbe49628",
+          "bytes": 117538
+        }
+      },
+      {
+        "name": "FlashGold_CoreChecks",
+        "kind": "script",
+        "status": "passed",
+        "errors": 0,
+        "warnings": 0,
+        "command": [
+          "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MetaEditor64.exe",
+          "/portable",
+          "/compile:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\tests\\FlashGold_CoreChecks.mq5\"",
+          "/log:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\logs\\FlashGold_CoreChecks.compile.log\"",
+          "/inc:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MQL5\""
+        ],
+        "binary": {
+          "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\binaries\\FlashGold_CoreChecks.ex5",
+          "sha256": "754d13194088edaf863627460e37cb09d4ab7f8af80660134ac9f3db34db7054",
+          "bytes": 52114
+        }
+      },
+      {
+        "name": "FlashGold_IndicatorFixture",
+        "kind": "expert",
+        "status": "passed",
+        "errors": 0,
+        "warnings": 0,
+        "command": [
+          "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MetaEditor64.exe",
+          "/portable",
+          "/compile:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\tests\\FlashGold_IndicatorFixture.mq5\"",
+          "/log:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\logs\\FlashGold_IndicatorFixture.compile.log\"",
+          "/inc:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MQL5\""
+        ],
+        "binary": {
+          "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\binaries\\FlashGold_IndicatorFixture.ex5",
+          "sha256": "8ba991ccc9dbab7f7dd8662d10de03ccbe19ce069a5b5e727298dcdaa3b95695",
+          "bytes": 1941430
+        }
+      },
+      {
+        "name": "FlashGold_CaptureWorker",
+        "kind": "expert",
+        "status": "passed",
+        "errors": 0,
+        "warnings": 0,
+        "command": [
+          "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MetaEditor64.exe",
+          "/portable",
+          "/compile:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\tests\\FlashGold_CaptureWorker.mq5\"",
+          "/log:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\logs\\FlashGold_CaptureWorker.compile.log\"",
+          "/inc:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MQL5\""
+        ],
+        "binary": {
+          "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\binaries\\FlashGold_CaptureWorker.ex5",
+          "sha256": "c52213252067a5b67122adf48f444850afcdd0da69549be0b4f45771781bee77",
+          "bytes": 26030
+        }
+      },
+      {
+        "name": "FlashGold_GoldFixture",
+        "kind": "expert",
+        "status": "passed",
+        "errors": 0,
+        "warnings": 0,
+        "command": [
+          "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MetaEditor64.exe",
+          "/portable",
+          "/compile:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\tests\\FlashGold_GoldFixture.mq5\"",
+          "/log:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\logs\\FlashGold_GoldFixture.compile.log\"",
+          "/inc:\"C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compiler\\MQL5\""
+        ],
+        "binary": {
+          "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\binaries\\FlashGold_GoldFixture.ex5",
+          "sha256": "c1a02549663183ae4f392916f6c263cf1fd289fd80011c137e55a4318ebcf9dd",
+          "bytes": 88572
+        }
+      }
+    ],
+    "compiler": {
+      "path": "C:\\Program Files\\MetaTrader 5\\MetaEditor64.exe",
+      "sha256": "197ca3dd8d1971831366f54cb57bf3f120b420700e573135509d406e4e23709e",
+      "bytes": 115840616
+    },
+    "standard_include_root": "D:\\TradingSystems\\shared_workspace\\runs\\20260909T010843-build-speedalert-continuation-5e93a3b1\\build\\compiler\\MQL5\\Include",
+    "fingerprints": {
+      "action": "build",
+      "compiler": "197ca3dd8d1971831366f54cb57bf3f120b420700e573135509d406e4e23709e",
+      "component": "flashgold-direction-filter-v12-20261013",
+      "environment": "087dcae4b97036aa99007ba2ff3c1b2b0856ce55f25b925cd120391bc37088b6",
+      "includes": "0313f2dd22fe5f47973ab0e1a847c2054e07f888424f4039132c286d3f76636a",
+      "machine_configuration": "2a5e458651670b29de10943242cc41a40f2137415ebc15148ea6c458114fe6f5",
+      "mode": "build",
+      "registry": "50dca19e08a96241daca26a2c410a3bf7104e0e844c4ff08194a63d8f44b349d",
+      "source": "4986a48dd9d5e791141b824b457eae8a4fb4c19662f2a7008007d82f371faae1",
+      "tools": "d6d36b1e0fcf99f49931cbd5de9a4198c4af40b721667224f35ceb81e2781773",
+      "validation_only": false
+    }
+  },
+  "tests": {
+    "source_contract": 26,
+    "offline_harness": 103,
+    "native_main": 301,
+    "native_main_failures": 0,
+    "native_core_assertions": 145,
+    "native_core_failures": 0
+  },
+  "actual_gold": {
+    "status": "PASS",
+    "symbol": "OANDA:XAUUSD",
+    "timeframe": "M1",
+    "tick_size": "0.001",
+    "input_rows": {
+      "actual_m1": 44142,
+      "constructed_m1": 3897,
+      "total_native_m1": 48039,
+      "golden_confirmed": 43302,
+      "missing_telemetry": 839,
+      "omitted": [
+        {
+          "utc_ms": 1791944640000,
+          "reason": "Pine unconfirmed"
+        }
+      ]
+    },
+    "compared_closed_rows": 43302,
+    "nine_buffer_fields": 389718,
+    "mismatches": 0,
+    "max_level_absolute_error": "4.533e-13",
+    "buffers": [
+      "active",
+      "buy_allowed",
+      "sell_allowed",
+      "level",
+      "signal",
+      "ended",
+      "zone",
+      "signal_confirmed",
+      "score"
+    ],
+    "tolerances": {
+      "discrete": 0,
+      "input_ohlc": "1e-8",
+      "level": "1e-8",
+      "missing": "exact",
+      "score": "1e-10"
+    },
+    "metadata_inclusive_groups": {
+      "actual_pine_outputs": {
+        "fields": 562926,
+        "rows": 43302
+      },
+      "h1_readback": {
+        "fields": 27810,
+        "rows": 4635
+      },
+      "h2_readback": {
+        "fields": 14514,
+        "rows": 2419
+      },
+      "h4_readback": {
+        "fields": 7272,
+        "rows": 1212
+      },
+      "m1_readback": {
+        "fields": 336273,
+        "rows": 48039
+      }
+    },
+    "provider_dependency_checks": {
+      "h1": {
+        "checked_fields": 13902,
+        "closed_rows": 4634,
+        "ignored_differences": [
+          {
+            "absolute_error": "0.1050000000002546",
+            "actual": "4163.4049999999997454",
+            "field": "open",
+            "native_ms": "1791928800000",
+            "provider": "4163.51",
+            "reason": "unused_by_default_equations",
+            "row": 4628
+          },
+          {
+            "absolute_error": "1.5050000000000364",
+            "actual": "4161.7100000000000364",
+            "field": "close",
+            "native_ms": "1791954000000",
+            "provider": "4160.205",
+            "reason": "final_forming_context",
+            "row": 4634
+          }
+        ],
+        "max_required_absolute": "4.366E-13",
+        "required_fields": [
+          "high",
+          "low",
+          "close"
+        ],
+        "rows": 4635
+      },
+      "h2": {
+        "checked_fields": 2418,
+        "closed_rows": 2418,
+        "ignored_differences": [
+          {
+            "absolute_error": "0.1050000000002546",
+            "actual": "4163.4049999999997454",
+            "field": "open",
+            "native_ms": "1791928800000",
+            "provider": "4163.51",
+            "reason": "unused_by_default_equations",
+            "row": 2415
+          },
+          {
+            "absolute_error": "0.6349999999999636",
+            "actual": "4161.7100000000000364",
+            "field": "close",
+            "native_ms": "1791950400000",
+            "provider": "4162.345",
+            "reason": "final_forming_context",
+            "row": 2418
+          }
+        ],
+        "max_required_absolute": "4.366E-13",
+        "required_fields": [
+          "close"
+        ],
+        "rows": 2419
+      },
+      "h4": {
+        "checked_fields": 1211,
+        "closed_rows": 1211,
+        "ignored_differences": [
+          {
+            "absolute_error": "5.9449999999996362",
+            "actual": "4164.8500000000003638",
+            "field": "open",
+            "native_ms": "1791835200000",
+            "provider": "4170.795",
+            "reason": "unused_by_default_equations",
+            "row": 1203
+          },
+          {
+            "absolute_error": "0.1599999999999636",
+            "actual": "4161.7100000000000364",
+            "field": "close",
+            "native_ms": "1791950400000",
+            "provider": "4161.87",
+            "reason": "final_forming_context",
+            "row": 1211
+          }
+        ],
+        "max_required_absolute": "4.366E-13",
+        "required_fields": [
+          "close"
+        ],
+        "rows": 1212
+      }
+    },
+    "reload_all_nine_exact": true,
+    "all_native_rows_domain_checked": 48039,
+    "constructed_or_excluded_rows_not_actual_output_comparisons": 4737
+  },
+  "synthetic_oracle": {
+    "status": "PASS",
+    "total_compared_values": 4940924,
+    "failures": 0,
+    "core_scenarios": 30,
+    "core": {
+      "expected_rows": 3716,
+      "failures": [],
+      "rows": 3716,
+      "values": 107764
+    },
+    "gates": {
+      "expected_rows": 37160,
+      "failures": [],
+      "rows": 37160,
+      "values": 1077640
+    },
+    "indicator_case_count": 9,
+    "indicator_rows": 234720,
+    "indicator_compared_values": 3755520,
+    "cases": [
+      {
+        "case": "default",
+        "closed_rows": 43199,
+        "compared_values": 691200,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 2.2798787041318905e-13,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 43200
+      },
+      {
+        "case": "disabled",
+        "closed_rows": 43199,
+        "compared_values": 691200,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 2.2798787041318905e-13,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 43200
+      },
+      {
+        "case": "m5_h1_open",
+        "closed_rows": 8639,
+        "compared_values": 138240,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 2.2798787041318905e-13,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 8640
+      },
+      {
+        "case": "h1_m5_open",
+        "closed_rows": 719,
+        "compared_values": 11520,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 2.2548951603745685e-13,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 720
+      },
+      {
+        "case": "h1_m5_close",
+        "closed_rows": 719,
+        "compared_values": 11520,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 2.2548951603745685e-13,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 720
+      },
+      {
+        "case": "minutes",
+        "closed_rows": 43199,
+        "compared_values": 691200,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 2.2798787041318905e-13,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 43200
+      },
+      {
+        "case": "zero_candles",
+        "closed_rows": 43199,
+        "compared_values": 691200,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 0,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 43200
+      },
+      {
+        "case": "m5_m3",
+        "closed_rows": 8639,
+        "compared_values": 138240,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 2.2633374562877844e-13,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 8640
+      },
+      {
+        "case": "scored",
+        "closed_rows": 43199,
+        "compared_values": 691200,
+        "failure_samples": [],
+        "max_absolute_error": {
+          "active": 0,
+          "bar_end_ms": 0,
+          "buy_allowed": 0,
+          "close": 0,
+          "ended": 0,
+          "high": 0,
+          "level": 2.2798787041318905e-13,
+          "live": 0,
+          "low": 0,
+          "open": 0,
+          "score": 1.9120528594212804e-16,
+          "sell_allowed": 0,
+          "signal": 0,
+          "signal_confirmed": 0,
+          "time_ms": 0,
+          "zone": 0
+        },
+        "mismatches": 0,
+        "provisional_rows": 1,
+        "rows": 43200
+      }
+    ],
+    "schema": 1,
+    "scope": "Independent Decimal source oracle against actual iCustom buffer CSV on identical synthetic M1 OHLC; no actual TradingView runtime golden",
+    "last_bar_scope": "Adapter provisional-last-bar convention only; closed-market Pine confirmation not asserted",
+    "count_explanation": "Counts include native state/gates plus OHLC/time/control fields; they are not all independent actual-Pine buffer comparisons."
+  },
+  "timing": {
+    "calendar_scope": "Explicit weekly native sessions; no historical holiday or cross-feed inference",
+    "required_assertions": [
+      "timing_actual_pine_shortened_30min_close",
+      "timing_actual_pine_historical_confirmed",
+      "timing_native_quote_session_readback",
+      "timing_actual_session_post_seed_exact_roster",
+      "timing_actual_session_m1_h1_prebuilt",
+      "timing_actual_session_post_quote_exact_roster",
+      "normal_timer_dependent_geometry_ready",
+      "normal_timer_normal_geometry_ready",
+      "timing_actual_session_closing_quote_readback",
+      "timing_actual_session_without_quote_provisional",
+      "timing_actual_session_confirmed_level_gate",
+      "timing_actual_session_reload_closed_buffers_match",
+      "normal_timer_template_applied",
+      "normal_timer_baseline_stable_before_expiry",
+      "normal_timer_idle_crossed_permission_expiry",
+      "normal_timer_no_new_quote",
+      "normal_timer_cached_production_buffers_unchanged",
+      "normal_timer_cached_production_visual_unchanged",
+      "normal_timer_owned_chart_closed",
+      "timing_owned_symbol_deleted"
+    ],
+    "scope": "normal_chart_template_production_binary_idle_past_expiry_and_chart_events;no_instrumented_callback_counter",
+    "status": "PASS"
+  },
+  "no_tick_argb": {
+    "comparison": "All original uint32 ARGB resource pixels and dimensions byte-identical",
+    "snapshots": [
+      {
+        "bytes": 2468208,
+        "height": 574,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_normal_timer_before.argb",
+        "phase": "before",
+        "sha256": "1a521774ba9470868349c6b3b79603c945a28b28f21b2d43f28aa9bfd5174f8d",
+        "width": 1075
+      },
+      {
+        "bytes": 2468208,
+        "height": 574,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_normal_timer_after.argb",
+        "phase": "after",
+        "sha256": "1a521774ba9470868349c6b3b79603c945a28b28f21b2d43f28aa9bfd5174f8d",
+        "width": 1075
+      }
+    ],
+    "status": "PASS"
+  },
+  "idle_observation": [
+    "now_ms=1791950822000 elapsed_ms=84984 tick_ms=1791950729000"
+  ],
+  "clock_diagnostics": [
+    "trade_server=2026.10.14 04:04:46 current=1970.01.01 00:00:00",
+    "trade_server=2026.10.14 04:04:49 current=1970.01.01 00:00:00 elapsed_ms=2406"
+  ],
+  "rendering": {
+    "png_alignment": {
+      "basic": {
+        "acceptance_rule": "One native reference row with >=100 exact-color pixels must lie inside one contiguous opaque canvas stroke of 1-3 rows, each with >=100 exact-color pixels.",
+        "bytes": 30896,
+        "canvas_rgb": [
+          0,
+          230,
+          118
+        ],
+        "canvas_row_counts": {
+          "286": 800,
+          "287": 800
+        },
+        "canvas_supported_rows": [
+          286,
+          287
+        ],
+        "contiguous_canvas_stroke": true,
+        "height": 592,
+        "logged_canvas_xy": [
+          744,
+          284
+        ],
+        "minimum_exact_color_pixels_per_row": 100,
+        "native_rgb": [
+          255,
+          0,
+          255
+        ],
+        "native_row_counts": {
+          "286": 122
+        },
+        "native_row_intersects_canvas_stroke": true,
+        "native_supported_rows": [
+          286
+        ],
+        "pair": "basic",
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_basic.png",
+        "price": "2075.75000000",
+        "scope": "original_native_png_hline_against_canvas_level",
+        "sha256": "308b640a833b1ac9f279f07228edefabe249f1de033c0531f9170ec66ae179a3",
+        "status": "PASS",
+        "unique_native_row": true,
+        "width": 1100
+      },
+      "off_midpoint": {
+        "acceptance_rule": "One native reference row with >=100 exact-color pixels must lie inside one contiguous opaque canvas stroke of 1-3 rows, each with >=100 exact-color pixels.",
+        "bytes": 24471,
+        "canvas_rgb": [
+          242,
+          54,
+          69
+        ],
+        "canvas_row_counts": {
+          "395": 800,
+          "396": 800
+        },
+        "canvas_supported_rows": [
+          395,
+          396
+        ],
+        "contiguous_canvas_stroke": true,
+        "height": 592,
+        "logged_canvas_xy": [
+          744,
+          393
+        ],
+        "minimum_exact_color_pixels_per_row": 100,
+        "native_rgb": [
+          0,
+          255,
+          255
+        ],
+        "native_row_counts": {
+          "395": 127
+        },
+        "native_row_intersects_canvas_stroke": true,
+        "native_supported_rows": [
+          395
+        ],
+        "pair": "alignment",
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_alignment.png",
+        "price": "2063.78000000",
+        "scope": "original_native_png_hline_against_canvas_level",
+        "sha256": "d46fe36153c43df392a09faec0bcb2cbb4bc13eb92eebb60d67d0486bf6b0832",
+        "status": "PASS",
+        "unique_native_row": true,
+        "width": 1100
+      },
+      "scope": "two_native_hline_prices_and_native_vline_time_against_original_canvas_pngs",
+      "status": "PASS",
+      "time_endpoint": {
+        "absolute_delta_pixels": 0,
+        "acceptance_rule": "Unique native yellow column with >=100 exact pixels must be within one pixel of the opaque lime horizontal stroke endpoint.",
+        "canvas_endpoint_x": 802,
+        "logged_endpoint_xy": [
+          800,
+          284
+        ],
+        "native_column_counts": {
+          "802": 261
+        },
+        "native_rgb": [
+          255,
+          255,
+          0
+        ],
+        "native_supported_columns": [
+          802
+        ],
+        "status": "PASS",
+        "time_ms": 1738281540000
+      }
+    },
+    "self_chart_gc_captures": {
+      "captures": [
+        {
+          "first_visible_bar": 1056,
+          "full_dimensions": [
+            1100,
+            592
+          ],
+          "image": "FG12HOST013_render_gc_committed.png",
+          "plot_dimensions": [
+            1057,
+            569
+          ],
+          "sequence": 1,
+          "sha256": "6bf48fd356e6f622daf5d4f17539237e94ff36a92d9439923beae0d9cd5318aa"
+        },
+        {
+          "first_visible_bar": 1056,
+          "full_dimensions": [
+            1100,
+            592
+          ],
+          "image": "FG12HOST013_render_gc_reset.png",
+          "plot_dimensions": [
+            1057,
+            569
+          ],
+          "sequence": 2,
+          "sha256": "8a8007c3a47f80dd3929b34524bef916b3463d894371abaa76daf9c52797e061"
+        }
+      ],
+      "nonce": "FG12HOST013_16162257",
+      "owner_chart": "73149249830636",
+      "scope": "Guarded worker on exact owned chart calls ChartScreenShot(0); original viewport preserved",
+      "status": "PASS",
+      "target_chart": "73149352048497"
+    },
+    "screenshots": [
+      {
+        "bytes": 48141,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_dark.png",
+        "sha256": "3f1e91afbd567c23c816ebc88d0e6e3b50149aa8d7bc16455af1e3167c96d18e",
+        "width": 1100
+      },
+      {
+        "bytes": 41700,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_light.png",
+        "sha256": "68bc57cc6e9aadc24ef519c8b42cd2846289f54a82ba43e5e8e9dd6f00722b3d",
+        "width": 1100
+      },
+      {
+        "bytes": 30896,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_basic.png",
+        "sha256": "308b640a833b1ac9f279f07228edefabe249f1de033c0531f9170ec66ae179a3",
+        "width": 1100
+      },
+      {
+        "bytes": 24471,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_alignment.png",
+        "sha256": "d46fe36153c43df392a09faec0bcb2cbb4bc13eb92eebb60d67d0486bf6b0832",
+        "width": 1100
+      },
+      {
+        "bytes": 38666,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_table_bounds.png",
+        "sha256": "39ff83b63a2a8e6d56ec8578d7b153087b4ffafd719a52e39d88038afc4d9c23",
+        "width": 1100
+      },
+      {
+        "bytes": 28369,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_theme.png",
+        "sha256": "843eaa7c5d6c053f2786dd19906e7a372b336fa5af3bd0fa834ad6ac399064cd",
+        "width": 1100
+      },
+      {
+        "bytes": 38859,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_overlap.png",
+        "sha256": "e62cc6d5288ed5f3e2dd9a55358d1c93e12eb0e24646aef1041f4e4d626d6ab6",
+        "width": 1100
+      },
+      {
+        "bytes": 25357,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_retention.png",
+        "sha256": "311b354e72b22b3237e9a9c1f85b44c962a0456ab0e323266bc165bf4d82929f",
+        "width": 1100
+      },
+      {
+        "bytes": 25357,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_reinit.png",
+        "sha256": "311b354e72b22b3237e9a9c1f85b44c962a0456ab0e323266bc165bf4d82929f",
+        "width": 1100
+      },
+      {
+        "bytes": 34654,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_gc_committed.png",
+        "sha256": "6bf48fd356e6f622daf5d4f17539237e94ff36a92d9439923beae0d9cd5318aa",
+        "width": 1100
+      },
+      {
+        "bytes": 38284,
+        "height": 592,
+        "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_render_gc_reset.png",
+        "sha256": "8a8007c3a47f80dd3929b34524bef916b3463d894371abaa76daf9c52797e061",
+        "width": 1100
+      }
+    ],
+    "native_assertions": [
+      "assert|actual_chart_geometry_ready|PASS",
+      "assert|actual_indicator_chart_attach|PASS",
+      "assert|actual_indicator_chart_refresh|PASS",
+      "assert|actual_attached_geometry_ready|PASS",
+      "assert|actual_indicator_surfaces_ready|PASS",
+      "assert|actual_indicator_foreground_visible|PASS",
+      "assert|actual_second_indicator_attach|PASS",
+      "assert|actual_second_chart_refresh|PASS",
+      "assert|actual_second_surfaces_ready|PASS",
+      "assert|actual_instance_prefixes_unique|PASS",
+      "assert|reload_baseline_snapshot|PASS",
+      "assert|actual_indicator_cleanup|PASS",
+      "assert|reload_parameters|PASS",
+      "assert|reload_instance_ready|PASS",
+      "assert|reload_closed_buffers_match|PASS",
+      "assert|actual_reload_geometry_ready|PASS",
+      "assert|reload_chart_attach|PASS",
+      "assert|reload_chart_refresh|PASS",
+      "assert|reload_attached_geometry_ready|PASS",
+      "assert|reload_indicator_surfaces_ready|PASS",
+      "assert|reload_indicator_foreground_visible|PASS",
+      "assert|reload_indicator_cleanup|PASS",
+      "assert|renderer_owned_custom_chart|PASS",
+      "assert|renderer_1200_bars|PASS",
+      "assert|renderer_basic_geometry_ready|PASS",
+      "assert|renderer_init_A|PASS",
+      "assert|renderer_init_B|PASS",
+      "assert|renderer_basic_render|PASS",
+      "assert|renderer_does_not_scale_prices|PASS",
+      "assert|renderer_foreground_readable|PASS",
+      "assert|renderer_native_bitmap_origin|PASS",
+      "assert|renderer_native_xy_level|PASS",
+      "assert|renderer_green_background_alpha|PASS",
+      "assert|renderer_native_hline_reference|PASS",
+      "assert|renderer_native_vline_reference|PASS",
+      "assert|renderer_native_endpoint_xy|PASS",
+      "assert|renderer_native_hline_cleanup|PASS",
+      "assert|renderer_native_vline_cleanup|PASS",
+      "assert|renderer_offmidpoint_render|PASS",
+      "assert|renderer_native_offmidpoint_reference|PASS",
+      "assert|renderer_offmidpoint_native_xy|PASS",
+      "assert|renderer_native_offmidpoint_cleanup|PASS",
+      "assert|renderer_after_alignment_render|PASS",
+      "assert|renderer_table_bounds_render|PASS",
+      "assert|renderer_table_inside_native_price_axis|PASS",
+      "assert|renderer_after_table_bounds_render|PASS",
+      "assert|renderer_second_instance|PASS",
+      "assert|renderer_two_instance_names|PASS",
+      "assert|renderer_B_cleanup_preserves_A|PASS",
+      "assert|renderer_longprefix_init_C|PASS",
+      "assert|renderer_longprefix_init_D|PASS",
+      "assert|renderer_longprefix_render_C|PASS",
+      "assert|renderer_longprefix_render_D|PASS",
+      "assert|renderer_longprefix_distinct_objects_resources|PASS",
+      "assert|renderer_longprefix_cleanup_preserves_peer|PASS",
+      "assert|renderer_owned_fixture_rebind|PASS",
+      "assert|renderer_destroy_preserves_rebound_object|PASS",
+      "assert|renderer_collision_fixture_cleanup|PASS",
+      "assert|renderer_theme_geometry_ready|PASS",
+      "assert|renderer_theme_zoom_render|PASS",
+      "assert|renderer_zoom_native_xy_level|PASS",
+      "assert|renderer_overlap_geometry_ready|PASS",
+      "assert|renderer_overlap_baseline_render|PASS",
+      "assert|renderer_overlap_baseline_line_found|PASS",
+      "assert|renderer_overlap_render|PASS",
+      "assert|renderer_overlap_keeps_opaque_line|PASS",
+      "assert|renderer_overlap_mixes_level_color|PASS",
+      "assert|renderer_retention_geometry_ready|PASS",
+      "assert|renderer_retention_render|PASS",
+      "assert|renderer_retention_boundary_visible|PASS",
+      "assert|renderer_500line_old_removed|PASS",
+      "assert|renderer_500line_oldest_band_kept|PASS",
+      "assert|renderer_all_owned_objects_removed|PASS",
+      "assert|renderer_reinit_A|PASS",
+      "assert|renderer_reinit_render|PASS",
+      "assert|renderer_final_cleanup|PASS",
+      "assert|renderer_gc_fixture_history|PASS",
+      "assert|renderer_gc_navigation_queued|PASS",
+      "assert|renderer_gc_staged_begin|PASS",
+      "assert|renderer_gc_end_anchor_requested|PASS",
+      "assert|renderer_gc_geometry_ready|PASS",
+      "assert|renderer_gc_boundary_visible|PASS",
+      "assert|renderer_gc_native_one_pixel_spacing|PASS",
+      "assert|renderer_gc_end_viewport_contains_latest_bar|PASS",
+      "assert|renderer_gc_boundary_labels_have_image_room|PASS",
+      "assert|renderer_gc_init|PASS",
+      "assert|renderer_gc_initial_render|PASS",
+      "assert|renderer_500label_old_removed|PASS",
+      "assert|renderer_500label_oldest_kept|PASS",
+      "assert|renderer_gc_boundary_label_present|PASS",
+      "assert|renderer_gc_provisional_render|PASS",
+      "assert|renderer_gc_provisional_hides_history|PASS",
+      "assert|renderer_gc_rollback_render|PASS",
+      "assert|renderer_gc_samebar_rollback_restores_history|PASS",
+      "assert|renderer_gc_before_commit_render|PASS",
+      "assert|renderer_gc_commit_arrays|PASS",
+      "assert|renderer_gc_commit_render|PASS",
+      "assert|renderer_gc_committed_deletion_survives_expiry|PASS",
+      "assert|renderer_gc_committed_boundary_kept|PASS",
+      "assert|renderer_gc_oldzones_creation_order_render|PASS",
+      "assert|renderer_gc_oldzones_count_during_new_signal|PASS",
+      "assert|renderer_gc_retracted_signal_render|PASS",
+      "assert|renderer_gc_retracted_signal_rolls_back_collection|PASS",
+      "assert|renderer_gc_restore_before_reset|PASS",
+      "assert|renderer_gc_reset_geometry_ready|PASS",
+      "assert|renderer_gc_history_reset_render|PASS",
+      "assert|renderer_gc_history_reset_reconstructs_labels|PASS",
+      "assert|renderer_gc_cleanup|PASS"
+    ]
+  },
+  "cleanup": {
+    "native_exit_code": 0,
+    "original_configuration_restored": true,
+    "eleven_restoration_readbacks": [
+      {
+        "relative_path": "Bases\\Custom\\history\\USDUSC\\2026.hcc",
+        "sha256": "2078df1fe70946440c509a363aa21285832165104bd8be55dae05cbca5740640",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "Bases\\Custom\\history\\XAUUSD_GVT_CENT\\2026.hcc",
+        "sha256": "d6229ba0a6858cadda4a35130fce9f0afe38c7a20cc0739f25922e738210a173",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "Bases\\Custom\\ticks\\USDUSC\\202608.tkc",
+        "sha256": "a86845a3436cc9a622a937c8a651745a340c42ff49dd235012ebb0bdbf0ef9bd",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "Bases\\Custom\\ticks\\USDUSC\\202609.tkc",
+        "sha256": "3e379984ca9c8396ee5be7dfa70b908aafc3f8ee7ae14e32c73eccbd93ab8273",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "Bases\\Custom\\ticks\\USDUSC\\ticks.dat",
+        "sha256": "1864e487d76b7a91813b1ad8828196d3f3461e41e27ef845b516d1537223eaa6",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "Bases\\Custom\\ticks\\XAUUSD_GVT_CENT\\202608.tkc",
+        "sha256": "93afb4b176797ff968f6ade20bda2d26e8fc8dcfc7d3318f5ab5f7b639c4dd7e",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "Bases\\Custom\\ticks\\XAUUSD_GVT_CENT\\202609.tkc",
+        "sha256": "0efe86c071d73b1251e413ce837b5a99ad880d7cc528daf729059d1302db71a0",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "Bases\\Custom\\ticks\\XAUUSD_GVT_CENT\\ticks.dat",
+        "sha256": "a98e236645a15bee3f076184006ffeb293cd0b2cdca556590c1d23fe787e4cb9",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "Bases\\symbols.custom.dat",
+        "sha256": "fa64c6137b3027e76a723fee2008b355bf9b6f56ece9874dd74d7116ea5f8cc5",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "config\\common.ini",
+        "sha256": "b8ac7673a19069c87ee34655cfc0e5dfef333ebc8dc0d115096108456a539e55",
+        "readback_matches": true
+      },
+      {
+        "relative_path": "config\\terminal.ini",
+        "sha256": "7f77a25703e67347c48e48e28aacd8b27f052ac087e34721bc97fbdf04cec684",
+        "readback_matches": true
+      }
+    ],
+    "gold_symbol_and_handles_deleted": true,
+    "full_and_timer_charts_and_symbols_deleted": true,
+    "owned_pid": 165952,
+    "process_absence_scope": "Root reported verified absence after natural exit; this report does not control any process."
+  },
+  "permissions": {
+    "account_login": "0",
+    "connected": "0",
+    "dll_allowed": "0",
+    "orders": "0",
+    "positions": "0",
+    "program_trade_allowed": "0",
+    "program_type": "PROGRAM_EXPERT",
+    "terminal_build": "6182",
+    "terminal_data": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\work\\fgf_native_portables_host013\\vt",
+    "terminal_path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\work\\fgf_native_portables_host013\\vt",
+    "terminal_trade_allowed": "0",
+    "terminal_dll_allowed": "0"
+  },
+  "platform_observations": {
+    "log_lines": [
+      "GK\t3\t00:04:23.805\tMCP\tbind error on 127.0.0.1:22346 [Only one usage of each socket address (protocol/network address/port) is normally permitted. (10048)]",
+      "EH\t0\t00:05:24.650\tLiveUpdate\tnew version build 6230 (IDE: 6230, Tester: 6230) is available",
+      "OE\t0\t00:05:26.671\tLiveUpdate\t'mt5clw64' downloaded (59505 kb)",
+      "OR\t0\t00:05:28.322\tLiveUpdate\t'mt5clwide64' downloaded and updated (46117 kb)",
+      "QI\t0\t00:05:28.914\tLiveUpdate\t'mt5clwtst64' downloaded and updated (11348 kb)",
+      "OO\t0\t00:05:28.917\tLiveUpdate\tdownloaded successfully",
+      "NF\t0\t00:05:28.921\tLiveUpdate\t'C:\\Users\\maynor\\AppData\\Roaming\\MetaQuotes\\Terminal\\C01EF230D36029F3158B2C35816CF53D\\liveupdate\\mt5clw64.6230' saved"
+    ],
+    "mcp_activity_observed": true,
+    "os_network_containment": "NOT_ENFORCED",
+    "review_required": true,
+    "scope": "Configured refused broker proxy plus no-account/no-trade guards; full network and shared-update containment are not claimed.",
+    "shared_updater_path_containment": "NOT_ENFORCED",
+    "updater_activity_observed": true
+  },
+  "limitations": [
+    "Finite source-bound OANDA:XAUUSD Gold M1 default-input replay with tick size0.001; no universal/live Octa or VT feed equivalence.",
+    "3,897 constructed old M1 rows encode actual provider H1 warmup OHLC; they are not actual historical market minutes. The other44,142 input rows are actual M1.",
+    "839 missing-telemetry rows and1 final unconfirmed Pine row are excluded from the43,302-row actual-Pine output comparison.",
+    "Provider time mapping is data-derived (native_ms=utc_ms+exported UTC offset+7h), not a single universal timezone shift. All corresponding M1/H1/H2/H4 native bars were read back.",
+    "Default equations use closed H1 high/low/close and H2/H4 close. Unused provider opens and separately captured final-forming differences remain recorded and are not asserted equal.",
+    "Session timing uses explicit current weekly MT5 quote sessions and a qualifying quote; historical holiday calendars, broker-specific past schedules, D1+ exact close calendars and arbitrary nonstandard timeframes are not established.",
+    "No-tick behavior is observed from the normal template-loaded production indicator and public chart events; callback counts are not instrumented and dependent-iCustom timer dispatch is not claimed.",
+    "Strict historical GC screenshots use the native scale0/END0 viewport. The nonzero-offset ChartScreenShot navigation limitation remains documented, not repaired.",
+    "The refused localhost broker proxy is not OS network isolation. MCP bind collision and LiveUpdate6230 downloads/shared cache writes occurred; actual terminal6182 and its hash did not change.",
+    "Native/software acceptance is not profitability, market-performance, future-signal accuracy, 100% broker/live-feed parity, or evidence of production installation."
+  ],
+  "native_raw_release_field": "PENDING_REVIEW_NOT_DELIVERED",
+  "raw_receipts_modified": false,
+  "historic_failures": "All BASE001/HOST001–HOST012 and failed HOST013 build receipts/source snapshots remain in the original task tree; none is relabeled.",
+  "historical_document_notice": "Frozen REVIEW.md/CURRENT_STATE contain earlier pending/failing checkpoints. This final proof adds later evidence without rewriting those historical bytes.",
+  "evidence": [
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\receipt.json",
+      "bytes": 61172,
+      "sha256": "efe47d12f3b5f42f4545ecc1ea5e269f9414335b9d1c4b42992fb00ef42f03c5"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compile_verification.json",
+      "bytes": 157630,
+      "sha256": "f0869cd598b19e638bbd6d9b2ac40328ceb8411099daa93c76cea90c799988b0"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040146-test-python-flashgold-direction-filter-v12-20261013-a1710875\\receipt.json",
+      "bytes": 2654,
+      "sha256": "3abbf268ec60009b8c6d78295cdb60625e42b1e82fa344c568dd0fd437231a01"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040042-test-python-flashgold-v12-native-harness-e501773b\\receipt.json",
+      "bytes": 2606,
+      "sha256": "c0763d5cfe0cd2c37e119186a3b6f737d0a4466db77da2945a1d6ca3a8542dda"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040358-test-mt5-broker-tester-751e4f26\\receipt.json",
+      "bytes": 1673,
+      "sha256": "b775244bb0b911a679efb9363494ca527d96b47cfd77f054a4c3920db5572ce1"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\receipt.json",
+      "bytes": 14089,
+      "sha256": "2d162a9c30984b0fdec1b4121b3c875fb22774a21f430723a94250fdbee39efc"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\native-receipt.json",
+      "bytes": 41791,
+      "sha256": "c80480f31a071789f1d9b49cc154dd3ff913a1ca335f193220b3bd9c16b244d6"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_result.txt",
+      "bytes": 102465,
+      "sha256": "3c79d2863527b57e8ff07f5005be0b59b327700fa42e033af5341c4a3de414ad"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\FG12HOST013_assertions.csv",
+      "bytes": 7893,
+      "sha256": "092d5143e64c0c8791b96cbda99f0d46e41db2dd948a4fba014fd18347680342"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\gold-comparison.json",
+      "bytes": 7877,
+      "sha256": "30f14e3ea84393a022e26c7d4f91733ec1ba63806fe94aff71da75244dfc12ec"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\oracle-comparison.json",
+      "bytes": 7148,
+      "sha256": "2184ab6a5ad1d24f62a9843c1e958ae309e319ff956dd71914ab2558cf8c9251"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\image-alignment.json",
+      "bytes": 3252,
+      "sha256": "f43d51f141ac73392a85718649ca8bdc6a075bbc50b373e0f3b065beedfd5b0e"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\fixture.fresh.log",
+      "bytes": 23033,
+      "sha256": "8f299644663a95bb5bfdf94a219af30a221f5c8a5980727f94a47a5dc12e1d58"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\worktree\\ORIGIN.json",
+      "bytes": 5705,
+      "sha256": "a938377c3027574972b93b63db7f268e60e81718d49ce886f44c5a22ff30c742"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\gold_reference\\replay_dataset_v1\\manifest.json",
+      "bytes": 6328,
+      "sha256": "8800041629dc965b18f82657bc81c728574a933bca9173cf21c9d749f80e7a4d"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\gold_reference\\provider_audit_v1\\provider_audit.json",
+      "bytes": 4326,
+      "sha256": "6cd5c6d381abc3ba9f9079734cbb750b56e5be6451050cd81f90c8f22d126d25"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T041011-doctor-flashgold-direction-filter-v12-20261013-558c9695\\receipt.json",
+      "bytes": 1567,
+      "sha256": "ebc60c4bf887ed9c850dc2059380f892a0a3a028b48a030eab011029933118d7"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T041013-package-flashgold-direction-filter-v12-20261013-e9b57792\\receipt.json",
+      "bytes": 1889,
+      "sha256": "88a62786a65be76f3c4e6d061ba42b6b81cade979a11f8cc8df6936bd86eb3cd"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T041013-package-flashgold-direction-filter-v12-20261013-e9b57792\\release_manifest.json",
+      "bytes": 5938,
+      "sha256": "938fce10c8245a19303bb83653691ed4a73d47f8b7ede825175a17b31c688d75"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_SOURCE_RELOCATION_RECEIPT.json",
+      "bytes": 954,
+      "sha256": "ff0386909aa137768437119b9a353f77614250963dd16971a87e643114bc9a4d"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_VISUAL_RUNTIME_REVIEW.json",
+      "bytes": 10097,
+      "sha256": "85e8f40d7cd6cd442eca58fd63fdaaf18d216e267c2345a15be37172ffc4f76e"
+    }
+  ],
+  "next_release_action": "Root completes release/package review, verifies delivery-copy hashes and records adoption separately. No production action is performed by this report.",
+  "supersedes_draft": {
+    "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\FINAL_PROOF_HOST013.json",
+    "bytes": 56010,
+    "sha256": "c3463a0dc1a4f082ca8ff3d42f5b09dbc0fd7547b55fcc19454100532177da27"
+  },
+  "idle_interval": {
+    "baseline_clock_ms": 1791950737000,
+    "permission_expiry_ms": 1791950820000,
+    "end_clock_ms": 1791950822000,
+    "total_elapsed_monotonic_ms": 84984,
+    "past_expiry_ms": 2000,
+    "scope": "84.984-second total idle observation crossed expiry by2 seconds, with unchanged quote/buffers/full ARGB; no instrumented callback count"
+  },
+  "package_review": {
+    "status": "PASS",
+    "doctor": {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T041011-doctor-flashgold-direction-filter-v12-20261013-558c9695\\receipt.json",
+      "bytes": 1567,
+      "sha256": "ebc60c4bf887ed9c850dc2059380f892a0a3a028b48a030eab011029933118d7"
+    },
+    "receipt": {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T041013-package-flashgold-direction-filter-v12-20261013-e9b57792\\receipt.json",
+      "bytes": 1889,
+      "sha256": "88a62786a65be76f3c4e6d061ba42b6b81cade979a11f8cc8df6936bd86eb3cd"
+    },
+    "manifest": {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T041013-package-flashgold-direction-filter-v12-20261013-e9b57792\\release_manifest.json",
+      "bytes": 5938,
+      "sha256": "938fce10c8245a19303bb83653691ed4a73d47f8b7ede825175a17b31c688d75"
+    },
+    "source_zip": {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T041013-package-flashgold-direction-filter-v12-20261013-e9b57792\\flashgold-direction-filter-v12-20261013.zip",
+      "bytes": 1229780,
+      "sha256": "42c1832834bad8a9432c56d3e656924f91e9ce4c4fc8e8a4db42a01a6e3c860a"
+    },
+    "relocation": {
+      "status": "PASS",
+      "scope": "Relocated source offline tests only; native replay not rerun from extraction",
+      "finished_utc": "2026-10-14T04:12:28.4405212Z",
+      "source_sha256": "4986a48dd9d5e791141b824b457eae8a4fb4c19662f2a7008007d82f371faae1",
+      "command": [
+        "C:\\Users\\maynor\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python\\python.exe",
+        "-I",
+        "-B",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_SOURCE_RELOCATION\\source\\tests",
+        "-v"
+      ],
+      "package_sha256": "42c1832834bad8a9432c56d3e656924f91e9ce4c4fc8e8a4db42a01a6e3c860a",
+      "tests_run": 26,
+      "schema_version": 1,
+      "exit_code": 0,
+      "observed_tool_chunk": "80d382",
+      "original_workspace_imports": "Python -I excludes working directory and PYTHONPATH; tests discover explicit relocated directory"
+    },
+    "relocation_receipt": {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_SOURCE_RELOCATION_RECEIPT.json",
+      "bytes": 954,
+      "sha256": "ff0386909aa137768437119b9a353f77614250963dd16971a87e643114bc9a4d"
+    },
+    "scope": "Registered source reproduction package and26 relocated source tests; native replay was not rerun from extraction"
+  },
+  "independent_visual_review": {
+    "status": "PASS_SCOPED_NO_VISUAL_RUNTIME_BLOCKER_FOUND",
+    "receipt": {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_VISUAL_RUNTIME_REVIEW.json",
+      "bytes": 10097,
+      "sha256": "85e8f40d7cd6cd442eca58fd63fdaaf18d216e267c2345a15be37172ffc4f76e"
+    },
+    "scope": "All13 original native PNGs reviewed and617,050 nonempty foreground ARGB pixels byte-equal; historical viewport/cleanup reviewed"
+  }
+}

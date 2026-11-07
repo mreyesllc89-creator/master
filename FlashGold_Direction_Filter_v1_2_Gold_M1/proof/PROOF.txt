@@ -1,0 +1,72 @@
+FlashGold Direction Filter v1.2 — verified Gold M1 port
+
+The exact indicator below passed the combined native test and source-package
+review. Release adoption is recorded separately; this proof does not install it.
+
+Actual TradingView comparison
+
+43,302 closed OANDA Gold M1 rows matched across all nine buffers: 389,718 fields,
+zero mismatches. Maximum level difference was 4.533e-13 (limit 1e-8); discrete and
+missing values must match exactly, and score tolerance is 1e-10. Native parameter
+readback verified all 53 defaults and types, the five serialized group titles,
+and the exact indicator path. All nine buffers matched after release/reload.
+
+Runtime and independent checks
+
+The same EX5 passed 301 native fixture checks and 145 core assertions, with zero
+failures. A separate independent synthetic oracle compared 4,940,924 values over
+30 core scenarios and nine actual-iCustom cases. These counts include state,
+gates, OHLC and timing fields; they are separate from the actual-Pine comparison.
+
+Attachment, multiple instances, reload, shortened sessions, provisional/confirmed
+final bars, foreground rendering and cleanup passed. A normal chart-loaded
+indicator kept identical buffers and all 617,050 ARGB pixels during an 84.984-second
+total idle observation. This crossed permission expiry by 2 seconds, without a
+new quote; callback counts were not instrumented. Native HLine references matched
+two screenshot level strokes, and the VLine/time endpoint matched at pixel 802.
+GC retention, rollback, reset and strict capture geometry passed. All 13 PNGs
+were reviewed. Owned charts/symbols/handles were cleaned, and all 11 original
+configuration/cache files were restored and rehashed.
+
+All five compiler targets had zero errors and warnings. The registered source
+package passed verification; all 26 source tests also passed from a relocated
+extraction with Python -I. The 103 offline harness checks passed. Relocation did
+not rerun the native fixture; the exact binary remains bound to HOST013.
+
+Intended files
+
+One indicator only: editable MQ5, three local MQH files, the tested EX5 and its
+default SET. Development fixture EAs/scripts are excluded. Keep the MQL5 folder
+layout when rebuilding; standard MT5 Canvas includes are required. Recompilation
+can produce a different EX5, so this proof applies to the supplied tested bytes.
+
+EX5 SHA256: ba815178b400a42f623d07da477ab8cb4a5258cb42a006cf53060b4bbbe49628
+MQ5 SHA256: 484ecfbe8ebdaff9432cef47e2752b2de0f7959428bd1c95a44d1fb50ae6eb39
+Component: 4986a48dd9d5e791141b824b457eae8a4fb4c19662f2a7008007d82f371faae1
+Build: 20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195
+Native: 20261014T040405-test-mt5-broker-tester-21488e3a
+Detailed schemas, commands, source pins and receipts: FINAL_PROOF.json.
+
+Scope and limits
+
+The frozen replay has 44,142 actual M1 rows plus 3,897 constructed rows encoding
+actual provider H1 warmup. Constructed rows are not actual historical minutes.
+The comparison excludes 839 missing-telemetry rows and one final unconfirmed
+Pine row. Native M1/H1/H2/H4 inputs and closed provider dependencies were read
+back. Unused provider opens and separately captured final-forming differences
+remain recorded. Inputs are exact defaults and tick size is 0.001.
+
+This proves finite identical-input parity, not universal live Octa/VT/TradingView
+equivalence or profitability. Broker feeds, histories, candle boundaries, tick
+sizes and calendars can differ. Session behavior uses current weekly quote
+sessions with valid quote evidence; historical holidays and exact D1+ calendars
+are outside scope. GC uses scale0/END0; the separate nonzero-offset screenshot
+API limitation is not claimed repaired.
+
+The isolated terminal had account 0, no connection, positions or orders, and both
+terminal/program trading and DLL permissions disabled. Broker proxy refusal was
+not full network isolation: MCP bind collision and LiveUpdate6230 download/shared
+cache activity occurred. Runtime6182 and its executable hash stayed unchanged.
+All previous failures and the raw native receipt's PENDING_REVIEW_NOT_DELIVERED
+field remain untouched. Any final release decision belongs to the later adoption
+record; no production installation or account action is part of this proof.

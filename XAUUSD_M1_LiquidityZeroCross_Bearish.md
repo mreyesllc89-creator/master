@@ -41,3 +41,21 @@ A search of 126,360 setups across 13 trigger/bias pairs used FTMO XAUUSD data fr
 - All 81 nearby settings in the same family had PF above 1, with a median of 1.67. M1 triggers had a median PF of about 0.8.
 
 This is a Python replica of the EA, not the MT5 Strategy Tester. Confirm the result in MT5 with real ticks before trading it live. See `research/` and the calibration report.
+
+## Two versions: without and with the FlashGold Direction Filter
+
+- `XAUUSD_M1_LiquidityZeroCross_Bearish.mq5` has no direction filter.
+- `XAUUSD_M1_LiquidityZeroCross_Bearish_FGF.mq5` is the same EA with the FlashGold Direction Filter v1.2 as a direction filter. A short opens only while the indicator's buffer 2 ("sell allowed") is 1. That means price is below the FlashGold level and outside the ATR no-trade band, and the permission window is open.
+
+The FGF file defines `XLZC_WITH_FGF` and includes the base file, so both versions share every rule and fix. Keep both files in `MQL5/Experts/` and compile the one you want.
+
+The indicator package is in `FlashGold_Direction_Filter_v1_2_Gold_M1/`. Copy its `MQL5/Indicators` and `MQL5/Include/FlashGold` folders into your MT5 data folder. The EA loads the indicator with its default inputs, which use an H1 filter timeframe. To change them, edit the indicator's defaults.
+
+FGF inputs:
+- `UseFGF_Filter` turns the filter on or off.
+- `FGF_IndicatorName` is the indicator's path under `MQL5/Indicators`.
+- `FGF_CalcTimeframe` is the chart timeframe the indicator runs on. The default is the trigger timeframe.
+- `FGF_Shift` picks the bar to read: 0 is the live permission, 1 is the last closed bar.
+- `FGF_BlockIfUnavailable` blocks trading until the indicator has data.
+
+The preset is `presets/XLZC_Bearish_M3_H1_NY_FGF.set`. The filter has not been backtested. Compare the two versions in the MT5 Strategy Tester.

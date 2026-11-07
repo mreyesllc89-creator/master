@@ -1,0 +1,95 @@
+{
+  "compiler_verification": {
+    "bytes": 157630,
+    "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040149-build-flashgold-direction-filter-v12-20261013-478e6195\\build\\compile_verification.json",
+    "sha256": "f0869cd598b19e638bbd6d9b2ac40328ceb8411099daa93c76cea90c799988b0"
+  },
+  "component": "flashgold-direction-filter-v12-20261013",
+  "files": [
+    {
+      "bytes": 6795,
+      "relative_path": "MQL5/Include/FlashGold/DirectionFilterClock.mqh",
+      "sha256": "997336e20521f7b8db140b21e13a69d8a26e1bb9cf6848996d755bf240397b78"
+    },
+    {
+      "bytes": 17562,
+      "relative_path": "MQL5/Include/FlashGold/DirectionFilterCore.mqh",
+      "sha256": "5baa1f7ddfea7965e1da802edbb85ba88bec5c777730da7cb56a5434d7fb8978"
+    },
+    {
+      "bytes": 32995,
+      "relative_path": "MQL5/Include/FlashGold/DirectionFilterRender.mqh",
+      "sha256": "e0319a229c19f27bca9b834999acc3e4912694500f2ce652554ca6dddf0e3460"
+    },
+    {
+      "bytes": 117538,
+      "relative_path": "MQL5/Indicators/FlashGold_Direction_Filter_v1_2.ex5",
+      "sha256": "ba815178b400a42f623d07da477ab8cb4a5258cb42a006cf53060b4bbbe49628"
+    },
+    {
+      "bytes": 22415,
+      "relative_path": "MQL5/Indicators/FlashGold_Direction_Filter_v1_2.mq5",
+      "sha256": "484ecfbe8ebdaff9432cef47e2752b2de0f7959428bd1c95a44d1fb50ae6eb39"
+    },
+    {
+      "bytes": 1990,
+      "relative_path": "presets/FlashGold_Direction_Filter_v1_2_Default.set",
+      "sha256": "3b647d715f0e224847cb768fc40bc47477c2baff87685fd6b0e105396915462d"
+    },
+    {
+      "bytes": 2558,
+      "relative_path": "proof/ADOPTION.json",
+      "sha256": "d3d1bdffc1187fdd5065550bf174db7147e1972ef40619c2ebed86bd68fb36b9"
+    },
+    {
+      "bytes": 61823,
+      "relative_path": "proof/FINAL_PROOF.json",
+      "sha256": "13f1574c696f07db2dbfc8fdfc502f165df8c509282555d052b5645876621847"
+    },
+    {
+      "bytes": 213006,
+      "relative_path": "proof/HOST013_FINAL_GOLD_NATIVE_AUDIT.json",
+      "sha256": "d1ca5e45d839f46e7d248e2a86f8badf91fbac06fb371e102143a238fbf6b5d5"
+    },
+    {
+      "bytes": 10097,
+      "relative_path": "proof/HOST013_VISUAL_RUNTIME_REVIEW.json",
+      "sha256": "85e8f40d7cd6cd442eca58fd63fdaaf18d216e267c2345a15be37172ffc4f76e"
+    },
+    {
+      "bytes": 4336,
+      "relative_path": "proof/PROOF.txt",
+      "sha256": "388b22fee72fee977107e8de421e9d47b042d9da9b95216008b53729536329ea"
+    }
+  ],
+  "fixture_experts_included": false,
+  "independent_reviews": [
+    {
+      "bytes": 213006,
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_FINAL_GOLD_NATIVE_AUDIT.json",
+      "sha256": "d1ca5e45d839f46e7d248e2a86f8badf91fbac06fb371e102143a238fbf6b5d5"
+    },
+    {
+      "bytes": 10097,
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_VISUAL_RUNTIME_REVIEW.json",
+      "sha256": "85e8f40d7cd6cd442eca58fd63fdaaf18d216e267c2345a15be37172ffc4f76e"
+    }
+  ],
+  "indicator_ex5_sha256": "ba815178b400a42f623d07da477ab8cb4a5258cb42a006cf53060b4bbbe49628",
+  "native_receipt": {
+    "bytes": 41791,
+    "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\checkout\\runs\\20261014T040405-test-mt5-broker-tester-21488e3a\\native\\native-receipt.json",
+    "sha256": "c80480f31a071789f1d9b49cc154dd3ff913a1ca335f193220b3bd9c16b244d6"
+  },
+  "production_installation": false,
+  "rebuild_prerequisite": "Standard MT5 Canvas/standard library plus supplied three local MQH files; preserve MQL5 layout. Rebuilt EX5 requires separate verification.",
+  "release_adoption": {
+    "bytes": 2558,
+    "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\delivery\\FlashGold_Direction_Filter_v1_2_Gold_M1\\proof\\ADOPTION.json",
+    "sha256": "d3d1bdffc1187fdd5065550bf174db7147e1972ef40619c2ebed86bd68fb36b9"
+  },
+  "schema_version": 2,
+  "source_copy_manifest_sha256": "3115ef508e20582aa835abc4ffada201f3d19511bf4158e71924bbd39c0c55d2",
+  "source_plan_sha256": "9bebfeca953ab83b3110e3f44180977b8beeb4238e4404c592cf5eb5a0c828ba",
+  "status": "REVIEWED_TESTED_INDICATOR_HANDOFF"
+}

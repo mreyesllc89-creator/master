@@ -1,0 +1,240 @@
+{
+  "schema": 1,
+  "reviewer": "flashgold_renderer",
+  "status": "PASS_SCOPED_NO_VISUAL_RUNTIME_BLOCKER_FOUND",
+  "run": "20261014T040405-test-mt5-broker-tester-21488e3a",
+  "method": "Read-only inspection of all 13 original native PNGs, independent exact RGB and original ARGB counts, receipt/protocol readback, and frozen fixture source review. No edited or synthesized images; no native launch or product edits.",
+  "indicator_ex5_sha256": "ba815178b400a42f623d07da477ab8cb4a5258cb42a006cf53060b4bbbe49628",
+  "native_assertions": {
+    "total": 301,
+    "unique_names": 301,
+    "passed": 301,
+    "failed": 0
+  },
+  "image_measurement": {
+    "basic": {
+      "width": 1100,
+      "height": 592,
+      "canvasRows": {
+        "286": 800,
+        "287": 800
+      },
+      "referenceRows": {
+        "286": 122
+      },
+      "yellowSupported": {
+        "802": 261
+      },
+      "endpoint": 802,
+      "intersect": true
+    },
+    "off_midpoint": {
+      "width": 1100,
+      "height": 592,
+      "canvasRows": {
+        "395": 800,
+        "396": 800
+      },
+      "referenceRows": {
+        "395": 127
+      },
+      "yellowSupported": {},
+      "endpoint": 802,
+      "intersect": true
+    }
+  },
+  "historical_gc": {
+    "captures": [
+      {
+        "sequence": 1,
+        "file": "FG12HOST013_render_gc_committed.png",
+        "identity_matches": true,
+        "status": "PASS",
+        "mode": "SELF_CHART",
+        "first_before": "1056",
+        "first_after": "1056",
+        "exact_viewport_preserved": true,
+        "plot_dimensions": [
+          "1057",
+          "569"
+        ],
+        "price_min": "2044.2500000000000000",
+        "price_max": "2107.2500000000000000"
+      },
+      {
+        "sequence": 2,
+        "file": "FG12HOST013_render_gc_reset.png",
+        "identity_matches": true,
+        "status": "PASS",
+        "mode": "SELF_CHART",
+        "first_before": "1056",
+        "first_after": "1056",
+        "exact_viewport_preserved": true,
+        "plot_dimensions": [
+          "1057",
+          "569"
+        ],
+        "price_min": "2044.2500000000000000",
+        "price_max": "2107.2500000000000000"
+      }
+    ],
+    "visual": "Committed image contains the retained upper boundary label; reset image restores two older labels at the same chart location. Native resource checks independently retain 500-label removal, oldest retained, provisional rollback, committed deletion, creation-order and reset predicates.",
+    "view_scope": "Native scale 0, END 0, one pixel per bar; actual first 1056. This proves the same historical GC boundary without a nonzero relative viewport offset. Prior platform screenshot resets at first 662 remain preserved failures and are not claimed repaired."
+  },
+  "idle_foreground": {
+    "measurement": {
+      "width": 1075,
+      "height": 574,
+      "bytes": 2468208,
+      "pixels": 617050,
+      "nonzeroAlphaPixels": 170836,
+      "opaquePixels": 86573,
+      "boundingBox": [
+        0,
+        0,
+        1005,
+        520
+      ],
+      "differentBytes": 0
+    },
+    "baseline_now_ms": 1791950737000,
+    "permission_expiry_ms": 1791950820000,
+    "final_now_ms": 1791950822000,
+    "elapsed_monotonic_ms": 84984,
+    "unchanged_quote_ms": 1791950729000,
+    "buffer_scope": "Current values of buffers 0 through 7 exact equality; score buffer 8 is outside this particular idle assertion.",
+    "nonvacuity": "Baseline source predicate requires active=1 and buy_allowed=1, nonzero-alpha foreground pixels, stable dimensions and three successive equal resource observations before expiry.",
+    "chart_event_scope": "Frozen source phases 14 and 15 issue grid toggle/restore plus ChartRedraw, then phase 16 waits past expiry. No callback counter or direct proof of each OnTimer callback is claimed.",
+    "priming_png_scope": "The two normal_timer_layout PNGs are pre-baseline paint/geometry diagnostics. Actual idle acceptance uses the later original nonempty ARGB foreground snapshots, not these priming PNGs."
+  },
+  "visual_observations": [
+    "Actual dark and light attachment PNGs show recognizable table text and zone label, with complete right table border inside the price axis.",
+    "Basic native magenta horizontal reference intersects lime canvas stroke; off-midpoint cyan reference intersects red stroke; native yellow time marker equals lime right endpoint.",
+    "Theme and zoom image retains price alignment and translucent green shading. Overlap image retains an opaque level under the translucent status table; native resource checks verify source-over color behavior.",
+    "Retention and renderer reinit PNG files have identical SHA256; the native 500-line and ownership assertions pass.",
+    "All 13 PNGs were visually inspected at their original copied dimensions; no outstanding clipping or vertical placement defect was found within these samples."
+  ],
+  "cleanup": {
+    "owned_pid": 165952,
+    "process_absent_at_review": true,
+    "original_configuration_restored": true,
+    "native_evidence": "Gold handle/symbol cleanup, indicator detach cleanup, renderer object ownership/collision cleanup, both owned charts absent and both remaining synthetic symbols deleted all PASS.",
+    "account_login": 0,
+    "positions": 0,
+    "orders": 0,
+    "terminal_trade_allowed": 0,
+    "program_trade_allowed": 0,
+    "terminal_dll_allowed": 0,
+    "program_dll_allowed": 0
+  },
+  "limitations": [
+    "Visual samples use synthetic native charts; this is not a TradingView versus MT5 whole-chart pixel identity proof. Font and label geometry remain native approximations.",
+    "Actual-Pine numeric parity is a separate finite frozen OANDA Gold M1/default-input proof in the same run; it does not establish broker-feed equality or all parameter/calendar combinations.",
+    "Controlled renderer cases execute the frozen renderer include inside the fixture; actual attachments, template reload and idle tests exercise the staged production indicator EX5.",
+    "Idle stability proves unchanged output through the observed no-quote interval and issued chart-setting commands, not an instrumented count of OnTimer callbacks.",
+    "No OS network/shared-updater containment is claimed. The native receipt records updater and MCP activity and marks platform review required; packaging must retain that disclosure.",
+    "No production installation or trade action occurred in this review."
+  ],
+  "artifact_pins": [
+    {
+      "file": "receipt.json",
+      "sha256": "2d162a9c30984b0fdec1b4121b3c875fb22774a21f430723a94250fdbee39efc",
+      "bytes": 14089
+    },
+    {
+      "file": "native_result.json",
+      "sha256": "c80480f31a071789f1d9b49cc154dd3ff913a1ca335f193220b3bd9c16b244d6",
+      "bytes": 41791
+    },
+    {
+      "file": "native\\native-receipt.json",
+      "sha256": "c80480f31a071789f1d9b49cc154dd3ff913a1ca335f193220b3bd9c16b244d6",
+      "bytes": 41791
+    },
+    {
+      "file": "native\\FG12HOST013_result.txt",
+      "sha256": "3c79d2863527b57e8ff07f5005be0b59b327700fa42e033af5341c4a3de414ad",
+      "bytes": 102465
+    },
+    {
+      "file": "native\\image-alignment.json",
+      "sha256": "f43d51f141ac73392a85718649ca8bdc6a075bbc50b373e0f3b065beedfd5b0e",
+      "bytes": 3252
+    },
+    {
+      "file": "native\\FG12HOST013_normal_timer_before.argb",
+      "sha256": "1a521774ba9470868349c6b3b79603c945a28b28f21b2d43f28aa9bfd5174f8d",
+      "bytes": 2468208
+    },
+    {
+      "file": "native\\FG12HOST013_normal_timer_after.argb",
+      "sha256": "1a521774ba9470868349c6b3b79603c945a28b28f21b2d43f28aa9bfd5174f8d",
+      "bytes": 2468208
+    },
+    {
+      "file": "native\\FG12HOST013_dark.png",
+      "sha256": "3f1e91afbd567c23c816ebc88d0e6e3b50149aa8d7bc16455af1e3167c96d18e",
+      "bytes": 48141
+    },
+    {
+      "file": "native\\FG12HOST013_light.png",
+      "sha256": "68bc57cc6e9aadc24ef519c8b42cd2846289f54a82ba43e5e8e9dd6f00722b3d",
+      "bytes": 41700
+    },
+    {
+      "file": "native\\FG12HOST013_normal_timer_layout_dependent.png",
+      "sha256": "0aa8b98d41f3f1e27bceb7fb811402f549fca272dc2594f26cd53b93aacc7cb5",
+      "bytes": 23311
+    },
+    {
+      "file": "native\\FG12HOST013_normal_timer_layout_normal.png",
+      "sha256": "0aa8b98d41f3f1e27bceb7fb811402f549fca272dc2594f26cd53b93aacc7cb5",
+      "bytes": 23311
+    },
+    {
+      "file": "native\\FG12HOST013_render_alignment.png",
+      "sha256": "d46fe36153c43df392a09faec0bcb2cbb4bc13eb92eebb60d67d0486bf6b0832",
+      "bytes": 24471
+    },
+    {
+      "file": "native\\FG12HOST013_render_basic.png",
+      "sha256": "308b640a833b1ac9f279f07228edefabe249f1de033c0531f9170ec66ae179a3",
+      "bytes": 30896
+    },
+    {
+      "file": "native\\FG12HOST013_render_gc_committed.png",
+      "sha256": "6bf48fd356e6f622daf5d4f17539237e94ff36a92d9439923beae0d9cd5318aa",
+      "bytes": 34654
+    },
+    {
+      "file": "native\\FG12HOST013_render_gc_reset.png",
+      "sha256": "8a8007c3a47f80dd3929b34524bef916b3463d894371abaa76daf9c52797e061",
+      "bytes": 38284
+    },
+    {
+      "file": "native\\FG12HOST013_render_overlap.png",
+      "sha256": "e62cc6d5288ed5f3e2dd9a55358d1c93e12eb0e24646aef1041f4e4d626d6ab6",
+      "bytes": 38859
+    },
+    {
+      "file": "native\\FG12HOST013_render_reinit.png",
+      "sha256": "311b354e72b22b3237e9a9c1f85b44c962a0456ab0e323266bc165bf4d82929f",
+      "bytes": 25357
+    },
+    {
+      "file": "native\\FG12HOST013_render_retention.png",
+      "sha256": "311b354e72b22b3237e9a9c1f85b44c962a0456ab0e323266bc165bf4d82929f",
+      "bytes": 25357
+    },
+    {
+      "file": "native\\FG12HOST013_render_table_bounds.png",
+      "sha256": "39ff83b63a2a8e6d56ec8578d7b153087b4ffafd719a52e39d88038afc4d9c23",
+      "bytes": 38666
+    },
+    {
+      "file": "native\\FG12HOST013_render_theme.png",
+      "sha256": "843eaa7c5d6c053f2786dd19906e7a372b336fa5af3bd0fa834ad6ac399064cd",
+      "bytes": 28369
+    }
+  ]
+}

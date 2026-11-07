@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "REVIEWED_FINITE_ENGINEERING_ACCEPTANCE_APPLIED",
+  "created_utc": "2026-10-14T04:24:09.874815+00:00",
+  "component": "flashgold-direction-filter-v12-20261013",
+  "accepted_revision": {
+    "source_sha256": "4986a48dd9d5e791141b824b457eae8a4fb4c19662f2a7008007d82f371faae1",
+    "indicator_ex5_sha256": "ba815178b400a42f623d07da477ab8cb4a5258cb42a006cf53060b4bbbe49628",
+    "build_receipt_sha256": "efe47d12f3b5f42f4545ecc1ea5e269f9414335b9d1c4b42992fb00ef42f03c5",
+    "native_receipt_sha256": "c80480f31a071789f1d9b49cc154dd3ff913a1ca335f193220b3bd9c16b244d6",
+    "software_verified": true,
+    "runtime_accepted": true,
+    "market_validated": false,
+    "scope": "Finite OANDA Gold M1 exact-default data parity plus tested synthetic/session/render/lifecycle cases; no universal broker feed claim"
+  },
+  "registry_before_sha256": "50dca19e08a96241daca26a2c410a3bf7104e0e844c4ff08194a63d8f44b349d",
+  "registry_after_sha256": "6ea9a5e61d217745e78db9c18b53ad24c09427c589cd57f7c7c7c502ec6a55cd",
+  "registry_scope": "Selected isolated checkout only; shared workspace unchanged",
+  "execution_binding": "Historic build/native/source-package receipts remain bound to their original registry snapshot; no receipts rewritten",
+  "independent_reviews": [
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_FINAL_GOLD_NATIVE_AUDIT.json",
+      "bytes": 213006,
+      "sha256": "d1ca5e45d839f46e7d248e2a86f8badf91fbac06fb371e102143a238fbf6b5d5"
+    },
+    {
+      "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\HOST013_VISUAL_RUNTIME_REVIEW.json",
+      "bytes": 10097,
+      "sha256": "85e8f40d7cd6cd442eca58fd63fdaaf18d216e267c2345a15be37172ffc4f76e"
+    }
+  ],
+  "proof": {
+    "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\evidence\\FINAL_PROOF_HOST013_v2.json",
+    "bytes": 61823,
+    "sha256": "13f1574c696f07db2dbfc8fdfc502f165df8c509282555d052b5645876621847"
+  },
+  "delivery_base_manifest": {
+    "path": "C:\\Users\\maynor\\Documents\\Codex\\2026-10-11\\pl\\work\\flashgold_direction_filter_v12_20261013\\delivery\\FlashGold_Direction_Filter_v1_2_Gold_M1\\MANIFEST.json",
+    "bytes": 2907,
+    "sha256": "3115ef508e20582aa835abc4ffada201f3d19511bf4158e71924bbd39c0c55d2"
+  },
+  "production_actions": 0,
+  "market_validation": "NOT_ESTABLISHED"
+}

@@ -94,8 +94,13 @@
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
 #property version     "1.10"
+#ifdef XLZC_WITH_FGF
+#property description "XAUUSD M1 Liquidity Zero-Cross Bearish (short-only) + FlashGold Direction Filter v1.2."
+#property description "Shorts are only opened while the FlashGold filter allows sells."
+#else
 #property description "XAUUSD M1 Liquidity Zero-Cross Bearish (short-only)."
 #property description "HTF MACD/EMA bias + M1 MACD zero-cross down + swing liquidity SL/TP."
+#endif
 #property description "No signal = no trade."
 
 #include <Trade\Trade.mqh>
@@ -191,6 +196,18 @@ input double  ManualTP_Price           = 0.0;   // Manual TP price (0 = structur
 input bool    UseHTFLiquidityLevels    = false; // Add HTF swing lows as TP candidates
 input int     HTFLiquidityLookbackBars = 30;    // HTF bars to scan for swing lows
 
+#ifdef XLZC_WITH_FGF
+//--- FlashGold Direction Filter v1.2 (FGF build only). The indicator must be
+//    installed as MQL5/Indicators/FlashGold_Direction_Filter_v1_2.ex5; it is
+//    loaded with its own default inputs (filter TF H1). Buffer 2 = "sell allowed".
+input group "=== FlashGold Direction Filter (FGF build) ==="
+input bool            UseFGF_Filter          = true;   // Only sell while FlashGold allows sells
+input string          FGF_IndicatorName      = "FlashGold_Direction_Filter_v1_2"; // Path under MQL5/Indicators
+input ENUM_TIMEFRAMES FGF_CalcTimeframe      = PERIOD_CURRENT; // Indicator chart TF (CURRENT = TriggerTimeframe)
+input int             FGF_Shift              = 0;      // 0 = permission now (live bar), 1 = last closed bar
+input bool            FGF_BlockIfUnavailable = true;   // No trade if the indicator has no data yet
+#endif
+
 //====================================================================
 // GLOBALS
 //====================================================================
@@ -202,6 +219,7 @@ int      g_hMacdHTF  = INVALID_HANDLE;
 int      g_hEmaHTF   = INVALID_HANDLE;
 int      g_hStochM1  = INVALID_HANDLE;
 int      g_hRsiM1    = INVALID_HANDLE;
+int      g_hFGF      = INVALID_HANDLE;   // FlashGold filter (FGF build only)
 
 double   g_ptScale        = 1.0;   // point scale factor (AutoScalePoints)
 int      g_sessStartMin   = 0;
@@ -370,6 +388,20 @@ int OnInit()
       return INIT_FAILED;
      }
 
+#ifdef XLZC_WITH_FGF
+   if(UseFGF_Filter)
+     {
+      ENUM_TIMEFRAMES fgfTf = (FGF_CalcTimeframe == PERIOD_CURRENT) ? TriggerTimeframe : FGF_CalcTimeframe;
+      g_hFGF = iCustom(_Symbol, fgfTf, FGF_IndicatorName);   // indicator defaults
+      if(g_hFGF == INVALID_HANDLE)
+        {
+         Print("[XLZC] Cannot load FlashGold indicator '", FGF_IndicatorName,
+               "' (install it in MQL5/Indicators). Error ", GetLastError());
+         return INIT_FAILED;
+        }
+     }
+#endif
+
    //--- trade object
    g_trade.SetExpertMagicNumber(MagicNumber);
    g_trade.SetDeviationInPoints((ulong)MathMax(0.0, MaxSlippage_Points * g_ptScale));
@@ -391,6 +423,7 @@ void OnDeinit(const int reason)
    if(g_hEmaHTF  != INVALID_HANDLE) IndicatorRelease(g_hEmaHTF);
    if(g_hStochM1 != INVALID_HANDLE) IndicatorRelease(g_hStochM1);
    if(g_hRsiM1   != INVALID_HANDLE) IndicatorRelease(g_hRsiM1);
+   if(g_hFGF     != INVALID_HANDLE) IndicatorRelease(g_hFGF);
    ObjectsDeleteAll(0, OBJ_PREFIX);
    Comment("");
   }
@@ -450,6 +483,10 @@ void OnTick()
      }
    if(!TradingAllowed())
       return;
+#ifdef XLZC_WITH_FGF
+   if(!FGFAllowsSell())                        // FlashGold direction filter
+      return;
+#endif
 
    if(TryOpenShort())
      {
@@ -1021,6 +1058,33 @@ bool NewsBlocked()
    return g_newsBlocked;
   }
 
+#ifdef XLZC_WITH_FGF
+//--- FlashGold Direction Filter: buffer 2 ("FGF sell allowed") is 1 while
+//    price is below the FlashGold level, outside the ATR no-trade band and
+//    the permission window is open. 0 = sells not allowed.
+bool FGFAllowsSell()
+  {
+   if(!UseFGF_Filter || g_hFGF == INVALID_HANDLE)
+      return true;
+   double v[];
+   if(BarsCalculated(g_hFGF) <= 0 || CopyBuffer(g_hFGF, 2, FGF_Shift, 1, v) != 1 || v[0] == EMPTY_VALUE)
+     {
+      if(FGF_BlockIfUnavailable)
+        {
+         LogSkip("FlashGold filter has no data yet");
+         return false;
+        }
+      return true;
+     }
+   if(v[0] < 0.5)
+     {
+      LogSkip("FlashGold filter does not allow sells");
+      return false;
+     }
+   return true;
+  }
+#endif
+
 bool TradingAllowed()
   {
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
@@ -1190,8 +1254,13 @@ void UpdatePanel()
   {
    if(MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE))
       return;
-   Comment(StringFormat("XLZC Bearish v1.10 | %s\nSignal: %s %s | Positions: %d\nSession: %s",
-                        _Symbol, g_signalActive ? "ACTIVE" : "none", g_signalTag,
+#ifdef XLZC_WITH_FGF
+   string build = "XLZC Bearish v1.10 + FGF";
+#else
+   string build = "XLZC Bearish v1.10";
+#endif
+   Comment(StringFormat("%s | %s\nSignal: %s %s | Positions: %d\nSession: %s",
+                        build, _Symbol, g_signalActive ? "ACTIVE" : "none", g_signalTag,
                         CountOwnPositions(), SessionOK() ? "open" : "closed"));
   }
 //+------------------------------------------------------------------+
