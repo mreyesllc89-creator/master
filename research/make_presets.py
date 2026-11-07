@@ -41,6 +41,20 @@ UNCAL_NOTE = ("Not calibrated: spec-based settings. Session hours are GMT. MaxSp
               "XAUUSD spreads are 40-55 points; a cap below that never trades.")
 
 
+def fgf_line():
+    import pandas as pd
+    g = pd.read_csv("research/results/fgf_stage1_grid.csv.gz")
+    dl = dict(filter_tf="H1", parent="H1", level_mode=0, zones="align2", any_combo=False, burst_atr=0.5,
+              hold_bars=0, band_atr=0.25, window="next", against=True, check=0)
+    for k, v in dl.items():
+        g = g[g[k] == v]
+    r = g[g.base == "M3/H1 chosen"].iloc[0]
+    b = pd.read_csv("research/results/fgf_stage1_baselines.csv").set_index("base").loc["M3/H1 chosen"]
+    return (f"FlashGold defaults on this setup (in-sample): {r.all_trades:.0f} trades, PF {r.all_pf:.2f}, "
+            f"net {r.all_net_r:+.1f}R vs {b.all_trades:.0f} trades, PF {b.all_pf:.2f}, net {b.all_net_r:+.1f}R "
+            "without the filter: higher PF, about a third of the trades, less total profit.")
+
+
 def main():
     m = json.load(open("research/results/m3_h1_verify.json"))
     ch = next(v for v in m["variants"] if v["label"] == "chosen")
@@ -71,7 +85,7 @@ def main():
           ["XAUUSD_M1_LiquidityZeroCross_Bearish_FGF v1.10 - same as XLZC_Bearish_M3_H1_NY plus the "
            "FlashGold Direction Filter v1.2 (indicator default inputs).",
            "Base-EA figures without the filter: " + head, wf_note, SERVER_NOTE, news,
-           "See the FGF comparison report for the filtered backtest."],
+           fgf_line()],
           dict(m3, MagicNumber=20261111, TradeComment="XLZC_M3H1_FGF", UseFGF_Filter=True), fgf=True)
     write("presets/XLZC_Bearish_Calibrated_M1_M15.set",
           ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - first-pass calibration (M1 trigger / M15 bias)",

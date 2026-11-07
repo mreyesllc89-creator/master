@@ -1,11 +1,17 @@
-; XAUUSD_M1_LiquidityZeroCross_Bearish_FGF v1.10 - M3/H1 NY preset WITH FlashGold Direction Filter (not separately backtested) (M3 trigger, H1 bias, NY session)
-; Calibrated on FTMO XAUUSD Jan 2025 - May 2026 (research/xlzc_calibrate.py, xlzc_verify.py).
-; Base EA backtest WITHOUT the filter: 77 trades, PF 2.22, PF per period 2.08 / 2.43 / 2.18 (2025H1 / 2025H2 / 2026), bootstrap 90% PF 1.36-3.91.
-; Points are 2-digit gold units (AutoScalePoints handles 3-digit feeds). Attach to any chart; signals use M3.
+; XAUUSD_M1_LiquidityZeroCross_Bearish_FGF v1.10 - same as XLZC_Bearish_M3_H1_NY plus the FlashGold Direction Filter v1.2 (indicator default inputs).
+; Base-EA figures without the filter: In-sample backtest (all 17 months used for selection): 77 trades, PF 2.48; per period 2.15 / 2.80 / 2.56. Same-bar trailing worst case PF 1.82.
+; Walk-forward: picking on 2025 only, the top-10 configs had median 2026 PF 0.67; the best 2025 pair family (M2/H1) had median 2026 PF 1.27. Base rate: 51% of all configs were profitable in 2026. This exact setup ranked 91 of 86241 on 2025 alone and made PF 2.56 on 30 trades in 2026: the M2/M3-trigger + H1-bias family held up out of sample, the exact parameter values are not proven.
+; Session hours are BROKER SERVER TIME (TradingHoursAreGMT=false). They were calibrated on FTMO data whose clock is GMT+2 winter / GMT+3 summer (New York close).
+; UseNewsFilter=true was NOT part of the backtest (no calendar history); live trade count and results will differ. Set it to false to match the backtest exactly.
+; FlashGold defaults on this setup (in-sample): 28 trades, PF 3.18, net +8.7R vs 77 trades, PF 2.48, net +20.8R without the filter: higher PF, about a third of the trades, less total profit.
 MagicNumber=20261111
 TradeComment=XLZC_M3H1_FGF
 AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
 RiskPercent=0.5
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
 MaxSpread_Points=60
 MaxSlippage_Points=30
 MaxEntryDelaySeconds=30
@@ -20,7 +26,7 @@ UseStochasticFilter=true
 Stoch_K=7
 Stoch_Slowing=1
 Stoch_D=7
-Stoch_OB_Level=80
+Stoch_OB_Level=80.0
 Stoch_LookbackBars=5
 StochHardBlock=false
 StochUnconfirmedRiskFactor=1.0
@@ -41,18 +47,42 @@ TrailingStart_Points=260
 TrailingDistance_Points=173
 TrailingStep_Points=10
 EnablePartialClose=false
+PartialCloseAtR=1.0
+PartialClosePercent=50.0
+MoveSLToBreakevenAfterPartial=true
 UseTradingHours=true
-TradingHoursAreGMT=true
+TradingHoursAreGMT=false
 TradingHoursStart=12:00
 TradingHoursEnd=16:30
+TesterGMTOffsetHours=2
 UseNewsFilter=true
 NewsCurrency=USD
 NewsWindowMinutes=30
 UseRSIFilter=false
+RSI_Period=12
+RSI_MaxLevel=50.0
 UseManualLevels=false
+ManualSL_Price=0.0
+ManualTP_Price=0.0
 UseHTFLiquidityLevels=false
+HTFLiquidityLookbackBars=30
 UseFGF_Filter=true
 FGF_IndicatorName=FlashGold_Direction_Filter_v1_2
 FGF_CalcTimeframe=0
 FGF_Shift=0
 FGF_BlockIfUnavailable=true
+FGF_PassInputs=false
+FGF_FilterTF=16385
+FGF_ParentTF=16385
+FGF_LevelMode=0
+FGF_Window=0
+FGF_Minutes=60
+FGF_Candles=1
+FGF_CheckMode=0
+FGF_BandAtr=0.25
+FGF_Against=true
+FGF_HoldBars=0
+FGF_BurstAtr=0.5
+FGF_AnyCombo=false
+FGF_UseZones=true
+FGF_MinAligned=2

@@ -1,0 +1,162 @@
+[
+ {
+  "id": "default",
+  "label": {
+   "filter_tf": "H1",
+   "parent": "H1",
+   "level_mode": 0,
+   "zones": "align2",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 0,
+   "band_atr": 0.25,
+   "window": "next",
+   "against": true,
+   "check": 0
+  }
+ },
+ {
+  "id": "wf_best_M3H1",
+  "label": {
+   "filter_tf": "H1",
+   "parent": "H1",
+   "level_mode": 1,
+   "zones": "off",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 0,
+   "band_atr": 0.0,
+   "window": "bars3",
+   "against": true,
+   "check": 0
+  }
+ },
+ {
+  "id": "wf_best_M2H1",
+  "label": {
+   "filter_tf": "H1",
+   "parent": "H1",
+   "level_mode": 0,
+   "zones": "align2",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 2,
+   "band_atr": 0.0,
+   "window": "next",
+   "against": false,
+   "check": 2
+  }
+ },
+ {
+  "id": "most_trades_PF_ge_base",
+  "label": {
+   "filter_tf": "M15",
+   "parent": "H1",
+   "level_mode": 0,
+   "zones": "align1",
+   "any_combo": true,
+   "burst_atr": 1.0,
+   "hold_bars": 0,
+   "band_atr": 0.0,
+   "window": "min60",
+   "against": true,
+   "check": 1
+  }
+ },
+ {
+  "id": "default_band_atr=0.0",
+  "label": {
+   "filter_tf": "H1",
+   "parent": "H1",
+   "level_mode": 0,
+   "zones": "align2",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 0,
+   "band_atr": 0.0,
+   "window": "next",
+   "against": true,
+   "check": 0
+  }
+ },
+ {
+  "id": "default_band_atr=0.5",
+  "label": {
+   "filter_tf": "H1",
+   "parent": "H1",
+   "level_mode": 0,
+   "zones": "align2",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 0,
+   "band_atr": 0.5,
+   "window": "next",
+   "against": true,
+   "check": 0
+  }
+ },
+ {
+  "id": "default_filter_tf=M15",
+  "label": {
+   "filter_tf": "M15",
+   "parent": "H1",
+   "level_mode": 0,
+   "zones": "align2",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 0,
+   "band_atr": 0.25,
+   "window": "next",
+   "against": true,
+   "check": 0
+  }
+ },
+ {
+  "id": "default_filter_tf=M30",
+  "label": {
+   "filter_tf": "M30",
+   "parent": "H1",
+   "level_mode": 0,
+   "zones": "align2",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 0,
+   "band_atr": 0.25,
+   "window": "next",
+   "against": true,
+   "check": 0
+  }
+ },
+ {
+  "id": "default_zones=off",
+  "label": {
+   "filter_tf": "H1",
+   "parent": "H1",
+   "level_mode": 0,
+   "zones": "off",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 0,
+   "band_atr": 0.25,
+   "window": "next",
+   "against": true,
+   "check": 0
+  }
+ },
+ {
+  "id": "default_level_mode=1",
+  "label": {
+   "filter_tf": "H1",
+   "parent": "H1",
+   "level_mode": 1,
+   "zones": "align2",
+   "any_combo": false,
+   "burst_atr": 0.5,
+   "hold_bars": 0,
+   "band_atr": 0.25,
+   "window": "next",
+   "against": true,
+   "check": 0
+  }
+ }
+]

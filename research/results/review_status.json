@@ -1,0 +1,212 @@
+{
+ "rows": [
+  {
+   "area": "mql5-compile",
+   "severity": "low",
+   "title": "CTrade::PositionClosePartial(ticket, ...) works only on hedging accounts; on netting accounts partial close fails on every tick",
+   "status": "Fixed",
+   "action": "Partial close uses the symbol overload on netting accounts and logs a failure once."
+  },
+  {
+   "area": "ea-logic",
+   "severity": "medium",
+   "title": "Signal is evaluated once per trigger bar with no retry, so a data-not-ready tick loses the signal or reads stale MTF data",
+   "status": "Fixed",
+   "action": "EvaluateSignal is tri-state; not-ready data is retried on the next tick instead of losing the signal."
+  },
+  {
+   "area": "ea-logic",
+   "severity": "low",
+   "title": "Manual SL override is applied after the TP was chosen, so MinRewardRisk and the fallback RR use the wrong risk",
+   "status": "Fixed",
+   "action": "Manual SL is applied before TP selection."
+  },
+  {
+   "area": "ea-logic",
+   "severity": "low",
+   "title": "Margin-shrink loop exits silently when OrderCalcMargin fails, sending an unchecked lot size",
+   "status": "Fixed",
+   "action": "A failed OrderCalcMargin skips the trade."
+  },
+  {
+   "area": "ea-logic",
+   "severity": "low",
+   "title": "Transient OrderSend errors are retried back-to-back in the same tick with no pause",
+   "status": "Fixed",
+   "action": "Pause and position check before resending after a transient error; no repeated bursts."
+  },
+  {
+   "area": "parity",
+   "severity": "critical",
+   "title": "Session window is in broker server time in the backtest but true GMT in the EA, a 2-3 hour shift that removes most of the edge",
+   "status": "Fixed",
+   "action": "Calibrated presets now use TradingHoursAreGMT=false (server time, as calibrated). Research docs say server time, not UTC."
+  },
+  {
+   "area": "parity",
+   "severity": "medium",
+   "title": "EA keeps retrying trade setup on every tick for 30 s after the bar opens; the simulation decides once at the open price",
+   "status": "Fixed",
+   "action": "Trade plan and FlashGold gate are decided once per signal, like the backtest."
+  },
+  {
+   "area": "parity",
+   "severity": "low",
+   "title": "Signal and HTF bias read indicator buffers on the first tick of a new bar without checking they are up to date; a miss is never re-evaluated",
+   "status": "Fixed",
+   "action": "HTF bar alignment and BarsCalculated checked before reading; retried if not ready."
+  },
+  {
+   "area": "backtest-bias",
+   "severity": "high",
+   "title": "Headline config is the single maximum of a 126k-config in-sample search; the three periods are not out-of-sample and the bootstrap ignores the selection",
+   "status": "Fixed",
+   "action": "Walk-forward added (choose on 2025, test on 2026). Headline relabelled in-sample; bootstrap labelled as ignoring selection."
+  },
+  {
+   "area": "backtest-bias",
+   "severity": "medium",
+   "title": "simulate() applies a trailing level only from the next M1 bar, ignoring same-bar hits (including provable ones); headline PF swings 1.80-2.46 on this assumption",
+   "status": "Fixed",
+   "action": "Same-bar trailing hits are modelled (certain hits by default) and the pessimistic case is reported: PF 1.82-2.48."
+  },
+  {
+   "area": "stats-claims",
+   "severity": "high",
+   "title": "The 'robust' headline is a best-of-126k pick that uses all three periods, so nothing was held out and nothing is out-of-sample",
+   "status": "Fixed",
+   "action": "Report, notes and preset headers say the headline is in-sample and show the hold-out result."
+  },
+  {
+   "area": "stats-claims",
+   "severity": "high",
+   "title": "Running the same search with a real hold-out fails: top picks from 2025 lose money in 2026",
+   "status": "Fixed",
+   "action": "\"Most stable\" wording dropped. Walk-forward table added: single setups fail out of sample, the M2/M3 + H1 pair family holds up."
+  },
+  {
+   "area": "stats-claims",
+   "severity": "medium",
+   "title": "The '81 nearby settings all PF>1' plateau claim uses in-sample data and overall PF, not the period test used for selection",
+   "status": "Fixed",
+   "action": "Plateau claim removed from the headline; walk-forward pair-family table replaces it."
+  },
+  {
+   "area": "stats-claims",
+   "severity": "medium",
+   "title": "'Sits in the middle of a broad profitable region' is false: the setup is on the edge of the search grid",
+   "status": "Fixed",
+   "action": "\"Middle of a broad region\" claim removed."
+  },
+  {
+   "area": "stats-claims",
+   "severity": "medium",
+   "title": "The 'M3/H1 is the only pair' comparison holds all pairs at M3/H1's best inputs",
+   "status": "Fixed",
+   "action": "Pair comparison now uses a 2025-only ranking per pair family; the data-building script is committed."
+  },
+  {
+   "area": "stats-claims",
+   "severity": "medium",
+   "title": "The bootstrap PF interval ignores selection and is presented as an uncertainty range",
+   "status": "Fixed",
+   "action": "Bootstrap labelled \"conditional on this setup, ignores selection\"."
+  },
+  {
+   "area": "stats-claims",
+   "severity": "low",
+   "title": "The 2025 H2 PF is given as 2.43 in the preset but 2.42 in the report and .md",
+   "status": "Fixed",
+   "action": "Report values come straight from stored results with 4 decimals."
+  },
+  {
+   "area": "stats-claims",
+   "severity": "low",
+   "title": "'Hourly bid/ask spread' is really a constant per-hour-of-day average, so the spread cap and spread stress tests do not model real spreads",
+   "status": "Fixed",
+   "action": "Spread model described as a constant per-hour mean; server-to-UTC hour mapping fixed."
+  },
+  {
+   "area": "presets",
+   "severity": "high",
+   "title": "Conservative preset spread cap (25) is below every hourly XAUUSD spread, so it never trades",
+   "status": "Fixed",
+   "action": "MaxSpread 60 in every preset."
+  },
+  {
+   "area": "presets",
+   "severity": "high",
+   "title": "Aggressive preset spread cap (35) is below every hourly XAUUSD spread, so it never trades",
+   "status": "Fixed",
+   "action": "MaxSpread 60 in every preset."
+  },
+  {
+   "area": "presets",
+   "severity": "medium",
+   "title": "Older presets omit the v1.10 inputs, so loading them after the M3/H1 preset keeps M3 trigger, the 30 s entry window and TP lookback 120",
+   "status": "Fixed",
+   "action": "Every preset is generated from the full EA input list (research/make_presets.py)."
+  },
+  {
+   "area": "presets",
+   "severity": "medium",
+   "title": "M3/H1 preset relies on the default TesterGMTOffsetHours=2, which puts the GMT session one hour off during summer time on an FTMO (EET) server",
+   "status": "Fixed",
+   "action": "Calibrated presets use server time, so the tester GMT offset no longer applies."
+  },
+  {
+   "area": "presets",
+   "severity": "low",
+   "title": "M3/H1 preset enables a news filter that the claimed backtest never modelled",
+   "status": "Documented",
+   "action": "News filter kept on for live safety; preset header says it was not in the backtest and how to match it."
+  },
+  {
+   "area": "completeness critic",
+   "severity": "medium",
+   "title": "Fixed point-unit SL cap and trailing distances drift with a gold price that went from ~3,230 to ~4,690, so the 2026 period runs a different strategy than 2025",
+   "status": "Documented",
+   "action": "Limitation noted: point distances are fixed while gold rose about 45%; ATR-scaled distances are a future option."
+  },
+  {
+   "area": "FlashGold port audit: build-loop",
+   "severity": "high",
+   "title": "Parent zone used the \"previous closed HTF bar\" rule",
+   "status": "Fixed",
+   "action": "Parent is always read at the filter bar close, as in the indicator."
+  },
+  {
+   "area": "FlashGold port audit: gate-pick",
+   "severity": "high",
+   "title": "Candles window opened at the filter-bar boundary on live ticks",
+   "status": "Fixed",
+   "action": "Tick mode uses the live index (never the boundary); open and bar-close modes keep it."
+  },
+  {
+   "area": "FlashGold port audit: gate-pick",
+   "severity": "medium",
+   "title": "EA re-checked the filter every tick; port checked once",
+   "status": "Fixed",
+   "action": "EA now decides the FlashGold gate once per signal."
+  },
+  {
+   "area": "FlashGold port audit: gate-pick",
+   "severity": "medium",
+   "title": "Grid settings could not reach the EA (indicator defaults only)",
+   "status": "Fixed",
+   "action": "FGF_PassInputs passes all 53 indicator inputs through iCustom; grid keeps parent H1 as an option."
+  },
+  {
+   "area": "FlashGold port audit: gate-pick",
+   "severity": "low",
+   "title": "Check modes open / bar close not modelled",
+   "status": "Fixed",
+   "action": "check_mode 0/1/2 modelled and swept."
+  }
+ ],
+ "refuted": [
+  "Tester session filter uses a fixed GMT offset, so the NY window is shifted 1h for half the year on DST servers",
+  "Live news filter removes trades around 15:30 server time (US data releases) that the backtest counted as its best trades",
+  "'Parameters were not chosen with any of that data' holds only for the M1/M15 parameters; 2026 picked the pair and the v1.10 setup"
+ ]
+}
