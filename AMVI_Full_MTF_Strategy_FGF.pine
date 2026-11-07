@@ -25,7 +25,8 @@ strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy", shor
 // Donchian, EMA and Donchian lengths, Reverse on Opposite Signal) are removed. A
 // volatility trigger in the BUY ZONE goes long, in the SELL ZONE short, in NO TRADE
 // (or before the first signal) nothing; a trigger in the opposite zone reverses the
-// position. Use the filter's Allow buys / Allow sells for long-only / short-only.
+// position. "Trade direction: Inverted" trades the same triggers the other way
+// round. Use the filter's Allow buys / Allow sells for long-only / short-only.
 // The confluence count (Min TFs Above High Vol) moved to Thresholds: it belongs to
 // the volatility trigger, not to direction. The backtest date range has its own
 // group. The filter must stay enabled: with it off both sides are allowed on every
@@ -70,6 +71,9 @@ enD    = input.bool(true,  "1D",  group=gTF, inline="h")
 useDateRange  = input.bool(false, "Limit Backtest Date Range", group="Backtest range")
 startTime     = input.time(timestamp("2020-01-01T00:00:00"), "Start", group="Backtest range")
 endTime       = input.time(timestamp("2099-12-31T00:00:00"), "End", group="Backtest range")
+
+// --- Trade direction (same entries, optionally the other way round) ---
+amviTradeDir = input.string("Follow the filter", "Trade direction", options=["Follow the filter", "Inverted"], group="Trade direction", tooltip="Follow the filter: a trigger in the BUY ZONE goes long, in the SELL ZONE short. Inverted: the same triggers at the same place, traded the other way round (BUY ZONE short, SELL ZONE long). Exits are unchanged.")
 
 // --- Strategy: Exits ---
 gEx = "Strategy - Exits"
@@ -736,11 +740,13 @@ bool trigger  = anyCross and hotCount >= minConfluence
 // Direction: the FlashGold Direction Filter is the guide. A trigger in the BUY ZONE goes
 // long, in the SELL ZONE short; in NO TRADE (or before the first signal) nothing. A
 // trigger in the opposite zone reverses the position (strategy.entry reverses).
+// "Trade direction: Inverted" takes the same triggers the other way round.
 bool inRange   = not useDateRange or (time >= startTime and time <= endTime)
 bool amviDirUp = fgfOn and fgfBuyOk and not fgfSellOk
 bool amviDirDn = fgfOn and fgfSellOk and not fgfBuyOk
-bool longSig   = trigger and amviDirUp and inRange
-bool shortSig  = trigger and amviDirDn and inRange
+bool amviInv   = amviTradeDir == "Inverted"
+bool longSig   = trigger and (amviInv ? amviDirDn : amviDirUp) and inRange
+bool shortSig  = trigger and (amviInv ? amviDirUp : amviDirDn) and inRange
 bool goLong    = longSig and strategy.position_size <= 0
 bool goShort   = shortSig and strategy.position_size >= 0
 
