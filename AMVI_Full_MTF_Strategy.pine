@@ -35,11 +35,11 @@ lowVolThreshold  = input.float(30.0, "Low Vol Threshold", group="Thresholds")
 
 // --- Timeframes (enable = fetch, plot and count toward signals) ---
 gTF = "Timeframes (enabled = fetched, plotted, used for signals)"
-en1s   = input.bool(false, "1s",  group=gTF, inline="s", tooltip="Seconds timeframes need a plan that supports them.")
-en5s   = input.bool(false, "5s",  group=gTF, inline="s")
-en15s  = input.bool(false, "15s", group=gTF, inline="s")
-en30s  = input.bool(false, "30s", group=gTF, inline="s")
-en45s  = input.bool(false, "45s", group=gTF, inline="s")
+en1s   = input.bool(true,  "1s",  group=gTF, inline="s", tooltip="Seconds timeframes require a TradingView plan with seconds data. If the script errors, turn these off.")
+en5s   = input.bool(true,  "5s",  group=gTF, inline="s")
+en15s  = input.bool(true,  "15s", group=gTF, inline="s")
+en30s  = input.bool(true,  "30s", group=gTF, inline="s")
+en45s  = input.bool(true,  "45s", group=gTF, inline="s")
 en1    = input.bool(true,  "1m",  group=gTF, inline="m")
 en5    = input.bool(true,  "5m",  group=gTF, inline="m")
 en15   = input.bool(true,  "15m", group=gTF, inline="m")
