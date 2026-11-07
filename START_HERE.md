@@ -26,6 +26,15 @@ A short-only Expert Advisor for XAUUSD (gold) in MetaTrader 5. It sells when MAC
 
 The code has not been compiled by me (no MetaEditor was available). If the compiler reports an error, send it to me.
 
+## Signals run on M2/M3 even on an M1 chart
+
+The EA computes its signals on `TriggerTimeframe` (M3 or M2 in the calibrated presets) and its trend filter on `HTF_Timeframe` (H1). The timeframe of the chart it is attached to does not matter. MT5 builds M2/M3 bars from its one-minute history. To see this for yourself:
+
+- **Journal at start:** `Signals are computed on M3 bars (TriggerTimeframe) with the H1 trend filter (HTF_Timeframe). This chart is M1: the chart timeframe does not change the signals.`
+- **Status panel** (top left, `ShowStatusPanel`): shows `Signals on: M3 bars | Trend filter: H1`, the last closed M3 bar and its close time, and the M3 MACD values the signal uses. It marks "(zero-cross DOWN)" when the signal fires. It also shows the H1 bias, the session, the spread and the open positions. It refreshes on each new M3 bar and once a minute.
+- **Signal arrows** (`MarkSignals`): a red sell arrow at every valid signal. Hover over it to see "M3 signal: MACD(M3) crossed below zero on the M3 bar closed at ...". On an M1 chart the arrows appear only every 3 minutes or more, at M3 bar closes.
+- **Switch the chart** (`SwitchChartToTriggerTF=true`): the EA switches its own chart to M3 when it starts, so the candles you see are the candles it trades. MT5 has M2/M3 charts too: right-click the chart and choose **Timeframes**.
+
 ## Which preset to use
 
 | Preset | EA file | Timeframes | Backtest result | How much to trust it |

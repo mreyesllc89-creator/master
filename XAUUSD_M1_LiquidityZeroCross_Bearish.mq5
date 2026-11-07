@@ -133,6 +133,9 @@ input string  TradeComment             = "XLZC_Bear";  // Order comment prefix
 input bool    AutoScalePoints          = true;         // Scale *_Points x10 on 3-digit gold feeds
 input bool    VerboseLog               = true;         // Print decision log to Experts tab
 input bool    ShowLevels               = true;         // Draw SL/TP liquidity levels on chart
+input bool    ShowStatusPanel          = true;         // Panel: signal/trend timeframes, last trigger bar, MACD
+input bool    MarkSignals              = true;         // Arrow on the chart at every valid signal
+input bool    SwitchChartToTriggerTF   = false;        // Switch this chart to the trigger timeframe (e.g. M3)
 
 input group "=== R5: Risk & Position ==="
 input double  RiskPercent              = 0.75;  // Risk per trade, % of equity (0.5-1.0)
@@ -451,6 +454,15 @@ int OnInit()
    g_trade.SetTypeFillingBySymbol(_Symbol);
    g_trade.LogLevel(LOG_LEVEL_ERRORS);
 
+   Print(StringFormat("[XLZC] Signals are computed on %s bars (TriggerTimeframe) with the %s trend filter "
+                      "(HTF_Timeframe). This chart is %s: the chart timeframe does not change the signals.",
+                      TFName(TriggerTimeframe), TFName(HTF_Timeframe), TFName((ENUM_TIMEFRAMES)_Period)));
+   if(SwitchChartToTriggerTF && !MQLInfoInteger(MQL_TESTER) && _Period != TriggerTimeframe)
+     {
+      Print("[XLZC] Switching this chart to ", TFName(TriggerTimeframe), " (SwitchChartToTriggerTF=true)");
+      ChartSetSymbolPeriod(0, _Symbol, TriggerTimeframe);   // the EA restarts on the new timeframe
+     }
+   UpdatePanel();
    Log(StringFormat("Init OK on %s | digits=%d pointScale=%.0f | HTF=%s | risk=%.2f%%",
                     _Symbol, _Digits, g_ptScale, EnumToString(HTF_Timeframe), RiskPercent));
    return INIT_SUCCEEDED;
@@ -479,6 +491,14 @@ void OnTick()
    //--- always manage what is already open (R5 trailing / partial)
    ManageOpenPositions();
 
+   //--- refresh the status panel about once a minute (spread, session, bias)
+   static datetime lastPanel = 0;
+   if(TimeCurrent() - lastPanel >= 60)
+     {
+      lastPanel = TimeCurrent();
+      UpdatePanel();
+     }
+
    //--- bar-based signal evaluation: once per new M1 bar, on CLOSED bars
    datetime barTime = iTime(_Symbol, TriggerTimeframe, 0);
    if(barTime == 0)
@@ -498,6 +518,8 @@ void OnTick()
       g_lastSkipReason = "";
       g_signalActive   = (state == SIG_VALID);
       g_signalBarTime  = g_signalActive ? barTime : 0;
+      if(g_signalActive && MarkSignals)
+         MarkSignal(barTime);
       UpdatePanel();
      }
 
@@ -1367,17 +1389,82 @@ void DrawPlan(const TradePlan &p)
       DrawLiquidityZone("LiqPool_" + id, p.tpRefTime, p.tpRef, now, p.tp, clrLightSteelBlue);
   }
 
-void UpdatePanel()
+//--- "M3", "H1" ... instead of PERIOD_M3
+string TFName(const ENUM_TIMEFRAMES tf)
+  {
+   ENUM_TIMEFRAMES t = (tf == PERIOD_CURRENT) ? (ENUM_TIMEFRAMES)_Period : tf;
+   string n = EnumToString(t);
+   StringReplace(n, "PERIOD_", "");
+   return n;
+  }
+
+//--- sell arrow at the trigger bar that produced the signal (drawn at that bar's
+//    time, so on an M1 chart it sits on the M1 bar where the M3 bar closed)
+void MarkSignal(const datetime barTime)
   {
    if(MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE))
+      return;
+   string n = OBJ_PREFIX + "SIG_" + (string)(long)barTime;
+   double price = iHigh(_Symbol, TriggerTimeframe, 1);
+   if(ObjectFind(0, n) < 0)
+      ObjectCreate(0, n, OBJ_ARROW_SELL, 0, barTime, price);
+   ObjectSetInteger(0, n, OBJPROP_COLOR, clrTomato);
+   ObjectSetInteger(0, n, OBJPROP_WIDTH, 2);
+   ObjectSetString(0, n, OBJPROP_TOOLTIP,
+                   StringFormat("XLZC %s signal: MACD(%s) crossed below zero on the %s bar closed at %s",
+                                TFName(TriggerTimeframe), TFName(TriggerTimeframe), TFName(TriggerTimeframe),
+                                TimeToString(barTime, TIME_DATE | TIME_MINUTES)));
+  }
+
+//--- status panel: proves which timeframe the signals come from
+void UpdatePanel()
+  {
+   if(!ShowStatusPanel || (MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE)))
       return;
 #ifdef XLZC_WITH_FGF
    string build = "XLZC Bearish v1.10 + FGF";
 #else
    string build = "XLZC Bearish v1.10";
 #endif
-   Comment(StringFormat("%s | %s\nSignal: %s %s | Positions: %d\nSession: %s",
-                        build, _Symbol, g_signalActive ? "ACTIVE" : "none", g_signalTag,
-                        CountOwnPositions(), SessionOK() ? "open" : "closed"));
+   //--- last closed trigger bar and its MACD (the exact values the signal uses)
+   datetime lastOpen = iTime(_Symbol, TriggerTimeframe, 1);
+   double macd[];
+   ArraySetAsSeries(macd, true);
+   string macdTxt = "not ready";
+   if(g_hMacdM1 != INVALID_HANDLE && CopyBuffer(g_hMacdM1, 0, 1, 2, macd) == 2)
+      macdTxt = StringFormat("%.3f -> %.3f%s", macd[1], macd[0],
+                             (macd[1] >= 0.0 && macd[0] < 0.0) ? "  (zero-cross DOWN)" : "");
+   string bias = "off";
+   if(UseHTF_Filter)
+     {
+      double hm, he;
+      if(CopyOne(g_hMacdHTF, 0, 1, hm) && CopyOne(g_hEmaHTF, 0, 1, he))
+         bias = (hm < 0.0 && iClose(_Symbol, HTF_Timeframe, 1) < he) ? "BEARISH (shorts allowed)" : "not bearish (no shorts)";
+      else
+         bias = "not ready";
+     }
+   double spreadPts = (Ask() - Bid()) / (_Point * g_ptScale);
+   Comment(StringFormat("%s | %s | chart %s
+"
+                        "Signals on: %s bars   |   Trend filter: %s
+"
+                        "Last closed %s bar: %s  (closed %s)
+"
+                        "MACD(%s) bar[2] -> bar[1]: %s
+"
+                        "%s bias: %s
+"
+                        "Session %s-%s %s: %s   |   Spread %.0f / %d pts
+"
+                        "Signal: %s %s   |   Positions: %d",
+                        build, _Symbol, TFName((ENUM_TIMEFRAMES)_Period),
+                        TFName(TriggerTimeframe), TFName(HTF_Timeframe),
+                        TFName(TriggerTimeframe), TimeToString(lastOpen, TIME_DATE | TIME_MINUTES),
+                        TimeToString(lastOpen + PeriodSeconds(TriggerTimeframe), TIME_MINUTES),
+                        TFName(TriggerTimeframe), macdTxt,
+                        TFName(HTF_Timeframe), bias,
+                        TradingHoursStart, TradingHoursEnd, TradingHoursAreGMT ? "GMT" : "server time",
+                        SessionOK() ? "open" : "closed", spreadPts, MaxSpread_Points,
+                        g_signalActive ? "ACTIVE" : "none", g_signalTag, CountOwnPositions()));
   }
 //+------------------------------------------------------------------+
