@@ -17,3 +17,16 @@ for ctf in (1,5,15):
         # where both close at the same instant, mapped close == chart close
         same=np.isin(cct,sct); assert np.allclose(m[same],ch.c.to_numpy()[same])
         print(f"chart {ctf}m <- {tf}m ok, mapped bars {ok.mean():.4f}")
+
+# HTF ATR must equal Pine's request.security(tf, ta.atr(14)[1], lookahead_on): the ATR of the
+# HTF bar *before* the one containing the chart bar, also on the chart bar that closes the HTF bar.
+for ctf in (1, 5, 15):
+    ch = resample(df, ctf)
+    for tf in (15, 60):
+        s = resample(df, tf); a = atr(s.h.to_numpy(), s.l.to_numpy(), s.c.to_numpy(), 14)
+        got = atr_on_chart(df, ch, ctf, tf, 14)
+        floor = ch.index.floor(f"{tf}min")
+        pos = s.index.get_indexer(floor)
+        exp = np.where(pos >= 1, a[np.maximum(pos - 1, 0)], np.nan)
+        assert np.allclose(got, exp, equal_nan=True), (ctf, tf)
+        print(f"chart {ctf}m ATR({tf}m)[1] ok")

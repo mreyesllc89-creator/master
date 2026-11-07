@@ -7,7 +7,8 @@
 //  - Distances are frozen at the signal bar and the exit is attached on the entry bar, so the position
 //    is protected from the fill bar onward (v3.0 left the whole fill bar unprotected).
 //  - Optional "TF toggles also gate entries" (off = v3.0 behaviour, where toggles only drive labels/4th filter).
-// Backtest notes: backtest/tdi_confluence_v3/RESULTS.md
+// Defaults (ATR 14 on 60m x 5, TP 2R, no trail) = most robust setting in the BTCUSDT backtest
+// (Apr-Oct 2026), best on a 5m chart. Backtest notes: backtest/tdi_confluence_v3/RESULTS.md
 strategy("TDI Confluence Strategy v3.1 [ATR/Pct stops]", shorttitle="TDI_Conf_v3.1", overlay=true, precision=2, max_labels_count=500,
      initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=1,
      commission_type=strategy.commission.percent, commission_value=0.02)
@@ -19,7 +20,7 @@ grp_risk  = "Stops & Targets"
 stopMode  = input.string("ATR", "Stop Mode", options=["ATR", "Percent", "Ticks"], group=grp_risk)
 atrLen    = input.int(14, "ATR Length", minval=1, group=grp_risk)
 atrTfOpt  = input.string("60", "ATR Timeframe", options=["Chart", "15", "60"], group=grp_risk, tooltip="Higher-TF ATR uses the last CLOSED bar (no repaint)")
-slAtrMult = input.float(2.0, "SL = ATR x", minval=0.1, step=0.1, group=grp_risk)
+slAtrMult = input.float(5.0, "SL = ATR x", minval=0.1, step=0.1, group=grp_risk)
 slPct     = input.float(0.5, "SL = % of price", minval=0.01, step=0.05, group=grp_risk)
 sl_ticks  = input.int(200, "SL = Ticks", minval=10, group=grp_risk)
 tpR       = input.float(2.0, "TP = SL x (R multiple)", minval=0.1, step=0.1, group=grp_risk)
@@ -390,15 +391,15 @@ toTicks(d) => math.max(1, math.round(d / syminfo.mintick))
 // Entry + exit are placed together on the signal bar, so the exit protects the position from the
 // fill bar onward. loss/profit/trail in ticks are measured from the actual fill price.
 // Exits are (re)issued only when the entry will actually open a new position (pyramiding = 1),
-// so distances stay frozen for the life of the trade.
-if validLongEntry and distOk and strategy.position_size <= 0
+// so distances stay frozen for the life of the trade. Bars with both a long and a short signal are skipped.
+if validLongEntry and not validShortEntry and distOk and strategy.position_size <= 0
     strategy.entry("Long", strategy.long)
     strategy.exit("Exit Long", "Long", loss=toTicks(slDist), profit=toTicks(slDist * tpR),
          trail_points = use_trail ? toTicks(slDist * trailActR) : na,
          trail_offset = use_trail ? toTicks(slDist * trailOffR) : na,
          comment_loss="Long SL", comment_profit="Long TP", comment_trailing="Long Trail")
 
-if validShortEntry and distOk and strategy.position_size >= 0
+if validShortEntry and not validLongEntry and distOk and strategy.position_size >= 0
     strategy.entry("Short", strategy.short)
     strategy.exit("Exit Short", "Short", loss=toTicks(slDist), profit=toTicks(slDist * tpR),
          trail_points = use_trail ? toTicks(slDist * trailActR) : na,

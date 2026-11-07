@@ -358,13 +358,17 @@ def map_float(sec_close_t, v, chart_close_t):
 def atr_on_chart(df1, ch, chart_tf, atr_tf, n):
     """ATR in price units on chart bars. atr_tf == 0 -> chart TF (ta.atr); otherwise
     last *closed* atr_tf bar (request.security(..., ta.atr(n)[1], lookahead_on))."""
-    if atr_tf == 0 or atr_tf == chart_tf:
+    if atr_tf == 0:
         return atr(ch.h.to_numpy(), ch.l.to_numpy(), ch.c.to_numpy(), n)
+    # Pine: request.security(tf, ta.atr(n)[1], lookahead_on) -> every chart bar inside HTF bar k
+    # (including the one closing it) sees atr[k-1]. Index by chart-bar OPEN time, shift back one.
     s = resample(df1, atr_tf)
     a = atr(s.h.to_numpy(), s.l.to_numpy(), s.c.to_numpy(), n)
-    sct = s.index.values.astype("int64") + atr_tf * 60_000_000_000
-    cct = ch.index.values.astype("int64") + chart_tf * 60_000_000_000
-    return map_float(sct, a, cct)
+    k = np.searchsorted(s.index.values.astype("int64"), ch.index.values.astype("int64"), side="right") - 1
+    out = np.full(len(ch), np.nan)
+    ok = k >= 1
+    out[ok] = a[k[ok] - 1]
+    return out
 
 
 @njit(cache=True)
