@@ -1,0 +1,410 @@
+//@version=6
+// TDI Confluence Strategy v3.1
+// Changes vs v3.0 (signal logic unchanged):
+//  - Stop mode selector: ATR (default) / Percent / Ticks. TP is a multiple (R) of the stop distance,
+//    trailing activation/offset are fractions of the stop distance, so one set of inputs scales to any
+//    instrument and volatility regime (v3.0's 200-tick stop was $2 on BTCUSDT).
+//  - Distances are frozen at the signal bar and the exit is attached on the entry bar, so the position
+//    is protected from the fill bar onward (v3.0 left the whole fill bar unprotected).
+//  - Optional "TF toggles also gate entries" (off = v3.0 behaviour, where toggles only drive labels/4th filter).
+// Backtest notes: backtest/tdi_confluence_v3/RESULTS.md
+strategy("TDI Confluence Strategy v3.1 [ATR/Pct stops]", shorttitle="TDI_Conf_v3.1", overlay=true, precision=2, max_labels_count=500,
+     initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=1,
+     commission_type=strategy.commission.percent, commission_value=0.02)
+
+// ──────────────────────────────────────────────
+// Stops / Targets
+// ──────────────────────────────────────────────
+grp_risk  = "Stops & Targets"
+stopMode  = input.string("ATR", "Stop Mode", options=["ATR", "Percent", "Ticks"], group=grp_risk)
+atrLen    = input.int(14, "ATR Length", minval=1, group=grp_risk)
+atrTfOpt  = input.string("60", "ATR Timeframe", options=["Chart", "15", "60"], group=grp_risk, tooltip="Higher-TF ATR uses the last CLOSED bar (no repaint)")
+slAtrMult = input.float(2.0, "SL = ATR x", minval=0.1, step=0.1, group=grp_risk)
+slPct     = input.float(0.5, "SL = % of price", minval=0.01, step=0.05, group=grp_risk)
+sl_ticks  = input.int(200, "SL = Ticks", minval=10, group=grp_risk)
+tpR       = input.float(2.0, "TP = SL x (R multiple)", minval=0.1, step=0.1, group=grp_risk)
+
+grp_trail = "Trailing Settings"
+use_trail = input.bool(false, "Enable Trailing Stop", group=grp_trail)
+trailActR = input.float(1.0, "Trailing Activation (x SL distance)", minval=0.05, step=0.05, group=grp_trail)
+trailOffR = input.float(0.5, "Trailing Offset (x SL distance)", minval=0.05, step=0.05, group=grp_trail)
+
+// ──────────────────────────────────────────────
+// Strategy Settings
+// ──────────────────────────────────────────────
+tradeWithLevels = input.bool(false, "Use TDI Levels Filter", group="Strategy Settings")
+buyLevel        = input.int(38, "TDI Buy Level (<=)", group="Strategy Settings")
+sellLevel       = input.int(62, "TDI Sell Level (>=)", group="Strategy Settings")
+togglesGate     = input.bool(false, "TF/Divergence toggles also gate entries", group="Strategy Settings", tooltip="Off = v3.0 behaviour: entries use every timeframe's raw TDI/divergence state regardless of the toggles")
+
+// ──────────────────────────────────────────────
+// TDI — MTF with individual toggles
+// ──────────────────────────────────────────────
+show1mTDI  = input.bool(true,  "Show 1m TDI Signals",  group="TDI")
+show5mTDI  = input.bool(true,  "Show 5m TDI Signals",  group="TDI")
+show15mTDI = input.bool(true,  "Show 15m TDI Signals", group="TDI")
+show30mTDI = input.bool(true,  "Show 30m TDI Signals", group="TDI")
+show60mTDI = input.bool(true,  "Show 1h TDI Signals",  group="TDI")
+
+calc_tdi() =>
+    r   = ta.rsi(close, 14)
+    ma  = ta.sma(r, 34)
+    offs = 1.6185 * ta.stdev(r, 34)
+    up  = ma + offs
+    dn  = ma - offs
+    mid = (up + dn) / 2
+    mbb = ta.sma(r, 7)
+    mab = ta.sma(r, 2)
+    long1  = ta.crossover(mab, mbb) and mbb > mid and mbb > 50
+    short1 = ta.crossunder(mab, mbb) and mbb < mid and mbb < 50
+    [long1, short1]
+
+[t1l, t1s] = request.security(syminfo.tickerid, "1",  calc_tdi(), gaps=barmerge.gaps_off)
+[t5l, t5s] = request.security(syminfo.tickerid, "5",  calc_tdi(), gaps=barmerge.gaps_off)
+[t15l,t15s]= request.security(syminfo.tickerid, "15", calc_tdi(), gaps=barmerge.gaps_off)
+[t30l,t30s]= request.security(syminfo.tickerid, "30", calc_tdi(), gaps=barmerge.gaps_off)
+[t60l,t60s]= request.security(syminfo.tickerid, "60", calc_tdi(), gaps=barmerge.gaps_off)
+
+t1LongSignal  = show1mTDI  and t1l  and not t1l[1]
+t1ShortSignal = show1mTDI  and t1s  and not t1s[1]
+t5LongSignal  = show5mTDI  and t5l  and not t5l[1]
+t5ShortSignal = show5mTDI  and t5s  and not t5s[1]
+t15LongSignal = show15mTDI and t15l and not t15l[1]
+t15ShortSignal= show15mTDI and t15s and not t15s[1]
+t30LongSignal = show30mTDI and t30l and not t30l[1]
+t30ShortSignal= show30mTDI and t30s and not t30s[1]
+t60LongSignal = show60mTDI and t60l and not t60l[1]
+t60ShortSignal= show60mTDI and t60s and not t60s[1]
+
+if t1LongSignal
+    label.new(bar_index, low,  "1m LONG",  style=label.style_label_up,   color=color.lime, textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if t1ShortSignal
+    label.new(bar_index, high, "1m SHORT", style=label.style_label_down, color=color.red,  textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if t5LongSignal
+    label.new(bar_index, low,  "5m LONG",  style=label.style_label_up,   color=color.lime, textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if t5ShortSignal
+    label.new(bar_index, high, "5m SHORT", style=label.style_label_down, color=color.red,  textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if t15LongSignal
+    label.new(bar_index, low,  "15m LONG", style=label.style_label_up,   color=color.lime, textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if t15ShortSignal
+    label.new(bar_index, high, "15m SHORT",style=label.style_label_down, color=color.red,  textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if t30LongSignal
+    label.new(bar_index, low,  "30m LONG", style=label.style_label_up,   color=color.lime, textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if t30ShortSignal
+    label.new(bar_index, high, "30m SHORT",style=label.style_label_down, color=color.red,  textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if t60LongSignal
+    label.new(bar_index, low,  "1h LONG",  style=label.style_label_up,   color=color.lime, textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if t60ShortSignal
+    label.new(bar_index, high, "1h SHORT", style=label.style_label_down, color=color.red,  textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+
+// ──────────────────────────────────────────────
+// Divergences — DYNAMIC previous swing point detection
+// ──────────────────────────────────────────────
+showRegularBull = input.bool(true,  "Show Regular Bullish Divergence", group="Divergences")
+showRegularBear = input.bool(false, "Show Regular Bearish Divergence", group="Divergences")
+showHiddenBull  = input.bool(false, "Show Hidden Bullish Divergence",  group="Divergences")
+showHiddenBear  = input.bool(false, "Show Hidden Bearish Divergence",  group="Divergences")
+
+divLeft   = input.int(5,  "Pivot Left Strength",  minval=1, group="Divergences")
+divRight  = input.int(5,  "Pivot Right Strength", minval=1, group="Divergences")
+divMinBars = input.int(5,  "Min Bars Between Swings", minval=1, group="Divergences")
+divMaxBars = input.int(60, "Max Bars Between Swings", minval=1, group="Divergences")
+
+calc_div() =>
+    osc = ta.rsi(close, 14)
+    pl = ta.pivotlow(osc, divLeft, divRight)
+    ph = ta.pivothigh(osc, divLeft, divRight)
+    plFound = not na(pl)
+    phFound = not na(ph)
+    prevPlOsc   = ta.valuewhen(plFound, pl, 1)
+    prevPlPrice = ta.valuewhen(plFound, low[divRight], 1)
+    prevPhOsc   = ta.valuewhen(phFound, ph, 1)
+    prevPhPrice = ta.valuewhen(phFound, high[divRight], 1)
+    currPlPrice = low[divRight]
+    currPhPrice = high[divRight]
+    barsSincePl = ta.barssince(plFound)
+    barsSincePh = ta.barssince(phFound)
+    regularBull = plFound and not na(prevPlOsc) and not na(prevPlPrice) and
+                  currPlPrice < prevPlPrice and pl > prevPlOsc and
+                  divMinBars <= barsSincePl[1] and barsSincePl[1] <= divMaxBars
+    regularBear = phFound and not na(prevPhOsc) and not na(prevPhPrice) and
+                  currPhPrice > prevPhPrice and ph < prevPhOsc and
+                  divMinBars <= barsSincePh[1] and barsSincePh[1] <= divMaxBars
+    hiddenBull  = plFound and not na(prevPlOsc) and not na(prevPlPrice) and
+                  currPlPrice > prevPlPrice and pl < prevPlOsc and
+                  divMinBars <= barsSincePl[1] and barsSincePl[1] <= divMaxBars
+    hiddenBear  = phFound and not na(prevPhOsc) and not na(prevPhPrice) and
+                  currPhPrice < prevPhPrice and ph > prevPhOsc and
+                  divMinBars <= barsSincePh[1] and barsSincePh[1] <= divMaxBars
+    [regularBull, regularBear, hiddenBull, hiddenBear]
+
+[d1rb, d1rr, d1hb, d1hr] = request.security(syminfo.tickerid, "1",  calc_div(), gaps=barmerge.gaps_off)
+[d5rb, d5rr, d5hb, d5hr] = request.security(syminfo.tickerid, "5",  calc_div(), gaps=barmerge.gaps_off)
+[d15rb,d15rr,d15hb,d15hr]= request.security(syminfo.tickerid, "15", calc_div(), gaps=barmerge.gaps_off)
+[d30rb,d30rr,d30hb,d30hr]= request.security(syminfo.tickerid, "30", calc_div(), gaps=barmerge.gaps_off)
+[d60rb,d60rr,d60hb,d60hr]= request.security(syminfo.tickerid, "60", calc_div(), gaps=barmerge.gaps_off)
+
+d1BullSignal  = showRegularBull and d1rb and not d1rb[1]
+d1BearSignal  = showRegularBear and d1rr and not d1rr[1]
+d1HiddenBull  = showHiddenBull  and d1hb and not d1hb[1]
+d1HiddenBear  = showHiddenBear  and d1hr and not d1hr[1]
+d5BullSignal  = showRegularBull and d5rb and not d5rb[1]
+d5BearSignal  = showRegularBear and d5rr and not d5rr[1]
+d5HiddenBull  = showHiddenBull  and d5hb and not d5hb[1]
+d5HiddenBear  = showHiddenBear  and d5hr and not d5hr[1]
+d15BullSignal = showRegularBull and d15rb and not d15rb[1]
+d15BearSignal = showRegularBear and d15rr and not d15rr[1]
+d15HiddenBull = showHiddenBull  and d15hb and not d15hb[1]
+d15HiddenBear = showHiddenBear  and d15hr and not d15hr[1]
+d30BullSignal = showRegularBull and d30rb and not d30rb[1]
+d30BearSignal = showRegularBear and d30rr and not d30rr[1]
+d30HiddenBull = showHiddenBull  and d30hb and not d30hb[1]
+d30HiddenBear = showHiddenBear  and d30hr and not d30hr[1]
+d60BullSignal = showRegularBull and d60rb and not d60rb[1]
+d60BearSignal = showRegularBear and d60rr and not d60rr[1]
+d60HiddenBull = showHiddenBull  and d60hb and not d60hb[1]
+d60HiddenBear = showHiddenBear  and d60hr and not d60hr[1]
+
+if d1BullSignal
+    label.new(bar_index, low, "1m Bull", style=label.style_label_up, color=color.lime, textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if d1BearSignal
+    label.new(bar_index, high, "1m Bear", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if d1HiddenBull
+    label.new(bar_index, low, "1m H-Bull", style=label.style_label_up, color=color.new(color.lime, 40), textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if d1HiddenBear
+    label.new(bar_index, high, "1m H-Bear", style=label.style_label_down, color=color.new(color.red, 40), textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+
+if d5BullSignal
+    label.new(bar_index, low, "5m Bull", style=label.style_label_up, color=color.aqua, textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if d5BearSignal
+    label.new(bar_index, high, "5m Bear", style=label.style_label_down, color=color.orange, textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if d5HiddenBull
+    label.new(bar_index, low, "5m H-Bull", style=label.style_label_up, color=color.new(color.aqua, 40), textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if d5HiddenBear
+    label.new(bar_index, high, "5m H-Bear", style=label.style_label_down, color=color.new(color.orange, 40), textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+
+if d15BullSignal
+    label.new(bar_index, low, "15m Bull", style=label.style_label_up, color=color.yellow, textcolor=color.black, size=size.small, yloc=yloc.belowbar)
+if d15BearSignal
+    label.new(bar_index, high, "15m Bear", style=label.style_label_down, color=color.fuchsia, textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if d15HiddenBull
+    label.new(bar_index, low, "15m H-Bull", style=label.style_label_up, color=color.new(color.yellow, 40), textcolor=color.black, size=size.small, yloc=yloc.belowbar)
+if d15HiddenBear
+    label.new(bar_index, high, "15m H-Bear", style=label.style_label_down, color=color.new(color.fuchsia, 40), textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+
+if d30BullSignal
+    label.new(bar_index, low, "30m Bull", style=label.style_label_up, color=color.new(color.green, 20), textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if d30BearSignal
+    label.new(bar_index, high, "30m Bear", style=label.style_label_down, color=color.maroon, textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if d30HiddenBull
+    label.new(bar_index, low, "30m H-Bull", style=label.style_label_up, color=color.new(color.green, 50), textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if d30HiddenBear
+    label.new(bar_index, high, "30m H-Bear", style=label.style_label_down, color=color.new(color.maroon, 50), textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+
+if d60BullSignal
+    label.new(bar_index, low, "1h Bull", style=label.style_label_up, color=color.new(color.teal, 20), textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if d60BearSignal
+    label.new(bar_index, high, "1h Bear", style=label.style_label_down, color=color.purple, textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+if d60HiddenBull
+    label.new(bar_index, low, "1h H-Bull", style=label.style_label_up, color=color.new(color.teal, 50), textcolor=color.white, size=size.small, yloc=yloc.belowbar)
+if d60HiddenBear
+    label.new(bar_index, high, "1h H-Bear", style=label.style_label_down, color=color.new(color.purple, 50), textcolor=color.white, size=size.small, yloc=yloc.abovebar)
+
+// ──────────────────────────────────────────────
+// Custom Day + Week + Month
+// ──────────────────────────────────────────────
+dayStartHour   = input.int(0, "Day Start Hour (0-23 UTC)", minval=0, maxval=23, group="Session & MTF Levels")
+dayStartMinute = input.int(0, "Day Start Minute", minval=0, maxval=59, group="Session & MTF Levels")
+showWeekHL     = input.bool(true, "Show Weekly High/Low", group="Session & MTF Levels")
+showMonthHL    = input.bool(true, "Show Monthly High/Low", group="Session & MTF Levels")
+showNewPeriodMarkers = input.bool(true, "Show New Week/Month Background", group="Session & MTF Levels")
+
+var float dayHigh = na
+var float dayLow  = na
+newCustomDay = (hour == dayStartHour and minute == dayStartMinute) and (hour[1] != dayStartHour or minute[1] != dayStartMinute)
+
+if newCustomDay or barstate.isfirst
+    dayHigh := high
+    dayLow  := low
+else
+    dayHigh := math.max(nz(dayHigh), high)
+    dayLow  := math.min(nz(dayLow), low)
+
+plot(dayHigh, "Custom Day High", color.new(color.red, 25), 2)
+plot(dayLow,  "Custom Day Low",  color.new(color.green, 25), 2)
+
+isNewWeek  = ta.change(time("W")) != 0
+isNewMonth = ta.change(time("M")) != 0
+
+var float weekHigh = na
+var float weekLow  = na
+if isNewWeek or barstate.isfirst
+    weekHigh := high
+    weekLow  := low
+else
+    weekHigh := math.max(nz(weekHigh), high)
+    weekLow  := math.min(nz(weekLow), low)
+
+plot(showWeekHL ? weekHigh : na, "Week High", color.new(#9C27B0, 35), 2)
+plot(showWeekHL ? weekLow  : na, "Week Low",  color.new(#00BCD4, 35), 2)
+
+var float monthHigh = na
+var float monthLow  = na
+if isNewMonth or barstate.isfirst
+    monthHigh := high
+    monthLow  := low
+else
+    monthHigh := math.max(nz(monthHigh), high)
+    monthLow  := math.min(nz(monthLow), low)
+
+plot(showMonthHL ? monthHigh : na, "Month High", color.new(color.orange, 35), 2)
+plot(showMonthHL ? monthLow  : na, "Month Low",  color.new(color.teal, 35), 2)
+
+bgcolor(showNewPeriodMarkers and isNewWeek  ? color.new(color.blue, 90) : na)
+bgcolor(showNewPeriodMarkers and isNewMonth ? color.new(color.fuchsia, 90) : na)
+
+breakHigh = high > nz(dayHigh[1]) and low[1] <= nz(dayHigh[1])
+breakLow  = low  < nz(dayLow[1])  and high[1] >= nz(dayLow[1])
+
+// ──────────────────────────────────────────────
+// Consecutive Signal Counter (The "4th Signal" Filter) - PER TIMEFRAME
+// ──────────────────────────────────────────────
+requireFourthSignal = input.bool(false, "Require 4th Consecutive Signal for Combined Alerts", group="Confluence Filters")
+
+tf1m_bull  = t1LongSignal  or d1BullSignal  or d1HiddenBull
+tf1m_bear  = t1ShortSignal or d1BearSignal  or d1HiddenBear
+tf5m_bull  = t5LongSignal  or d5BullSignal  or d5HiddenBull
+tf5m_bear  = t5ShortSignal or d5BearSignal  or d5HiddenBear
+tf15m_bull = t15LongSignal or d15BullSignal or d15HiddenBull
+tf15m_bear = t15ShortSignal or d15BearSignal or d15HiddenBear
+tf30m_bull = t30LongSignal or d30BullSignal or d30HiddenBull
+tf30m_bear = t30ShortSignal or d30BearSignal or d30HiddenBear
+tf60m_bull = t60LongSignal or d60BullSignal or d60HiddenBull
+tf60m_bear = t60ShortSignal or d60BearSignal or d60HiddenBear
+
+var int bulls1m = 0
+var int bears1m = 0
+var int bulls5m = 0
+var int bears5m = 0
+var int bulls15m = 0
+var int bears15m = 0
+var int bulls30m = 0
+var int bears30m = 0
+var int bulls60m = 0
+var int bears60m = 0
+
+if newCustomDay
+    bulls1m := 0
+    bears1m := 0
+    bulls5m := 0
+    bears5m := 0
+    bulls15m := 0
+    bears15m := 0
+    bulls30m := 0
+    bears30m := 0
+    bulls60m := 0
+    bears60m := 0
+
+if tf1m_bull
+    bulls1m += 1
+    bears1m := 0
+if tf1m_bear
+    bears1m += 1
+    bulls1m := 0
+if tf5m_bull
+    bulls5m += 1
+    bears5m := 0
+if tf5m_bear
+    bears5m += 1
+    bulls5m := 0
+if tf15m_bull
+    bulls15m += 1
+    bears15m := 0
+if tf15m_bear
+    bears15m += 1
+    bulls15m := 0
+if tf30m_bull
+    bulls30m += 1
+    bears30m := 0
+if tf30m_bear
+    bears30m += 1
+    bulls30m := 0
+if tf60m_bull
+    bulls60m += 1
+    bears60m := 0
+if tf60m_bear
+    bears60m += 1
+    bulls60m := 0
+
+isFourthBull = (bulls1m == 4 and tf1m_bull) or (bulls5m == 4 and tf5m_bull) or (bulls15m == 4 and tf15m_bull) or (bulls30m == 4 and tf30m_bull) or (bulls60m == 4 and tf60m_bull)
+isFourthBear = (bears1m == 4 and tf1m_bear) or (bears5m == 4 and tf5m_bear) or (bears15m == 4 and tf15m_bear) or (bears30m == 4 and tf30m_bear) or (bears60m == 4 and tf60m_bear)
+
+if isFourthBull
+    label.new(bar_index, low,  "4th\nBULL", style=label.style_label_up,   color=color.yellow, textcolor=color.black, size=size.normal, yloc=yloc.belowbar)
+if isFourthBear
+    label.new(bar_index, high, "4th\nBEAR", style=label.style_label_down, color=color.yellow, textcolor=color.black, size=size.normal, yloc=yloc.abovebar)
+
+// ──────────────────────────────────────────────
+// Combined Confluence
+// ──────────────────────────────────────────────
+anyBullRaw = t1l or t5l or t15l or t30l or t60l or d1rb or d5rb or d15rb or d30rb or d60rb or d1hb or d5hb or d15hb or d30hb or d60hb
+anyBearRaw = t1s or t5s or t15s or t30s or t60s or d1rr or d5rr or d15rr or d30rr or d60rr or d1hr or d5hr or d15hr or d30hr or d60hr
+anyBullGated = (show1mTDI and t1l) or (show5mTDI and t5l) or (show15mTDI and t15l) or (show30mTDI and t30l) or (show60mTDI and t60l) or
+               (showRegularBull and (d1rb or d5rb or d15rb or d30rb or d60rb)) or (showHiddenBull and (d1hb or d5hb or d15hb or d30hb or d60hb))
+anyBearGated = (show1mTDI and t1s) or (show5mTDI and t5s) or (show15mTDI and t15s) or (show30mTDI and t30s) or (show60mTDI and t60s) or
+               (showRegularBear and (d1rr or d5rr or d15rr or d30rr or d60rr)) or (showHiddenBear and (d1hr or d5hr or d15hr or d30hr or d60hr))
+
+combinedLongRaw  = breakLow  and (togglesGate ? anyBullGated : anyBullRaw)
+combinedShortRaw = breakHigh and (togglesGate ? anyBearGated : anyBearRaw)
+
+combinedLongFilter  = requireFourthSignal ? (combinedLongRaw and isFourthBull) : combinedLongRaw
+combinedShortFilter = requireFourthSignal ? (combinedShortRaw and isFourthBear) : combinedShortRaw
+
+combinedLong  = combinedLongFilter  and not combinedLongFilter[1]
+combinedShort = combinedShortFilter and not combinedShortFilter[1]
+
+if combinedLong
+    label.new(bar_index, low,  "LONG\nTDI+DAY",  style=label.style_label_up,   color=color.new(color.green, 0), textcolor=color.white, size=size.normal, yloc=yloc.belowbar)
+if combinedShort
+    label.new(bar_index, high, "SHORT\nTDI+DAY", style=label.style_label_down, color=color.new(color.red, 0),   textcolor=color.white, size=size.normal, yloc=yloc.abovebar)
+
+// ──────────────────────────────────────────────
+// Execution & Risk Management
+// ──────────────────────────────────────────────
+currentChartRsi = ta.rsi(close, 14)
+currentChartTdiFast = ta.sma(currentChartRsi, 2)
+
+validLongEntry  = combinedLong  and (not tradeWithLevels or currentChartTdiFast <= buyLevel)
+validShortEntry = combinedShort and (not tradeWithLevels or currentChartTdiFast >= sellLevel)
+
+// Stop distance in price units, evaluated on the signal bar.
+// Higher-TF ATR: last closed bar of that TF ([1] + lookahead_on = no repaint, no future data).
+atrChart = ta.atr(atrLen)
+atrHtf   = request.security(syminfo.tickerid, atrTfOpt == "Chart" ? timeframe.period : atrTfOpt, ta.atr(atrLen)[1], lookahead=barmerge.lookahead_on)
+atrVal   = atrTfOpt == "Chart" ? atrChart : atrHtf
+slDist   = stopMode == "ATR" ? slAtrMult * atrVal : stopMode == "Percent" ? close * slPct / 100.0 : sl_ticks * syminfo.mintick
+distOk   = not na(slDist) and slDist > 0
+
+toTicks(d) => math.max(1, math.round(d / syminfo.mintick))
+
+// Entry + exit are placed together on the signal bar, so the exit protects the position from the
+// fill bar onward. loss/profit/trail in ticks are measured from the actual fill price.
+// Exits are (re)issued only when the entry will actually open a new position (pyramiding = 1),
+// so distances stay frozen for the life of the trade.
+if validLongEntry and distOk and strategy.position_size <= 0
+    strategy.entry("Long", strategy.long)
+    strategy.exit("Exit Long", "Long", loss=toTicks(slDist), profit=toTicks(slDist * tpR),
+         trail_points = use_trail ? toTicks(slDist * trailActR) : na,
+         trail_offset = use_trail ? toTicks(slDist * trailOffR) : na,
+         comment_loss="Long SL", comment_profit="Long TP", comment_trailing="Long Trail")
+
+if validShortEntry and distOk and strategy.position_size >= 0
+    strategy.entry("Short", strategy.short)
+    strategy.exit("Exit Short", "Short", loss=toTicks(slDist), profit=toTicks(slDist * tpR),
+         trail_points = use_trail ? toTicks(slDist * trailActR) : na,
+         trail_offset = use_trail ? toTicks(slDist * trailOffR) : na,
+         comment_loss="Short SL", comment_profit="Short TP", comment_trailing="Short Trail")
+
+// Visuals for Entries
+bgcolor(validLongEntry ? color.new(color.green, 90) : na)
+bgcolor(validShortEntry ? color.new(color.red, 90) : na)

@@ -13,7 +13,7 @@ def load_1m():
     df.columns = ["t", "o", "h", "l", "c", "v"]
     t = df["t"].astype("int64")
     t = np.where(t > 1e14, t // 1000, t)  # us -> ms
-    df.index = pd.to_datetime(t, unit="ms", utc=True)
+    df.index = pd.to_datetime(t, unit="ms", utc=True).as_unit("ns")  # MTF mapping below works in ns
     return df.drop(columns="t").sort_index()
 
 
@@ -328,3 +328,86 @@ def stats(pnl, mdd, eq0=10000.0):
                 pf=gp / gl if gl > 0 else np.inf, mdd_pct=100 * mdd,
                 # avg trade in basis points of the traded notional (1% equity)
                 avg_bp=1e4 * pnl.mean() / (eq0 * 0.01))
+
+
+# ================= v3.1: distance-based exits (ticks / ATR / percent) =================
+@njit(cache=True)
+def atr(h, l, c, n):
+    m = h.size
+    out = np.full(m, np.nan)
+    s = 0.0
+    for i in range(m):
+        tr = h[i] - l[i] if i == 0 else max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1]))
+        if i < n - 1:
+            s += tr
+        elif i == n - 1:
+            s = (s + tr) / n; out[i] = s
+        else:
+            s = (1.0 / n) * tr + (1.0 - 1.0 / n) * s; out[i] = s
+    return out
+
+
+def map_float(sec_close_t, v, chart_close_t):
+    idx = np.searchsorted(sec_close_t, chart_close_t, side="right") - 1
+    out = np.full(chart_close_t.size, np.nan)
+    ok = idx >= 0
+    out[ok] = v[idx[ok]]
+    return out
+
+
+def atr_on_chart(df1, ch, chart_tf, atr_tf, n):
+    """ATR in price units on chart bars. atr_tf == 0 -> chart TF (ta.atr); otherwise
+    last *closed* atr_tf bar (request.security(..., ta.atr(n)[1], lookahead_on))."""
+    if atr_tf == 0 or atr_tf == chart_tf:
+        return atr(ch.h.to_numpy(), ch.l.to_numpy(), ch.c.to_numpy(), n)
+    s = resample(df1, atr_tf)
+    a = atr(s.h.to_numpy(), s.l.to_numpy(), s.c.to_numpy(), n)
+    sct = s.index.values.astype("int64") + atr_tf * 60_000_000_000
+    cct = ch.index.values.astype("int64") + chart_tf * 60_000_000_000
+    return map_float(sct, a, cct)
+
+
+@njit(cache=True)
+def simulate_d(o, h, l, c, sigL, sigS, slA, tpA, actA, offA, use_trail, arm_on_fill, comm):
+    """Exit distances (price units) are taken from the arrays at the SIGNAL bar and frozen
+    for the trade. arm_on_fill=True: exits protect the position from the fill bar (v3.1 Pine
+    places strategy.exit on the entry bar); False reproduces v3.0 (armed one bar later).
+    Returns per-trade return in bp of notional (after commission), entry bar, side."""
+    n = o.size
+    ret = np.zeros(n); ebar = np.zeros(n, np.int64); side = np.zeros(n, np.int64); nt = 0
+    pos = 0; E = 0.0; armed = False; peak = 0.0; tact = False; eb = 0
+    sl = 0.0; tp = 0.0; act = 0.0; off = 0.0
+    pend = 0; psl = 0.0; ptp = 0.0; pact = 0.0; poff = 0.0
+    pts = np.empty(4)
+    for i in range(n):
+        if pend != 0 and pend != pos:
+            if pos != 0:
+                ret[nt] = 1e4 * (pos * (o[i] - E) / E - comm * (o[i] + E) / E)
+                ebar[nt] = eb; side[nt] = pos; nt += 1
+            pos = pend; E = o[i]; eb = i; tact = False
+            sl = psl; tp = ptp; act = pact; off = poff
+            peak = E if pos > 0 else -E
+            armed = arm_on_fill
+        pend = 0
+        if pos != 0 and armed:
+            if abs(o[i] - h[i]) < abs(o[i] - l[i]):
+                pts[0] = o[i]; pts[1] = h[i]; pts[2] = l[i]; pts[3] = c[i]
+            else:
+                pts[0] = o[i]; pts[1] = l[i]; pts[2] = h[i]; pts[3] = c[i]
+            if pos < 0:
+                for k in range(4): pts[k] = -pts[k]
+            Eadj = E if pos > 0 else -E
+            px, peak, tact = _walk(pts, Eadj, sl, tp, act, off, use_trail, peak, tact)
+            if not np.isnan(px):
+                xp = px if pos > 0 else -px
+                ret[nt] = 1e4 * (pos * (xp - E) / E - comm * (xp + E) / E)
+                ebar[nt] = eb; side[nt] = pos; nt += 1
+                pos = 0
+        if pos != 0:
+            armed = True
+        ok = not np.isnan(slA[i])
+        if ok and sigL[i] and not sigS[i] and pos != 1:
+            pend = 1; psl = slA[i]; ptp = tpA[i]; pact = actA[i]; poff = offA[i]
+        elif ok and sigS[i] and not sigL[i] and pos != -1:
+            pend = -1; psl = slA[i]; ptp = tpA[i]; pact = actA[i]; poff = offA[i]
+    return ret[:nt], ebar[:nt], side[:nt]
