@@ -33,7 +33,7 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 
-TF_MIN = {"M1": 1, "M5": 5, "M15": 15, "H1": 60, "H4": 240}
+TF_MIN = {"M1": 1, "M2": 2, "M3": 3, "M5": 5, "M15": 15, "M30": 30, "H1": 60, "H4": 240}
 OOS_START = pd.Timestamp("2026-01-01")
 
 # ----------------------------------------------------------------------------- data

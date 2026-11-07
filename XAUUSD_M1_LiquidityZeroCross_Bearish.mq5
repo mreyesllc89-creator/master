@@ -2,10 +2,18 @@
 //|                     XAUUSD_M1_LiquidityZeroCross_Bearish.mq5     |
 //|                                                                  |
 //|  Strategy : XAUUSD M1 Liquidity Zero-Cross (BEARISH / SHORT ONLY)|
-//|  Version  : 1.00                                                 |
+//|  Version  : 1.10                                                 |
 //+------------------------------------------------------------------+
 //
 //  "No señal = no operación"  ->  no signal = no trade.
+//
+//  v1.10 (calibration release, defaults keep v1.00 behaviour):
+//    + TriggerTimeframe  : trigger/structure timeframe (default M1 = rules)
+//    + TP_LookbackBars   : search the TP liquidity pool further back than the
+//                          SL structure (0 = same as LiquidityLookbackBars)
+//    + TP_FallbackRR     : fixed-RR target when no pool pays MinRewardRisk
+//                          (0 = skip the trade, as in v1.00)
+//    See research/ and presets/ for the backtest calibration.
 //
 //  OVERVIEW
 //  --------
@@ -82,7 +90,7 @@
 //  * Long trades are never opened (strategy is bearish only).
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
-#property version     "1.00"
+#property version     "1.10"
 #property description "XAUUSD M1 Liquidity Zero-Cross Bearish (short-only)."
 #property description "HTF MACD/EMA bias + M1 MACD zero-cross down + swing liquidity SL/TP."
 #property description "No signal = no trade."
@@ -119,7 +127,8 @@ input bool            UseHTF_Filter    = true;        // Require HTF bearish bia
 input ENUM_TIMEFRAMES HTF_Timeframe    = PERIOD_M15;  // HTF (M15 or M5)
 input int             HTF_EMA_Period   = 50;          // HTF EMA period
 
-input group "=== R1/R2: MACD (HTF and M1) ==="
+input group "=== R1/R2: MACD (HTF and trigger) ==="
+input ENUM_TIMEFRAMES TriggerTimeframe = PERIOD_M1; // Trigger timeframe (M1 per rules)
 input int     MACD_Fast                = 12;   // MACD fast EMA
 input int     MACD_Slow                = 26;   // MACD slow EMA
 input int     MACD_Signal              = 9;    // MACD signal SMA
@@ -142,6 +151,8 @@ input bool    SL_AddSpread             = true;  // Add current spread to SL (sho
 input bool    RequireLiquiditySweep    = false; // Require a sweep candle (else swing high is enough)
 input int     TP_Buffer_Points         = 0;     // TP placed this far ABOVE the liquidity pool
 input double  MinRewardRisk            = 1.0;   // Min reward:risk to accept a TP pool
+input int     TP_LookbackBars          = 0;     // TP pool lookback (0 = LiquidityLookbackBars)
+input double  TP_FallbackRR            = 0.0;   // Fixed RR target if no pool qualifies (0 = skip trade)
 input int     MinSL_Points             = 50;    // Min SL distance (points, sanity)
 input int     MaxSL_Points             = 1000;  // Max SL distance (points, 0 = off)
 
@@ -325,8 +336,14 @@ int OnInit()
             EnumToString(HTF_Timeframe));
    if(StringFind(_Symbol, "XAU") < 0 && StringFind(_Symbol, "GOLD") < 0)
       Print("[XLZC] Warning: EA designed for XAUUSD, attached to ", _Symbol);
-   if(_Period != PERIOD_M1)
-      Print("[XLZC] Note: signals are computed on M1 regardless of chart timeframe.");
+   if(TriggerTimeframe != PERIOD_M1)
+      Print("[XLZC] Note: trigger timeframe ", EnumToString(TriggerTimeframe),
+            " differs from the M1 rule (calibration option).");
+   if(TriggerTimeframe >= HTF_Timeframe)
+     {
+      Print("[XLZC] TriggerTimeframe must be lower than HTF_Timeframe");
+      return INIT_PARAMETERS_INCORRECT;
+     }
 
    //--- point scaling: inputs are written for 2-digit gold (0.01 point)
    g_ptScale = 1.0;
@@ -334,12 +351,12 @@ int OnInit()
       g_ptScale = MathPow(10.0, _Digits - 2);
 
    //--- indicator handles
-   g_hMacdM1  = iMACD(_Symbol, PERIOD_M1, MACD_Fast, MACD_Slow, MACD_Signal, PRICE_CLOSE);
+   g_hMacdM1  = iMACD(_Symbol, TriggerTimeframe, MACD_Fast, MACD_Slow, MACD_Signal, PRICE_CLOSE);
    g_hMacdHTF = iMACD(_Symbol, HTF_Timeframe, MACD_Fast, MACD_Slow, MACD_Signal, PRICE_CLOSE);
    g_hEmaHTF  = iMA(_Symbol, HTF_Timeframe, HTF_EMA_Period, 0, MODE_EMA, PRICE_CLOSE);
-   g_hStochM1 = iStochastic(_Symbol, PERIOD_M1, Stoch_K, Stoch_D, Stoch_Slowing, MODE_SMA, STO_LOWHIGH);
+   g_hStochM1 = iStochastic(_Symbol, TriggerTimeframe, Stoch_K, Stoch_D, Stoch_Slowing, MODE_SMA, STO_LOWHIGH);
    if(UseRSIFilter)
-      g_hRsiM1 = iRSI(_Symbol, PERIOD_M1, RSI_Period, PRICE_CLOSE);
+      g_hRsiM1 = iRSI(_Symbol, TriggerTimeframe, RSI_Period, PRICE_CLOSE);
 
    if(g_hMacdM1 == INVALID_HANDLE || g_hMacdHTF == INVALID_HANDLE ||
       g_hEmaHTF == INVALID_HANDLE || g_hStochM1 == INVALID_HANDLE ||
@@ -383,7 +400,7 @@ void OnTick()
    ManageOpenPositions();
 
    //--- bar-based signal evaluation: once per new M1 bar, on CLOSED bars
-   datetime barTime = iTime(_Symbol, PERIOD_M1, 0);
+   datetime barTime = iTime(_Symbol, TriggerTimeframe, 0);
    if(barTime == 0)
       return;
 
@@ -504,7 +521,7 @@ bool EvaluateSignal()
         }
      }
 
-   Log("Signal VALID on bar " + TimeToString(iTime(_Symbol, PERIOD_M1, 0)) + " " + g_signalTag);
+   Log("Signal VALID on bar " + TimeToString(iTime(_Symbol, TriggerTimeframe, 0)) + " " + g_signalTag);
    return true;
   }
 
@@ -579,13 +596,14 @@ bool BuildTradePlan(TradePlan &p, string &reason)
   {
    int N    = LiquidityLookbackBars;
    int S    = SwingStrength;
-   int need = N + S + 1;
+   int NT   = (TP_LookbackBars > 0) ? TP_LookbackBars : N;   // TP pool lookback
+   int need = MathMax(N, NT) + S + 1;
 
    MqlRates r[];
    ArraySetAsSeries(r, true);
-   if(CopyRates(_Symbol, PERIOD_M1, 0, need, r) != need)
+   if(CopyRates(_Symbol, TriggerTimeframe, 0, need, r) != need)
      {
-      reason = "not enough M1 history";
+      reason = "not enough trigger-timeframe history";
       return false;
      }
 
@@ -662,13 +680,13 @@ bool BuildTradePlan(TradePlan &p, string &reason)
    datetime lowTimes[];
    string   lowSrc[];
    int      cnt = 0;
-   for(int i = 1 + S; i <= N && i + S < need; i++)
+   for(int i = 1 + S; i <= NT && i + S < need; i++)
       if(IsSwingLow(r, i, S) && r[i].low < bid)
         {
          ArrayResize(lows, cnt + 1);
          ArrayResize(lowTimes, cnt + 1);
          ArrayResize(lowSrc, cnt + 1);
-         lows[cnt] = r[i].low; lowTimes[cnt] = r[i].time; lowSrc[cnt] = "M1 swingLow";
+         lows[cnt] = r[i].low; lowTimes[cnt] = r[i].time; lowSrc[cnt] = "swingLow";
          cnt++;
         }
 
@@ -718,6 +736,20 @@ bool BuildTradePlan(TradePlan &p, string &reason)
       p.tpRefTime = lowTimes[best];
       p.tpSource  = lowSrc[best];
       found       = true;
+     }
+
+   //--- v1.1: fixed-RR fallback when no liquidity pool pays MinRewardRisk
+   if(!found && TP_FallbackRR > 0.0)
+     {
+      double tp = NormalizePrice(p.entry - TP_FallbackRR * risk);
+      if(p.entry - tp > minDist)
+        {
+         p.tp        = tp;
+         p.tpRef     = tp;
+         p.tpRefTime = 0;
+         p.tpSource  = StringFormat("fixed %.1fR", TP_FallbackRR);
+         found       = true;
+        }
      }
 
    //--- optional: manual SL/TP override (discretionary, default OFF)
@@ -1134,7 +1166,7 @@ void DrawLiquidityZone(const string name, const datetime t1, const double p1,
 void DrawPlan(const TradePlan &p)
   {
    string id    = TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES);
-   datetime now = iTime(_Symbol, PERIOD_M1, 0);
+   datetime now = iTime(_Symbol, TriggerTimeframe, 0);
    DrawLevel("SL", p.sl, clrTomato, "XLZC SL " + p.slSource);
    DrawLevel("TP", p.tp, clrDodgerBlue, "XLZC TP " + p.tpSource);
    if(p.slRefTime > 0)
@@ -1147,7 +1179,7 @@ void UpdatePanel()
   {
    if(MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE))
       return;
-   Comment(StringFormat("XLZC Bearish v1.00 | %s\nSignal: %s %s | Positions: %d\nSession: %s",
+   Comment(StringFormat("XLZC Bearish v1.10 | %s\nSignal: %s %s | Positions: %d\nSession: %s",
                         _Symbol, g_signalActive ? "ACTIVE" : "none", g_signalTag,
                         CountOwnPositions(), SessionOK() ? "open" : "closed"));
   }
