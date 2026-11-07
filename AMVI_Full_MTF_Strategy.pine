@@ -1,0 +1,262 @@
+//@version=6
+strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy", shorttitle="AMVI Full+ Strat", overlay=false, precision=2,
+     initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10,
+     commission_type=strategy.commission.percent, commission_value=0.04, slippage=1, pyramiding=0)
+
+// =====================================================================================
+// AMVI Full MTF -> Strategy
+// -------------------------------------------------------------------------------------
+// AMVI measures volatility, not direction. The strategy therefore works as a
+// "volatility expansion" system:
+//   1. TRIGGER   : an enabled timeframe's AMVI crosses above the High Vol threshold
+//                  while at least N enabled timeframes are above it (confluence).
+//   2. DIRECTION : decided by a bias filter (EMA trend, candle colour, or Donchian breakout).
+//   3. EXITS     : ATR stop / ATR target / optional ATR trailing stop, optional
+//                  "volatility collapse" exit (average AMVI crosses below Low Vol),
+//                  optional time stop, optional reversal on opposite signal.
+// =====================================================================================
+
+// --- Input Parameters ---
+fastATRPeriod       = input.int(14, "Fast ATR Period", minval=1, group="Calculation")
+slowATRPeriod       = input.int(50, "Slow ATR Period", minval=1, group="Calculation")
+stdDevPeriod        = input.int(20, "StdDev Period", minval=1, group="Calculation")
+candleRangePeriod   = input.int(10, "Candle Range Period", minval=1, group="Calculation")
+normalizationPeriod = input.int(200, "Normalization Period", minval=1, group="Calculation")
+noRepaint           = input.bool(true, "Non-Repainting MTF Values (use last confirmed bar)", group="Calculation",
+     tooltip="Recommended for strategies. Uses the previous confirmed bar of each requested timeframe so backtest and live behave the same.")
+
+aatrWeight = input.float(0.35, "AATR Weight", minval=0.0, maxval=1.0, group="Weights")
+vrWeight   = input.float(0.25, "VR Weight", minval=0.0, maxval=1.0, group="Weights")
+nsdWeight  = input.float(0.25, "NSD Weight", minval=0.0, maxval=1.0, group="Weights")
+acrWeight  = input.float(0.15, "ACR Weight", minval=0.0, maxval=1.0, group="Weights")
+
+highVolThreshold = input.float(70.0, "High Vol Threshold", group="Thresholds")
+lowVolThreshold  = input.float(30.0, "Low Vol Threshold", group="Thresholds")
+
+// --- Timeframes (enable = fetch, plot and count toward signals) ---
+gTF = "Timeframes (enabled = fetched, plotted, used for signals)"
+en1s   = input.bool(false, "1s",  group=gTF, inline="s", tooltip="Seconds timeframes need a plan that supports them.")
+en5s   = input.bool(false, "5s",  group=gTF, inline="s")
+en15s  = input.bool(false, "15s", group=gTF, inline="s")
+en30s  = input.bool(false, "30s", group=gTF, inline="s")
+en45s  = input.bool(false, "45s", group=gTF, inline="s")
+en1    = input.bool(true,  "1m",  group=gTF, inline="m")
+en5    = input.bool(true,  "5m",  group=gTF, inline="m")
+en15   = input.bool(true,  "15m", group=gTF, inline="m")
+en30   = input.bool(true,  "30m", group=gTF, inline="m")
+en60   = input.bool(true,  "1h",  group=gTF, inline="h")
+en240  = input.bool(true,  "4h",  group=gTF, inline="h")
+enD    = input.bool(true,  "1D",  group=gTF, inline="h")
+
+// --- Strategy: Entries ---
+gEn = "Strategy - Entries"
+tradeDir      = input.string("Both", "Trade Direction", options=["Both", "Long Only", "Short Only"], group=gEn)
+minConfluence = input.int(3, "Min TFs Above High Vol (Confluence)", minval=1, maxval=12, group=gEn)
+dirMode       = input.string("Trend (EMA)", "Direction Filter", options=["Trend (EMA)", "Candle", "Breakout (Donchian)"], group=gEn)
+emaLen        = input.int(50, "EMA Length (Trend mode)", minval=1, group=gEn)
+dcLen         = input.int(20, "Donchian Length (Breakout mode)", minval=1, group=gEn)
+allowReverse  = input.bool(true, "Reverse on Opposite Signal", group=gEn)
+useDateRange  = input.bool(false, "Limit Backtest Date Range", group=gEn)
+startTime     = input.time(timestamp("2020-01-01T00:00:00"), "Start", group=gEn)
+endTime       = input.time(timestamp("2099-12-31T00:00:00"), "End", group=gEn)
+
+// --- Strategy: Exits ---
+gEx = "Strategy - Exits"
+exitAtrLen  = input.int(14, "Exit ATR Length", minval=1, group=gEx)
+slMult      = input.float(1.5, "Stop Loss (x ATR, 0 = off)", minval=0.0, step=0.1, group=gEx)
+tpMult      = input.float(3.0, "Take Profit (x ATR, 0 = off)", minval=0.0, step=0.1, group=gEx)
+useTrail    = input.bool(false, "Use ATR Trailing Stop", group=gEx)
+trailActMul = input.float(1.5, "Trail Activation (x ATR)", minval=0.0, step=0.1, group=gEx)
+trailOffMul = input.float(1.0, "Trail Offset (x ATR)", minval=0.0, step=0.1, group=gEx)
+useVolExit  = input.bool(true, "Exit on Volatility Collapse (avg AMVI < Low Vol)", group=gEx)
+maxBars     = input.int(0, "Time Stop (bars, 0 = off)", minval=0, group=gEx)
+
+// --- Global Toggles ---
+showOverlay = input.bool(true, "Master Toggle: Show Price Overlay Lines", group="Overlay")
+showLabels  = input.bool(true, "Show Timeframe Text Labels", group="Overlay")
+showLevels  = input.bool(true, "Show Stop / Target Levels", group="Overlay")
+
+// --- Individual Toggles ---
+showL1s = input.bool(true, "1s", group="Overlay"), showL5s = input.bool(true, "5s", group="Overlay"), showL15s = input.bool(true, "15s", group="Overlay")
+showL30s = input.bool(true, "30s", group="Overlay"), showL45s = input.bool(true, "45s", group="Overlay"), showL1 = input.bool(true, "1m", group="Overlay")
+showL5 = input.bool(true, "5m", group="Overlay"), showL15 = input.bool(true, "15m", group="Overlay"), showL30 = input.bool(true, "30m", group="Overlay")
+showL60 = input.bool(true, "1h", group="Overlay"), showL240 = input.bool(true, "4h", group="Overlay"), showLD = input.bool(true, "1D", group="Overlay")
+
+// --- Colors ---
+c1s = #FFCDD2, c5s = #F8BBD0, c15s = #E1BEE7, c30s = #D1C4E9, c45s = #C5CAE9
+c1 = #FF5252, c5 = #FF9800, c15 = #FFEB3B, c30 = #4CAF50, c60 = #00BCD4, c240 = #2196F3, cD = #9C27B0
+
+// --- Core Logic ---
+normalize(val, len) =>
+    float lo = ta.lowest(val, len), float hi = ta.highest(val, len)
+    hi <= lo ? 0.0 : (val - lo) / (hi - lo)
+
+calc_amvi() =>
+    float fATR = ta.atr(fastATRPeriod), float sATR = ta.atr(slowATRPeriod)
+    float vr   = sATR > 0 ? math.min(2.0, math.max(0.5, fATR / sATR)) : 1.0
+    float nVR  = (vr - 0.5) / 1.5
+    float sd   = ta.stdev(close, stdDevPeriod), float cr = ta.sma(high - low, candleRangePeriod)
+    float nATR = normalize(fATR, normalizationPeriod), float nSD = normalize(sd, normalizationPeriod), float nCR = normalize(cr, normalizationPeriod)
+    (aatrWeight * nATR + vrWeight * nVR + nsdWeight * nSD + acrWeight * nCR) * 100.0
+
+// Disabled timeframes request the chart timeframe instead (cheap, never errors on
+// unsupported seconds timeframes) and return na so they never plot or count.
+get_mtf(simple string tf, simple bool on) =>
+    float v = request.security(syminfo.tickerid, on ? tf : timeframe.period, calc_amvi()[noRepaint ? 1 : 0],
+         gaps=barmerge.gaps_off, lookahead=noRepaint ? barmerge.lookahead_on : barmerge.lookahead_off)
+    on ? v : na
+
+// --- Fetch MTF Data ---
+v1s = get_mtf("1S", en1s), v5s = get_mtf("5S", en5s), v15s = get_mtf("15S", en15s), v30s = get_mtf("30S", en30s), v45s = get_mtf("45S", en45s)
+v1 = get_mtf("1", en1), v5 = get_mtf("5", en5), v15 = get_mtf("15", en15), v30 = get_mtf("30", en30), v60 = get_mtf("60", en60)
+v240 = get_mtf("240", en240), vD = get_mtf("D", enD)
+
+// --- Cross Detection ---
+x1s = ta.crossover(v1s, highVolThreshold), x5s = ta.crossover(v5s, highVolThreshold), x15s = ta.crossover(v15s, highVolThreshold)
+x30s = ta.crossover(v30s, highVolThreshold), x45s = ta.crossover(v45s, highVolThreshold), x1 = ta.crossover(v1, highVolThreshold)
+x5 = ta.crossover(v5, highVolThreshold), x15 = ta.crossover(v15, highVolThreshold), x30 = ta.crossover(v30, highVolThreshold)
+x60 = ta.crossover(v60, highVolThreshold), x240 = ta.crossover(v240, highVolThreshold), xD = ta.crossover(vD, highVolThreshold)
+
+// --- Price Tracking ---
+p1s = ta.valuewhen(x1s, close, 0), p5s = ta.valuewhen(x5s, close, 0), p15s = ta.valuewhen(x15s, close, 0)
+p30s = ta.valuewhen(x30s, close, 0), p45s = ta.valuewhen(x45s, close, 0), p1 = ta.valuewhen(x1, close, 0)
+p5 = ta.valuewhen(x5, close, 0), p15 = ta.valuewhen(x15, close, 0), p30 = ta.valuewhen(x30, close, 0)
+p60 = ta.valuewhen(x60, close, 0), p240 = ta.valuewhen(x240, close, 0), pD = ta.valuewhen(xD, close, 0)
+
+no_stairs(p) => ta.change(p) != 0 ? na : p
+
+// =====================================================================================
+// STRATEGY ENGINE
+// =====================================================================================
+hot(v) => not na(v) and v > highVolThreshold ? 1 : 0
+val(v) => na(v) ? 0.0 : v
+cnt(v) => na(v) ? 0 : 1
+
+int hotCount = hot(v1s) + hot(v5s) + hot(v15s) + hot(v30s) + hot(v45s) + hot(v1) + hot(v5) + hot(v15) + hot(v30) + hot(v60) + hot(v240) + hot(vD)
+int enCount  = cnt(v1s) + cnt(v5s) + cnt(v15s) + cnt(v30s) + cnt(v45s) + cnt(v1) + cnt(v5) + cnt(v15) + cnt(v30) + cnt(v60) + cnt(v240) + cnt(vD)
+float amviSum = val(v1s) + val(v5s) + val(v15s) + val(v30s) + val(v45s) + val(v1) + val(v5) + val(v15) + val(v30) + val(v60) + val(v240) + val(vD)
+float avgAmvi = enCount > 0 ? amviSum / enCount : na
+
+bool anyCross = x1s or x5s or x15s or x30s or x45s or x1 or x5 or x15 or x30 or x60 or x240 or xD
+bool trigger  = anyCross and hotCount >= minConfluence
+
+// Direction bias
+float ema  = ta.ema(close, emaLen)
+float dcHi = ta.highest(high, dcLen)[1]
+float dcLo = ta.lowest(low, dcLen)[1]
+bool upBias = switch dirMode
+    "Trend (EMA)" => close > ema
+    "Candle"      => close > open
+    => close > dcHi
+bool dnBias = switch dirMode
+    "Trend (EMA)" => close < ema
+    "Candle"      => close < open
+    => close < dcLo
+
+bool inRange  = not useDateRange or (time >= startTime and time <= endTime)
+bool longSig  = trigger and upBias and tradeDir != "Short Only" and inRange
+bool shortSig = trigger and dnBias and tradeDir != "Long Only" and inRange
+
+bool canLong  = allowReverse or strategy.position_size >= 0
+bool canShort = allowReverse or strategy.position_size <= 0
+bool goLong   = longSig and canLong and strategy.position_size <= 0
+bool goShort  = shortSig and canShort and strategy.position_size >= 0
+
+float atrX = ta.atr(exitAtrLen)
+var float entryAtr = na
+
+if goLong
+    entryAtr := atrX
+    strategy.entry("Long", strategy.long, comment="AMVI L " + str.tostring(hotCount) + "TF")
+if goShort
+    entryAtr := atrX
+    strategy.entry("Short", strategy.short, comment="AMVI S " + str.tostring(hotCount) + "TF")
+
+// Exit orders are (re)placed on the signal bar too, so protection is active from the fill bar.
+float trailPts = useTrail and not na(entryAtr) ? math.max(1, math.round(entryAtr * trailActMul / syminfo.mintick)) : na
+float trailOff = useTrail and not na(entryAtr) ? math.max(1, math.round(entryAtr * trailOffMul / syminfo.mintick)) : na
+
+float longSL = na, float longTP = na, float shortSL = na, float shortTP = na
+bool hasBracket = slMult > 0 or tpMult > 0 or useTrail
+
+if hasBracket and (strategy.position_size > 0 or goLong)
+    float ep = strategy.position_size > 0 ? strategy.position_avg_price : close
+    longSL := slMult > 0 ? ep - entryAtr * slMult : na
+    longTP := tpMult > 0 ? ep + entryAtr * tpMult : na
+    strategy.exit("L-Exit", "Long", stop=longSL, limit=longTP, trail_points=trailPts, trail_offset=trailOff,
+         comment_loss="L SL", comment_profit="L TP", comment_trailing="L Trail")
+
+if hasBracket and (strategy.position_size < 0 or goShort)
+    float ep = strategy.position_size < 0 ? strategy.position_avg_price : close
+    shortSL := slMult > 0 ? ep + entryAtr * slMult : na
+    shortTP := tpMult > 0 ? ep - entryAtr * tpMult : na
+    strategy.exit("S-Exit", "Short", stop=shortSL, limit=shortTP, trail_points=trailPts, trail_offset=trailOff,
+         comment_loss="S SL", comment_profit="S TP", comment_trailing="S Trail")
+
+// Volatility collapse exit (crossunder computed every bar for consistent history)
+bool volCollapse = ta.crossunder(avgAmvi, lowVolThreshold)
+if useVolExit and strategy.position_size != 0 and volCollapse
+    strategy.close_all(comment="Vol Collapse")
+
+// Time stop
+if maxBars > 0 and strategy.opentrades > 0 and bar_index - strategy.opentrades.entry_bar_index(0) >= maxBars
+    strategy.close_all(comment="Time Stop")
+
+// =====================================================================================
+// PLOTS
+// =====================================================================================
+
+// --- Oscillator Plots ---
+plot(v1s, "1s AMVI", c1s), plot(v5s, "5s AMVI", c5s), plot(v15s, "15s AMVI", c15s)
+plot(v30s, "30s AMVI", c30s), plot(v45s, "45s AMVI", c45s), plot(v1, "1m AMVI", c1)
+plot(v5, "5m AMVI", c5), plot(v15, "15m AMVI", c15), plot(v30, "30m AMVI", c30)
+plot(v60, "1h AMVI", c60), plot(v240, "4h AMVI", c240), plot(vD, "1D AMVI", cD)
+plot(avgAmvi, "Avg AMVI (enabled TFs)", color.white, 3)
+hline(highVolThreshold, "High Vol", color.new(color.blue, 50)), hline(lowVolThreshold, "Low Vol", color.new(color.red, 50))
+bgcolor(trigger ? color.new(color.yellow, 85) : na, title="Trigger BG")
+
+// --- Signal markers on price chart ---
+plotshape(goLong, "Long Signal", shape.triangleup, location.belowbar, color.lime, size=size.small, force_overlay=true)
+plotshape(goShort, "Short Signal", shape.triangledown, location.abovebar, color.red, size=size.small, force_overlay=true)
+plot(showLevels and strategy.position_size > 0 ? longSL : na, "Long SL", color.red, 1, plot.style_linebr, force_overlay=true)
+plot(showLevels and strategy.position_size > 0 ? longTP : na, "Long TP", color.lime, 1, plot.style_linebr, force_overlay=true)
+plot(showLevels and strategy.position_size < 0 ? shortSL : na, "Short SL", color.red, 1, plot.style_linebr, force_overlay=true)
+plot(showLevels and strategy.position_size < 0 ? shortTP : na, "Short TP", color.lime, 1, plot.style_linebr, force_overlay=true)
+
+// --- Main Chart Overlay ---
+// 1s
+plot(showOverlay and showL1s ? no_stairs(p1s) : na, "1s P", c1s, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL1s and x1s ? p1s : na, "1s L", "", location.absolute, c1s, size=size.tiny, text="1s", textcolor=c1s, force_overlay=true)
+// 5s
+plot(showOverlay and showL5s ? no_stairs(p5s) : na, "5s P", c5s, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL5s and x5s ? p5s : na, "5s L", "", location.absolute, c5s, size=size.tiny, text="5s", textcolor=c5s, force_overlay=true)
+// 15s
+plot(showOverlay and showL15s ? no_stairs(p15s) : na, "15s P", c15s, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL15s and x15s ? p15s : na, "15s L", "", location.absolute, c15s, size=size.tiny, text="15s", textcolor=c15s, force_overlay=true)
+// 30s
+plot(showOverlay and showL30s ? no_stairs(p30s) : na, "30s P", c30s, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL30s and x30s ? p30s : na, "30s L", "", location.absolute, c30s, size=size.tiny, text="30s", textcolor=c30s, force_overlay=true)
+// 45s
+plot(showOverlay and showL45s ? no_stairs(p45s) : na, "45s P", c45s, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL45s and x45s ? p45s : na, "45s L", "", location.absolute, c45s, size=size.tiny, text="45s", textcolor=c45s, force_overlay=true)
+// 1m
+plot(showOverlay and showL1 ? no_stairs(p1) : na, "1m P", c1, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL1 and x1 ? p1 : na, "1m L", "", location.absolute, c1, size=size.tiny, text="1m", textcolor=c1, force_overlay=true)
+// 5m
+plot(showOverlay and showL5 ? no_stairs(p5) : na, "5m P", c5, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL5 and x5 ? p5 : na, "5m L", "", location.absolute, c5, size=size.tiny, text="5m", textcolor=c5, force_overlay=true)
+// 15m
+plot(showOverlay and showL15 ? no_stairs(p15) : na, "15m P", c15, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL15 and x15 ? p15 : na, "15m L", "", location.absolute, c15, size=size.tiny, text="15m", textcolor=c15, force_overlay=true)
+// 30m
+plot(showOverlay and showL30 ? no_stairs(p30) : na, "30m P", c30, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL30 and x30 ? p30 : na, "30m L", "", location.absolute, c30, size=size.tiny, text="30m", textcolor=c30, force_overlay=true)
+// 1h
+plot(showOverlay and showL60 ? no_stairs(p60) : na, "1h P", c60, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL60 and x60 ? p60 : na, "1h L", "", location.absolute, c60, size=size.tiny, text="1h", textcolor=c60, force_overlay=true)
+// 4h
+plot(showOverlay and showL240 ? no_stairs(p240) : na, "4h P", c240, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showL240 and x240 ? p240 : na, "4h L", "", location.absolute, c240, size=size.tiny, text="4h", textcolor=c240, force_overlay=true)
+// 1D
+plot(showOverlay and showLD ? no_stairs(pD) : na, "1D P", cD, 2, plot.style_linebr, force_overlay=true)
+plotchar(showOverlay and showLabels and showLD and xD ? pD : na, "1D L", "", location.absolute, cD, size=size.tiny, text="1D", textcolor=cD, force_overlay=true)
