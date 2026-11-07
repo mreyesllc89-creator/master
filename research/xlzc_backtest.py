@@ -197,8 +197,8 @@ class M1Path:
     #   "next"  - only tested from bar k+1 (original model; optimistic)
     #   "close" - also stop at bar k if its close is at/above the new level (certain hit)
     #   "worst" - also stop at bar k if its high reached the new level
-    #   "random"- the low comes first in a random half of the bars (fixed seed); only those
-    #             bars can hit the new level later in the same bar (a central estimate)
+    #   "random"- the low comes first in a seeded half of the bars: there the later high can hit
+    #             the new level; on high-first bars only a close beyond it counts (as "close")
     #   With a trailing distance below a typical M1 range, "worst" exits near the bar's low (a
     #   good price) and "next" is the pessimistic case: no mode is a bound on its own.
     TRAIL_MODE = "close"  # default: count certain same-bar hits; "worst" is the pessimistic bound
@@ -237,9 +237,9 @@ class M1Path:
             same_hit = np.zeros(end - pos, bool)
             if trail is not None and self.TRAIL_MODE != "next":
                 if self.TRAIL_MODE == "random":
-                    # low before high in about half of the bars (fixed seed): only then can the
-                    # level set at the low be hit by the later high inside the same bar
-                    trig = np.where(self.low_first[pos:end], ah, -np.inf)
+                    # low before high in a seeded half of the bars: there the later high can hit
+                    # the level set at the low; on high-first bars only a close beyond it is certain
+                    trig = np.where(self.low_first[pos:end], ah, self.c[pos:end] + self.hs[pos:end])
                 else:
                     trig = ah if self.TRAIL_MODE == "worst" else self.c[pos:end] + self.hs[pos:end]
                 same_hit = np.isfinite(cand) & (cand < eff) & (trig >= cand) & ~tp_hit
@@ -264,11 +264,19 @@ class M1Path:
                     if trail is not None:
                         best_trail = min(best_trail, cm[part_k + 1] if part_k + 1 < len(cm) else cand[part_k])
                         best_trail = min(best_trail, cand[part_k])
+                    if k is not None and part_k == k and same_hit[k]:
+                        # partial and a same-bar trailing hit in one bar: close the rest at the level
+                        return pos + k, realized + remaining * (entry - cand[k]) / risk
                     pos = pos + part_k + 1
                     continue
             if k is not None:
                 if stop_hit[k]:
                     px = max(eff[k], ao[k])
+                    # random mode, low-first bar: rising from the low, the price meets the newer
+                    # (lower) level set at the low before the older one
+                    if (trail is not None and self.TRAIL_MODE == "random" and self.low_first[pos + k]
+                            and np.isfinite(cand[k]) and cand[k] < eff[k] and ao[k] < eff[k] and ah[k] >= cand[k]):
+                        px = cand[k]
                 elif tp_hit[k]:
                     px = min(tp, ao[k])
                 else:                      # trailing level set and hit inside the same bar

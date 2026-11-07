@@ -122,6 +122,19 @@ def main():
         k = 32.6 * TFM[trig] ** 0.5               # gold points x instrument scale x sqrt(trigger minutes)
         sess = {"ny_12-1630": ("12:00", "16:30"), "ldn_ny_07-20": ("07:00", "20:00")}[cfg["session"]]
         name = f"presets/XLZC_Bearish_BTCUSD_{trig}_{htf}.set"
+        # trailing (gold points): BTC M3/H1 uses 150/25, the only trailing change that beat the
+        # previous 150/100 on 2026 data (research/trailing_sweep.py + review); others keep 150/100
+        t_start, t_dist = (150, 25) if cfg["tf"] == "M3/H1" else (150, 100)
+        ts = json.load(open("research/results/trailing_sweep_btc.json"))["presets"]
+        tsp = ts["BTC M3/H1 preset" if cfg["tf"] == "M3/H1" else "BTC M3/M30 preset"]
+        trow = [r for r in tsp["rows"] if r["start"] == t_start and r["dist"] == t_dist]
+        tr_lo = min(r["all_pf"] for r in trow); tr_hi = max(r["all_pf"] for r in trow)
+        tr26 = min(r["2026_pf"] for r in trow); tr26h = max(r["2026_pf"] for r in trow)
+        trail_line = (f"Trailing {t_start}/{t_dist} gold pts = {round(t_start * k)}/{round(t_dist * k)} points: PF {tr_lo:.2f}-{tr_hi:.2f} "
+                      f"across the four same-bar fill models (2026: {tr26:.2f}-{tr26h:.2f}).")
+        c = next(r for r in trow if r["mode"] == "close")      # headline: default fill model, chosen trailing
+        if cfg["tf"] != "M3/H1":
+            trail_line = ("EXPERIMENTAL: no trailing setting chosen on 2025 held up in 2026 for this preset. " + trail_line)
         write(name,
               [f"XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - BTCUSD {trig} trigger / {htf} bias / {sess[0]}-{sess[1]} server time",
                "LOW-COST BROKERS ONLY. Calibrated assuming a 5 USD BTCUSD spread; MaxSpread_Points=1000 (10 USD) "
@@ -130,8 +143,8 @@ def main():
                f"Backtest (Binance BTCUSDT M1, Jan 2025-May 2026, 5 USD spread): {c['all_trades']:.0f} trades, PF {c['all_pf']:.2f}, "
                f"net {c['all_net_r']:+.1f}R, max DD {c['all_maxdd_r']:.1f}R; PF {c['2025H1_pf']:.2f} / {c['2025H2_pf']:.2f} (2025) / "
                f"{c['2026_pf']:.2f} on {c['2026_trades']:.0f} trades (2026, out of sample).",
-               f"Weak spots: worst-case trailing fills PF {w['all_pf']:.2f}. At a 20 USD spread no BTC setup held up "
-               "out of sample, so do not raise MaxSpread_Points to make it trade.",
+               trail_line + " The distance is below a typical BTC one-minute range: confirm with real ticks in MT5.",
+               "At a 20 USD spread no BTC setup held up out of sample, so do not raise MaxSpread_Points to make it trade.",
                "Points are 0.01 USD steps (AutoScalePoints rescales other BTC quote digits). Short-only EA: no trades "
                "while the trend filter is not bearish.",
                "Session hours are BROKER SERVER TIME (TradingHoursAreGMT=false): the Binance UTC data was converted to "
@@ -145,7 +158,7 @@ def main():
                    MinSL_Points=round(50 * k), MaxSL_Points=round(1000 * k),
                    StochHardBlock=(cfg["stoch"] == "hard"),
                    EnableTrailing=bool(cfg["trail"]), TrailingMode=0,
-                   TrailingStart_Points=round(150 * k), TrailingDistance_Points=round(100 * k),
+                   TrailingStart_Points=round(t_start * k), TrailingDistance_Points=round(t_dist * k),
                    TrailingStep_Points=100, UseTradingHours=True, TradingHoursAreGMT=False,
                    TradingHoursStart=sess[0], TradingHoursEnd=sess[1], UseNewsFilter=True))
     write("presets/XLZC_Bearish_Calibrated_M1_M15.set",

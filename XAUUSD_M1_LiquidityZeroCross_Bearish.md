@@ -43,6 +43,34 @@ The research (`research/`) replays the EA's rules in Python on FTMO XAUUSD M1 da
 - **M2/H1 preset** (`presets/XLZC_Bearish_M2_H1_NY.set`). Chosen with 2025 data only, as the most stable M2/H1 setup (median of the setup and its neighbouring settings, at least 30 trades per half-year): M2 trigger, H1 bias, 12:00-16:30 server time, swing strength 4, lookback 15, fixed 1.5R target when no liquidity pool qualifies, trailing on. 186 trades, PF 1.55, +19.9R, max drawdown 4.9R; PF 1.51 / 1.56 in 2025 and **1.61 on 43 trades in 2026, which the choice never saw**. It leans on trailing: counting every same-bar trailing touch as a stop gives PF 1.05. The FlashGold filter lowers it (PF 1.44, 2026 PF 1.11), so there is no FGF variant.
 - **Sensitivity.** Trailing is essential (PF 1.35 without it). A 07:00-20:00 window drops PF to about 1.2. A spread 50% wider than FTMO's exceeds the 60-point cap, so the EA would not trade at all.
 
+## Trailing stop calibration
+
+`research/trailing_sweep.py` tested every trailing start (0 to 800 gold points) against every distance (25 to 600) plus trailing off, 81 combinations, on the four calibrated presets. Each combination ran under four assumptions about what happens inside a one-minute bar after a new trailing level is set:
+- `next`: no same-bar hit;
+- `close`: a hit when the bar closes beyond the level;
+- `worst`: a hit when the bar's high reaches it;
+- `random`: the low comes first in a seeded half of the bars.
+
+The EA's points are gold points × √(trigger minutes) × instrument scale. Results, where PF is the range across the four assumptions:
+
+| Preset | Trailing off | Current 150/100 | Best tight setting on 2025 | Decision |
+|---|---|---|---|---|
+| Gold M2/H1 | PF 1.25 | PF 1.05–1.55; 2026 1.21–1.61 | 300/25: PF 1.41–1.62 | **Keep 150/100.** The tight setting looked better in 2025 but was not better in 2026. |
+| Gold M3/H1 | PF 1.35 | PF 1.82–2.48; 2026 2.12–2.56 | 150/25: PF 1.94–2.54 | **Keep 150/100.** No confirmed improvement in 2026. |
+| BTC M3/H1 | PF 0.89 | PF 0.99–1.52; 2026 0.82–1.21 | 150/25: PF 1.39–1.58; 2026 1.19–1.37 | **Changed to 150/25** (8470/1412 points). Better than 150/100 on 2026 data in a paired bootstrap. |
+| BTC M3/M30 | PF 1.15 | PF 0.96–1.45 | 0/25 failed in 2026 (0.49–0.97) | **Experimental.** No trailing setting chosen on 2025 held up. |
+
+What this shows:
+- **Trailing matters.** It is on in every preset because it beats trailing off in all four presets, in both 2025 and 2026.
+- **Tight distances can't be judged on one-minute bars.** Below a typical one-minute range, which includes every 25-point setting, the result depends on the order of prices inside the bar. None of the four assumptions bounds what real ticks do.
+- **Settle it in MT5.** Optimize the two trailing inputs in the Strategy Tester with *Every tick based on real ticks* and EVK, then run `python -m evk analyze`. Use these ranges, which cover the same gold-point grid:
+
+| Preset | `TrailingStart_Points` start / step / stop | `TrailingDistance_Points` start / step / stop |
+|---|---|---|
+| Gold M2/H1 | 0 / 71 / 1131 | 35 / 35 / 849 |
+| Gold M3/H1 | 0 / 87 / 1386 | 43 / 43 / 1039 |
+| BTC M3/H1 or M3/M30 | 0 / 2823 / 45172 | 1412 / 1412 / 33879 |
+
 ## BTCUSD
 
 The same research was run on BTCUSD (Binance BTCUSDT one-minute data, Jan 2025 to May 2026, converted to the same server clock). All point distances were scaled by 32.6, the ratio of BTC's typical one-minute range to gold's ($41 vs $1.26). The spread is an assumption, because no broker spread data was available.

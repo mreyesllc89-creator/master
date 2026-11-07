@@ -1,8 +1,9 @@
 ; XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - BTCUSD M3 trigger / H1 bias / 12:00-16:30 server time
 ; LOW-COST BROKERS ONLY. Calibrated assuming a 5 USD BTCUSD spread; MaxSpread_Points=1000 (10 USD) blocks entries when the spread is wider. Commission counts as cost too.
 ; Chosen with 2025 data ONLY (median of the setup and its neighbouring settings, >=30 trades per half-year).
-; Backtest (Binance BTCUSDT M1, Jan 2025-May 2026, 5 USD spread): 102 trades, PF 1.52, net +19.8R, max DD 3.0R; PF 2.05 / 1.35 (2025) / 1.21 on 32 trades (2026, out of sample).
-; Weak spots: worst-case trailing fills PF 0.99. At a 20 USD spread no BTC setup held up out of sample, so do not raise MaxSpread_Points to make it trade.
+; Backtest (Binance BTCUSDT M1, Jan 2025-May 2026, 5 USD spread): 102 trades, PF 1.58, net +21.9R, max DD 3.6R; PF 2.12 / 1.27 (2025) / 1.37 on 32 trades (2026, out of sample).
+; Trailing 150/25 gold pts = 8470/1412 points: PF 1.39-1.58 across the four same-bar fill models (2026: 1.19-1.37). The distance is below a typical BTC one-minute range: confirm with real ticks in MT5.
+; At a 20 USD spread no BTC setup held up out of sample, so do not raise MaxSpread_Points to make it trade.
 ; Points are 0.01 USD steps (AutoScalePoints rescales other BTC quote digits). Short-only EA: no trades while the trend filter is not bearish.
 ; Session hours are BROKER SERVER TIME (TradingHoursAreGMT=false): the Binance UTC data was converted to a GMT+2 winter / GMT+3 summer (New York close) server clock. Shift the hours if your broker differs.
 ; UseNewsFilter=true was NOT part of the backtest (no calendar history); live trade count and results will differ. Set it to false to match the backtest exactly.
@@ -49,7 +50,7 @@ MaxSL_Points=56465
 EnableTrailing=true
 TrailingMode=0
 TrailingStart_Points=8470
-TrailingDistance_Points=5646
+TrailingDistance_Points=1412
 TrailingStep_Points=100
 EnablePartialClose=false
 PartialCloseAtR=1.0

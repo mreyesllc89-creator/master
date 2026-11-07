@@ -14,7 +14,7 @@ Fill assumptions when a trailing level is set and touched inside the same M1 bar
   next  - ignored until the next bar (optimistic)
   close - stop if the bar closes beyond it (certain hits; the default)
   worst - stop if the bar's high reaches it
-  random- the low comes first in a random half of the bars (central estimate)
+  random- the low comes first in a seeded half of the bars; high-first bars use the close check
 None of the three is a true bound: when the trailing distance is smaller than a typical M1 bar,
 "worst" exits near the bar's low (a GOOD price) and "next" is the pessimistic one. One-minute
 bars cannot tell the order of prices inside a bar, so a setting is only credible if it is good
@@ -93,13 +93,19 @@ def main():
             i, j = STARTS.index(st), DISTS.index(di)
             nb = [v]
             for a, b in ((i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1)):
-                if 0 <= a < len(STARTS) and 0 <= b < len(DISTS):
-                    nb.append(score[(STARTS[a], DISTS[b])])
+                # reflect at the grid edges so edge settings get 4 neighbours like inner ones
+                a = -a if a < 0 else (2 * (len(STARTS) - 1) - a if a >= len(STARTS) else a)
+                b = -b if b < 0 else (2 * (len(DISTS) - 1) - b if b >= len(DISTS) else b)
+                nb.append(score[(STARTS[a], DISTS[b])])
             nb = np.array(nb, float)
             smooth[(st, di)] = float(np.nanmedian(nb)) if np.isfinite(nb).any() else np.nan
+        off_score = next(r for r in rows if r["mode"] == "close" and r["start"] is None)["min25"]
         best = max(smooth, key=lambda q: -np.inf if not np.isfinite(smooth[q]) else smooth[q])
+        if off_score is not None and off_score >= smooth[best]:
+            best = (None, None)                     # trailing off wins on 2025
         chosen = {m: next(r for r in rows if r["mode"] == m and r["start"] == best[0] and r["dist"] == best[1])
                   for m in MODES}
+        smooth[(None, None)] = off_score
         current = {m: next(r for r in rows if r["mode"] == m and r["start"] == 150 and r["dist"] == 100) for m in MODES}
         offr = {m: next(r for r in rows if r["mode"] == m and r["start"] is None) for m in MODES}
         res["presets"][name] = dict(base=base, k=k_note[name], rows=rows, chosen=dict(start=best[0], dist=best[1],
