@@ -1,0 +1,243 @@
+{
+ "n_configs": 126360,
+ "base_rate_2026_pf_gt1": 0.5111707370496112,
+ "base_median_2026_pf": 1.0079048063734555,
+ "config_level": [
+  {
+   "min_trades_per_half": 10,
+   "top_k": 1,
+   "median_2025_minpf": 4.64693951113732,
+   "median_2026_pf": 0.5858065872744357,
+   "share_2026_pf_gt1": 0.0,
+   "pairs": {
+    "M5/M15": 1
+   }
+  },
+  {
+   "min_trades_per_half": 10,
+   "top_k": 10,
+   "median_2025_minpf": 3.9470508427059596,
+   "median_2026_pf": 0.6728285534757795,
+   "share_2026_pf_gt1": 0.3,
+   "pairs": {
+    "M5/M15": 8,
+    "M3/H1": 2
+   }
+  },
+  {
+   "min_trades_per_half": 10,
+   "top_k": 50,
+   "median_2025_minpf": 2.7710152666874768,
+   "median_2026_pf": 0.7607136942699269,
+   "share_2026_pf_gt1": 0.28,
+   "pairs": {
+    "M5/M15": 36,
+    "M3/H1": 8,
+    "M5/M30": 3
+   }
+  },
+  {
+   "min_trades_per_half": 10,
+   "top_k": 200,
+   "median_2025_minpf": 2.132656616410816,
+   "median_2026_pf": 0.9666269161352397,
+   "share_2026_pf_gt1": 0.375,
+   "pairs": {
+    "M5/M15": 116,
+    "M5/M30": 36,
+    "M3/H1": 27
+   }
+  },
+  {
+   "min_trades_per_half": 15,
+   "top_k": 1,
+   "median_2025_minpf": 3.5427267343993427,
+   "median_2026_pf": 0.3275970961487868,
+   "share_2026_pf_gt1": 0.0,
+   "pairs": {
+    "M5/M15": 1
+   }
+  },
+  {
+   "min_trades_per_half": 15,
+   "top_k": 10,
+   "median_2025_minpf": 2.5105499783503884,
+   "median_2026_pf": 0.7201935847840121,
+   "share_2026_pf_gt1": 0.1,
+   "pairs": {
+    "M5/M15": 9,
+    "M3/H1": 1
+   }
+  },
+  {
+   "min_trades_per_half": 15,
+   "top_k": 50,
+   "median_2025_minpf": 2.185930375624789,
+   "median_2026_pf": 0.9388843633673049,
+   "share_2026_pf_gt1": 0.14,
+   "pairs": {
+    "M5/M15": 38,
+    "M5/M30": 8,
+    "M3/H1": 3
+   }
+  },
+  {
+   "min_trades_per_half": 15,
+   "top_k": 200,
+   "median_2025_minpf": 1.8849432710069993,
+   "median_2026_pf": 0.9822944767242997,
+   "share_2026_pf_gt1": 0.435,
+   "pairs": {
+    "M5/M15": 117,
+    "M5/M30": 42,
+    "M3/H1": 20
+   }
+  },
+  {
+   "min_trades_per_half": 20,
+   "top_k": 1,
+   "median_2025_minpf": 2.207539476189054,
+   "median_2026_pf": 0.6908273496486595,
+   "share_2026_pf_gt1": 0.0,
+   "pairs": {
+    "M5/M15": 1
+   }
+  },
+  {
+   "min_trades_per_half": 20,
+   "top_k": 10,
+   "median_2025_minpf": 2.0707594865803545,
+   "median_2026_pf": 0.700559169238215,
+   "share_2026_pf_gt1": 0.3,
+   "pairs": {
+    "M5/M15": 8,
+    "M3/H1": 2
+   }
+  },
+  {
+   "min_trades_per_half": 20,
+   "top_k": 50,
+   "median_2025_minpf": 1.8568488039156483,
+   "median_2026_pf": 0.8745796567196245,
+   "share_2026_pf_gt1": 0.34,
+   "pairs": {
+    "M5/M15": 34,
+    "M3/H1": 8,
+    "M2/M30": 2
+   }
+  },
+  {
+   "min_trades_per_half": 20,
+   "top_k": 200,
+   "median_2025_minpf": 1.6001495881080312,
+   "median_2026_pf": 0.830694607639394,
+   "share_2026_pf_gt1": 0.215,
+   "pairs": {
+    "M5/M15": 56,
+    "M3/M15": 51,
+    "M3/M30": 48
+   }
+  }
+ ],
+ "chosen": {
+  "rank_on_2025_only": 91,
+  "of": 86241,
+  "min25": 2.1493639818244583,
+  "pf_2026": 2.5647643060863183,
+  "trades_2026": 30
+ },
+ "pair_level": [
+  {
+   "tf": "M2/H1",
+   "share_2025_both_halves_gt1": 0.8888888888888888,
+   "median_min25": 1.1717510922567045,
+   "median_2026_pf": 1.2667172597149945,
+   "share_2026_gt1": 0.7407407407407407
+  },
+  {
+   "tf": "M3/H1",
+   "share_2025_both_halves_gt1": 0.5925925925925926,
+   "median_min25": 1.167844652008455,
+   "median_2026_pf": 2.301150507094891,
+   "share_2026_gt1": 1.0
+  },
+  {
+   "tf": "M5/M15",
+   "share_2025_both_halves_gt1": 0.5432098765432098,
+   "median_min25": 1.08162745542267,
+   "median_2026_pf": 0.8453047115421924,
+   "share_2026_gt1": 0.38271604938271603
+  },
+  {
+   "tf": "M2/M30",
+   "share_2025_both_halves_gt1": 0.5061728395061729,
+   "median_min25": 1.0163603632467455,
+   "median_2026_pf": 0.8052223744304995,
+   "share_2026_gt1": 0.24691358024691357
+  },
+  {
+   "tf": "M3/M30",
+   "share_2025_both_halves_gt1": 0.2345679012345679,
+   "median_min25": 0.8446743286302829,
+   "median_2026_pf": 1.6053047797009856,
+   "share_2026_gt1": 0.8641975308641975
+  },
+  {
+   "tf": "M1/M5",
+   "share_2025_both_halves_gt1": 0.012345679012345678,
+   "median_min25": 0.7693752541863621,
+   "median_2026_pf": 1.0433871768283582,
+   "share_2026_gt1": 0.6666666666666666
+  },
+  {
+   "tf": "M2/M15",
+   "share_2025_both_halves_gt1": 0.04938271604938271,
+   "median_min25": 0.6422253308440035,
+   "median_2026_pf": 0.6813850650366944,
+   "share_2026_gt1": 0.16049382716049382
+  },
+  {
+   "tf": "M1/M30",
+   "share_2025_both_halves_gt1": 0.0,
+   "median_min25": 0.6138392997543229,
+   "median_2026_pf": 1.7173718068896069,
+   "share_2026_gt1": 1.0
+  },
+  {
+   "tf": "M1/M15",
+   "share_2025_both_halves_gt1": 0.0,
+   "median_min25": 0.5906227434844424,
+   "median_2026_pf": 1.3674273806064274,
+   "share_2026_gt1": 0.9876543209876543
+  },
+  {
+   "tf": "M1/H1",
+   "share_2025_both_halves_gt1": 0.0,
+   "median_min25": 0.5895301201858649,
+   "median_2026_pf": 1.3848682758078648,
+   "share_2026_gt1": 1.0
+  },
+  {
+   "tf": "M3/M15",
+   "share_2025_both_halves_gt1": 0.037037037037037035,
+   "median_min25": 0.5876849819937221,
+   "median_2026_pf": 1.492930176484324,
+   "share_2026_gt1": 0.8518518518518519
+  },
+  {
+   "tf": "M5/M30",
+   "share_2025_both_halves_gt1": 0.06172839506172839,
+   "median_min25": 0.5148271083857684,
+   "median_2026_pf": 0.7664713142377885,
+   "share_2026_gt1": 0.35802469135802467
+  },
+  {
+   "tf": "M5/H1",
+   "share_2025_both_halves_gt1": 0.012345679012345678,
+   "median_min25": 0.4313303669138625,
+   "median_2026_pf": 0.7732038427963339,
+   "share_2026_gt1": 0.345679012345679
+  }
+ ],
+ "note": "Walk-forward: picking on 2025 only, the top-10 configs had median 2026 PF 0.67; the best 2025 pair family (M2/H1) had median 2026 PF 1.27. Base rate: 51% of all configs were profitable in 2026."
+}

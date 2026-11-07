@@ -213,6 +213,23 @@ input string          FGF_IndicatorName      = "FlashGold_Direction_Filter_v1_2"
 input ENUM_TIMEFRAMES FGF_CalcTimeframe      = PERIOD_CURRENT; // Indicator chart TF (CURRENT = TriggerTimeframe)
 input int             FGF_Shift              = 0;      // 0 = permission now (live bar), 1 = last closed bar
 input bool            FGF_BlockIfUnavailable = true;   // No trade if the indicator has no data yet
+//--- Indicator inputs. Used only when FGF_PassInputs=true; otherwise the indicator
+//    runs with the defaults compiled into it (same values as below).
+input bool            FGF_PassInputs         = false;  // Pass the inputs below to the indicator
+input ENUM_TIMEFRAMES FGF_FilterTF           = PERIOD_H1; // fgfTf: filter timeframe
+input ENUM_TIMEFRAMES FGF_ParentTF           = PERIOD_H1; // fgfParentTf: parent obedience timeframe
+input int             FGF_LevelMode          = 0;      // fgfLvMode: 0 entry price, 1 signal close
+input int             FGF_Window             = 0;      // fgfLast: 0 next signal, 1 minutes, 2 candles
+input int             FGF_Minutes            = 60;     // fgfMinutes
+input int             FGF_Candles            = 1;      // fgfBars
+input int             FGF_CheckMode          = 0;      // fgfCheck: 0 tick, 1 open, 2 bar close
+input double          FGF_BandAtr            = 0.25;   // fgfBandAtr: no-trade band, ATR mult
+input bool            FGF_Against            = true;   // fgfAgainst: allow trading against the signal
+input int             FGF_HoldBars           = 0;      // fgfHoldBars
+input double          FGF_BurstAtr           = 0.5;    // fgfBurstAtr
+input bool            FGF_AnyCombo           = false;  // fgfAnyCombo
+input bool            FGF_UseZones           = true;   // fgfUseZones
+input int             FGF_MinAligned         = 2;      // fgfMinAligned
 #endif
 
 //====================================================================
@@ -399,7 +416,22 @@ int OnInit()
    if(UseFGF_Filter)
      {
       ENUM_TIMEFRAMES fgfTf = (FGF_CalcTimeframe == PERIOD_CURRENT) ? TriggerTimeframe : FGF_CalcTimeframe;
-      g_hFGF = iCustom(_Symbol, fgfTf, FGF_IndicatorName);   // indicator defaults
+      if(!FGF_PassInputs)
+         g_hFGF = iCustom(_Symbol, fgfTf, FGF_IndicatorName);   // indicator defaults
+      else
+         //--- all 53 inputs, in the indicator's declaration order (input groups are
+         //    not parameters). Display inputs are off: the handle is not drawn.
+         g_hFGF = iCustom(_Symbol, fgfTf, FGF_IndicatorName,
+                          true, FGF_FilterTF, FGF_LevelMode, FGF_Window, FGF_Minutes, FGF_Candles,
+                          FGF_CheckMode, FGF_BandAtr, FGF_Against, true, true,
+                          false, false, false, false, 0,                 // shade, level, marks, box, box pos
+                          false, 500, 10,                                // direction score
+                          25.0, 50.0, FGF_HoldBars, 5.0, true,           // spread, entry dist, hold, hold fav, one/bar
+                          0, FGF_BurstAtr, 0.25, 0.1, 172.0,             // unit ATR, burst, entry dist, hold fav, burst pts
+                          true, FGF_AnyCombo, 60, false,                 // use burst, any combo, drift bars, use drift
+                          FGF_UseZones, FGF_ParentTF, 14, 2, FGF_MinAligned, false, true, true,
+                          true, PERIOD_H1, true, PERIOD_H2, true, PERIOD_H4,
+                          false, PERIOD_H8, false, PERIOD_M1, false, PERIOD_M2);
       if(g_hFGF == INVALID_HANDLE)
         {
          Print("[XLZC] Cannot load FlashGold indicator '", FGF_IndicatorName,
@@ -1150,6 +1182,7 @@ bool FGFAllowsSell()
    if(v[0] < 0.5)
      {
       LogSkip("FlashGold filter does not allow sells");
+      g_signalActive = false;   // decided once per signal, as in the backtest
       return false;
      }
    return true;

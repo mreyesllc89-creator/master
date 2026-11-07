@@ -39,6 +39,7 @@ class FgfConfig:
     parent_tf: str = "H1"
     level_mode: int = 0          # 0 entry price, 1 signal close
     window_mode: int = 0         # 0 until next signal, 1 minutes, 2 candles
+    check_mode: int = 0          # 0 tick (live price), 1 bar open, 2 previous bar close
     minutes: int = 60
     bars: int = 1
     band_atr: float = 0.25
@@ -159,11 +160,12 @@ class FgfEngine:
             self._dirs[key] = tdi_dirs(self.bars(tf)["close"].values, rsi_len, fast_len)
         return self._dirs[key]
 
-    def read_zone(self, cfg, tf, fb):
-        """Adapter Read() for each filter bar: returns int array of directions."""
+    def read_zone(self, cfg, tf, fb, prev_on):
+        """Adapter Read() for each filter bar: returns int array of directions.
+        prev_on=True -> OpenAt(filter open)-1 (child zones with 'HTF zones use last
+        CLOSED bar'); False -> ClosedAt(filter end) (always used for the parent)."""
         b = self.bars(tf)
         d = self.dirs(tf, cfg.rsi_len, cfg.fast_len)
-        prev_on = cfg.htf_closed and TF_MIN[tf] > TF_MIN[cfg.filter_tf]
         if prev_on:
             k = np.searchsorted(b["open_t"].values, fb["open_t"].values, side="right") - 1 - 1
         else:
@@ -175,8 +177,9 @@ class FgfEngine:
         fb = self.bars(cfg.filter_tf)
         n = len(fb)
         o = fb["open"].values; h = fb["high"].values; l = fb["low"].values; c = fb["close"].values
-        parents = self.read_zone(cfg, cfg.parent_tf, fb)
-        zones = [self.read_zone(cfg, z, fb) for z in cfg.zones]
+        parents = self.read_zone(cfg, cfg.parent_tf, fb, prev_on=False)
+        zones = [self.read_zone(cfg, z, fb, prev_on=cfg.htf_closed and TF_MIN[z] > TF_MIN[cfg.filter_tf])
+                 for z in cfg.zones]
         tick = cfg.tick
         half = cfg.spread_pts * tick * 0.5
 
@@ -272,10 +275,17 @@ class FgfEngine:
         return FilterState(end_t, armed_at, armed_bar, armed_price, armed_dir, armed_atr, sell_sig, buy_sig)
 
 
-def sell_allowed(cfg: FgfConfig, st: FilterState, t, value):
-    """FgfChartPick (live chart bar, check on tick) + FgfEvaluateGate sellOK.
-    t: entry time (server-time epoch seconds, int64 array); value: live bid price (array)."""
+def sell_allowed(cfg: FgfConfig, st: FilterState, t, value, prev_close=None):
+    """FgfChartPick (live chart bar) + FgfEvaluateGate sellOK, evaluated once at the
+    first tick of the EA's entry bar.
+    t: entry bar open (server-time epoch seconds); value: live bid at that tick;
+    prev_close: bid close of the previous trigger bar (check mode 2).
+    check_mode 0 on a live/real-tick feed: the first tick arrives after hh:mm:00.000,
+    so the chart clock is strictly after the closed filter bar's end and the live
+    index is always that bar's index + 1. Modes 1/2 use clock = bar open exactly."""
     t = np.asarray(t, np.int64); value = np.asarray(value, float)
+    if cfg.check_mode == 2:
+        value = np.asarray(prev_close, float)
     k = np.searchsorted(st.end_t, t, side="right") - 1          # last filter bar with end <= t
     ok = np.zeros(len(t), bool)
     valid = k >= 0
@@ -283,11 +293,13 @@ def sell_allowed(cfg: FgfConfig, st: FilterState, t, value):
     a_at = st.armed_at[kk]; a_bar = st.armed_bar[kk]; a_price = st.armed_price[kk]
     a_dir = st.armed_dir[kk]; a_atr = st.armed_atr[kk]
     armed = valid & (a_at >= 0) & (t >= a_at)
+    at_open = cfg.check_mode in (1, 2)
+    # live chart-bar index (FgfChartPick): at_open uses clock = bar.time exactly, so a
+    # bar opening on the filter boundary gets index k; tick mode is always k+1.
+    index = np.where(at_open & (t == st.end_t[kk]), kk, kk + 1)
     if cfg.window_mode == 1:
         is_open = armed & (t < a_at + cfg.minutes * 60)
     elif cfg.window_mode == 2:
-        # live chart-bar index: fp.index (=k+1) unless the clock sits exactly on fq.end
-        index = np.where(t == st.end_t[kk], kk, kk + 1)
         is_open = armed & (index < a_bar + cfg.bars)
     else:
         is_open = armed
@@ -295,10 +307,7 @@ def sell_allowed(cfg: FgfConfig, st: FilterState, t, value):
     has_band = band > EPS
     tick = cfg.tick
     lower = np.where(has_band, np.floor((a_price - band) / tick + 1e-9) * tick, a_price)
-    # onSigBar requires index == armedBar; for a live bar after a closed signal bar
-    # index = k+1 > armedBar, except when t is exactly the signal bar's end (index = k).
-    index_live = np.where(t == st.end_t[kk], kk, kk + 1)
-    on_sig = armed & (index_live == a_bar)
+    on_sig = armed & (index == a_bar)
     at_sell = on_sig & (a_dir < 0) & (value - a_price <= EPS)
     in_dn = np.where(has_band, (value - (lower - tick / 2.0)) < -EPS,
                      ((value - a_price) < -EPS) | at_sell)

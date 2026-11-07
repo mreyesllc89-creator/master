@@ -37,29 +37,50 @@ BASES = {
                                     stoch="soft", session="ny_12-1630", trail=False),
 }
 
-FGF_GRID = dict(
+# Inputs that change the filter itself (one build each) ...
+BUILD_GRID = dict(
     filter_tf=["M15", "M30", "H1", "H4"],
-    band_atr=[0.0, 0.25, 0.5, 1.0],
-    window=[("next", 0, 60, 1), ("min60", 1, 60, 1), ("min240", 1, 240, 1), ("bars1", 2, 60, 1), ("bars3", 2, 60, 3)],
+    parent=["H1", "same"],                 # indicator default parent is H1 whatever the filter TF
     level_mode=[0, 1],
-    against=[True, False],
-    zones=[("off", False, 2), ("align1", True, 1), ("align2", True, 2), ("align3", True, 3)],
+    zones=["off", "align1", "align2", "align3"],
     any_combo=[False, True],
     burst_atr=[0.25, 0.5, 1.0],
     hold_bars=[0, 2],
 )
+# ... and inputs that only change the gate the EA reads (cheap, share one build).
+GATE_GRID = dict(
+    band_atr=[0.0, 0.25, 0.5, 1.0],
+    window=["next", "min60", "min240", "bars1", "bars3"],
+    against=[True, False],
+    check=[0, 1, 2],                       # 0 tick, 1 bar open, 2 previous bar close
+)
+WINDOWS = {"next": (0, 60, 1), "min60": (1, 60, 1), "min240": (1, 240, 1), "bars1": (2, 60, 1), "bars3": (2, 60, 3)}
+ZONES = {"off": (False, 2), "align1": (True, 1), "align2": (True, 2), "align3": (True, 3)}
+DEFAULT_LABEL = dict(filter_tf="H1", parent="H1", level_mode=0, zones="align2", any_combo=False, burst_atr=0.5,
+                     hold_bars=0, band_atr=0.25, window="next", against=True, check=0)
 
 
-def fgf_configs():
+def cfg_from_label(lab):
+    w = WINDOWS[lab["window"]]; z = ZONES[lab["zones"]]
+    parent = lab["filter_tf"] if lab["parent"] == "same" else lab["parent"]
+    return F.FgfConfig(filter_tf=lab["filter_tf"], parent_tf=parent, level_mode=lab["level_mode"],
+                       use_zones=z[0], min_aligned=z[1], any_combo=lab["any_combo"], burst_atr=lab["burst_atr"],
+                       hold_bars=lab["hold_bars"], band_atr=lab["band_atr"], window_mode=w[0], minutes=w[1],
+                       bars=w[2], against=lab["against"], check_mode=lab["check"])
+
+
+def build_labels():
     out = []
-    for ftf, band, win, lvl, ag, z, anyc, burst, hold in itertools.product(*FGF_GRID.values()):
-        cfg = F.FgfConfig(filter_tf=ftf, parent_tf=ftf, band_atr=band, window_mode=win[1], minutes=win[2],
-                          bars=win[3], level_mode=lvl, against=ag, use_zones=z[1], min_aligned=z[2],
-                          any_combo=anyc, burst_atr=burst, hold_bars=hold)
-        label = dict(filter_tf=ftf, band_atr=band, window=win[0], level_mode=lvl, against=ag,
-                     zones=z[0], any_combo=anyc, burst_atr=burst, hold_bars=hold)
-        out.append((label, cfg))
+    for vals in itertools.product(*BUILD_GRID.values()):
+        lab = dict(zip(BUILD_GRID, vals))
+        if lab["filter_tf"] == "H1" and lab["parent"] == "same":
+            continue                          # identical to parent H1
+        out.append(lab)
     return out
+
+
+def gate_labels():
+    return [dict(zip(GATE_GRID, v)) for v in itertools.product(*GATE_GRID.values())]
 
 
 # ----------------------------------------------------------------------------- shared setup
@@ -81,8 +102,10 @@ def prepare(data_dir, pairs):
         sigs[pair] = dict(bias=sig["bias"].values, stoch_ok=sig["stoch_ok"].values, et=et.values,
                           tod=(et.dt.hour * 60 + et.dt.minute).values, mi=mi)
         mic = np.clip(mi, 0, len(path.t) - 1)
+        prev_bar = np.clip(sig["entry_bar"].values - 1, 0, len(t) - 1)
         entry[pair] = dict(t=path.t[mic].astype("datetime64[s]").astype(np.int64),
-                           bid=path.o[mic] - path.hs[mic])
+                           bid=path.o[mic] - path.hs[mic],
+                           prev_close=t["close"].values[prev_bar] - path.hs[mic])
         for S in C.SS:
             shf, slf = B.swing_flags(t["high"].values, t["low"].values, S)
             pools[(pair, S)] = C.low_pools(t, sig, S, slf)
@@ -111,26 +134,34 @@ def run_with_mask(base_cfg, mask):
     return trades
 
 
+def build_key(cfg):
+    # gate-only fields do not change the filter build
+    from dataclasses import replace
+    return replace(cfg, band_atr=0.0, window_mode=0, minutes=60, bars=1, against=True, check_mode=0)
+
+
 def fgf_mask(cfg, pair, state_cache):
-    key = cfg
+    key = build_key(cfg)
     st = state_cache.get(key)
     if st is None:
         st = W["eng"].build(cfg)
         state_cache.clear(); state_cache[key] = st
     e = W["entry"][pair]
-    return F.sell_allowed(cfg, st, e["t"], e["bid"])
+    return F.sell_allowed(cfg, st, e["t"], e["bid"], e["prev_close"])
 
 
-def stage1_job(item):
-    label, cfg = item
+def stage1_job(blab):
     cache = {}
     rows = []
-    for name, base in BASES.items():
-        mask = fgf_mask(cfg, base["tf"], cache)
-        tr = run_with_mask(base, mask)
-        r = dict(label); r["base"] = name; r.update(C.seg_stats(tr))
-        r["gate_open_share"] = float(mask[W["sig"][base["tf"]]["bias"]].mean())
-        rows.append(r)
+    for glab in gate_labels():
+        lab = dict(blab, **glab)
+        cfg = cfg_from_label(lab)
+        for name, base in BASES.items():
+            mask = fgf_mask(cfg, base["tf"], cache)
+            tr = run_with_mask(base, mask)
+            r = dict(lab); r["base"] = name; r.update(C.seg_stats(tr))
+            r["gate_open_share"] = float(mask[W["sig"][base["tf"]]["bias"]].mean())
+            rows.append(r)
     return rows
 
 
@@ -153,21 +184,21 @@ def main():
         for name, base in BASES.items():
             r = {"base": name, "fgf": "off"}; r.update(C.seg_stats(run_with_mask(base, None))); base_rows.append(r)
         pd.DataFrame(base_rows).to_csv(os.path.join(out_dir, "stage1_baselines.csv"), index=False)
-        items = fgf_configs()
-        print(f"stage1: {len(items)} FlashGold settings x {len(BASES)} bases", flush=True)
+        items = build_labels()
+        print(f"stage1: {len(items)} filter builds x {len(gate_labels())} gate settings x {len(BASES)} bases",
+              flush=True)
         rows = []
         with Pool(4, initializer=init_worker, initargs=(payload,)) as pool:
-            for i, rs in enumerate(pool.imap_unordered(stage1_job, items, chunksize=16)):
+            for i, rs in enumerate(pool.imap_unordered(stage1_job, items, chunksize=1)):
                 rows.extend(rs)
-                if i % 2000 == 0:
+                if i % 50 == 0:
                     print(i, flush=True)
         pd.DataFrame(rows).to_csv(os.path.join(out_dir, "stage1_fgf_grid.csv"), index=False)
         print("done", len(rows))
     else:
         sel = json.load(open(sys.argv[4]))  # list of {"id":..., "label": {...}}
         payload = prepare(data_dir, C.PAIRS)
-        lookup = {json.dumps(l, sort_keys=True): c for l, c in fgf_configs()}
-        fgfs = [(s["id"], s["label"], lookup[json.dumps(s["label"], sort_keys=True)]) for s in sel]
+        fgfs = [(s["id"], s["label"], cfg_from_label(s["label"])) for s in sel]
         fgfs = [("off", None, None)] + fgfs
         bases = [dict(tf=p, N=N, S=S, buffer=buf, NT=nt, min_rr=rr, fb=0.0, stoch="soft", session=se, trail=tr)
                  for p, N, S, buf, nt, rr, se, tr in itertools.product(

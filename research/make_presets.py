@@ -44,11 +44,16 @@ UNCAL_NOTE = ("Not calibrated: spec-based settings. Session hours are GMT. MaxSp
 def main():
     m = json.load(open("research/results/m3_h1_verify.json"))
     ch = next(v for v in m["variants"] if v["label"] == "chosen")
-    wf = m.get("walk_forward", {})
+    wf = json.load(open("research/results/walkforward.json")) if os.path.exists("research/results/walkforward.json") else {}
     head = (f"In-sample backtest (all 17 months used for selection): {ch['all_trades']:.0f} trades, "
             f"PF {ch['all_pf']:.2f}; per period {ch['2025H1_pf']:.2f} / {ch['2025H2_pf']:.2f} / "
             f"{ch['2026_pf']:.2f}. Same-bar trailing worst case PF {m.get('worst_pf', float('nan')):.2f}.")
     wf_note = wf.get("note", "See the calibration report for the walk-forward (hold-out) result.")
+    if "chosen" in wf:
+        c = wf["chosen"]
+        wf_note += (f" This exact setup ranked {c['rank_on_2025_only']} of {c['of']} on 2025 alone and made "
+                    f"PF {c['pf_2026']:.2f} on {c['trades_2026']} trades in 2026: the M2/M3-trigger + H1-bias "
+                    "family held up out of sample, the exact parameter values are not proven.")
     m3 = dict(MagicNumber=20261110, TradeComment="XLZC_M3H1", RiskPercent=0.5, MaxSpread_Points=60,
               MaxSlippage_Points=30, MaxEntryDelaySeconds=30, HTF_Timeframe=16385, TriggerTimeframe=3,
               LiquidityLookbackBars=40, SwingStrength=2, SL_Buffer_Points=208, MinRewardRisk=1.5,
