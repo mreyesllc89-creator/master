@@ -1,0 +1,211 @@
+<title>XLZC Bearish Calibration</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: single reading column, verdict first, then charts, then evidence tables. */
+:root{
+  --bg:#f7f7f4; --surface:#ffffff; --fg:#1b1d22; --fg2:#555a63; --muted:#8a8f98; --rule:#e2e2dc;
+  --gold:#9a6b00; --good:#1e7d3a; --bad:#b4322f; --warnbg:#fff5dc;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --sans:"Libre Franklin",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141518; --surface:#1c1d21; --fg:#eceae4; --fg2:#b9bac0; --muted:#868a93; --rule:#2e3036;
+  --gold:#e0b44a; --good:#4cc072; --bad:#ec6b67; --warnbg:#2c2614;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141518; --surface:#1c1d21; --fg:#eceae4; --fg2:#b9bac0; --muted:#868a93; --rule:#2e3036;
+  --gold:#e0b44a; --good:#4cc072; --bad:#ec6b67; --warnbg:#2c2614;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:15px;line-height:1.55}
+main{max-width:960px;margin:0 auto;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px}
+h1{font-size:30px;line-height:1.15;margin:0;text-wrap:balance}
+h2{font-size:20px;margin:0 0 6px;text-wrap:balance}
+p{margin:0;max-width:68ch;color:var(--fg2)}
+.eyebrow{font:600 12px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+header{display:grid;gap:12px}
+section{display:grid;gap:14px;min-width:0}
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.v{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:14px 16px;display:grid;gap:4px}
+.v b{font:600 24px/1.1 var(--mono);font-variant-numeric:tabular-nums}
+.v span{font-size:13px;color:var(--fg2)}
+.warn{background:var(--warnbg);border-left:3px solid var(--gold);padding:12px 16px;border-radius:0 6px 6px 0;color:var(--fg)}
+.warn p{color:var(--fg)}
+.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums;font-size:13.5px}
+th,td{padding:8px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--rule)}
+th{font:600 11.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;color:var(--muted);background:var(--bg)}
+td:first-child,th:first-child{text-align:left}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--mono);font-size:12.5px}
+.pos{color:var(--good);font-weight:600}.neg{color:var(--bad);font-weight:600}
+.pill{display:inline-block;font:600 11px var(--mono);padding:2px 7px;border-radius:99px;border:1px solid currentColor}
+.chart{background:var(--surface);border:1px solid var(--rule);border-radius:6px;padding:12px;position:relative;min-width:0}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:13px;color:var(--fg2);padding:4px 4px 10px}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg);font:12px/1.4 var(--mono);padding:6px 9px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-110%)}
+.axis text{fill:var(--muted);font:11px var(--mono)}
+.grid line{stroke:var(--rule)}
+ul{margin:0;padding-left:20px;color:var(--fg2);max-width:70ch;display:grid;gap:6px}
+code{font-family:var(--mono);font-size:.9em}
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">XAUUSD · FTMO MT5 feed · Jan 2025 – May 2026</div>
+  <h1>Liquidity Zero-Cross Bearish: timeframe and profit-factor calibration</h1>
+  <p>The EA's rules replayed in Python on 480,000 real M1 bars, across 6 trigger/bias timeframe pairs and 5,838 parameter sets. Fills use the broker's hourly bid/ask spread. Results are in R, multiples of the risk per trade. Because the EA sizes every trade to the same % of equity, profit factor (PF) in R matches PF in money.</p>
+</header>
+
+<section>
+  <div class="verdict" id="verdict"></div>
+  <div class="warn"><p><b>The shipped default <code>MaxSpread_Points = 30</code> takes zero trades on this broker.</b> FTMO's gold spread averages 41–53 points at every hour. All results below use 60. Check your own broker's spread before running the EA.</p></div>
+</section>
+
+<section>
+  <h2>Profit factor by timeframe pair, shipped defaults</h2>
+  <p>Trigger timeframe / HTF bias timeframe. Lookback 25, swing strength 2, buffer 40 (scaled by √TF), RR ≥ 1, soft Stochastic, 12:00–16:30 UTC, no trailing. The dashed line marks PF 1.0, breakeven.</p>
+  <div class="chart" id="pfchart"></div>
+</section>
+
+<section>
+  <h2>Equity in R</h2>
+  <p>Cumulative R per trade, closed trades in order. The out-of-sample period starts at the vertical line (1 Jan 2026). Parameters were not chosen with any of that data.</p>
+  <div class="chart" id="eqchart"></div>
+</section>
+
+<section>
+  <h2>All timeframe pairs</h2>
+  <div class="tw"><table id="tftable"></table></div>
+  <p>“Configs PF&gt;1” is the share of parameter sets with at least 30 trades and PF above 1. It shows how often a random calibration makes money, which matters more than the single best number.</p>
+</section>
+
+<section>
+  <h2>Pick on 2025, test on 2026</h2>
+  <p>For each timeframe pair, the parameter set with the highest 2025 PF (at least 25 trades), then its PF on unseen 2026 data. Only M1/M15 held up.</p>
+  <div class="tw"><table id="besttable"></table></div>
+</section>
+
+<section>
+  <h2>How sensitive M1/M15 is</h2>
+  <p>Neighbours of the calibrated set, without trailing (RR ≥ 1, overlap session). The edge sits at lookback 25 with swing strength 3 and fades at lookback 40. Without trailing, most of the profit comes from 2026, a single strong period. Treat it as fragile.</p>
+  <div class="tw"><table id="nbtable"></table></div>
+</section>
+
+<section>
+  <h2>What this tells you</h2>
+  <ul id="findings"></ul>
+</section>
+
+<section>
+  <h2>Method and limits</h2>
+  <ul>
+    <li>Data: FTMO-Server4 XAUUSD, mid-price M1 bars resampled from ticks, Jan 2 2025 – May 15 2026, in UTC. Higher timeframes are resampled from M1.</li>
+    <li>Fills: shorts enter at the bid on the first tick after the signal bar. SL and TP trigger on the ask. When one bar touches both SL and TP, the SL is counted first, the pessimistic choice. A gap through a level fills at the bar open.</li>
+    <li>Not modelled: the news filter (no calendar history), commission, swap, slippage beyond the spread, and the trailing step (trailing is continuous).</li>
+    <li>Point inputs are scaled by √(trigger minutes) on higher timeframes (buffer, trailing, SL bounds), so M5 and M15 aren't judged with M1-sized stops.</li>
+    <li>Sample sizes are small, roughly 3–8 trades a month. The 90% bootstrap interval for the calibrated M1/M15 set is PF 1.0–3.1, so this is evidence to test further in MT5, not proof.</li>
+  </ul>
+</section>
+</main>
+
+<script>
+const D = __DATA__;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const f2 = x => x==null ? "∞" : x.toFixed(2);
+const cls = x => x==null ? "pos" : (x>=1 ? "pos" : "neg");
+const NS = "http://www.w3.org/2000/svg";
+const el = (t,a={},p) => { const e=document.createElementNS(NS,t); for(const k in a) e.setAttribute(k,a[k]); if(p) p.appendChild(e); return e; };
+
+// verdict tiles
+const cal = D.best.find(b=>b.tf==="M1/M15");
+const m15 = D.tf.find(r=>r.tf==="M1/M15");
+document.getElementById("verdict").innerHTML = [
+  ["0", "trades with the shipped 30-point spread cap"],
+  [f2(m15.pf), "PF, M1/M15 shipped defaults (spread 60), 88 trades"],
+  [f2(cal.is_pf), "PF on 2025, M1/M15 calibrated: swing 3, buffer 80, trailing (36 trades)"],
+  [f2(cal.oos_pf), "PF of that same set on unseen 2026 data (15 trades)"]
+].map(([b,s])=>`<div class="v"><b>${b}</b><span>${s}</span></div>`).join("");
+
+// tables
+document.getElementById("tftable").innerHTML =
+ `<tr><th>Trigger / HTF</th><th>Trades</th><th>PF</th><th>Win %</th><th>Net R</th><th>Max DD R</th><th>PF 2025</th><th>PF 2026</th><th>Configs PF&gt;1</th><th>Median PF</th></tr>` +
+ D.tf.map(r=>`<tr><td class="mono">${r.tf}</td><td>${r.trades}</td><td class="${cls(r.pf)}">${f2(r.pf)}</td><td>${(r.win*100).toFixed(0)}</td><td>${r.net.toFixed(1)}</td><td>${r.dd.toFixed(1)}</td><td>${f2(r.is_pf)}</td><td class="${cls(r.oos_pf)}">${f2(r.oos_pf)}</td><td>${(r.share*100).toFixed(0)}% of ${r.n_cfg}</td><td>${f2(r.pf_med)}</td></tr>`).join("");
+document.getElementById("besttable").innerHTML =
+ `<tr><th>Trigger / HTF</th><th>Best 2025 parameters</th><th>2025 trades</th><th>2025 PF</th><th>2026 trades</th><th>2026 PF</th><th>Held up?</th></tr>` +
+ D.best.map(b=>{const ok=b.oos_pf>=1.2 && b.is_pf>=1.2; return `<tr><td class="mono">${b.tf}</td><td class="mono">${b.cfg}</td><td>${b.is_t}</td><td>${f2(b.is_pf)}</td><td>${b.oos_t}</td><td class="${cls(b.oos_pf)}">${f2(b.oos_pf)}</td><td><span class="pill ${ok?'pos':'neg'}">${ok?'yes':'no'}</span></td></tr>`}).join("");
+document.getElementById("nbtable").innerHTML =
+ `<tr><th>Lookback</th><th>Swing strength</th><th>SL buffer</th><th>Trades</th><th>PF</th><th>PF 2025</th><th>PF 2026</th></tr>` +
+ D.nb.map(r=>`<tr${r.N===25&&r.S===3&&r.buf===80?' style="font-weight:600;background:var(--warnbg)"':''}><td>${r.N}</td><td>${r.S}</td><td>${r.buf}</td><td>${r.trades}</td><td class="${cls(r.pf)}">${f2(r.pf)}</td><td>${f2(r.is_pf)}</td><td>${f2(r.oos_pf)}</td></tr>`).join("");
+
+document.getElementById("findings").innerHTML = [
+ "M1 trigger with an M15 bias is the only pair whose best 2025 settings kept working in 2026 (PF 1.70 → 1.69). Use it as the starting point.",
+ "The changes that helped M1 were swing strength 3 instead of 2 and a wider SL buffer (80 points instead of 40). Both mean fewer, cleaner liquidity highs and stops that survive the post-sweep retest.",
+ "The HTF bias filter does its job: with it off, M1 trades lose (PF 0.68 over 176 trades). Keep <code>UseHTF_Filter=true</code>.",
+ "M5 and M15 triggers fire too rarely (2–4 trades a month), and their best 2025 settings collapsed in 2026 (PF 3.4 → 0.5). On this data they are noise.",
+ "Trailing (start 150, distance 100) made the calibrated M1/M15 set consistent across both years (PF 1.70 in 2025, 1.69 in 2026). Without it, the same set made PF 1.19 in 2025 and 3.67 in 2026: more total R, but almost all of it from one period. Across the whole grid, trailing and partial close didn't raise the median PF.",
+ "The whole sample is a strong gold uptrend: about $2,625 in Jan 2025 to $4,540 in May 2026. 2026 was choppier, with a peak near $4,670 in March. A short-only system sits flat while the HTF bias stays bullish, which is part of why trade counts are low.",
+ "Most rejected signals had no swing low below price that paid RR ≥ 1. When MACD crosses zero, price has usually already moved, so the nearest pool is close."
+].map(s=>`<li>${s}</li>`).join("");
+
+// tooltip helper
+function tipFor(box){ const t=document.createElement("div"); t.className="tip"; t.hidden=true; box.appendChild(t); return t; }
+
+// PF bar chart
+(function(){
+  const box=document.getElementById("pfchart"), W=880,H=260,m={l:44,r:12,t:12,b:34};
+  const svg=el("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Profit factor per timeframe pair"},box);
+  const rows=D.tf, max=1.6, iw=W-m.l-m.r, ih=H-m.t-m.b, y=v=>m.t+ih-(Math.min(v,max)/max)*ih;
+  const g=el("g",{class:"grid"},svg), ax=el("g",{class:"axis"},svg);
+  [0,0.4,0.8,1.2,1.6].forEach(v=>{el("line",{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v)},g); el("text",{x:m.l-8,y:y(v)+4,"text-anchor":"end"},ax).textContent=v.toFixed(1);});
+  const bw=iw/rows.length, tip=tipFor(box);
+  rows.forEach((r,i)=>{
+    const x=m.l+i*bw+bw*0.28, w=bw*0.44, top=y(r.pf);
+    const c = r.pf>=1 ? css("--s1") : css("--muted");
+    el("path",{d:`M${x},${y(0)} V${top+4} q0,-4 4,-4 h${w-8} q4,0 4,4 V${y(0)} Z`,fill:c},svg);
+    el("text",{x:x+w/2,y:top-6,"text-anchor":"middle",fill:css("--fg"),style:"font:600 12px var(--mono)"},svg).textContent=r.pf.toFixed(2);
+    el("text",{x:x+w/2,y:H-12,"text-anchor":"middle"},ax).textContent=r.tf;
+    const hit=el("rect",{x:m.l+i*bw,y:m.t,width:bw,height:ih,fill:"transparent"},svg);
+    hit.addEventListener("mousemove",e=>{const b=box.getBoundingClientRect(); tip.hidden=false; tip.style.left=(e.clientX-b.left)+"px"; tip.style.top=(e.clientY-b.top)+"px"; tip.textContent=`${r.tf}  PF ${r.pf.toFixed(2)} · ${r.trades} trades · net ${r.net.toFixed(1)}R`;});
+    hit.addEventListener("mouseleave",()=>tip.hidden=true);
+  });
+  el("line",{x1:m.l,x2:W-m.r,y1:y(1),y2:y(1),stroke:css("--fg2"),"stroke-dasharray":"5 4","stroke-width":1.5},svg);
+  el("text",{x:m.l+4,y:y(1)-6,"text-anchor":"start",fill:css("--fg2"),style:"font:11px var(--mono)"},svg).textContent="breakeven 1.0";
+})();
+
+// equity chart
+(function(){
+  const box=document.getElementById("eqchart"), W=880,H=320,m={l:44,r:16,t:12,b:30};
+  const cols=["--s1","--s2","--s3","--s4"].map(css);
+  const lg=document.createElement("div"); lg.className="legend";
+  lg.innerHTML=D.curves.map((c,i)=>`<span><i style="background:${cols[i]}"></i>${c.name} (${c.pts.at(-1)[1]>0?"+":""}${c.pts.at(-1)[1].toFixed(1)}R)</span>`).join("");
+  box.appendChild(lg);
+  const svg=el("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Cumulative R equity curves"},box);
+  const t0=Date.parse("2025-01-01"), t1=Date.parse("2026-05-20"), iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const all=D.curves.flatMap(c=>c.pts.map(p=>p[1])), lo=Math.min(-10,...all), hi=Math.max(25,...all);
+  const x=d=>m.l+(Date.parse(d)-t0)/(t1-t0)*iw, y=v=>m.t+ih-(v-lo)/(hi-lo)*ih;
+  const g=el("g",{class:"grid"},svg), ax=el("g",{class:"axis"},svg);
+  for(let v=Math.ceil(lo/5)*5; v<=hi; v+=5){ el("line",{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:v===0?css("--fg2"):""},g); el("text",{x:m.l-8,y:y(v)+4,"text-anchor":"end"},ax).textContent=v; }
+  ["2025-01-01","2025-04-01","2025-07-01","2025-10-01","2026-01-01","2026-04-01"].forEach(d=>{el("text",{x:x(d),y:H-8,"text-anchor":"middle"},ax).textContent=d.slice(0,7);});
+  el("line",{x1:x("2026-01-01"),x2:x("2026-01-01"),y1:m.t,y2:m.t+ih,stroke:css("--fg2"),"stroke-dasharray":"4 4"},svg);
+  el("text",{x:x("2026-01-01")+6,y:m.t+12,fill:css("--fg2"),style:"font:11px var(--mono)"},svg).textContent="out-of-sample →";
+  D.curves.forEach((c,i)=>{
+    let d=`M${x("2025-01-02")},${y(0)}`; let prev=0;
+    c.pts.forEach(p=>{ d+=` H${x(p[0])} V${y(p[1])}`; prev=p[1]; });
+    el("path",{d,fill:"none",stroke:cols[i],"stroke-width":2,"stroke-linejoin":"round"},svg);
+  });
+  const tip=tipFor(box), cross=el("line",{y1:m.t,y2:m.t+ih,stroke:css("--muted"),visibility:"hidden"},svg);
+  const hit=el("rect",{x:m.l,y:m.t,width:iw,height:ih,fill:"transparent"},svg);
+  hit.addEventListener("mousemove",e=>{
+    const b=svg.getBoundingClientRect(), px=(e.clientX-b.left)/b.width*W, t=t0+(px-m.l)/iw*(t1-t0);
+    const date=new Date(t).toISOString().slice(0,10);
+    const vals=D.curves.map(c=>{let v=0; for(const p of c.pts){ if(p[0]<=date) v=p[1]; else break;} return v;});
+    cross.setAttribute("x1",px); cross.setAttribute("x2",px); cross.setAttribute("visibility","visible");
+    const bb=box.getBoundingClientRect(); tip.hidden=false; tip.style.left=(e.clientX-bb.left)+"px"; tip.style.top=(e.clientY-bb.top)+"px";
+    tip.innerHTML=date+"<br>"+D.curves.map((c,i)=>`<span style="color:${cols[i]}">■</span> ${vals[i].toFixed(1)}R`).join("  ");
+  });
+  hit.addEventListener("mouseleave",()=>{tip.hidden=true; cross.setAttribute("visibility","hidden");});
+})();
+</script>
