@@ -41,6 +41,24 @@
 //  REPAINTING: a parent obedience timeframe above the filter timeframe reads
 //  a still-forming bar on live candles; keep the parent equal to the filter
 //  timeframe, and keep "Higher-TF zones use the last CLOSED bar" on.
+//
+//  TEST RESULTS (2026-11-07): a Python replica of this strategy, built on the
+//  filter rebuild that matched TradingView 100% and checked against a literal
+//  emulation of this Pine section trade for trade. Costs: gold $0.30 spread per
+//  round trip, BTC 0.02% per side + $0.20; R = the stop distance.
+//  NO TIMEFRAME PASSED the out-of-sample rule, so the defaults below are NOT
+//  calibrated. With the file defaults the strategy loses almost everywhere:
+//    XAUUSD 10m -48.8R, 15m -41.7R, 30m -121.5R, 45m -125.5R, 60m -42.3R
+//           (OANDA) / -65.8R (VANTAGE), 120m -5.9R / -3.9R, 240m +7.2R / -11.4R
+//    BTCUSD 1m -12,757R, 5m -3,233R, 15m -1,201R, 30m -455R, 60m -84R,
+//           120m -12R, 240m +13.9R (Bitfinex 2018-2019 only)
+//  A search of every timeframe (filter timeframe, zones, band, level,
+//  permission, entry trigger, direction, exits) found settings that looked
+//  strong in sample (e.g. XAUUSD 60m +199.5R, BTCUSD 15m +1,160R), but none
+//  survived a hold-out where the search never saw the half being tested, and
+//  most turned negative without their 10 biggest trades. BTCUSD 5m passed the
+//  hold-outs but lost under stressed costs (-235R at 0.035% per side).
+//  Treat the defaults as a starting point for your own tests.
 // ============================================================================
 strategy("FlashGold Direction Strategy", "FG-DS", overlay=true, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, calc_on_every_tick=false, calc_on_order_fills=false, process_orders_on_close=false, commission_type=strategy.commission.percent, commission_value=0, slippage=0, margin_long=1, margin_short=1, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
@@ -695,18 +713,23 @@ dsQty(float stopDist) =>
 // ---- triggers (from the filter's own outputs)
 bool dsBuyEdge  = fgfOn and fgfBuyOk  and not fgfBuyOk[1]
 bool dsSellEdge = fgfOn and fgfSellOk and not fgfSellOk[1]
-bool dsSigOkNow = fgfOn and fgfOpen and fgfSigOk
-bool dsConfEdge = dsSigOkNow and (not dsSigOkNow[1] or fgfNewSig)
-bool dsNewBuy   = fgfOn and fgfNewSig and fgfSigDir > 0
-bool dsNewSell  = fgfOn and fgfNewSig and fgfSigDir < 0
-bool dsRawBuy   = dsTrigger == "Zone start" ? dsBuyEdge  : dsTrigger == "Signal confirmed" ? dsConfEdge and fgfSigDir > 0 : dsNewBuy
-bool dsRawSell  = dsTrigger == "Zone start" ? dsSellEdge : dsTrigger == "Signal confirmed" ? dsConfEdge and fgfSigDir < 0 : dsNewSell
+bool dsSigOkNow  = fgfOn and fgfOpen and fgfSigOk
+bool dsConfBuy   = dsSigOkNow and fgfSigDir > 0 and fgfBuyOk
+bool dsConfSell  = dsSigOkNow and fgfSigDir < 0 and fgfSellOk
+bool dsConfEdgeB = dsConfBuy  and (not dsConfBuy[1]  or fgfNewSig)
+bool dsConfEdgeS = dsConfSell and (not dsConfSell[1] or fgfNewSig)
+bool dsNewBuy    = fgfOn and fgfNewSig and fgfSigDir > 0
+bool dsNewSell   = fgfOn and fgfNewSig and fgfSigDir < 0
+bool dsRawBuy    = dsTrigger == "Zone start" ? dsBuyEdge  : dsTrigger == "Signal confirmed" ? dsConfEdgeB : dsNewBuy
+bool dsRawSell   = dsTrigger == "Zone start" ? dsSellEdge : dsTrigger == "Signal confirmed" ? dsConfEdgeS : dsNewSell
 bool dsInv      = dsDirection == "Inverted"
 bool dsGoLong   = (dsInv ? dsRawSell : dsRawBuy)  and dsSides != "Short only"
 bool dsGoShort  = (dsInv ? dsRawBuy  : dsRawSell) and dsSides != "Long only"
 // the permission that keeps an open trade alive (the one that opened it)
-bool dsLongKeep    = dsInv ? fgfSellOk : fgfBuyOk
-bool dsShortKeep   = dsInv ? fgfBuyOk  : fgfSellOk
+bool dsBuyKeep     = dsTrigger == "Signal confirmed" ? (fgfOn and fgfOpen and fgfSigOk and fgfSigDir > 0 and fgfBuyOk)  : fgfBuyOk
+bool dsSellKeep    = dsTrigger == "Signal confirmed" ? (fgfOn and fgfOpen and fgfSigOk and fgfSigDir < 0 and fgfSellOk) : fgfSellOk
+bool dsLongKeep    = dsInv ? dsSellKeep : dsBuyKeep
+bool dsShortKeep   = dsInv ? dsBuyKeep  : dsSellKeep
 bool dsUseZoneExit = dsZoneExit and dsTrigger != "New signal"
 
 // ---- bars in trade (counted from the fill bar)
@@ -720,7 +743,7 @@ bool dsTimeUp  = dsTimeStop > 0 and not na(dsBarsIn) and dsBarsIn >= dsTimeStop
 
 // ---- orders
 float dsQ     = dsQty(dsStopDist)
-bool  dsQtyOk = dsQ > 0 and (dsQtyMode == "Fixed" or dsStopDist > 0)
+bool  dsQtyOk = dsQ > 0 and (dsQtyMode == "Fixed" or dsStopDist > 0) and (dsExitMode == "Points" or not na(dsAtr))
 bool  dsFlat  = strategy.position_size == 0
 bool  dsLong  = strategy.position_size > 0
 bool  dsShort = strategy.position_size < 0
@@ -731,18 +754,22 @@ if dsEnterLong
     strategy.entry("DS Long", strategy.long, qty=dsQ, comment="Long")
     if dsUseTrail
         strategy.exit("DS Long Exit", "DS Long", loss=dsLoss, profit=dsProfit, trail_points=dsTrActTicks, trail_offset=dsTrDstTicks)
-    else
+    else if not na(dsLoss) or not na(dsProfit)
         strategy.exit("DS Long Exit", "DS Long", loss=dsLoss, profit=dsProfit)
+    else
+        strategy.cancel("DS Long Exit")
 if dsEnterShort
     strategy.entry("DS Short", strategy.short, qty=dsQ, comment="Short")
     if dsUseTrail
         strategy.exit("DS Short Exit", "DS Short", loss=dsLoss, profit=dsProfit, trail_points=dsTrActTicks, trail_offset=dsTrDstTicks)
-    else
+    else if not na(dsLoss) or not na(dsProfit)
         strategy.exit("DS Short Exit", "DS Short", loss=dsLoss, profit=dsProfit)
+    else
+        strategy.cancel("DS Short Exit")
 
 if not dsEnterLong and not dsEnterShort
-    bool dsCloseLongOpp  = dsLong  and dsGoShort and not dsReverse
-    bool dsCloseShortOpp = dsShort and dsGoLong  and not dsReverse
+    bool dsCloseLongOpp  = dsLong  and (dsInv ? dsRawBuy  : dsRawSell)
+    bool dsCloseShortOpp = dsShort and (dsInv ? dsRawSell : dsRawBuy)
     bool dsCloseLongZone  = dsLong  and dsUseZoneExit and not dsLongKeep
     bool dsCloseShortZone = dsShort and dsUseZoneExit and not dsShortKeep
     if dsLong and (dsCloseLongOpp or dsCloseLongZone or dsTimeUp)
