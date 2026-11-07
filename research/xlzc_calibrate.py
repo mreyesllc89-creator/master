@@ -139,8 +139,10 @@ def run_cfg(cfg):
             if cfg["fb"] <= 0:
                 continue
             tp = entry - cfg["fb"] * risk
-        trail = (round(150 * k) * pt, round(100 * k) * pt) if cfg["trail"] else None
-        key = (mi, round(sl, 3), round(tp, 3), cfg["trail"], trig)
+        # trailing start / distance in gold points (scaled by k); defaults 150 / 100
+        t_start, t_dist = cfg.get("trail_start", 150), cfg.get("trail_dist", 100)
+        trail = (round(t_start * k) * pt, round(t_dist * k) * pt) if cfg["trail"] else None
+        key = (mi, round(sl, 3), round(tp, 3), trail, trig, B.M1Path.TRAIL_MODE)
         res = cache.get(key)
         if res is None:
             res = path.simulate(mi, entry, sl, tp, trail, None)

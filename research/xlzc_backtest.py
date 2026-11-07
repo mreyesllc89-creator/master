@@ -196,13 +196,18 @@ class M1Path:
     # How a trailing level set from bar k's low is treated inside bar k:
     #   "next"  - only tested from bar k+1 (original model; optimistic)
     #   "close" - also stop at bar k if its close is at/above the new level (certain hit)
-    #   "worst" - also stop at bar k if its high reached the new level (pessimistic)
+    #   "worst" - also stop at bar k if its high reached the new level
+    #   "random"- the low comes first in a random half of the bars (fixed seed); only those
+    #             bars can hit the new level later in the same bar (a central estimate)
+    #   With a trailing distance below a typical M1 range, "worst" exits near the bar's low (a
+    #   good price) and "next" is the pessimistic case: no mode is a bound on its own.
     TRAIL_MODE = "close"  # default: count certain same-bar hits; "worst" is the pessimistic bound
 
     def __init__(self, m1, hs_by_hour):
         self.t = m1.index.values
         self.o = m1["open"].values; self.h = m1["high"].values; self.l = m1["low"].values
         self.c = m1["close"].values
+        self.low_first = np.random.default_rng(20261107).random(len(m1)) < 0.5   # for TRAIL_MODE "random"
         self.hs = hs_by_hour[server_to_utc_hour(m1.index)] / 2.0  # half spread per bar
 
     def simulate(self, start, entry, sl0, tp, trail, partial):
@@ -231,7 +236,12 @@ class M1Path:
             tp_hit = al <= tp
             same_hit = np.zeros(end - pos, bool)
             if trail is not None and self.TRAIL_MODE != "next":
-                trig = ah if self.TRAIL_MODE == "worst" else self.c[pos:end] + self.hs[pos:end]
+                if self.TRAIL_MODE == "random":
+                    # low before high in about half of the bars (fixed seed): only then can the
+                    # level set at the low be hit by the later high inside the same bar
+                    trig = np.where(self.low_first[pos:end], ah, -np.inf)
+                else:
+                    trig = ah if self.TRAIL_MODE == "worst" else self.c[pos:end] + self.hs[pos:end]
                 same_hit = np.isfinite(cand) & (cand < eff) & (trig >= cand) & ~tp_hit
             part_k = None
             if not partial_done:
