@@ -11,8 +11,14 @@ It is NOT the MT5 Strategy Tester. It reproduces the EA's rules on OHLC bars:
   R5 risk       : 1 position at a time, spread filter, trailing (server), optional partial close
   R6 session    : UTC window on the entry time (news filter NOT replicated - no calendar data)
 
+Time base: the dataset's 'datetime' column is BROKER SERVER TIME (FTMO, New York + 7h,
+i.e. GMT+2 winter / GMT+3 US summer), not UTC as its README says (weekly open is
+Monday 01:05; the 08:30 ET payroll spike sits at 15:30 all year). Session windows
+in this research are therefore server-time windows.
+
 Fill model (data is mid-price M1 from an FTMO MT5 feed):
-  bid = mid - spread/2, ask = mid + spread/2, spread = per-UTC-hour mean from spreads_summary.csv.
+  bid = mid - spread/2, ask = mid + spread/2, spread = constant per-hour-of-day mean
+  from spreads_summary.csv (that file is in UTC hours; bars are mapped server->UTC).
   Shorts enter at bid on the first tick of the bar after the signal bar.
   Exits walk M1 bars: SL is checked against the ask high BEFORE TP/trailing (pessimistic),
   gaps through a level fill at the bar open. Trailing step is ignored (continuous trailing).
@@ -45,7 +51,17 @@ def load(data_dir):
     hourly = sp.reindex(range(24))
     hourly[21] = 60.0  # rollover hour, not sampled: assume wide
     hourly = hourly.interpolate().bfill().ffill()
-    return m1, hourly.values * 0.01  # points -> price (XAUUSD point = 0.01)
+    return m1, hourly.values * 0.01  # points -> price (XAUUSD point = 0.01), indexed by UTC hour
+
+
+def server_to_utc_hour(index):
+    """Server time (New York + 7h) -> UTC hour of day, DST-aware."""
+    ny = (index - pd.Timedelta(hours=7)).tz_localize("America/New_York", ambiguous="NaT",
+                                                       nonexistent="shift_forward")
+    utc = ny.tz_convert("UTC")
+    h = np.asarray(utc.hour, dtype=float)
+    fallback = (np.asarray(index.hour) - 2) % 24          # ambiguous hour: assume +2
+    return np.where(np.isnan(h), fallback, h).astype(int)
 
 
 def resample(m1, tf):
@@ -159,10 +175,17 @@ def structure(t, sig, N, S):
 
 # ----------------------------------------------------------------------------- exits
 class M1Path:
+    # How a trailing level set from bar k's low is treated inside bar k:
+    #   "next"  - only tested from bar k+1 (original model; optimistic)
+    #   "close" - also stop at bar k if its close is at/above the new level (certain hit)
+    #   "worst" - also stop at bar k if its high reached the new level (pessimistic)
+    TRAIL_MODE = "close"  # default: count certain same-bar hits; "worst" is the pessimistic bound
+
     def __init__(self, m1, hs_by_hour):
         self.t = m1.index.values
         self.o = m1["open"].values; self.h = m1["high"].values; self.l = m1["low"].values
-        self.hs = hs_by_hour[m1.index.hour.values] / 2.0  # half spread per bar
+        self.c = m1["close"].values
+        self.hs = hs_by_hour[server_to_utc_hour(m1.index)] / 2.0  # half spread per bar
 
     def simulate(self, start, entry, sl0, tp, trail, partial):
         """Return (exit_idx, R). trail=(start,dist) price units or None; partial=(atR,pct,be) or None."""
@@ -188,13 +211,17 @@ class M1Path:
                 eff = np.full(end - pos, min(sl0, sl_floor))
             stop_hit = ah >= eff
             tp_hit = al <= tp
+            same_hit = np.zeros(end - pos, bool)
+            if trail is not None and self.TRAIL_MODE != "next":
+                trig = ah if self.TRAIL_MODE == "worst" else self.c[pos:end] + self.hs[pos:end]
+                same_hit = np.isfinite(cand) & (cand < eff) & (trig >= cand) & ~tp_hit
             part_k = None
             if not partial_done:
                 lvl = entry - partial[0] * risk
                 ph = al <= lvl
                 if ph.any():
                     part_k = int(np.argmax(ph))
-            ev = stop_hit | tp_hit
+            ev = stop_hit | tp_hit | same_hit
             k = int(np.argmax(ev)) if ev.any() else None
             if part_k is not None and (k is None or part_k < k or (part_k == k and not stop_hit[k])):
                 if k is not None and part_k == k and tp_hit[k]:
@@ -214,8 +241,10 @@ class M1Path:
             if k is not None:
                 if stop_hit[k]:
                     px = max(eff[k], ao[k])
-                else:
+                elif tp_hit[k]:
                     px = min(tp, ao[k])
+                else:                      # trailing level set and hit inside the same bar
+                    px = cand[k]
                 r = realized + remaining * (entry - px) / risk
                 return pos + k, r
             if trail is not None:

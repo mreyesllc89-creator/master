@@ -107,6 +107,13 @@
 #include <Trade\PositionInfo.mqh>
 
 //--- enums -----------------------------------------------------------
+enum ENUM_SIGNAL_STATE
+  {
+   SIG_NONE     = 0, // evaluated: no valid signal on this bar
+   SIG_VALID    = 1, // evaluated: valid signal
+   SIG_NOTREADY = 2  // indicator / multi-timeframe data not up to date yet: retry next tick
+  };
+
 enum ENUM_TRAIL_MODE
   {
    TRAIL_SERVER = 0, // Server: modify the position SL
@@ -443,9 +450,17 @@ void OnTick()
 
    if(barTime != g_lastBarTime)
      {
+      //--- evaluate once per bar, but only on up-to-date data; a not-ready
+      //    read is retried on the next tick instead of losing the signal
+      int state = EvaluateSignal(barTime);
+      if(state == SIG_NOTREADY)
+        {
+         LogSkip("indicator data not up to date yet - retrying on next tick");
+         return;
+        }
       g_lastBarTime    = barTime;
       g_lastSkipReason = "";
-      g_signalActive   = EvaluateSignal();
+      g_signalActive   = (state == SIG_VALID);
       g_signalBarTime  = g_signalActive ? barTime : 0;
       UpdatePanel();
      }
@@ -518,35 +533,72 @@ void OnTrade()
 //====================================================================
 // SIGNAL (R1, R2, R3, optional RSI) - evaluated on closed bars only
 //====================================================================
-bool EvaluateSignal()
+//--- true when a handle has calculated every bar of its series and the
+//    series is synchronized (first tick of a new bar can arrive before that)
+bool HandleReady(const int handle, const ENUM_TIMEFRAMES tf)
   {
+   if(handle == INVALID_HANDLE)
+      return true;
+   if(!SeriesInfoInteger(_Symbol, tf, SERIES_SYNCHRONIZED))
+      return false;
+   int bars = Bars(_Symbol, tf);
+   return (bars > MACD_Slow + MACD_Signal + 3 && BarsCalculated(handle) >= bars);
+  }
+
+//--- all data the signal reads is current for the trigger bar opening at barTime
+bool SignalDataReady(const datetime barTime)
+  {
+   if(!HandleReady(g_hMacdM1, TriggerTimeframe) || !HandleReady(g_hStochM1, TriggerTimeframe))
+      return false;
+   if(UseRSIFilter && !HandleReady(g_hRsiM1, TriggerTimeframe))
+      return false;
+   if(UseHTF_Filter)
+     {
+      if(!HandleReady(g_hMacdHTF, HTF_Timeframe) || !HandleReady(g_hEmaHTF, HTF_Timeframe))
+         return false;
+      //--- the HTF series must already contain the HTF bar that holds barTime,
+      //    otherwise "shift 1" would still be the HTF bar before the last closed one
+      datetime htf0 = iTime(_Symbol, HTF_Timeframe, 0);
+      if(htf0 == 0 || barTime < htf0 || barTime >= htf0 + PeriodSeconds(HTF_Timeframe))
+         return false;
+     }
+   return true;
+  }
+
+int EvaluateSignal(const datetime barTime)
+  {
+   if(!SignalDataReady(barTime))
+      return SIG_NOTREADY;
+
    //--- R2: M1 MACD main line zero-cross DOWN, bar-based (no repaint)
    //    bar[2] main >= 0  and  bar[1] main < 0   (bar[1] = last closed)
    double macd[];
    ArraySetAsSeries(macd, true);
-   if(BarsCalculated(g_hMacdM1) < MACD_Slow + MACD_Signal + 3)
-      return false;
    if(CopyBuffer(g_hMacdM1, 0, 1, 2, macd) != 2)
-      return false;
+      return SIG_NOTREADY;
    bool zeroCrossDown = (macd[1] >= 0.0 && macd[0] < 0.0);
    if(!zeroCrossDown)
-      return false;   // No señal = no operación
+      return SIG_NONE;   // No señal = no operación
    Log(StringFormat("R2 trigger: M1 MACD zero-cross down (%.3f -> %.3f)", macd[1], macd[0]));
 
    //--- R1: HTF bias - MACD main < 0 AND close < EMA(50), last closed HTF bar
-   if(UseHTF_Filter && !HTFBiasBearish())
-      return false;
+   if(UseHTF_Filter)
+     {
+      int bias = HTFBiasState();
+      if(bias != SIG_VALID)
+         return bias;
+     }
 
    //--- optional: RSI(12) confluence (discretionary, default OFF)
    if(UseRSIFilter)
      {
       double rsi;
       if(!CopyOne(g_hRsiM1, 0, 1, rsi))
-         return false;
+         return SIG_NOTREADY;
       if(rsi >= RSI_MaxLevel)
         {
          Log(StringFormat("RSI filter: RSI=%.1f >= %.1f -> skip", rsi, RSI_MaxLevel));
-         return false;
+         return SIG_NONE;
         }
      }
 
@@ -562,26 +614,23 @@ bool EvaluateSignal()
          if(StochHardBlock)
            {
             Log("R3 Stochastic not confirmed and StochHardBlock=true -> skip");
-            return false;
+            return SIG_NONE;
            }
          g_riskFactor = MathMax(0.0, MathMin(1.0, StochUnconfirmedRiskFactor));
          Log(StringFormat("R3 Stochastic not confirmed (soft) -> risk factor %.2f", g_riskFactor));
         }
      }
 
-   Log("Signal VALID on bar " + TimeToString(iTime(_Symbol, TriggerTimeframe, 0)) + " " + g_signalTag);
-   return true;
+   Log("Signal VALID on bar " + TimeToString(barTime) + " " + g_signalTag);
+   return SIG_VALID;
   }
 
-//--- R1: HTF bearish bias
-bool HTFBiasBearish()
+//--- R1: HTF bearish bias -> SIG_VALID / SIG_NONE / SIG_NOTREADY
+int HTFBiasState()
   {
    double htfMacd, htfEma;
    if(!CopyOne(g_hMacdHTF, 0, 1, htfMacd) || !CopyOne(g_hEmaHTF, 0, 1, htfEma))
-     {
-      Log("R1: HTF data not ready -> skip");
-      return false;
-     }
+      return SIG_NOTREADY;
    double htfClose = iClose(_Symbol, HTF_Timeframe, 1);
    bool macdBear  = (htfMacd < 0.0);
    bool belowEma  = (htfClose > 0.0 && htfClose < htfEma);
@@ -589,9 +638,9 @@ bool HTFBiasBearish()
      {
       Log(StringFormat("R1 HTF bias FAILED: MACD=%.3f (<0? %s) close=%.2f EMA=%.2f (below? %s)",
                        htfMacd, macdBear ? "yes" : "no", htfClose, htfEma, belowEma ? "yes" : "no"));
-      return false;
+      return SIG_NONE;
      }
-   return true;
+   return SIG_VALID;
   }
 
 //--- R3: Stochastic came from overbought and is turning/turned down
@@ -721,6 +770,14 @@ bool BuildTradePlan(TradePlan &p, string &reason)
    if(SL_AddSpread)
       sl += (ask - bid);
    p.sl = NormalizePrice(sl);
+
+   //--- optional: manual SL override (discretionary, default OFF). Applied
+   //    BEFORE the TP search so MinRewardRisk / TP_FallbackRR use the final risk.
+   if(UseManualLevels && ManualSL_Price > p.entry)
+     {
+      p.sl = NormalizePrice(ManualSL_Price);
+      p.slSource = "manual";
+     }
    double risk = p.sl - p.entry;
 
    //--- TP: next lower liquidity pool (nearest swing low that pays MinRR)
@@ -800,15 +857,9 @@ bool BuildTradePlan(TradePlan &p, string &reason)
         }
      }
 
-   //--- optional: manual SL/TP override (discretionary, default OFF)
+   //--- optional: manual TP override (discretionary, default OFF)
    if(UseManualLevels)
      {
-      if(ManualSL_Price > p.entry)
-        {
-         p.sl = NormalizePrice(ManualSL_Price);
-         p.slSource = "manual";
-         risk = p.sl - p.entry;
-        }
       if(ManualTP_Price > 0.0 && ManualTP_Price < p.entry)
         {
          p.tp = NormalizePrice(ManualTP_Price);
@@ -894,10 +945,17 @@ double CalcLots(const double entry, const double sl, const double riskFactor)
    //--- margin check: shrink until it fits the free margin
    double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
    double margin     = 0.0;
-   while(lots >= volMin &&
-         OrderCalcMargin(ORDER_TYPE_SELL, _Symbol, lots, entry, margin) &&
-         margin > freeMargin * 0.95)
+   while(lots >= volMin)
+     {
+      if(!OrderCalcMargin(ORDER_TYPE_SELL, _Symbol, lots, entry, margin))
+        {
+         LogSkip(StringFormat("OrderCalcMargin failed (error %d) - trade skipped", GetLastError()));
+         return 0.0;   // never send a lot size whose margin could not be checked
+        }
+      if(margin <= freeMargin * 0.95)
+         break;
       lots -= volStep;
+     }
    if(lots < volMin)
      {
       LogSkip("not enough free margin");
@@ -929,13 +987,17 @@ bool TryOpenShort()
       if(!BuildTradePlan(plan, reason))
         {
          LogSkip(reason);
-         return false;   // keep the signal alive for this bar; price may still fit
+         g_signalActive = false;   // decided once per signal, as in the backtest
+         return false;
         }
 
       //--- R5: position size from SL distance
       double lots = CalcLots(plan.entry, plan.sl, g_riskFactor);
       if(lots <= 0.0)
+        {
+         g_signalActive = false;
          return false;
+        }
 
       string comment = TradeComment + (g_signalTag != "" ? " " + g_signalTag : "");
       Log(StringFormat("SELL %.2f @%.2f SL=%.2f (%s %.2f) TP=%.2f (%s %.2f) RR=%.2f",
@@ -961,7 +1023,16 @@ bool TryOpenShort()
          g_signalActive = false;   // hard error: drop this signal
          return false;
         }
+      //--- transient error (timeout, requote, connection): the order may still
+      //    have been executed. Pause, then check before sending again.
+      Sleep(300);
+      if(CountOwnPositions() > 0)
+        {
+         Log("Position found after a transient OrderSend error - treating as filled");
+         return true;
+        }
      }
+   g_signalActive = false;   // no repeated bursts on later ticks
    return false;
   }
 
@@ -1157,7 +1228,12 @@ void ManageOpenPositions()
          double closeVol = MathFloor(vol * PartialClosePercent / 100.0 / volStep + 1e-9) * volStep;
          if(closeVol >= volMin && vol - closeVol >= volMin - 1e-9)
            {
-            if(g_trade.PositionClosePartial(ticket, closeVol))
+            //--- the ticket overload only works on hedging accounts; netting
+            //    accounts reduce the symbol's single position by volume instead
+            bool hedging = (AccountInfoInteger(ACCOUNT_MARGIN_MODE) == ACCOUNT_MARGIN_MODE_RETAIL_HEDGING);
+            bool closed  = hedging ? g_trade.PositionClosePartial(ticket, closeVol)
+                                   : g_trade.PositionClosePartial(_Symbol, closeVol);
+            if(closed)
               {
                GlobalVariableSet(pKey, 1.0);
                Log(StringFormat("Partial close %.2f lots of #%I64u at %.1fR", closeVol, ticket, PartialCloseAtR));
@@ -1168,7 +1244,11 @@ void ManageOpenPositions()
                  }
               }
             else
-               Print("[XLZC] Partial close failed: ", g_trade.ResultRetcodeDescription());
+              {
+               Print("[XLZC] Partial close failed: retcode ", g_trade.ResultRetcode(), " ",
+                     g_trade.ResultRetcodeDescription(), " - not retried for this position");
+               GlobalVariableSet(pKey, 1.0);   // log once instead of on every tick
+              }
            }
          else
             GlobalVariableSet(pKey, 1.0);  // volume too small to split; don't retry

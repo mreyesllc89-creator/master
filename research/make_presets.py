@@ -1,0 +1,97 @@
+#!/usr/bin/env python3
+"""
+Generate every presets/*.set file from the EA's full input list, so each preset
+is complete: loading one preset never leaves values behind from another.
+
+Usage: python3 research/make_presets.py   (run from the repository root)
+"""
+import json
+import os
+import re
+
+EA = "XAUUSD_M1_LiquidityZeroCross_Bearish.mq5"
+ENUMS = {"PERIOD_CURRENT": 0, "PERIOD_M1": 1, "PERIOD_M2": 2, "PERIOD_M3": 3, "PERIOD_M5": 5,
+         "PERIOD_M15": 15, "PERIOD_M30": 30, "PERIOD_H1": 16385, "PERIOD_H2": 16386,
+         "PERIOD_H4": 16388, "TRAIL_SERVER": 0, "TRAIL_HYBRID": 1}
+FGF_KEYS = {"UseFGF_Filter", "FGF_IndicatorName", "FGF_CalcTimeframe", "FGF_Shift", "FGF_BlockIfUnavailable"}
+
+
+def defaults():
+    src = open(EA).read()
+    out = {}
+    for _typ, name, val in re.findall(r"^input\s+(\w+)\s+(\w+)\s*=\s*([^;]+);", src, re.M):
+        v = val.strip().strip('"')
+        out[name] = str(ENUMS.get(v, v))
+    return out
+
+
+def write(path, header, overrides, fgf=False):
+    vals = defaults()
+    for k, v in overrides.items():
+        assert k in vals, f"unknown input {k}"
+        vals[k] = str(v).lower() if isinstance(v, bool) else str(v)
+    lines = [f"; {h}" for h in header]
+    lines += [f"{k}={v}" for k, v in vals.items() if fgf or k not in FGF_KEYS]
+    open(path, "w").write("\n".join(lines) + "\n")
+
+
+SERVER_NOTE = ("Session hours are BROKER SERVER TIME (TradingHoursAreGMT=false). They were calibrated "
+               "on FTMO data whose clock is GMT+2 winter / GMT+3 summer (New York close).")
+UNCAL_NOTE = ("Not calibrated: spec-based settings. Session hours are GMT. MaxSpread 60 because typical "
+              "XAUUSD spreads are 40-55 points; a cap below that never trades.")
+
+
+def main():
+    m = json.load(open("research/results/m3_h1_verify.json"))
+    ch = next(v for v in m["variants"] if v["label"] == "chosen")
+    wf = m.get("walk_forward", {})
+    head = (f"In-sample backtest (all 17 months used for selection): {ch['all_trades']:.0f} trades, "
+            f"PF {ch['all_pf']:.2f}; per period {ch['2025H1_pf']:.2f} / {ch['2025H2_pf']:.2f} / "
+            f"{ch['2026_pf']:.2f}. Same-bar trailing worst case PF {m.get('worst_pf', float('nan')):.2f}.")
+    wf_note = wf.get("note", "See the calibration report for the walk-forward (hold-out) result.")
+    m3 = dict(MagicNumber=20261110, TradeComment="XLZC_M3H1", RiskPercent=0.5, MaxSpread_Points=60,
+              MaxSlippage_Points=30, MaxEntryDelaySeconds=30, HTF_Timeframe=16385, TriggerTimeframe=3,
+              LiquidityLookbackBars=40, SwingStrength=2, SL_Buffer_Points=208, MinRewardRisk=1.5,
+              TP_LookbackBars=120, TP_FallbackRR=0, MinSL_Points=87, MaxSL_Points=1732,
+              EnableTrailing=True, TrailingMode=0, TrailingStart_Points=260, TrailingDistance_Points=173,
+              TrailingStep_Points=10, UseTradingHours=True, TradingHoursAreGMT=False,
+              TradingHoursStart="12:00", TradingHoursEnd="16:30", UseNewsFilter=True)
+    news = ("UseNewsFilter=true was NOT part of the backtest (no calendar history); live trade count "
+            "and results will differ. Set it to false to match the backtest exactly.")
+    write("presets/XLZC_Bearish_M3_H1_NY.set",
+          ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - M3 trigger / H1 bias / 12:00-16:30 server time",
+           head, wf_note, SERVER_NOTE, news,
+           "Points are 2-digit gold units (AutoScalePoints handles 3-digit feeds). Signals use M3 on any chart."], m3)
+    write("presets/XLZC_Bearish_M3_H1_NY_FGF.set",
+          ["XAUUSD_M1_LiquidityZeroCross_Bearish_FGF v1.10 - same as XLZC_Bearish_M3_H1_NY plus the "
+           "FlashGold Direction Filter v1.2 (indicator default inputs).",
+           "Base-EA figures without the filter: " + head, wf_note, SERVER_NOTE, news,
+           "See the FGF comparison report for the filtered backtest."],
+          dict(m3, MagicNumber=20261111, TradeComment="XLZC_M3H1_FGF", UseFGF_Filter=True), fgf=True)
+    write("presets/XLZC_Bearish_Calibrated_M1_M15.set",
+          ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - first-pass calibration (M1 trigger / M15 bias)",
+           "In-sample first pass: 51 trades, PF ~1.7 (swing 3, buffer 80, trailing). Fragile: lookback 40 drops PF to ~1.05.",
+           SERVER_NOTE],
+          dict(MagicNumber=20261109, TradeComment="XLZC_Bear_Cal", RiskPercent=0.5, MaxSpread_Points=60,
+               HTF_Timeframe=15, LiquidityLookbackBars=25, SwingStrength=3, SL_Buffer_Points=80,
+               EnableTrailing=True, TrailingStart_Points=150, TrailingDistance_Points=100,
+               TrailingStep_Points=20, TradingHoursAreGMT=False, TradingHoursStart="12:00",
+               TradingHoursEnd="16:30"))
+    write("presets/XLZC_Bearish_Conservative.set",
+          ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - CONSERVATIVE (spec defaults, M1 / M15)", UNCAL_NOTE],
+          dict(MagicNumber=20261107, TradeComment="XLZC_Bear_C", RiskPercent=0.5, MaxSpread_Points=60,
+               MaxSlippage_Points=15, StochHardBlock=True, SwingStrength=3, SL_Buffer_Points=50,
+               MinRewardRisk=1.5, MinSL_Points=60, MaxSL_Points=800, EnableTrailing=True,
+               TrailingStart_Points=200, TrailingDistance_Points=150, TrailingStep_Points=20))
+    write("presets/XLZC_Bearish_Aggressive.set",
+          ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - AGGRESSIVE (spec defaults, M1 / M5)", UNCAL_NOTE],
+          dict(MagicNumber=20261108, TradeComment="XLZC_Bear_A", RiskPercent=1.0, MaxSpread_Points=60,
+               MaxSlippage_Points=25, HTF_Timeframe=5, LiquidityLookbackBars=30, SL_Buffer_Points=30,
+               MinSL_Points=40, MaxSL_Points=1200, EnableTrailing=True, TrailingMode=1,
+               TrailingStart_Points=120, TrailingDistance_Points=100, TrailingStep_Points=10,
+               EnablePartialClose=True, TradingHoursStart="07:00", TradingHoursEnd="20:00"))
+    print("presets written")
+
+
+if __name__ == "__main__":
+    main()

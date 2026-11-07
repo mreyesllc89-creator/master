@@ -6,7 +6,7 @@ Extends xlzc_backtest.py with:
   * more trigger/HTF pairs (M1, M2, M3, M5 triggers; M5..H1 bias)
   * TP_LookbackBars: the TP liquidity pool may be searched further back than the SL structure
   * TP_FallbackRR: if no pool pays MinRewardRisk, use a fixed RR target instead of skipping
-  * finer UTC session windows
+  * finer session windows (broker server time, see xlzc_backtest.py)
 
 Robustness-first selection: the sample is cut into three periods
 (2025-H1, 2025-H2, 2026 Jan-May). A configuration is only "robust" if it is

@@ -19,8 +19,8 @@ Not modelled: quote-session truncated bar ends (nominal ends are used), the
 live-observation commit of request.security values, and the direction score
 (it does not affect the buffers the EA reads).
 
-Times: data is UTC. Broker server time (FTMO) is New York time + 7h, so H2/H4
-candles are aligned in server time, which shifts with US daylight saving.
+Times: the dataset is in broker server time (FTMO, New York + 7h), the clock MT5
+uses for candle alignment, so all bars are resampled on the data index directly.
 """
 from dataclasses import dataclass, field, replace
 
@@ -82,27 +82,14 @@ def EQ(a, b): return isnum(a) and isnum(b) and abs(a - b) <= EPS
 
 
 # ----------------------------------------------------------------------------- bars
-def server_time(utc_index):
-    ny = utc_index.tz_localize("UTC").tz_convert("America/New_York").tz_localize(None)
-    return ny + pd.Timedelta(hours=7)
-
-
 def make_bars(m1, tf):
-    """OHLC bars for tf with broker-server alignment; returns DataFrame with
-    UTC 'open_t' / 'end_t' (int64 seconds) and o/h/l/c."""
+    """OHLC bars for tf. The data index is already broker server time, which is
+    the clock MT5 uses to align H2/H4 candles, so bars are resampled directly.
+    'open_t' / 'end_t' are server-time epoch seconds (same clock as the EA's entries)."""
     mins = TF_MIN[tf]
-    srv = server_time(m1.index)
-    df = pd.DataFrame({"open": m1["open"].values, "high": m1["high"].values,
-                       "low": m1["low"].values, "close": m1["close"].values,
-                       "utc": m1.index.values}, index=srv)
-    g = df.resample(f"{mins}min", label="left", closed="left")
-    o = g.agg({"open": "first", "high": "max", "low": "min", "close": "last", "utc": "first"}).dropna()
-    # bar open in UTC = server label minus the server offset in force for that bar
-    srv_label = o.index.values.astype("datetime64[s]").astype(np.int64)
-    first_utc = o["utc"].values.astype("datetime64[s]").astype(np.int64)
-    first_srv = server_time(pd.DatetimeIndex(o["utc"].values)).values.astype("datetime64[s]").astype(np.int64)
-    off = first_srv - first_utc                       # exact offset (2h or 3h) for that bar
-    open_s = srv_label - off
+    o = m1[["open", "high", "low", "close"]].resample(f"{mins}min", label="left", closed="left").agg(
+        {"open": "first", "high": "max", "low": "min", "close": "last"}).dropna()
+    open_s = o.index.values.astype("datetime64[s]").astype(np.int64)
     out = pd.DataFrame({"open_t": open_s, "end_t": open_s + mins * 60,
                         "open": o["open"].values, "high": o["high"].values,
                         "low": o["low"].values, "close": o["close"].values})
@@ -143,7 +130,7 @@ def tdi_dirs(close, rsi_len, fast_len):
 # ----------------------------------------------------------------------------- filter build
 @dataclass
 class FilterState:
-    end_t: np.ndarray        # filter bar end (UTC seconds)
+    end_t: np.ndarray        # filter bar end (server-time epoch seconds)
     armed_at: np.ndarray     # -1 if never armed
     armed_bar: np.ndarray
     armed_price: np.ndarray
@@ -287,7 +274,7 @@ class FgfEngine:
 
 def sell_allowed(cfg: FgfConfig, st: FilterState, t, value):
     """FgfChartPick (live chart bar, check on tick) + FgfEvaluateGate sellOK.
-    t: entry time (UTC seconds, int64 array); value: live bid price (array)."""
+    t: entry time (server-time epoch seconds, int64 array); value: live bid price (array)."""
     t = np.asarray(t, np.int64); value = np.asarray(value, float)
     k = np.searchsorted(st.end_t, t, side="right") - 1          # last filter bar with end <= t
     ok = np.zeros(len(t), bool)

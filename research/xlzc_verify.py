@@ -32,7 +32,7 @@ def setup(m1, hs, pair, spread_mult=1.0):
 def summarize(trades):
     rs = np.array([r for _, r in trades])
     st = C.seg_stats(trades)
-    return {k: (None if isinstance(v, float) and not np.isfinite(v) else round(float(v), 3)) for k, v in st.items()}
+    return {k: (None if isinstance(v, float) and not np.isfinite(v) else round(float(v), 4)) for k, v in st.items()}
 
 
 def main():
@@ -50,6 +50,13 @@ def main():
 
     setup(m1, hs, BASE["tf"])
     base_tr = run("chosen")
+    # same-bar trailing-stop assumption (review finding): report the range
+    for mode in ("next", "worst"):
+        B.M1Path.TRAIL_MODE = mode; C.G["cache"] = {}
+        tr = run(f"trailing same-bar: {mode}")
+        if mode == "worst":
+            rs = np.array([r for _, r in tr]); out["worst_pf"] = round(float(rs[rs > 0].sum() / -rs[rs < 0].sum()), 3)
+    B.M1Path.TRAIL_MODE = "close"; C.G["cache"] = {}
     for b in (80, 160, 200):
         run(f"buffer {b}", buffer=b)
     run("trailing off", trail=False)
@@ -71,6 +78,8 @@ def main():
     rs = np.array([r for _, r in base_tr]); rng = np.random.default_rng(7); pf = []
     for _ in range(10000):
         s = rng.choice(rs, len(rs)); l = -s[s < 0].sum(); pf.append(s[s > 0].sum() / l if l > 0 else np.nan)
+    # NOTE: conditional on this one configuration; it ignores that the configuration was
+    # selected from 126,360 tried on the same data, so it overstates confidence.
     out["bootstrap_pf_5_95"] = [round(float(x), 2) for x in np.nanpercentile(pf, [5, 95])]
     out["p_pf_below_1"] = round(float(np.nanmean(np.array(pf) < 1)), 3)
     print("bootstrap", out["bootstrap_pf_5_95"], "P(PF<1)", out["p_pf_below_1"])
@@ -82,6 +91,7 @@ def main():
         BASE_tf = BASE["tf"]; setup(m1, hs, pair)
         run(f"same inputs on {pair}", tf=pair)
     json.dump(out, open(sys.argv[2], "w"), indent=1)
+    print("written", sys.argv[2])
 
 
 if __name__ == "__main__":
