@@ -26,6 +26,7 @@ def main():
     out["stress"] = v["variants"]; out["monthly"] = v["monthly_r"]; out["worst_pf"] = v.get("worst_pf")
     out["boot"] = v["bootstrap_pf_5_95"]
     out["wf"] = json.load(open(R + "walkforward.json"))
+    out["m2"] = json.load(open(R + "m2_h1_verify.json"))
     # equity curves: chosen setup with and without FlashGold defaults
     p = FB.prepare(data_dir, ["M3/H1"]); FB.init_worker(p)
     off = FB.run_with_mask(FB.CHOSEN, None)

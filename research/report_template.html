@@ -63,6 +63,13 @@ code{font-family:var(--mono);font-size:.9em}
 </section>
 
 <section>
+  <h2>Calibrated presets</h2>
+  <p>The two presets built from this research, both without the FlashGold filter. M2/H1 was chosen with 2025 data only, so its 2026 column is a true out-of-sample test. M3/H1 was chosen with all 17 months, so every column is in-sample.</p>
+  <div class="tw"><table id="presets"></table></div>
+  <p>Worst case: every same-bar trailing touch counted as a stop-out. Both presets lean on trailing, M2/H1 more so.</p>
+</section>
+
+<section>
   <h2>What holds up out of sample</h2>
   <p>Setups chosen with 2025 data only, then measured on January–May 2026, which the choice never saw.</p>
   <div class="tw"><table id="wfconfig"></table></div>
@@ -138,6 +145,11 @@ document.getElementById("tiles").innerHTML=[
  [`${f2(on.all_pf)} vs ${f2(off.all_pf)}`,`PF with FlashGold defaults vs without on M3/H1: ${on.all_trades} vs ${off.all_trades} trades, net ${on.all_net_r.toFixed(1)}R vs ${off.all_net_r.toFixed(1)}R`]
 ].map(([b,t])=>`<div class="v"><b>${b}</b><span>${t}</span></div>`).join("");
 
+const p2=D.m2.chosen, p2w=D.m2["trailing same-bar: worst"], p2f=D.m2["with FlashGold defaults"];
+tbl("presets",["Preset","Chosen on","Trades","PF","Worst-case PF","Net R","Max DD R","PF 2025 H1","PF 2025 H2","PF 2026","With FlashGold"],[
+ [`XLZC_Bearish_M2_H1_NY`,"2025 only",p2,p2w.all_pf,p2f],
+ [`XLZC_Bearish_M3_H1_NY`,"all 17 months",ch,D.worst_pf,on]
+].map(([n,c,s,w,f])=>`<tr><td class="mono">${n}</td><td>${c}</td><td>${s.all_trades}</td><td class="${cls(s.all_pf)}">${f2(s.all_pf)}</td><td class="${cls(w)}">${f2(w)}</td><td>${s.all_net_r.toFixed(1)}</td><td>${s.all_maxdd_r.toFixed(1)}</td><td>${f2(s["2025H1_pf"])}</td><td>${f2(s["2025H2_pf"])}</td><td class="${cls(s["2026_pf"])}">${f2(s["2026_pf"])}${c==="2025 only"?" (out of sample)":""}</td><td>PF ${f2(f.all_pf)}, ${f.all_trades} trades</td></tr>`));
 tbl("wfconfig",["Min trades per half","Top k on 2025","Median worst-half PF 2025","Median PF 2026","Profitable in 2026"],
  D.wf.config_level.filter(r=>r.top_k<=50).map(r=>`<tr><td>${r.min_trades_per_half}</td><td>${r.top_k}</td><td>${f2(r.median_2025_minpf)}</td><td class="${cls(r.median_2026_pf)}">${f2(r.median_2026_pf)}</td><td>${pct(r.share_2026_pf_gt1)}</td></tr>`));
 tbl("wfpair",["Pair (2025 rank)","Setups profitable in both 2025 halves","Median worst-half PF 2025","Median PF 2026","Setups profitable in 2026"],
