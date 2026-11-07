@@ -10,7 +10,8 @@ strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy", shor
 // "volatility expansion" system:
 //   1. TRIGGER   : an enabled timeframe's AMVI crosses above the High Vol threshold
 //                  while at least N enabled timeframes are above it (confluence).
-//   2. DIRECTION : decided by a bias filter (EMA trend, candle colour, or Donchian breakout).
+//   2. DIRECTION : the FlashGold Direction Filter (FGF build, see below): a trigger in the
+//                  BUY ZONE goes long, in the SELL ZONE short, in NO TRADE nothing.
 //   3. EXITS     : ATR stop / ATR target / optional ATR trailing stop, optional
 //                  "volatility collapse" exit (average AMVI crosses below Low Vol),
 //                  optional time stop, optional reversal on opposite signal.
@@ -19,10 +20,17 @@ strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy", shor
 // BEGIN and END FLASHGOLD DIRECTION FILTER, byte-identical to
 // FlashGold_Direction_Filter_v1_2.pine except FGF_FORCE_OVERLAY = true (this script
 // runs in its own pane, so the filter's shading, level lines, marks and status box
-// are drawn on the price chart). It gates ENTRIES only: a long needs fgfBuyOk, a
-// short needs fgfSellOk; exits are never gated. With "Enable filter" off the
-// strategy is the original AMVI. The Data Window shows the raw and blocked entry
-// counts (FGD ...). Not yet tested or calibrated on this strategy.
+// are drawn on the price chart). The filter IS the direction: the "Strategy -
+// Entries" inputs of the original (Trade Direction, Direction Filter EMA / Candle /
+// Donchian, EMA and Donchian lengths, Reverse on Opposite Signal) are removed. A
+// volatility trigger in the BUY ZONE goes long, in the SELL ZONE short, in NO TRADE
+// (or before the first signal) nothing; a trigger in the opposite zone reverses the
+// position. Use the filter's Allow buys / Allow sells for long-only / short-only.
+// The confluence count (Min TFs Above High Vol) moved to Thresholds: it belongs to
+// the volatility trigger, not to direction. The backtest date range has its own
+// group. The filter must stay enabled: with it off both sides are allowed on every
+// bar, there is no direction, and nothing trades. Exits are unchanged. The Data
+// Window counts the triggers and how many had a direction (FGD ...).
 // =====================================================================================
 
 // --- Input Parameters ---
@@ -41,6 +49,7 @@ acrWeight  = input.float(0.15, "ACR Weight", minval=0.0, maxval=1.0, group="Weig
 
 highVolThreshold = input.float(70.0, "High Vol Threshold", group="Thresholds")
 lowVolThreshold  = input.float(30.0, "Low Vol Threshold", group="Thresholds")
+minConfluence    = input.int(3, "Min TFs Above High Vol (Confluence)", minval=1, maxval=12, group="Thresholds", tooltip="How many enabled timeframes must be above High Vol when one of them crosses it. This is the volatility trigger, not a direction setting.")
 
 // --- Timeframes (enable = fetch, plot and count toward signals) ---
 gTF = "Timeframes (enabled = fetched, plotted, used for signals)"
@@ -57,17 +66,10 @@ en60   = input.bool(true,  "1h",  group=gTF, inline="h")
 en240  = input.bool(true,  "4h",  group=gTF, inline="h")
 enD    = input.bool(true,  "1D",  group=gTF, inline="h")
 
-// --- Strategy: Entries ---
-gEn = "Strategy - Entries"
-tradeDir      = input.string("Both", "Trade Direction", options=["Both", "Long Only", "Short Only"], group=gEn)
-minConfluence = input.int(3, "Min TFs Above High Vol (Confluence)", minval=1, maxval=12, group=gEn)
-dirMode       = input.string("Trend (EMA)", "Direction Filter", options=["Trend (EMA)", "Candle", "Breakout (Donchian)"], group=gEn)
-emaLen        = input.int(50, "EMA Length (Trend mode)", minval=1, group=gEn)
-dcLen         = input.int(20, "Donchian Length (Breakout mode)", minval=1, group=gEn)
-allowReverse  = input.bool(true, "Reverse on Opposite Signal", group=gEn)
-useDateRange  = input.bool(false, "Limit Backtest Date Range", group=gEn)
-startTime     = input.time(timestamp("2020-01-01T00:00:00"), "Start", group=gEn)
-endTime       = input.time(timestamp("2099-12-31T00:00:00"), "End", group=gEn)
+// --- Backtest range (the "Strategy - Entries" section is removed: the direction filter is the guide) ---
+useDateRange  = input.bool(false, "Limit Backtest Date Range", group="Backtest range")
+startTime     = input.time(timestamp("2020-01-01T00:00:00"), "Start", group="Backtest range")
+endTime       = input.time(timestamp("2099-12-31T00:00:00"), "End", group="Backtest range")
 
 // --- Strategy: Exits ---
 gEx = "Strategy - Exits"
@@ -731,43 +733,28 @@ float avgAmvi = enCount > 0 ? amviSum / enCount : na
 bool anyCross = x1s or x5s or x15s or x30s or x45s or x1 or x5 or x15 or x30 or x60 or x240 or xD
 bool trigger  = anyCross and hotCount >= minConfluence
 
-// Direction bias
-float ema  = ta.ema(close, emaLen)
-float dcHi = ta.highest(high, dcLen)[1]
-float dcLo = ta.lowest(low, dcLen)[1]
-bool upBias = switch dirMode
-    "Trend (EMA)" => close > ema
-    "Candle"      => close > open
-    => close > dcHi
-bool dnBias = switch dirMode
-    "Trend (EMA)" => close < ema
-    "Candle"      => close < open
-    => close < dcLo
+// Direction: the FlashGold Direction Filter is the guide. A trigger in the BUY ZONE goes
+// long, in the SELL ZONE short; in NO TRADE (or before the first signal) nothing. A
+// trigger in the opposite zone reverses the position (strategy.entry reverses).
+bool inRange   = not useDateRange or (time >= startTime and time <= endTime)
+bool amviDirUp = fgfOn and fgfBuyOk and not fgfSellOk
+bool amviDirDn = fgfOn and fgfSellOk and not fgfBuyOk
+bool longSig   = trigger and amviDirUp and inRange
+bool shortSig  = trigger and amviDirDn and inRange
+bool goLong    = longSig and strategy.position_size <= 0
+bool goShort   = shortSig and strategy.position_size >= 0
 
-bool inRange  = not useDateRange or (time >= startTime and time <= endTime)
-bool longSig  = trigger and upBias and tradeDir != "Short Only" and inRange
-bool shortSig = trigger and dnBias and tradeDir != "Long Only" and inRange
-
-bool canLong  = allowReverse or strategy.position_size >= 0
-bool canShort = allowReverse or strategy.position_size <= 0
-bool goLong   = longSig and canLong and strategy.position_size <= 0 and fgfBuyOk
-bool goShort  = shortSig and canShort and strategy.position_size >= 0 and fgfSellOk
-
-// FGF diagnostics (Data Window only, no logic): the entry funnel before and after the filter.
-bool fgdRawLong      = longSig and canLong and strategy.position_size <= 0
-bool fgdRawShort     = shortSig and canShort and strategy.position_size >= 0
-bool fgdBlockedLong  = fgdRawLong  and not fgfBuyOk
-bool fgdBlockedShort = fgdRawShort and not fgfSellOk
+// FGF diagnostics (Data Window only, no logic): volatility triggers and their direction.
+bool fgdTrig      = trigger and inRange
+bool fgdTrigLong  = fgdTrig and amviDirUp
+bool fgdTrigShort = fgdTrig and amviDirDn
+bool fgdTrigNone  = fgdTrig and not amviDirUp and not amviDirDn
 plot(fgfBuyOk  ? 1 : 0, "FGF buy allowed",  display = display.data_window)
 plot(fgfSellOk ? 1 : 0, "FGF sell allowed", display = display.data_window)
-plot(fgdRawLong      ? 1 : 0, "FGD raw long",      display = display.data_window)
-plot(fgdRawShort     ? 1 : 0, "FGD raw short",     display = display.data_window)
-plot(fgdBlockedLong  ? 1 : 0, "FGD blocked long",  display = display.data_window)
-plot(fgdBlockedShort ? 1 : 0, "FGD blocked short", display = display.data_window)
-plot(ta.cum(fgdRawLong      ? 1 : 0), "FGD raw long count",      display = display.data_window)
-plot(ta.cum(fgdRawShort     ? 1 : 0), "FGD raw short count",     display = display.data_window)
-plot(ta.cum(fgdBlockedLong  ? 1 : 0), "FGD blocked long count",  display = display.data_window)
-plot(ta.cum(fgdBlockedShort ? 1 : 0), "FGD blocked short count", display = display.data_window)
+plot(ta.cum(fgdTrig      ? 1 : 0), "FGD triggers",                   display = display.data_window)
+plot(ta.cum(fgdTrigLong  ? 1 : 0), "FGD triggers in BUY ZONE",       display = display.data_window)
+plot(ta.cum(fgdTrigShort ? 1 : 0), "FGD triggers in SELL ZONE",      display = display.data_window)
+plot(ta.cum(fgdTrigNone  ? 1 : 0), "FGD triggers with no direction", display = display.data_window)
 
 float atrX = ta.atr(exitAtrLen)
 var float entryAtr = na
