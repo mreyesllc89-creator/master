@@ -105,6 +105,10 @@
 
 #include <Trade\Trade.mqh>
 #include <Trade\PositionInfo.mqh>
+//--- EA Validation Kit: records every trade in the Strategy Tester and exports
+//    each optimization pass for  python -m evk analyze  (no effect on live trading).
+//    Remove this line if EVK is not installed in MQL5/Include/EVK/.
+#include <EVK/EVK.mqh>
 
 //--- enums -----------------------------------------------------------
 enum ENUM_SIGNAL_STATE

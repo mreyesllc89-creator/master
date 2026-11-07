@@ -12,15 +12,17 @@ A short-only Expert Advisor for XAUUSD (gold) in MetaTrader 5. It sells when MAC
 | `MQL5/Include/FlashGold/*.mqh` | Include files for the indicator source. |
 | `MQL5/Presets/*.set` | Input presets (table below). |
 | `README.md` | Full documentation: rules, inputs, calibration and FlashGold results. |
+| `MQL5/Include/EVK/EVK.mqh` + `EVK/` | The EA Validation Kit: runs the same tests on any EA from MT5 optimization results. See `EVK/README.md`. The XLZC EA already includes it. |
 | `calibration_report.html` | The backtest report with charts, the walk-forward test and the code-review log. Open it in a browser. |
 
 ## Install
 
 1. In MT5 choose **File > Open Data Folder**.
 2. Copy the package's `MQL5` folder over the data folder's `MQL5` folder. This adds the files and replaces nothing else.
-3. In MetaEditor, compile `XAUUSD_M1_LiquidityZeroCross_Bearish.mq5` and/or `XAUUSD_M1_LiquidityZeroCross_Bearish_FGF.mq5`. If you want to rebuild the indicator from source, compile `FlashGold_Direction_Filter_v1_2.mq5` too; otherwise the supplied `.ex5` is used.
-4. Attach the EA to an XAUUSD chart (any timeframe: the EA reads its own timeframes). In the **Inputs** tab click **Load** and pick a preset.
-5. Enable **Algo Trading**.
+3. The EA includes `EVK/EVK.mqh` (copied with the `MQL5` folder). It only records trades in the Strategy Tester. If you remove EVK, delete the `#include <EVK/EVK.mqh>` line.
+4. In MetaEditor, compile `XAUUSD_M1_LiquidityZeroCross_Bearish.mq5` and/or `XAUUSD_M1_LiquidityZeroCross_Bearish_FGF.mq5`. If you want to rebuild the indicator from source, compile `FlashGold_Direction_Filter_v1_2.mq5` too; otherwise the supplied `.ex5` is used.
+5. Attach the EA to an XAUUSD chart (any timeframe: the EA reads its own timeframes). In the **Inputs** tab click **Load** and pick a preset.
+6. Enable **Algo Trading**.
 
 The code has not been compiled by me (no MetaEditor was available). If the compiler reports an error, send it to me.
 
@@ -44,7 +46,7 @@ All presets risk 0.5% per trade (1% for Aggressive). Change `RiskPercent` to sui
 - **Spread.** Every preset allows up to 60 points (`MaxSpread_Points`). If your broker's gold spread is usually wider, the EA will not trade at all.
 - **News filter.** It is on in the presets but was not part of the backtest, because no calendar history was available. Set `UseNewsFilter=false` to match the backtest exactly.
 - **FlashGold filter.** It helped on M3 triggers and hurt on M1 triggers and on M2/H1. There is no FGF version of the M2/H1 preset for that reason.
-- **Test first.** Run each preset in the MT5 **Strategy Tester** with **Every tick based on real ticks** on your broker, then on a demo account, before trading real money.
+- **Test first.** Run each preset in the MT5 **Strategy Tester** with **Every tick based on real ticks** on your broker, then on a demo account, before trading real money. To repeat our hold-out and walk-forward tests on your broker, optimize the EA in MT5 and run `python -m evk analyze` on the CSV it writes (see `EVK/README.md`).
 
 ## Words used in the results
 
