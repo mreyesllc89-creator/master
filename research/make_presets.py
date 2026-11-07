@@ -87,6 +87,27 @@ def main():
            "Base-EA figures without the filter: " + head, wf_note, SERVER_NOTE, news,
            fgf_line()],
           dict(m3, MagicNumber=20261111, TradeComment="XLZC_M3H1_FGF", UseFGF_Filter=True), fgf=True)
+    v2 = json.load(open("research/results/m2_h1_verify.json"))
+    c2, w2, f2 = v2["chosen"], v2["trailing same-bar: worst"], v2["with FlashGold defaults"]
+    write("presets/XLZC_Bearish_M2_H1_NY.set",
+          ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - M2 trigger / H1 bias / 12:00-16:30 server time",
+           "Chosen with 2025 data ONLY (median of the setup and its neighbouring settings, >=30 trades per half-year); "
+           "2026 was not used, so the 2026 figure is out of sample.",
+           f"Backtest: {c2['all_trades']:.0f} trades, PF {c2['all_pf']:.2f}, net {c2['all_net_r']:+.1f}R, max DD "
+           f"{c2['all_maxdd_r']:.1f}R; PF {c2['2025H1_pf']:.2f} / {c2['2025H2_pf']:.2f} (2025, in-sample) / "
+           f"{c2['2026_pf']:.2f} on {c2['2026_trades']:.0f} trades (2026, out of sample).",
+           f"Depends on trailing: if every same-bar trailing touch counts as a stop, PF is {w2['all_pf']:.2f}. "
+           f"With the FlashGold filter PF falls to {f2['all_pf']:.2f} ({f2['all_trades']:.0f} trades): not recommended here.",
+           "When no liquidity pool pays MinRewardRisk, TP is a fixed 1.5R (TP_FallbackRR=1.5).",
+           SERVER_NOTE, news,
+           "Points are 2-digit gold units scaled by sqrt(2) for M2 (AutoScalePoints handles 3-digit feeds). Signals use M2 on any chart."],
+          dict(MagicNumber=20261112, TradeComment="XLZC_M2H1", RiskPercent=0.5, MaxSpread_Points=60,
+               MaxSlippage_Points=30, MaxEntryDelaySeconds=30, HTF_Timeframe=16385, TriggerTimeframe=2,
+               LiquidityLookbackBars=15, SwingStrength=4, SL_Buffer_Points=57, MinRewardRisk=1.5,
+               TP_LookbackBars=120, TP_FallbackRR=1.5, MinSL_Points=71, MaxSL_Points=1414,
+               EnableTrailing=True, TrailingMode=0, TrailingStart_Points=212, TrailingDistance_Points=141,
+               TrailingStep_Points=10, UseTradingHours=True, TradingHoursAreGMT=False,
+               TradingHoursStart="12:00", TradingHoursEnd="16:30", UseNewsFilter=True))
     write("presets/XLZC_Bearish_Calibrated_M1_M15.set",
           ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - first-pass calibration (M1 trigger / M15 bias)",
            "In-sample first pass: 51 trades, PF ~1.7 (swing 3, buffer 80, trailing). Fragile: lookback 40 drops PF to ~1.05.",
