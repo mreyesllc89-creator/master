@@ -49,7 +49,11 @@ INSTRUMENTS = {
     "BTCUSD": dict(scale=32.6, spread_cap=3000, spread_pts=2000),
 }
 SYMBOL = os.environ.get("XLZC_SYMBOL", "XAUUSD")
-INST = INSTRUMENTS[SYMBOL]
+INST = dict(INSTRUMENTS[SYMBOL])
+if os.environ.get("XLZC_SPREAD_PTS"):          # override the assumed constant spread (points)
+    INST["spread_pts"] = float(os.environ["XLZC_SPREAD_PTS"])
+if os.environ.get("XLZC_SPREAD_CAP"):          # override the simulated MaxSpread_Points
+    INST["spread_cap"] = float(os.environ["XLZC_SPREAD_CAP"])
 
 TF_MIN = {"M1": 1, "M2": 2, "M3": 3, "M5": 5, "M15": 15, "M30": 30, "H1": 60, "H4": 240}
 OOS_START = pd.Timestamp("2026-01-01")

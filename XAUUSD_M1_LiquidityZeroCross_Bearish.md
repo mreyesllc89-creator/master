@@ -43,6 +43,19 @@ The research (`research/`) replays the EA's rules in Python on FTMO XAUUSD M1 da
 - **M2/H1 preset** (`presets/XLZC_Bearish_M2_H1_NY.set`). Chosen with 2025 data only, as the most stable M2/H1 setup (median of the setup and its neighbouring settings, at least 30 trades per half-year): M2 trigger, H1 bias, 12:00-16:30 server time, swing strength 4, lookback 15, fixed 1.5R target when no liquidity pool qualifies, trailing on. 186 trades, PF 1.55, +19.9R, max drawdown 4.9R; PF 1.51 / 1.56 in 2025 and **1.61 on 43 trades in 2026, which the choice never saw**. It leans on trailing: counting every same-bar trailing touch as a stop gives PF 1.05. The FlashGold filter lowers it (PF 1.44, 2026 PF 1.11), so there is no FGF variant.
 - **Sensitivity.** Trailing is essential (PF 1.35 without it). A 07:00-20:00 window drops PF to about 1.2. A spread 50% wider than FTMO's exceeds the 60-point cap, so the EA would not trade at all.
 
+## BTCUSD
+
+The same research was run on BTCUSD (Binance BTCUSDT one-minute data, Jan 2025 to May 2026, converted to the same server clock). All point distances were scaled by 32.6, the ratio of BTC's typical one-minute range to gold's ($41 vs $1.26). The spread is an assumption, because no broker spread data was available.
+
+- **At a 20 USD spread there is no edge.** Every pair family's median PF is below 1. Setups chosen on 2025 lost money in 2026 (M3/M30 PF 0.72, M3/H1 PF 0.82).
+- **Costs decide it.** At 10 USD the M3 families have a median PF around 1.06-1.10; at 5 USD, 1.13-1.18. The trend-filter pairs M3/M30 and M3/H1 were the top two on 2025 and stayed profitable in 2026.
+- **Low-cost presets.** Chosen on 2025 only with a 5 USD spread:
+  - `presets/XLZC_Bearish_BTCUSD_M3_M30.set`: 117 trades, PF 1.45; 2026 PF 1.31 on 38 trades.
+  - `presets/XLZC_Bearish_BTCUSD_M3_H1.set`: 102 trades, PF 1.52; 2026 PF 1.21 on 32 trades.
+  - Both use `MaxSpread_Points=1000` (10 USD), so they stand aside when the spread is wider.
+  - Both depend on trailing: the worst-case fill assumption gives PF about 0.96-0.99.
+- `AutoScalePoints` now also handles BTC quotes with 1 or 0 decimals; the inputs are always 0.01 USD steps.
+
 This is a Python replica of the EA, not the MT5 Strategy Tester. Confirm the result in MT5 with real ticks before trading it live. The calibration report in `research/results/calibration_report.html` has the details.
 
 ## Two versions: without and with the FlashGold Direction Filter

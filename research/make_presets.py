@@ -55,6 +55,9 @@ def fgf_line():
             "without the filter: higher PF, about a third of the trades, less total profit.")
 
 
+TFM = {"M1": 1, "M2": 2, "M3": 3, "M5": 5}
+
+
 def main():
     m = json.load(open("research/results/m3_h1_verify.json"))
     ch = next(v for v in m["variants"] if v["label"] == "chosen")
@@ -108,6 +111,43 @@ def main():
                EnableTrailing=True, TrailingMode=0, TrailingStart_Points=212, TrailingDistance_Points=141,
                TrailingStep_Points=10, UseTradingHours=True, TradingHoursAreGMT=False,
                TradingHoursStart="12:00", TradingHoursEnd="16:30", UseNewsFilter=True))
+    #---------------------------------------------------------------- BTCUSD
+    bt = json.load(open("research/results/btc_select_verify_spread5.json"))
+    bt20 = json.load(open("research/results/btc_select_verify.json"))
+    tfnum = {"M2": 2, "M3": 3, "M5": 5, "M15": 15, "M30": 30, "H1": 16385}
+    for i, pr in enumerate(bt["presets"]):
+        cfg, vf = pr["cfg"], pr["verify"]
+        c, w = vf["chosen"], vf["trailing same-bar: worst"]
+        trig, htf = cfg["tf"].split("/")
+        k = 32.6 * TFM[trig] ** 0.5               # gold points x instrument scale x sqrt(trigger minutes)
+        sess = {"ny_12-1630": ("12:00", "16:30"), "ldn_ny_07-20": ("07:00", "20:00")}[cfg["session"]]
+        name = f"presets/XLZC_Bearish_BTCUSD_{trig}_{htf}.set"
+        write(name,
+              [f"XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - BTCUSD {trig} trigger / {htf} bias / {sess[0]}-{sess[1]} server time",
+               "LOW-COST BROKERS ONLY. Calibrated assuming a 5 USD BTCUSD spread; MaxSpread_Points=1000 (10 USD) "
+               "blocks entries when the spread is wider. Commission counts as cost too.",
+               "Chosen with 2025 data ONLY (median of the setup and its neighbouring settings, >=30 trades per half-year).",
+               f"Backtest (Binance BTCUSDT M1, Jan 2025-May 2026, 5 USD spread): {c['all_trades']:.0f} trades, PF {c['all_pf']:.2f}, "
+               f"net {c['all_net_r']:+.1f}R, max DD {c['all_maxdd_r']:.1f}R; PF {c['2025H1_pf']:.2f} / {c['2025H2_pf']:.2f} (2025) / "
+               f"{c['2026_pf']:.2f} on {c['2026_trades']:.0f} trades (2026, out of sample).",
+               f"Weak spots: worst-case trailing fills PF {w['all_pf']:.2f}. At a 20 USD spread no BTC setup held up "
+               "out of sample, so do not raise MaxSpread_Points to make it trade.",
+               "Points are 0.01 USD steps (AutoScalePoints rescales other BTC quote digits). Short-only EA: no trades "
+               "while the trend filter is not bearish.",
+               "Session hours are BROKER SERVER TIME (TradingHoursAreGMT=false): the Binance UTC data was converted to "
+               "a GMT+2 winter / GMT+3 summer (New York close) server clock. Shift the hours if your broker differs.", news],
+              dict(MagicNumber=20261120 + i, TradeComment=f"XLZC_BTC_{trig}{htf}", RiskPercent=0.5,
+                   MaxSpread_Points=1000, MaxSlippage_Points=1000, MaxEntryDelaySeconds=30,
+                   HTF_Timeframe=tfnum[htf], TriggerTimeframe=tfnum[trig],
+                   LiquidityLookbackBars=cfg["N"], SwingStrength=cfg["S"],
+                   SL_Buffer_Points=round(cfg["buffer"] * k), MinRewardRisk=cfg["min_rr"],
+                   TP_LookbackBars=cfg["NT"], TP_FallbackRR=cfg["fb"],
+                   MinSL_Points=round(50 * k), MaxSL_Points=round(1000 * k),
+                   StochHardBlock=(cfg["stoch"] == "hard"),
+                   EnableTrailing=bool(cfg["trail"]), TrailingMode=0,
+                   TrailingStart_Points=round(150 * k), TrailingDistance_Points=round(100 * k),
+                   TrailingStep_Points=100, UseTradingHours=True, TradingHoursAreGMT=False,
+                   TradingHoursStart=sess[0], TradingHoursEnd=sess[1], UseNewsFilter=True))
     write("presets/XLZC_Bearish_Calibrated_M1_M15.set",
           ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - first-pass calibration (M1 trigger / M15 bias)",
            "In-sample first pass: 51 trades, PF ~1.7 (swing 3, buffer 80, trailing). Fragile: lookback 40 drops PF to ~1.05.",

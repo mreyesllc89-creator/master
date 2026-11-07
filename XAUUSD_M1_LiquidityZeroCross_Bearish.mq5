@@ -130,7 +130,7 @@ enum ENUM_TRAIL_MODE
 input group "=== General ==="
 input ulong   MagicNumber              = 20261107;     // Magic number
 input string  TradeComment             = "XLZC_Bear";  // Order comment prefix
-input bool    AutoScalePoints          = true;         // Scale *_Points x10 on 3-digit gold feeds
+input bool    AutoScalePoints          = true;         // *_Points are 0.01 price steps on any quote (rescale other digits)
 input bool    VerboseLog               = true;         // Print decision log to Experts tab
 input bool    ShowLevels               = true;         // Draw SL/TP liquidity levels on chart
 input bool    ShowStatusPanel          = true;         // Panel: signal/trend timeframes, last trigger bar, MACD
@@ -387,8 +387,8 @@ int OnInit()
    if(HTF_Timeframe != PERIOD_M5 && HTF_Timeframe != PERIOD_M15)
       Print("[XLZC] Warning: strategy rules specify M5 or M15 for the HTF bias; using ",
             EnumToString(HTF_Timeframe));
-   if(StringFind(_Symbol, "XAU") < 0 && StringFind(_Symbol, "GOLD") < 0)
-      Print("[XLZC] Warning: EA designed for XAUUSD, attached to ", _Symbol);
+   if(StringFind(_Symbol, "XAU") < 0 && StringFind(_Symbol, "GOLD") < 0 && StringFind(_Symbol, "BTC") < 0)
+      Print("[XLZC] Warning: EA calibrated for XAUUSD and BTCUSD, attached to ", _Symbol);
    if(TriggerTimeframe != PERIOD_M1)
       Print("[XLZC] Note: trigger timeframe ", EnumToString(TriggerTimeframe),
             " differs from the M1 rule (calibration option).");
@@ -399,8 +399,10 @@ int OnInit()
      }
 
    //--- point scaling: inputs are written for 2-digit gold (0.01 point)
+   //    i.e. every *_Points input is a 0.01 price step. Other quotes are rescaled:
+   //    3 digits -> x10, 1 digit (e.g. some BTCUSD feeds) -> x0.1, 0 digits -> x0.01.
    g_ptScale = 1.0;
-   if(AutoScalePoints && _Digits > 2)
+   if(AutoScalePoints && _Digits != 2)
       g_ptScale = MathPow(10.0, _Digits - 2);
 
    //--- indicator handles
