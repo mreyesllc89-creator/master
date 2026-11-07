@@ -24,8 +24,9 @@ class Run:
             self.trades[c] = pd.to_datetime(self.trades[c].astype("int64"), unit="s")
         self.trades = self.trades.sort_values(["pass", "close_time"]).reset_index(drop=True)
         self.passes = df.drop_duplicates("pass")[["pass", "criterion"] + self.param_cols].set_index("pass")
-        # R needs an initial stop loss; fall back to money when no trade has one
-        self.has_r = self.trades["r"].notna().mean() > 0.5 if len(self.trades) else False
+        # R needs an initial stop loss on EVERY trade; otherwise the whole run uses money
+        self.r_missing = int(self.trades["r"].isna().sum()) if len(self.trades) else 0
+        self.has_r = bool(len(self.trades)) and self.r_missing == 0
 
     def value_col(self, value):
         if value == "auto":
@@ -42,12 +43,24 @@ class Run:
 
 
 def load(path):
-    meta = ""
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        first = f.readline()
-        if first.startswith("#"):
-            meta = first[1:].strip()
-    df = pd.read_csv(path, comment="#", dtype={"side": "string"})
+    # EVK.mqh writes the terminal's ANSI code page; try UTF-8 first, then cp1252
+    enc = "utf-8"
+    try:
+        with open(path, "r", encoding=enc) as f:
+            first = f.readline()
+            f.read()
+    except UnicodeDecodeError:
+        enc = "cp1252"
+        with open(path, "r", encoding=enc, errors="replace") as f:
+            first = f.readline()
+    meta = first[1:].strip() if first.startswith("#") else ""
+    try:
+        # only the first line is a comment: '#' may legitimately appear in values
+        df = pd.read_csv(path, skiprows=1 if meta else 0, dtype={"side": "string"}, encoding=enc,
+                         encoding_errors="replace")
+    except pd.errors.EmptyDataError:
+        raise ValueError(f"{path}: the file has no passes. If MT5 served the optimization from its cache, "
+                         "delete <terminal data folder>/Tester/cache (or change EVK_RunName) and run it again.")
     missing = {"pass", "criterion"} - set(df.columns) | (set(TRADE_COLS) - set(df.columns))
     if missing:
         raise ValueError(f"{path}: not an EVK file (missing columns {sorted(missing)})")

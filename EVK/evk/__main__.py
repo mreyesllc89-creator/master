@@ -44,6 +44,8 @@ def main(argv=None):
     v = run.value_col(args.value)
     print(f"{run.meta}\n{len(run.passes)} passes, {len(run.trades)} trades, {t0.date()} .. {t1.date()}, unit {v}")
     print(f"optimized inputs: {', '.join(c[2:] for c in run.varying) or 'none'}")
+    if args.value == "auto" and run.r_missing:
+        print(f"note: {run.r_missing} trade(s) have no initial stop loss, so results are in money, not R")
 
     ho = A.holdout(run, args.value, split, args.criterion, args.min_trades, smooth=not args.no_smooth)
     print(f"\nHOLD-OUT (choose before {split.date()}, test after): base rate {ho['base_rate']:.0%} of passes profitable")
@@ -62,7 +64,10 @@ def main(argv=None):
     cmp = None
     if args.compare:
         la, lb = (args.labels.split(",") + ["B"])[:2]
-        cmp = A.compare(run, load(args.compare), args.value, la.strip(), lb.strip())
+        other = load(args.compare)
+        if other.trades.empty:
+            sys.exit(f"{args.compare}: no trades to compare.")
+        cmp = A.compare(run, other, args.value, la.strip(), lb.strip())
         if "pf_a" in cmp:
             print(f"\nCOMPARE {la} vs {lb}: {cmp['used']} pairs, median PF {cmp['pf_a']:.2f} -> {cmp['pf_b']:.2f}, "
                   f"{lb} better PF in {cmp['share_pf_up']:.0%}, better net in {cmp['share_net_up']:.0%}")

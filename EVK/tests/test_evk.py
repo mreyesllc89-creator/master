@@ -127,5 +127,77 @@ class LoadAndAnalyze(unittest.TestCase):
         os.unlink(out)
 
 
+class ReviewRegressions(unittest.TestCase):
+    """Cases found by the EVK review."""
+
+    def write(self, text, encoding="utf-8"):
+        f = tempfile.NamedTemporaryFile("wb", suffix=".csv", delete=False)
+        f.write(text.encode(encoding))
+        f.close()
+        self.addCleanup(os.unlink, f.name)
+        return f.name
+
+    def grid_rows(self, fast_vals, slow_vals, edge_at):
+        rows, pid = [], 0
+        t0 = int(pd.Timestamp("2025-01-01").timestamp())
+        for fast in fast_vals:
+            for slow in slow_vals:
+                pid += 1
+                for k in range(80):
+                    good = (fast, slow) == edge_at
+                    p = 100.0 if (k % 3 != 0 if good else k % 2 == 0) else -100.0
+                    rows.append(trade(pid, fast, slow, "A", t0 + k * 86400 * 4, p))
+        return rows
+
+    def test_neighbours_mixed_int_float(self):
+        path = make_csv(self.grid_rows((5, 10, 15), (0.5, 1.0, 1.5), (10, 1.0)))
+        self.addCleanup(os.unlink, path)
+        run = load(path)
+        tab = A.pass_table(run, "auto", None)
+        nb = A.neighbours(run, tab, "all_pf")
+        centre = [q for q in tab.index if run.label(q) == "Fast=10, Slow=1"][0]
+        self.assertEqual(nb.loc[centre, "nb_n"], 5)          # itself + 2 + 2 neighbours
+
+    def test_hash_in_value_keeps_rows(self):
+        head = HEAD.replace("p.Mode", "p.Comment")
+        rows = [trade(1, 5, 20, "run#1", 1735689600 + k * 3600, 50.0 if k % 2 else -40.0) for k in range(10)]
+        run = load(self.write(head + "\n".join(rows) + "\n"))
+        self.assertEqual(len(run.trades), 10)
+
+    def test_cp1252_file(self):
+        head = HEAD.replace("TestEA", "EA_é")
+        rows = [trade(1, 5, 20, "Ü", 1735689600 + k * 3600, 50.0 if k % 2 else -40.0) for k in range(5)]
+        run = load(self.write(head + "\n".join(rows) + "\n", encoding="cp1252"))
+        self.assertEqual(len(run.trades), 5)
+
+    def test_empty_run(self):
+        run = load(self.write(HEAD + "1,0,5,20,A,,,,,,,,,,,\n2,0,10,20,A,,,,,,,,,,,\n"))
+        self.assertTrue(run.trades.empty)
+        tab = A.pass_table(run, "auto", None)
+        self.assertEqual(tab.all_trades.sum(), 0)
+
+    def test_header_only_file_message(self):
+        with self.assertRaises(ValueError):
+            load(self.write("# EVK 1.0 | X | Y | Z | t\n"))
+
+    def test_partial_r_uses_money(self):
+        rows = [trade(1, 5, 20, "A", 1735689600 + k * 3600, 50.0 if k % 2 else -40.0, risk=0 if k == 3 else 100.0)
+                for k in range(40)]
+        run = load(self.write(HEAD + "\n".join(rows) + "\n"))
+        self.assertFalse(run.has_r)
+        self.assertEqual(run.r_missing, 1)
+        x = run.trades["r"].to_numpy(float)       # forcing R: NaN must be ignored, not poison the score
+        self.assertTrue(np.isfinite(score(None, x, "pf", 10)))
+
+    def test_compare_refuses_different_grids(self):
+        a = make_csv(self.grid_rows((5, 10), (20, 30), (5, 20)))
+        rows_b = [r.replace(",A,", ",B,") for r in self.grid_rows((5, 10), (20,), (5, 20))]
+        b = make_csv(rows_b)
+        self.addCleanup(os.unlink, a)
+        self.addCleanup(os.unlink, b)
+        with self.assertRaises(ValueError):
+            A.compare(load(a), load(b), "auto")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -21,7 +21,7 @@ def _clean(o):
 
 
 def _curve(trades, v):
-    eq = np.cumsum(trades[v].to_numpy(float))
+    eq = np.cumsum(np.nan_to_num(trades[v].to_numpy(float)))
     return [[str(t)[:10], round(float(e), 3)] for t, e in zip(trades.close_time, eq)]
 
 

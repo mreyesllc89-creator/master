@@ -24,6 +24,9 @@
 //|        #define EVK_NO_HANDLERS                                   |
 //|  before the #include and call EVK_OnTester(), EVK_OnTesterInit(),|
 //|  EVK_OnTesterPass(), EVK_OnTesterDeinit() from your handlers.    |
+//|  If the EA sends frames of its own, call EVK_HandleFrame() for   |
+//|  each frame inside your FrameNext loop instead of                |
+//|  EVK_OnTesterPass() (which would consume your frames too).       |
 //|                                                                  |
 //|  The EA itself is not changed: EVK only reads the deal history.  |
 //+------------------------------------------------------------------+
@@ -67,6 +70,7 @@ struct EVKTrade
    double   risk;       // money lost if the initial SL had been hit (0 = unknown)
    long     magic;
    string   symbol;
+   bool     closed;     // fully closed (a netting reversal starts a new record)
   };
 
 int    g_evkFile        = INVALID_HANDLE;
@@ -85,6 +89,7 @@ string EVK_Clean(const string s)
    StringReplace(r, "\"", "'");
    StringReplace(r, "\r", " ");
    StringReplace(r, "\n", " ");
+   StringReplace(r, "#", " ");        // '#' starts a comment line in the CSV
    return r;
   }
 
@@ -96,12 +101,41 @@ string EVK_Name()
    return EVK_Clean(n);
   }
 
+//--- the still-open record of a position (closed records are skipped)
 int EVK_FindPosition(const EVKTrade &t[], const int count, const long position)
   {
    for(int i = count - 1; i >= 0; i--)   // recent positions first
-      if(t[i].position == position)
+      if(t[i].position == position && !t[i].closed)
          return i;
    return -1;
+  }
+
+int EVK_NewTrade(EVKTrade &t[], int &count, const ulong deal, const long pos, const datetime when,
+                 const long dtype, const long magic)
+  {
+   int i = count++;
+   ArrayResize(t, count, 256);
+   t[i].position   = pos;
+   t[i].openTime   = when;
+   t[i].closeTime  = 0;
+   t[i].type       = (dtype == DEAL_TYPE_BUY) ? 0 : 1;
+   t[i].volume     = 0.0;
+   t[i].entry      = 0.0;
+   t[i].exitValue  = 0.0;
+   t[i].exitVolume = 0.0;
+   t[i].sl         = HistoryDealGetDouble(deal, DEAL_SL);
+   if(t[i].sl <= 0.0)
+     {
+      ulong order = (ulong)HistoryDealGetInteger(deal, DEAL_ORDER);
+      if(order > 0 && HistoryOrderSelect(order))
+         t[i].sl = HistoryOrderGetDouble(order, ORDER_SL);
+     }
+   t[i].profit = 0.0;
+   t[i].risk   = 0.0;
+   t[i].magic  = magic;
+   t[i].symbol = HistoryDealGetString(deal, DEAL_SYMBOL);
+   t[i].closed = false;
+   return i;
   }
 
 //+------------------------------------------------------------------+
@@ -130,61 +164,49 @@ int EVK_CollectTrades(EVKTrade &out[])
       long   pos    = HistoryDealGetInteger(deal, DEAL_POSITION_ID);
       double vol    = HistoryDealGetDouble(deal, DEAL_VOLUME);
       double price  = HistoryDealGetDouble(deal, DEAL_PRICE);
-      double money  = HistoryDealGetDouble(deal, DEAL_PROFIT) +
-                      HistoryDealGetDouble(deal, DEAL_COMMISSION) +
-                      HistoryDealGetDouble(deal, DEAL_SWAP);
+      double pnl    = HistoryDealGetDouble(deal, DEAL_PROFIT) + HistoryDealGetDouble(deal, DEAL_SWAP);
+      double costs  = HistoryDealGetDouble(deal, DEAL_COMMISSION) + HistoryDealGetDouble(deal, DEAL_FEE);
       datetime when = (datetime)HistoryDealGetInteger(deal, DEAL_TIME);
       int i = EVK_FindPosition(t, count, pos);
 
       if(entry == DEAL_ENTRY_IN || (entry == DEAL_ENTRY_INOUT && i < 0))
         {
          if(i < 0)
-           {
-            i = count++;
-            ArrayResize(t, count, 256);
-            t[i].position   = pos;
-            t[i].openTime   = when;
-            t[i].closeTime  = 0;
-            t[i].type       = (dtype == DEAL_TYPE_BUY) ? 0 : 1;
-            t[i].volume     = 0.0;
-            t[i].entry      = 0.0;
-            t[i].exitValue  = 0.0;
-            t[i].exitVolume = 0.0;
-            t[i].sl         = HistoryDealGetDouble(deal, DEAL_SL);
-            if(t[i].sl <= 0.0)
-              {
-               ulong order = (ulong)HistoryDealGetInteger(deal, DEAL_ORDER);
-               if(order > 0 && HistoryOrderSelect(order))
-                  t[i].sl = HistoryOrderGetDouble(order, ORDER_SL);
-              }
-            t[i].profit = 0.0;
-            t[i].risk   = 0.0;
-            t[i].magic  = magic;
-            t[i].symbol = HistoryDealGetString(deal, DEAL_SYMBOL);
-           }
+            i = EVK_NewTrade(t, count, deal, pos, when, dtype, magic);
          //--- scale-in: volume-weighted average entry
          double nv = t[i].volume + vol;
          if(nv > 0.0)
             t[i].entry = (t[i].entry * t[i].volume + price * vol) / nv;
          t[i].volume  = nv;
-         t[i].profit += money;                       // entry commission
+         t[i].profit += pnl + costs;                 // entry commission / fee
         }
-      else if(i >= 0)                                // OUT, OUT_BY, INOUT closing part
+      else if(i >= 0)                                // OUT, OUT_BY, or INOUT (netting reversal)
         {
-         double closeVol = vol;
-         if(entry == DEAL_ENTRY_INOUT)               // netting reversal: only the open part closes
-            closeVol = MathMin(vol, t[i].volume - t[i].exitVolume);
+         double openVol  = t[i].volume - t[i].exitVolume;
+         double closeVol = (entry == DEAL_ENTRY_INOUT) ? MathMin(vol, openVol) : vol;
+         double share    = (vol > 0.0) ? closeVol / vol : 1.0;
          t[i].exitValue  += price * closeVol;
          t[i].exitVolume += closeVol;
-         t[i].profit     += money;
+         t[i].profit     += pnl + costs * share;      // realised P/L belongs to the closed part
          t[i].closeTime   = when;
+         if(t[i].exitVolume >= t[i].volume * 0.999)
+            t[i].closed = true;
+         //--- netting reversal: the rest of the deal opens a new trade on the other side
+         double rest = vol - closeVol;
+         if(entry == DEAL_ENTRY_INOUT && rest > 1e-9)
+           {
+            int j = EVK_NewTrade(t, count, deal, pos, when, dtype, magic);
+            t[j].volume = rest;
+            t[j].entry  = price;
+            t[j].profit = costs * (1.0 - share);
+           }
         }
      }
    //--- keep fully closed trades, compute initial risk
    int n = 0;
    for(int i = 0; i < count; i++)
      {
-      if(t[i].closeTime == 0 || t[i].exitVolume < t[i].volume * 0.999)
+      if(!t[i].closed)
          continue;                                   // still open at the end of the test
       if(t[i].sl > 0.0)
         {
@@ -317,10 +339,17 @@ bool EVK_Open()
   {
    if(g_evkFile != INVALID_HANDLE)
       return true;
+   //--- in the tester TimeLocal() is the simulated time, so two single tests over the
+   //    same period would get the same name: add _2, _3 ... until the name is free
    MqlDateTime s;
    TimeToStruct(TimeLocal(), s);
-   g_evkPath = StringFormat("EVK\\%s_%s_%04d%02d%02d_%02d%02d%02d.csv", EVK_Name(), EVK_Clean(_Symbol),
-                            s.year, s.mon, s.day, s.hour, s.min, s.sec);
+   string base = StringFormat("EVK\\%s_%s_%04d%02d%02d_%02d%02d%02d", EVK_Name(), EVK_Clean(_Symbol),
+                              s.year, s.mon, s.day, s.hour, s.min, s.sec);
+   if(!MQLInfoInteger(MQL_OPTIMIZATION) && MQLInfoInteger(MQL_TESTER))
+      base += "_single";
+   g_evkPath = base + ".csv";
+   for(int k = 2; FileIsExist(g_evkPath, FILE_COMMON) && k < 10000; k++)
+      g_evkPath = base + "_" + IntegerToString(k) + ".csv";
    g_evkFile = FileOpen(g_evkPath, FILE_WRITE | FILE_TXT | FILE_ANSI | FILE_COMMON);
    if(g_evkFile == INVALID_HANDLE)
      {
@@ -357,8 +386,11 @@ void EVK_WritePass(const long pass, const double crit, string &params[], const i
          head += ",p." + names[i];
         }
       head += "," + EVK_TradeColumns();
+      //--- in an optimization this runs in the terminal, whose account is not the tester's
+      string ccy = (MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_OPTIMIZATION))
+                   ? AccountInfoString(ACCOUNT_CURRENCY) : "tester deposit currency";
       FileWriteString(g_evkFile, "# EVK " + EVK_VERSION + " | " + EVK_Name() + " | " + _Symbol +
-                      " | " + AccountInfoString(ACCOUNT_CURRENCY) + " | times are broker server time\n");
+                      " | " + ccy + " | times are broker server time\n");
       FileWriteString(g_evkFile, head + "\n");
       g_evkHeader = true;
      }
@@ -393,11 +425,12 @@ void EVK_Close()
 //+------------------------------------------------------------------+
 double EVK_OnTester()
   {
-   if(!EVK_Enable)
-      return 0.0;
+   //--- the criterion is always computed (also with EVK_Enable=false); only the export is optional
    EVKTrade t[];
    int n = EVK_CollectTrades(t);
    double crit = EVK_Score(t, n);
+   if(!EVK_Enable)
+      return crit;
    double d[];
    EVK_Pack(t, n, d);
    if(MQLInfoInteger(MQL_OPTIMIZATION))
@@ -418,10 +451,28 @@ double EVK_OnTester()
 
 void EVK_OnTesterInit()
   {
-   if(EVK_Enable)
-      EVK_Open();
+   //--- the CSV is created when the first pass arrives, so an optimization that
+   //    sends nothing leaves no empty file behind
+   g_evkPasses = 0;
   }
 
+//--- Handle ONE frame. Returns true if it was an EVK frame (and was written).
+//    An EA that sends frames of its own calls this inside its own FrameNext loop
+//    (with EVK_NO_HANDLERS) and handles the frames for which it returns false.
+bool EVK_HandleFrame(const ulong pass, const string name, const long id, const double value, const double &d[])
+  {
+   if(!EVK_Enable || name != EVK_FRAME_NAME || id != EVK_FRAME_ID)
+      return false;
+   string params[];
+   uint   np = 0;
+   if(!FrameInputs(pass, params, np))
+      np = 0;
+   EVK_WritePass((long)pass, value, params, (int)np, d, ArraySize(d) / EVK_FIELDS);
+   return true;
+  }
+
+//--- Default pass handler: reads every queued frame. Use it only when the EA sends
+//    no frames of its own; otherwise use EVK_HandleFrame (see above).
 void EVK_OnTesterPass()
   {
    ulong  pass;
@@ -430,20 +481,16 @@ void EVK_OnTesterPass()
    double value;
    double d[];
    while(FrameNext(pass, name, id, value, d))
-     {
-      if(name != EVK_FRAME_NAME || id != EVK_FRAME_ID)
-         continue;
-      string params[];
-      uint   np = 0;
-      if(!FrameInputs(pass, params, np))
-         np = 0;
-      EVK_WritePass((long)pass, value, params, (int)np, d, ArraySize(d) / EVK_FIELDS);
-     }
+      EVK_HandleFrame(pass, name, id, value, d);
   }
 
 void EVK_OnTesterDeinit()
   {
    EVK_OnTesterPass();   // collect any frames still queued
+   if(EVK_Enable && g_evkPasses == 0)
+      Print("[EVK] No passes were received, so no CSV was written. Passes served from the tester "
+            "cache send nothing: delete the files in <terminal data folder>\\Tester\\cache or change "
+            "EVK_RunName, then run the optimization again.");
    EVK_Close();
   }
 

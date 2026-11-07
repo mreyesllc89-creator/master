@@ -48,13 +48,25 @@ void   OnTesterPass()   { EVK_OnTesterPass(); }
 void   OnTesterDeinit() { EVK_OnTesterDeinit(); }
 ```
 
+If the EA **sends frames of its own** (`FrameAdd`), don't call `EVK_OnTesterPass()`, because it would consume your frames too. Instead, call `EVK_HandleFrame()` for every frame inside your own loop:
+
+```mql5
+void OnTesterPass()
+  {
+   ulong pass; string name; long id; double value; double data[];
+   while(FrameNext(pass, name, id, value, data))
+      if(!EVK_HandleFrame(pass, name, id, value, data))
+        { /* your own frame */ }
+  }
+```
+
 EVK adds these inputs, in their own group:
 
 | Input | Meaning |
 |---|---|
 | `EVK_Enable` | Record and export. It only acts in the Strategy Tester. |
 | `EVK_Magic` | Only count trades with this magic number (-1 = all). Use it when other EAs or manual trades share the account. |
-| `EVK_Criterion` | Value returned to the optimizer when you choose **Custom max**. The default is the worst profit factor across `EVK_Periods` time slices, which favours settings that work in every part of the period. |
+| `EVK_Criterion` | Value returned to the optimizer when you choose **Custom max**. It is computed even when `EVK_Enable` is false. The default is the worst profit factor across `EVK_Periods` time slices, which favours settings that work in every part of the period. |
 | `EVK_MinTrades` | Passes with fewer trades score 0. |
 | `EVK_Periods` | Number of time slices for the worst-period criterion. |
 | `EVK_RunName` | Prefix of the CSV name (default: the EA's name). |
@@ -67,12 +79,13 @@ EVK adds these inputs, in their own group:
 4. Set **Forward** to **No**. EVK does the out-of-sample split itself, after the run, so you can try several splits without re-running MT5.
 5. Set **Criterion** to *Custom max* to rank by EVK's criterion, or keep MT5's own criterion. The CSV is the same either way.
 6. In the **Inputs** tab, tick only the inputs to optimize, with start/step/stop values. Keep the grid modest: 50 to 2,000 passes is a good range.
-7. Start. When it finishes, the Journal prints the path of the CSV:
+7. Start. MT5 reuses cached results when you re-run an identical optimization, and cached passes send nothing to EVK. **Before re-running the same optimization, delete the files in `<terminal data folder>\Tester\cache`**, or change `EVK_RunName`. EVK prints a warning when it receives no passes.
+8. When it finishes, the Journal prints the path of the CSV:
    `[EVK] 640 pass(es) written to <Common Data Folder>\Files\EVK\MyEA_XAUUSD_20261107_153000.csv`
 
    The Common Data Folder is `C:\Users\<you>\AppData\Roaming\MetaQuotes\Terminal\Common\`.
 
-A **single test** (no optimization) also writes a CSV with that one pass, which is useful for the stress tests of one setting. Use local tester agents: frames from MQL5 Cloud agents also work, but a single test on a remote agent writes its file on that machine.
+A **single test** (no optimization) also writes a CSV with that one pass, named `..._single.csv`, which is useful for the stress tests of one setting. Repeated single tests get `_2`, `_3` and so on, so no file is overwritten. A single-test file has no input columns, so note which settings you used. Use local tester agents: frames from MQL5 Cloud agents also work, but a single test on a remote agent writes its file on that machine.
 
 ## 4. Analyse
 
@@ -139,7 +152,8 @@ python -m evk analyze examples/xlzc_m2h1_off.csv --split 2026-01-01 --compare ex
   - partial closes are summed;
   - a netting reversal (`INOUT`) closes the open part and opens a new trade.
 - Positions still open when the test ends are left out.
-- **R** uses the stop loss set on the opening order. Trades without one fall back to money results.
+- **R** uses the stop loss set on the opening order. If **any** trade has no initial stop loss, the whole run is analysed in money and the tool says how many trades lacked a stop. With `--value r`, trades without R are left out.
+- Net profit includes commission, swap and fees. The deposit currency is shown only for single tests. For an optimization the header says "tester deposit currency"; check it in the tester settings.
 - Times are broker server time, as MT5 records them.
 - EVK measures what the Strategy Tester produced. If the tester's modelling is unrealistic (for example *Open prices only* on an intrabar EA), the analysis inherits that.
 - Tests: `python -m unittest discover -s EVK/tests`.

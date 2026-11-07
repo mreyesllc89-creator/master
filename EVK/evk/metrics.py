@@ -39,6 +39,9 @@ def period_pfs(times, x, edges):
 def score(times, x, criterion, min_trades, edges=None):
     """Ranking score used to choose a pass on a training window."""
     x = np.asarray(x, float)
+    keep = np.isfinite(x)
+    x = x[keep]
+    times = np.asarray(times)[keep] if times is not None and len(times) == len(keep) else times
     if len(x) < min_trades:
         return -np.inf
     if criterion == "pf":

@@ -17,6 +17,13 @@ def pass_table(run, value, split, is_periods=2):
     """Per-pass statistics: whole run, in-sample (before split), out-of-sample, IS sub-periods."""
     t = run.trades
     v = run.value_col(value)
+    if t.empty:
+        empty = {f"all_{k}": val for k, val in stats([]).items()}
+        if split is not None:
+            empty.update({f"is_{k}": val for k, val in stats([]).items()})
+            empty.update({f"oos_{k}": val for k, val in stats([]).items()})
+        empty.update(is_period_trades_min=0, is_period_pf_min=np.nan)
+        return pd.DataFrame([dict(empty, **{"pass": p}) for p in run.passes.index]).set_index("pass").join(run.passes)
     start, end = t.close_time.min(), t.close_time.max()
     split = pd.Timestamp(split) if split is not None else None
     is_end = split if split is not None else end + pd.Timedelta(seconds=1)
@@ -56,31 +63,30 @@ def neighbours(run, tab, metric):
     if not params:
         return pd.DataFrame({"nb_median": tab[metric], "nb_share_gt1": (tab[metric] > 1).astype(float), "nb_n": 1},
                             index=tab.index)
+    strtab = tab[params].astype(str)
+    numtab = tab[params].apply(pd.to_numeric, errors="coerce")
+    numeric = {c: bool(numtab[c].notna().all()) for c in params}
+    # sorted grid of each numeric input, with the original string form of each value
     grid = {}
-    numeric = {}
     for c in params:
-        vals = pd.to_numeric(tab[c], errors="coerce")
-        numeric[c] = vals.notna().all()
-        grid[c] = sorted(vals.unique()) if numeric[c] else sorted(tab[c].astype(str).unique())
-    key = tab[params].astype(str).apply(tuple, axis=1)
-    lookup = dict(zip(key, tab.index))
+        if numeric[c]:
+            pairs = sorted({(float(v), sv) for v, sv in zip(numtab[c], strtab[c])})
+            grid[c] = [sv for _, sv in pairs]
+    keys = list(strtab.itertuples(index=False, name=None))
+    lookup = dict(zip(keys, tab.index))
     med, share, cnt = [], [], []
-    for p, row in tab[params].iterrows():
+    for p, key in zip(tab.index, keys):
         vals = [tab.at[p, metric]]
-        for c in params:
+        for ci, c in enumerate(params):
             if not numeric[c]:
                 continue
             g = grid[c]
-            i = g.index(float(row[c]))
+            i = g.index(key[ci])
             for j in (i - 1, i + 1):
                 if 0 <= j < len(g):
-                    nb = row.copy()
-                    # keep the original string form of the value
-                    match = tab[c][pd.to_numeric(tab[c], errors="coerce") == g[j]]
-                    if match.empty:
-                        continue
-                    nb[c] = match.iloc[0]
-                    q = lookup.get(tuple(nb.astype(str)))
+                    nb = list(key)
+                    nb[ci] = g[j]
+                    q = lookup.get(tuple(nb))
                     if q is not None:
                         vals.append(tab.at[q, metric])
         arr = np.array(vals, float)
@@ -117,17 +123,20 @@ def holdout(run, value, split, criterion="min_period_pf", min_trades=30, is_peri
     else:
         tab["rank_score"] = tab.is_score
     ranked = tab[np.isfinite(tab.rank_score)].sort_values("rank_score", ascending=False)
-    base = tab[tab.oos_trades >= 5]
+    # same rules for the picks and the base rate: every rankable pass counts, a pass with
+    # no out-of-sample trade counts as "not profitable", medians ignore passes without trades
+    base = ranked
     topk = []
     for k in (1, 5, 10, 25, 50):
         top = ranked.head(k)
         if len(top) < k and k > 1:
             break
-        topk.append(dict(k=k, oos_pf_median=float(top.oos_pf.median()), oos_profitable=float((top.oos_pf > 1).mean()),
+        topk.append(dict(k=k, oos_pf_median=float(top.oos_pf.dropna().median()) if top.oos_pf.notna().any() else np.nan,
+                         oos_profitable=float((top.oos_pf.fillna(0) > 1).mean()),
                          oos_trades_median=float(top.oos_trades.median()), is_score_median=float(top.is_score.median())))
     return dict(table=tab, ranked=ranked, topk=topk,
-                base_rate=float((base.oos_pf > 1).mean()) if len(base) else np.nan,
-                base_median=float(base.oos_pf.median()) if len(base) else np.nan,
+                base_rate=float((base.oos_pf.fillna(0) > 1).mean()) if len(base) else np.nan,
+                base_median=float(base.oos_pf.dropna().median()) if base.oos_pf.notna().any() else np.nan,
                 chosen=ranked.index[0] if len(ranked) else None, criterion=criterion, smooth=smooth,
                 split=str(pd.Timestamp(split).date()), min_trades=min_trades)
 
@@ -216,16 +225,26 @@ def compare(run_a, run_b, value, label_a="A", label_b="B", min_trades=15):
     """Pair passes of two runs with identical optimized inputs (e.g. a filter off vs on) and
     report how often B beats A."""
     va, vb = run_a.value_col(value), run_b.value_col(value)
-    common = [c for c in run_a.varying if c in run_b.varying]
+    if set(run_a.varying) != set(run_b.varying):
+        raise ValueError("the two runs optimized different inputs: "
+                         f"{sorted(c[2:] for c in run_a.varying)} vs {sorted(c[2:] for c in run_b.varying)}")
     ta = pass_table(run_a, value, None)
     tb = pass_table(run_b, value, None)
-    ka = ta[common].astype(str).apply(tuple, axis=1) if common else pd.Series([()] * len(ta), index=ta.index)
-    kb = tb[common].astype(str).apply(tuple, axis=1) if common else pd.Series([()] * len(tb), index=tb.index)
-    a = ta.assign(key=ka.values).set_index("key")
-    b = tb.assign(key=kb.values).set_index("key")
+
+    def keys(tab):
+        cols = []
+        for c in run_a.varying:          # optimized inputs identify the twin pass
+            num = pd.to_numeric(tab[c], errors="coerce")
+            cols.append(num.round(10).astype(str) if num.notna().all() else tab[c].astype(str))
+        return list(zip(*cols)) if cols else [()] * len(tab)
+    a = ta.assign(key=keys(ta)).set_index("key")
+    b = tb.assign(key=keys(tb)).set_index("key")
+    if not (a.index.is_unique and b.index.is_unique):
+        raise ValueError("passes are not unique by their optimized inputs; cannot pair them")
     j = a.join(b, lsuffix="_a", rsuffix="_b", how="inner")
     ok = j[(j.all_trades_a >= min_trades) & (j.all_trades_b >= min_trades)]
-    res = dict(label_a=label_a, label_b=label_b, matched=int(len(j)), used=int(len(ok)), inputs=[c[2:] for c in common])
+    res = dict(label_a=label_a, label_b=label_b, matched=int(len(j)), used=int(len(ok)),
+               inputs=[c[2:] for c in run_a.varying])
     if len(ok):
         res.update(pf_a=float(ok.all_pf_a.median()), pf_b=float(ok.all_pf_b.median()),
                    share_pf_up=float((ok.all_pf_b > ok.all_pf_a).mean()),
