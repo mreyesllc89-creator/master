@@ -39,15 +39,29 @@ from multiprocessing import Pool
 import numpy as np
 import pandas as pd
 
+# Instrument settings. Point distances in the research are written in gold points and
+# multiplied by `scale` (ratio of typical M1 ranges) for other instruments.
+#   spread_pts: constant spread in points when no spreads_summary.csv row exists
+#   spread_cap: the EA's MaxSpread_Points used in the simulation (in that instrument's points)
+INSTRUMENTS = {
+    "XAUUSD": dict(scale=1.0, spread_cap=60, spread_pts=None),
+    # BTC M1 median range $41.0 vs gold $1.26 (Jan 2025-May 2026) -> 32.6; CFD spread assumed $20
+    "BTCUSD": dict(scale=32.6, spread_cap=3000, spread_pts=2000),
+}
+SYMBOL = os.environ.get("XLZC_SYMBOL", "XAUUSD")
+INST = INSTRUMENTS[SYMBOL]
+
 TF_MIN = {"M1": 1, "M2": 2, "M3": 3, "M5": 5, "M15": 15, "M30": 30, "H1": 60, "H4": 240}
 OOS_START = pd.Timestamp("2026-01-01")
 
 # ----------------------------------------------------------------------------- data
 def load(data_dir):
-    m1 = pd.read_csv(os.path.join(data_dir, "XAUUSD_m1.csv"), parse_dates=["datetime"])
+    m1 = pd.read_csv(os.path.join(data_dir, f"{SYMBOL}_m1.csv"), parse_dates=["datetime"])
     m1 = m1.set_index("datetime").sort_index()
+    if INST["spread_pts"] is not None:
+        return m1, np.full(24, INST["spread_pts"] * 0.01)
     sp = pd.read_csv(os.path.join(data_dir, "spreads_summary.csv"))
-    sp = sp[sp.symbol == "XAUUSD"].set_index("hour_utc")["mean_spread"]
+    sp = sp[sp.symbol == SYMBOL].set_index("hour_utc")["mean_spread"]
     hourly = sp.reindex(range(24))
     hourly[21] = 60.0  # rollover hour, not sampled: assume wide
     hourly = hourly.interpolate().bfill().ffill()

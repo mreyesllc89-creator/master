@@ -95,7 +95,8 @@ def run_cfg(cfg):
     path = G["path"]
     s0, s1 = SESSIONS[cfg["session"]]
     pt = 0.01
-    k = B.TF_MIN[trig] ** 0.5
+    # point distances scale with the trigger timeframe (sqrt) and the instrument (B.INST)
+    k = B.TF_MIN[trig] ** 0.5 * B.INST["scale"]
     nt = cfg["N"] if cfg["NT"] == 0 else cfg["NT"]
     trades = []
     busy = np.datetime64("1970-01-01")
@@ -118,7 +119,7 @@ def run_cfg(cfg):
         if mi < 0:
             continue
         hs = path.hs[mi]
-        if 2 * hs / pt > 60:
+        if 2 * hs / pt > B.INST["spread_cap"]:
             continue
         entry = path.o[mi] - hs
         sl = st[0] + hs + cfg["buffer"] * k * pt
