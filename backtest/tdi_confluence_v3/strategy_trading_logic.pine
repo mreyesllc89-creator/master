@@ -1,0 +1,245 @@
+//@version=6
+// Trading-logic copy of "TDI Confluence Strategy v3.0 [Full]" used as the porting spec.
+// label.new() calls and week/month plots were stripped (they do not affect orders).
+strategy("TDI Confluence Strategy v3.0 [Full]", shorttitle="TDI_Conf_Risk", overlay=true, precision=2, max_labels_count=500, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=1)
+
+grp_risk = "Risk Management"
+sl_ticks   = input.int(200, "Fixed Stop Loss (Ticks)", minval=10, group=grp_risk)
+tp_ticks   = input.int(400, "Fixed Take Profit (Ticks)", minval=10, group=grp_risk)
+grp_trail = "Trailing Settings"
+use_trail    = input.bool(true, "Enable Trailing Stop", group=grp_trail)
+trail_points = input.int(150, "Trailing Activation (Ticks)", minval=10, group=grp_trail)
+trail_offset = input.int(50, "Trailing Offset (Ticks)", minval=5, group=grp_trail)
+
+tradeWithLevels = input.bool(false, "Use TDI Levels Filter", group="Strategy Settings")
+buyLevel        = input.int(38, "TDI Buy Level (<=)", group="Strategy Settings")
+sellLevel       = input.int(62, "TDI Sell Level (>=)", group="Strategy Settings")
+
+show1mTDI  = input.bool(true,  "Show 1m TDI Signals",  group="TDI")
+show5mTDI  = input.bool(true,  "Show 5m TDI Signals",  group="TDI")
+show15mTDI = input.bool(true,  "Show 15m TDI Signals", group="TDI")
+show30mTDI = input.bool(true,  "Show 30m TDI Signals", group="TDI")
+show60mTDI = input.bool(true,  "Show 1h TDI Signals",  group="TDI")
+
+calc_tdi() =>
+    r   = ta.rsi(close, 14)
+    ma  = ta.sma(r, 34)
+    offs = 1.6185 * ta.stdev(r, 34)
+    up  = ma + offs
+    dn  = ma - offs
+    mid = (up + dn) / 2
+    mbb = ta.sma(r, 7)
+    mab = ta.sma(r, 2)
+    long1  = ta.crossover(mab, mbb) and mbb > mid and mbb > 50
+    short1 = ta.crossunder(mab, mbb) and mbb < mid and mbb < 50
+    [long1, short1]
+
+[t1l, t1s] = request.security(syminfo.tickerid, "1",  calc_tdi(), gaps=barmerge.gaps_off)
+[t5l, t5s] = request.security(syminfo.tickerid, "5",  calc_tdi(), gaps=barmerge.gaps_off)
+[t15l,t15s]= request.security(syminfo.tickerid, "15", calc_tdi(), gaps=barmerge.gaps_off)
+[t30l,t30s]= request.security(syminfo.tickerid, "30", calc_tdi(), gaps=barmerge.gaps_off)
+[t60l,t60s]= request.security(syminfo.tickerid, "60", calc_tdi(), gaps=barmerge.gaps_off)
+
+t1LongSignal  = show1mTDI  and t1l  and not t1l[1]
+t1ShortSignal = show1mTDI  and t1s  and not t1s[1]
+t5LongSignal  = show5mTDI  and t5l  and not t5l[1]
+t5ShortSignal = show5mTDI  and t5s  and not t5s[1]
+t15LongSignal = show15mTDI and t15l and not t15l[1]
+t15ShortSignal= show15mTDI and t15s and not t15s[1]
+t30LongSignal = show30mTDI and t30l and not t30l[1]
+t30ShortSignal= show30mTDI and t30s and not t30s[1]
+t60LongSignal = show60mTDI and t60l and not t60l[1]
+t60ShortSignal= show60mTDI and t60s and not t60s[1]
+
+// (label.new drawing calls omitted — no effect on trading)
+
+showRegularBull = input.bool(true,  "Show Regular Bullish Divergence", group="Divergences")
+showRegularBear = input.bool(false, "Show Regular Bearish Divergence", group="Divergences")
+showHiddenBull  = input.bool(false, "Show Hidden Bullish Divergence",  group="Divergences")
+showHiddenBear  = input.bool(false, "Show Hidden Bearish Divergence",  group="Divergences")
+
+divLeft   = input.int(5,  "Pivot Left Strength",  minval=1, group="Divergences")
+divRight  = input.int(5,  "Pivot Right Strength", minval=1, group="Divergences")
+divMinBars = input.int(5,  "Min Bars Between Swings", minval=1, group="Divergences")
+divMaxBars = input.int(60, "Max Bars Between Swings", minval=1, group="Divergences")
+
+calc_div() =>
+    osc = ta.rsi(close, 14)
+    pl = ta.pivotlow(osc, divLeft, divRight)
+    ph = ta.pivothigh(osc, divLeft, divRight)
+    plFound = not na(pl)
+    phFound = not na(ph)
+    prevPlOsc   = ta.valuewhen(plFound, pl, 1)
+    prevPlPrice = ta.valuewhen(plFound, low[divRight], 1)
+    prevPhOsc   = ta.valuewhen(phFound, ph, 1)
+    prevPhPrice = ta.valuewhen(phFound, high[divRight], 1)
+    currPlPrice = low[divRight]
+    currPhPrice = high[divRight]
+    barsSincePl = ta.barssince(plFound)
+    barsSincePh = ta.barssince(phFound)
+    regularBull = plFound and not na(prevPlOsc) and not na(prevPlPrice) and
+                  currPlPrice < prevPlPrice and pl > prevPlOsc and
+                  divMinBars <= barsSincePl[1] and barsSincePl[1] <= divMaxBars
+    regularBear = phFound and not na(prevPhOsc) and not na(prevPhPrice) and
+                  currPhPrice > prevPhPrice and ph < prevPhOsc and
+                  divMinBars <= barsSincePh[1] and barsSincePh[1] <= divMaxBars
+    hiddenBull  = plFound and not na(prevPlOsc) and not na(prevPlPrice) and
+                  currPlPrice > prevPlPrice and pl < prevPlOsc and
+                  divMinBars <= barsSincePl[1] and barsSincePl[1] <= divMaxBars
+    hiddenBear  = phFound and not na(prevPhOsc) and not na(prevPhPrice) and
+                  currPhPrice < prevPhPrice and ph > prevPhOsc and
+                  divMinBars <= barsSincePh[1] and barsSincePh[1] <= divMaxBars
+    [regularBull, regularBear, hiddenBull, hiddenBear]
+
+[d1rb, d1rr, d1hb, d1hr] = request.security(syminfo.tickerid, "1",  calc_div(), gaps=barmerge.gaps_off)
+[d5rb, d5rr, d5hb, d5hr] = request.security(syminfo.tickerid, "5",  calc_div(), gaps=barmerge.gaps_off)
+[d15rb,d15rr,d15hb,d15hr]= request.security(syminfo.tickerid, "15", calc_div(), gaps=barmerge.gaps_off)
+[d30rb,d30rr,d30hb,d30hr]= request.security(syminfo.tickerid, "30", calc_div(), gaps=barmerge.gaps_off)
+[d60rb,d60rr,d60hb,d60hr]= request.security(syminfo.tickerid, "60", calc_div(), gaps=barmerge.gaps_off)
+
+d1BullSignal  = showRegularBull and d1rb and not d1rb[1]
+d1BearSignal  = showRegularBear and d1rr and not d1rr[1]
+d1HiddenBull  = showHiddenBull  and d1hb and not d1hb[1]
+d1HiddenBear  = showHiddenBear  and d1hr and not d1hr[1]
+d5BullSignal  = showRegularBull and d5rb and not d5rb[1]
+d5BearSignal  = showRegularBear and d5rr and not d5rr[1]
+d5HiddenBull  = showHiddenBull  and d5hb and not d5hb[1]
+d5HiddenBear  = showHiddenBear  and d5hr and not d5hr[1]
+d15BullSignal = showRegularBull and d15rb and not d15rb[1]
+d15BearSignal = showRegularBear and d15rr and not d15rr[1]
+d15HiddenBull = showHiddenBull  and d15hb and not d15hb[1]
+d15HiddenBear = showHiddenBear  and d15hr and not d15hr[1]
+d30BullSignal = showRegularBull and d30rb and not d30rb[1]
+d30BearSignal = showRegularBear and d30rr and not d30rr[1]
+d30HiddenBull = showHiddenBull  and d30hb and not d30hb[1]
+d30HiddenBear = showHiddenBear  and d30hr and not d30hr[1]
+d60BullSignal = showRegularBull and d60rb and not d60rb[1]
+d60BearSignal = showRegularBear and d60rr and not d60rr[1]
+d60HiddenBull = showHiddenBull  and d60hb and not d60hb[1]
+d60HiddenBear = showHiddenBear  and d60hr and not d60hr[1]
+
+dayStartHour   = input.int(0, "Day Start Hour (0-23 UTC)", minval=0, maxval=23, group="Session & MTF Levels")
+dayStartMinute = input.int(0, "Day Start Minute", minval=0, maxval=59, group="Session & MTF Levels")
+
+var float dayHigh = na
+var float dayLow  = na
+newCustomDay = (hour == dayStartHour and minute == dayStartMinute) and (hour[1] != dayStartHour or minute[1] != dayStartMinute)
+
+if newCustomDay or barstate.isfirst
+    dayHigh := high
+    dayLow  := low
+else
+    dayHigh := math.max(nz(dayHigh), high)
+    dayLow  := math.min(nz(dayLow), low)
+
+// (week/month high-low plots omitted — display only)
+
+breakHigh = high > nz(dayHigh[1]) and low[1] <= nz(dayHigh[1])
+breakLow  = low  < nz(dayLow[1])  and high[1] >= nz(dayLow[1])
+
+requireFourthSignal = input.bool(false, "Require 4th Consecutive Signal for Combined Alerts", group="Confluence Filters")
+
+tf1m_bull  = t1LongSignal  or d1BullSignal  or d1HiddenBull
+tf1m_bear  = t1ShortSignal or d1BearSignal  or d1HiddenBear
+tf5m_bull  = t5LongSignal  or d5BullSignal  or d5HiddenBull
+tf5m_bear  = t5ShortSignal or d5BearSignal  or d5HiddenBear
+tf15m_bull = t15LongSignal or d15BullSignal or d15HiddenBull
+tf15m_bear = t15ShortSignal or d15BearSignal or d15HiddenBear
+tf30m_bull = t30LongSignal or d30BullSignal or d30HiddenBull
+tf30m_bear = t30ShortSignal or d30BearSignal or d30HiddenBear
+tf60m_bull = t60LongSignal or d60BullSignal or d60HiddenBull
+tf60m_bear = t60ShortSignal or d60BearSignal or d60HiddenBear
+
+var int bulls1m = 0
+var int bears1m = 0
+var int bulls5m = 0
+var int bears5m = 0
+var int bulls15m = 0
+var int bears15m = 0
+var int bulls30m = 0
+var int bears30m = 0
+var int bulls60m = 0
+var int bears60m = 0
+
+if newCustomDay
+    bulls1m := 0
+    bears1m := 0
+    bulls5m := 0
+    bears5m := 0
+    bulls15m := 0
+    bears15m := 0
+    bulls30m := 0
+    bears30m := 0
+    bulls60m := 0
+    bears60m := 0
+
+if tf1m_bull
+    bulls1m += 1
+    bears1m := 0
+if tf1m_bear
+    bears1m += 1
+    bulls1m := 0
+if tf5m_bull
+    bulls5m += 1
+    bears5m := 0
+if tf5m_bear
+    bears5m += 1
+    bulls5m := 0
+if tf15m_bull
+    bulls15m += 1
+    bears15m := 0
+if tf15m_bear
+    bears15m += 1
+    bulls15m := 0
+if tf30m_bull
+    bulls30m += 1
+    bears30m := 0
+if tf30m_bear
+    bears30m += 1
+    bulls30m := 0
+if tf60m_bull
+    bulls60m += 1
+    bears60m := 0
+if tf60m_bear
+    bears60m += 1
+    bulls60m := 0
+
+isFourthBull = (bulls1m == 4 and tf1m_bull) or (bulls5m == 4 and tf5m_bull) or (bulls15m == 4 and tf15m_bull) or (bulls30m == 4 and tf30m_bull) or (bulls60m == 4 and tf60m_bull)
+isFourthBear = (bears1m == 4 and tf1m_bear) or (bears5m == 4 and tf5m_bear) or (bears15m == 4 and tf15m_bear) or (bears30m == 4 and tf30m_bear) or (bears60m == 4 and tf60m_bear)
+
+combinedLongRaw  = breakLow  and (t1l or t5l or t15l or t30l or t60l or d1rb or d5rb or d15rb or d30rb or d60rb or d1hb or d5hb or d15hb or d30hb or d60hb)
+combinedShortRaw = breakHigh and (t1s or t5s or t15s or t30s or t60s or d1rr or d5rr or d15rr or d30rr or d60rr or d1hr or d5hr or d15hr or d30hr or d60hr)
+
+combinedLongFilter  = requireFourthSignal ? (combinedLongRaw and isFourthBull) : combinedLongRaw
+combinedShortFilter = requireFourthSignal ? (combinedShortRaw and isFourthBear) : combinedShortRaw
+
+combinedLong  = combinedLongFilter  and not combinedLongFilter[1]
+combinedShort = combinedShortFilter and not combinedShortFilter[1]
+
+currentChartRsi = ta.rsi(close, 14)
+currentChartTdiFast = ta.sma(currentChartRsi, 2)
+
+validLongEntry  = combinedLong  and (not tradeWithLevels or currentChartTdiFast <= buyLevel)
+validShortEntry = combinedShort and (not tradeWithLevels or currentChartTdiFast >= sellLevel)
+
+if validLongEntry
+    strategy.entry("Long", strategy.long)
+
+if validShortEntry
+    strategy.entry("Short", strategy.short)
+
+if strategy.position_size > 0
+    strategy.exit("Exit Long", "Long",
+         loss=sl_ticks,
+         profit=tp_ticks,
+         trail_points = use_trail ? trail_points : na,
+         trail_offset = use_trail ? trail_offset : na,
+         comment_loss="Long SL", comment_profit="Long TP", comment_trailing="Long Trail")
+
+if strategy.position_size < 0
+    strategy.exit("Exit Short", "Short",
+         loss=sl_ticks,
+         profit=tp_ticks,
+         trail_points = use_trail ? trail_points : na,
+         trail_offset = use_trail ? trail_offset : na,
+         comment_loss="Short SL", comment_profit="Short TP", comment_trailing="Short Trail")
