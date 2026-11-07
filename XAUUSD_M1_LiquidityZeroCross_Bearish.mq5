@@ -13,6 +13,9 @@
 //                          SL structure (0 = same as LiquidityLookbackBars)
 //    + TP_FallbackRR     : fixed-RR target when no pool pays MinRewardRisk
 //                          (0 = skip the trade, as in v1.00)
+//    + MaxEntryDelaySeconds : only enter within N seconds of the bar open
+//                          (0 = any tick of the signal bar, as in v1.00)
+//    Strongest backtested edge: presets/XLZC_Bearish_M3_H1_NY.set
 //    See research/ and presets/ for the backtest calibration.
 //
 //  OVERVIEW
@@ -121,6 +124,7 @@ input double  MaxLotSize               = 0.0;   // Max lot (0 = broker max)
 input bool    SkipIfBelowMinLot        = true;  // Skip trade if risk lot < broker min lot
 input int     MaxSpread_Points         = 30;    // Max spread (points)
 input int     MaxSlippage_Points       = 20;    // Max slippage (points)
+input int     MaxEntryDelaySeconds     = 0;     // Enter only within N s of bar open (0 = whole bar)
 
 input group "=== R1: HTF Bias Filter ==="
 input bool            UseHTF_Filter    = true;        // Require HTF bearish bias
@@ -418,6 +422,13 @@ void OnTick()
       return;
    if(g_lastTradeBar == barTime)
       return;
+   //--- v1.10: optional entry window (the calibration backtest enters at bar open)
+   if(MaxEntryDelaySeconds > 0 && TimeCurrent() - barTime > MaxEntryDelaySeconds)
+     {
+      LogSkip("entry window after bar open has passed");
+      g_signalActive = false;
+      return;
+     }
 
    //--- per-tick execution filters (re-checked until the bar ends)
    if(CountOwnPositions() > 0)                 // R5: max one open position

@@ -29,3 +29,15 @@ Files:
 - `TimeGMT()` equals server time in the tester. Set `TesterGMTOffsetHours` to the broker's offset when backtesting.
 - "Stochastic(7,1,7)" is mapped as %K=7, Slowing=1, %D=7. All three are inputs.
 - The source code was not compiled in this environment because MetaEditor is not available on Linux CI. Compile it and run a visual backtest before going live.
+
+## v1.10 calibration (strongest backtested edge)
+
+v1.10 adds `TriggerTimeframe`, `TP_LookbackBars`, `TP_FallbackRR` and `MaxEntryDelaySeconds`. Their defaults keep the v1.00 behaviour.
+
+A search of 126,360 setups across 13 trigger/bias pairs used FTMO XAUUSD data from January 2025 to May 2026. Each setup had to be profitable in 2025 H1, 2025 H2 and 2026 separately. The strongest and most stable result was an **M3 trigger with an H1 bias, traded 12:00–16:30 GMT**. That setup is `presets/XLZC_Bearish_M3_H1_NY.set`:
+
+- 77 trades, PF 2.22, +17.6R, maximum drawdown 1.2R, 78% winners.
+- PF by period: 2.08 in 2025 H1, 2.42 in 2025 H2, 2.18 in 2026. The 90% bootstrap range for PF is 1.36–3.91.
+- All 81 nearby settings in the same family had PF above 1, with a median of 1.67. M1 triggers had a median PF of about 0.8.
+
+This is a Python replica of the EA, not the MT5 Strategy Tester. Confirm the result in MT5 with real ticks before trading it live. See `research/` and the calibration report.
