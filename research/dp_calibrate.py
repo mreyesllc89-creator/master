@@ -113,7 +113,7 @@ def stage_a(out):
     print(df.head(25).to_string())
 
 
-def stage_b(out, top=30):
+def stage_b(out, top=int(os.environ.get("DP_TOP", "30"))):
     prof = base_profile(SYM_ARG)
     a = pd.read_csv(os.path.join(out, "stageA_scored.csv"))
     keysA = [k for k in GRID_A if k != "tf"]
