@@ -115,6 +115,28 @@ def main():
                EnableTrailing=True, TrailingMode=0, TrailingStart_Points=212, TrailingDistance_Points=141,
                TrailingStep_Points=10, UseTradingHours=True, TradingHoursAreGMT=False,
                TradingHoursStart="12:00", TradingHoursEnd="16:30", UseNewsFilter=True))
+    #---------------------------------------------------------------- Gold M3/H4 (every-timeframe search)
+    g4 = json.load(open("research/results/alltf_gold_select.json"))
+    p4 = next(p for p in g4["presets"] if p["pair"] == "M3/H4")
+    c4, w4 = p4["verify"]["chosen"], p4["verify"]["trailing same-bar: worst"]
+    write("presets/XLZC_Bearish_M3_H4_NY.set",
+          ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.20 - M3 trigger / H4 bias / 12:00-16:30 server time",
+           "From the every-timeframe search (39 trigger/filter pairs). Chosen with 2025 data ONLY (median of the "
+           "setup and its neighbouring settings, >=30 trades per half-year); 2026 is out of sample.",
+           f"Backtest: {c4['all_trades']:.0f} trades, PF {c4['all_pf']:.2f}, net {c4['all_net_r']:+.1f}R, max DD "
+           f"{c4['all_maxdd_r']:.1f}R; PF {c4['2025H1_pf']:.2f} / {c4['2025H2_pf']:.2f} (2025) / {c4['2026_pf']:.2f} "
+           f"on {c4['2026_trades']:.0f} trades (2026, out of sample). Worst-case trailing fills PF {w4['all_pf']:.2f}.",
+           "When no liquidity pool pays MinRewardRisk, TP is a fixed 1.5R (TP_FallbackRR=1.5).",
+           SERVER_NOTE, news,
+           "Points are 2-digit gold units scaled by sqrt(3) for M3 (AutoScalePoints handles 3-digit feeds)."],
+          dict(MagicNumber=20261113, TradeComment="XLZC_M3H4", RiskPercent=0.5, MaxSpread_Points=60,
+               MaxSlippage_Points=30, MaxEntryDelaySeconds=30, HTF_Timeframe=16388, TriggerTimeframe=3,
+               LiquidityLookbackBars=25, SwingStrength=4, SL_Buffer_Points=208, MinRewardRisk=1.5,
+               TP_LookbackBars=60, TP_FallbackRR=1.5, MinSL_Points=87, MaxSL_Points=1732,
+               EnableTrailing=True, TrailingMode=0, TrailingStart_Points=260, TrailingDistance_Points=173,
+               TrailingStep_Points=10, UseTradingHours=True, TradingHoursAreGMT=False,
+               TradingHoursStart="12:00", TradingHoursEnd="16:30", UseNewsFilter=True))
+
     #---------------------------------------------------------------- BTCUSD
     bt = json.load(open("research/results/btc_select_verify_spread5.json"))
     bt20 = json.load(open("research/results/btc_select_verify.json"))

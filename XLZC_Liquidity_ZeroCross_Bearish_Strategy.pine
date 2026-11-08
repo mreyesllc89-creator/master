@@ -42,6 +42,8 @@
 //  Gold M3/H1     M3 chart, H1 filter, 05:00-09:30 NY. In-sample PF 1.82-2.48 (77 trades).
 //  Gold M2/H1     M2 chart, H1 filter, 05:00-09:30 NY. Chosen on 2025 only: PF 1.55 (186
 //                 trades), 2026 out of sample PF 1.61.
+//  Gold M3/H4     M3 chart, H4 filter, 05:00-09:30 NY. From the every-timeframe search, chosen on
+//                 2025 only: PF 2.07 (106 trades), 2026 out of sample PF 2.15 (26 trades).
 //  BTC M3/H1      M3 chart, H1 filter. Low-cost brokers only (calibrated with a 5 USD spread).
 //  BTC M3/M30     M3 chart, M30 filter. Experimental (its trailing did not hold up in 2026).
 //  Custom         every value from the inputs below.
@@ -65,7 +67,7 @@ gSess = "Session (Custom)"
 gCost = "Costs"
 gViz  = "Display"
 
-preset = input.string("Gold M3/H1", "Preset", options = ["Gold M3/H1", "Gold M2/H1", "BTC M3/H1 (low-cost)", "BTC M3/M30 (experimental)", "Custom"], group = gPre,
+preset = input.string("Gold M3/H1", "Preset", options = ["Gold M3/H1", "Gold M2/H1", "Gold M3/H4", "BTC M3/H1 (low-cost)", "BTC M3/M30 (experimental)", "Custom"], group = gPre,
      tooltip = "A preset overrides the Custom inputs below (except costs, risk %, display). Use Custom to set everything yourself.")
 
 cTrig     = input.timeframe("3", "Chart (trigger) timeframe expected", group = gTf, tooltip = "Only used for the warning: the strategy always trades the chart's own bars. Put the chart on this timeframe.")
@@ -104,35 +106,37 @@ showTbl   = input.bool(true, "Status table", group = gViz)
 // ===================================================================== presets
 isGold3 = preset == "Gold M3/H1"
 isGold2 = preset == "Gold M2/H1"
+isGold4 = preset == "Gold M3/H4"
 isBtcH1 = preset == "BTC M3/H1 (low-cost)"
 isBtc30 = preset == "BTC M3/M30 (experimental)"
-pick(float g3, float g2, float b1, float b30, float custom) =>
-    isGold3 ? g3 : isGold2 ? g2 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
-pickS(string g3, string g2, string b1, string b30, string custom) =>
-    isGold3 ? g3 : isGold2 ? g2 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
-pickB(bool g3, bool g2, bool b1, bool b30, bool custom) =>
-    isGold3 ? g3 : isGold2 ? g2 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
+// arguments: Gold M3/H1, Gold M2/H1, BTC M3/H1, BTC M3/M30, Custom, Gold M3/H4 (last, added later)
+pick(float g3, float g2, float b1, float b30, float custom, float g4) =>
+    isGold3 ? g3 : isGold2 ? g2 : isGold4 ? g4 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
+pickS(string g3, string g2, string b1, string b30, string custom, string g4) =>
+    isGold3 ? g3 : isGold2 ? g2 : isGold4 ? g4 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
+pickB(bool g3, bool g2, bool b1, bool b30, bool custom, bool g4) =>
+    isGold3 ? g3 : isGold2 ? g2 : isGold4 ? g4 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
 
-trigTf   = pickS("3", "2", "3", "3", cTrig)
-htfTf    = pickS("60", "60", "60", "30", cHtf)
+trigTf   = pickS("3", "2", "3", "3", cTrig, "3")
+htfTf    = pickS("60", "60", "60", "30", cHtf, "240")
 useHtf   = preset == "Custom" ? cUseHtf : true
-nBars    = int(pick(40, 15, 40, 40, cN))
-sStr     = int(pick(2, 4, 2, 3, cS))
-bufPts   = pick(208, 57, 2259, 4517, cBuf)
-ntIn     = int(pick(120, 120, 60, 120, cNT))
-minRR    = pick(1.5, 1.5, 2.0, 2.0, cRR)
-fbRR     = pick(0.0, 1.5, 0.0, 0.0, cFb)
-minSLPts = pick(87, 71, 2823, 2823, cMinSL)
-maxSLPts = pick(1732, 1414, 56465, 56465, cMaxSL)
+nBars    = int(pick(40, 15, 40, 40, cN, 25))
+sStr     = int(pick(2, 4, 2, 3, cS, 4))
+bufPts   = pick(208, 57, 2259, 4517, cBuf, 208)
+ntIn     = int(pick(120, 120, 60, 120, cNT, 60))
+minRR    = pick(1.5, 1.5, 2.0, 2.0, cRR, 1.5)
+fbRR     = pick(0.0, 1.5, 0.0, 0.0, cFb, 1.5)
+minSLPts = pick(87, 71, 2823, 2823, cMinSL, 87)
+maxSLPts = pick(1732, 1414, 56465, 56465, cMaxSL, 1732)
 reqSweep = preset == "Custom" ? cSweep : false
 stochHard = preset == "Custom" ? cStochH : false
-trailOn  = pickB(true, true, true, true, cTrail)
-tStart   = pick(260, 212, 8470, 8470, cTStart)
-tDist    = pick(173, 141, 1412, 5646, cTDist)
+trailOn  = pickB(true, true, true, true, cTrail, true)
+tStart   = pick(260, 212, 8470, 8470, cTStart, 260)
+tDist    = pick(173, 141, 1412, 5646, cTDist, 173)
 sessOn   = preset == "Custom" ? cSessOn : true
-sessFrom = int(pick(500, 500, 500, 500, cSessFrom))
-sessTo   = int(pick(930, 930, 930, 930, cSessTo))
-spread   = spreadIn >= 0 ? spreadIn : (isGold3 or isGold2) ? 0.45 : (isBtcH1 or isBtc30) ? 5.0 : 0.0
+sessFrom = int(pick(500, 500, 500, 500, cSessFrom, 500))
+sessTo   = int(pick(930, 930, 930, 930, cSessTo, 930))
+spread   = spreadIn >= 0 ? spreadIn : (isGold3 or isGold2 or isGold4) ? 0.45 : (isBtcH1 or isBtc30) ? 5.0 : 0.0
 ntBars   = ntIn > 0 ? ntIn : nBars
 PT       = 0.01                                   // one "point" = 0.01 price, as in the EA presets
 if useHtf and timeframe.in_seconds(htfTf) <= timeframe.in_seconds(timeframe.period)
