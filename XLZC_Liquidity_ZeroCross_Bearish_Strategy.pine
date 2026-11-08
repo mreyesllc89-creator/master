@@ -1,12 +1,12 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
 //@version=6
 //
-// XLZC Liquidity Zero-Cross Bearish - STRATEGY (TradingView port of the MT5 EA v1.10)
+// XLZC Liquidity Zero-Cross Bearish - STRATEGY (TradingView port of the MT5 EA v1.20)
 // ---------------------------------------------------------------------------
 // Short-only. "No señal = no operación": no signal, no trade.
 //
 // RULES (same as XAUUSD_M1_LiquidityZeroCross_Bearish.mq5)
-//  R1 Trend filter (HTF, H1 or M30): MACD(12,26) main < 0 and close < EMA(50) on the last
+//  R1 Trend filter (HTF, M15 to D1): MACD(12,26) main < 0 and/or close < EMA(50) (Trend condition) on the last
 //     CLOSED higher-timeframe bar (no repainting, see htfData below).
 //  R2 Trigger: MACD(12,26) main of the chart bar crosses zero DOWN (previous bar >= 0, this
 //     closed bar < 0). The order fills at the next bar's open, like the EA.
@@ -20,8 +20,8 @@
 //     optional trailing stop (start / distance).
 //  R6 Session window (broker server time = New York + 7h, so it is entered in New York time).
 //
-// RUN IT ON THE TRIGGER TIMEFRAME CHART: the M3 presets need a 3-minute chart and the M2 preset
-// a 2-minute chart. The table in the top-right corner turns red if the chart is wrong.
+// RUN IT ON THE TRIGGER TIMEFRAME CHART: M3 presets need a 3-minute chart, M2 presets a 2-minute
+// chart, BTC M1/M15 a 1-minute chart and BTC M5/H2 a 5-minute chart. The table in the top-right corner turns red if the chart is wrong.
 //
 // POINTS: every "points" input is a 0.01 price step, exactly like the EA presets
 // (gold: 100 points = 1 USD; BTC: 100 points = 1 USD).
@@ -38,19 +38,26 @@
 // price the plan is computed from; the EA fills at the next bar's open, the same price on a
 // continuous feed. The bar magnifier (Premium) refines same-bar stop / trailing fills.
 //
-// PRESETS (calibrated in research/ on FTMO XAUUSD and Binance BTCUSDT M1, Jan 2025-May 2026):
-//  Gold M3/H1     M3 chart, H1 filter, 05:00-09:30 NY. In-sample PF 1.82-2.48 (77 trades).
-//  Gold M2/H1     M2 chart, H1 filter, 05:00-09:30 NY. Chosen on 2025 only: PF 1.55 (186
-//                 trades), 2026 out of sample PF 1.61.
-//  Gold M3/H4     M3 chart, H4 filter, 05:00-09:30 NY. From the every-timeframe search, chosen on
-//                 2025 only: PF 2.07 (106 trades), 2026 out of sample PF 2.15 (26 trades).
-//  BTC M3/H1      M3 chart, H1 filter. Low-cost brokers only (calibrated with a 5 USD spread).
-//  BTC M3/M30     M3 chart, M30 filter. Experimental (its trailing did not hold up in 2026).
-//  Custom         every value from the inputs below.
+// PRESETS (generated from presets/*.set by research/make_pine_presets.py, so they always match MT5).
+// Calibrated on FTMO XAUUSD and Binance BTCUSDT M1, Jan 2025-May 2026. v1.20 settings were chosen
+// with 2025 only; "2026" is out of sample. PF ranges cover four trailing-fill assumptions.
+//  v1.20 Gold M2/H4    2-min chart, 05:00-09:30 NY. 154 trades PF 2.00-2.11; 2026 PF 1.89-2.23.
+//  v1.20 Gold M3/H4    3-min chart, 05:00-09:30 NY. 106 trades PF 1.78-2.16; 2026 PF 1.76-2.42.
+//  v1.20 Gold M3/M15   3-min chart, 00:00-13:00 NY.  92 trades PF 2.00-2.14; 2026 PF 1.40-1.65.
+//  v1.20 Gold M3/H1    3-min chart, 00:00-13:00 NY. 101 trades PF 1.77-1.87; 2026 PF 1.44-1.58.
+//  v1.20 Gold M2/H1    2-min chart, 05:00-09:30 NY. 111 trades PF 1.72-1.83; 2026 PF 1.33-1.61.
+//  v1.20 BTC M1/M15    1-min chart, 00:00-13:00 NY. 104 trades PF 1.62-1.85; 2026 PF 1.67-1.89.
+//  v1.20 BTC M5/H2     5-min chart, 00:00-13:00 NY. 108 trades PF 1.82-2.20; 2026 PF 1.51-1.74.
+//  v1.20 BTC M3/D1     3-min chart, 05:00-09:30 NY. 176 trades PF 1.60-1.87; 2026 PF 1.26-1.45.
+//  v1.10 Gold M3/H1, M2/H1, M3/H4, BTC M3/H1, BTC M3/M30: the earlier calibration (see README).
+//  BTC presets assume a 5 USD spread: low-cost brokers only.
+//  Custom              every value from the inputs below.
+// v1.20 options ported: trend condition (and / or / MACD only / EMA only), Stochastic AND/OR rule,
+// TP at liquidity zones (swing lows clustered from the zone top) and TP buffer.
 //
 // NOT PORTED (MT5 only): broker spread cap (no spread data on TradingView), news filter,
-// entry delay window, partial close, hybrid trailing, RSI filter, manual levels, HTF liquidity
-// levels, the FlashGold filter build and the EVK export.
+// entry delay window, partial close, hybrid trailing, RSI filter, second trend timeframe (HTF2),
+// manual zone levels, HTF liquidity levels, the FlashGold filter build and the EVK export.
 // ---------------------------------------------------------------------------
 strategy("XLZC Liquidity Zero-Cross Bearish (Strategy)", "XLZC Bear S", overlay = true, pyramiding = 0,
      initial_capital = 10000, currency = currency.USD, default_qty_type = strategy.fixed, default_qty_value = 1,
@@ -67,8 +74,10 @@ gSess = "Session (Custom)"
 gCost = "Costs"
 gViz  = "Display"
 
-preset = input.string("Gold M3/H1", "Preset", options = ["Gold M3/H1", "Gold M2/H1", "Gold M3/H4", "BTC M3/H1 (low-cost)", "BTC M3/M30 (experimental)", "Custom"], group = gPre,
-     tooltip = "A preset overrides the Custom inputs below (except costs, risk %, display). Use Custom to set everything yourself.")
+// <<preset-input>> generated by research/make_pine_presets.py from presets/*.set - do not edit by hand
+preset = input.string("v1.20 Gold M2/H4", "Preset", options = ["v1.20 Gold M2/H4", "v1.20 Gold M3/H4", "v1.20 Gold M3/M15", "v1.20 Gold M3/H1", "v1.20 Gold M2/H1", "v1.20 BTC M1/M15 (low-cost)", "v1.20 BTC M5/H2 (low-cost)", "v1.20 BTC M3/D1 (low-cost)", "v1.10 Gold M3/H1", "v1.10 Gold M2/H1", "v1.10 Gold M3/H4", "v1.10 BTC M3/H1 (low-cost)", "v1.10 BTC M3/M30 (experimental)", "Custom"], group = gPre,
+     tooltip = "v1.20 = final calibration (recommended). A preset overrides the Custom inputs below (except costs, risk %, display). Use Custom to set everything yourself.")
+// <</preset-input>>
 
 cTrig     = input.timeframe("3", "Chart (trigger) timeframe expected", group = gTf, tooltip = "Only used for the warning: the strategy always trades the chart's own bars. Put the chart on this timeframe.")
 cHtf      = input.timeframe("60", "Trend filter timeframe", group = gTf)
@@ -84,6 +93,12 @@ cMinSL    = input.int(87, "Min SL distance (points)", minval = 0, group = gStr)
 cMaxSL    = input.int(1732, "Max SL distance (points, 0 = off)", minval = 0, group = gStr)
 cSweep    = input.bool(false, "Require a liquidity sweep candle", group = gStr)
 cStochH   = input.bool(false, "Stochastic blocks unconfirmed signals (hard filter)", group = gStr)
+cStochR   = input.string("and", "Stochastic confirmation rule", options = ["and", "or"], group = gStr, tooltip = "and: came from >= 80 AND turned down. or: came from >= 80 OR turned down (refined spec wording; almost never blocks).")
+cCond     = input.string("and", "Trend condition", options = ["and", "or", "macd", "ema"], group = gTf, tooltip = "What counts as bearish on the trend timeframe: MACD < 0 and close < EMA50 (and), either (or), MACD only, EMA only.")
+cZone     = input.bool(false, "TP at liquidity zones (blue rectangles)", group = gStr, tooltip = "Swing lows within the zone tolerance of a zone's top form one zone; the TP sits the TP buffer above the zone top.")
+cZoneTol  = input.int(100, "Zone tolerance (points)", minval = 0, group = gStr)
+cZoneMin  = input.int(1, "Lows a zone needs", minval = 1, group = gStr)
+cTpBuf    = input.int(0, "TP buffer above the pool / zone (points)", minval = 0, group = gStr)
 
 cTrail    = input.bool(true, "Trailing stop", group = gRisk)
 cTStart   = input.int(260, "Trailing start (points of profit)", minval = 0, group = gRisk)
@@ -104,39 +119,357 @@ showBias  = input.bool(true, "Shade bars when the trend filter allows shorts", g
 showTbl   = input.bool(true, "Status table", group = gViz)
 
 // ===================================================================== presets
-isGold3 = preset == "Gold M3/H1"
-isGold2 = preset == "Gold M2/H1"
-isGold4 = preset == "Gold M3/H4"
-isBtcH1 = preset == "BTC M3/H1 (low-cost)"
-isBtc30 = preset == "BTC M3/M30 (experimental)"
-// arguments: Gold M3/H1, Gold M2/H1, BTC M3/H1, BTC M3/M30, Custom, Gold M3/H4 (last, added later)
-pick(float g3, float g2, float b1, float b30, float custom, float g4) =>
-    isGold3 ? g3 : isGold2 ? g2 : isGold4 ? g4 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
-pickS(string g3, string g2, string b1, string b30, string custom, string g4) =>
-    isGold3 ? g3 : isGold2 ? g2 : isGold4 ? g4 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
-pickB(bool g3, bool g2, bool b1, bool b30, bool custom, bool g4) =>
-    isGold3 ? g3 : isGold2 ? g2 : isGold4 ? g4 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
-
-trigTf   = pickS("3", "2", "3", "3", cTrig, "3")
-htfTf    = pickS("60", "60", "60", "30", cHtf, "240")
+// <<preset-values>> generated by research/make_pine_presets.py from presets/*.set - do not edit by hand
+string trigTf = switch preset
+    "v1.20 Gold M2/H4" => "2"
+    "v1.20 Gold M3/H4" => "3"
+    "v1.20 Gold M3/M15" => "3"
+    "v1.20 Gold M3/H1" => "3"
+    "v1.20 Gold M2/H1" => "2"
+    "v1.20 BTC M1/M15 (low-cost)" => "1"
+    "v1.20 BTC M5/H2 (low-cost)" => "5"
+    "v1.20 BTC M3/D1 (low-cost)" => "3"
+    "v1.10 Gold M3/H1" => "3"
+    "v1.10 Gold M2/H1" => "2"
+    "v1.10 Gold M3/H4" => "3"
+    "v1.10 BTC M3/H1 (low-cost)" => "3"
+    "v1.10 BTC M3/M30 (experimental)" => "3"
+    => cTrig
+string htfTf = switch preset
+    "v1.20 Gold M2/H4" => "240"
+    "v1.20 Gold M3/H4" => "240"
+    "v1.20 Gold M3/M15" => "15"
+    "v1.20 Gold M3/H1" => "60"
+    "v1.20 Gold M2/H1" => "60"
+    "v1.20 BTC M1/M15 (low-cost)" => "15"
+    "v1.20 BTC M5/H2 (low-cost)" => "120"
+    "v1.20 BTC M3/D1 (low-cost)" => "D"
+    "v1.10 Gold M3/H1" => "60"
+    "v1.10 Gold M2/H1" => "60"
+    "v1.10 Gold M3/H4" => "240"
+    "v1.10 BTC M3/H1 (low-cost)" => "60"
+    "v1.10 BTC M3/M30 (experimental)" => "30"
+    => cHtf
+int nBars = switch preset
+    "v1.20 Gold M2/H4" => 15
+    "v1.20 Gold M3/H4" => 25
+    "v1.20 Gold M3/M15" => 15
+    "v1.20 Gold M3/H1" => 15
+    "v1.20 Gold M2/H1" => 15
+    "v1.20 BTC M1/M15 (low-cost)" => 25
+    "v1.20 BTC M5/H2 (low-cost)" => 40
+    "v1.20 BTC M3/D1 (low-cost)" => 40
+    "v1.10 Gold M3/H1" => 40
+    "v1.10 Gold M2/H1" => 15
+    "v1.10 Gold M3/H4" => 25
+    "v1.10 BTC M3/H1 (low-cost)" => 40
+    "v1.10 BTC M3/M30 (experimental)" => 40
+    => cN
+int sStr = switch preset
+    "v1.20 Gold M2/H4" => 2
+    "v1.20 Gold M3/H4" => 4
+    "v1.20 Gold M3/M15" => 2
+    "v1.20 Gold M3/H1" => 4
+    "v1.20 Gold M2/H1" => 2
+    "v1.20 BTC M1/M15 (low-cost)" => 3
+    "v1.20 BTC M5/H2 (low-cost)" => 3
+    "v1.20 BTC M3/D1 (low-cost)" => 3
+    "v1.10 Gold M3/H1" => 2
+    "v1.10 Gold M2/H1" => 4
+    "v1.10 Gold M3/H4" => 4
+    "v1.10 BTC M3/H1 (low-cost)" => 2
+    "v1.10 BTC M3/M30 (experimental)" => 3
+    => cS
+float bufPts = switch preset
+    "v1.20 Gold M2/H4" => 170
+    "v1.20 Gold M3/H4" => 208
+    "v1.20 Gold M3/M15" => 208
+    "v1.20 Gold M3/H1" => 208
+    "v1.20 Gold M2/H1" => 113
+    "v1.20 BTC M1/M15 (low-cost)" => 3912
+    "v1.20 BTC M5/H2 (low-cost)" => 2916
+    "v1.20 BTC M3/D1 (low-cost)" => 2259
+    "v1.10 Gold M3/H1" => 208
+    "v1.10 Gold M2/H1" => 57
+    "v1.10 Gold M3/H4" => 208
+    "v1.10 BTC M3/H1 (low-cost)" => 2259
+    "v1.10 BTC M3/M30 (experimental)" => 4517
+    => cBuf
+int ntIn = switch preset
+    "v1.20 Gold M2/H4" => 60
+    "v1.20 Gold M3/H4" => 60
+    "v1.20 Gold M3/M15" => 120
+    "v1.20 Gold M3/H1" => 60
+    "v1.20 Gold M2/H1" => 120
+    "v1.20 BTC M1/M15 (low-cost)" => 60
+    "v1.20 BTC M5/H2 (low-cost)" => 120
+    "v1.20 BTC M3/D1 (low-cost)" => 120
+    "v1.10 Gold M3/H1" => 120
+    "v1.10 Gold M2/H1" => 120
+    "v1.10 Gold M3/H4" => 60
+    "v1.10 BTC M3/H1 (low-cost)" => 60
+    "v1.10 BTC M3/M30 (experimental)" => 120
+    => cNT
+float minRR = switch preset
+    "v1.20 Gold M2/H4" => 2.0
+    "v1.20 Gold M3/H4" => 1.0
+    "v1.20 Gold M3/M15" => 1.5
+    "v1.20 Gold M3/H1" => 1.0
+    "v1.20 Gold M2/H1" => 1.0
+    "v1.20 BTC M1/M15 (low-cost)" => 1.5
+    "v1.20 BTC M5/H2 (low-cost)" => 1.0
+    "v1.20 BTC M3/D1 (low-cost)" => 2.0
+    "v1.10 Gold M3/H1" => 1.5
+    "v1.10 Gold M2/H1" => 1.5
+    "v1.10 Gold M3/H4" => 1.5
+    "v1.10 BTC M3/H1 (low-cost)" => 2.0
+    "v1.10 BTC M3/M30 (experimental)" => 2.0
+    => cRR
+float fbRR = switch preset
+    "v1.20 Gold M2/H4" => 1.5
+    "v1.20 Gold M3/H4" => 1.5
+    "v1.20 Gold M3/M15" => 1.5
+    "v1.20 Gold M3/H1" => 0.0
+    "v1.20 Gold M2/H1" => 0.0
+    "v1.20 BTC M1/M15 (low-cost)" => 0.0
+    "v1.20 BTC M5/H2 (low-cost)" => 0.0
+    "v1.20 BTC M3/D1 (low-cost)" => 0.0
+    "v1.10 Gold M3/H1" => 0
+    "v1.10 Gold M2/H1" => 1.5
+    "v1.10 Gold M3/H4" => 1.5
+    "v1.10 BTC M3/H1 (low-cost)" => 0.0
+    "v1.10 BTC M3/M30 (experimental)" => 0.0
+    => cFb
+float minSLPts = switch preset
+    "v1.20 Gold M2/H4" => 71
+    "v1.20 Gold M3/H4" => 87
+    "v1.20 Gold M3/M15" => 87
+    "v1.20 Gold M3/H1" => 87
+    "v1.20 Gold M2/H1" => 71
+    "v1.20 BTC M1/M15 (low-cost)" => 1630
+    "v1.20 BTC M5/H2 (low-cost)" => 3645
+    "v1.20 BTC M3/D1 (low-cost)" => 2823
+    "v1.10 Gold M3/H1" => 87
+    "v1.10 Gold M2/H1" => 71
+    "v1.10 Gold M3/H4" => 87
+    "v1.10 BTC M3/H1 (low-cost)" => 2823
+    "v1.10 BTC M3/M30 (experimental)" => 2823
+    => cMinSL
+float maxSLPts = switch preset
+    "v1.20 Gold M2/H4" => 1414
+    "v1.20 Gold M3/H4" => 1732
+    "v1.20 Gold M3/M15" => 1732
+    "v1.20 Gold M3/H1" => 1732
+    "v1.20 Gold M2/H1" => 1414
+    "v1.20 BTC M1/M15 (low-cost)" => 32600
+    "v1.20 BTC M5/H2 (low-cost)" => 72896
+    "v1.20 BTC M3/D1 (low-cost)" => 56465
+    "v1.10 Gold M3/H1" => 1732
+    "v1.10 Gold M2/H1" => 1414
+    "v1.10 Gold M3/H4" => 1732
+    "v1.10 BTC M3/H1 (low-cost)" => 56465
+    "v1.10 BTC M3/M30 (experimental)" => 56465
+    => cMaxSL
+bool trailOn = switch preset
+    "v1.20 Gold M2/H4" => true
+    "v1.20 Gold M3/H4" => true
+    "v1.20 Gold M3/M15" => true
+    "v1.20 Gold M3/H1" => true
+    "v1.20 Gold M2/H1" => true
+    "v1.20 BTC M1/M15 (low-cost)" => true
+    "v1.20 BTC M5/H2 (low-cost)" => true
+    "v1.20 BTC M3/D1 (low-cost)" => true
+    "v1.10 Gold M3/H1" => true
+    "v1.10 Gold M2/H1" => true
+    "v1.10 Gold M3/H4" => true
+    "v1.10 BTC M3/H1 (low-cost)" => true
+    "v1.10 BTC M3/M30 (experimental)" => true
+    => cTrail
+float tStart = switch preset
+    "v1.20 Gold M2/H4" => 566
+    "v1.20 Gold M3/H4" => 260
+    "v1.20 Gold M3/M15" => 693
+    "v1.20 Gold M3/H1" => 693
+    "v1.20 Gold M2/H1" => 566
+    "v1.20 BTC M1/M15 (low-cost)" => 13040
+    "v1.20 BTC M5/H2 (low-cost)" => 10934
+    "v1.20 BTC M3/D1 (low-cost)" => 8470
+    "v1.10 Gold M3/H1" => 260
+    "v1.10 Gold M2/H1" => 212
+    "v1.10 Gold M3/H4" => 260
+    "v1.10 BTC M3/H1 (low-cost)" => 8470
+    "v1.10 BTC M3/M30 (experimental)" => 8470
+    => cTStart
+float tDist = switch preset
+    "v1.20 Gold M2/H4" => 71
+    "v1.20 Gold M3/H4" => 87
+    "v1.20 Gold M3/M15" => 87
+    "v1.20 Gold M3/H1" => 87
+    "v1.20 Gold M2/H1" => 71
+    "v1.20 BTC M1/M15 (low-cost)" => 1630
+    "v1.20 BTC M5/H2 (low-cost)" => 3645
+    "v1.20 BTC M3/D1 (low-cost)" => 2823
+    "v1.10 Gold M3/H1" => 173
+    "v1.10 Gold M2/H1" => 141
+    "v1.10 Gold M3/H4" => 173
+    "v1.10 BTC M3/H1 (low-cost)" => 1412
+    "v1.10 BTC M3/M30 (experimental)" => 5646
+    => cTDist
+int sessFrom = switch preset
+    "v1.20 Gold M2/H4" => 500
+    "v1.20 Gold M3/H4" => 500
+    "v1.20 Gold M3/M15" => 0
+    "v1.20 Gold M3/H1" => 0
+    "v1.20 Gold M2/H1" => 500
+    "v1.20 BTC M1/M15 (low-cost)" => 0
+    "v1.20 BTC M5/H2 (low-cost)" => 0
+    "v1.20 BTC M3/D1 (low-cost)" => 500
+    "v1.10 Gold M3/H1" => 500
+    "v1.10 Gold M2/H1" => 500
+    "v1.10 Gold M3/H4" => 500
+    "v1.10 BTC M3/H1 (low-cost)" => 500
+    "v1.10 BTC M3/M30 (experimental)" => 500
+    => cSessFrom
+int sessTo = switch preset
+    "v1.20 Gold M2/H4" => 930
+    "v1.20 Gold M3/H4" => 930
+    "v1.20 Gold M3/M15" => 1300
+    "v1.20 Gold M3/H1" => 1300
+    "v1.20 Gold M2/H1" => 930
+    "v1.20 BTC M1/M15 (low-cost)" => 1300
+    "v1.20 BTC M5/H2 (low-cost)" => 1300
+    "v1.20 BTC M3/D1 (low-cost)" => 930
+    "v1.10 Gold M3/H1" => 930
+    "v1.10 Gold M2/H1" => 930
+    "v1.10 Gold M3/H4" => 930
+    "v1.10 BTC M3/H1 (low-cost)" => 930
+    "v1.10 BTC M3/M30 (experimental)" => 930
+    => cSessTo
+string condMode = switch preset
+    "v1.20 Gold M2/H4" => "ema"
+    "v1.20 Gold M3/H4" => "and"
+    "v1.20 Gold M3/M15" => "and"
+    "v1.20 Gold M3/H1" => "and"
+    "v1.20 Gold M2/H1" => "and"
+    "v1.20 BTC M1/M15 (low-cost)" => "and"
+    "v1.20 BTC M5/H2 (low-cost)" => "ema"
+    "v1.20 BTC M3/D1 (low-cost)" => "and"
+    "v1.10 Gold M3/H1" => "and"
+    "v1.10 Gold M2/H1" => "and"
+    "v1.10 Gold M3/H4" => "and"
+    "v1.10 BTC M3/H1 (low-cost)" => "and"
+    "v1.10 BTC M3/M30 (experimental)" => "and"
+    => cCond
+bool stochHard = switch preset
+    "v1.20 Gold M2/H4" => false
+    "v1.20 Gold M3/H4" => false
+    "v1.20 Gold M3/M15" => true
+    "v1.20 Gold M3/H1" => false
+    "v1.20 Gold M2/H1" => false
+    "v1.20 BTC M1/M15 (low-cost)" => true
+    "v1.20 BTC M5/H2 (low-cost)" => true
+    "v1.20 BTC M3/D1 (low-cost)" => true
+    "v1.10 Gold M3/H1" => false
+    "v1.10 Gold M2/H1" => false
+    "v1.10 Gold M3/H4" => false
+    "v1.10 BTC M3/H1 (low-cost)" => false
+    "v1.10 BTC M3/M30 (experimental)" => false
+    => cStochH
+string stochRule = switch preset
+    "v1.20 Gold M2/H4" => "and"
+    "v1.20 Gold M3/H4" => "and"
+    "v1.20 Gold M3/M15" => "and"
+    "v1.20 Gold M3/H1" => "and"
+    "v1.20 Gold M2/H1" => "and"
+    "v1.20 BTC M1/M15 (low-cost)" => "and"
+    "v1.20 BTC M5/H2 (low-cost)" => "and"
+    "v1.20 BTC M3/D1 (low-cost)" => "or"
+    "v1.10 Gold M3/H1" => "and"
+    "v1.10 Gold M2/H1" => "and"
+    "v1.10 Gold M3/H4" => "and"
+    "v1.10 BTC M3/H1 (low-cost)" => "and"
+    "v1.10 BTC M3/M30 (experimental)" => "and"
+    => cStochR
+bool tpZone = switch preset
+    "v1.20 Gold M2/H4" => true
+    "v1.20 Gold M3/H4" => false
+    "v1.20 Gold M3/M15" => true
+    "v1.20 Gold M3/H1" => false
+    "v1.20 Gold M2/H1" => true
+    "v1.20 BTC M1/M15 (low-cost)" => true
+    "v1.20 BTC M5/H2 (low-cost)" => true
+    "v1.20 BTC M3/D1 (low-cost)" => false
+    "v1.10 Gold M3/H1" => false
+    "v1.10 Gold M2/H1" => false
+    "v1.10 Gold M3/H4" => false
+    "v1.10 BTC M3/H1 (low-cost)" => false
+    "v1.10 BTC M3/M30 (experimental)" => false
+    => cZone
+float zoneTol = switch preset
+    "v1.20 Gold M2/H4" => 71
+    "v1.20 Gold M3/H4" => 173
+    "v1.20 Gold M3/M15" => 87
+    "v1.20 Gold M3/H1" => 173
+    "v1.20 Gold M2/H1" => 71
+    "v1.20 BTC M1/M15 (low-cost)" => 3260
+    "v1.20 BTC M5/H2 (low-cost)" => 7290
+    "v1.20 BTC M3/D1 (low-cost)" => 5646
+    "v1.10 Gold M3/H1" => 100
+    "v1.10 Gold M2/H1" => 100
+    "v1.10 Gold M3/H4" => 100
+    "v1.10 BTC M3/H1 (low-cost)" => 100
+    "v1.10 BTC M3/M30 (experimental)" => 100
+    => cZoneTol
+int zoneMin = switch preset
+    "v1.20 Gold M2/H4" => 1
+    "v1.20 Gold M3/H4" => 1
+    "v1.20 Gold M3/M15" => 1
+    "v1.20 Gold M3/H1" => 1
+    "v1.20 Gold M2/H1" => 1
+    "v1.20 BTC M1/M15 (low-cost)" => 1
+    "v1.20 BTC M5/H2 (low-cost)" => 1
+    "v1.20 BTC M3/D1 (low-cost)" => 1
+    "v1.10 Gold M3/H1" => 1
+    "v1.10 Gold M2/H1" => 1
+    "v1.10 Gold M3/H4" => 1
+    "v1.10 BTC M3/H1 (low-cost)" => 1
+    "v1.10 BTC M3/M30 (experimental)" => 1
+    => cZoneMin
+float tpBuf = switch preset
+    "v1.20 Gold M2/H4" => 0
+    "v1.20 Gold M3/H4" => 35
+    "v1.20 Gold M3/M15" => 0
+    "v1.20 Gold M3/H1" => 0
+    "v1.20 Gold M2/H1" => 28
+    "v1.20 BTC M1/M15 (low-cost)" => 0
+    "v1.20 BTC M5/H2 (low-cost)" => 1458
+    "v1.20 BTC M3/D1 (low-cost)" => 1129
+    "v1.10 Gold M3/H1" => 0
+    "v1.10 Gold M2/H1" => 0
+    "v1.10 Gold M3/H4" => 0
+    "v1.10 BTC M3/H1 (low-cost)" => 0
+    "v1.10 BTC M3/M30 (experimental)" => 0
+    => cTpBuf
+float spreadDef = switch preset
+    "v1.20 Gold M2/H4" => 0.45
+    "v1.20 Gold M3/H4" => 0.45
+    "v1.20 Gold M3/M15" => 0.45
+    "v1.20 Gold M3/H1" => 0.45
+    "v1.20 Gold M2/H1" => 0.45
+    "v1.20 BTC M1/M15 (low-cost)" => 5.0
+    "v1.20 BTC M5/H2 (low-cost)" => 5.0
+    "v1.20 BTC M3/D1 (low-cost)" => 5.0
+    "v1.10 Gold M3/H1" => 0.45
+    "v1.10 Gold M2/H1" => 0.45
+    "v1.10 Gold M3/H4" => 0.45
+    "v1.10 BTC M3/H1 (low-cost)" => 5.0
+    "v1.10 BTC M3/M30 (experimental)" => 5.0
+    => 0.0
+// <</preset-values>>
 useHtf   = preset == "Custom" ? cUseHtf : true
-nBars    = int(pick(40, 15, 40, 40, cN, 25))
-sStr     = int(pick(2, 4, 2, 3, cS, 4))
-bufPts   = pick(208, 57, 2259, 4517, cBuf, 208)
-ntIn     = int(pick(120, 120, 60, 120, cNT, 60))
-minRR    = pick(1.5, 1.5, 2.0, 2.0, cRR, 1.5)
-fbRR     = pick(0.0, 1.5, 0.0, 0.0, cFb, 1.5)
-minSLPts = pick(87, 71, 2823, 2823, cMinSL, 87)
-maxSLPts = pick(1732, 1414, 56465, 56465, cMaxSL, 1732)
 reqSweep = preset == "Custom" ? cSweep : false
-stochHard = preset == "Custom" ? cStochH : false
-trailOn  = pickB(true, true, true, true, cTrail, true)
-tStart   = pick(260, 212, 8470, 8470, cTStart, 260)
-tDist    = pick(173, 141, 1412, 5646, cTDist, 173)
 sessOn   = preset == "Custom" ? cSessOn : true
-sessFrom = int(pick(500, 500, 500, 500, cSessFrom, 500))
-sessTo   = int(pick(930, 930, 930, 930, cSessTo, 930))
-spread   = spreadIn >= 0 ? spreadIn : (isGold3 or isGold2 or isGold4) ? 0.45 : (isBtcH1 or isBtc30) ? 5.0 : 0.0
+spread   = spreadIn >= 0 ? spreadIn : spreadDef
 ntBars   = ntIn > 0 ? ntIn : nBars
 PT       = 0.01                                   // one "point" = 0.01 price, as in the EA presets
 if useHtf and timeframe.in_seconds(htfTf) <= timeframe.in_seconds(timeframe.period)
@@ -156,14 +489,19 @@ htfJustClosed = not na(hTClose) and not na(time_close) and time_close >= hTClose
 hMacd  = htfJustClosed ? hM0 : hM1
 hClose = htfJustClosed ? hC0 : hC1
 hEma   = htfJustClosed ? hE0 : hE1
-biasOK = not useHtf or (hMacd < 0 and hClose < hEma)
+macdBear = hMacd < 0
+emaBear  = hClose < hEma
+htfBear  = condMode == "or" ? (macdBear or emaBear) : condMode == "macd" ? macdBear : condMode == "ema" ? emaBear : (macdBear and emaBear)
+biasOK   = not useHtf or htfBear
 
 // ===================================================================== R2 trigger, R3 stochastic
 macd      = ta.ema(close, 12) - ta.ema(close, 26)
 zeroCross = macd[1] >= 0 and macd < 0
 stK = ta.stoch(close, high, low, 7)               // slowing 1 = raw %K
 stD = ta.sma(stK, 7)
-stochOK = ta.highest(stK, 5) >= 80 and (stK < stD or stK < 80)
+wasOB   = ta.highest(stK, 5) >= 80
+turned  = stK < stD or stK < 80
+stochOK = stochRule == "or" ? (wasOB or turned) : (wasOB and turned)
 
 // ===================================================================== R6 session (next bar's open)
 nextOpen = time_close
@@ -231,14 +569,40 @@ if barstate.isconfirmed and zeroCross and readyBars and strategy.position_size =
         float risk = sl - entryPx
         float riskPts = risk / PT
         // TP: nearest swing low below price (highest first) that pays >= min reward:risk
+        // TP candidates: swing lows below price within the TP lookback, highest first.
+        // Zone mode (EA TP_Mode = TP_ZONE): lows within the tolerance of a zone's TOP form one zone
+        // and the zone top is the candidate. The TP is the candidate + TP buffer, and the first
+        // (highest) candidate that pays >= min reward:risk is used.
         float tp = na
+        lowsArr = array.new_float()
         if 1 + sStr <= ntBars
             for i = 1 + sStr to ntBars
                 int o = i - 1
                 if isSwingLow(o, sStr) and low[o] < entryPx
-                    float reward = entryPx - low[o]
-                    if reward > 0 and (minRR <= 0 or reward >= minRR * risk)
-                        tp := na(tp) ? low[o] : math.max(tp, low[o])
+                    array.push(lowsArr, low[o])
+        array.sort(lowsArr, order.descending)
+        cands = array.new_float()
+        if tpZone
+            float zTop = na
+            int zCount = 0
+            for lv in lowsArr
+                if not na(zTop) and zTop - lv <= zoneTol * PT
+                    zCount += 1
+                else
+                    if not na(zTop) and zCount >= zoneMin
+                        array.push(cands, zTop)
+                    zTop := lv
+                    zCount := 1
+            if not na(zTop) and zCount >= zoneMin
+                array.push(cands, zTop)
+        else
+            cands := lowsArr
+        for c in cands
+            float tpc = c + tpBuf * PT
+            float reward = entryPx - tpc
+            if reward > 0 and (minRR <= 0 or reward >= minRR * risk)
+                tp := tpc
+                break
         if na(tp) and fbRR > 0
             tp := entryPx - fbRR * risk
         if na(tp)
@@ -289,7 +653,7 @@ bgcolor(showBias and useHtf and biasOK ? color.new(color.red, 93) : na, title = 
 
 chartOK = timeframe.period == trigTf
 if showTbl and barstate.islast
-    var table t = table.new(position.top_right, 2, 8, border_width = 1)
+    var table t = table.new(position.top_right, 2, 9, border_width = 1)
     table.cell(t, 0, 0, "XLZC Bear", text_color = color.white, bgcolor = color.new(color.gray, 20))
     table.cell(t, 1, 0, preset, text_color = color.white, bgcolor = color.new(color.gray, 20))
     table.cell(t, 0, 1, "Chart / needed")
@@ -305,5 +669,7 @@ if showTbl and barstate.islast
     table.cell(t, 1, 5, trailOn ? str.format("{0,number,#}/{1,number,#} pts", tStart, tDist) : "off")
     table.cell(t, 0, 6, "Commission to set")
     table.cell(t, 1, 6, str.tostring(spread * syminfo.pointvalue / 2.0) + " per contract per side + broker fee")
-    table.cell(t, 0, 7, "Last skip")
-    table.cell(t, 1, 7, lastSkip)
+    table.cell(t, 0, 7, "Options")
+    table.cell(t, 1, 7, "trend " + condMode + ", stoch " + (stochHard ? "hard/" + stochRule : "soft") + ", TP " + (tpZone ? "zones " + str.tostring(zoneTol) + " pts" : "swing") + (tpBuf > 0 ? " +" + str.tostring(tpBuf) : ""))
+    table.cell(t, 0, 8, "Last skip")
+    table.cell(t, 1, 8, lastSkip)

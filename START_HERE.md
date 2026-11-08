@@ -70,19 +70,19 @@ Every preset risks 0.5% per trade (1% for Aggressive) and uses its own magic num
 
 ## TradingView version
 
-`XLZC_Liquidity_ZeroCross_Bearish_Strategy.pine` is the same strategy as a TradingView Pine v6 strategy, with the four calibrated presets in a **Preset** dropdown.
+`XLZC_Liquidity_ZeroCross_Bearish_Strategy.pine` is the same strategy as a TradingView Pine v6 strategy. Its **Preset** dropdown holds all eight v1.20 presets (default: Gold M2/H4) and the five v1.10 presets, with the same values as the `.set` files.
 
 1. Open the Pine Editor, paste the file, click **Add to chart**.
-2. Put the chart on the trigger timeframe: **3 minutes** for the M3 presets, **2 minutes** for M2/H1. The table in the top-right corner turns red when the chart is wrong.
+2. Put the chart on the trigger timeframe: **2 minutes** for the M2 presets, **3 minutes** for the M3 presets, **1 minute** for BTC M1/M15 and **5 minutes** for BTC M5/H2. The table in the top-right corner turns red when the chart is wrong.
 3. In **Settings > Inputs**, pick the preset and set **Spread** to your broker's typical spread in price, for example 0.45 for gold or 5 for BTC.
 4. In **Settings > Properties > Commission**, enter the value the table shows: half the spread per contract per side, plus your broker's commission. Without it the backtest leaves out the spread cost.
 
-The TradingView dropdown holds the v1.10 presets plus Gold M3/H4. The v1.20 presets use options the Pine version does not have yet (trend condition modes, liquidity zones, the Stochastic OR rule), so they run in MT5 only.
+The Pine version now has the v1.20 options the presets use: the trend condition (MACD and/or EMA), take-profit at liquidity zones with a TP buffer, and the Stochastic AND/OR rule. The presets are written into the Pine file by `research/make_pine_presets.py`, so rerun it after changing a `.set` file.
 
 Differences from MT5:
-- The session is entered in New York time: 05:00–09:30 New York = 12:00–16:30 broker server time.
+- The session is entered in New York time (server time − 7 h): 12:00–16:30 server = 05:00–09:30 New York, 07:00–20:00 server = 00:00–13:00 New York. The presets already do this conversion.
 - TradingView has no spread data, so there is no spread cap.
-- There is no news filter, partial close, hybrid trailing or FlashGold build.
+- There is no news filter, partial close, hybrid trailing, RSI filter, second trend timeframe, manual zone levels or FlashGold build. None of the shipped presets uses them, except the news filter, which was not in the backtest either.
 - Orders fill at the signal bar's close instead of the next bar's open (the same price on a continuous feed).
 - Same-bar stop and trailing fills use TradingView's bar magnifier on Premium plans; otherwise TradingView guesses the order of prices inside each bar.
 
