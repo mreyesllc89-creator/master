@@ -50,7 +50,10 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
     s_top = s_bot = s_kt = s_kb = 0.0; s_idx = 0; s_act = False
     side = 0; avg = 0.0; sl = np.nan; tp = np.nan; e_sl = 0.0; e_tp = np.nan; e_atr = 0.0
     entry_index = -1; trail = np.nan; armed = False; be = False; entry_row = -1
+    trail_c = np.nan; armed_c = False; be_c = False   # committed (last closed bar) protection state
+    rebase = False                                     # SL/TP still follow the fill bar's ATR
     q_kind = 0; q_side = 0; q_sl = 0.0; q_tp = 0.0; q_atr = 0.0     # queued: 1 entry, 2 close
+    q_keep = False                                     # pending distances survive (reversal queued on the final tick)
     last_entry_bar = -1; last_flat_bar = -1
     consec = 0; pause_until = -1; cooldown_until = -1
     pending_closed = 0; closed_pnl = np.zeros(64)
@@ -63,6 +66,25 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
         for j in range(first[k], last[k] + 1):
             bid_o = o[j]; s = sp[j]
             # ---- next tick: dispatch the queued action at this M1 open
+            if q_kind != 0 and side != 0:
+                # the tester fills the old bracket first; DispatchScheduledEntry then retires the action
+                adj = 0.0 if side > 0 else s
+                po = bid_o + adj
+                g = 0
+                if side > 0:
+                    if po <= sl: g = 1
+                    elif tp == tp and po >= tp: g = 2
+                else:
+                    if po >= sl: g = 1
+                    elif tp == tp and po <= tp: g = 2
+                if g != 0:
+                    pnl = (po - avg) if side > 0 else (avg - po)
+                    out[nt, 0] = entry_row; out[nt, 1] = j; out[nt, 2] = side; out[nt, 3] = pnl
+                    out[nt, 4] = e_sl; out[nt, 5] = g - 1
+                    nt += 1
+                    if pending_closed < 64:
+                        closed_pnl[pending_closed] = pnl; pending_closed += 1
+                    side = 0; q_kind = 0
             if q_kind != 0:
                 if side != 0:
                     px = bid_o if side > 0 else bid_o + s
@@ -80,6 +102,8 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
                     sl = avg - e_sl if side > 0 else avg + e_sl
                     tp = (avg + e_tp if side > 0 else avg - e_tp) if e_tp == e_tp else np.nan
                     entry_index = k; entry_row = j; trail = np.nan; armed = False; be = False
+                    trail_c = np.nan; armed_c = False; be_c = False
+                    rebase = not q_keep
                 q_kind = 0
             # ---- stops / targets along this M1 path (bid chart; shorts exit at the ask)
             if side != 0:
@@ -184,14 +208,20 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
             intent = 1 if (can and buy and side <= 0) else (-1 if (can and sell and side >= 0) else 0)
             if intent != 0 and q_kind == 0 and atr_f == atr_f:
                 q_kind = 1; q_side = intent; q_sl = sl_d; q_tp = tp_d; q_atr = atr_f
+                q_keep = side != 0 and j == last[k]
                 last_entry_bar = k
                 if P[I_OPZ] == 1 and j == last[k]:
                     from_demand = intent < 0 if P[I_FADE] == 1 else intent > 0
                     consume_final = 1 if from_demand else 2
-            # protection (trailing / breakeven) from this tick's close
+            # protection: each tick starts from the committed state (DPFProtectionEvaluate on a copy)
             if side != 0:
+                if rebase and entry_index == k and atr_f == atr_f:
+                    # no pending distances: entry_sl/entry_tp follow this tick's ATR until the fill bar closes
+                    e_sl = sl_d; e_tp = tp_d; e_atr = atr_f
+                    tp = (avg + e_tp if side > 0 else avg - e_tp) if e_tp == e_tp else np.nan
                 base = avg - e_sl if side > 0 else avg + e_sl
                 stop = base
+                armed = armed_c; trail = trail_c; be = be_c
                 if P[I_TRAIL] == 1 and atr_f == atr_f:
                     act = atr_f * F[F_TACT]; dst = max(atr_f * F[F_TDST], F[F_MINTICK])
                     if side > 0:
@@ -211,6 +241,8 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
                     if side < 0 and fc <= avg - e_atr * F[F_BE]: be = True
                     if be: stop = max(stop, avg) if side > 0 else min(stop, avg)
                 sl = stop
+                if j == last[k]:
+                    armed_c = armed; trail_c = trail; be_c = be
             # forced close
             if side != 0 and q_kind == 0 and last_flat_bar != k:
                 reason = 0
@@ -219,7 +251,8 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
                 elif t_exit: reason = 3
                 if reason != 0:
                     q_kind = 2; last_flat_bar = k
-                    if reason >= 2:
+                    if reason >= 2 and j == last[k]:
+                        # losses_current is reset every tick: only a final-tick queue keeps the cooldown
                         cooldown_until = k + P[I_CDBARS]
         # ---- commit the closed bar
         rng = fh - fl; up = 0.5
@@ -247,13 +280,14 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
         if P[I_INVAL] == 1:
             if d_act and fc < d_bot: d_act = False
             if s_act and fc > s_top: s_act = False
-        if consume_final == 1: d_act = False
-        if consume_final == 2: s_act = False
         if avg_d == avg_d:
             if delta > avg_d * F[F_DELTA] and fc > fo and (P[I_ZTREND] == 0 or fc > ema):
                 d_top = fh; d_bot = fl; d_kt = fc; d_kb = fo; d_idx = k; d_act = True
             if delta < -avg_d * F[F_DELTA] and fc < fo and (P[I_ZTREND] == 0 or fc < ema):
                 s_top = fh; s_bot = fl; s_kt = fo; s_kb = fc; s_idx = k; s_act = True
+        # Consume runs after Push created this bar's zones (QueueEntry after Push)
+        if consume_final == 1: d_act = False
+        if consume_final == 2: s_act = False
         pc = fc
     return out[:nt]
 
@@ -274,6 +308,8 @@ def load_m1(symbol):
         hourly = sp.interpolate().bfill().ffill().values * 0.01
         spread = hourly[B.server_to_utc_hour(server)]
         spread = spread * float(os.environ.get("DP_SPREAD_MULT", "1"))
+        for col in ("open", "high", "low", "close"):          # FTMO bars are mid quotes: chart = bid
+            m1[col] = m1[col] - spread / 2
         key = server                                              # bar buckets (whole-hour offset)
     else:
         m1 = pd.read_csv(os.path.join(BTC_DIR, "BTCUSD_m1.csv"), parse_dates=["datetime"])
