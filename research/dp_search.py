@@ -73,6 +73,7 @@ def to_cfg(sym, p):
         if k in p:
             c[k] = bool(p[k])
     c["session"] = SESSIONS[p["session"]]
+    c["intrabar"] = int(os.environ.get("DP_INTRABAR", c["intrabar"]))   # 0 = live bar-close EA
     c["block_hours"] = tuple(p.get("block_hours", ()))
     mt = c["mintick"]
     c["sl_pts"] = p["sl_usd"] / mt

@@ -85,7 +85,12 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
                     nt += 1
                     if pending_closed < 64:
                         closed_pnl[pending_closed] = pnl; pending_closed += 1
-                    side = 0; q_kind = 0
+                    side = 0
+                    # tick tester: DispatchScheduledEntry retires the queued action. Bar-close live
+                    # (EvaluateClosedBar): the decision is taken at this quote with the real (flat)
+                    # position, so a queued entry still goes ahead; only a forced close is moot.
+                    if P[I_INTRA] == 1 or q_kind == 2:
+                        q_kind = 0
             if q_kind != 0:
                 if side != 0:
                     px = bid_o if side > 0 else bid_o + s
