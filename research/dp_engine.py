@@ -34,9 +34,9 @@ BTC_DIR = os.environ.get("DP_BTC_DIR", "")
 # integer parameter slots
 I_ZLEN, I_EMALEN, I_USEEMA, I_MINRET, I_MAXAGE, I_INVAL, I_MODE, I_ZTREND, I_FADE, I_ATRLEN, \
     I_TRAIL, I_TSTOP, I_DEADON, I_DEADBARS, I_BEON, I_OPZ, I_CDON, I_CDBARS, I_LCON, I_LCN, \
-    I_LCPAUSE, I_COSTON, I_INTRA, I_WORST, I_NI = range(25)
+    I_LCPAUSE, I_COSTON, I_INTRA, I_WORST, I_PTS, I_LIMDEC, I_LIMFLAT, I_NI = range(28)
 # float parameter slots
-F_DELTA, F_SL, F_TPR, F_TACT, F_TDST, F_BE, F_COSTMIN, F_MINTICK, F_NF = range(9)
+F_DELTA, F_SL, F_TPR, F_TACT, F_TDST, F_BE, F_COSTMIN, F_MINTICK, F_SLP, F_TPP, F_TACTP, F_TDSTP, F_NF = range(13)
 
 
 @nb.njit(cache=True)
@@ -177,8 +177,12 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
                 atr_f = (tr_seed + tr) / atr_len
             else:
                 atr_f = tr / atr_len + (1.0 - 1.0 / atr_len) * atr
-            sl_d = atr_f * F[F_SL]
-            tp_d = sl_d * F[F_TPR] if F[F_TPR] > 0 else np.nan
+            if P[I_PTS] == 1:                       # ExitMode = Points (distances in price)
+                sl_d = F[F_SLP]
+                tp_d = F[F_TPP] if F[F_TPP] > 0 else np.nan
+            else:
+                sl_d = atr_f * F[F_SL]
+                tp_d = sl_d * F[F_TPR] if F[F_TPR] > 0 else np.nan
             cost_block = P[I_COSTON] == 1 and sl_d == sl_d and sl_d < F[F_COSTMIN]
             held = k - entry_index if side != 0 else -1
             long_red = side > 0 and fc <= avg
@@ -204,9 +208,9 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
             os_ = in_s and fc < fo and pc == pc and fc < pc and (P[I_USEEMA] == 0 or fc < ema_f) and allowed and not cost_block
             buy = (os_ if P[I_FADE] == 1 else ob) and not blk_long[k]
             sell = (ob if P[I_FADE] == 1 else os_) and not blk_short[k]
-            can = last_entry_bar != k and last_flat_bar != k
+            can = (P[I_LIMDEC] == 0 or last_entry_bar != k) and last_flat_bar != k
             intent = 1 if (can and buy and side <= 0) else (-1 if (can and sell and side >= 0) else 0)
-            if intent != 0 and q_kind == 0 and atr_f == atr_f:
+            if intent != 0 and q_kind == 0 and atr_f == atr_f and sl_d == sl_d:
                 q_kind = 1; q_side = intent; q_sl = sl_d; q_tp = tp_d; q_atr = atr_f
                 q_keep = side != 0 and j == last[k]
                 last_entry_bar = k
@@ -223,7 +227,10 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
                 stop = base
                 armed = armed_c; trail = trail_c; be = be_c
                 if P[I_TRAIL] == 1 and atr_f == atr_f:
-                    act = atr_f * F[F_TACT]; dst = max(atr_f * F[F_TDST], F[F_MINTICK])
+                    if P[I_PTS] == 1:
+                        act = F[F_TACTP]; dst = F[F_TDSTP]
+                    else:
+                        act = atr_f * F[F_TACT]; dst = max(atr_f * F[F_TDST], F[F_MINTICK])
                     if side > 0:
                         if fc - avg >= act: armed = True
                         if armed:
@@ -244,7 +251,7 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
                 if j == last[k]:
                     armed_c = armed; trail_c = trail; be_c = be
             # forced close
-            if side != 0 and q_kind == 0 and last_flat_bar != k:
+            if side != 0 and q_kind == 0 and (P[I_LIMFLAT] == 0 or last_flat_bar != k):
                 reason = 0
                 if b_exit: reason = 1
                 elif dead_l or dead_s: reason = 2
@@ -361,7 +368,12 @@ def time_gates(open_ny, cfg):
     if win:
         a, b = win
         outside = ~((m >= a) & (m < b)) if a < b else ~((m >= a) | (m < b))
-    entry = black | near | sunday | robust | outside
+    custom = np.isin(hr, list(cfg.get("block_hours", ())))     # code-level: recalibrated losing NY hours
+    sess = cfg.get("session")                              # useSessionFilter + nySession (start_min, end_min)
+    if sess:
+        a, b = sess
+        outside |= ~((m >= a) & (m < b)) if a < b else ~((m >= a) | (m < b))
+    entry = black | near | sunday | robust | outside | custom
     return entry, long_b, short_b, black | pre
 
 
@@ -384,6 +396,10 @@ def pack(cfg):
     P[I_OPZ] = cfg["opz"]; P[I_CDON] = cfg["cd"]; P[I_CDBARS] = cfg["cd_bars"]
     P[I_LCON] = cfg["lc"]; P[I_LCN] = cfg["lc_n"]; P[I_LCPAUSE] = cfg["lc_pause"]
     P[I_COSTON] = cfg["cost"]; P[I_INTRA] = cfg["intrabar"]; P[I_WORST] = cfg["worst"]
+    P[I_PTS] = cfg.get("points", 0); P[I_LIMDEC] = cfg.get("lim_dec", 1); P[I_LIMFLAT] = cfg.get("lim_flat", 1)
+    mt = cfg["mintick"]
+    F[F_SLP] = cfg.get("sl_pts", 5000) * mt; F[F_TPP] = cfg.get("tp_pts", 50000) * mt
+    F[F_TACTP] = cfg.get("tact_pts", 1000) * mt; F[F_TDSTP] = max(cfg.get("tdst_pts", 100), 1) * mt
     F[F_DELTA] = cfg["delta"]; F[F_SL] = cfg["sl"]; F[F_TPR] = cfg["tpr"]; F[F_TACT] = cfg["tact"]
     F[F_TDST] = cfg["tdst"]; F[F_BE] = cfg["be_trig"]; F[F_MINTICK] = cfg["mintick"]
     F[F_COSTMIN] = cfg["cost_ratio"] * 2 * cfg["cost_ticks"] * cfg["mintick"]
