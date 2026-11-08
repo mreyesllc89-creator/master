@@ -143,7 +143,8 @@ def run_cfg(cfg):
             lows_nt = sorted((low for shift, low in pools[n] if shift <= nt), reverse=True)
             zones = []
             for low in lows_nt:
-                if zones and zones[-1][1] - low <= cfg["zone_tol"] * k * pt:
+                # anchored on the zone TOP: a falling staircase of lows does not chain into one zone
+                if zones and zones[-1][0] - low <= cfg["zone_tol"] * k * pt:
                     zones[-1][1] = low; zones[-1][2] += 1
                 else:
                     zones.append([low, low, 1])

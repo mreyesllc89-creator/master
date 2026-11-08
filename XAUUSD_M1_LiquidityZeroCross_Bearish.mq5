@@ -67,7 +67,8 @@
 //    levels as TP candidates, partial close.
 //  Not automated in v1:
 //    visual order blocks / "blue rectangle" zones drawn by hand in the
-//    source videos. DrawLiquidityZone() is the hook to add them later.
+//    source videos. v1.20 adds TP_Mode=TP_ZONE (swing-low clusters drawn as blue rectangles)
+//    and Manual_Zone_Levels; hand-drawn order blocks are still not detected.
 //
 //  POINT UNITS
 //  -----------
@@ -94,7 +95,7 @@
 //  * Liquidity detection is simplified: fractal swing highs/lows and a
 //    single "sweep" candle pattern over the last N bars. Hand-drawn
 //    zones ("blue rectangles"), order blocks and equal-high/low clusters
-//    from the source videos are NOT auto-detected in v1.
+//    from the source videos are approximated by v1.20 zones (clusters of swing lows).
 //  * The MT5 economic calendar is not available in the Strategy Tester:
 //    the news filter is bypassed there (a warning is printed once).
 //  * In the tester TimeGMT() equals server time; TesterGMTOffsetHours is
@@ -215,7 +216,7 @@ input int     TP_LookbackBars          = 0;     // TP pool lookback (0 = Liquidi
 input ENUM_TP_MODE TP_Mode             = TP_SWING_LOW; // v1.20: TP at a swing low or at a liquidity zone ("blue rectangle")
 input int     Zone_Tolerance_Points    = 100;   // Swing lows within this distance form one zone
 input int     Zone_MinTouches          = 1;     // Lows a zone needs (2+ = only repeated lows)
-input string  Manual_Zone_Levels       = "";    // Extra TP zone tops, e.g. "2650.5;2641" (empty = none)
+input string  Manual_Zone_Levels       = "";    // Extra TP zone tops in any TP mode, e.g. "2650.5;2641" (decimal point ".")
 input double  TP_FallbackRR            = 0.0;   // Fixed RR target if no pool qualifies (0 = skip trade)
 input int     MinSL_Points             = 50;    // Min SL distance (points, sanity)
 input int     MaxSL_Points             = 1000;  // Max SL distance (points, 0 = off)
@@ -431,9 +432,14 @@ int OnInit()
          return INIT_PARAMETERS_INCORRECT;
         }
      }
-   if(HTF_Timeframe != PERIOD_M5 && HTF_Timeframe != PERIOD_M15)
-      Print("[XLZC] Warning: strategy rules specify M5 or M15 for the HTF bias; using ",
-            EnumToString(HTF_Timeframe));
+   if(UseHTF_Filter && UseHTF2)
+     {
+      if(PeriodSeconds(HTF2_Timeframe) <= PeriodSeconds(TriggerTimeframe) || HTF2_Timeframe == HTF_Timeframe)
+        {
+         Print("[XLZC] HTF2_Timeframe must be higher than TriggerTimeframe and different from HTF_Timeframe");
+         return INIT_PARAMETERS_INCORRECT;
+        }
+     }
    if(StringFind(_Symbol, "XAU") < 0 && StringFind(_Symbol, "GOLD") < 0 && StringFind(_Symbol, "BTC") < 0)
       Print("[XLZC] Warning: EA calibrated for XAUUSD and BTCUSD, attached to ", _Symbol);
    if(TriggerTimeframe != PERIOD_M1)
@@ -664,6 +670,21 @@ bool HandleReady(const int handle, const ENUM_TIMEFRAMES tf)
    return (bars > MACD_Slow + MACD_Signal + 3 && BarsCalculated(handle) >= bars);
   }
 
+//--- the series of tf already holds the bar that contains barTime (not a stale bar)
+bool HTFBarCurrent(const ENUM_TIMEFRAMES tf, const datetime barTime)
+  {
+   datetime h0 = iTime(_Symbol, tf, 0);
+   if(h0 == 0 || barTime < h0)
+      return false;
+   if(tf == PERIOD_MN1)
+     {
+      MqlDateTime a, b;
+      TimeToStruct(h0, a); TimeToStruct(barTime, b);
+      return (a.year == b.year && a.mon == b.mon);
+     }
+   return barTime < h0 + PeriodSeconds(tf);
+  }
+
 //--- all data the signal reads is current for the trigger bar opening at barTime
 bool SignalDataReady(const datetime barTime)
   {
@@ -677,16 +698,14 @@ bool SignalDataReady(const datetime barTime)
          return false;
       //--- the HTF series must already contain the HTF bar that holds barTime,
       //    otherwise "shift 1" would still be the HTF bar before the last closed one
-      datetime htf0 = iTime(_Symbol, HTF_Timeframe, 0);
-      if(htf0 == 0 || barTime < htf0 || barTime >= htf0 + PeriodSeconds(HTF_Timeframe))
+      if(!HTFBarCurrent(HTF_Timeframe, barTime))
          return false;
       if(UseHTF2)
         {
          if(!HandleReady(g_hMacdHTF2, HTF2_Timeframe) || !HandleReady(g_hEmaHTF2, HTF2_Timeframe))
             return false;
-         datetime h2 = iTime(_Symbol, HTF2_Timeframe, 0);
-         if(h2 == 0 || barTime < h2)
-            return false;   // the bar holding barTime is not in the series yet (D1 may start later than a session)
+         if(!HTFBarCurrent(HTF2_Timeframe, barTime))
+            return false;   // e.g. the new D1 bar is not in the series yet at the day rollover
         }
      }
    return true;
@@ -760,8 +779,9 @@ int EvaluateSignal(const datetime barTime)
   }
 
 //--- R1: one trend timeframe -> SIG_VALID (bearish) / SIG_NONE / SIG_NOTREADY
-int TFBearState(const int hMacd, const int hEma, const ENUM_TIMEFRAMES tf)
+int TFBearState(const int hMacd, const int hEma, const ENUM_TIMEFRAMES tf, string &why)
   {
+   why = "";
    double m, e;
    if(!CopyOne(hMacd, 0, 1, m) || !CopyOne(hEma, 0, 1, e))
       return SIG_NOTREADY;
@@ -776,23 +796,31 @@ int TFBearState(const int hMacd, const int hEma, const ENUM_TIMEFRAMES tf)
       case HTF_EMA_ONLY:    bear = belowEma;             break;
       default:              bear = macdBear && belowEma; break;
      }
-   if(!bear && !g_quietLog)
-      Log(StringFormat("R1 %s not bearish: MACD=%.3f (<0? %s) close=%.2f EMA=%.2f (below? %s)", TFName(tf),
-                       m, macdBear ? "yes" : "no", c, e, belowEma ? "yes" : "no"));
+   if(!bear)
+      why = StringFormat("%s not bearish: MACD=%.3f (<0? %s) close=%.2f EMA=%.2f (below? %s)", TFName(tf),
+                         m, macdBear ? "yes" : "no", c, e, belowEma ? "yes" : "no");
    return bear ? SIG_VALID : SIG_NONE;
   }
 
 //--- R1: HTF bearish bias over one or two trend timeframes
 int HTFBiasState()
   {
-   int s1 = TFBearState(g_hMacdHTF, g_hEmaHTF, HTF_Timeframe);
+   string w1, w2;
+   int s1 = TFBearState(g_hMacdHTF, g_hEmaHTF, HTF_Timeframe, w1);
    if(!UseHTF2)
+     {
+      if(s1 == SIG_NONE && !g_quietLog)
+         Log("R1 " + w1);
       return s1;
-   int s2 = TFBearState(g_hMacdHTF2, g_hEmaHTF2, HTF2_Timeframe);
+     }
+   int s2 = TFBearState(g_hMacdHTF2, g_hEmaHTF2, HTF2_Timeframe, w2);
    if(s1 == SIG_NOTREADY || s2 == SIG_NOTREADY)
       return SIG_NOTREADY;
    bool b1 = (s1 == SIG_VALID), b2 = (s2 == SIG_VALID);
-   return (HTF_Combine == HTF_EITHER ? (b1 || b2) : (b1 && b2)) ? SIG_VALID : SIG_NONE;
+   bool ok = (HTF_Combine == HTF_EITHER) ? (b1 || b2) : (b1 && b2);
+   if(!ok && !g_quietLog)                       // log only when the combined verdict blocks the trade
+      Log("R1 " + (w1 != "" ? w1 : "") + (w1 != "" && w2 != "" ? " | " : "") + (w2 != "" ? w2 : ""));
+   return ok ? SIG_VALID : SIG_NONE;
   }
 
 //--- R3: Stochastic came from overbought and is turning/turned down
@@ -914,10 +942,15 @@ bool BuildTradePlan(TradePlan &p, string &reason)
    //--- SL reference = the structural high, or any higher high printed since
    //    (the most recent significant high must stay protected)
    double slRef = r[structBar].high;
+   int    refBar = structBar;
    for(int k = 0; k < structBar; k++)
-      slRef = MathMax(slRef, r[k].high);
+      if(r[k].high > slRef)
+        {
+         slRef  = r[k].high;
+         refBar = k;
+        }
    p.slRef     = slRef;
-   p.slRefTime = r[structBar].time;
+   p.slRefTime = r[refBar].time;      // the bar that made the protected high (red line start)
 
    double sl = slRef + Pts(SL_Buffer_Points);
    if(SL_AddSpread)
@@ -958,6 +991,12 @@ bool BuildTradePlan(TradePlan &p, string &reason)
          for(int i = 1 + S; i + S < hn; i++)
             if(IsSwingLow(h, i, S) && h[i].low < bid)
               {
+               bool dup = false;                      // same price as a trigger-TF low: not an extra touch
+               for(int q = 0; q < cnt && !dup; q++)
+                  if(MathAbs(lows[q] - h[i].low) < _Point * 0.5)
+                     dup = true;
+               if(dup)
+                  continue;
                ArrayResize(lows, cnt + 1);
                ArrayResize(lowTimes, cnt + 1);
                ArrayResize(lowSrc, cnt + 1);
@@ -966,6 +1005,13 @@ bool BuildTradePlan(TradePlan &p, string &reason)
                cnt++;
               }
      }
+
+   //--- manual zone tops (both TP modes): separators ';' or ',', decimal point '.'
+   string mz = Manual_Zone_Levels;
+   StringReplace(mz, ",", ";");
+   StringReplace(mz, " ", "");
+   string parts[];
+   int np = (StringLen(mz) > 0) ? StringSplit(mz, ';', parts) : 0;
 
    //--- v1.20: liquidity ZONES ("blue rectangles"). Swing lows within Zone_Tolerance_Points
    //    of each other form one zone [bottom, top]; zones with fewer than Zone_MinTouches lows
@@ -996,7 +1042,9 @@ bool BuildTradePlan(TradePlan &p, string &reason)
       double   tol = Pts(Zone_Tolerance_Points);
       for(int i = 0; i < cnt; i++)
         {
-         if(zc > 0 && zBot[zc - 1] - lows[i] <= tol)
+         //--- tolerance measured from the zone TOP, so a falling staircase of lows
+         //    does not chain into one tall zone
+         if(zc > 0 && zTop[zc - 1] - lows[i] <= tol)
            {
             zBot[zc - 1] = lows[i];                      // extend the zone downwards
             zN[zc - 1]++;
@@ -1007,10 +1055,7 @@ bool BuildTradePlan(TradePlan &p, string &reason)
          zTop[zc] = lows[i]; zBot[zc] = lows[i]; zTime[zc] = lowTimes[i]; zN[zc] = 1;
          zc++;
         }
-      //--- manual zone tops
-      string parts[];
-      int np = (StringLen(Manual_Zone_Levels) > 0) ? StringSplit(Manual_Zone_Levels, ';', parts) : 0;
-      int keep = 0;
+      //--- manual zone tops are added below (both modes)
       cnt = 0;
       ArrayResize(lows, 0); ArrayResize(lowTimes, 0); ArrayResize(lowSrc, 0); ArrayResize(zoneLow, 0);
       for(int z = 0; z < zc; z++)
@@ -1022,15 +1067,15 @@ bool BuildTradePlan(TradePlan &p, string &reason)
          lowSrc[cnt] = StringFormat("zone x%d", zN[z]);
          cnt++;
         }
-      for(int k = 0; k < np; k++)
-        {
-         double lv = StringToDouble(parts[k]);
-         if(lv <= 0.0 || lv >= bid)
-            continue;
-         ArrayResize(lows, cnt + 1); ArrayResize(lowTimes, cnt + 1); ArrayResize(lowSrc, cnt + 1); ArrayResize(zoneLow, cnt + 1);
-         lows[cnt] = lv; zoneLow[cnt] = lv; lowTimes[cnt] = r[MathMin(NT, need - 1)].time; lowSrc[cnt] = "manual zone";
-         cnt++;
-        }
+     }
+   for(int k = 0; k < np; k++)
+     {
+      double lv = StringToDouble(parts[k]);
+      if(lv <= 0.0 || lv >= bid)
+         continue;
+      ArrayResize(lows, cnt + 1); ArrayResize(lowTimes, cnt + 1); ArrayResize(lowSrc, cnt + 1); ArrayResize(zoneLow, cnt + 1);
+      lows[cnt] = lv; zoneLow[cnt] = lv; lowTimes[cnt] = r[MathMin(NT, need - 1)].time; lowSrc[cnt] = "manual zone";
+      cnt++;
      }
 
    //--- pick the nearest pool below price (highest low first) that gives >= MinRR
@@ -1083,7 +1128,10 @@ bool BuildTradePlan(TradePlan &p, string &reason)
       if(ManualTP_Price > 0.0 && ManualTP_Price < p.entry)
         {
          p.tp = NormalizePrice(ManualTP_Price);
-         p.tpSource = "manual";
+         p.tpSource  = "manual";
+         p.tpRef     = p.tp;
+         p.tpZoneLow = p.tp;
+         p.tpRefTime = 0;                // no zone rectangle for a manual TP
          found = true;
         }
      }
@@ -1589,7 +1637,8 @@ void MarkSignal(const datetime barTime)
                                 TimeToString(barTime, TIME_DATE | TIME_MINUTES)));
   }
 
-//--- closed trades of this EA (magic + symbol): positions closed, positions won
+//--- closed trades of this EA (magic + symbol): positions fully closed, positions won.
+//    Every deal of a position counts (entry commission too); still-open positions are skipped.
 void WinStats(int &closed, int &wins)
   {
    closed = 0; wins = 0;
@@ -1597,6 +1646,7 @@ void WinStats(int &closed, int &wins)
       return;
    long   ids[];
    double pnl[];
+   bool   hasExit[];
    int    n = 0;
    for(int k = 0; k < HistoryDealsTotal(); k++)
      {
@@ -1604,27 +1654,34 @@ void WinStats(int &closed, int &wins)
       if(d == 0 || HistoryDealGetString(d, DEAL_SYMBOL) != _Symbol ||
          (ulong)HistoryDealGetInteger(d, DEAL_MAGIC) != MagicNumber)
          continue;
-      long et = HistoryDealGetInteger(d, DEAL_ENTRY);
-      if(et != DEAL_ENTRY_OUT && et != DEAL_ENTRY_OUT_BY && et != DEAL_ENTRY_INOUT)
+      long dt = HistoryDealGetInteger(d, DEAL_TYPE);
+      if(dt != DEAL_TYPE_BUY && dt != DEAL_TYPE_SELL)
          continue;
+      long et = HistoryDealGetInteger(d, DEAL_ENTRY);
       long id = HistoryDealGetInteger(d, DEAL_POSITION_ID);
       double v = HistoryDealGetDouble(d, DEAL_PROFIT) + HistoryDealGetDouble(d, DEAL_SWAP) +
-                 HistoryDealGetDouble(d, DEAL_COMMISSION);
+                 HistoryDealGetDouble(d, DEAL_COMMISSION) + HistoryDealGetDouble(d, DEAL_FEE);
       int i = -1;
       for(int q = n - 1; q >= 0; q--)
          if(ids[q] == id) { i = q; break; }
       if(i < 0)
         {
          i = n++;
-         ArrayResize(ids, n); ArrayResize(pnl, n);
-         ids[i] = id; pnl[i] = 0.0;
+         ArrayResize(ids, n); ArrayResize(pnl, n); ArrayResize(hasExit, n);
+         ids[i] = id; pnl[i] = 0.0; hasExit[i] = false;
         }
-      pnl[i] += v;                                     // partial closes add up per position
+      pnl[i] += v;
+      if(et == DEAL_ENTRY_OUT || et == DEAL_ENTRY_OUT_BY || et == DEAL_ENTRY_INOUT)
+         hasExit[i] = true;
      }
-   closed = n;
    for(int i = 0; i < n; i++)
+     {
+      if(!hasExit[i] || PositionSelectByTicket((ulong)ids[i]))
+         continue;                                   // never closed, or partly closed and still open
+      closed++;
       if(pnl[i] > 0.0)
          wins++;
+     }
   }
 
 //--- status panel: proves which timeframe the signals come from
