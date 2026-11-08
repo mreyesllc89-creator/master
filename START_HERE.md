@@ -51,6 +51,22 @@ The EA computes its signals on `TriggerTimeframe` (M3 or M2 in the calibrated pr
 
 All presets risk 0.5% per trade (1% for Aggressive). Change `RiskPercent` to suit you. Each preset uses its own magic number, so two presets can run side by side.
 
+## TradingView version
+
+`XLZC_Liquidity_ZeroCross_Bearish_Strategy.pine` is the same strategy as a TradingView Pine v6 strategy, with the four calibrated presets in a **Preset** dropdown.
+
+1. Open the Pine Editor, paste the file, click **Add to chart**.
+2. Put the chart on the trigger timeframe: **3 minutes** for the M3 presets, **2 minutes** for M2/H1. The table in the top-right corner turns red when the chart is wrong.
+3. In **Settings > Inputs**, pick the preset and set **Spread** to your broker's typical spread in price, for example 0.45 for gold or 5 for BTC.
+4. In **Settings > Properties > Commission**, enter the value the table shows: half the spread per contract per side, plus your broker's commission. Without it the backtest leaves out the spread cost.
+
+Differences from MT5:
+- The session is entered in New York time: 05:00–09:30 New York = 12:00–16:30 broker server time.
+- TradingView has no spread data, so there is no spread cap.
+- There is no news filter, partial close, hybrid trailing or FlashGold build.
+- Orders fill at the signal bar's close instead of the next bar's open (the same price on a continuous feed).
+- Same-bar stop and trailing fills use TradingView's bar magnifier on Premium plans; otherwise TradingView guesses the order of prices inside each bar.
+
 ## Things to check before trading
 
 - **Session clock.** The calibrated presets use **broker server time** (`TradingHoursAreGMT=false`). They were built on FTMO data, whose clock is GMT+2 in winter and GMT+3 in US summer (New York close). If your broker's clock differs, shift `TradingHoursStart` and `TradingHoursEnd`.

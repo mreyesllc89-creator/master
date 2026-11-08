@@ -27,10 +27,16 @@
 // (gold: 100 points = 1 USD; BTC: 100 points = 1 USD).
 //
 // SPREAD: TradingView charts show one price (normally the bid on CFD feeds) and no spread.
-// The EA enters a short at the bid and its stop / target / trailing trigger on the ASK. With
-// "Model the spread on exits" the strategy places those levels "spread" lower on the chart,
-// which reproduces the EA's fills on a bid chart. Set the spread to your broker's typical
-// value and add your commission in the strategy Properties.
+// The EA enters a short at the bid; its stop / target / trailing trigger and fill on the ASK.
+//  1. TIMING: with "Model the spread on exits" the levels sit "spread" lower on the chart, so
+//     they trigger when the EA's would.
+//  2. COST: TradingView then fills at that chart (bid) price, not at the ask, so the spread must
+//     be charged as commission: Properties > Commission = spread / 2 per contract per side,
+//     plus your broker's own commission. Default 0.225 = gold 0.45 spread with 1-oz contracts;
+//     BTC with a 5 USD spread = 2.5 per BTC. The status table shows the value for the preset.
+// ENTRY: the order fills at the close of the signal bar (process_orders_on_close), the same
+// price the plan is computed from; the EA fills at the next bar's open, the same price on a
+// continuous feed. The bar magnifier (Premium) refines same-bar stop / trailing fills.
 //
 // PRESETS (calibrated in research/ on FTMO XAUUSD and Binance BTCUSDT M1, Jan 2025-May 2026):
 //  Gold M3/H1     M3 chart, H1 filter, 05:00-09:30 NY. In-sample PF 1.82-2.48 (77 trades).
@@ -46,9 +52,9 @@
 // ---------------------------------------------------------------------------
 strategy("XLZC Liquidity Zero-Cross Bearish (Strategy)", "XLZC Bear S", overlay = true, pyramiding = 0,
      initial_capital = 10000, currency = currency.USD, default_qty_type = strategy.fixed, default_qty_value = 1,
-     commission_type = strategy.commission.cash_per_contract, commission_value = 0.0, slippage = 0,
-     process_orders_on_close = false, calc_on_every_tick = false, max_bars_back = 600,
-     max_lines_count = 200, max_labels_count = 200)
+     commission_type = strategy.commission.cash_per_contract, commission_value = 0.225, slippage = 0,
+     process_orders_on_close = true, calc_on_every_tick = false, calc_on_order_fills = false,
+     use_bar_magnifier = true, max_bars_back = 600, max_lines_count = 200, max_labels_count = 200)
 
 // ===================================================================== inputs
 gPre  = "Preset"
@@ -66,10 +72,10 @@ cTrig     = input.timeframe("3", "Chart (trigger) timeframe expected", group = g
 cHtf      = input.timeframe("60", "Trend filter timeframe", group = gTf)
 cUseHtf   = input.bool(true, "Use the trend filter (R1)", group = gTf)
 
-cN        = input.int(40, "Liquidity lookback bars (SL structure)", minval = 5, group = gStr)
-cS        = input.int(2, "Swing strength (bars each side)", minval = 1, group = gStr)
+cN        = input.int(40, "Liquidity lookback bars (SL structure)", minval = 5, maxval = 300, group = gStr)
+cS        = input.int(2, "Swing strength (bars each side)", minval = 1, maxval = 20, group = gStr)
 cBuf      = input.int(208, "SL buffer above the liquidity high (points)", minval = 0, group = gStr)
-cNT       = input.int(120, "TP lookback bars (0 = same as SL lookback)", minval = 0, group = gStr)
+cNT       = input.int(120, "TP lookback bars (0 = same as SL lookback)", minval = 0, maxval = 300, group = gStr)
 cRR       = input.float(1.5, "Min reward:risk for a TP pool", minval = 0, step = 0.1, group = gStr)
 cFb       = input.float(0.0, "Fixed reward:risk if no pool qualifies (0 = skip trade)", minval = 0, step = 0.1, group = gStr)
 cMinSL    = input.int(87, "Min SL distance (points)", minval = 0, group = gStr)
@@ -129,6 +135,8 @@ sessTo   = int(pick(930, 930, 930, 930, cSessTo))
 spread   = spreadIn >= 0 ? spreadIn : (isGold3 or isGold2) ? 0.45 : (isBtcH1 or isBtc30) ? 5.0 : 0.0
 ntBars   = ntIn > 0 ? ntIn : nBars
 PT       = 0.01                                   // one "point" = 0.01 price, as in the EA presets
+if useHtf and timeframe.in_seconds(htfTf) <= timeframe.in_seconds(timeframe.period)
+    runtime.error("The trend filter timeframe (" + htfTf + ") must be higher than the chart timeframe (" + timeframe.period + ").")
 
 // ===================================================================== R1 trend filter (no repaint)
 // lookahead_on returns the HTF bar that CONTAINS this chart bar. Its values [0] are only final
@@ -160,8 +168,8 @@ inSession = not sessOn or (sessFrom <= sessTo ? (hhmm >= sessFrom and hhmm < ses
 
 // ===================================================================== R4 liquidity structure
 // Offsets: the EA's shift k (k = 1 is the last closed bar) is offset k - 1 here, because the
-// strategy decides on the close of that bar. The entry price is this bar's close (the EA uses
-// the next bar's open bid; on a continuous feed they are the same price).
+// strategy decides on the close of that bar. The entry price is this bar's close, where the
+// order fills (process_orders_on_close); the EA fills at the next bar's open bid.
 isSwingHigh(int o, int s) =>
     bool ok = true
     for k = 1 to s
@@ -185,7 +193,7 @@ var string lastSkip = "-"
 bool signal = false
 bool readyBars = bar_index > math.max(nBars, ntBars) + sStr + 60
 
-if zeroCross and readyBars and strategy.position_size == 0 and biasOK and inSession and (not stochHard or stochOK)
+if barstate.isconfirmed and zeroCross and readyBars and strategy.position_size == 0 and biasOK and inSession and (not stochHard or stochOK)
     entryPx = close
     // (a) liquidity sweep candle: most recent bar that ran above an older swing high and closed below it
     int sweepO = -1
@@ -277,7 +285,7 @@ bgcolor(showBias and useHtf and biasOK ? color.new(color.red, 93) : na, title = 
 
 chartOK = timeframe.period == trigTf
 if showTbl and barstate.islast
-    var table t = table.new(position.top_right, 2, 7, border_width = 1)
+    var table t = table.new(position.top_right, 2, 8, border_width = 1)
     table.cell(t, 0, 0, "XLZC Bear", text_color = color.white, bgcolor = color.new(color.gray, 20))
     table.cell(t, 1, 0, preset, text_color = color.white, bgcolor = color.new(color.gray, 20))
     table.cell(t, 0, 1, "Chart / needed")
@@ -291,5 +299,7 @@ if showTbl and barstate.islast
     table.cell(t, 1, 4, str.tostring(spread) + (spreadOn ? "" : " (off)"))
     table.cell(t, 0, 5, "Trailing")
     table.cell(t, 1, 5, trailOn ? str.format("{0,number,#}/{1,number,#} pts", tStart, tDist) : "off")
-    table.cell(t, 0, 6, "Last skip")
-    table.cell(t, 1, 6, lastSkip)
+    table.cell(t, 0, 6, "Commission to set")
+    table.cell(t, 1, 6, str.tostring(spread * syminfo.pointvalue / 2.0) + " per contract per side + broker fee")
+    table.cell(t, 0, 7, "Last skip")
+    table.cell(t, 1, 7, lastSkip)
