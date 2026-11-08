@@ -12,7 +12,9 @@ import re
 EA = "XAUUSD_M1_LiquidityZeroCross_Bearish.mq5"
 ENUMS = {"PERIOD_CURRENT": 0, "PERIOD_M1": 1, "PERIOD_M2": 2, "PERIOD_M3": 3, "PERIOD_M5": 5,
          "PERIOD_M15": 15, "PERIOD_M30": 30, "PERIOD_H1": 16385, "PERIOD_H2": 16386,
-         "PERIOD_H4": 16388, "TRAIL_SERVER": 0, "TRAIL_HYBRID": 1}
+         "PERIOD_H4": 16388, "PERIOD_D1": 16408, "TRAIL_SERVER": 0, "TRAIL_HYBRID": 1,
+         "HTF_MACD_AND_EMA": 0, "HTF_MACD_OR_EMA": 1, "HTF_MACD_ONLY": 2, "HTF_EMA_ONLY": 3,
+         "HTF_BOTH": 0, "HTF_EITHER": 1, "TP_SWING_LOW": 0, "TP_ZONE": 1}
 FGF_KEYS = {"UseFGF_Filter", "FGF_IndicatorName", "FGF_CalcTimeframe", "FGF_Shift", "FGF_BlockIfUnavailable"}
 
 
@@ -21,6 +23,8 @@ def defaults():
     out = {}
     for _typ, name, val in re.findall(r"^input\s+(\w+)\s+(\w+)\s*=\s*([^;]+);", src, re.M):
         v = val.strip().strip('"')
+        if _typ.startswith("ENUM_") and v not in ENUMS:
+            raise ValueError(f"enum value {v} of input {name} has no number in ENUMS")
         out[name] = str(ENUMS.get(v, v))
     return out
 
