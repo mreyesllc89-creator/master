@@ -227,7 +227,7 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
             if side != 0:
                 if rebase and entry_index == k and atr_f == atr_f:
                     # no pending distances: entry_sl/entry_tp follow this tick's ATR until the fill bar closes
-                    e_sl = sl_d; e_tp = tp_d; e_atr = atr_f
+                    e_sl = sl_d; e_tp = tp_d   # long_atr/short_atr (breakeven) keep the signal ATR
                     tp = (avg + e_tp if side > 0 else avg - e_tp) if e_tp == e_tp else np.nan
                 base = avg - e_sl if side > 0 else avg + e_sl
                 stop = base
