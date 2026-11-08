@@ -137,13 +137,31 @@ def run_cfg(cfg):
         if rp < 50 * k or rp > 1000 * k:
             continue
         tp = None
-        for shift, low in pools[n]:
-            if shift > nt:
-                continue
-            c = low - hs
-            if entry - c >= cfg["min_rr"] * risk:
-                if tp is None or c > tp:
-                    tp = c  # nearest qualifying pool (highest low)
+        tp_buf = cfg.get("tp_buf", 0) * k * pt       # EA TP_Buffer_Points: TP this far above the pool
+        if cfg.get("zone_tol"):
+            # EA v1.20 TP_ZONE: swing lows within zone_tol form one zone; TP above the zone top
+            lows_nt = sorted((low for shift, low in pools[n] if shift <= nt), reverse=True)
+            zones = []
+            for low in lows_nt:
+                if zones and zones[-1][1] - low <= cfg["zone_tol"] * k * pt:
+                    zones[-1][1] = low; zones[-1][2] += 1
+                else:
+                    zones.append([low, low, 1])
+            for top, _bot, cnt in zones:
+                if cnt < cfg.get("zone_min", 1):
+                    continue
+                c = top - hs + tp_buf
+                if entry - c > 0 and entry - c >= cfg["min_rr"] * risk:
+                    tp = c
+                    break
+        else:
+            for shift, low in pools[n]:
+                if shift > nt:
+                    continue
+                c = low - hs + tp_buf
+                if entry - c > 0 and entry - c >= cfg["min_rr"] * risk:
+                    if tp is None or c > tp:
+                        tp = c  # nearest qualifying pool (highest low)
         if tp is None:
             if cfg["fb"] <= 0:
                 continue

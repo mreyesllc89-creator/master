@@ -2,10 +2,22 @@
 //|                     XAUUSD_M1_LiquidityZeroCross_Bearish.mq5     |
 //|                                                                  |
 //|  Strategy : XAUUSD M1 Liquidity Zero-Cross (BEARISH / SHORT ONLY)|
-//|  Version  : 1.10                                                 |
+//|  Version  : 1.20                                                 |
 //+------------------------------------------------------------------+
 //
 //  "No señal = no operación"  ->  no signal = no trade.
+//
+//  v1.20 (refined spec, Nov 2026; every new input defaults to v1.10 behaviour):
+//    + HTF_Condition    : what counts as bearish on a trend timeframe: MACD<0 AND close<EMA
+//                         (clearly bearish, default), OR, MACD only, EMA only
+//    + UseHTF2 / HTF2_Timeframe / HTF_Combine : second trend timeframe (spec: "M15 and/or
+//                         D1"), both or either must be bearish
+//    + TP_Mode = TP_ZONE : liquidity zones ("blue rectangles"): swing lows within
+//                         Zone_Tolerance_Points form a zone; TP sits TP_Buffer_Points above the
+//                         zone top. Zone_MinTouches, Manual_Zone_Levels
+//    + UseRSISoft       : RSI(12) "preferred, not mandatory": tag / RSIUnconfirmedRiskFactor
+//    + chart: red line at the liquidity high, blue rectangle at the TP zone; panel shows the
+//      live win rate (spec claims ~9 of 10 trades win under valid conditions)
 //
 //  v1.10 (calibration release, defaults keep v1.00 behaviour):
 //    + TriggerTimeframe  : trigger/structure timeframe (default M1 = rules)
@@ -93,7 +105,7 @@
 //  * Long trades are never opened (strategy is bearish only).
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
-#property version     "1.10"
+#property version     "1.20"
 #ifdef XLZC_WITH_FGF
 #property description "XAUUSD M1 Liquidity Zero-Cross Bearish (short-only) + FlashGold Direction Filter v1.2."
 #property description "Shorts are only opened while the FlashGold filter allows sells."
@@ -118,6 +130,26 @@ enum ENUM_SIGNAL_STATE
    SIG_NOTREADY = 2  // indicator / multi-timeframe data not up to date yet: retry next tick
   };
 
+enum ENUM_HTF_COND
+  {
+   HTF_MACD_AND_EMA = 0, // MACD < 0 AND close < EMA (clearly bearish)
+   HTF_MACD_OR_EMA  = 1, // MACD < 0 OR close < EMA
+   HTF_MACD_ONLY    = 2, // MACD < 0
+   HTF_EMA_ONLY     = 3  // close < EMA
+  };
+
+enum ENUM_HTF_COMBINE
+  {
+   HTF_BOTH   = 0, // both trend timeframes bearish
+   HTF_EITHER = 1  // at least one trend timeframe bearish
+  };
+
+enum ENUM_TP_MODE
+  {
+   TP_SWING_LOW = 0, // nearest swing low (v1.10)
+   TP_ZONE      = 1  // nearest liquidity zone (cluster of swing lows), TP just above its top
+  };
+
 enum ENUM_TRAIL_MODE
   {
    TRAIL_SERVER = 0, // Server: modify the position SL
@@ -135,6 +167,7 @@ input bool    VerboseLog               = true;         // Print decision log to 
 input bool    ShowLevels               = true;         // Draw SL/TP liquidity levels on chart
 input bool    ShowStatusPanel          = true;         // Panel: signal/trend timeframes, last trigger bar, MACD
 input bool    MarkSignals              = true;         // Arrow on the chart at every valid signal
+input bool    ShowLiquidityLines       = true;         // Red line at the liquidity high, blue rectangle at the TP zone
 input bool    SwitchChartToTriggerTF   = false;        // Switch this chart to the trigger timeframe (e.g. M3)
 
 input group "=== R5: Risk & Position ==="
@@ -149,6 +182,10 @@ input group "=== R1: HTF Bias Filter ==="
 input bool            UseHTF_Filter    = true;        // Require HTF bearish bias
 input ENUM_TIMEFRAMES HTF_Timeframe    = PERIOD_M15;  // HTF (M15 or M5)
 input int             HTF_EMA_Period   = 50;          // HTF EMA period
+input ENUM_HTF_COND   HTF_Condition    = HTF_MACD_AND_EMA; // What counts as bearish (spec: MA and/or MACD)
+input bool            UseHTF2          = false;       // v1.20: second trend timeframe (spec: M15 and/or D1)
+input ENUM_TIMEFRAMES HTF2_Timeframe   = PERIOD_D1;   // Second trend timeframe
+input ENUM_HTF_COMBINE HTF_Combine     = HTF_BOTH;    // Both timeframes bearish, or either
 
 input group "=== R1/R2: MACD (HTF and trigger) ==="
 input ENUM_TIMEFRAMES TriggerTimeframe = PERIOD_M1; // Trigger timeframe (M1 per rules)
@@ -175,6 +212,10 @@ input bool    RequireLiquiditySweep    = false; // Require a sweep candle (else 
 input int     TP_Buffer_Points         = 0;     // TP placed this far ABOVE the liquidity pool
 input double  MinRewardRisk            = 1.0;   // Min reward:risk to accept a TP pool
 input int     TP_LookbackBars          = 0;     // TP pool lookback (0 = LiquidityLookbackBars)
+input ENUM_TP_MODE TP_Mode             = TP_SWING_LOW; // v1.20: TP at a swing low or at a liquidity zone ("blue rectangle")
+input int     Zone_Tolerance_Points    = 100;   // Swing lows within this distance form one zone
+input int     Zone_MinTouches          = 1;     // Lows a zone needs (2+ = only repeated lows)
+input string  Manual_Zone_Levels       = "";    // Extra TP zone tops, e.g. "2650.5;2641" (empty = none)
 input double  TP_FallbackRR            = 0.0;   // Fixed RR target if no pool qualifies (0 = skip trade)
 input int     MinSL_Points             = 50;    // Min SL distance (points, sanity)
 input int     MaxSL_Points             = 1000;  // Max SL distance (points, 0 = off)
@@ -201,7 +242,9 @@ input string  NewsCurrency             = "USD";    // News currency
 input int     NewsWindowMinutes        = 30;       // +/- minutes around the event
 
 input group "=== Optional / Discretionary (default OFF) ==="
-input bool    UseRSIFilter             = false; // RSI(12) confluence
+input bool    UseRSIFilter             = false; // RSI(12) confluence as a HARD filter
+input bool    UseRSISoft               = false; // v1.20: RSI(12) confluence as a SOFT filter (spec: preferred, not mandatory)
+input double  RSIUnconfirmedRiskFactor = 1.0;   // Soft mode: risk multiplier when RSI does not confirm
 input int     RSI_Period               = 12;    // RSI period
 input double  RSI_MaxLevel             = 50.0;  // Require RSI below this level
 input bool    UseManualLevels          = false; // Manual SL/TP override
@@ -250,6 +293,8 @@ int      g_hMacdHTF  = INVALID_HANDLE;
 int      g_hEmaHTF   = INVALID_HANDLE;
 int      g_hStochM1  = INVALID_HANDLE;
 int      g_hRsiM1    = INVALID_HANDLE;
+int      g_hMacdHTF2 = INVALID_HANDLE;   // v1.20 second trend timeframe
+int      g_hEmaHTF2  = INVALID_HANDLE;
 int      g_hFGF      = INVALID_HANDLE;   // FlashGold filter (FGF build only)
 
 double   g_ptScale        = 1.0;   // point scale factor (AutoScalePoints)
@@ -268,6 +313,7 @@ bool     g_newsBlocked    = false;
 bool     g_newsWarned     = false;
 string   g_lastSkipReason = "";
 
+bool     g_quietLog       = false;   // suppress Log() inside HTFBiasState for the panel
 const string OBJ_PREFIX   = "XLZC_";
 
 //--- trade plan built from the liquidity structure (R4)
@@ -277,7 +323,8 @@ struct TradePlan
    double sl;         // final SL price
    double tp;         // final TP price
    double slRef;      // liquidity high used for SL
-   double tpRef;      // liquidity pool used for TP
+   double tpRef;      // liquidity pool used for TP (zone top in zone mode)
+   double tpZoneLow;  // zone bottom (zone mode), else = tpRef
    datetime slRefTime;
    datetime tpRefTime;
    string slSource;
@@ -410,12 +457,22 @@ int OnInit()
    g_hMacdHTF = iMACD(_Symbol, HTF_Timeframe, MACD_Fast, MACD_Slow, MACD_Signal, PRICE_CLOSE);
    g_hEmaHTF  = iMA(_Symbol, HTF_Timeframe, HTF_EMA_Period, 0, MODE_EMA, PRICE_CLOSE);
    g_hStochM1 = iStochastic(_Symbol, TriggerTimeframe, Stoch_K, Stoch_D, Stoch_Slowing, MODE_SMA, STO_LOWHIGH);
-   if(UseRSIFilter)
+   if(UseRSIFilter || UseRSISoft)
       g_hRsiM1 = iRSI(_Symbol, TriggerTimeframe, RSI_Period, PRICE_CLOSE);
+   if(UseHTF_Filter && UseHTF2)
+     {
+      g_hMacdHTF2 = iMACD(_Symbol, HTF2_Timeframe, MACD_Fast, MACD_Slow, MACD_Signal, PRICE_CLOSE);
+      g_hEmaHTF2  = iMA(_Symbol, HTF2_Timeframe, HTF_EMA_Period, 0, MODE_EMA, PRICE_CLOSE);
+      if(g_hMacdHTF2 == INVALID_HANDLE || g_hEmaHTF2 == INVALID_HANDLE)
+        {
+         Print("[XLZC] Failed to create the second trend timeframe handles, error ", GetLastError());
+         return INIT_FAILED;
+        }
+     }
 
    if(g_hMacdM1 == INVALID_HANDLE || g_hMacdHTF == INVALID_HANDLE ||
       g_hEmaHTF == INVALID_HANDLE || g_hStochM1 == INVALID_HANDLE ||
-      (UseRSIFilter && g_hRsiM1 == INVALID_HANDLE))
+      ((UseRSIFilter || UseRSISoft) && g_hRsiM1 == INVALID_HANDLE))
      {
       Print("[XLZC] Failed to create indicator handles, error ", GetLastError());
       return INIT_FAILED;
@@ -480,6 +537,8 @@ void OnDeinit(const int reason)
    if(g_hEmaHTF  != INVALID_HANDLE) IndicatorRelease(g_hEmaHTF);
    if(g_hStochM1 != INVALID_HANDLE) IndicatorRelease(g_hStochM1);
    if(g_hRsiM1   != INVALID_HANDLE) IndicatorRelease(g_hRsiM1);
+   if(g_hMacdHTF2 != INVALID_HANDLE) IndicatorRelease(g_hMacdHTF2);
+   if(g_hEmaHTF2  != INVALID_HANDLE) IndicatorRelease(g_hEmaHTF2);
    if(g_hFGF     != INVALID_HANDLE) IndicatorRelease(g_hFGF);
    ObjectsDeleteAll(0, OBJ_PREFIX);
    Comment("");
@@ -610,7 +669,7 @@ bool SignalDataReady(const datetime barTime)
   {
    if(!HandleReady(g_hMacdM1, TriggerTimeframe) || !HandleReady(g_hStochM1, TriggerTimeframe))
       return false;
-   if(UseRSIFilter && !HandleReady(g_hRsiM1, TriggerTimeframe))
+   if((UseRSIFilter || UseRSISoft) && !HandleReady(g_hRsiM1, TriggerTimeframe))
       return false;
    if(UseHTF_Filter)
      {
@@ -621,6 +680,14 @@ bool SignalDataReady(const datetime barTime)
       datetime htf0 = iTime(_Symbol, HTF_Timeframe, 0);
       if(htf0 == 0 || barTime < htf0 || barTime >= htf0 + PeriodSeconds(HTF_Timeframe))
          return false;
+      if(UseHTF2)
+        {
+         if(!HandleReady(g_hMacdHTF2, HTF2_Timeframe) || !HandleReady(g_hEmaHTF2, HTF2_Timeframe))
+            return false;
+         datetime h2 = iTime(_Symbol, HTF2_Timeframe, 0);
+         if(h2 == 0 || barTime < h2)
+            return false;   // the bar holding barTime is not in the series yet (D1 may start later than a session)
+        }
      }
    return true;
   }
@@ -649,21 +716,27 @@ int EvaluateSignal(const datetime barTime)
          return bias;
      }
 
-   //--- optional: RSI(12) confluence (discretionary, default OFF)
-   if(UseRSIFilter)
+   //--- optional: RSI(12) confluence. Hard = block, soft = tag / smaller risk (spec: preferred)
+   double rsiFactor = 1.0;
+   string rsiTag    = "";
+   if(UseRSIFilter || UseRSISoft)
      {
       double rsi;
       if(!CopyOne(g_hRsiM1, 0, 1, rsi))
          return SIG_NOTREADY;
-      if(rsi >= RSI_MaxLevel)
+      bool rsiOK = (rsi < RSI_MaxLevel);
+      if(!rsiOK && UseRSIFilter)
         {
          Log(StringFormat("RSI filter: RSI=%.1f >= %.1f -> skip", rsi, RSI_MaxLevel));
          return SIG_NONE;
         }
+      rsiTag = rsiOK ? " RSI+" : " RSI-";
+      if(!rsiOK)
+         rsiFactor = MathMax(0.0, MathMin(1.0, RSIUnconfirmedRiskFactor));
      }
 
    //--- R3: Stochastic quality filter (soft by default)
-   g_riskFactor = 1.0;
+   g_riskFactor = rsiFactor;
    g_signalTag  = "";
    if(UseStochasticFilter)
      {
@@ -676,31 +749,50 @@ int EvaluateSignal(const datetime barTime)
             Log("R3 Stochastic not confirmed and StochHardBlock=true -> skip");
             return SIG_NONE;
            }
-         g_riskFactor = MathMax(0.0, MathMin(1.0, StochUnconfirmedRiskFactor));
+         g_riskFactor *= MathMax(0.0, MathMin(1.0, StochUnconfirmedRiskFactor));
          Log(StringFormat("R3 Stochastic not confirmed (soft) -> risk factor %.2f", g_riskFactor));
         }
      }
 
+   g_signalTag += rsiTag;
    Log("Signal VALID on bar " + TimeToString(barTime) + " " + g_signalTag);
    return SIG_VALID;
   }
 
-//--- R1: HTF bearish bias -> SIG_VALID / SIG_NONE / SIG_NOTREADY
+//--- R1: one trend timeframe -> SIG_VALID (bearish) / SIG_NONE / SIG_NOTREADY
+int TFBearState(const int hMacd, const int hEma, const ENUM_TIMEFRAMES tf)
+  {
+   double m, e;
+   if(!CopyOne(hMacd, 0, 1, m) || !CopyOne(hEma, 0, 1, e))
+      return SIG_NOTREADY;
+   double c = iClose(_Symbol, tf, 1);
+   bool macdBear = (m < 0.0);
+   bool belowEma = (c > 0.0 && c < e);
+   bool bear;
+   switch(HTF_Condition)
+     {
+      case HTF_MACD_OR_EMA: bear = macdBear || belowEma; break;
+      case HTF_MACD_ONLY:   bear = macdBear;             break;
+      case HTF_EMA_ONLY:    bear = belowEma;             break;
+      default:              bear = macdBear && belowEma; break;
+     }
+   if(!bear && !g_quietLog)
+      Log(StringFormat("R1 %s not bearish: MACD=%.3f (<0? %s) close=%.2f EMA=%.2f (below? %s)", TFName(tf),
+                       m, macdBear ? "yes" : "no", c, e, belowEma ? "yes" : "no"));
+   return bear ? SIG_VALID : SIG_NONE;
+  }
+
+//--- R1: HTF bearish bias over one or two trend timeframes
 int HTFBiasState()
   {
-   double htfMacd, htfEma;
-   if(!CopyOne(g_hMacdHTF, 0, 1, htfMacd) || !CopyOne(g_hEmaHTF, 0, 1, htfEma))
+   int s1 = TFBearState(g_hMacdHTF, g_hEmaHTF, HTF_Timeframe);
+   if(!UseHTF2)
+      return s1;
+   int s2 = TFBearState(g_hMacdHTF2, g_hEmaHTF2, HTF2_Timeframe);
+   if(s1 == SIG_NOTREADY || s2 == SIG_NOTREADY)
       return SIG_NOTREADY;
-   double htfClose = iClose(_Symbol, HTF_Timeframe, 1);
-   bool macdBear  = (htfMacd < 0.0);
-   bool belowEma  = (htfClose > 0.0 && htfClose < htfEma);
-   if(!(macdBear && belowEma))
-     {
-      Log(StringFormat("R1 HTF bias FAILED: MACD=%.3f (<0? %s) close=%.2f EMA=%.2f (below? %s)",
-                       htfMacd, macdBear ? "yes" : "no", htfClose, htfEma, belowEma ? "yes" : "no"));
-      return SIG_NONE;
-     }
-   return SIG_VALID;
+   bool b1 = (s1 == SIG_VALID), b2 = (s2 == SIG_VALID);
+   return (HTF_Combine == HTF_EITHER ? (b1 || b2) : (b1 && b2)) ? SIG_VALID : SIG_NONE;
   }
 
 //--- R3: Stochastic came from overbought and is turning/turned down
@@ -773,6 +865,7 @@ bool BuildTradePlan(TradePlan &p, string &reason)
    p.tpRefTime   = 0;
    p.slSource    = "";
    p.tpSource    = "";
+   p.tpZoneLow   = 0.0;
 
    //--- (a) liquidity candle: most recent bar j that swept an older swing
    //        high (high above it) and closed back below it
@@ -874,6 +967,72 @@ bool BuildTradePlan(TradePlan &p, string &reason)
               }
      }
 
+   //--- v1.20: liquidity ZONES ("blue rectangles"). Swing lows within Zone_Tolerance_Points
+   //    of each other form one zone [bottom, top]; zones with fewer than Zone_MinTouches lows
+   //    are dropped. Manual levels are added as one-price zones. The TP then sits
+   //    TP_Buffer_Points above the zone TOP, i.e. just before price reaches the zone.
+   double zoneLow[];
+   ArrayResize(zoneLow, cnt);
+   for(int i = 0; i < cnt; i++)
+      zoneLow[i] = lows[i];
+   if(TP_Mode == TP_ZONE)
+     {
+      //--- sort candidates by price, highest first (insertion sort; a few dozen items)
+      for(int i = 1; i < cnt; i++)
+        {
+         double lv = lows[i]; datetime lt = lowTimes[i]; string ls = lowSrc[i];
+         int j = i - 1;
+         while(j >= 0 && lows[j] < lv)
+           {
+            lows[j + 1] = lows[j]; lowTimes[j + 1] = lowTimes[j]; lowSrc[j + 1] = lowSrc[j];
+            j--;
+           }
+         lows[j + 1] = lv; lowTimes[j + 1] = lt; lowSrc[j + 1] = ls;
+        }
+      double   zTop[], zBot[];
+      datetime zTime[];
+      int      zN[];
+      int      zc = 0;
+      double   tol = Pts(Zone_Tolerance_Points);
+      for(int i = 0; i < cnt; i++)
+        {
+         if(zc > 0 && zBot[zc - 1] - lows[i] <= tol)
+           {
+            zBot[zc - 1] = lows[i];                      // extend the zone downwards
+            zN[zc - 1]++;
+            zTime[zc - 1] = MathMin(zTime[zc - 1], lowTimes[i]);
+            continue;
+           }
+         ArrayResize(zTop, zc + 1); ArrayResize(zBot, zc + 1); ArrayResize(zTime, zc + 1); ArrayResize(zN, zc + 1);
+         zTop[zc] = lows[i]; zBot[zc] = lows[i]; zTime[zc] = lowTimes[i]; zN[zc] = 1;
+         zc++;
+        }
+      //--- manual zone tops
+      string parts[];
+      int np = (StringLen(Manual_Zone_Levels) > 0) ? StringSplit(Manual_Zone_Levels, ';', parts) : 0;
+      int keep = 0;
+      cnt = 0;
+      ArrayResize(lows, 0); ArrayResize(lowTimes, 0); ArrayResize(lowSrc, 0); ArrayResize(zoneLow, 0);
+      for(int z = 0; z < zc; z++)
+        {
+         if(zN[z] < MathMax(1, Zone_MinTouches))
+            continue;
+         ArrayResize(lows, cnt + 1); ArrayResize(lowTimes, cnt + 1); ArrayResize(lowSrc, cnt + 1); ArrayResize(zoneLow, cnt + 1);
+         lows[cnt] = zTop[z]; zoneLow[cnt] = zBot[z]; lowTimes[cnt] = zTime[z];
+         lowSrc[cnt] = StringFormat("zone x%d", zN[z]);
+         cnt++;
+        }
+      for(int k = 0; k < np; k++)
+        {
+         double lv = StringToDouble(parts[k]);
+         if(lv <= 0.0 || lv >= bid)
+            continue;
+         ArrayResize(lows, cnt + 1); ArrayResize(lowTimes, cnt + 1); ArrayResize(lowSrc, cnt + 1); ArrayResize(zoneLow, cnt + 1);
+         lows[cnt] = lv; zoneLow[cnt] = lv; lowTimes[cnt] = r[MathMin(NT, need - 1)].time; lowSrc[cnt] = "manual zone";
+         cnt++;
+        }
+     }
+
    //--- pick the nearest pool below price (highest low first) that gives >= MinRR
    bool   found  = false;
    bool   used[];
@@ -898,6 +1057,7 @@ bool BuildTradePlan(TradePlan &p, string &reason)
          continue;
       p.tp        = tp;
       p.tpRef     = lows[best];
+      p.tpZoneLow = zoneLow[best];
       p.tpRefTime = lowTimes[best];
       p.tpSource  = lowSrc[best];
       found       = true;
@@ -1385,10 +1545,21 @@ void DrawPlan(const TradePlan &p)
    datetime now = iTime(_Symbol, TriggerTimeframe, 0);
    DrawLevel("SL", p.sl, clrTomato, "XLZC SL " + p.slSource);
    DrawLevel("TP", p.tp, clrDodgerBlue, "XLZC TP " + p.tpSource);
-   if(p.slRefTime > 0)
-      DrawLiquidityZone("LiqHigh_" + id, p.slRefTime, p.slRef, now, p.sl, clrMistyRose);
+   if(!ShowLiquidityLines)
+      return;
+   //--- red line: the liquidity high the SL protects (spec: "the red horizontal line")
+   string rl = OBJ_PREFIX + "LiqHighLine_" + id;
+   if(p.slRefTime > 0 && ObjectCreate(0, rl, OBJ_TREND, 0, p.slRefTime, p.slRef, now, p.slRef))
+     {
+      ObjectSetInteger(0, rl, OBJPROP_COLOR, clrRed);
+      ObjectSetInteger(0, rl, OBJPROP_WIDTH, 2);
+      ObjectSetInteger(0, rl, OBJPROP_RAY_RIGHT, true);
+      ObjectSetInteger(0, rl, OBJPROP_SELECTABLE, false);
+     }
+   //--- blue rectangle: the liquidity zone / swing low the TP targets
    if(p.tpRefTime > 0)
-      DrawLiquidityZone("LiqPool_" + id, p.tpRefTime, p.tpRef, now, p.tp, clrLightSteelBlue);
+      DrawLiquidityZone("LiqPool_" + id, p.tpRefTime, MathMin(p.tpZoneLow > 0.0 ? p.tpZoneLow : p.tpRef, p.tp),
+                        now + PeriodSeconds(TriggerTimeframe) * 30, MathMax(p.tpRef, p.tp), clrDodgerBlue);
   }
 
 //--- "M3", "H1" ... instead of PERIOD_M3
@@ -1418,15 +1589,53 @@ void MarkSignal(const datetime barTime)
                                 TimeToString(barTime, TIME_DATE | TIME_MINUTES)));
   }
 
+//--- closed trades of this EA (magic + symbol): positions closed, positions won
+void WinStats(int &closed, int &wins)
+  {
+   closed = 0; wins = 0;
+   if(!HistorySelect(0, TimeCurrent() + 1))
+      return;
+   long   ids[];
+   double pnl[];
+   int    n = 0;
+   for(int k = 0; k < HistoryDealsTotal(); k++)
+     {
+      ulong d = HistoryDealGetTicket(k);
+      if(d == 0 || HistoryDealGetString(d, DEAL_SYMBOL) != _Symbol ||
+         (ulong)HistoryDealGetInteger(d, DEAL_MAGIC) != MagicNumber)
+         continue;
+      long et = HistoryDealGetInteger(d, DEAL_ENTRY);
+      if(et != DEAL_ENTRY_OUT && et != DEAL_ENTRY_OUT_BY && et != DEAL_ENTRY_INOUT)
+         continue;
+      long id = HistoryDealGetInteger(d, DEAL_POSITION_ID);
+      double v = HistoryDealGetDouble(d, DEAL_PROFIT) + HistoryDealGetDouble(d, DEAL_SWAP) +
+                 HistoryDealGetDouble(d, DEAL_COMMISSION);
+      int i = -1;
+      for(int q = n - 1; q >= 0; q--)
+         if(ids[q] == id) { i = q; break; }
+      if(i < 0)
+        {
+         i = n++;
+         ArrayResize(ids, n); ArrayResize(pnl, n);
+         ids[i] = id; pnl[i] = 0.0;
+        }
+      pnl[i] += v;                                     // partial closes add up per position
+     }
+   closed = n;
+   for(int i = 0; i < n; i++)
+      if(pnl[i] > 0.0)
+         wins++;
+  }
+
 //--- status panel: proves which timeframe the signals come from
 void UpdatePanel()
   {
    if(!ShowStatusPanel || (MQLInfoInteger(MQL_TESTER) && !MQLInfoInteger(MQL_VISUAL_MODE)))
       return;
 #ifdef XLZC_WITH_FGF
-   string build = "XLZC Bearish v1.10 + FGF";
+   string build = "XLZC Bearish v1.20 + FGF";
 #else
-   string build = "XLZC Bearish v1.10";
+   string build = "XLZC Bearish v1.20";
 #endif
    //--- last closed trigger bar and its MACD (the exact values the signal uses)
    datetime lastOpen = iTime(_Symbol, TriggerTimeframe, 1);
@@ -1439,34 +1648,33 @@ void UpdatePanel()
    string bias = "off";
    if(UseHTF_Filter)
      {
-      double hm, he;
-      if(CopyOne(g_hMacdHTF, 0, 1, hm) && CopyOne(g_hEmaHTF, 0, 1, he))
-         bias = (hm < 0.0 && iClose(_Symbol, HTF_Timeframe, 1) < he) ? "BEARISH (shorts allowed)" : "not bearish (no shorts)";
-      else
-         bias = "not ready";
+      g_quietLog = true;                      // same rule as the signal, without log lines
+      int st = HTFBiasState();
+      g_quietLog = false;
+      bias = (st == SIG_VALID) ? "BEARISH (shorts allowed)" : (st == SIG_NONE) ? "not bearish (no shorts)" : "not ready";
      }
    double spreadPts = (Ask() - Bid()) / (_Point * g_ptScale);
-   Comment(StringFormat("%s | %s | chart %s
-"
-                        "Signals on: %s bars   |   Trend filter: %s
-"
-                        "Last closed %s bar: %s  (closed %s)
-"
-                        "MACD(%s) bar[2] -> bar[1]: %s
-"
-                        "%s bias: %s
-"
-                        "Session %s-%s %s: %s   |   Spread %.0f / %d pts
-"
-                        "Signal: %s %s   |   Positions: %d",
+   int closedN, winsN;
+   WinStats(closedN, winsN);
+   string winTxt = (closedN > 0) ? StringFormat("%d of %d closed trades won (%.0f%%)", winsN, closedN,
+                                                100.0 * winsN / closedN) : "no closed trades yet";
+   Comment(StringFormat("%s | %s | chart %s\n"
+                        "Signals on: %s bars   |   Trend filter: %s%s\n"
+                        "Last closed %s bar: %s  (closed %s)\n"
+                        "MACD(%s) bar[2] -> bar[1]: %s\n"
+                        "%s bias: %s\n"
+                        "Session %s-%s %s: %s   |   Spread %.0f / %d pts\n"
+                        "Signal: %s %s   |   Positions: %d\n"
+                        "Results: %s",
                         build, _Symbol, TFName((ENUM_TIMEFRAMES)_Period),
                         TFName(TriggerTimeframe), TFName(HTF_Timeframe),
+                        (UseHTF_Filter && UseHTF2) ? (HTF_Combine == HTF_EITHER ? " or " : " and ") + TFName(HTF2_Timeframe) : "",
                         TFName(TriggerTimeframe), TimeToString(lastOpen, TIME_DATE | TIME_MINUTES),
                         TimeToString(lastOpen + PeriodSeconds(TriggerTimeframe), TIME_MINUTES),
                         TFName(TriggerTimeframe), macdTxt,
-                        TFName(HTF_Timeframe), bias,
+                        "Trend", bias,
                         TradingHoursStart, TradingHoursEnd, TradingHoursAreGMT ? "GMT" : "server time",
                         SessionOK() ? "open" : "closed", spreadPts, MaxSpread_Points,
-                        g_signalActive ? "ACTIVE" : "none", g_signalTag, CountOwnPositions()));
+                        g_signalActive ? "ACTIVE" : "none", g_signalTag, CountOwnPositions(), winTxt));
   }
 //+------------------------------------------------------------------+
