@@ -1,0 +1,295 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+//@version=6
+//
+// XLZC Liquidity Zero-Cross Bearish - STRATEGY (TradingView port of the MT5 EA v1.10)
+// ---------------------------------------------------------------------------
+// Short-only. "No señal = no operación": no signal, no trade.
+//
+// RULES (same as XAUUSD_M1_LiquidityZeroCross_Bearish.mq5)
+//  R1 Trend filter (HTF, H1 or M30): MACD(12,26) main < 0 and close < EMA(50) on the last
+//     CLOSED higher-timeframe bar (no repainting, see htfData below).
+//  R2 Trigger: MACD(12,26) main of the chart bar crosses zero DOWN (previous bar >= 0, this
+//     closed bar < 0). The order fills at the next bar's open, like the EA.
+//  R3 Stochastic(7, slowing 1, D 7) came from >= 80 in the last 5 bars and turned down:
+//     a soft quality filter (no effect) unless "Stochastic blocks" is on.
+//  R4 Liquidity: SL above the latest liquidity sweep candle (a bar that ran above an older
+//     swing high and closed back below it), else the latest swing high above price, plus a
+//     buffer. TP at the nearest swing low within the TP lookback that pays >= Min reward:risk,
+//     else a fixed reward:risk (if set), else no trade.
+//  R5 Risk: % of equity per trade sized from the SL distance, one position at a time,
+//     optional trailing stop (start / distance).
+//  R6 Session window (broker server time = New York + 7h, so it is entered in New York time).
+//
+// RUN IT ON THE TRIGGER TIMEFRAME CHART: the M3 presets need a 3-minute chart and the M2 preset
+// a 2-minute chart. The table in the top-right corner turns red if the chart is wrong.
+//
+// POINTS: every "points" input is a 0.01 price step, exactly like the EA presets
+// (gold: 100 points = 1 USD; BTC: 100 points = 1 USD).
+//
+// SPREAD: TradingView charts show one price (normally the bid on CFD feeds) and no spread.
+// The EA enters a short at the bid and its stop / target / trailing trigger on the ASK. With
+// "Model the spread on exits" the strategy places those levels "spread" lower on the chart,
+// which reproduces the EA's fills on a bid chart. Set the spread to your broker's typical
+// value and add your commission in the strategy Properties.
+//
+// PRESETS (calibrated in research/ on FTMO XAUUSD and Binance BTCUSDT M1, Jan 2025-May 2026):
+//  Gold M3/H1     M3 chart, H1 filter, 05:00-09:30 NY. In-sample PF 1.82-2.48 (77 trades).
+//  Gold M2/H1     M2 chart, H1 filter, 05:00-09:30 NY. Chosen on 2025 only: PF 1.55 (186
+//                 trades), 2026 out of sample PF 1.61.
+//  BTC M3/H1      M3 chart, H1 filter. Low-cost brokers only (calibrated with a 5 USD spread).
+//  BTC M3/M30     M3 chart, M30 filter. Experimental (its trailing did not hold up in 2026).
+//  Custom         every value from the inputs below.
+//
+// NOT PORTED (MT5 only): broker spread cap (no spread data on TradingView), news filter,
+// entry delay window, partial close, hybrid trailing, RSI filter, manual levels, HTF liquidity
+// levels, the FlashGold filter build and the EVK export.
+// ---------------------------------------------------------------------------
+strategy("XLZC Liquidity Zero-Cross Bearish (Strategy)", "XLZC Bear S", overlay = true, pyramiding = 0,
+     initial_capital = 10000, currency = currency.USD, default_qty_type = strategy.fixed, default_qty_value = 1,
+     commission_type = strategy.commission.cash_per_contract, commission_value = 0.0, slippage = 0,
+     process_orders_on_close = false, calc_on_every_tick = false, max_bars_back = 600,
+     max_lines_count = 200, max_labels_count = 200)
+
+// ===================================================================== inputs
+gPre  = "Preset"
+gTf   = "Timeframes (Custom)"
+gStr  = "Liquidity structure (Custom)"
+gRisk = "Risk and exits (Custom)"
+gSess = "Session (Custom)"
+gCost = "Costs"
+gViz  = "Display"
+
+preset = input.string("Gold M3/H1", "Preset", options = ["Gold M3/H1", "Gold M2/H1", "BTC M3/H1 (low-cost)", "BTC M3/M30 (experimental)", "Custom"], group = gPre,
+     tooltip = "A preset overrides the Custom inputs below (except costs, risk %, display). Use Custom to set everything yourself.")
+
+cTrig     = input.timeframe("3", "Chart (trigger) timeframe expected", group = gTf, tooltip = "Only used for the warning: the strategy always trades the chart's own bars. Put the chart on this timeframe.")
+cHtf      = input.timeframe("60", "Trend filter timeframe", group = gTf)
+cUseHtf   = input.bool(true, "Use the trend filter (R1)", group = gTf)
+
+cN        = input.int(40, "Liquidity lookback bars (SL structure)", minval = 5, group = gStr)
+cS        = input.int(2, "Swing strength (bars each side)", minval = 1, group = gStr)
+cBuf      = input.int(208, "SL buffer above the liquidity high (points)", minval = 0, group = gStr)
+cNT       = input.int(120, "TP lookback bars (0 = same as SL lookback)", minval = 0, group = gStr)
+cRR       = input.float(1.5, "Min reward:risk for a TP pool", minval = 0, step = 0.1, group = gStr)
+cFb       = input.float(0.0, "Fixed reward:risk if no pool qualifies (0 = skip trade)", minval = 0, step = 0.1, group = gStr)
+cMinSL    = input.int(87, "Min SL distance (points)", minval = 0, group = gStr)
+cMaxSL    = input.int(1732, "Max SL distance (points, 0 = off)", minval = 0, group = gStr)
+cSweep    = input.bool(false, "Require a liquidity sweep candle", group = gStr)
+cStochH   = input.bool(false, "Stochastic blocks unconfirmed signals (hard filter)", group = gStr)
+
+cTrail    = input.bool(true, "Trailing stop", group = gRisk)
+cTStart   = input.int(260, "Trailing start (points of profit)", minval = 0, group = gRisk)
+cTDist    = input.int(173, "Trailing distance (points)", minval = 1, group = gRisk)
+riskPct   = input.float(0.5, "Risk per trade, % of equity", minval = 0.01, maxval = 10, step = 0.05, group = gRisk)
+qtyStep   = input.float(0.01, "Quantity step (contracts)", minval = 0.00001, group = gRisk)
+
+cSessOn   = input.bool(true, "Trade only inside the session", group = gSess)
+cSessFrom = input.int(500, "Session start, HHMM New York time", minval = 0, maxval = 2359, group = gSess, tooltip = "Broker server time (GMT+2/+3, New York close) minus 7 hours. 12:00 server time = 05:00 New York.")
+cSessTo   = input.int(930, "Session end, HHMM New York time", minval = 0, maxval = 2359, group = gSess)
+
+spreadIn  = input.float(-1, "Spread (price units, -1 = preset default)", group = gCost, tooltip = "Typical broker spread in PRICE units, e.g. 0.45 for gold, 5 for BTC. -1 uses 0.45 for gold presets, 5 for BTC presets, 0 for Custom.")
+spreadOn  = input.bool(true, "Model the spread on exits (bid chart)", group = gCost)
+
+showLv    = input.bool(true, "Show SL / TP of the open trade", group = gViz)
+showSig   = input.bool(true, "Mark signals", group = gViz)
+showBias  = input.bool(true, "Shade bars when the trend filter allows shorts", group = gViz)
+showTbl   = input.bool(true, "Status table", group = gViz)
+
+// ===================================================================== presets
+isGold3 = preset == "Gold M3/H1"
+isGold2 = preset == "Gold M2/H1"
+isBtcH1 = preset == "BTC M3/H1 (low-cost)"
+isBtc30 = preset == "BTC M3/M30 (experimental)"
+pick(float g3, float g2, float b1, float b30, float custom) =>
+    isGold3 ? g3 : isGold2 ? g2 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
+pickS(string g3, string g2, string b1, string b30, string custom) =>
+    isGold3 ? g3 : isGold2 ? g2 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
+pickB(bool g3, bool g2, bool b1, bool b30, bool custom) =>
+    isGold3 ? g3 : isGold2 ? g2 : isBtcH1 ? b1 : isBtc30 ? b30 : custom
+
+trigTf   = pickS("3", "2", "3", "3", cTrig)
+htfTf    = pickS("60", "60", "60", "30", cHtf)
+useHtf   = preset == "Custom" ? cUseHtf : true
+nBars    = int(pick(40, 15, 40, 40, cN))
+sStr     = int(pick(2, 4, 2, 3, cS))
+bufPts   = pick(208, 57, 2259, 4517, cBuf)
+ntIn     = int(pick(120, 120, 60, 120, cNT))
+minRR    = pick(1.5, 1.5, 2.0, 2.0, cRR)
+fbRR     = pick(0.0, 1.5, 0.0, 0.0, cFb)
+minSLPts = pick(87, 71, 2823, 2823, cMinSL)
+maxSLPts = pick(1732, 1414, 56465, 56465, cMaxSL)
+reqSweep = preset == "Custom" ? cSweep : false
+stochHard = preset == "Custom" ? cStochH : false
+trailOn  = pickB(true, true, true, true, cTrail)
+tStart   = pick(260, 212, 8470, 8470, cTStart)
+tDist    = pick(173, 141, 1412, 5646, cTDist)
+sessOn   = preset == "Custom" ? cSessOn : true
+sessFrom = int(pick(500, 500, 500, 500, cSessFrom))
+sessTo   = int(pick(930, 930, 930, 930, cSessTo))
+spread   = spreadIn >= 0 ? spreadIn : (isGold3 or isGold2) ? 0.45 : (isBtcH1 or isBtc30) ? 5.0 : 0.0
+ntBars   = ntIn > 0 ? ntIn : nBars
+PT       = 0.01                                   // one "point" = 0.01 price, as in the EA presets
+
+// ===================================================================== R1 trend filter (no repaint)
+// lookahead_on returns the HTF bar that CONTAINS this chart bar. Its values [0] are only final
+// when this chart bar is the last one of that HTF bar (they close together); otherwise the last
+// closed HTF bar is [1]. The EA decides at the next bar's open, so on the closing bar it already
+// sees the HTF bar that just closed: this reproduces that without looking ahead.
+htfData() =>
+    m = ta.ema(close, 12) - ta.ema(close, 26)
+    e = ta.ema(close, 50)
+    [m, close, e, m[1], close[1], e[1], time_close]
+[hM0, hC0, hE0, hM1, hC1, hE1, hTClose] = request.security(syminfo.tickerid, htfTf, htfData(), barmerge.gaps_off, barmerge.lookahead_on)
+htfJustClosed = not na(hTClose) and not na(time_close) and time_close >= hTClose
+hMacd  = htfJustClosed ? hM0 : hM1
+hClose = htfJustClosed ? hC0 : hC1
+hEma   = htfJustClosed ? hE0 : hE1
+biasOK = not useHtf or (hMacd < 0 and hClose < hEma)
+
+// ===================================================================== R2 trigger, R3 stochastic
+macd      = ta.ema(close, 12) - ta.ema(close, 26)
+zeroCross = macd[1] >= 0 and macd < 0
+stK = ta.stoch(close, high, low, 7)               // slowing 1 = raw %K
+stD = ta.sma(stK, 7)
+stochOK = ta.highest(stK, 5) >= 80 and (stK < stD or stK < 80)
+
+// ===================================================================== R6 session (next bar's open)
+nextOpen = time_close
+hhmm = hour(nextOpen, "America/New_York") * 100 + minute(nextOpen, "America/New_York")
+inSession = not sessOn or (sessFrom <= sessTo ? (hhmm >= sessFrom and hhmm < sessTo) : (hhmm >= sessFrom or hhmm < sessTo))
+
+// ===================================================================== R4 liquidity structure
+// Offsets: the EA's shift k (k = 1 is the last closed bar) is offset k - 1 here, because the
+// strategy decides on the close of that bar. The entry price is this bar's close (the EA uses
+// the next bar's open bid; on a continuous feed they are the same price).
+isSwingHigh(int o, int s) =>
+    bool ok = true
+    for k = 1 to s
+        if high[o - k] >= high[o] or high[o + k] > high[o]
+            ok := false
+            break
+    ok
+isSwingLow(int o, int s) =>
+    bool ok = true
+    for k = 1 to s
+        if low[o - k] <= low[o] or low[o + k] < low[o]
+            ok := false
+            break
+    ok
+
+float planSL  = na
+float planTP  = na
+float planRef = na
+string planWhy = ""
+var string lastSkip = "-"
+bool signal = false
+bool readyBars = bar_index > math.max(nBars, ntBars) + sStr + 60
+
+if zeroCross and readyBars and strategy.position_size == 0 and biasOK and inSession and (not stochHard or stochOK)
+    entryPx = close
+    // (a) liquidity sweep candle: most recent bar that ran above an older swing high and closed below it
+    int sweepO = -1
+    for j = 1 to nBars
+        int oj = j - 1
+        // Pine counts DOWN when start > end, so guard the range explicitly
+        if j + sStr + 1 <= nBars
+            for i = j + sStr + 1 to nBars
+                int oi = i - 1
+                if isSwingHigh(oi, sStr) and high[oj] > high[oi] and close[oj] < high[oi]
+                    sweepO := oj
+                    break
+        if sweepO >= 0
+            break
+    int structO = -1
+    if sweepO >= 0 and high[sweepO] > entryPx
+        structO := sweepO
+    else if not reqSweep and 1 + sStr <= nBars
+        // (b) most recent confirmed swing high above price
+        for i = 1 + sStr to nBars
+            if isSwingHigh(i - 1, sStr) and high[i - 1] > entryPx
+                structO := i - 1
+                break
+    if structO < 0
+        planWhy := "no liquidity high above price"
+    else
+        float ref = entryPx
+        for o = 0 to structO
+            ref := math.max(ref, high[o])
+        float sl = ref + bufPts * PT + spread           // EA: buffer + spread above the high (ask side)
+        float risk = sl - entryPx
+        float riskPts = risk / PT
+        // TP: nearest swing low below price (highest first) that pays >= min reward:risk
+        float tp = na
+        if 1 + sStr <= ntBars
+            for i = 1 + sStr to ntBars
+                int o = i - 1
+                if isSwingLow(o, sStr) and low[o] < entryPx
+                    float reward = entryPx - low[o]
+                    if reward > 0 and (minRR <= 0 or reward >= minRR * risk)
+                        tp := na(tp) ? low[o] : math.max(tp, low[o])
+        if na(tp) and fbRR > 0
+            tp := entryPx - fbRR * risk
+        if na(tp)
+            planWhy := "no liquidity pool pays the min reward:risk"
+        else if riskPts < minSLPts
+            planWhy := "SL too tight"
+        else if maxSLPts > 0 and riskPts > maxSLPts
+            planWhy := "SL too wide"
+        else
+            planSL := sl
+            planTP := tp
+            planRef := ref
+            signal := true
+    lastSkip := signal ? "-" : planWhy
+
+// ===================================================================== orders
+// The EA's SL / TP / trailing trigger on the ASK. On a bid chart that is "spread" lower.
+sh = spreadOn ? spread : 0.0
+toTicks(float price) => math.max(1, math.round(price / syminfo.mintick))
+
+var float openSL = na
+var float openTP = na
+if signal
+    float riskMoney = strategy.equity * riskPct / 100.0
+    float qty = riskMoney / ((planSL - close) * syminfo.pointvalue)
+    qty := math.floor(qty / qtyStep) * qtyStep
+    if qty > 0
+        strategy.entry("XLZC short", strategy.short, qty = qty, comment = stochOK ? "STO+" : "STO-")
+        stopPx  = planSL - sh
+        limitPx = planTP - sh
+        if trailOn
+            strategy.exit("XLZC exit", "XLZC short", stop = stopPx, limit = limitPx,
+                 trail_points = toTicks(tStart * PT + sh), trail_offset = toTicks(tDist * PT))
+        else
+            strategy.exit("XLZC exit", "XLZC short", stop = stopPx, limit = limitPx)
+        openSL := stopPx
+        openTP := limitPx
+
+if strategy.position_size == 0 and not signal
+    openSL := na
+    openTP := na
+
+// ===================================================================== display
+plotshape(showSig and signal, "Signal", shape.triangledown, location.abovebar, color.new(color.red, 0), size = size.small, text = "XLZC")
+plot(showLv and strategy.position_size < 0 ? openSL : na, "Stop (bid chart)", color.new(color.red, 0), 1, plot.style_linebr)
+plot(showLv and strategy.position_size < 0 ? openTP : na, "Target (bid chart)", color.new(color.teal, 0), 1, plot.style_linebr)
+bgcolor(showBias and useHtf and biasOK ? color.new(color.red, 93) : na, title = "Trend filter allows shorts")
+
+chartOK = timeframe.period == trigTf
+if showTbl and barstate.islast
+    var table t = table.new(position.top_right, 2, 7, border_width = 1)
+    table.cell(t, 0, 0, "XLZC Bear", text_color = color.white, bgcolor = color.new(color.gray, 20))
+    table.cell(t, 1, 0, preset, text_color = color.white, bgcolor = color.new(color.gray, 20))
+    table.cell(t, 0, 1, "Chart / needed")
+    table.cell(t, 1, 1, timeframe.period + " / " + trigTf, text_color = color.white,
+         bgcolor = chartOK ? color.new(color.green, 30) : color.new(color.red, 10))
+    table.cell(t, 0, 2, "Trend filter")
+    table.cell(t, 1, 2, useHtf ? htfTf + (biasOK ? ": shorts allowed" : ": no shorts") : "off")
+    table.cell(t, 0, 3, "Session (NY)")
+    table.cell(t, 1, 3, sessOn ? str.format("{0,number,0000}-{1,number,0000} {2}", sessFrom, sessTo, inSession ? "open" : "closed") : "off")
+    table.cell(t, 0, 4, "Spread modelled")
+    table.cell(t, 1, 4, str.tostring(spread) + (spreadOn ? "" : " (off)"))
+    table.cell(t, 0, 5, "Trailing")
+    table.cell(t, 1, 5, trailOn ? str.format("{0,number,#}/{1,number,#} pts", tStart, tDist) : "off")
+    table.cell(t, 0, 6, "Last skip")
+    table.cell(t, 1, 6, lastSkip)
