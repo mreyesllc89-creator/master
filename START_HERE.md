@@ -1,4 +1,4 @@
-# XLZC Bearish EA v1.10: start here
+# XLZC Bearish EA v1.20: start here
 
 A short-only Expert Advisor for XAUUSD (gold) in MetaTrader 5. It sells when MACD crosses below zero on a short timeframe while the higher-timeframe trend is down. It places the stop above the latest liquidity high and the target at the next liquidity low. *No signal = no trade.*
 
@@ -37,19 +37,36 @@ The EA computes its signals on `TriggerTimeframe` (M3 or M2 in the calibrated pr
 
 ## Which preset to use
 
-| Preset | EA file | Timeframes | Backtest result | How much to trust it |
-|---|---|---|---|---|
-| `XLZC_Bearish_M2_H1_NY.set` | without filter | M2 trigger, H1 bias, 12:00-16:30 server time | 186 trades, PF 1.55, +19.9R, max drawdown 4.9R. **2026: PF 1.61 on 43 trades, data it was not chosen on.** | **Best-tested.** Chosen with 2025 data only, so 2026 is a real out-of-sample check. Weak spot: if every same-bar trailing touch is a stop-out, PF is 1.05. |
-| `XLZC_Bearish_M3_H1_NY.set` | without filter | M3 trigger, H1 bias, 12:00-16:30 server time | 77 trades, PF 2.48 (1.82 in the worst trailing case), +20.8R, max drawdown 1.1R. | **Highest numbers, but in-sample.** All 17 months were used to choose it. The M3/H1 combination held up out of sample; the exact values are not proven. |
-| `XLZC_Bearish_M3_H1_NY_FGF.set` | **with** filter | Same as M3/H1 + FlashGold defaults | 28 trades, PF 3.18, +8.7R. | Higher PF, a third of the trades, less than half the profit. In-sample. |
-| `XLZC_Bearish_BTCUSD_M3_M30.set` | without filter | **BTCUSD**: M3 trigger, M30 bias, 12:00-16:30 server time | With a 5 USD spread: 117 trades, PF 1.45, +15.8R; **2026: PF 1.31 on 38 trades (out of sample)**. | **Low-cost brokers only.** At a 20 USD spread nothing held up. The 10 USD spread cap blocks trading when costs are higher. Worst-case trailing fills: PF 0.96. |
-| `XLZC_Bearish_BTCUSD_M3_H1.set` | without filter | **BTCUSD**: M3 trigger, H1 bias, 12:00-16:30 server time | With a 5 USD spread: 102 trades, PF 1.52, +19.8R; 2026: PF 1.21 on 32 trades (out of sample). | Same conditions as above. Worst-case trailing fills: PF 0.99. |
-| `XLZC_Bearish_Calibrated_M1_M15.set` | without filter | M1 trigger, M15 bias, 12:00-16:30 server time | 51 trades, PF about 1.7 (first calibration pass). | Fragile: small changes drop PF to about 1.05. Kept for reference. |
-| `XLZC_Bearish_Conservative.set` | without filter | M1 / M15, 12:00-16:30 GMT | Not calibrated. | Built from the original strategy spec, not from the backtest. |
-| `XLZC_Bearish_Aggressive.set` | without filter | M1 / M5, 07:00-20:00 GMT | Not calibrated. | Built from the original strategy spec; uses partial close and hybrid trailing. |
-| `FlashGold_Direction_Filter_v1_2_Default.set` | indicator | | | The indicator's own default inputs. |
+**v1.20 presets (recommended).** These came from the final calibration: 39 timeframe pairs × 324 structure settings × 5 trailing settings × 2 sessions × Stochastic soft/hard, then the v1.20 options on the best setups. Every setting was chosen with **2025 data only**. They are shipped because they also held up in 2026 under all four ways of filling a trailing stop inside a bar.
 
-All presets risk 0.5% per trade (1% for Aggressive). Change `RiskPercent` to suit you. Each preset uses its own magic number, so two presets can run side by side.
+| Preset | Chart / trend | Backtest, whole period | 2026 (out of sample) |
+|---|---|---|---|
+| `XLZC_v120_Gold_M2_H4.set` | M2 / H4, 12:00–16:30 | 154 trades, PF 2.00–2.11 | **PF 1.89–2.23** (37 trades) |
+| `XLZC_v120_Gold_M3_H4.set` | M3 / H4, 12:00–16:30 | 106 trades, PF 1.78–2.16 | PF 1.76–2.42 (26 trades) |
+| `XLZC_v120_Gold_M3_M15.set` | M3 / M15, 07:00–20:00 | 92 trades, PF 2.00–2.14 | PF 1.40–1.65 (23 trades) |
+| `XLZC_v120_Gold_M3_H1.set` | M3 / H1, 07:00–20:00 | 101 trades, PF 1.77–1.87 | PF 1.44–1.58 (23 trades) |
+| `XLZC_v120_Gold_M2_H1.set` | M2 / H1, 12:00–16:30 | 111 trades, PF 1.72–1.83 | PF 1.33–1.61 (31 trades) |
+| `XLZC_v120_BTCUSD_M1_M15.set` | M1 / M15, 07:00–20:00 | 104 trades, PF 1.62–1.85 | **PF 1.67–1.89** (26 trades) |
+| `XLZC_v120_BTCUSD_M5_H2.set` | M5 / H2, 07:00–20:00 | 108 trades, PF 1.82–2.20 | PF 1.51–1.74 (29 trades) |
+| `XLZC_v120_BTCUSD_M3_D1.set` | M3 / D1, 12:00–16:30 | 176 trades, PF 1.60–1.87 | PF 1.26–1.45 (55 trades) |
+
+- Times are broker server time. PF ranges cover the four trailing-fill assumptions.
+- The BTC presets assume a 5 USD spread and refuse to trade above 10 USD. Use them with low-cost brokers only.
+- **Caution:** each preset's settings were chosen on 2025, but these pairs were then shipped because they held up in 2026, which is a mild second selection. Expect live results below these figures.
+- Most presets use tight trailing, which one-minute bars cannot fully judge. Run them in the MT5 Strategy Tester with real ticks first.
+
+**v1.10 presets (earlier calibration, still valid).**
+
+| Preset | EA file | Notes |
+|---|---|---|
+| `XLZC_Bearish_M2_H1_NY.set` | without filter | 186 trades, PF 1.55; 2026 PF 1.61 (chosen on 2025). |
+| `XLZC_Bearish_M3_H1_NY.set` | without filter | 77 trades, PF 1.82–2.48; in-sample (chosen with all 17 months). |
+| `XLZC_Bearish_M3_H4_NY.set` | without filter | 106 trades, PF 2.07; 2026 PF 2.15. Superseded by the v1.20 M3/H4. |
+| `XLZC_Bearish_M3_H1_NY_FGF.set` | **with** filter | 28 trades, PF 3.18, less total profit. |
+| `XLZC_Bearish_BTCUSD_M3_H1.set` / `_M3_M30.set` | without filter | BTC, low-cost brokers; M3/M30 is experimental. |
+| `XLZC_Bearish_Calibrated_M1_M15.set`, `_Conservative.set`, `_Aggressive.set` | without filter | First pass or spec-based; reference only. |
+
+Every preset risks 0.5% per trade (1% for Aggressive) and uses its own magic number.
 
 ## TradingView version
 
@@ -59,6 +76,8 @@ All presets risk 0.5% per trade (1% for Aggressive). Change `RiskPercent` to sui
 2. Put the chart on the trigger timeframe: **3 minutes** for the M3 presets, **2 minutes** for M2/H1. The table in the top-right corner turns red when the chart is wrong.
 3. In **Settings > Inputs**, pick the preset and set **Spread** to your broker's typical spread in price, for example 0.45 for gold or 5 for BTC.
 4. In **Settings > Properties > Commission**, enter the value the table shows: half the spread per contract per side, plus your broker's commission. Without it the backtest leaves out the spread cost.
+
+The TradingView dropdown holds the v1.10 presets plus Gold M3/H4. The v1.20 presets use options the Pine version does not have yet (trend condition modes, liquidity zones, the Stochastic OR rule), so they run in MT5 only.
 
 Differences from MT5:
 - The session is entered in New York time: 05:00–09:30 New York = 12:00–16:30 broker server time.

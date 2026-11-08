@@ -33,6 +33,7 @@ Stoch_D=7
 Stoch_OB_Level=80.0
 Stoch_LookbackBars=5
 StochHardBlock=true
+StochRule=0
 StochUnconfirmedRiskFactor=1.0
 LiquidityLookbackBars=25
 SwingStrength=3

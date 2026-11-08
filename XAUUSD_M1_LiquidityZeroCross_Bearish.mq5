@@ -16,6 +16,7 @@
 //                         Zone_Tolerance_Points form a zone; TP sits TP_Buffer_Points above the
 //                         zone top. Zone_MinTouches, Manual_Zone_Levels
 //    + UseRSISoft       : RSI(12) "preferred, not mandatory": tag / RSIUnconfirmedRiskFactor
+//    + StochRule        : stochastic confirmation = overbought AND turned down (default) or OR
 //    + chart: red line at the liquidity high, blue rectangle at the TP zone; panel shows the
 //      live win rate (spec claims ~9 of 10 trades win under valid conditions)
 //
@@ -145,6 +146,12 @@ enum ENUM_HTF_COMBINE
    HTF_EITHER = 1  // at least one trend timeframe bearish
   };
 
+enum ENUM_STOCH_RULE
+  {
+   STOCH_AND = 0, // came from overbought AND turned down (v1.10)
+   STOCH_OR  = 1  // came from overbought OR turned down (refined spec wording)
+  };
+
 enum ENUM_TP_MODE
   {
    TP_SWING_LOW = 0, // nearest swing low (v1.10)
@@ -202,6 +209,7 @@ input int     Stoch_D                  = 7;     // %D (signal) period
 input double  Stoch_OB_Level           = 80.0;  // Overbought level
 input int     Stoch_LookbackBars       = 5;     // Bars to look back for overbought
 input bool    StochHardBlock           = false; // true = block trade if not confirmed
+input ENUM_STOCH_RULE StochRule        = STOCH_AND; // v1.20: what "confirmed" means (spec: overbought OR turning down)
 input double  StochUnconfirmedRiskFactor = 1.0; // Risk multiplier if unconfirmed (soft mode)
 
 input group "=== R4: Liquidity Structure ==="
@@ -841,7 +849,7 @@ bool StochasticConfirmed()
          break;
         }
    bool turnedDown = (mainB[0] < sigB[0] || mainB[0] < Stoch_OB_Level);
-   return (wasOverbought && turnedDown);
+   return (StochRule == STOCH_OR) ? (wasOverbought || turnedDown) : (wasOverbought && turnedDown);
   }
 
 //====================================================================

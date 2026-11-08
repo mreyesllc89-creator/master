@@ -14,7 +14,7 @@ ENUMS = {"PERIOD_CURRENT": 0, "PERIOD_M1": 1, "PERIOD_M2": 2, "PERIOD_M3": 3, "P
          "PERIOD_M15": 15, "PERIOD_M30": 30, "PERIOD_H1": 16385, "PERIOD_H2": 16386,
          "PERIOD_H4": 16388, "PERIOD_D1": 16408, "TRAIL_SERVER": 0, "TRAIL_HYBRID": 1,
          "HTF_MACD_AND_EMA": 0, "HTF_MACD_OR_EMA": 1, "HTF_MACD_ONLY": 2, "HTF_EMA_ONLY": 3,
-         "HTF_BOTH": 0, "HTF_EITHER": 1, "TP_SWING_LOW": 0, "TP_ZONE": 1}
+         "HTF_BOTH": 0, "HTF_EITHER": 1, "TP_SWING_LOW": 0, "TP_ZONE": 1, "STOCH_AND": 0, "STOCH_OR": 1}
 FGF_KEYS = {"UseFGF_Filter", "FGF_IndicatorName", "FGF_CalcTimeframe", "FGF_Shift", "FGF_BlockIfUnavailable"}
 
 
@@ -60,6 +60,65 @@ def fgf_line():
 
 
 TFM = {"M1": 1, "M2": 2, "M3": 3, "M5": 5}
+TFNUM = {"M1": 1, "M2": 2, "M3": 3, "M5": 5, "M15": 15, "M30": 30, "H1": 16385, "H2": 16386, "H4": 16388, "D1": 16408}
+# final two-stage calibration (research/final_calibration.py): pairs whose 2025-only pick held up
+# in 2026 under all four same-bar fill models
+FINAL = {"gold": ("research/results/final_picks_gold.json", 1.0, ["M2/H4", "M3/H4", "M3/M15", "M3/H1", "M2/H1"]),
+         "btc": ("research/results/final_picks_btc5.json", 32.6, ["M1/M15", "M5/H2", "M3/D1"])}
+
+
+def final_presets():
+    news = ("UseNewsFilter=true was NOT part of the backtest (no calendar history); live trade count "
+            "and results will differ. Set it to false to match the backtest exactly.")
+    magic = 20261130
+    for market, (path, scale, pairs) in FINAL.items():
+        picks = {p["pair"]: p for p in json.load(open(path))}
+        for pair in pairs:
+            pk = picks[pair]
+            c, f = pk["cfg"], pk["fills"]
+            trig, htf = pair.split("/")
+            cond, srule = c["tf"].split("|")[1:]
+            k = TFM[trig] ** 0.5 * scale
+            sess = {"ny_12-1630": ("12:00", "16:30"), "ldn_ny_07-20": ("07:00", "20:00")}[c["session"]]
+            lo = min(x["all_pf"] for x in f.values()); hi = max(x["all_pf"] for x in f.values())
+            lo26 = min(x["2026_pf"] for x in f.values()); hi26 = max(x["2026_pf"] for x in f.values())
+            cl = f["close"]
+            gold = market == "gold"
+            sym = "Gold" if gold else "BTCUSD"
+            zone = c.get("zone_tol")
+            ov = dict(MagicNumber=magic, TradeComment=f"XLZC120_{'G' if gold else 'B'}_{trig}{htf}", RiskPercent=0.5,
+                      MaxSpread_Points=60 if gold else 1000, MaxSlippage_Points=30 if gold else 1000,
+                      MaxEntryDelaySeconds=30, TriggerTimeframe=TFNUM[trig], HTF_Timeframe=TFNUM[htf],
+                      HTF_Condition={"and": 0, "or": 1, "macd": 2, "ema": 3}[cond],
+                      StochHardBlock=(c["stoch"] == "hard"), StochRule={"and": 0, "or": 1}[srule],
+                      LiquidityLookbackBars=int(c["N"]), SwingStrength=int(c["S"]),
+                      SL_Buffer_Points=round(c["buffer"] * k), MinRewardRisk=c["min_rr"],
+                      TP_LookbackBars=int(c["NT"]), TP_FallbackRR=c["fb"],
+                      TP_Mode=1 if zone else 0, Zone_Tolerance_Points=round((zone or 100) * k), Zone_MinTouches=1,
+                      TP_Buffer_Points=round(c.get("tp_buf", 0) * k),
+                      MinSL_Points=round(50 * k), MaxSL_Points=round(1000 * k),
+                      EnableTrailing=bool(c["trail"]), TrailingMode=0,
+                      TrailingStart_Points=round(c.get("trail_start", 150) * k),
+                      TrailingDistance_Points=round(c.get("trail_dist", 100) * k),
+                      TrailingStep_Points=10 if gold else 100, UseTradingHours=True, TradingHoursAreGMT=False,
+                      TradingHoursStart=sess[0], TradingHoursEnd=sess[1], UseNewsFilter=True)
+            opts = [f"trend {cond.upper()}", f"stochastic {c['stoch']}{' (OR rule)' if srule == 'or' else ''}",
+                    f"TP {'zones, tolerance ' + str(round(zone * k)) + ' pts' if zone else 'swing low'}"
+                    + (f" + buffer {round(c.get('tp_buf', 0) * k)} pts" if c.get("tp_buf") else ""),
+                    f"trailing {round(c['trail_start'] * k)}/{round(c['trail_dist'] * k)} pts" if c["trail"] else "no trailing"]
+            write(f"presets/XLZC_v120_{sym}_{trig}_{htf}.set",
+                  [f"XAUUSD_M1_LiquidityZeroCross_Bearish v1.20 - {sym} {trig} trigger / {htf} trend / {sess[0]}-{sess[1]} server time",
+                   "FINAL CALIBRATION (research/final_calibration.py): 39 timeframe pairs x 324 structure x 5 trailing x 2 sessions "
+                   "x stochastic, then the v1.20 options on the top setups. Settings chosen with 2025 data ONLY.",
+                   f"Options: {', '.join(opts)}.",
+                   f"Backtest ({'FTMO XAUUSD' if gold else 'Binance BTCUSDT, 5 USD spread'}, Jan 2025-May 2026): {cl['all_trades']:.0f} trades, "
+                   f"PF {lo:.2f}-{hi:.2f} across the four same-bar fill models; 2025 PF {cl['2025H1_pf']:.2f} / {cl['2025H2_pf']:.2f}; "
+                   f"2026 (out of sample) PF {lo26:.2f}-{hi26:.2f} on {cl['2026_trades']:.0f} trades.",
+                   "Shipped because it held up in 2026; that pick among 10 pairs uses 2026, so expect live results below these.",
+                   ("" if gold else "LOW-COST BROKERS ONLY: MaxSpread_Points=1000 (10 USD) blocks entries when the spread is wider. ")
+                   + "Tight trailing distances cannot be judged on one-minute bars: confirm with real ticks in MT5.",
+                   SERVER_NOTE, news], ov)
+            magic += 1
 
 
 def main():
@@ -187,6 +246,7 @@ def main():
                    TrailingStart_Points=round(t_start * k), TrailingDistance_Points=round(t_dist * k),
                    TrailingStep_Points=100, UseTradingHours=True, TradingHoursAreGMT=False,
                    TradingHoursStart=sess[0], TradingHoursEnd=sess[1], UseNewsFilter=True))
+    final_presets()
     write("presets/XLZC_Bearish_Calibrated_M1_M15.set",
           ["XAUUSD_M1_LiquidityZeroCross_Bearish v1.10 - first-pass calibration (M1 trigger / M15 bias)",
            "In-sample first pass: 51 trades, PF ~1.7 (swing 3, buffer 80, trailing). Fragile: lookback 40 drops PF to ~1.05.",
