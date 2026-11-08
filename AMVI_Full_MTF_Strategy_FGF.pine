@@ -27,6 +27,7 @@ strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy", shor
 // "Trade Opposite Direction (same spot)" (Strategy - Entries, default off): entries
 // fire on exactly the same bars as before, gated by the same filter check for the
 // original side, but the trade is flipped (long spot -> short, short spot -> long).
+// In this mode only one trade is open at a time: entries only when flat, no reversal.
 // =====================================================================================
 
 // --- Input Parameters ---
@@ -70,7 +71,7 @@ emaLen        = input.int(50, "EMA Length (Trend mode)", minval=1, group=gEn)
 dcLen         = input.int(20, "Donchian Length (Breakout mode)", minval=1, group=gEn)
 allowReverse  = input.bool(true, "Reverse on Opposite Signal", group=gEn)
 tradeOpposite = input.bool(false, "Trade Opposite Direction (same spot)", group=gEn,
-     tooltip="Off: normal. On: every entry fires on exactly the same bar as before, but in the opposite direction: where the strategy would go LONG it goes SHORT, and where it would go SHORT it goes LONG. The trigger, direction bias and the direction filter's gate are judged for the ORIGINAL side (the spot is unchanged); only the trade is flipped. Trade Direction (Long Only / Short Only) applies to the trade actually taken. Stops, targets and exits follow the flipped position.")
+     tooltip="Off: normal. On: every entry fires on exactly the same bar as before, but in the opposite direction: where the strategy would go LONG it goes SHORT, and where it would go SHORT it goes LONG. The trigger, direction bias and the direction filter's gate are judged for the ORIGINAL side (the spot is unchanged); only the trade is flipped. Trade Direction (Long Only / Short Only) applies to the trade actually taken. Stops, targets and exits follow the flipped position. ONE TRADE AT A TIME: while on, a new entry is taken only when flat; an open trade is never reversed (Reverse on Opposite Signal is ignored) and must exit first.")
 useDateRange  = input.bool(false, "Limit Backtest Date Range", group=gEn)
 startTime     = input.time(timestamp("2020-01-01T00:00:00"), "Start", group=gEn)
 endTime       = input.time(timestamp("2099-12-31T00:00:00"), "End", group=gEn)
@@ -763,8 +764,12 @@ bool shortSig = (tradeOpposite ? longSpot  : shortSpot) and tradeDir != "Long On
 bool longOk   = tradeOpposite ? shortSpotOk : longSpotOk
 bool shortOk  = tradeOpposite ? longSpotOk  : shortSpotOk
 
-bool canLong  = allowReverse or strategy.position_size >= 0
-bool canShort = allowReverse or strategy.position_size <= 0
+// With Trade Opposite Direction on: one trade at a time. A new entry is taken only
+// when flat; an open trade is never reversed or stacked, it must exit first
+// (SL / TP / trail / Vol Collapse / Time Stop). Overrides Reverse on Opposite Signal.
+bool flatOnly = tradeOpposite
+bool canLong  = flatOnly ? strategy.position_size == 0 : (allowReverse or strategy.position_size >= 0)
+bool canShort = flatOnly ? strategy.position_size == 0 : (allowReverse or strategy.position_size <= 0)
 bool goLong   = longSig and canLong and strategy.position_size <= 0 and longOk
 bool goShort  = shortSig and canShort and strategy.position_size >= 0 and shortOk
 
