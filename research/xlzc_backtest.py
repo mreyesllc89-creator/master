@@ -55,7 +55,8 @@ if os.environ.get("XLZC_SPREAD_PTS"):          # override the assumed constant s
 if os.environ.get("XLZC_SPREAD_CAP"):          # override the simulated MaxSpread_Points
     INST["spread_cap"] = float(os.environ["XLZC_SPREAD_CAP"])
 
-TF_MIN = {"M1": 1, "M2": 2, "M3": 3, "M5": 5, "M15": 15, "M30": 30, "H1": 60, "H4": 240}
+TF_MIN = {"M1": 1, "M2": 2, "M3": 3, "M5": 5, "M10": 10, "M15": 15, "M30": 30, "H1": 60, "H2": 120,
+          "H4": 240, "D1": 1440}
 OOS_START = pd.Timestamp("2026-01-01")
 
 # ----------------------------------------------------------------------------- data

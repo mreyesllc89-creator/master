@@ -34,6 +34,15 @@ PAIRS = ["M1/M5", "M1/M15", "M1/M30", "M1/H1",
          "M2/M15", "M2/M30", "M2/H1",
          "M3/M15", "M3/M30", "M3/H1",
          "M5/M15", "M5/M30", "M5/H1"]
+# every-timeframe extension: triggers up to H1, trend filters up to D1 (filter >= 3x trigger)
+ALL_TRIGGERS = ["M1", "M2", "M3", "M5", "M10", "M15", "M30", "H1"]
+ALL_FILTERS = ["M15", "M30", "H1", "H2", "H4", "D1"]
+ALL_PAIRS = [f"{t}/{h}" for t in ALL_TRIGGERS for h in ALL_FILTERS
+             if B.TF_MIN[h] >= 3 * B.TF_MIN[t]]
+if os.environ.get("XLZC_PAIRS") == "new":
+    PAIRS = [p for p in ALL_PAIRS if p not in PAIRS]
+elif os.environ.get("XLZC_PAIRS"):
+    PAIRS = os.environ["XLZC_PAIRS"].split(",")
 NS = [15, 25, 40]
 SS = [2, 3, 4]
 NT_MAX = 120
