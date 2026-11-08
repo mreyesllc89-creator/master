@@ -58,7 +58,8 @@ def _run(o, h, l, c, v, sp, first, last, blk_entry, blk_long, blk_short, blk_exi
     consec = 0; pause_until = -1; cooldown_until = -1
     pending_closed = 0; closed_pnl = np.zeros(64)
     # trades: entry_row, exit_row, side, pnl, risk, reason
-    out = np.zeros((nbars // 2 + 16, 6))
+    cap = 2 * o.shape[0] + 16                       # at most two trade records per M1 row
+    out = np.empty((cap, 6))
     nt = 0
     for k in range(nbars):
         fo = o[first[k]]; fh = -1e300; fl = 1e300; fv = 0.0
