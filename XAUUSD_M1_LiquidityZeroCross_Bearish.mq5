@@ -107,7 +107,7 @@
 //  * Long trades are never opened (strategy is bearish only).
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
-#property version     "1.20"
+#property version     "1.21"
 #ifdef XLZC_WITH_FGF
 #property description "XAUUSD M1 Liquidity Zero-Cross Bearish (short-only) + FlashGold Direction Filter v1.2."
 #property description "Shorts are only opened while the FlashGold filter allows sells."
@@ -675,7 +675,14 @@ bool HandleReady(const int handle, const ENUM_TIMEFRAMES tf)
    if(!SeriesInfoInteger(_Symbol, tf, SERIES_SYNCHRONIZED))
       return false;
    int bars = Bars(_Symbol, tf);
-   return (bars > MACD_Slow + MACD_Signal + 3 && BarsCalculated(handle) >= bars);
+   if(bars <= MACD_Slow + MACD_Signal + 3)
+      return false;
+   // The non-visual Strategy Tester calculates indicators lazily: request a closed-bar value
+   // first, otherwise BarsCalculated() stays behind and the EA never trades there.
+   double probe[1];
+   if(CopyBuffer(handle, 0, 1, 1, probe) != 1)
+      return false;
+   return (BarsCalculated(handle) >= bars);
   }
 
 //--- the series of tf already holds the bar that contains barTime (not a stale bar)

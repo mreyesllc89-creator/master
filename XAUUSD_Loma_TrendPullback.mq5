@@ -2,7 +2,7 @@
 //|                                  XAUUSD_Loma_TrendPullback.mq5   |
 //|                                                                  |
 //|  Strategy : XAUUSD "Loma" (MACD hump) Trend Pullback, both sides |
-//|  Version  : 1.32                                                 |
+//|  Version  : 1.33                                                 |
 //+------------------------------------------------------------------+
 //
 //  "No signal = no trade."
@@ -115,7 +115,7 @@
 //    at or after that moment.
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
-#property version     "1.32"
+#property version     "1.33"
 #property strict
 #property description "XAUUSD Loma (MACD hump) Trend Pullback, sells and buys."
 #property description "Big MACD hump defines the trend; trade the zero-cross after a small pullback hump."
@@ -700,7 +700,14 @@ bool HandleReady(const int handle, const ENUM_TIMEFRAMES tf)
    if(!SeriesInfoInteger(_Symbol, tf, SERIES_SYNCHRONIZED))
       return false;
    int bars = Bars(_Symbol, tf);
-   return (bars > MACD_Slow + MACD_Signal + 3 && BarsCalculated(handle) >= bars);
+   if(bars <= MACD_Slow + MACD_Signal + 3)
+      return false;
+   // The non-visual Strategy Tester calculates indicators lazily: request a closed-bar value
+   // first, otherwise BarsCalculated() stays behind and the EA never trades there.
+   double probe[1];
+   if(CopyBuffer(handle, 0, 1, 1, probe) != 1)
+      return false;
+   return (BarsCalculated(handle) >= bars);
   }
 
 //--- the series of tf already holds the bar that contains barTime (not a stale bar)
@@ -1815,7 +1822,7 @@ void UpdatePanel()
   {
    if(!ShowStatusPanel || VisualsOff())
       return;
-   string build = "Loma TrendPullback v1.32";
+   string build = "Loma TrendPullback v1.33";
 
    string anchorTxt = "none";
    if(g_trend != 0)
