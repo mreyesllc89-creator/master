@@ -15,7 +15,8 @@ for f in sorted(glob.glob("results_run1/*.json")):
     mk = markets[(sym, start)]; usd = mk.spec["usd_per_unit"]
     for rank, r in enumerate(sane, 1):
         res = mk.run(r["params"])
-        m = R.metrics(res, F0, F1); old = R.metrics(res, j["is_window"][0], j["oos_window"][1])
+        # forward = everything after the run-1 windows, including the end-of-data mark
+        m = R.metrics(res, j["oos_window"][1], None); old = R.metrics(res, j["is_window"][0], j["oos_window"][1])
         rows.append(dict(preset=f"{sym}_{lab}_rank{rank}.set", symbol=sym, tf=lab, fwd_trades=m["trades"], fwd_net_usd=round(m["net"] * usd, 2),
                          fwd_pf=round(m["pf"], 2), fwd_win=round(m["win"], 2), check_old_net=round(old["net"] * usd, 2), reported_old_net=round(r["all"]["net"], 2)))
         print(rows[-1], flush=True)

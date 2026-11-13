@@ -8,7 +8,7 @@ from multiprocessing import Pool
 import xpw_run as R
 import xpw_search as S1
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "results2")
+OUT = os.environ.get("XPW_OUT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "results2")
 TS = lambda y, m, d: int(dt.datetime(y, m, d, tzinfo=dt.timezone.utc).timestamp())
 TF_LABEL = {1: "M1", 5: "M5", 15: "M15", 30: "M30", 60: "H1", 240: "H4"}
 YEAR = 365.25 * 86400

@@ -3,7 +3,7 @@ import csv, glob, json, os, sys, datetime as dt
 import xpw_preset as P, xpw_run as R, xpw_report as X1, xpw_search2 as S
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.join(HERE, "results2")
+RESULTS = os.environ.get("XPW_OUT") or os.path.join(HERE, "results2")
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "out2")
 TOP_N = 3
 LIVE = {1, 5}
