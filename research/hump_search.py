@@ -114,8 +114,12 @@ if __name__ == "__main__":
         n = int(sys.argv[3]) if len(sys.argv) > 3 else 20000
         rng = random.Random(7)
         pts = [{k: rng.choice(v) for k, v in SPACE.items()} for _ in range(n)]
+        rows = []
         with Pool(4, initializer=init) as pool:
-            rows = pool.map(ev, pts, chunksize=16)
+            for i, r in enumerate(pool.imap_unordered(ev, pts, chunksize=16)):
+                rows.append(r)
+                if i % 2000 == 0:
+                    print(i, n, flush=True)
         df = pd.DataFrame(rows).sort_values("raw", ascending=False)
         df.to_csv(os.path.join(out, "R.csv"), index=False)
     else:

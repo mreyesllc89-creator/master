@@ -300,7 +300,7 @@ class _Bias:
             b = np.sign(hb["close"] - B.ema(hb["close"], n))
             b.index = b.index + pd.Timedelta(minutes=B.TF_MIN[htf])          # known from its close
             self.cache[(htf, n)] = b.reindex(self.index + pd.Timedelta(minutes=B.TF_MIN[self.name]),
-                                             method="ffill").values
+                                             method="ffill").fillna(0).values.astype(np.int8)
         return self.cache[(htf, n)]
 
 
@@ -327,12 +327,10 @@ class Market:
         self._tf = {}
 
     def tf(self, name, fast=12, slow=26, k=7):
-        key = (name, fast, slow, k)
-        if key not in self._tf:
+        """Bars and indicators of a trigger timeframe. Price arrays, MACD, Stochastic and the HTF bias are cached
+        separately so that trying several indicator periods does not duplicate the large arrays."""
+        if name not in self._tf:
             t = B.resample(self.m1, name)
-            macd = (B.ema(t["close"], fast) - B.ema(t["close"], slow)).values.copy()
-            macd[:max(60, 2 * slow)] = np.nan
-            stk, _ = B.stoch(t, k, 1, 7)
             nxt = t.index.values + np.timedelta64(B.TF_MIN[name], "m")      # next bar's open time
             row = np.searchsorted(self.t, nxt)
             ok = (row < len(self.t))
@@ -341,9 +339,16 @@ class Market:
             pc = t["close"].shift(1)
             tr = pd.concat([t["high"] - t["low"], (t["high"] - pc).abs(), (t["low"] - pc).abs()], axis=1).max(axis=1)
             atr = tr.ewm(alpha=1 / 14, adjust=False, min_periods=14).mean().values     # Wilder ATR(14)
-            self._tf[key] = (t["high"].values.astype(float), t["low"].values.astype(float), macd,
-                             stk.values.astype(float), row.astype(np.int64), _Bias(self, name, t.index), atr)
-        return self._tf[key]
+            self._tf[name] = dict(t=t, hi=t["high"].values.astype(float), lo=t["low"].values.astype(float),
+                                  row=row.astype(np.int64), atr=atr, bias=_Bias(self, name, t.index), macd={}, stk={})
+        d = self._tf[name]
+        if (fast, slow) not in d["macd"]:
+            m = (B.ema(d["t"]["close"], fast) - B.ema(d["t"]["close"], slow)).values.copy()
+            m[:max(60, 2 * slow)] = np.nan
+            d["macd"][(fast, slow)] = m
+        if k not in d["stk"]:
+            d["stk"][k] = B.stoch(d["t"], k, 1, 7)[0].values.astype(float)
+        return d["hi"], d["lo"], d["macd"][(fast, slow)], d["stk"][k], d["row"], d["bias"], d["atr"]
 
     def run(self, cfg):
         c = dict(DEFAULT); c.update(cfg)
