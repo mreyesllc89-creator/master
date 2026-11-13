@@ -87,6 +87,74 @@ So it is a broad plateau, not a single lucky point.
 
 **Avoid D:** its edge is about 7 bp per trade before costs above 0.02%, and it disappears at 0.05% per side.
 
+## Update 3: input optimisation for the 15m chart on two years
+
+Scripts: `opt15.py` (first sweep), `opt15_final.py` (finalists on 1-minute bars), `opt15m.py` (re-run with exits on 1-minute bars), `opt15_wf.py` (walk-forward and marginals), `opt15_pick.py` (stress test of the pick). Outputs are the matching `*_out.txt` files. Costs 0.02% per side.
+
+### The first sweep's winner was a simulation artifact
+The first sweep (2,176,515 backtests, exits judged from 15m bars) ranked one family on top: stop 1× ATR(15m) with a trail activating at 0.5R and trailing by 0.25R. It showed +9.7 bp per trade, 70% wins, t = 6.5. Re-simulating the same trades with exits walked on real 1-minute bars gives **+1.4 bp** (t = 1.3), and a loss at 0.04% fees or more. A 15m bar only gives open, high, low and close, and the simulator, like TradingView without Bar Magnifier, has to assume the order of the high and low. Tight trailing stops exploit that assumption. Wide stops without a trail give identical results under both methods.
+
+An independent audit of the 1-minute exit method found no defects.
+
+### Re-run with exits on 1-minute bars (129,360 backtests)
+539 distinct signal sets (pivot 3/4/5/6/8, swing 5–60 or 10–120, 13 day-start hours, TDI levels off/35-65/38-62/42-58/45-55/30-70) × 240 exits (ATR on chart/60m/240m × 1–12, percent 0.5–3, TP 1–4R, trail off or two trail settings).
+
+- **Most settings lose:** 33% of combinations are profitable after fees; the median is −3.1 bp per trade.
+- **The best results are no better than chance would produce:** 0.86% of combinations have t > 2 and 0.019% have t > 3. With no edge at all, roughly 2.3% and 0.13% would.
+- **Last year's winners don't repeat:** rank correlation between year 1 and year 2 is −0.10. Of the settings profitable in year 1, 25% were profitable in year 2, against a 27% base rate.
+- **Walk-forward optimisation adds nothing:** re-optimising on all prior data every 3 months and trading the next 3 months made −0.1 bp per trade over 231 trades. The top 1% of settings by training t-stat averaged between −10.6 and +6.4 bp in the following quarter.
+
+### What is consistent
+Median bp per trade across all exits:
+
+| Pivot strength | All | Year 1 | Year 2 | Share profitable |
+|---|---|---|---|---|
+| 3 | −5.3 | −3.5 | −8.5 | 18% |
+| 4 | −2.7 | +5.7 | −14.8 | 31% |
+| **5** | **+2.1** | −1.0 | +5.8 | **64%** |
+| 6 | −1.2 | +2.2 | −4.8 | 41% |
+| 8 | −9.2 | −6.0 | −10.3 | 5% |
+
+- **Stop width:** only wide stops have a positive median (5× ATR(240m) +2.2, 12× ATR(60m) +1.3). Every stop of 3× ATR or tighter, and every percent stop up to 2%, has a negative median.
+- **TDI levels filter:** with pivot 5 and a wide stop, levels 42/58 or 45/55 are positive in both years at almost every day-start hour; with levels off, year 1 is near zero.
+- **Day start:** 12:00–14:00 UTC is best, and other hours are weaker but mostly still positive with the levels filter on.
+- **Trailing:** no benefit once exits are simulated on 1-minute bars.
+
+### The pick: levels filter on at 42/58, everything else as before
+Pivot 5/5, swing 5–60, day start 13:00, stop 5× ATR(60m), TP 2R, no trail, TDI levels on at 42/58. Exits on 1-minute bars.
+
+| Setup | Trades | Win % | bp/trade | t | PF | Year 1 / Year 2 bp | Long / short bp | At 0.05% / 0.10% fees | Random entries beat it |
+|---|---|---|---|---|---|---|---|---|---|
+| Previous default (levels off) | 370 | 55 | +26.4 | 1.7 | 1.26 | 0.0 / +52.5 | +29.1 / +23.6 | +20.4 / +10.4 | 2.5% |
+| **Pick: levels 42/58** | 232 | 59 | **+62.9** | 2.8 | 1.56 | +41.0 / +86.8 | +89.0 / +37.7 | +56.9 / +46.9 | 0 of 200 |
+| Levels 42/58, 8× ATR(60m), TP 3R | 201 | 65 | +71.7 | 2.4 | 1.55 | +61.8 / +83.1 | +83.4 / +59.8 | +65.7 / +55.7 | 0 of 200 |
+| Levels 42/58, 5× ATR(240m), TP 2R | 189 | 66 | +67.1 | 2.2 | 1.51 | +66.5 / +67.7 | +83.6 / +50.0 | +61.1 / +51.1 | 0.5% |
+| Levels 45/55 | 258 | 56 | +45.4 | 2.2 | 1.39 | +22.6 / +70.4 | +66.5 / +25.2 | +39.4 / +29.4 | 0 of 200 |
+
+For the pick: 6 of 9 quarters and 17 of 25 months were positive. The worst quarter was 2025 Q1 at −3,153 bp in total, the worst single trade −752 bp, and the worst drawdown 3,487 bp (35% of one position's notional; 0.35% of the account at 1% sizing). About 9–10 trades a month.
+
+### Why this is still not a proven edge
+Changing one input of the pick (all / year 1 / year 2 bp per trade):
+
+| Change | All | Year 1 | Year 2 |
+|---|---|---|---|
+| Pivot 3 | −7.7 | +12.0 | −31.5 |
+| Pivot 4 | +8.9 | +21.4 | −7.7 |
+| **Pivot 5 (pick)** | +62.9 | +41.0 | +86.8 |
+| Pivot 6 | −1.2 | +26.4 | −30.3 |
+| Pivot 8 | −6.1 | −26.2 | +16.1 |
+| Swing 10–120 | +31.4 | −15.2 | +80.3 |
+| Levels 38/62 | +51.6 | +0.5 | +110.2 |
+| Day start 00:00 | +24.0 | +0.7 | +51.1 |
+| Day start 12:00 | +61.8 | +25.4 | +98.2 |
+| Day start 14:00 | +46.0 | +13.0 | +82.2 |
+
+- **It only works at pivot strength 5.** Pivot 4 and 6 are near zero. A real edge usually degrades gradually around its best setting; a single sharp peak is typical of a fitted result.
+- **The pick was chosen using the full two years**, so there is no unseen data left to test it on. The t of 2.8 is the best of many settings tried and is within what chance produces across this many combinations.
+- **The systematic walk-forward found no benefit from optimising at all.**
+
+Expect materially less than +63 bp per trade going forward. Forward-test on a 15m chart with Bar Magnifier on before using real money.
+
 ## Update 2: two-year backtest (Nov 2024 → Nov 12 2026)
 
 Data: 1,068,480 one-minute bars, no gaps. The settings were chosen on April–October 2026, so **November 2024 – March 2026 (17 months) is data nothing was tuned on**. Script `hist2y.py`, full output `hist2y_out.txt`. v3.1 defaults: stop 5× ATR(60m), TP 2R, no trail, 0.02% per side.
@@ -178,5 +246,9 @@ python3 finalists.py   # stress tests
 python3 dayhour.py     # day-start hour sweep
 python3 day13.py       # 13:00 default re-test incl. November
 python3 hist2y.py      # two-year backtest (needs the full download)
+python3 opt15.py && python3 opt15_wf.py opt15      # 15m sweep, exits on 15m bars (~15 min)
+python3 opt15_final.py                             # finalists with exits on 1m bars
+python3 opt15m.py && python3 opt15_wf.py opt15m    # 15m sweep, exits on 1m bars (~20 min)
+python3 opt15_pick.py                              # stress test of the pick
 ```
 `v31_top_results.csv` lists the top 3,000 combinations, by t-stat, that have at least 100 trades.

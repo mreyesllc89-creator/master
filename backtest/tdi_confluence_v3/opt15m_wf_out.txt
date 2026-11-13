@@ -1,0 +1,197 @@
+539 signal sets x 240 exits = 129360 backtests, 25 months
+
+combos with >=200 trades: 100528; profitable after fees: 32.6%; median -3.1bp; t>2: 0.86%  t>3: 0.019%
+first year vs second year rank correlation of bp: -0.100; of t: -0.042
+profitable in year 1: 47%; of those also profitable in year 2: 25%; year-2 base rate 27%
+
+=== Walk-forward: expanding train, 3-month test blocks ===
+default row: [63471] piv5 swing5-60 day13 lvl=off 4th=False ungated | SL 5xATR(60m) TP 2R trail off
+ 2025-08..2025-10: best-t pick -> piv4 swing5-60 day10 lvl=off 4th=False ungated | SL 1xATR(240m) TP 1R trail off  (train 214 tr +31.1bp t=3.40; test 66 tr -6.3bp)
+ 2025-11..2026-01: best-t pick -> piv4 swing5-60 day12 lvl=45/55 4th=False ungated | SL 1xATR(240m) TP 1R trail off  (train 200 tr +33.1bp t=3.53; test 37 tr -48.8bp)
+ 2026-02..2026-04: best-t pick -> piv6 swing5-60 day00 lvl=off 4th=False ungated | SL 1% TP 2R trail off  (train 331 tr +23.2bp t=3.09; test 59 tr +13.6bp)
+ 2026-05..2026-07: best-t pick -> piv5 swing5-60 day12 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 1R trail 0.5/0.25  (train 253 tr +27.5bp t=3.17; test 45 tr +5.1bp)
+ 2026-08..2026-11: best-t pick -> piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 2% TP 4R trail off  (train 231 tr +66.6bp t=3.12; test 24 tr +48.2bp)
+test                   2025-08..2025-10  2025-11..2026-01  2026-02..2026-04  2026-05..2026-07  2026-08..2026-11
+combos                         119981.0          120205.0          117414.0          116377.0          115799.0
+best_t: train bp                   31.1              33.1              23.2              27.5              66.6
+best_t: test bp                    -6.3             -48.8              13.6               5.1              48.2
+best_t: test n                     66.0              37.0              59.0              45.0              24.0
+best_mean: train bp               169.6             132.1             115.1              92.4              79.4
+best_mean: test bp                138.8              53.4            -102.0               0.9             -17.5
+best_mean: test n                  16.0              15.0              14.0              24.0              19.0
+top0.1% by t: test bp               1.2             -16.9              -7.0               3.0              -0.7
+top1% by t: test bp                -0.8             -10.6               3.9              -4.5               6.4
+top10% by t: test bp                1.7              -7.6               6.3              -9.5              -2.7
+all combos: test bp                 1.8              -3.2              11.8             -17.6              -7.4
+default: test bp                  -22.7             110.8              69.6               6.7              15.8
+ walk-forward best-t: 231 test trades, -0.1bp/trade, t=-0.01
+ walk-forward best-mean: 88 test trades, +14.6bp/trade, t=0.32
+ default over the same test months: 232 trades, +37.6bp/trade, t=1.99
+
+=== Marginals: median bp over all combos with >=200 trades [all 2y | year1 | year2 | share profitable] ===
+
+divL:
+      combos  trades    bp    y1     y2   prof     t
+divL                                                
+3      18305   322.0 -5.34 -3.53  -8.53  17.92 -0.79
+4      19772   296.0 -2.66  5.74 -14.81  30.53 -0.41
+5      22192   296.0  2.14 -1.02   5.80  63.54  0.35
+6      20166   300.0 -1.18  2.15  -4.79  40.93 -0.20
+8      20093   298.0 -9.15 -5.95 -10.32   5.26 -1.22
+
+divMin:
+        combos  trades    bp    y1    y2   prof     t
+divMin                                               
+5        61788   322.0 -2.26 -0.00 -5.54  36.42 -0.36
+10       38740   279.0 -4.36 -1.89 -6.84  26.39 -0.64
+
+dayH:
+      combos  trades    bp    y1    y2   prof     t
+dayH                                               
+0       8031   306.0 -1.00  1.10 -3.51  44.55 -0.15
+2       8043   308.0 -3.83 -3.21 -4.46  26.94 -0.64
+4       8209   316.0 -2.47 -1.38 -3.32  34.17 -0.34
+6       8075   310.0 -5.19 -4.22 -5.30  22.48 -0.75
+8       7948   304.0 -4.78 -1.51 -9.71  25.29 -0.76
+10      7690   307.0 -2.74 -0.17 -7.66  34.32 -0.47
+12      7142   296.0 -1.43  1.82 -7.21  41.37 -0.26
+13      6919   290.0 -0.57  2.84 -5.79  46.41 -0.10
+14      6918   281.0 -0.73  1.92 -4.91  44.77 -0.14
+16      7685   294.0 -4.45 -1.00 -8.39  23.31 -0.58
+18      7946   304.0 -4.16 -1.92 -6.57  26.62 -0.61
+20      7890   303.0 -4.07 -1.01 -7.13  27.58 -0.59
+22      8032   307.0 -3.39 -1.43 -6.65  29.49 -0.55
+
+levels:
+        combos  trades    bp    y1    y2   prof     t
+levels                                               
+35/65     5126   225.0 -1.42  0.14 -4.37  38.55 -0.26
+38/62    14188   244.0 -3.00  0.12 -7.38  32.06 -0.47
+42/58    23373   278.0 -2.92 -0.14 -5.95  34.27 -0.41
+45/55    26781   299.0 -3.47 -1.18 -6.16  31.85 -0.49
+off      31060   406.0 -3.18 -1.24 -5.79  31.11 -0.53
+
+req4:
+       combos  trades    bp    y1    y2   prof     t
+req4                                                
+False  100528   301.0 -3.05 -0.73 -6.03  32.56 -0.46
+
+fix:
+       combos  trades    bp    y1    y2   prof     t
+fix                                                 
+False  100528   301.0 -3.05 -0.73 -6.03  32.56 -0.46
+
+tfs:
+     combos  trades    bp    y1    y2   prof     t
+tfs                                               
+all  100528   301.0 -3.05 -0.73 -6.03  32.56 -0.46
+
+div:
+     combos  trades    bp    y1    y2   prof     t
+div                                               
+RB   100528   301.0 -3.05 -0.73 -6.03  32.56 -0.46
+
+mode:
+      combos  trades    bp    y1    y2   prof     t
+mode                                               
+atr    78484   299.0 -2.69  0.02 -6.06  35.25 -0.38
+pct    22044   310.0 -4.41 -3.23 -5.92  22.97 -0.78
+
+stop:
+               combos  trades    bp    y1     y2   prof     t
+stop                                                         
+0.5%             6227   348.0 -2.29 -1.83  -3.20  21.15 -0.93
+1%               6032   326.0 -5.92 -3.60  -8.75  17.29 -1.12
+12xATR(60m)      2621   248.0  1.27 -0.93   4.96  53.45  0.06
+12xATR(chart)    3995   270.0 -4.77 -8.56  -3.17  37.25 -0.28
+1xATR(240m)      5917   318.0 -3.65  1.90  -9.95  30.25 -0.55
+1xATR(60m)       6191   345.0 -1.68 -0.08  -4.76  34.32 -0.49
+1xATR(chart)     6385   358.0 -2.35 -2.16  -2.89  17.93 -1.25
+2%               5274   298.0 -6.98 -3.33 -11.81  23.66 -0.72
+2xATR(240m)      4892   287.0 -3.30 -1.02  -5.80  39.35 -0.25
+2xATR(60m)       5906   321.0 -3.51  3.78 -11.47  30.83 -0.53
+2xATR(chart)     6177   344.0 -2.16  0.28  -5.68  29.85 -0.57
+3%               4511   276.0 -5.93 -9.17  -2.51  32.28 -0.43
+3xATR(240m)      3978   266.0 -3.82 -6.36  -2.74  40.25 -0.22
+3xATR(60m)       5388   301.0 -2.87  4.31 -11.83  38.72 -0.29
+3xATR(chart)     6055   330.0 -2.94  2.16  -7.14  30.69 -0.53
+5xATR(240m)      2812   251.5  2.23 -2.04   4.06  53.84  0.10
+5xATR(60m)       4437   275.0 -6.40 -9.08  -5.71  32.07 -0.41
+5xATR(chart)     5563   309.0 -1.95  4.57 -10.25  40.90 -0.20
+8xATR(60m)       3370   257.0 -0.80 -5.31   4.29  48.40 -0.05
+8xATR(chart)     4797   287.0 -4.35 -2.72  -8.53  36.21 -0.31
+
+rmult:
+       combos  trades    bp    y1    y2   prof     t
+rmult                                               
+1       25635   303.0 -3.32 -0.69 -6.39  29.64 -0.53
+2       25145   301.0 -3.00 -0.56 -6.03  32.81 -0.46
+3       24923   300.0 -3.01 -0.90 -5.86  33.64 -0.44
+4       24825   300.0 -2.82 -0.82 -5.74  34.22 -0.42
+
+trail:
+          combos  trades    bp    y1    y2   prof     t
+trail                                                  
+0.5/0.25   35764   310.0 -2.84 -0.61 -5.05  28.36 -0.55
+1.0/0.5    33331   300.0 -3.55 -1.09 -6.83  30.54 -0.51
+off        31433   294.0 -2.68 -0.44 -6.76  39.47 -0.29
+
+=== Ungated only: stop x TP (median bp, trail off) ===
+rmult            1    2    3    4
+stop                             
+0.5%          -2.6 -4.0 -3.9 -3.7
+1%            -7.9 -6.2 -6.8 -5.8
+12xATR(60m)    1.3  2.0  0.6  1.4
+12xATR(chart) -2.9 -2.5 -2.5 -1.6
+1xATR(240m)   -5.8 -1.1 -1.2  0.9
+1xATR(60m)    -1.0 -6.6 -4.1 -0.3
+1xATR(chart)  -3.0 -1.8 -4.5 -4.7
+2%            -7.7 -6.2 -3.6 -0.9
+2xATR(240m)   -2.0  0.4 -0.9 -3.2
+2xATR(60m)    -7.4  0.6  0.7  0.5
+2xATR(chart)  -2.5 -5.5 -3.4  1.2
+3%            -5.2 -0.4 -0.0 -1.8
+3xATR(240m)   -3.7 -1.1 -3.3 -2.5
+3xATR(60m)    -1.7  1.0  0.9  1.7
+3xATR(chart)  -5.1 -0.2  1.2  0.9
+5xATR(240m)    1.7  0.3  2.7  2.8
+5xATR(60m)    -4.0 -3.3 -6.3 -5.4
+5xATR(chart)  -2.5 -0.9  1.3  1.0
+8xATR(60m)    -0.9 -1.5  1.0  0.4
+8xATR(chart)  -2.5 -1.8 -3.7 -4.3
+
+=== Ungated only: pivot x levels (median bp) ===
+levels  35/65  38/62  42/58  45/55  off
+divL                                   
+3        -3.6   -5.9   -4.0   -5.9 -6.0
+4        -0.7   -2.6   -3.4   -4.0 -2.1
+5        -0.3    1.7    2.9    3.6  1.7
+6        -0.9    0.1   -1.5   -0.5 -2.2
+8        -4.0   -8.9   -9.1  -11.0 -7.6
+
+=== Top 25 by 2-year t (>=250 trades, both years >=80 trades) ===
+ t=3.24 n=255 +64.9bp | y1 +51.1 y2 +79.9 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 2% TP 4R trail off
+ t=3.21 n=254 +57.9bp | y1 +38.1 y2 +79.8 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 4R trail off
+ t=3.11 n=331 +22.6bp | y1 +22.0 y2 +23.3 :: piv5 swing5-60 day12 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 1R trail 0.5/0.25
+ t=3.10 n=331 +22.8bp | y1 +23.2 y2 +22.3 :: piv5 swing5-60 day12 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 2R trail 0.5/0.25
+ t=3.10 n=331 +22.8bp | y1 +23.2 y2 +22.3 :: piv5 swing5-60 day12 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 3R trail 0.5/0.25
+ t=3.10 n=331 +22.8bp | y1 +23.2 y2 +22.3 :: piv5 swing5-60 day12 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 4R trail 0.5/0.25
+ t=3.07 n=435 +34.3bp | y1 +14.8 y2 +54.1 :: piv5 swing5-60 day13 lvl=off 4th=False ungated | SL 3xATR(60m) TP 2R trail off
+ t=3.06 n=317 +50.4bp | y1 +26.2 y2 +73.2 :: piv5 swing5-60 day06 lvl=45/55 4th=False ungated | SL 12xATR(chart) TP 4R trail 1.0/0.5
+ t=3.06 n=317 +50.3bp | y1 +26.2 y2 +73.1 :: piv5 swing5-60 day06 lvl=45/55 4th=False ungated | SL 12xATR(chart) TP 3R trail 1.0/0.5
+ t=3.06 n=317 +50.3bp | y1 +26.6 y2 +72.7 :: piv5 swing5-60 day06 lvl=45/55 4th=False ungated | SL 12xATR(chart) TP 2R trail 1.0/0.5
+ t=3.04 n=269 +45.1bp | y1 +25.2 y2 +66.7 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 2R trail off
+ t=3.03 n=256 +60.5bp | y1 +36.9 y2 +84.8 :: piv5 swing5-60 day12 lvl=45/55 4th=False ungated | SL 12xATR(chart) TP 2R trail 1.0/0.5
+ t=3.03 n=256 +60.4bp | y1 +37.1 y2 +84.5 :: piv5 swing5-60 day12 lvl=45/55 4th=False ungated | SL 12xATR(chart) TP 4R trail 1.0/0.5
+ t=3.03 n=256 +60.4bp | y1 +37.1 y2 +84.5 :: piv5 swing5-60 day12 lvl=45/55 4th=False ungated | SL 12xATR(chart) TP 3R trail 1.0/0.5
+ t=3.03 n=314 +23.1bp | y1 +23.1 y2 +23.1 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 1R trail 0.5/0.25
+ t=3.01 n=256 +56.7bp | y1 +41.8 y2 +74.2 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 3xATR(60m) TP 4R trail off
+ t=3.01 n=259 +48.2bp | y1 +29.5 y2 +69.5 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 8xATR(chart) TP 1R trail 1.0/0.5
+ t=3.01 n=259 +48.2bp | y1 +29.5 y2 +69.5 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 8xATR(chart) TP 1R trail off
+ t=3.00 n=314 +23.1bp | y1 +24.4 y2 +21.6 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 4R trail 0.5/0.25
+ t=3.00 n=314 +23.1bp | y1 +24.4 y2 +21.6 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 3R trail 0.5/0.25
+ t=3.00 n=314 +23.1bp | y1 +24.4 y2 +21.6 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 5xATR(chart) TP 2R trail 0.5/0.25
+ t=2.98 n=263 +52.7bp | y1 +32.1 y2 +75.8 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 3xATR(60m) TP 3R trail off
+ t=2.96 n=284 +50.1bp | y1 +30.3 y2 +72.4 :: piv5 swing5-60 day13 lvl=45/55 4th=False ungated | SL 5xATR(chart) TP 4R trail off
+ t=2.96 n=258 +50.0bp | y1 +25.8 y2 +77.3 :: piv5 swing5-60 day13 lvl=42/58 4th=False ungated | SL 8xATR(chart) TP 2R trail 1.0/0.5
+ t=2.95 n=280 +55.4bp | y1 +42.3 y2 +69.5 :: piv5 swing5-60 day13 lvl=45/55 4th=False ungated | SL 2% TP 4R trail off
