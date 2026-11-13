@@ -21,6 +21,9 @@ SPACE = dict(
     tp_mode=[0, 1], tp_rr=[1.0, 1.5, 2.0, 3.0], trail_start=[0.0, 0.5, 1.0, 1.5], trail_dist=[0.3, 0.5, 1.0],
     min_risk=[0.3, 0.5, 1.0, 2.0],
 )
+if H.SYMBOL == "BTCUSD":          # price distances in BTC dollars; the market trades through the weekend
+    SPACE.update(buf=[5, 10, 20, 35, 50], min_risk=[10, 20, 35, 70], tf=["M1", "M2", "M3", "M5", "M10", "M15"])
+BASE = dict(skip_big_pb=1, max_spread=1e9) if H.SYMBOL == "BTCUSD" else {}
 MK = None
 
 
@@ -30,7 +33,7 @@ def init():
 
 
 def measure(p, extra=None):
-    c = dict(p)
+    c = dict(BASE); c.update(p)
     if extra: c.update(extra)
     df = MK.run(c)
     t = df.entry_time.values; r = df.r.values

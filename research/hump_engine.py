@@ -39,6 +39,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import xlzc_backtest as B  # noqa: E402
 
 DATA = os.environ.get("HUMP_DATA", "/workspace/gianniskas/mt5-m1-bars-us500-eurusd-xauusd")
+SYMBOL = os.environ.get("HUMP_SYMBOL", "XAUUSD")
+BTC_DATA = os.environ.get("HUMP_BTC_DATA", "")
+BTC_SPREAD = float(os.environ.get("HUMP_BTC_SPREAD", "10"))       # assumed CFD spread in USD
+
+
+def load_btc():
+    """Binance BTCUSDT M1 (UTC) re-indexed to broker server time (New York + 7h), constant spread."""
+    m1 = pd.read_csv(os.path.join(BTC_DATA, "BTCUSD_m1.csv"), parse_dates=["datetime"])
+    utc = pd.DatetimeIndex(m1["datetime"]).tz_localize("UTC")
+    server = (utc.tz_convert("America/New_York").tz_localize(None) + pd.Timedelta(hours=7))
+    m1.index = server
+    m1 = m1[~m1.index.duplicated()].sort_index()[["open", "high", "low", "close"]]
+    return m1, np.full(len(m1), BTC_SPREAD / 2.0)
 
 
 @nb.njit(cache=True)
@@ -272,6 +285,8 @@ class Market:
         broker server time (New York + 7h) and a per-bar half spread (e.g. Dukascopy bid/ask)."""
         os.environ.setdefault("XLZC_SYMBOL", "XAUUSD")
         hourly = None
+        if m1 is None and SYMBOL == "BTCUSD":
+            m1, half_spread = load_btc()
         if m1 is None:
             m1, hourly = B.load(DATA)
         self.m1 = m1
