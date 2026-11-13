@@ -36,11 +36,21 @@ Backtest: FTMO XAUUSD one-minute data, January 2025 to May 2026, real spreads, r
 
 | Preset | Chart / trend filter | Session (server time) | Trades | PF | 2025 PF | 2026 PF |
 |---|---|---|---|---|---|---|
-| `Loma_Gold_M5_Buy_H1.set` | M5 buys / H1 | all day | 134 | 1.84 | 1.93 | 1.49 |
+| `Loma_Gold_M5_Buy_H1.set` | M5 buys / H1 | all day | 135 | 2.17 | 2.27 | 1.84 |
 | `Loma_Gold_M5_Buy_H4.set` | M5 buys / H4 | all day | 126 | 2.05 | 2.03 | 2.14 |
 | `Loma_Gold_M2_Sell_London_H1.set` | M2 sells / H1 | 07:00-12:00 | 116 | 2.22 | 2.30 | 2.00 |
 | `Loma_Gold_M3_Sell_H4.set` | M3 sells / H4 | 07:00-20:00 | 124 | 2.05 | 2.14 | 1.89 |
 | `Loma_Gold_M2_Sell_NY_H1.set` | M2 sells / H1 | 12:00-20:00 | 106 | 1.74 | 1.80 | 1.61 |
+
+## Stop, target and trailing units (sweep of 13 November 2026)
+
+Every combination of units was tested on the five presets (393,900 backtests): stop at the hump, in points, in percent of price or in ATR; target at the previous hump, as a multiple of the risk, in points, percent or ATR; trailing off, in multiples of the risk, points, percent or ATR.
+
+- **Stop:** the hump stop is the best unit (median 2026 PF 1.95, against 1.56 for ATR, 1.25 for percent and 1.03 for points).
+- **Target:** multiples of the risk and ATR are about equal; the previous-hump target is the weakest.
+- **Trailing:** no unit is reliably better. Very tight trailing in points (0.30 behind price) scores PF 4 to 6 on one-minute bars but falls to about 1.2 with slippage and commission: it is an artefact, not an edge.
+- **One preset changed:** `Loma_Gold_M5_Buy_H1` now uses a 60-point stop buffer and a target of 6 x risk (was 100 points and 3 x). Under the worst combination its PF is 1.92 (was 1.61). The stress table below still shows its old exits.
+- The EA keeps the hump stop and risk-multiple target and trailing: nothing else earned a new input.
 
 ## Stress test of v1.31 (13 November 2026)
 

@@ -24,6 +24,11 @@ PICKS = [("Loma_Gold_M5_Buy_H1", 0, 26113011, "Gold M5 buys, H1 trend filter, al
          ("Loma_Gold_M2_Sell_NY_H1", 12, 26113023, "Gold M2 sells, H1 trend filter, 12:00-20:00 server time")]
 
 
+# Exit settings changed after the exhaustive stop/target/trailing sweep (chosen on 2025, held under stress):
+# M5 Buy H1: stop buffer 0.60 and target 6 x risk instead of 1.00 and 3 x.
+EXIT_OVERRIDES = {"Loma_Gold_M5_Buy_H1": dict(buf=0.6, tp_rr=6.0)}
+
+
 def defaults():
     out = []
     for _t, name, val in re.findall(r"^input\s+([\w]+)\s+(\w+)\s*=\s*([^;]+);", open(EA).read(), re.M):
@@ -49,6 +54,7 @@ def main():
     os.makedirs("presets", exist_ok=True)
     for fname, row, magic, desc in PICKS:
         p = {k: X.cast(L.iloc[row][k], X.SPACE[k]) for k in X.SPACE}
+        p.update(EXIT_OVERRIDES.get(fname, {}))        # from the exit-unit sweep (research/hump_exit_sweep.py)
         df = mk.run(dict(p, skip_big_pb=1, weekend_close=1)); t = df.entry_time.values; r = df.r.values
         m25 = t < np.datetime64("2026-01-01")
         s = H.stats(r)
