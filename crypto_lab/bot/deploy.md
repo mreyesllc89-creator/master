@@ -41,3 +41,12 @@ New champion = `git pull` (only `config.yaml` changes) and `sudo systemctl resta
 A cron line `*/10 * * * * cd /root/master && git pull -q && systemctl restart crypto-bot` keeps it in sync
 with what the Engineer role commits at 04:00 NY. Live trading is refused unless `testnet: false` AND
 `LIVE_TRADING=I_SAID_GO_LIVE` is in the env file: do not set it until the owner says "go live".
+
+## Sending the decision log back to the lab
+The 07:30 brief reads `crypto_lab/bot/logs/*.jsonl` from the repo. On the server, push the log hourly:
+
+```bash
+# crontab -e
+5 * * * * cd /root/master && mkdir -p crypto_lab/bot/logs && cp crypto_lab/bot/decisions.jsonl crypto_lab/bot/logs/$(hostname).jsonl && git add crypto_lab/bot/logs && git commit -qm "bot log $(date -u +\%FT\%H)" && git push -q origin claude/intelligent-turing-7uhnvg
+```
+The log never contains keys (the bot logs decisions and order ids only).
