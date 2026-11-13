@@ -1,10 +1,11 @@
-; XAUUSD_Loma_TrendPullback v1.31 - TOP 10 by 2025, rank 5: gold M5 buy, session AllDay server time, trend filter H4
-; Rank uses 2025 only (worse half-year PF 1.89). Out of sample 2026: PF 1.19 on 29 trades -> held in 2026.
-; Backtest Jan 2025-May 2026 (FTMO XAUUSD M1 path, risk-% sizing): 138 trades, PF 1.83, net +66R, max drawdown 5.9R. Harsh stress (1 min late, pessimistic trailing, slippage, commission): PF 1.77.
-; UNPROVEN: for Strategy Tester (real ticks) and demo only. A high 2025 rank did not predict 2026: read the header line above.
-; Session hours are BROKER SERVER TIME (FTMO clock, GMT+2 winter / GMT+3 summer). UseNewsFilter was not in the backtest.
-MagicNumber=26113105
-TradeComment=LOMA_T05
+; XAUUSD_Loma_TrendPullback v1.32 - ALL-ROUND TOP 10, rank 8: gold M5 buy, session AllDay server time, trend filter H4
+; Backtest Jan 2025-May 2026 (FTMO XAUUSD M1 path, risk-% sizing): 138 trades, PF 1.83, net +66R, max drawdown 5.9R. 2025 worse half-year PF 1.89; 2026 PF 1.19 (29 trades).
+; Harsh stress (1 min late, pessimistic trailing, 0.10 slippage, commission): PF 1.77; 2025 worse half 1.86; 2026 PF 1.17.
+; Chosen with ALL the data (2025 and 2026): there is no unseen test behind these numbers. Expect roughly PF 1.1-1.4 live.
+; UNPROVEN: Strategy Tester (real ticks) and demo only. Session, weekend and end-of-day times are BROKER SERVER TIME (FTMO clock).
+; UseNewsFilter was not in the backtest.
+MagicNumber=26113208
+TradeComment=LOMA_T08
 TradeDirection=2
 AutoScalePoints=true
 VerboseLog=true
@@ -59,3 +60,6 @@ WeekendCloseTime=23:00
 UseNewsFilter=true
 NewsCurrency=USD
 NewsWindowMinutes=30
+MaxHoldMinutes=0
+CloseAtEndOfDay=false
+EndOfDayTime=22:00
