@@ -150,7 +150,10 @@ _cache = {}
 
 def security_block(df1, chart_tf, L, R, mn, mx):
     """returns dict tf -> (tdiL, tdiS, rb, rr, hb, hr) mapped to chart bars + chart df."""
-    key = (chart_tf, L, R, mn, mx)
+    # the dataset is part of the key: without it a second symbol / date range in the same process
+    # would silently get the first dataset's signals back
+    key = (len(df1), int(df1.index[0].value), int(df1.index[-1].value), float(df1.c.iloc[0]), float(df1.c.iloc[-1]),
+           chart_tf, L, R, mn, mx)
     if key in _cache:
         return _cache[key]
     ch = resample(df1, chart_tf)

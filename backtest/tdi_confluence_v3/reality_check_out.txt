@@ -1,0 +1,9 @@
+settings tried with >=200 trades: 100,528 of 129,360
+the pick: 232 trades, +62.9 bp/trade, t = 2.82  (rank 48 by t)
+best t among all settings: 3.24
+
+best t-statistic expected from the search alone (no real edge anywhere), 5000 month-resamples:
+  median 3.35, 90th percentile 4.36, 98th percentile 5.12
+  share of no-edge worlds whose best setting reaches the pick's t (2.82): 0.802
+  share whose best setting reaches the best t found (3.24): 0.568
+  -> a setting needed t >= 5.12 on the tuning data to count as significant at 98% after the search
