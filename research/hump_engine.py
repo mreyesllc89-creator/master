@@ -43,7 +43,7 @@ DATA = os.environ.get("HUMP_DATA", "/workspace/gianniskas/mt5-m1-bars-us500-euru
 
 @nb.njit(cache=True)
 def signals(hi, lo, macd, stk, big_mult, hist, big_min_bars, stoch_req, pb_min_bars, pb_max_ratio,
-            break_ratio, max_signals, trend_max_bars, sides, classic):
+            break_ratio, max_signals, trend_max_bars, sides, classic, skip_big_pb):
     """Return rows (signal_bar, side, sl_ref, tp_ref, hump_peak_ratio). side +1 buy, -1 sell.
     classic=1: every zero-cross in the allowed direction is a signal (old XLZC trigger) with the
     same SL/TP construction, for comparison."""
@@ -83,6 +83,8 @@ def signals(hi, lo, macd, stk, big_mult, hist, big_min_bars, stoch_req, pb_min_b
                     m += 1
             else:
                 alive = trend != 0 and used < max_signals and (i - anchor_bar) <= trend_max_bars
+                if skip_big_pb == 1 and big:
+                    alive = False        # the pullback hump is itself a big opposite hump: trend change, no signal
                 if alive and trend == -1 and cs > 0 and s < 0 and (sides == 0 or sides == -1):
                     if c_n >= pb_min_bars and c_peak <= pb_max_ratio * anchor_peak and last_neg_lo == last_neg_lo:
                         out[m, 0] = i; out[m, 1] = -1; out[m, 2] = max(c_hi, hi[i]); out[m, 3] = last_neg_lo
@@ -121,7 +123,7 @@ def signals(hi, lo, macd, stk, big_mult, hist, big_min_bars, stoch_req, pb_min_b
 
 @nb.njit(cache=True)
 def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, tp_mode, tp_rr,
-             trail_start, trail_dist, max_spread, min_risk, max_risk, slip, comm, delay, trail_worst):
+             trail_start, trail_dist, max_spread, min_risk, max_risk, slip, comm, delay, trail_worst, wk):
     """Sequential trades on the M1 path. Returns rows (entry_row, exit_row, side, R, risk)."""
     n = len(o)
     out = np.empty((len(sig), 5))
@@ -137,6 +139,8 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
             continue
         sp = 2 * hs[e]
         if sp > max_spread:
+            continue
+        if wk[e]:                                          # no new trades in the pre-weekend window
             continue
         side = int(sig[k, 1])
         if side < 0:
@@ -167,6 +171,8 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
                         stop = cand
                         if c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop):
                             px = stop + slip; break            # same-bar hit (worst: any touch after the low)
+                if wk[j]:                                  # close before the weekend at this bar's close
+                    px = c[j] + hs[j] + slip; break
                 j += 1
             if px != px:
                 j = n - 1; px = c[j] + hs[j]
@@ -199,6 +205,8 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
                         stop = cand
                         if c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop):
                             px = stop - slip; break
+                if wk[j]:
+                    px = c[j] - hs[j] - slip; break
                 j += 1
             if px != px:
                 j = n - 1; px = c[j] - hs[j]
@@ -214,7 +222,8 @@ SESSIONS = {"all": (0, 1440), "ldn_ny_07-20": (420, 1200), "ny_12-1630": (720, 9
 DEFAULT = dict(tf="M2", big_mult=1.5, hist=20, big_min_bars=5, stoch_req=1, pb_min_bars=3, pb_max_ratio=0.6,
                break_ratio=1.0, max_signals=2, trend_max_bars=120, sides=0, classic=0, session="all",
                buf=0.30, anticip=0.10, min_rr=0.8, tp_mode=0, tp_rr=1.5, trail_start=0.0, trail_dist=0.5,
-               max_spread=0.60, min_risk=0.50, max_risk=1e9, htf="none", slip=0.0, comm=0.0, delay=0, trail_worst=0)
+               max_spread=0.60, min_risk=0.50, max_risk=1e9, htf="none", slip=0.0, comm=0.0, delay=0, trail_worst=0,
+               skip_big_pb=0, weekend_close=0, weekend_min=1380)
 
 
 class Market:
@@ -232,6 +241,9 @@ class Market:
         mult = float(os.environ.get("HUMP_SPREAD_MULT", "1"))
         self.hs = (hourly[B.server_to_utc_hour(m1.index)] / 2.0 if half_spread is None else np.asarray(half_spread, float)) * mult
         self.tod = (m1.index.hour * 60 + m1.index.minute).values.astype(np.int64)
+        self.dow = m1.index.dayofweek.values                       # server time: Friday = 4
+        gap = np.r_[(self.t[1:] - self.t[:-1]) > np.timedelta64(24, "h"), True]
+        self.pre_gap = gap                                          # last bar before a closure of a day or more
         self._tf = {}
 
     def tf(self, name):
@@ -260,15 +272,19 @@ class Market:
         hi, lo, macd, stk, row, bias = self.tf(c["tf"])
         sg = signals(hi, lo, macd, stk, c["big_mult"], int(c["hist"]), int(c["big_min_bars"]), int(c["stoch_req"]),
                      int(c["pb_min_bars"]), c["pb_max_ratio"], c["break_ratio"], int(c["max_signals"]),
-                     int(c["trend_max_bars"]), int(c["sides"]), int(c["classic"]))
+                     int(c["trend_max_bars"]), int(c["sides"]), int(c["classic"]), int(c["skip_big_pb"]))
         if c.get("htf", "none") != "none" and len(sg):      # optional: trade only with the HTF EMA50 side
             sg = sg[bias[c["htf"]][sg[:, 0].astype(np.int64)] == sg[:, 1]]
         er = row[sg[:, 0].astype(np.int64)] if len(sg) else np.zeros(0, np.int64)
         s0, s1 = SESSIONS[c["session"]]
+        if c["weekend_close"]:           # Friday from weekend_min (server time) on, and the last bar before any long closure
+            wk = ((self.dow == 4) & (self.tod >= int(c["weekend_min"]))) | self.pre_gap
+        else:
+            wk = np.zeros(len(self.t), np.bool_)
         tr = simulate(sg, er, self.o, self.h, self.l, self.c, self.hs, self.tod, s0, s1, c["buf"], c["anticip"],
                       c["min_rr"], int(c["tp_mode"]), c["tp_rr"], c["trail_start"], c["trail_dist"],
                       c["max_spread"], c["min_risk"], c["max_risk"], c["slip"], c["comm"], int(c["delay"]),
-                      int(c["trail_worst"]))
+                      int(c["trail_worst"]), wk)
         df = pd.DataFrame(tr, columns=["entry_row", "exit_row", "side", "r", "risk"])
         df["entry_time"] = self.t[df.entry_row.astype(int).values] if len(df) else pd.Series(dtype="datetime64[ns]")
         df.attrs["signals"] = len(sg)

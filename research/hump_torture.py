@@ -38,6 +38,8 @@ def main(out):
     for name, row in PICKS.items():
         p = {k: X.cast(L.iloc[row][k], X.SPACE[k]) for k in X.SPACE}
         p["max_spread"] = 5.0                       # the spread cap must not hide the stress
+        if os.environ.get("HUMP_FIXES") == "1":      # v1.31: skip big pullback humps, close before the weekend
+            p.update(skip_big_pb=1, weekend_close=1)
         R = {}
         base = mk.run(p)
         R["base"] = summ(base)
