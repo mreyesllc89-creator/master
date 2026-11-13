@@ -1,0 +1,12 @@
+provenance: {"started_utc": "2026-11-13T23:41:22.333873+00:00", "git_head": "a51780cbfbf40ea114e195b27ed13e48fec94181", "git_dirty_registered_files": "", "code_sha256": {"engine.py": "2aa0e9b124e8eae52daca04d377739f512eb69a426ac2b1dc125ee6cab9caa20", "validate.py": "04cdd2120a487df57b46669162167060444ca32634d60c0566e5163f0e9c81ce", "PREREGISTRATION.md": "3c1801552cb683612d5ba892d61bb203ba935390dea95f1cb4aff01183ee7d0d", "data_exclusions.json": "1d45a3eb8bab9e86325787cda01a427f8bbf3b4e820f41714971c308e6bacd49", "data_manifest.sha256": "7480a6814804d403bc742787e013a79f3c3eabf60e90607087cc4b080f883169"}, "versions": {"python": "3.13.18", "numpy": "2.5.3", "pandas": "3.0.5", "numba": "0.68.1"}}
+====================================================================================================
+PRIMARY: BTCUSDT, unseen history (listing .. 2024-10-31), frozen rule, exits on 1-minute bars
+====================================================================================================
+data: 3,782,719 one-minute bars, 2017-08-17 04:00:00+00:00 -> 2024-10-31 23:59:00+00:00; excluded months (stale prices): 2017-08, 2017-09, 2017-10, 2017-11
+statistics span 2017-12-01 00:00:00+00:00 -> 2024-10-31 23:59:00+00:00; signals on valid bars: 509 long, 523 short
+result        :   626 trades  win 45.7%  avg  -27.9 bp  t -1.21  PF 0.88  | month-clustered t -1.16 p 0.8753  6-month-clustered t -0.91 p 0.8114  | bootstrap p 0.8765
+   at 0.00% per side:   626 trades  win 46.0%  avg  -23.9 bp  t -1.03  PF 0.90  | month-clustered t -0.99 p 0.8383  6-month-clustered t -0.78 p 0.7761  | bootstrap p 0.8370
+   at 0.02% per side:   626 trades  win 45.7%  avg  -27.9 bp  t -1.21  PF 0.88  | month-clustered t -1.16 p 0.8753  6-month-clustered t -0.91 p 0.8114  | bootstrap p 0.8765
+   at 0.05% per side:   626 trades  win 45.7%  avg  -33.9 bp  t -1.47  PF 0.86  | month-clustered t -1.41 p 0.9188  6-month-clustered t -1.11 p 0.8566  | bootstrap p 0.9214
+   at 0.10% per side:   626 trades  win 45.2%  avg  -43.9 bp  t -1.90  PF 0.82  | month-clustered t -1.83 p 0.9643  6-month-clustered t -1.44 p 0.9131  | bootstrap p 0.9689
+   realistic execution (0.05%/side, stops at the bar's worst price, 3 bp/day holding cost):   626 trades  win 45.5%  avg  -52.9 bp  t -2.25  PF 0.79  | month-clustered t -2.16 p 0.9831  6-month-clustered t -1.73 p 0.9459  | bootstrap p 0.9878
