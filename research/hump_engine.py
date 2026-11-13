@@ -121,7 +121,7 @@ def signals(hi, lo, macd, stk, big_mult, hist, big_min_bars, stoch_req, pb_min_b
 
 @nb.njit(cache=True)
 def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, tp_mode, tp_rr,
-             trail_start, trail_dist, max_spread, min_risk, max_risk):
+             trail_start, trail_dist, max_spread, min_risk, max_risk, slip, comm, delay, trail_worst):
     """Sequential trades on the M1 path. Returns rows (entry_row, exit_row, side, R, risk)."""
     n = len(o)
     out = np.empty((len(sig), 5))
@@ -129,6 +129,8 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
     busy = -1
     for k in range(len(sig)):
         e = entry_row[k]
+        if e >= 0:
+            e += delay                                     # stress: enter this many M1 bars late
         if e < 0 or e >= n or e <= busy:
             continue
         if not (s0 <= tod[e] < s1) if s0 < s1 else not (tod[e] >= s0 or tod[e] < s1):
@@ -138,7 +140,7 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
             continue
         side = int(sig[k, 1])
         if side < 0:
-            entry = o[e] - hs[e]                           # sell at bid
+            entry = o[e] - hs[e] - slip                    # sell at bid (minus slippage)
             sl = sig[k, 2] + buf + hs[e]                   # ask-side stop above the hump high
             risk = sl - entry
             if risk < min_risk or risk > max_risk:
@@ -154,23 +156,23 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
             while j < n:
                 ah = h[j] + hs[j]; al = l[j] + hs[j]; ao = o[j] + hs[j]
                 if ao >= stop:
-                    px = ao; break
+                    px = ao + slip; break
                 if ah >= stop:
-                    px = stop; break
+                    px = stop + slip; break
                 if al <= tp:
                     px = min(tp, ao); break
                 if trail_start > 0 and entry - al >= trail_start * risk:
                     cand = al + trail_dist * risk
                     if cand < stop:
                         stop = cand
-                        if c[j] + hs[j] >= stop:           # certain same-bar hit
-                            px = stop; break
+                        if c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop):
+                            px = stop + slip; break            # same-bar hit (worst: any touch after the low)
                 j += 1
             if px != px:
                 j = n - 1; px = c[j] + hs[j]
-            r = (entry - px) / risk
+            r = (entry - px - comm) / risk
         else:
-            entry = o[e] + hs[e]                           # buy at ask
+            entry = o[e] + hs[e] + slip                    # buy at ask (plus slippage)
             sl = sig[k, 2] - buf - hs[e]                   # bid-side stop below the hump low
             risk = entry - sl
             if risk < min_risk or risk > max_risk:
@@ -186,21 +188,21 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
             while j < n:
                 bh = h[j] - hs[j]; bl = l[j] - hs[j]; bo = o[j] - hs[j]
                 if bo <= stop:
-                    px = bo; break
+                    px = bo - slip; break
                 if bl <= stop:
-                    px = stop; break
+                    px = stop - slip; break
                 if bh >= tp:
                     px = max(tp, bo); break
                 if trail_start > 0 and bh - entry >= trail_start * risk:
                     cand = bh - trail_dist * risk
                     if cand > stop:
                         stop = cand
-                        if c[j] - hs[j] <= stop:
-                            px = stop; break
+                        if c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop):
+                            px = stop - slip; break
                 j += 1
             if px != px:
                 j = n - 1; px = c[j] - hs[j]
-            r = (px - entry) / risk
+            r = (px - entry - comm) / risk
         out[m, 0] = e; out[m, 1] = j; out[m, 2] = side; out[m, 3] = r; out[m, 4] = risk
         m += 1
         busy = j
@@ -212,19 +214,23 @@ SESSIONS = {"all": (0, 1440), "ldn_ny_07-20": (420, 1200), "ny_12-1630": (720, 9
 DEFAULT = dict(tf="M2", big_mult=1.5, hist=20, big_min_bars=5, stoch_req=1, pb_min_bars=3, pb_max_ratio=0.6,
                break_ratio=1.0, max_signals=2, trend_max_bars=120, sides=0, classic=0, session="all",
                buf=0.30, anticip=0.10, min_rr=0.8, tp_mode=0, tp_rr=1.5, trail_start=0.0, trail_dist=0.5,
-               max_spread=0.60, min_risk=0.50, max_risk=1e9, htf="none")
+               max_spread=0.60, min_risk=0.50, max_risk=1e9, htf="none", slip=0.0, comm=0.0, delay=0, trail_worst=0)
 
 
 class Market:
-    def __init__(self):
+    def __init__(self, m1=None, half_spread=None):
+        """Default: FTMO data with the hourly spread table. Or pass mid-price M1 bars indexed by
+        broker server time (New York + 7h) and a per-bar half spread (e.g. Dukascopy bid/ask)."""
         os.environ.setdefault("XLZC_SYMBOL", "XAUUSD")
-        m1, hourly = B.load(DATA)
+        hourly = None
+        if m1 is None:
+            m1, hourly = B.load(DATA)
         self.m1 = m1
         self.t = m1.index.values
         self.o = m1["open"].values.astype(float); self.h = m1["high"].values.astype(float)
         self.l = m1["low"].values.astype(float); self.c = m1["close"].values.astype(float)
         mult = float(os.environ.get("HUMP_SPREAD_MULT", "1"))
-        self.hs = hourly[B.server_to_utc_hour(m1.index)] / 2.0 * mult
+        self.hs = (hourly[B.server_to_utc_hour(m1.index)] / 2.0 if half_spread is None else np.asarray(half_spread, float)) * mult
         self.tod = (m1.index.hour * 60 + m1.index.minute).values.astype(np.int64)
         self._tf = {}
 
@@ -261,7 +267,8 @@ class Market:
         s0, s1 = SESSIONS[c["session"]]
         tr = simulate(sg, er, self.o, self.h, self.l, self.c, self.hs, self.tod, s0, s1, c["buf"], c["anticip"],
                       c["min_rr"], int(c["tp_mode"]), c["tp_rr"], c["trail_start"], c["trail_dist"],
-                      c["max_spread"], c["min_risk"], c["max_risk"])
+                      c["max_spread"], c["min_risk"], c["max_risk"], c["slip"], c["comm"], int(c["delay"]),
+                      int(c["trail_worst"]))
         df = pd.DataFrame(tr, columns=["entry_row", "exit_row", "side", "r", "risk"])
         df["entry_time"] = self.t[df.entry_row.astype(int).values] if len(df) else pd.Series(dtype="datetime64[ns]")
         df.attrs["signals"] = len(sg)
