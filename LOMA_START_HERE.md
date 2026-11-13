@@ -1,4 +1,4 @@
-# Loma EA v1.31: start here
+# Loma EA v1.32: start here
 
 `XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method on XAUUSD in MetaTrader 5, buys and sells. It is a new, separate EA: the XLZC Bearish EA is not changed.
 
@@ -30,7 +30,36 @@ The EA has not been compiled here (no MetaEditor was available). Two independent
 - **`SkipBigPullback` (on):** when the pullback hump is itself a big opposite hump, that is a trend change, so no signal is taken. In the backtest those trades were about break-even.
 - **`CloseBeforeWeekend` (on in the presets, off by default in the EA):** positions are closed on Friday from `WeekendCloseTime` (23:00 server time) and no new trades open after it. This removes the dependence on weekend gaps. A position still open on Saturday or Sunday is closed on the first tick.
 
-## Presets (v1.31)
+## What changed in v1.32
+
+- **`MaxHoldMinutes` (0 = off):** closes a position once it has been open that many market minutes.
+- **`CloseAtEndOfDay` with `EndOfDayTime` (server time):** closes positions when the server clock reaches that time. A trade opened after that time is kept until the next day's time.
+- Neither blocks new entries on later bars. Both are off by default and off in the five original presets below; seven of the top-10 presets use them.
+
+## Top-10 presets (`Loma_Top01` to `Loma_Top10`)
+
+These are the ten best all-round setups from both gold calibrations (about 54,000 random setups plus refinement, with indicator periods, trend-filter timeframe and EMA, M10/M15 and the time exits included). **They were chosen with all the data, 2025 and 2026: there is no unseen test behind them.** A ranking on 2025 alone did not predict 2026 (about half of its top ten lost in 2026), so this list keeps only setups that pass 2025, 2025 under stress, 2026 and 2026 under stress.
+
+| # | Chart | Direction | Session | Trend filter | MACD | Max hold | End-of-day | Trades | PF | 2026 PF | Stress PF (2026) |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | M10 | both | 07:00-20:00 | H1 EMA 20 | 16/35 | off | 23:00 | 129 | 2.09 | 1.72 | 2.08 (1.97) |
+| 2 | M3 | sell | all day | none | 16/35 | 2 h | 22:00 | 143 | 1.98 | 2.07 | 1.81 (2.03) |
+| 3 | M2 | sell | 12:00-20:00 | H1 EMA 20 | 12/26 | 4 h | 22:00 | 117 | 2.03 | 1.46 | 1.90 (1.63) |
+| 4 | M5 | both | 07:00-12:00 | H1 EMA 50 | 8/17 | 4 h | 23:00 | 124 | 1.82 | 1.40 | 1.76 (1.66) |
+| 5 | M10 | buy | all day | M30 EMA 20 | 16/35 | 4 h | 23:00 | 141 | 1.96 | 1.47 | 1.80 (1.38) |
+| 6 | M2 | sell | 12:00-20:00 | H4 EMA 50 | 12/26 | off | off | 104 | 1.56 | 1.31 | 1.49 (1.60) |
+| 7 | M5 | buy | all day | H1 EMA 50 | 12/26 | off | off | 135 | 2.17 | 1.84 | 1.92 (1.73) |
+| 8 | M5 | buy | all day | H4 EMA 50 | 12/26 | off | off | 138 | 1.83 | 1.19 | 1.77 (1.17) |
+| 9 | M5 | both | 07:00-20:00 | none | 10/22 | 8 h | 22:00 | 191 | 1.92 | 1.17 | 1.67 (1.12) |
+| 10 | M3 | both | 07:00-12:00 | none | 8/17 | off | 21:00 | 140 | 1.65 | 1.11 | 1.50 (1.09) |
+
+- Stress = entry one minute late, pessimistic trailing, 0.10 slippage and commission.
+- Six of the ten run **without a trailing stop**, so they do not depend on the trailing behaviour that one-minute bars cannot judge.
+- #7 is the same setup as `Loma_Gold_M5_Buy_H1`; #8 is a variant of `Loma_Gold_M5_Buy_H4`. Do not run a top-10 preset together with its twin.
+- Several use MACD periods other than 12/26: set your chart's MACD to the preset's values if you want the chart to match what the EA sees.
+- Expect roughly PF 1.1-1.4 live. Strategy Tester with real ticks, then demo, before anything else.
+
+## Original five presets
 
 Backtest: FTMO XAUUSD one-minute data, January 2025 to May 2026, real spreads, risk-% sizing. Settings were chosen with 2025 only; 2026 is out of sample. The two v1.31 rules were added after seeing all the data.
 

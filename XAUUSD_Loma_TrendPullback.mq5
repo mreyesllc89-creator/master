@@ -66,12 +66,17 @@
 //        day: entries are blocked on Friday only, so on a broker whose week opens on Sunday
 //        (server time) the Sunday session trades normally. A failed close is retried at
 //        most once every WEEKEND_RETRY_SEC seconds, and not at all while algo trading is off.
-//    R10 Optional time exits; neither blocks new entries:
+//    R10 Optional time exits; neither blocks new entries (only the signal of the trigger bar
+//        on which the time exit happens is not traded, as in the reference backtest):
 //        MaxHoldMinutes > 0: the position is closed at market once it has been open that many
-//        minutes (server time now - position open time).
+//        minutes, counted in M1 bars after the entry bar as in the reference backtest (minutes
+//        without quotes - daily break, weekend - do not count). Without M1 history the
+//        clock time since the position was opened is used.
 //        CloseAtEndOfDay: the position is closed at market once the server time of day is at
 //        or after EndOfDayTime, if it was opened before today's EndOfDayTime. A position
-//        opened after that time is kept until the next day's EndOfDayTime.
+//        opened after that time is kept until the next day's EndOfDayTime. A close that was
+//        due on an earlier day but did not happen (algo trading off, EA not running) is
+//        made on the first tick available.
 //        Failed closes are retried like the weekend close (WEEKEND_RETRY_SEC).
 //
 //  STATE AFTER ATTACH / RESTART
@@ -107,7 +112,7 @@
 //    foresee a holiday closure: only Friday and Saturday/Sunday are handled.
 //  * Time exits: the reference backtest (max_hold / eod) closes at the close of the M1 bar that
 //    reaches the holding limit or crosses the end-of-day time; the EA closes on the first tick
-//    at or after that moment. MaxHoldMinutes counts clock minutes, weekend included.
+//    at or after that moment.
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
 #property version     "1.32"
@@ -251,6 +256,7 @@ int      g_eodMin         = 0;     // EndOfDayTime in minutes from midnight
 ulong    g_timeExitLogged  = 0;    // ticket whose time exit was announced (once per position)
 ulong    g_timeExitFailLog = 0;    // ticket whose failed time exit was reported (once per position)
 datetime g_timeExitLastTry = 0;    // server time of the last failed time exit (retry throttle)
+datetime g_timeExitBar     = 0;    // trigger bar on which a time exit was last due (its signal is not traded)
 
 datetime g_lastBarTime    = 0;     // last evaluated trigger bar (open time of the forming bar)
 datetime g_signalBarTime  = 0;     // forming bar on which a valid signal is active
@@ -550,7 +556,7 @@ void OnTick()
    WeekendClosePositions();
 
    //--- R10: time exits (maximum holding time, end-of-day close); new entries are not blocked
-   TimeExitPositions();
+   bool timeExitDue = TimeExitPositions();
 
    //--- always manage what is already open (trailing)
    ManageOpenPositions();
@@ -565,6 +571,8 @@ void OnTick()
 
    //--- bar-based signal evaluation: once per new trigger bar, on CLOSED bars
    datetime barTime = iTime(_Symbol, TriggerTimeframe, 0);
+   if(timeExitDue)
+      g_timeExitBar = barTime;
    if(barTime == 0)
       return;
 
@@ -617,6 +625,12 @@ void OnTick()
    if(CountOwnPositions() > 0)                 // max one open position
      {
       LogSkip("a position is already open (max 1)");
+      g_signalActive = false;
+      return;
+     }
+   if(g_timeExitBar == barTime)                // as in the backtest: no entry on the bar of a time exit
+     {
+      LogSkip("a position was open at the bar open (time exit on this bar)");
       g_signalActive = false;
       return;
      }
@@ -1555,17 +1569,45 @@ string EndOfDayTimeText()
    return StringFormat("%02d:%02d", g_eodMin / 60, g_eodMin % 60);
   }
 
+//--- true when the position has been open MaxHoldMinutes: M1 bars after the entry bar, as in
+//    the reference backtest; clock minutes when the M1 history is not available
+bool MaxHoldReached(const datetime opened, const datetime now)
+  {
+   if((long)(now - opened) < (long)MaxHoldMinutes * 60)
+      return false;                            // bars after the entry bar <= clock minutes
+   int bars = Bars(_Symbol, PERIOD_M1, opened - (opened % 60), now);   // entry bar included
+   if(bars <= 0)
+      return true;
+   return (bars - 1 >= MaxHoldMinutes);
+  }
+
+//--- true when an EndOfDayTime crossing on a day before today was missed: the market traded
+//    at or after EndOfDayTime on a day on which the position was already open before that time
+bool EodCrossingMissed(const datetime opened, const datetime now)
+  {
+   datetime first = opened - (opened % 86400) + (datetime)(g_eodMin * 60);
+   if(opened >= first)
+      first += 86400;                          // opened after that day's EndOfDayTime
+   datetime d = now - (now % 86400) - 86400 + (datetime)(g_eodMin * 60);   // yesterday's EndOfDayTime
+   for(int k = 0; k < 7 && d >= first; k++, d -= 86400)
+      if(Bars(_Symbol, PERIOD_M1, d, d - (d % 86400) + 86399) > 0)
+         return true;
+   return false;
+  }
+
 //--- R10: close this EA's position at market when it has been open MaxHoldMinutes, or when the
 //    server time of day is at or after EndOfDayTime and it was opened before today's
-//    EndOfDayTime. A failed close is retried at most once every WEEKEND_RETRY_SEC seconds;
-//    the journal gets one line per position.
-void TimeExitPositions()
+//    EndOfDayTime (or an earlier day's crossing was missed). A failed close is retried at most
+//    once every WEEKEND_RETRY_SEC seconds; the journal gets one line per position.
+//    Returns true when a position was due for a time exit on this tick (closed or attempted).
+bool TimeExitPositions()
   {
    if(MaxHoldMinutes <= 0 && !CloseAtEndOfDay)
-      return;
+      return false;
    datetime now = TimeCurrent();
    if(g_timeExitLastTry > 0 && now >= g_timeExitLastTry && now - g_timeExitLastTry < WEEKEND_RETRY_SEC)
-      return;                                  // throttle retries after a failed close
+      return false;                            // throttle retries after a failed close
+   bool due = false;
    datetime eodMoment = now - (now % 86400) + (datetime)(g_eodMin * 60);   // today's EndOfDayTime
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
@@ -1576,12 +1618,15 @@ void TimeExitPositions()
 
       datetime opened = g_pos.Time();
       string   why    = "";
-      if(MaxHoldMinutes > 0 && (long)(now - opened) >= (long)MaxHoldMinutes * 60)
+      if(MaxHoldMinutes > 0 && MaxHoldReached(opened, now))
          why = StringFormat("open for %d minutes or more (MaxHoldMinutes)", MaxHoldMinutes);
       else if(CloseAtEndOfDay && now >= eodMoment && opened < eodMoment)
          why = StringFormat("end of day (%s server time or later)", EndOfDayTimeText());
+      else if(CloseAtEndOfDay && EodCrossingMissed(opened, now))
+         why = StringFormat("end of day (%s server time) of an earlier day was missed", EndOfDayTimeText());
       if(why == "")
          continue;
+      due = true;
 
       ulong ticket = g_pos.Ticket();
       if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
@@ -1593,7 +1638,7 @@ void TimeExitPositions()
                                ticket));
            }
          g_timeExitLastTry = now;
-         return;
+         return true;
         }
       if(g_timeExitLogged != ticket)
         {
@@ -1616,6 +1661,7 @@ void TimeExitPositions()
                             ticket, rc, g_trade.ResultRetcodeDescription(), GetLastError()));
         }
      }
+   return due;
   }
 
 //====================================================================

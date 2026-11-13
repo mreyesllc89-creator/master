@@ -63,3 +63,6 @@ WeekendCloseTime=23:00
 UseNewsFilter=true
 NewsCurrency=USD
 NewsWindowMinutes=30
+MaxHoldMinutes=0
+CloseAtEndOfDay=false
+EndOfDayTime=22:00
