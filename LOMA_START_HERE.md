@@ -49,6 +49,30 @@ All five stay profitable with the spread doubled, and the hump rules beat taking
 - **News filter** is on in the presets but was not in the backtest. Set `UseNewsFilter=false` to match it.
 - **Not built yet:** extending the target to the middle of a liquidity candle.
 
+## Stress test (13 November 2026)
+
+The backtest engine was audited by three independent reviews: no look-ahead was found (corrupting future data left every earlier signal and trade unchanged in 40 of 40 runs), and a from-scratch re-implementation reproduced two presets trade for trade. The presets themselves are **not proven**:
+
+| Preset | Normal PF | Slippage 0.10 + commission | Late entry + pessimistic trailing + those costs | No trailing | Verdict |
+|---|---|---|---|---|---|
+| M5 Buy H1 | 2.24 | 2.14 | 2.00 | 1.50 | unproven |
+| M5 Buy H4 | 2.06 | 1.88 | 1.53 | 1.50 | fragile |
+| M2 Sell London H1 | 2.16 | 1.96 | 1.26 | 1.22 | unproven |
+| M3 Sell H4 | 1.70 | 1.53 | 1.18 | 1.26 | fragile |
+| M2 Sell NY H1 | 1.70 | 1.65 | 1.20 | 1.23 | fragile |
+
+- **The 2026 figures are the best of a family.** The 19 setups calibrated the same way but not shipped have a median 2026 PF of 1.05. Expect roughly PF 1.05-1.4 live, not 1.7-2.2.
+- **2026 rests on few trades.** Without its best five trades of 2026, each preset is at PF 0.63-1.25.
+- **The trailing stop carries the edge**, and one-minute bars judge it optimistically. Real ticks are required to confirm it.
+- **Timing matters for the sells:** one minute of delay cuts M2 Sell London to PF 1.64 and M2 Sell NY to 1.35.
+- **The timeframe is knife-edge:** moving a preset one timeframe up or down usually drops it to PF 0.9-1.3.
+- **M5 Buy H1 earns mostly from trades held overnight and over weekends;** one weekend gap is 53% of its 2026 profit. Its same-day trades lost in 2026.
+- **The two buy presets take about 80% the same trades.** Run one, not both.
+- **All five together at 0.5% risk:** PF 1.93, worst drawdown 11.7R (5.8%); under pessimistic trailing and slippage PF 1.64 and 16.9R (8.4%).
+- **What held:** the hump filter beats random entries with the same exits (under 1% chance by luck), doubled spread alone leaves PF 1.4-2.0, no losing quarter, and 99-100% of 400 randomly nudged versions of each preset stayed profitable.
+
+Use these presets for Strategy Tester (real ticks) and demo testing only until they are confirmed there.
+
 ## What you see on the chart
 
 - **Status panel:** trend state (BEARISH / BULLISH / LINEAL), the big hump's size, signals used, the current hump and the last reason a signal was skipped.
