@@ -1,0 +1,61 @@
+; XAUUSD_Loma_TrendPullback v1.31 - TOP 10 by 2025, rank 9: gold M5 buy, session 1200-1630 server time, trend filter none
+; Rank uses 2025 only (worse half-year PF 1.65). Out of sample 2026: PF 0.89 on 38 trades -> LOST in 2026.
+; Backtest Jan 2025-May 2026 (FTMO XAUUSD M1 path, risk-% sizing): 121 trades, PF 1.38, net +24R, max drawdown 8.5R. Harsh stress (1 min late, pessimistic trailing, slippage, commission): PF 1.15.
+; UNPROVEN: for Strategy Tester (real ticks) and demo only. A high 2025 rank did not predict 2026: read the header line above.
+; Session hours are BROKER SERVER TIME (FTMO clock, GMT+2 winter / GMT+3 summer). UseNewsFilter was not in the backtest.
+MagicNumber=26113109
+TradeComment=LOMA_T09
+TradeDirection=2
+AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
+ShowStatusPanel=true
+MarkSignals=true
+ShowHumpLabels=true
+TriggerTimeframe=5
+MACD_Fast=12
+MACD_Slow=26
+MACD_Signal=9
+Stoch_K=7
+Stoch_Slowing=1
+Stoch_D=7
+HumpWarmupBars=3000
+BigHumpHistory=20
+BigHumpMultiplier=3.0
+BigHumpMinBars=8
+RequireStochLevel=true
+StochLow=20.0
+StochHigh=80.0
+TrendBreakRatio=1.0
+MaxSignalsPerBigHump=99
+TrendMaxBars=100000
+PullbackMinBars=4
+PullbackMaxRatio=0.8
+SkipBigPullback=true
+SL_Buffer_Points=150
+TP_Mode=1
+TP_Anticipation=0.2
+TP_RR=3.0
+MinRewardRisk=0.6
+MinSL_Points=100
+MaxSL_Points=0
+UseHTFFilter=false
+HTF_Timeframe=16388
+HTF_EMA_Period=50
+RiskPercent=0.5
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
+MaxSpread_Points=60
+MaxSlippage_Points=20
+MaxEntryDelaySeconds=0
+TrailStartR=1.5
+TrailDistanceR=0.5
+TrailStep_Points=10
+UseTradingHours=true
+TradingHoursStart=12:00
+TradingHoursEnd=16:30
+CloseBeforeWeekend=true
+WeekendCloseTime=23:00
+UseNewsFilter=true
+NewsCurrency=USD
+NewsWindowMinutes=30

@@ -1,0 +1,11 @@
+rank,file,trades,pf,worse_half_2025,pf_2026,trades_2026,stress_pf,verdict
+1,Loma_Top01_Gold_M5_Buy_AllDay_H4,100,3.07,2.23,4.0,25,1.53,held in 2026
+2,Loma_Top02_Gold_M2_Sell_0700-1200_H1,116,2.22,2.2,2.0,33,1.25,held in 2026
+3,Loma_Top03_Gold_M3_Both_1200-2000_H1,167,1.72,2.1,1.01,56,1.52,about break-even in 2026
+4,Loma_Top04_Gold_M5_Sell_0700-2000_NoFilter,75,1.48,1.96,0.84,27,1.2,LOST in 2026
+5,Loma_Top05_Gold_M5_Buy_AllDay_H4,138,1.83,1.89,1.19,29,1.77,held in 2026
+6,Loma_Top06_Gold_M5_Both_1200-2000_H4,125,1.41,1.76,0.65,33,1.42,LOST in 2026
+7,Loma_Top07_Gold_M5_Buy_AllDay_H4,126,2.05,1.68,2.14,30,1.49,held in 2026
+8,Loma_Top08_Gold_M5_Buy_0700-2000_NoFilter,148,1.32,1.66,0.66,45,1.32,LOST in 2026
+9,Loma_Top09_Gold_M5_Buy_1200-1630_NoFilter,121,1.38,1.65,0.89,38,1.15,LOST in 2026
+10,Loma_Top10_Gold_M5_Buy_0700-2000_H1,126,1.4,1.62,0.72,31,1.45,LOST in 2026
