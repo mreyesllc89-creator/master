@@ -10,6 +10,7 @@ LIVE = {1, 5}
 COST_RT_USD = {"XAUUSD": 0.28, "BTCUSD": 0.40}
 DIRN = {0: "Both", 1: "Long only", 2: "Short only"}
 d = lambda ts: dt.datetime.fromtimestamp(ts, dt.timezone.utc).strftime("%Y-%m-%d")
+FWD_FROM, FWD_TO = "2026-11-01", "2026-11-12"
 
 
 def pick(top):
@@ -27,7 +28,7 @@ def pick(top):
 
 
 def describe(p):
-    s = X1.describe(p)
+    s = X1.describe(p).replace("loss-rev x0;", "loss-rev unlimited;")
     return f"{DIRN[int(p['TradeDir'])]}; " + s
 
 
@@ -42,7 +43,7 @@ def main():
                             ref_trades=j["baseline"]["trades"], ref_net_usd=round(j["baseline"]["net"], 2), ref_pf=round(j["baseline"]["pf"], 3)))
         for s in j["strata"]:
             strata.append(dict(symbol=sym, tf=lab, style=s["style"], direction=DIRN[s["direction"]], evaluated=s["evaluated"], is_profitable=s["is_profitable"],
-                               pass_is_oos=s["pass_is_oos_distinct"], in_final=sum(1 for r in j["top"] if r["style_i"] == s["style_i"] and r["direction"] == s["direction"]),
+                               pass_is_oos=s["pass_is_oos_distinct"], pass_rules=s["pass_rules"], in_final=sum(1 for r in j["top"] if r["style_i"] == s["style_i"] and r["direction"] == s["direction"]),
                                best_final_oos_net_usd=max([round(r["oos"]["net"], 2) for r in j["top"] if r["style_i"] == s["style_i"] and r["direction"] == s["direction"]], default="")))
         nb = len(j["blocks"]) - 1
         for rank, r in enumerate(chosen, 1):
@@ -58,8 +59,8 @@ def main():
                 f"Way of playing: {r['style']}, {DIRN[int(p['TradeDir'])]}. Data: {spec['data']} 1-minute history, {spec['lot_desc']}; profit in USD per 0.01 lot after modeled costs.",
                 f"In-sample {d(j['is_window'][0])}..{d(j['is_window'][1])}: {r['is_']['trades']} trades, net {r['is_']['net']:.0f}, PF {r['is_']['pf']:.2f}, maxDD {r['is_']['maxdd']:.0f}.",
                 f"Out-of-sample {d(j['oos_window'][0])}..{d(j['oos_window'][1])}: {r['oos']['trades']} trades, net {r['oos']['net']:.0f}, PF {r['oos']['pf']:.2f}, maxDD {r['oos']['maxdd']:.0f}.",
-                f"2x-cost stress: net {r['stress_all']['net']:.0f}, PF {r['stress_all']['pf']:.2f}. Profitable calendar blocks: {sum(1 for b in r['blocks'] if b > 0)} of {nb}. Neighbour stability: {r['stability']['stable_share']:.0%}.",
-                f"Untouched forward window {d(j['fwd_window'][0])}..{d(j['fwd_window'][1] - 86400)}: {r['fwd']['trades']} trades, net {r['fwd']['net']:.0f}.",
+                f"2x-cost stress: net {r['stress_all']['net']:.0f}, PF {r['stress_all']['pf']:.2f}. Profitable calendar blocks: {sum(1 for b in r['blocks'] if b > 0)} of {nb}. Neighbour stability: {r['stability']['stable_share']:.0%} of {r['stability']['neighbours']} variants.",
+                f"Unseen days {FWD_FROM}..{FWD_TO} (open positions valued at the last price): {r['fwd']['trades']} trades, net {r['fwd']['net']:.0f}.",
                 "Live execution DISABLED (EnableTrading=false, FenceAllowExecution=false). Native MT5 performance NOT verified.",
             ] + (["WARNING: average profit per trade is below 2x the modeled round-trip cost; very sensitive to real spread/commission."] if fragile else []) \
               + (["NOTE: one-direction preset; part of its result is the market's own trend over the test period."] if int(p["TradeDir"]) != 0 else [])
@@ -84,14 +85,14 @@ def main():
          "Run 2 searches every way the EA can be played as its own problem: 7 entry styles x 3 trade directions, per symbol and timeframe, over a wider input grid than run 1 and with stricter acceptance. "
          "Results are replica backtests on Binance 1-minute data (PAX Gold as the XAUUSD proxy), **not** MT5 Strategy Tester or broker results. Live gates stay disabled in every preset.\n",
          "## How run 1 did on data it never saw\n",
-         f"Before recalibrating, the 33 run-1 presets were run on {d(S.FWD[0])} to {d(S.FWD[1] - 86400)}, published after run 1.\n",
+         f"Before recalibrating, the 33 run-1 presets were run on {FWD_FROM} to {FWD_TO}, published after run 1. Positions still open at the end are valued at the last price.\n",
          "| Symbol | Presets | Made money | Lost money | Did not trade | Combined net (USD per 0.01 lot) |", "|---|---:|---:|---:|---:|---:|"]
     for sym in ("XAUUSD", "BTCUSD"):
         rs = [r for r in fwd1 if r["symbol"] == sym]
         L.append(f"| {sym} | {len(rs)} | {sum(float(r['fwd_net_usd']) > 0 for r in rs)} | {sum(float(r['fwd_net_usd']) < 0 for r in rs)} | {sum(int(r['fwd_trades']) == 0 for r in rs)} | {sum(float(r['fwd_net_usd']) for r in rs):.0f} |")
-    L += ["", "Twelve days is a short test. It is the only fully independent evidence available, and it is mixed: roughly half the presets made money. Per-preset figures are in `data/run1_forward_test.csv`.\n",
+    L += ["", "Twelve days is a short test. It is the only fully independent evidence available, and it is mixed: fewer than half the presets made money. Per-preset figures are in `data/run1_forward_test.csv`.\n",
           "## Search summary\n",
-          "| Symbol | TF | Clock | Window | Combos tested | Pass in and out of sample | Pass all rules | Stability-checked | Stable | Saved | Reference preset net |",
+          "| Symbol | TF | Clock | Window | Combos tested | Pass in and out of sample | Pass cost, block and winner rules | Stability-checked | Stable | Saved | Reference preset net |",
           "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|"]
     for s in summary:
         L.append(f"| {s['symbol']} | {s['tf']} | {s['clock']} | {s['window']} | {s['evaluated']} | {s['pass_is_oos']} | {s['pass_rules']} | {s['checked_for_stability']} | {s['stable']} | {s['saved']} | {s['ref_net_usd']:.0f} ({s['ref_trades']} trades) |")
@@ -118,16 +119,24 @@ def main():
     L.append("""
 ## What changed from run 1
 
-- **Every way of playing gets its own search.** 7 entry styles (BOT/TOP square; Turn with predict stop, at cross, after hold; BOT/TOP tick; CONT at close, CONT stop entry) x 3 directions (both, long only, short only) = 21 searches per symbol and timeframe, half of each with the FlashGold filter on.
+- **Every way of playing gets its own search.** 7 entry styles (BOT/TOP square; Turn with predict stop, at cross, after hold; BOT/TOP tick; CONT at close, CONT stop entry) x 3 directions (both, long only, short only) = 21 searches per symbol and timeframe, half of each starting with the FlashGold filter on.
 - **Wider grid.** New or widened inputs: TradeDir, InvertFill, AtrLen, ExAtrLen, MaxChase, ContStopBars, BotMinW/TopMinW, BotNeedLow/TopNeedHigh, FlashGold hold bars, drift bars, TDI lengths, D1 filter/parent/zone timeframes, and more values for stops, targets, trailing, time stop, RSI/MA lengths, squares, wicks and CONT thresholds.
-- **Stricter acceptance.** On top of run 1's rules (in-sample and out-of-sample net > 0 with PF >= 1.15, minimum trades and winners, profitable at 2x costs): at most one losing calendar block (yearly blocks, or half-year blocks for the short gold window), and at least half of 24 one-step neighbours (one input changed) must stay profitable overall and out of sample.
-- **Untouched forward window.** 2026-11-01 to 2026-11-12 is reported for every preset and used for nothing else.
+- **Stricter acceptance.** On top of run 1's rules (in-sample and out-of-sample net > 0 with PF >= 1.15, minimum trades and winners, profitable at 2x costs): at most one losing calendar block (yearly blocks, or half-year blocks for the short gold window), and neighbour stability of at least 50 %.
+- **Neighbour stability.** For each leading candidate, 24 variants are built by changing one input one step. Only variants whose trades actually differ from the candidate and from each other count. The share that stays profitable overall and out of sample is the stability score. The overall top 30 and the top 5 of every way of playing are checked, so no way of playing is skipped.
+- **Drawdown is mark-to-market.** Maximum drawdown includes the paper loss of open positions at each bar close, not only closed trades. Run 1 used closed trades only, so run-2 drawdowns read higher for the same behaviour.
+- **Warm-up.** Indicators and the FlashGold filter get 120 days of history before the in-sample window; no trade may open in the warm-up. Run 1 started cold.
+- **Unseen days.** 2026-11-01 to 2026-11-12 is reported for every preset and used for nothing else. Positions still open at the end are valued at the last price.
 - **Diverse picks.** Up to 3 presets per symbol and timeframe, preferring different entry style / direction combinations.
-- **Engine checks.** A causality test (168 configurations) confirms trades closed before a cut date are identical with and without later data, so the engine does not look ahead.
+
+## Checks on the tooling
+
+- **No look-ahead.** 168 configurations across all styles and directions produce identical trades with and without later data (`tools/causality_test.py`).
+- **Search-space bookkeeping is sound.** Inputs that cannot matter for a given way of playing are reset to defaults so duplicates are not re-tested; 1,890 cases confirm that resetting them never changes a single trade (`tools/canon_test.py`).
+- **Independent review.** The run-2 search code was reviewed by three reviewers with two adversarial verifiers per finding. Thirteen findings were confirmed and all were fixed before this run, including an inflated stability score, stability checks limited to the overall leaders, closed-trade-only drawdown, a forward window that dropped the final hours, and BTC point inputs re-entering the search at gold scale.
 
 ## Caveats
 
-- **Search size cuts both ways.** Testing this many combinations finds more candidates and also more lucky ones. The block, stability and forward columns are there to tell them apart; no rule removes the risk.
+- **Search size cuts both ways.** Testing this many combinations finds more candidates and also more lucky ones. The block, stability and unseen-days columns are there to tell them apart; no rule removes the risk.
 - **One-direction presets ride the trend.** Gold rose strongly over 2023-2026, so a long-only gold preset profits partly from that rise, and would lose it in a falling market. They are marked in the Note column.
 - **Proxy data, replica engine, clocks, sizing.** As in run 1: PAXG is not the broker's XAUUSD feed, the Python port is not the MT5 tester, only M1/M5 presets run on a live chart, and `QtyFixed` assumes 100 oz (gold) and 1 BTC contracts. See `../CALIBRATION_REPORT.md`.
 - **BTC points.** Stops and targets in points assume a 0.01 tick on BTCUSD.c; scale `SlPts`, `TpPts` and the other point inputs if your broker's tick differs.
@@ -135,10 +144,13 @@ def main():
 ## Reproduce
 
 ```bash
-python3 tools/xpw_search2.py          # writes results2/*.json
+python3 tools/xpw_search2.py          # writes results2/strata/*.json, then results2/*.json (resumable)
+python3 tools/xpw_search2.py merge    # re-run acceptance and stability from the saved strata
 python3 tools/xpw_report2.py out2     # presets, CSV and this report
 python3 tools/causality_test.py       # look-ahead check
-python3 tools/fwd_run1.py             # run-1 presets on the forward window
+python3 tools/canon_test.py 30        # inert-input check
+python3 tools/warmup_test.py          # warm-up and drawdown check
+python3 tools/fwd_run1.py             # run-1 presets on the unseen days
 ```
 """)
     open(os.path.join(OUT, "CALIBRATION_REPORT.md"), "w").write("\n".join(L))

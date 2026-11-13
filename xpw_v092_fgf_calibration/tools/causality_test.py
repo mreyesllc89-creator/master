@@ -12,7 +12,7 @@ for symbol, tf, cut in (("XAUUSD", 60, TS(2025, 3, 5)), ("BTCUSD", 15, TS(2024, 
         for d, _ in S.DIRS:
             for rep in range(2):
                 p = S.sample(rng, symbol, tf, style, d, rep == 0)
-                a = full.run(p); b = part.run(p)
+                a = S.run(full, p, w); b = S.run(part, p, w)
                 lim = cut - 2 * 86400
                 ta = a["time"]; tb = b["time"]
                 ma = ta[a["exit_i"]] < lim; mb = tb[b["exit_i"]] < lim

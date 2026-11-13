@@ -10,7 +10,7 @@ for f in sorted(glob.glob("results_run1/*.json")):
     is_lo = j["is_window"][0]
     sane = [r for r in j["top"] if r["is_"]["win"] * r["is_"]["trades"] >= X.MIN_WINNERS_IS and r["oos"]["win"] * r["oos"]["trades"] >= X.MIN_WINNERS_OOS][:X.TOP_N]
     if not sane: continue
-    start = None if (sym == "BTCUSD" or tf > 15) else is_lo
+    start = is_lo   # run 1 had no warm-up prefix: reproduce it exactly
     if (sym, start) not in markets: markets[(sym, start)] = R.Market(sym, start=start)
     mk = markets[(sym, start)]; usd = mk.spec["usd_per_unit"]
     for rank, r in enumerate(sane, 1):

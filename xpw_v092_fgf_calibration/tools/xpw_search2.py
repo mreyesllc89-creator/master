@@ -12,7 +12,6 @@ OUT = os.environ.get("XPW_OUT") or os.path.join(os.path.dirname(os.path.abspath(
 TS = lambda y, m, d: int(dt.datetime(y, m, d, tzinfo=dt.timezone.utc).timestamp())
 TF_LABEL = {1: "M1", 5: "M5", 15: "M15", 30: "M30", 60: "H1", 240: "H4"}
 YEAR = 365.25 * 86400
-FWD = (TS(2026, 11, 1), TS(2026, 11, 13))          # never used for selection or acceptance
 MIN_IS = {1: 300, 5: 150, 15: 80, 30: 60, 60: 40, 240: 25}
 MIN_WIN_IS, MIN_WIN_OOS = 15, 8
 
@@ -61,23 +60,65 @@ SPECIAL = ("fgfTfMin", "fgfParentMin", "fgfZoneSet")
 
 
 def canonicalize(p):
-    """Reset every input that cannot influence this run, so equal behaviours share one key."""
-    S1.canonicalize(p)
+    """Reset every input that cannot influence this run, so equal behaviours share one key.
+    Soundness (reset inputs really are inert) is checked by canon_test.py."""
     D = R.DEFAULTS
+    mult = 1.0 if float(p["QtyFixed"]) >= 1.0 else 50.0     # point inputs: BTC grid is 50x the gold grid
+    keep_parent = p["fgfParentTf"]
+    S1.canonicalize(p)
     sig = int(p["SigMode"])
     predict = sig == 1 and int(p["TurnEntry"]) == 0
-    if not (predict and p["CatchUp"]): p["MaxChase"] = D["MaxChase"]
+    cont_stop = sig == 3 and int(p["ContEntry"]) == 1
+    one_sided = int(p["TradeDir"]) != 0
     if sig == 2:
         for k in ("RsiLen", "FastLen", "SlowLen", "InvertFill"): p[k] = D[k]
     if sig in (2, 3):
         for k in ("BotMinW", "TopMinW", "BotNeedLow", "TopNeedHigh"): p[k] = D[k]
     if sig in (0, 1): p["AtrLen"] = D["AtrLen"]
-    if p["AllOn"]:
-        p["BotNeedLow"] = D["BotNeedLow"]; p["TopNeedHigh"] = D["TopNeedHigh"]
     if int(p["ExitUnit"]) == 0: p["ExAtrLen"] = D["ExAtrLen"]
+    if one_sided:
+        # a reversal needs the other direction, which is not allowed
+        p["LossRevOn"] = False
+        for k in ("LossRevWhat", "LossRevMax", "LossRevTiny"): p[k] = D[k]
+        if predict or cont_stop:
+            if int(p["OppMode"]) == 2: p["OppMode"] = 0     # no opposite position can exist: Reverse == Ignore
+        elif int(p["OppMode"]) == 1: p["OppMode"] = 0       # opposite entry is not allowed: Reverse == Close only
+    squares_live = sig in (0, 1)
+    if predict and int(p["ArmMode"]) == 1:
+        # every cross arms the stop: squares, areas and turn timing are never read
+        squares_live = False
+        for k in ("AllOn", "AllCtx", "BotMinW", "BotMaxW", "BotCtxIn", "BotSepIn", "BotNeedLow", "TopMinW", "TopMaxW", "TopCtxIn", "TopSepIn",
+                  "TopNeedHigh", "LoFrac", "HiFrac", "AreaLook", "TurnMax", "InvertFill"): p[k] = D[k]
+        if not p["FailExit"]: p["TurnHold"] = D["TurnHold"]
+    if predict and one_sided and int(p["ArmMode"]) == 0 and int(p["OppMode"]) != 1:
+        side = ("TopMinW", "TopMaxW", "TopCtxIn", "TopSepIn", "TopNeedHigh", "HiFrac") if int(p["TradeDir"]) == 1 else \
+               ("BotMinW", "BotMaxW", "BotCtxIn", "BotSepIn", "BotNeedLow", "LoFrac")
+        for k in side: p[k] = D[k]
+    if squares_live:
+        if p["AllOn"]:
+            p["BotNeedLow"] = D["BotNeedLow"]; p["TopNeedHigh"] = D["TopNeedHigh"]
+        else:
+            if not p["BotNeedLow"]: p["LoFrac"] = D["LoFrac"]
+            if not p["TopNeedHigh"]: p["HiFrac"] = D["HiFrac"]
+            if not p["BotNeedLow"] and not p["TopNeedHigh"]: p["AreaLook"] = D["AreaLook"]
     if p["fgfOn"]:
         if int(p["fgfHoldBars"]) == 0: p["fgfHoldFavAtr"] = D["fgfHoldFavAtr"]
         if not p["fgfUseDrift"]: p["fgfDriftBars"] = D["fgfDriftBars"]
+        parent_live = p["fgfUseZones"] or (p["fgfAnyCombo"] and p["fgfUseBurst"])
+        if parent_live and not p["fgfUseZones"]: p["fgfParentTf"] = keep_parent      # run-1 canonicalize reset it although it is read
+        if not parent_live:
+            p["fgfRsiLen"] = D["fgfRsiLen"]; p["fgfFastLen"] = D["fgfFastLen"]
+        if int(p["fgfLvMode"]) == 1: p["fgfEntryDistAtr"] = D["fgfEntryDistAtr"]
+        if p["fgfAnyCombo"] and not p["fgfUseBurst"]: p["fgfBurstAtr"] = D["fgfBurstAtr"]
+    # inert point inputs take the symbol-scaled default, so a later mutation re-activates them on the symbol's own grid
+    inert = []
+    if int(p["ExitUnit"]) != 0: inert += ["SlPts", "TpPts", "TrActPts", "TrDisPts"]
+    elif not p["TrailOn"]: inert += ["TrActPts", "TrDisPts"]
+    if not predict: inert.append("PredBuf")
+    if not (predict and p["CatchUp"]): inert.append("MaxChase")
+    if not cont_stop: inert.append("ContStopBuf")
+    if not (p["LossRevOn"] and p["LossRevTiny"]): inert.append("LossRevTinyPts")
+    for k in inert: p[k] = D[k] * mult
     if int(p["SlowLen"]) <= int(p["FastLen"]): p["SlowLen"] = int(p["FastLen"]) + 4
     return p
 
@@ -95,6 +136,10 @@ def _set_special(rng, q, k, tf):
 
 
 def sample(rng, symbol, tf, style, direction, fgf_on):
+    return canonicalize(sample_raw(rng, symbol, tf, style, direction, fgf_on))
+
+
+def sample_raw(rng, symbol, tf, style, direction, fgf_on):
     p = dict(R.DEFAULTS)
     p["SigTF"] = tf
     for k, v in SPACE.items():
@@ -110,29 +155,45 @@ def sample(rng, symbol, tf, style, direction, fgf_on):
     _set_special(rng, p, "fgfTfMin", tf); _set_special(rng, p, "fgfParentMin", tf); _set_special(rng, p, "fgfZoneSet", tf)
     p["QtyFixed"] = 1.0 if symbol == "XAUUSD" else 0.01
     p["QtyMax"] = p["QtyFixed"]
-    return canonicalize(p)
+    return p
 
 
 MUT_KEYS = [k for k in list(SPACE.keys()) + list(GOLD_PTS.keys()) + ["fgfOn"]]
 
 
 def mutate(rng, p, symbol, tf, k_changes):
+    """Change k inputs; retried until the canonical parameter set really differs from the parent."""
+    base = key_of(p); mult = 1 if symbol == "XAUUSD" else 50
     q = dict(p)
-    for _ in range(k_changes):
-        k = rng.choice(MUT_KEYS)
-        if k in SPECIAL: _set_special(rng, q, k, tf)
-        elif k in GOLD_PTS: q[k] = float(rng.choice(GOLD_PTS[k]) * (1 if symbol == "XAUUSD" else 50))
-        elif k == "fgfOn": q[k] = not q[k]
-        else: q[k] = rng.choice(SPACE[k])
-    return canonicalize(q)
+    for _ in range(40):
+        q = dict(p)
+        for _ in range(k_changes):
+            k = rng.choice(MUT_KEYS)
+            if k in SPECIAL: _set_special(rng, q, k, tf)
+            elif k == "fgfOn": q[k] = not q[k]
+            else:
+                vals = sorted({float(v * mult) for v in GOLD_PTS[k]} if k in GOLD_PTS else set(SPACE[k]))
+                vals = [v for v in vals if v != q[k]]
+                if vals: q[k] = rng.choice(vals)
+        q = canonicalize(q)
+        if key_of(q) != base: return q
+    return q
+
+
+WARMUP = 120 * 86400
 
 
 def windows(symbol, tf):
+    """Data starts WARMUP before the in-sample window (indicator and filter warm-up only: no entry before is_[0])."""
     if symbol == "XAUUSD" and tf <= 15:
-        return dict(start=TS(2025, 5, 1), is_=(TS(2025, 5, 1), TS(2026, 4, 1)), oos=(TS(2026, 4, 1), TS(2026, 11, 1)),
-                    blocks=[TS(2025, 5, 1), TS(2025, 11, 1), TS(2026, 5, 1), TS(2026, 11, 1)], label="2025-05 to 2026-10")
-    return dict(start=None, is_=(TS(2023, 1, 1), TS(2025, 7, 1)), oos=(TS(2025, 7, 1), TS(2026, 11, 1)),
-                blocks=[TS(2023, 1, 1), TS(2024, 1, 1), TS(2025, 1, 1), TS(2026, 1, 1), TS(2026, 11, 1)], label="2023-01 to 2026-10")
+        w = dict(is_=(TS(2025, 5, 1), TS(2026, 4, 1)), oos=(TS(2026, 4, 1), TS(2026, 11, 1)),
+                 blocks=[TS(2025, 5, 1), TS(2025, 11, 1), TS(2026, 5, 1), TS(2026, 11, 1)], label="2025-05 to 2026-10")
+    else:
+        w = dict(is_=(TS(2023, 1, 1), TS(2025, 7, 1)), oos=(TS(2025, 7, 1), TS(2026, 11, 1)),
+                 blocks=[TS(2023, 1, 1), TS(2024, 1, 1), TS(2025, 1, 1), TS(2026, 1, 1), TS(2026, 11, 1)], label="2023-01 to 2026-10")
+    w["start"] = w["is_"][0] - WARMUP
+    w["fwd"] = (w["oos"][1], None)      # everything after the out-of-sample window, incl. the end-of-data mark
+    return w
 
 
 _MK = {}
@@ -150,6 +211,10 @@ def key_of(p):
     return json.dumps({k: p[k] for k in sorted(p)}, sort_keys=True, default=str)
 
 
+def run(mk, p, w, cost_mult=1.0):
+    return mk.run(p, cost_mult=cost_mult, trade_from=w["is_"][0])
+
+
 def usd_metrics(mk, res, lo, hi):
     m = R.metrics(res, lo, hi)
     for k in ("net", "maxdd", "avg"): m[k] *= mk.spec["usd_per_unit"]
@@ -163,13 +228,20 @@ def is_score(mi, min_trades):
 
 def balanced(r, w):
     yi = (w["is_"][1] - w["is_"][0]) / YEAR; yo = (w["oos"][1] - w["oos"][0]) / YEAR
-    rf = r["all"]["rf"] if r["all"]["maxdd"] > 0 else 0.0
-    return min(r["is_"]["net"] / yi, r["oos"]["net"] / yo) * min(r["is_"]["pf"], r["oos"]["pf"], 3.0) * min(1.0, rf / 3.0)
+    return min(r["is_"]["net"] / yi, r["oos"]["net"] / yo) * min(r["is_"]["pf"], r["oos"]["pf"], 3.0) * min(1.0, r["all"]["rf"] / 3.0)
 
 
 def passes_basic(r, min_is, min_oos):
     return (r["is_"]["trades"] >= min_is and r["oos"]["trades"] >= min_oos and r["is_"]["net"] > 0 and r["oos"]["net"] > 0
             and r["is_"]["pf"] >= 1.15 and r["oos"]["pf"] >= 1.15)
+
+
+def trade_sig(res):
+    return (int(res["n"]), res["entry_i"].tobytes(), res["exit_i"].tobytes(), res["side"].tobytes(), np.round(res["pnl"], 8).tobytes())
+
+
+def stratum_file(symbol, tf, si, direction):
+    return os.path.join(OUT, "strata", f"{symbol}_{TF_LABEL[tf]}_{si}_{direction}.json")
 
 
 def stratum_task(args):
@@ -186,7 +258,7 @@ def stratum_task(args):
     def consider(p, gen):
         k = key_of(p)
         if k in seen: return
-        res = mk.run(p)
+        res = run(mk, p, w)
         row = dict(gen=gen, params=p, is_=usd_metrics(mk, res, *w["is_"]), oos=usd_metrics(mk, res, *w["oos"]),
                    all=usd_metrics(mk, res, w["is_"][0], w["oos"][1]))
         row["score"] = is_score(row["is_"], min_is)
@@ -197,7 +269,14 @@ def stratum_task(args):
     for rnd in range(1, n_rounds + 1):
         ranked = sorted(rows, key=lambda r: r["score"], reverse=True)
         if ranked[0]["score"] <= -1e8: break
-        for par in [r["params"] for r in ranked[:n_parents]]:
+        # parents: best distinct behaviours, so clones do not crowd the parent set
+        parents = []; psig = set()
+        for r in ranked:
+            sg = (r["all"]["trades"], round(r["all"]["net"], 4))
+            if sg in psig or r["score"] <= -1e8: continue
+            psig.add(sg); parents.append(r["params"])
+            if len(parents) == n_parents: break
+        for par in parents:
             for _ in range(n_children):
                 consider(mutate(rng, par, symbol, tf, rng.choice([1, 2, 3])), rnd)
     n_is_pos = sum(1 for r in rows if r["score"] > -1e8)
@@ -210,43 +289,51 @@ def stratum_task(args):
         sigs.add(sg); uniq.append(r)
     out = []
     for r in uniq[:keep]:
-        res = mk.run(r["params"])
+        res = run(mk, r["params"], w)
         r["blocks"] = [usd_metrics(mk, res, w["blocks"][i], w["blocks"][i + 1])["net"] for i in range(len(w["blocks"]) - 1)]
-        r["fwd"] = usd_metrics(mk, res, *FWD)
-        rs = mk.run(r["params"], cost_mult=2.0)
+        r["fwd"] = usd_metrics(mk, res, *w["fwd"])
+        rs = run(mk, r["params"], w, cost_mult=2.0)
         r["stress_is"] = usd_metrics(mk, rs, *w["is_"]); r["stress_oos"] = usd_metrics(mk, rs, *w["oos"])
         r["stress_all"] = usd_metrics(mk, rs, w["is_"][0], w["oos"][1])
         r["balanced"] = balanced(r, w); r["style"] = style[3]; r["style_i"] = si; r["direction"] = direction
         out.append(r)
     best = max(rows, key=lambda r: r["score"])
-    return dict(symbol=symbol, tf=tf, style_i=si, style=style[3], direction=direction, evaluated=len(rows), is_profitable=n_is_pos,
-                pass_is_oos=len(cands), pass_is_oos_distinct=len(uniq), best_is_net=best["is_"]["net"] if best["score"] > -1e8 else None,
-                best_is_oos_net=best["oos"]["net"] if best["score"] > -1e8 else None, elapsed=time.time() - t0, candidates=out)
+    result = dict(symbol=symbol, tf=tf, style_i=si, style=style[3], direction=direction, evaluated=len(rows), is_profitable=n_is_pos,
+                  pass_is_oos=len(cands), pass_is_oos_distinct=len(uniq), best_is_net=best["is_"]["net"] if best["score"] > -1e8 else None,
+                  best_is_oos_net=best["oos"]["net"] if best["score"] > -1e8 else None, elapsed=time.time() - t0, candidates=out)
+    tmp = stratum_file(symbol, tf, si, direction) + ".tmp"
+    json.dump(result, open(tmp, "w"), default=str); os.replace(tmp, stratum_file(symbol, tf, si, direction))
+    return {k: v for k, v in result.items() if k != "candidates"}
 
 
 def accept(r):
     """Stress, winners and block-consistency rules applied on top of the basic IS/OOS filter."""
     if not (r["stress_is"]["net"] > 0 and r["stress_oos"]["net"] > 0): return False
-    if r["is_"]["win"] * r["is_"]["trades"] < MIN_WIN_IS or r["oos"]["win"] * r["oos"]["trades"] < MIN_WIN_OOS: return False
+    if r["is_"]["wins"] < MIN_WIN_IS or r["oos"]["wins"] < MIN_WIN_OOS: return False
     return sum(1 for b in r["blocks"] if b <= 0) <= 1
 
 
+N_NEIGHBOURS, MIN_NEIGHBOURS, MIN_STABLE = 24, 12, 0.5
+
+
 def stability_task(args):
-    """Share of one-step neighbours (one input changed) that stay profitable overall and out of sample."""
+    """Share of one-step neighbours (one input changed, trades actually different from the base and from each
+    other) that stay profitable overall and out of sample."""
     symbol, tf, plist, seed = args
     w = windows(symbol, tf); mk = market(symbol, w["start"])
     for c in (mk._ind, mk._evt, mk._fgf): c.clear()
     rng = random.Random(seed); out = []
     for p in plist:
-        base = key_of(p); seen = {base}; ok = 0; n = 0; tries = 0
-        while n < 24 and tries < 120:
+        keys = {key_of(p)}; sigs = {trade_sig(run(mk, p, w))}; ok = 0; n = 0; tries = 0
+        while n < N_NEIGHBOURS and tries < 240:
             tries += 1
             q = mutate(rng, p, symbol, tf, 1)
-            for k in STRATUM_KEYS: q[k] = p[k]
-            q = canonicalize(q); k = key_of(q)
-            if k in seen: continue
-            seen.add(k); n += 1
-            res = mk.run(q)
+            k = key_of(q)
+            if k in keys: continue
+            keys.add(k)
+            res = run(mk, q, w); sg = trade_sig(res)
+            if sg in sigs: continue          # same trades as the base or an earlier neighbour: not a real neighbour
+            sigs.add(sg); n += 1
             if R.metrics(res, w["is_"][0], w["oos"][1])["net"] > 0 and R.metrics(res, *w["oos"])["net"] > 0: ok += 1
         out.append(dict(neighbours=n, stable_share=ok / n if n else 0.0))
     return symbol, tf, out
@@ -259,8 +346,56 @@ def baseline_task(args):
     if symbol != "XAUUSD":
         for k in S1.GOLD_PTS: base[k] = R.DEFAULTS[k] * 50 if k != "TpPts" else 50000.0 * 50
         base["SlPts"] = 20000.0
-    res = mk.run(base)
-    return symbol, tf, usd_metrics(mk, res, w["is_"][0], w["oos"][1]), len(mk.bars(tf)[0])
+    res = run(mk, base, w)
+    k0 = int(np.searchsorted(mk.bars(tf)[0], w["is_"][0]))
+    return symbol, tf, usd_metrics(mk, res, w["is_"][0], w["oos"][1]), len(mk.bars(tf)[0]) - k0
+
+
+def is_stable(r):
+    return r["stability"]["neighbours"] >= MIN_NEIGHBOURS and r["stability"]["stable_share"] >= MIN_STABLE
+
+
+def merge(pool, pairs):
+    """Merge the saved strata per symbol/timeframe, apply acceptance, check neighbour stability for the overall
+    leaders AND the leaders of every way of playing, and write one JSON per symbol/timeframe."""
+    merged = {}
+    for symbol, tf in pairs:
+        ss = []
+        for si in range(len(STYLES)):
+            for d, _ in DIRS:
+                f = stratum_file(symbol, tf, si, d)
+                if os.path.exists(f): ss.append(json.load(open(f)))
+        if len(ss) != len(STYLES) * len(DIRS):
+            print("incomplete", symbol, TF_LABEL[tf], len(ss), flush=True); continue
+        cands = sorted([c for s in ss for c in s["candidates"]], key=lambda r: r["balanced"], reverse=True)
+        acc = [r for r in cands if accept(r)]
+        chk = list(acc[:30]); ids = {id(r) for r in chk}; per = {}
+        for r in acc:
+            k = (r["style_i"], r["direction"]); per[k] = per.get(k, 0) + 1
+            if per[k] <= 5 and id(r) not in ids: chk.append(r); ids.add(id(r))
+        chk.sort(key=lambda r: r["balanced"], reverse=True)
+        merged[(symbol, tf)] = (ss, cands, acc, chk)
+    stab_tasks = [(symbol, tf, [r["params"] for r in chk], 7700 + tf + (0 if symbol == "BTCUSD" else 5000))      # seed fixed per pair
+                  for (symbol, tf), (ss, cands, acc, chk) in merged.items() if chk]
+    for symbol, tf, out in pool.imap_unordered(stability_task, stab_tasks):
+        chk = merged[(symbol, tf)][3]
+        assert len(out) == len(chk)
+        for r, s in zip(chk, out): r["stability"] = s
+        print(time.strftime("%H:%M:%S"), "stability", symbol, TF_LABEL[tf], len(chk), flush=True)
+    bases = {(s, tf): (m, bars) for s, tf, m, bars in pool.imap_unordered(baseline_task, list(merged.keys()))}
+    for (symbol, tf), (ss, cands, acc, chk) in merged.items():
+        w = windows(symbol, tf)
+        final = [r for r in chk if is_stable(r)]
+        out = dict(symbol=symbol, tf=tf, tf_label=TF_LABEL[tf], window=w["label"], is_window=list(w["is_"]), oos_window=list(w["oos"]),
+                   blocks=w["blocks"], bars=bases[(symbol, tf)][1], baseline=bases[(symbol, tf)][0],
+                   evaluated=sum(s["evaluated"] for s in ss), pass_is_oos=sum(s["pass_is_oos_distinct"] for s in ss),
+                   pass_rules=len(acc), checked_for_stability=len(chk), final=len(final),
+                   strata=[dict({k: v for k, v in s.items() if k != "candidates"}, pass_rules=sum(1 for c in s["candidates"] if accept(c)))
+                           for s in sorted(ss, key=lambda s: (s["style_i"], s["direction"]))],
+                   top=final, unstable=[r for r in chk if not is_stable(r)])
+        json.dump(out, open(os.path.join(OUT, f"{symbol}_{TF_LABEL[tf]}.json"), "w"), default=str)
+        print("job", symbol, TF_LABEL[tf], "evaluated", out["evaluated"], "pass IS+OOS", out["pass_is_oos"], "pass rules", len(acc),
+              "checked", len(chk), "final", len(final), flush=True)
 
 
 def budget_for(tf, quick):
@@ -271,44 +406,23 @@ def budget_for(tf, quick):
 
 
 if __name__ == "__main__":
-    quick = len(sys.argv) > 1 and sys.argv[1] == "quick"
-    os.makedirs(OUT, exist_ok=True)
+    mode = sys.argv[1] if len(sys.argv) > 1 else "full"
+    quick = mode == "quick"
+    os.makedirs(os.path.join(OUT, "strata"), exist_ok=True)
     tasks = []; seed = 20261113
     pairs = [(s, tf) for s in ("BTCUSD", "XAUUSD") for tf in (1, 5, 15, 30, 60, 240)]
     if quick: pairs = [("XAUUSD", 60), ("BTCUSD", 240)]
     for symbol, tf in pairs:
         for si in range(len(STYLES)):
             for d, _ in DIRS:
-                tasks.append((symbol, tf, si, d, budget_for(tf, quick), seed)); seed += 1
-    strata = {}
+                seed += 1
+                if not os.path.exists(stratum_file(symbol, tf, si, d)):      # resumable: finished strata are kept
+                    tasks.append((symbol, tf, si, d, budget_for(tf, quick), seed))
     t0 = time.time()
     with Pool(4, maxtasksperchild=8) as pool:
-        for n, res in enumerate(pool.imap_unordered(stratum_task, tasks), 1):
-            strata.setdefault((res["symbol"], res["tf"]), []).append(res)
-            print(time.strftime("%H:%M:%S"), f"stratum {n}/{len(tasks)}", res["symbol"], TF_LABEL[res["tf"]], res["style"], DIRS[res["direction"]][1],
-                  "evaluated", res["evaluated"], "pass", res["pass_is_oos_distinct"], "%.0fs" % res["elapsed"], flush=True)
-        # merge per symbol/timeframe, apply acceptance, then neighbour stability on the leaders
-        merged = {}
-        for (symbol, tf), ss in strata.items():
-            w = windows(symbol, tf)
-            cands = [c for s in ss for c in s["candidates"]]
-            cands.sort(key=lambda r: r["balanced"], reverse=True)
-            acc = [r for r in cands if accept(r)]
-            merged[(symbol, tf)] = (ss, cands, acc)
-        stab_tasks = [(symbol, tf, [r["params"] for r in acc[:30]], 77 + i) for i, ((symbol, tf), (ss, cands, acc)) in enumerate(merged.items()) if acc]
-        for symbol, tf, out in pool.imap_unordered(stability_task, stab_tasks):
-            for r, s in zip(merged[(symbol, tf)][2][:30], out): r["stability"] = s
-            print(time.strftime("%H:%M:%S"), "stability", symbol, TF_LABEL[tf], flush=True)
-        bases = {(s, tf): (m, bars) for s, tf, m, bars in pool.imap_unordered(baseline_task, list(merged.keys()))}
-    for (symbol, tf), (ss, cands, acc) in merged.items():
-        w = windows(symbol, tf)
-        final = [r for r in acc[:30] if r["stability"]["stable_share"] >= 0.5]
-        out = dict(symbol=symbol, tf=tf, tf_label=TF_LABEL[tf], window=w["label"], is_window=list(w["is_"]), oos_window=list(w["oos"]),
-                   fwd_window=list(FWD), blocks=w["blocks"], bars=bases[(symbol, tf)][1], baseline=bases[(symbol, tf)][0],
-                   evaluated=sum(s["evaluated"] for s in ss), pass_is_oos=sum(s["pass_is_oos_distinct"] for s in ss),
-                   pass_rules=len(acc), checked_for_stability=min(30, len(acc)), final=len(final),
-                   strata=[{k: v for k, v in s.items() if k != "candidates"} for s in sorted(ss, key=lambda s: (s["style_i"], s["direction"]))],
-                   top=final, unstable=[r for r in acc[:30] if r["stability"]["stable_share"] < 0.5])
-        json.dump(out, open(os.path.join(OUT, f"{symbol}_{TF_LABEL[tf]}.json"), "w"), default=str)
-        print("job", symbol, TF_LABEL[tf], "evaluated", out["evaluated"], "pass IS+OOS", out["pass_is_oos"], "pass rules", len(acc), "final", len(final), flush=True)
+        if mode != "merge":
+            for n, res in enumerate(pool.imap_unordered(stratum_task, tasks), 1):
+                print(time.strftime("%H:%M:%S"), f"stratum {n}/{len(tasks)}", res["symbol"], TF_LABEL[res["tf"]], res["style"], DIRS[res["direction"]][1],
+                      "evaluated", res["evaluated"], "pass", res["pass_is_oos_distinct"], "%.0fs" % res["elapsed"], flush=True)
+        merge(pool, pairs)
     print("ALL DONE %.1f min" % ((time.time() - t0) / 60), flush=True)

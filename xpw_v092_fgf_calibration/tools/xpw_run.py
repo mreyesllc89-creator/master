@@ -144,7 +144,8 @@ class Market:
                                                bool(p["fgfAgainst"]), bool(p["fgfAllowBuy"]), bool(p["fgfAllowSell"]), tick)
         return self._fgf[key]
 
-    def run(self, p, cost_mult=1.0):
+    def run(self, p, cost_mult=1.0, trade_from=None):
+        """trade_from: no entry is allowed on bars that open before this time (indicator warm-up prefix)."""
         minutes = int(p["SigTF"])
         bt, bo, bh, bl, bc = self.bars(minutes)
         s0, s1 = self.subranges(minutes)
@@ -152,6 +153,10 @@ class Market:
         rsi, up, dn, validRsi, fast, slow, validFast, validSlow, isRed, atr, validAtr, pos, exAtr, validExAtr, exAtrOpen = self.indicators(minutes, p)
         ev = self.events(minutes, p)
         fb, fs = self.fgf(minutes, p)
+        if trade_from is not None:
+            k = int(np.searchsorted(bt, trade_from))
+            if k > 0:
+                fb = fb.copy(); fs = fs.copy(); fb[:k] = 0; fs[:k] = 0
         s = self.spec
         res = E.simulate(bo, bh, bl, bc, s0, s1, mo, mh, ml, mc, exAtr, exAtrOpen, validExAtr, fast, slow, validFast, validSlow, *ev, fb, fs,
                          int(p["SigMode"]), int(p["TradeDir"]), int(p["TurnEntry"]), bool(p["FailExit"]), int(p["OppMode"]), int(p["ArmMode"]) == 1,
@@ -166,7 +171,9 @@ class Market:
 
 
 def metrics(r, t_lo=None, t_hi=None):
-    """Trade metrics restricted to trades whose EXIT time is in [t_lo, t_hi)."""
+    """Trade metrics restricted to trades whose EXIT time is in [t_lo, t_hi).
+    Max drawdown is the larger of the closed-trade drawdown and the mark-to-market
+    drawdown of the bar-close equity curve inside the window (open positions count)."""
     t = r["time"]
     xt = t[r["exit_i"]] if r["n"] else np.zeros(0, np.int64)
     m = np.ones(r["n"], bool)
@@ -174,15 +181,23 @@ def metrics(r, t_lo=None, t_hi=None):
     if t_hi is not None: m &= xt < t_hi
     pnl = r["pnl"][m]
     n = len(pnl)
+    e = r["equity"]
+    i0 = int(np.searchsorted(t, t_lo)) if t_lo is not None else 0
+    i1 = int(np.searchsorted(t, t_hi)) if t_hi is not None else len(t)
+    eq_dd = 0.0
+    if i1 > i0:
+        base = e[i0 - 1] if i0 > 0 else 0.0
+        seg = e[i0:i1]
+        eq_dd = float((np.maximum(np.maximum.accumulate(seg), base) - seg).max())
     if n == 0:
-        return dict(trades=0, net=0.0, pf=0.0, win=0.0, maxdd=0.0, avg=0.0, rf=0.0, sharpe=0.0)
+        return dict(trades=0, wins=0, net=0.0, pf=0.0, win=0.0, maxdd=max(eq_dd, 0.0), avg=0.0, rf=0.0, sharpe=0.0)
     gp = pnl[pnl > 0].sum(); gl = -pnl[pnl < 0].sum()
     eq = np.cumsum(pnl)
     peak = np.maximum.accumulate(np.concatenate(([0.0], eq)))
-    dd = (peak[1:] - eq).max()
+    dd = max(float((peak[1:] - eq).max()), eq_dd)
     net = pnl.sum()
     sd = pnl.std()
-    return dict(trades=int(n), net=float(net), pf=float(gp / gl) if gl > 0 else 99.0, win=float((pnl > 0).mean()),
+    return dict(trades=int(n), wins=int((pnl > 0).sum()), net=float(net), pf=float(gp / gl) if gl > 0 else 99.0, win=float((pnl > 0).mean()),
                 maxdd=float(dd), avg=float(pnl.mean()), rf=float(net / dd) if dd > 0 else 99.0,
                 sharpe=float(pnl.mean() / sd * np.sqrt(n)) if sd > 0 else 0.0)
 
