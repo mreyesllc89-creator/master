@@ -8,7 +8,7 @@
 //    is protected from the fill bar onward (v3.0 left the whole fill bar unprotected).
 //  - Optional "TF toggles also gate entries" (off = v3.0 behaviour, where toggles only drive labels/4th filter).
 // Defaults (ATR 14 on 60m x 5, TP 2R, no trail) = most robust setting in the BTCUSDT backtest
-// (Apr-Oct 2026), best on a 5m chart. Day start defaults to 13:00 UTC (user choice; best hour in the backtest). Backtest notes: backtest/tdi_confluence_v3/RESULTS.md
+// (Apr-Oct 2026). On 2 years of data (Nov 2024-Nov 2026) only the 15m chart held up; use a 15m chart. Day start defaults to 13:00 UTC (user choice; best hour in the backtest). Backtest notes: backtest/tdi_confluence_v3/RESULTS.md
 strategy("TDI Confluence Strategy v3.1 [ATR/Pct stops]", shorttitle="TDI_Conf_v3.1", overlay=true, precision=2, max_labels_count=500,
      initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=1,
      commission_type=strategy.commission.percent, commission_value=0.02)

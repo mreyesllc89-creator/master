@@ -1,0 +1,115 @@
+######## Defaults by chart and day start (SL 5xATR(60m), TP 2R, 0.02%/side) ########
+
+== 1m chart, day start 13:00 ==
+ ALL 2 years          :  574 tr  win 57.3%  avg   +8.2bp  t +0.81  PF 1.09  sum   +4704bp
+ unseen Nov24-Mar26   :  399 tr  win 56.6%  avg   +3.4bp  t +0.26  PF 1.03  sum   +1357bp
+ tuned  Apr-Oct 26    :  169 tr  win 59.2%  avg  +23.2bp  t +1.55  PF 1.37  sum   +3915bp
+ unseen Nov 1-12 26   :    6 tr  win 50.0%  avg  -94.6bp  t -0.88  PF 0.42  sum    -568bp
+  long (all):  290 tr  win 57.6%  avg  +10.8bp  t +0.72  PF 1.12  sum   +3124bp
+  short(all):  284 tr  win 57.0%  avg   +5.6bp  t +0.41  PF 1.06  sum   +1581bp
+  unseen long:  202 tr  win 56.9%  avg   +6.5bp  t +0.33  PF 1.06  sum   +1311bp
+  unseen short:  197 tr  win 56.3%  avg   +0.2bp  t +0.01  PF 1.00  sum     +46bp
+  months positive: 15/25
+  monthly sum bp: 24-11:+345 24-12:-407 25-01:+2201 25-02:-683 25-03:+183 25-04:+1666 25-05:-544 25-06:-20 25-07:+332 25-08:+556 25-09:+331 25-10:-130 25-11:-985 25-12:+505 26-01:-688 26-02:+368 26-03:-1675 26-04:+2468 26-05:+473 26-06:+242 26-07:+366 26-08:+563 26-09:-457 26-10:+260 26-11:-568
+  max drawdown 3585bp;  no fees +12.2bp  0.05% fees +2.2bp
+  random entries: avg -3.7bp; beat real 3.5%
+
+== 1m chart, day start 00:00 ==
+ ALL 2 years          :  599 tr  win 60.1%  avg  +11.1bp  t +1.15  PF 1.13  sum   +6634bp
+ unseen Nov24-Mar26   :  414 tr  win 60.4%  avg  +17.9bp  t +1.43  PF 1.21  sum   +7391bp
+ tuned  Apr-Oct 26    :  182 tr  win 59.9%  avg   -1.4bp  t -0.10  PF 0.98  sum    -251bp
+ unseen Nov 1-12 26   :    3 tr  win 33.3%  avg -168.8bp  t -0.82  PF 0.32  sum    -507bp
+
+== 5m chart, day start 13:00 ==
+ ALL 2 years          :  468 tr  win 55.1%  avg   +7.6bp  t +0.63  PF 1.08  sum   +3545bp
+ unseen Nov24-Mar26   :  331 tr  win 52.3%  avg  -11.8bp  t -0.78  PF 0.90  sum   -3894bp
+ tuned  Apr-Oct 26    :  134 tr  win 62.7%  avg  +58.8bp  t +3.07  PF 1.95  sum   +7880bp
+ unseen Nov 1-12 26   :    3 tr  win 33.3%  avg -146.8bp  t -1.03  PF 0.23  sum    -440bp
+  long (all):  238 tr  win 57.1%  avg   +8.0bp  t +0.45  PF 1.08  sum   +1899bp
+  short(all):  230 tr  win 53.0%  avg   +7.2bp  t +0.44  PF 1.08  sum   +1646bp
+  unseen long:  171 tr  win 54.4%  avg  -13.4bp  t -0.60  PF 0.89  sum   -2289bp
+  unseen short:  160 tr  win 50.0%  avg  -10.0bp  t -0.50  PF 0.90  sum   -1606bp
+  months positive: 14/25
+  monthly sum bp: 24-11:+972 24-12:+1784 25-01:-2002 25-02:-699 25-03:-576 25-04:-137 25-05:-1085 25-06:+42 25-07:+298 25-08:+94 25-09:-484 25-10:-877 25-11:-1455 25-12:+1905 26-01:+424 26-02:-3205 26-03:+1105 26-04:+2899 26-05:-543 26-06:+1803 26-07:+768 26-08:+1263 26-09:+567 26-10:+1122 26-11:-440
+  max drawdown 9101bp;  no fees +11.6bp  0.05% fees +1.6bp
+  random entries: avg -2.3bp; beat real 18.0%
+
+== 5m chart, day start 00:00 ==
+ ALL 2 years          :  512 tr  win 55.5%  avg   +4.2bp  t +0.37  PF 1.04  sum   +2132bp
+ unseen Nov24-Mar26   :  361 tr  win 55.7%  avg   +2.8bp  t +0.19  PF 1.03  sum    +997bp
+ tuned  Apr-Oct 26    :  146 tr  win 56.2%  avg  +13.1bp  t +0.74  PF 1.17  sum   +1907bp
+ unseen Nov 1-12 26   :    5 tr  win 20.0%  avg -154.5bp  t -1.55  PF 0.17  sum    -772bp
+
+== 15m chart, day start 13:00 ==
+ ALL 2 years          :  370 tr  win 55.1%  avg  +26.4bp  t +1.69  PF 1.26  sum   +9756bp
+ unseen Nov24-Mar26   :  263 tr  win 54.0%  avg  +22.4bp  t +1.15  PF 1.20  sum   +5894bp
+ tuned  Apr-Oct 26    :  103 tr  win 60.2%  avg  +41.3bp  t +1.63  PF 1.50  sum   +4251bp
+ unseen Nov 1-12 26   :    4 tr  win  0.0%  avg  -97.4bp  t -3.00  PF 0.00  sum    -390bp
+  long (all):  188 tr  win 54.8%  avg  +29.1bp  t +1.36  PF 1.28  sum   +5465bp
+  short(all):  182 tr  win 55.5%  avg  +23.6bp  t +1.04  PF 1.23  sum   +4290bp
+  unseen long:  136 tr  win 53.7%  avg  +25.8bp  t +0.97  PF 1.23  sum   +3506bp
+  unseen short:  127 tr  win 54.3%  avg  +18.8bp  t +0.65  PF 1.17  sum   +2388bp
+  months positive: 15/25
+  monthly sum bp: 24-11:+1569 24-12:+781 25-01:+76 25-02:-415 25-03:-692 25-04:+1343 25-05:-1385 25-06:+504 25-07:-739 25-08:-717 25-09:-1430 25-10:+1103 25-11:+1517 25-12:+2371 26-01:+1096 26-02:+535 26-03:+378 26-04:+2845 26-05:-1410 26-06:-148 26-07:+1818 26-08:-472 26-09:+27 26-10:+1592 26-11:-390
+  max drawdown 4699bp;  no fees +30.4bp  0.05% fees +20.4bp
+  random entries: avg -2.1bp; beat real 1.5%
+
+== 15m chart, day start 00:00 ==
+ ALL 2 years          :  393 tr  win 58.5%  avg  +27.0bp  t +1.84  PF 1.27  sum  +10597bp
+ unseen Nov24-Mar26   :  278 tr  win 57.2%  avg  +22.6bp  t +1.23  PF 1.21  sum   +6271bp
+ tuned  Apr-Oct 26    :  113 tr  win 61.9%  avg  +36.0bp  t +1.55  PF 1.45  sum   +4071bp
+ unseen Nov 1-12 26   :    2 tr  win 50.0%  avg +127.5bp  t  +nan  PF 1.75  sum    +255bp
+
+######## 5m chart, day 13: stop/target grid  [all 2y avg bp (trades) | unseen Nov24-Mar26] ########
+  1xATR(60m): TP1R   +0.6 (785) | unseen   +2.6 (564)   TP2R   +0.9 (762) | unseen   +2.1 (546)   TP3R   +1.8 (735) | unseen   +1.8 (522)
+  2xATR(60m): TP1R   +1.8 (676) | unseen   +2.2 (481)   TP2R   +8.5 (621) | unseen   +6.1 (436)   TP3R  +11.6 (598) | unseen   +5.5 (420)
+  3xATR(60m): TP1R   +6.6 (575) | unseen   -0.0 (408)   TP2R  +16.1 (532) | unseen   +2.0 (376)   TP3R  +15.2 (521) | unseen   +2.0 (372)
+  5xATR(60m): TP1R   +4.9 (493) | unseen  -13.0 (346)   TP2R   +7.6 (468) | unseen  -11.8 (331)   TP3R   +7.8 (464) | unseen  -13.3 (328)
+  8xATR(60m): TP1R  +16.5 (431) | unseen   -2.4 (298)   TP2R  +16.8 (423) | unseen   -4.2 (292)   TP3R  +17.8 (423) | unseen   -3.5 (292)
+ 12xATR(60m): TP1R  +20.9 (406) | unseen   +1.3 (278)   TP2R  +21.9 (403) | unseen   +1.7 (276)   TP3R  +22.3 (403) | unseen   +1.7 (276)
+  2xATR(chart): TP1R   -2.4 (862) | unseen   -1.8 (619)   TP2R   -0.6 (837) | unseen   -0.1 (599)   TP3R   -0.7 (819) | unseen   -1.2 (584)
+  5xATR(chart): TP1R   +2.6 (724) | unseen   +3.5 (519)   TP2R   +6.6 (680) | unseen   +4.9 (488)   TP3R   +5.9 (645) | unseen   +1.3 (459)
+  8xATR(chart): TP1R   +9.2 (625) | unseen   +1.8 (452)   TP2R  +13.4 (565) | unseen   -0.1 (405)   TP3R  +16.8 (550) | unseen   +3.4 (397)
+ 12xATR(chart): TP1R   +8.3 (542) | unseen   -4.1 (382)   TP2R  +15.3 (507) | unseen   +2.4 (360)   TP3R  +16.7 (499) | unseen   +2.3 (354)
+ 0.5% stop      : TP1R   -1.7 (807) | unseen   -1.6 (584)   TP2R   -0.2 (775) | unseen   +0.0 (559)   TP3R   -1.7 (756) | unseen   -1.7 (543)
+ 1% stop      : TP1R   +0.5 (712) | unseen   +3.0 (515)   TP2R   +2.4 (672) | unseen   +1.2 (483)   TP3R   +4.6 (648) | unseen   +0.8 (465)
+ 2% stop      : TP1R   +6.5 (568) | unseen   +0.6 (408)   TP2R  +14.1 (532) | unseen   +4.2 (385)   TP3R  +16.8 (518) | unseen   +3.4 (374)
+ v3.0 ticks 200/400 trail:   -3.9 (951) | unseen   -3.9 (680)
+
+######## 5m chart, default exits: other inputs one at a time ########
+ default (day13)    +7.6 (468) | unseen  -11.8 (331)
+ pivot 3/3          +0.2 (528) | unseen   -2.6 (387)
+ pivot 8/8         -25.7 (354) | unseen  -27.1 (262)
+ swing 10-120       +0.8 (341) | unseen  -12.0 (244)
+ levels 38/62      +19.8 (274) | unseen  +12.2 (194)
+ levels 45/55       +8.6 (360) | unseen   -6.3 (259)
+ gated no1m        -19.4 (232) | unseen  -55.4 (164)
+ gated 15-60       -19.3 (224) | unseen  -52.7 (159)
+ 4th signal        +67.4 (7) | unseen +113.4 (4)
+ trail 1R/0.5R      +7.6 (488) | unseen  -11.3 (344)
+
+######## Day-start hour, 5m & 15m chart, default exits ########
+ 00:00  5m   +4.2 (512) | unseen   +2.8 (361)    15m  +27.0 (393) | unseen  +22.6 (278)
+ 01:00  5m   +5.1 (462) | unseen   -1.1 (331)    15m  +29.2 (393) | unseen  +33.5 (276)
+ 02:00  5m   +9.7 (493) | unseen   -0.9 (340)    15m  +21.1 (397) | unseen  +13.3 (266)
+ 03:00  5m   -3.1 (520) | unseen  -15.4 (374)    15m   +7.8 (423) | unseen   +7.5 (304)
+ 04:00  5m   +8.2 (544) | unseen   -0.7 (385)    15m  +17.5 (433) | unseen  +19.4 (304)
+ 05:00  5m   +3.1 (535) | unseen   -0.8 (403)    15m  +16.0 (434) | unseen  +12.6 (316)
+ 06:00  5m   +3.4 (546) | unseen   +0.4 (405)    15m   +7.6 (401) | unseen  +11.3 (285)
+ 07:00  5m   +2.8 (552) | unseen   -4.8 (405)    15m  +18.8 (399) | unseen  +25.1 (282)
+ 08:00  5m   -1.7 (524) | unseen   -7.4 (376)    15m  +19.4 (403) | unseen  +22.8 (289)
+ 09:00  5m   +7.8 (535) | unseen   +3.9 (379)    15m   +7.5 (406) | unseen  +10.9 (291)
+ 10:00  5m   -9.3 (529) | unseen  -19.3 (373)    15m   +7.4 (415) | unseen   +2.2 (292)
+ 11:00  5m   -4.4 (512) | unseen  -16.3 (366)    15m  +14.6 (407) | unseen   +8.6 (286)
+ 12:00  5m   +0.7 (492) | unseen  -11.7 (348)    15m  +16.2 (384) | unseen  +15.7 (278)
+ 13:00  5m   +7.6 (468) | unseen  -11.8 (331)    15m  +26.4 (370) | unseen  +22.4 (263)
+ 14:00  5m   +4.7 (435) | unseen   -1.4 (305)    15m  +31.1 (333) | unseen  +40.4 (245)
+ 15:00  5m   +2.1 (465) | unseen   -2.1 (309)    15m  +24.0 (344) | unseen  +36.6 (241)
+ 16:00  5m   -0.7 (473) | unseen   -5.6 (320)    15m   +7.5 (340) | unseen  +10.2 (230)
+ 17:00  5m   -2.7 (468) | unseen  -17.0 (331)    15m  +10.6 (370) | unseen   +9.4 (256)
+ 18:00  5m   -5.3 (481) | unseen  -12.3 (352)    15m   +9.6 (383) | unseen   +1.9 (260)
+ 19:00  5m   -7.4 (494) | unseen  -14.9 (335)    15m  +11.5 (389) | unseen   +7.2 (250)
+ 20:00  5m   -7.8 (495) | unseen  -11.3 (347)    15m  +15.9 (382) | unseen  +14.2 (259)
+ 21:00  5m   -7.4 (479) | unseen  -13.7 (341)    15m   +4.6 (381) | unseen   -0.2 (272)
+ 22:00  5m   -5.1 (483) | unseen   -7.8 (341)    15m   +1.0 (387) | unseen  -17.8 (265)
+ 23:00  5m   -5.3 (512) | unseen  -17.0 (360)    15m  +22.5 (416) | unseen  +12.5 (283)

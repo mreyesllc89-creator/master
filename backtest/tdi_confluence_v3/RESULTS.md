@@ -87,6 +87,31 @@ So it is a broad plateau, not a single lucky point.
 
 **Avoid D:** its edge is about 7 bp per trade before costs above 0.02%, and it disappears at 0.05% per side.
 
+## Update 2: two-year backtest (Nov 2024 → Nov 12 2026)
+
+Data: 1,068,480 one-minute bars, no gaps. The settings were chosen on April–October 2026, so **November 2024 – March 2026 (17 months) is data nothing was tuned on**. Script `hist2y.py`, full output `hist2y_out.txt`. v3.1 defaults: stop 5× ATR(60m), TP 2R, no trail, 0.02% per side.
+
+| Chart, day start | All 2 years: trades / bp / t / PF | Unseen 17 months: trades / bp / PF | Tuned Apr–Oct 2026: bp |
+|---|---|---|---|
+| 1m, 13:00 | 574 / +8.2 / 0.8 / 1.09 | 399 / +3.4 / 1.03 | +23.2 |
+| **5m, 13:00** | 468 / +7.6 / 0.6 / 1.08 | 331 / **−11.8** / 0.90 | +58.8 |
+| 5m, 00:00 | 512 / +4.2 / 0.4 / 1.04 | 361 / +2.8 / 1.03 | +13.1 |
+| **15m, 13:00** | 370 / +26.4 / 1.7 / 1.26 | 263 / **+22.4** / 1.20 | +41.3 |
+| 15m, 00:00 | 393 / +27.0 / 1.8 / 1.27 | 278 / +22.6 / 1.21 | +36.0 |
+
+(The Apr–Oct figures differ slightly from earlier sections because indicators now warm up on prior history.)
+
+**What the longer history shows**
+- **The 5m result did not hold.** The +55 bp per trade on the 5m chart with a 13:00 day start was specific to Apr–Oct 2026. On the 17 unseen months the same settings lost 11.8 bp per trade, on both longs (−13.4) and shorts (−10.0). Over two years the 5m chart is about break-even after fees, with a worst drawdown of 91% of one position's notional, and random entries beat it 18% of the time.
+- **The 13:00 day start was a lucky pick.** Over two years no hour stands out on the 5m chart: results range from −9 to +10 bp, and only 4 of 24 hours are positive on the unseen months.
+- **The 15m chart is the part that held up.** It made +22 bp per trade on the unseen months and +26 bp over two years, with both longs (+29) and shorts (+24) positive. 23 of 24 day-start hours are positive on the unseen months, so it does not depend on the hour. Random entries beat it 1.5% of the time, and it keeps +20 bp at 0.05% fees.
+- **It is still not statistically proven.** t = 1.7 over two years, 15 of 25 months positive, and the worst drawdown is 47% of one position's notional (0.47% of the account at 1% sizing).
+- **Pivot strength 8 loses everywhere** (−26 bp over two years on 5m). Gating entries by the TF toggles, which looked best on 2026, lost heavily on unseen data (−55 bp). TDI levels 38/62 was the only 5m variant positive on unseen data (+12 bp, 194 trades).
+- **Tick stops still lose:** v3.0-style 200/400 ticks made −3.9 bp per trade over 951 trades.
+- **Stop width on 5m:** no ATR or percent setting produced more than about +6 bp on unseen data.
+
+**Takeaway:** run v3.1 on a **15m chart**. The day-start hour matters little there; 13:00 and 00:00 perform the same. Treat it as a small, unproven edge.
+
 ## Update: day start 13:00 UTC is now the default
 
 At your request, v3.1 now defaults to a 13:00 UTC day start. Re-test of the full defaults (5× ATR(60m) stop, TP 2R, no trail, 0.02% per side), from `day13.py`; full output in `day13_out.txt`.
@@ -152,5 +177,6 @@ python3 wf31.py        # mode comparison + walk-forward + plateaus
 python3 finalists.py   # stress tests
 python3 dayhour.py     # day-start hour sweep
 python3 day13.py       # 13:00 default re-test incl. November
+python3 hist2y.py      # two-year backtest (needs the full download)
 ```
 `v31_top_results.csv` lists the top 3,000 combinations, by t-stat, that have at least 100 trades.
