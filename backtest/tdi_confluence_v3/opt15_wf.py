@@ -1,14 +1,20 @@
 """Analysis of opt15 results: walk-forward selection, parameter marginals, half-vs-half stability."""
 import numpy as np, pandas as pd
-from opt15 import EXITS, MONTHS
+import sys, pickle
+from opt15 import MONTHS
+PFX = sys.argv[1] if len(sys.argv) > 1 else "opt15"      # "opt15" (15m-bar exits) or "opt15m" (1m-bar exits)
+if PFX == "opt15":
+    from opt15 import EXITS
+else:
+    EXITS = pickle.load(open(PFX + "_exits.pkl", "rb"))
 pd.set_option("display.width", 250); pd.set_option("display.max_columns", 40); pd.set_option("display.max_rows", 200)
-z = np.load("opt15.npz"); D = pd.read_pickle("opt15_sig.pkl")
+z = np.load(PFX + ".npz"); D = pd.read_pickle(PFX + "_sig.pkl")
 NS, NE, NM = z["N"].shape
 N = z["N"].reshape(-1, NM).astype(np.float64); S1 = z["S1"].reshape(-1, NM).astype(np.float64); S2 = z["S2"].reshape(-1, NM).astype(np.float64)
 E = pd.DataFrame([dict(mode=m, atr_tf=a, x=x, rmult=r, trail=("off" if t is None else f"{t[0]}/{t[1]}")) for m, a, x, r, t in EXITS])
 P = pd.concat([D.drop(columns=["h", "nsig"]).loc[np.repeat(np.arange(NS), NE)].reset_index(drop=True),
                E.loc[np.tile(np.arange(NE), NS)].reset_index(drop=True)], axis=1)
-P["stop"] = np.where(P["mode"] == "atr", P.x.astype(str) + "xATR(" + P.atr_tf.map({0: "chart", 60: "60m", 240: "240m"}) + ")", P.x.astype(str) + "%")
+P["stop"] = np.where(P["mode"] == "atr", P.x.map("{:g}".format) + "xATR(" + P.atr_tf.map({0: "chart", 60: "60m", 240: "240m"}) + ")", P.x.map("{:g}".format) + "%")
 
 def agg(ms):
     n = N[:, ms].sum(1); s1 = S1[:, ms].sum(1); s2 = S2[:, ms].sum(1)
@@ -73,4 +79,4 @@ if __name__ == "__main__":
     print("\n=== Top 25 by 2-year t (>=250 trades, both years >=80 trades) ===")
     top = P[(P.n >= 250) & (P.n_h1 >= 80) & (P.n_h2 >= 80)].sort_values("t", ascending=False).head(25)
     for i, r in top.iterrows(): print(f" t={r.t:.2f} n={r.n:.0f} {r.bp:+.1f}bp | y1 {r.bp_h1:+.1f} y2 {r.bp_h2:+.1f} :: {desc(i)}")
-    P.to_pickle("opt15_summary.pkl")
+    P.to_pickle(PFX + "_summary.pkl")
