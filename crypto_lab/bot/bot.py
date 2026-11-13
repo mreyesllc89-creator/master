@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "tools"))
 import pandas as pd  # noqa: E402
 import strategies as st  # noqa: E402
 
-TESTNET = ("https://testnet.binancefuture.com", "wss://stream.binancefuture.com/ws")
+TESTNET = ("https://testnet.binancefuture.com", "wss://stream.binancefuture.com/ws")  # chart tf comes from config (1h/4h)
 LIVE = ("https://fapi.binance.com", "wss://fstream.binance.com/ws")
 
 

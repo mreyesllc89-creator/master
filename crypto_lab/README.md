@@ -33,6 +33,12 @@ This file is the contract every scheduled role follows. Read it fully before doi
 - `bot/` - the 24/7 bot (Engineer): `bot.py`, `config.yaml`, `tests/`, `deploy.md`.
 - `briefs/` - morning briefs and weekly reviews (also emailed to the owner).
 
+## Timeframes (owner decision 2026-11-13)
+1h and 4h only. 5-minute bars were dropped: all 34 5m combinations of the first gauntlet lost after retail fees. The 5m parquet files stay in `data/` for reference but are not updated.
+
+## Watch list
+`cards/champion.yaml` carries a `watch:` list — rules that passed out-of-sample but failed a final-check item. The Judge re-scores them every night and reports whether they recover; the bot never trades them.
+
 ## Scoring (1-5 each, Judge)
 walk-forward net after costs; max drawdown; trade count (>= 50 OOS); longest losing streak; consistency across bull / bear / chop quarters.
 Champion = highest total with no score of 1; ties go to the lower drawdown.

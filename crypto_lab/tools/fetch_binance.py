@@ -143,7 +143,7 @@ if __name__ == "__main__":
     syms = sys.argv[4:] or ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
     os.makedirs(out, exist_ok=True)
     for s in syms:
-        for tf in ("5m", "1h"):
+        for tf in ("1h", "4h"):
             klines(s, tf, start, end, out)
         funding(s, start, end, out)
         metrics(s, start, end, out)

@@ -3,7 +3,7 @@
 testnet: true
 dry_run: true
 symbol: BTCUSDT
-tf: 5m
+tf: 1h
 strategy: donchian_trend        # placeholder benchmark until the Judge crowns a champion
 params: {n: 96, atr_mult: 3.0}
 paper_equity: 10000
