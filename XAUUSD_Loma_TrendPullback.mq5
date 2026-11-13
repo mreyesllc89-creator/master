@@ -2,7 +2,7 @@
 //|                                  XAUUSD_Loma_TrendPullback.mq5   |
 //|                                                                  |
 //|  Strategy : XAUUSD "Loma" (MACD hump) Trend Pullback, both sides |
-//|  Version  : 1.30                                                 |
+//|  Version  : 1.31                                                 |
 //+------------------------------------------------------------------+
 //
 //  "No signal = no trade."
@@ -36,6 +36,8 @@
 //        (previous bar >= 0, this bar < 0), provided the positive (pullback) hump that just
 //        ended had >= PullbackMinBars bars and a peak <= PullbackMaxRatio x the anchor peak, and
 //        a previous negative hump low exists. A bare touch of zero without a hump is no signal.
+//        With SkipBigPullback, a pullback hump that is itself BIG (R1) is a trend change, not a
+//        pullback: no signal is produced and it does not count against MaxSignalsPerBigHump.
 //        Ordering (as in signals()): the signal check uses the trend in force BEFORE the hump
 //        that just ended is classified; then that hump is classified (big -> new trend, or
 //        trend break); then the previous-hump extremes and the ring are updated.
@@ -57,6 +59,10 @@
 //    R8  Risk: RiskPercent of equity per trade, lot from the SL distance, ONE position at a
 //        time (magic number), spread filter, trading hours (broker server time), news filter,
 //        optional trailing in R multiples (TrailStartR / TrailDistanceR).
+//    R9  Optional weekend flat (CloseBeforeWeekend): on Friday from WeekendCloseTime (broker
+//        server time) on, no new entries are taken and the open position is closed at market
+//        on the first tick. A position found open on a Saturday or Sunday (restart, missed
+//        close) is closed on the first tick available.
 //
 //  STATE AFTER ATTACH / RESTART
 //  ----------------------------
@@ -85,9 +91,13 @@
 //  * A signal counts against MaxSignalsPerBigHump when it is produced, even if the trade is
 //    then skipped (spread, session, reward/risk, HTF filter, position already open), exactly
 //    as in the reference backtest.
+//  * Weekend close: the reference backtest (weekend_close / weekend_min) closes at the close of
+//    the first M1 bar inside the Friday window, and also on the last bar before any closure of
+//    24 hours or more (holidays). The EA closes on the first tick of the window and cannot
+//    foresee a holiday closure: only Friday and Saturday/Sunday are handled.
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
-#property version     "1.30"
+#property version     "1.31"
 #property strict
 #property description "XAUUSD Loma (MACD hump) Trend Pullback, sells and buys."
 #property description "Big MACD hump defines the trend; trade the zero-cross after a small pullback hump."
@@ -161,6 +171,7 @@ input int     TrendMaxBars             = 120;   // Trend lapses this many bars a
 input group "=== R4: Pullback hump ==="
 input int     PullbackMinBars          = 3;     // Pullback hump: minimum bars
 input double  PullbackMaxRatio         = 0.6;   // Pullback hump: peak <= this x anchor peak
+input bool    SkipBigPullback          = true;  // No signal when the pullback hump is itself a big hump (trend change)
 
 input group "=== R5: Stop loss / take profit ==="
 input int     SL_Buffer_Points         = 30;    // SL buffer beyond the pullback hump extreme (points)
@@ -193,6 +204,8 @@ input group "=== R8: Session / News ==="
 input bool    UseTradingHours          = false;    // Restrict to trading hours (broker server time)
 input string  TradingHoursStart        = "07:00";  // Start HH:MM, server time
 input string  TradingHoursEnd          = "20:00";  // End   HH:MM, server time
+input bool    CloseBeforeWeekend       = false;    // Friday: no new entries and close the open position
+input string  WeekendCloseTime         = "23:00";  // Friday HH:MM, server time
 input bool    UseNewsFilter            = true;     // Skip around high-impact news
 input string  NewsCurrency             = "USD";    // News currency
 input int     NewsWindowMinutes        = 30;       // +/- minutes around the event
@@ -210,6 +223,9 @@ int      g_hEmaHTF   = INVALID_HANDLE;   // EMA on the higher timeframe (optiona
 double   g_ptScale        = 1.0;   // point scale factor (AutoScalePoints)
 int      g_sessStartMin   = 0;
 int      g_sessEndMin     = 0;
+int      g_weekendMin     = 0;     // WeekendCloseTime in minutes from midnight
+bool     g_weekendLogged  = false; // weekend close announced (once per weekend window)
+bool     g_weekendFailLog = false; // failed weekend close reported (once per weekend window)
 
 datetime g_lastBarTime    = 0;     // last evaluated trigger bar (open time of the forming bar)
 datetime g_signalBarTime  = 0;     // forming bar on which a valid signal is active
@@ -419,6 +435,11 @@ int OnInit()
          return INIT_PARAMETERS_INCORRECT;
         }
      }
+   if(CloseBeforeWeekend && !ParseHHMM(WeekendCloseTime, g_weekendMin))
+     {
+      Print("[LOMA] WeekendCloseTime must be HH:MM");
+      return INIT_PARAMETERS_INCORRECT;
+     }
    if(UseHTFFilter && PeriodSeconds(HTF_Timeframe) <= PeriodSeconds(TriggerTimeframe))
      {
       Print("[LOMA] HTF_Timeframe must be higher than TriggerTimeframe");
@@ -490,6 +511,9 @@ void OnDeinit(const int reason)
 //====================================================================
 void OnTick()
   {
+   //--- R9: flat before the weekend (Friday from WeekendCloseTime on, Saturday, Sunday)
+   WeekendClosePositions();
+
    //--- always manage what is already open (trailing)
    ManageOpenPositions();
 
@@ -566,6 +590,12 @@ void OnTick()
    if(!SessionOK())                            // trading hours (server time)
      {
       LogSkip("outside trading hours");
+      g_signalActive = false;
+      return;
+     }
+   if(InWeekendWindow())                       // R9: no new entries before the weekend
+     {
+      LogSkip(StringFormat("pre-weekend window (no new entries from Friday %s server time)", WeekendTimeText()));
       g_signalActive = false;
       return;
      }
@@ -728,6 +758,8 @@ void ProcessBar(const datetime barTime, const double high, const double low, con
 
       //--- R4: the signal check uses the trend in force BEFORE this hump is classified
       bool alive = TrendAlive(i);
+      if(SkipBigPullback && big)
+         alive = false;                            // big opposite hump: trend change, no signal (not counted)
       if(alive && g_trend == -1 && g_cs > 0 && s < 0 && SideAllowed(-1))
         {
          if(g_cN >= PullbackMinBars && g_cPeak <= PullbackMaxRatio * g_anchorPeak && g_hasNegLo)
@@ -1255,6 +1287,24 @@ bool SessionOK()
    return (m >= g_sessStartMin || m < g_sessEndMin);   // window crosses midnight
   }
 
+//--- "hh:mm" of the parsed WeekendCloseTime
+string WeekendTimeText()
+  {
+   return StringFormat("%02d:%02d", g_weekendMin / 60, g_weekendMin % 60);
+  }
+
+//--- R9: Friday at or after WeekendCloseTime, Saturday or Sunday (broker server time)
+bool InWeekendWindow()
+  {
+   if(!CloseBeforeWeekend)
+      return false;
+   MqlDateTime dt;
+   TimeToStruct(TimeTradeServer(), dt);
+   if(dt.day_of_week == 6 || dt.day_of_week == 0)
+      return true;
+   return (dt.day_of_week == 5 && dt.hour * 60 + dt.min >= g_weekendMin);
+  }
+
 bool NewsBlocked()
   {
    if(!UseNewsFilter)
@@ -1383,6 +1433,46 @@ void ManageOpenPositions()
             else
                Print("[LOMA] Trailing modify failed: ", g_trade.ResultRetcodeDescription());
            }
+        }
+     }
+  }
+
+//--- R9: close this EA's position at market inside the weekend window. A failed close is
+//    retried on every later tick; the journal gets one line per window.
+void WeekendClosePositions()
+  {
+   if(!CloseBeforeWeekend)
+      return;
+   if(!InWeekendWindow())
+     {
+      g_weekendLogged  = false;
+      g_weekendFailLog = false;
+      return;
+     }
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      if(!g_pos.SelectByIndex(i))
+         continue;
+      if(g_pos.Symbol() != _Symbol || (ulong)g_pos.Magic() != MagicNumber)
+         continue;
+
+      ulong ticket = g_pos.Ticket();
+      if(!g_weekendLogged)
+        {
+         g_weekendLogged = true;
+         Log(StringFormat("Weekend close: closing position #%I64u at market (Friday %s server time or later)",
+                          ticket, WeekendTimeText()));
+        }
+      ResetLastError();
+      bool sent = g_trade.PositionClose(ticket);
+      uint rc   = g_trade.ResultRetcode();
+      if(sent && (rc == TRADE_RETCODE_DONE || rc == TRADE_RETCODE_DONE_PARTIAL || rc == TRADE_RETCODE_PLACED))
+         continue;
+      if(!g_weekendFailLog)
+        {
+         g_weekendFailLog = true;
+         Print(StringFormat("[LOMA] Weekend close of #%I64u failed: retcode=%u (%s) lastError=%d - retrying on the next ticks",
+                            ticket, rc, g_trade.ResultRetcodeDescription(), GetLastError()));
         }
      }
   }
@@ -1538,7 +1628,7 @@ void UpdatePanel()
   {
    if(!ShowStatusPanel || VisualsOff())
       return;
-   string build = "Loma TrendPullback v1.30";
+   string build = "Loma TrendPullback v1.31";
 
    string anchorTxt = "none";
    if(g_trend != 0)
@@ -1560,6 +1650,8 @@ void UpdatePanel()
    string sessTxt = UseTradingHours ? StringFormat("%s-%s server time: %s", TradingHoursStart, TradingHoursEnd,
                                                    SessionOK() ? "open" : "closed")
                                     : "all day";
+   if(CloseBeforeWeekend)
+      sessTxt += "  |  weekend close ON " + WeekendTimeText();
    string htfTxt  = UseHTFFilter ? TFName(HTF_Timeframe) + StringFormat(" EMA(%d)", HTF_EMA_Period) : "off";
    string sigTxt  = g_signalActive ? "ACTIVE " + SideName(g_sigSide) : "none";
    double spreadPts = (Ask() - Bid()) / (_Point * g_ptScale);
