@@ -1,2 +1,3 @@
 danny_phantom_calibration/results/sweep_*.csv
 __pycache__/
+crypto_lab/data/raw/*_metrics_daily/
