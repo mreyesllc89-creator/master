@@ -56,7 +56,7 @@ def load_btc():
 
 @nb.njit(cache=True)
 def signals(hi, lo, macd, stk, big_mult, hist, big_min_bars, stoch_req, pb_min_bars, pb_max_ratio,
-            break_ratio, max_signals, trend_max_bars, sides, classic, skip_big_pb):
+            break_ratio, max_signals, trend_max_bars, sides, classic, skip_big_pb, stoch_lo, stoch_hi):
     """Return rows (signal_bar, side, sl_ref, tp_ref, hump_peak_ratio). side +1 buy, -1 sell.
     classic=1: every zero-cross in the allowed direction is a signal (old XLZC trigger) with the
     same SL/TP construction, for comparison."""
@@ -84,7 +84,7 @@ def signals(hi, lo, macd, stk, big_mult, hist, big_min_bars, stoch_req, pb_min_b
                 med = np.median(peaks[:min(pk_n, hist)])
             big = pk_n >= 5 and c_peak >= big_mult * med and c_n >= big_min_bars
             if big and stoch_req == 1:
-                big = (c_smin <= 20.0) if cs < 0 else (c_smax >= 80.0)
+                big = (c_smin <= stoch_lo) if cs < 0 else (c_smax >= stoch_hi)
             # signal check uses the trend in force BEFORE this hump is classified
             took = False
             if classic == 1:
@@ -137,7 +137,7 @@ def signals(hi, lo, macd, stk, big_mult, hist, big_min_bars, stoch_req, pb_min_b
 @nb.njit(cache=True)
 def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, tp_mode, tp_rr,
              trail_start, trail_dist, max_spread, min_risk, max_risk, slip, comm, delay, trail_worst, wk,
-             sl_mode, sl_val, tp_val, trail_mode):
+             sl_mode, sl_val, tp_val, trail_mode, max_hold, eod):
     """Sequential trades on the M1 path. Returns rows (entry_row, exit_row, side, R, risk).
     Units: sl_mode 0 hump extreme + buf, 1 points (price distance sl_val), 2 percent of price, 3 ATR multiple.
     tp_mode 0 previous hump, 1 multiple of risk (tp_rr), 2 points, 3 percent, 4 ATR multiple (tp_val).
@@ -208,6 +208,9 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
                             px = stop + slip; break            # same-bar hit (worst: any touch after the low)
                 if wk[j]:                                  # close before the weekend at this bar's close
                     px = c[j] + hs[j] + slip; break
+                if (max_hold > 0 and j - e >= max_hold) or \
+                        (eod >= 0 and j > e and tod[j] >= eod and (tod[j - 1] < eod or tod[j - 1] > tod[j])):
+                    px = c[j] + hs[j] + slip; break         # time exit: holding limit or end-of-day close
                 j += 1
             if px != px:
                 j = n - 1; px = c[j] + hs[j]
@@ -259,6 +262,9 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
                             px = stop - slip; break
                 if wk[j]:
                     px = c[j] - hs[j] - slip; break
+                if (max_hold > 0 and j - e >= max_hold) or \
+                        (eod >= 0 and j > e and tod[j] >= eod and (tod[j - 1] < eod or tod[j - 1] > tod[j])):
+                    px = c[j] - hs[j] - slip; break
                 j += 1
             if px != px:
                 j = n - 1; px = c[j] - hs[j]
@@ -276,7 +282,26 @@ DEFAULT = dict(tf="M2", big_mult=1.5, hist=20, big_min_bars=5, stoch_req=1, pb_m
                buf=0.30, anticip=0.10, min_rr=0.8, tp_mode=0, tp_rr=1.5, trail_start=0.0, trail_dist=0.5,
                max_spread=0.60, min_risk=0.50, max_risk=1e9, htf="none", slip=0.0, comm=0.0, delay=0, trail_worst=0,
                skip_big_pb=0, weekend_close=0, weekend_min=1380,
-               sl_mode=0, sl_val=0.0, tp_val=0.0, trail_mode=0)
+               sl_mode=0, sl_val=0.0, tp_val=0.0, trail_mode=0,
+               macd_fast=12, macd_slow=26, stoch_k=7, stoch_lo=20.0, stoch_hi=80.0, htf_ema=50, max_hold=0, eod=-1)
+
+
+class _Bias:
+    """Lazy higher-timeframe bias: sign(close - EMA(n)) of the last CLOSED HTF bar at each trigger bar's close.
+    bias["H4"] uses EMA 50; bias[("H4", 100)] any length."""
+
+    def __init__(self, mk, name, index):
+        self.mk, self.name, self.index, self.cache = mk, name, index, {}
+
+    def __getitem__(self, key):
+        htf, n = key if isinstance(key, tuple) else (key, 50)
+        if (htf, n) not in self.cache:
+            hb = B.resample(self.mk.m1, htf)
+            b = np.sign(hb["close"] - B.ema(hb["close"], n))
+            b.index = b.index + pd.Timedelta(minutes=B.TF_MIN[htf])          # known from its close
+            self.cache[(htf, n)] = b.reindex(self.index + pd.Timedelta(minutes=B.TF_MIN[self.name]),
+                                             method="ffill").values
+        return self.cache[(htf, n)]
 
 
 class Market:
@@ -301,12 +326,13 @@ class Market:
         self.pre_gap = gap                                          # last bar before a closure of a day or more
         self._tf = {}
 
-    def tf(self, name):
-        if name not in self._tf:
+    def tf(self, name, fast=12, slow=26, k=7):
+        key = (name, fast, slow, k)
+        if key not in self._tf:
             t = B.resample(self.m1, name)
-            macd = B.macd_main(t["close"]).values.copy()
-            macd[:60] = np.nan
-            stk, _ = B.stoch(t, 7, 1, 7)
+            macd = (B.ema(t["close"], fast) - B.ema(t["close"], slow)).values.copy()
+            macd[:max(60, 2 * slow)] = np.nan
+            stk, _ = B.stoch(t, k, 1, 7)
             nxt = t.index.values + np.timedelta64(B.TF_MIN[name], "m")      # next bar's open time
             row = np.searchsorted(self.t, nxt)
             ok = (row < len(self.t))
@@ -315,24 +341,19 @@ class Market:
             pc = t["close"].shift(1)
             tr = pd.concat([t["high"] - t["low"], (t["high"] - pc).abs(), (t["low"] - pc).abs()], axis=1).max(axis=1)
             atr = tr.ewm(alpha=1 / 14, adjust=False, min_periods=14).mean().values     # Wilder ATR(14)
-            bias = {}
-            for htf in ("H1", "H4"):                 # last CLOSED higher-timeframe bar: close vs EMA50
-                hb = B.resample(self.m1, htf)
-                b = np.sign(hb["close"] - B.ema(hb["close"], 50))
-                b.index = b.index + pd.Timedelta(minutes=B.TF_MIN[htf])      # known from its close
-                bias[htf] = b.reindex(t.index + pd.Timedelta(minutes=B.TF_MIN[name]), method="ffill").values
-            self._tf[name] = (t["high"].values.astype(float), t["low"].values.astype(float), macd,
-                              stk.values.astype(float), row.astype(np.int64), bias, atr)
-        return self._tf[name]
+            self._tf[key] = (t["high"].values.astype(float), t["low"].values.astype(float), macd,
+                             stk.values.astype(float), row.astype(np.int64), _Bias(self, name, t.index), atr)
+        return self._tf[key]
 
     def run(self, cfg):
         c = dict(DEFAULT); c.update(cfg)
-        hi, lo, macd, stk, row, bias, atr = self.tf(c["tf"])
+        hi, lo, macd, stk, row, bias, atr = self.tf(c["tf"], int(c["macd_fast"]), int(c["macd_slow"]), int(c["stoch_k"]))
         sg = signals(hi, lo, macd, stk, c["big_mult"], int(c["hist"]), int(c["big_min_bars"]), int(c["stoch_req"]),
                      int(c["pb_min_bars"]), c["pb_max_ratio"], c["break_ratio"], int(c["max_signals"]),
-                     int(c["trend_max_bars"]), int(c["sides"]), int(c["classic"]), int(c["skip_big_pb"]))
+                     int(c["trend_max_bars"]), int(c["sides"]), int(c["classic"]), int(c["skip_big_pb"]),
+                     c["stoch_lo"], c["stoch_hi"])
         if c.get("htf", "none") != "none" and len(sg):      # optional: trade only with the HTF EMA50 side
-            sg = sg[bias[c["htf"]][sg[:, 0].astype(np.int64)] == sg[:, 1]]
+            sg = sg[bias[(c["htf"], int(c["htf_ema"]))][sg[:, 0].astype(np.int64)] == sg[:, 1]]
         ix = sg[:, 0].astype(np.int64) if len(sg) else np.zeros(0, np.int64)
         sg = np.column_stack([sg, atr[ix]]) if len(sg) else np.zeros((0, 6))
         er = row[ix]
@@ -341,12 +362,13 @@ class Market:
     def prepare(self, cfg):
         """Signals of a configuration, to re-simulate many exit settings quickly (see sim)."""
         c = dict(DEFAULT); c.update(cfg)
-        hi, lo, macd, stk, row, bias, atr = self.tf(c["tf"])
+        hi, lo, macd, stk, row, bias, atr = self.tf(c["tf"], int(c["macd_fast"]), int(c["macd_slow"]), int(c["stoch_k"]))
         sg = signals(hi, lo, macd, stk, c["big_mult"], int(c["hist"]), int(c["big_min_bars"]), int(c["stoch_req"]),
                      int(c["pb_min_bars"]), c["pb_max_ratio"], c["break_ratio"], int(c["max_signals"]),
-                     int(c["trend_max_bars"]), int(c["sides"]), int(c["classic"]), int(c["skip_big_pb"]))
+                     int(c["trend_max_bars"]), int(c["sides"]), int(c["classic"]), int(c["skip_big_pb"]),
+                     c["stoch_lo"], c["stoch_hi"])
         if c.get("htf", "none") != "none" and len(sg):
-            sg = sg[bias[c["htf"]][sg[:, 0].astype(np.int64)] == sg[:, 1]]
+            sg = sg[bias[(c["htf"], int(c["htf_ema"]))][sg[:, 0].astype(np.int64)] == sg[:, 1]]
         ix = sg[:, 0].astype(np.int64) if len(sg) else np.zeros(0, np.int64)
         sg = np.column_stack([sg, atr[ix]]) if len(sg) else np.zeros((0, 6))
         return sg, row[ix], c
@@ -364,7 +386,8 @@ class Market:
         tr = simulate(sg, er, self.o, self.h, self.l, self.c, self.hs, self.tod, s0, s1, c["buf"], c["anticip"],
                       c["min_rr"], int(c["tp_mode"]), c["tp_rr"], c["trail_start"], c["trail_dist"],
                       c["max_spread"], c["min_risk"], c["max_risk"], c["slip"], c["comm"], int(c["delay"]),
-                      int(c["trail_worst"]), wk, int(c["sl_mode"]), c["sl_val"], c["tp_val"], int(c["trail_mode"]))
+                      int(c["trail_worst"]), wk, int(c["sl_mode"]), c["sl_val"], c["tp_val"], int(c["trail_mode"]),
+                      int(c["max_hold"]), int(c["eod"]))
         df = pd.DataFrame(tr, columns=["entry_row", "exit_row", "side", "r", "risk"])
         df["entry_time"] = self.t[df.entry_row.astype(int).values] if len(df) else pd.Series(dtype="datetime64[ns]")
         df.attrs["signals"] = len(sg)

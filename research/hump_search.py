@@ -24,6 +24,23 @@ SPACE = dict(
 if H.SYMBOL == "BTCUSD":          # price distances in BTC dollars; the market trades through the weekend
     SPACE.update(buf=[5, 10, 20, 35, 50], min_risk=[10, 20, 35, 70], tf=["M1", "M2", "M3", "M5", "M10", "M15"])
 BASE = dict(skip_big_pb=1, max_spread=1e9) if H.SYMBOL == "BTCUSD" else {}
+if os.environ.get("HUMP_SPACE") == "2":      # second gold pass: v1.31 rules on, plus what the first pass held fixed
+    BASE = dict(skip_big_pb=1, weekend_close=1)
+    SPACE.update(tf=["M1", "M2", "M3", "M5", "M10", "M15"], htf=["none", "M15", "M30", "H1", "H4", "D1"],
+                 htf_ema=[20, 50, 100, 200], macd=["12-26", "8-17", "10-22", "16-35"], stoch_k=[5, 7, 10, 14],
+                 stoch_lv=["20-80", "25-75", "15-85"], max_hold=[0, 60, 120, 240, 480, 1440],
+                 eod=[-1, 1260, 1320, 1380])
+CATEGORICAL = ("tf", "sides", "session", "htf", "tp_mode", "stoch_req", "macd", "stoch_lv", "eod")
+
+
+def engine_cfg(c):
+    """Translate the combined search keys into engine settings."""
+    c = dict(c)
+    if "macd" in c:
+        f, sl = c.pop("macd").split("-"); c["macd_fast"], c["macd_slow"] = int(f), int(sl)
+    if "stoch_lv" in c:
+        lo, hi = c.pop("stoch_lv").split("-"); c["stoch_lo"], c["stoch_hi"] = float(lo), float(hi)
+    return c
 MK = None
 
 
@@ -35,7 +52,7 @@ def init():
 def measure(p, extra=None):
     c = dict(BASE); c.update(p)
     if extra: c.update(extra)
-    df = MK.run(c)
+    df = MK.run(engine_cfg(c))
     t = df.entry_time.values; r = df.r.values
     row = {}
     for name, a, b in [("h1", "2025-01-01", "2025-07-01"), ("h2", "2025-07-01", "2026-01-01"),
@@ -71,7 +88,7 @@ def refine(p):
         if not imp: break
     nb = []
     for k, lv in SPACE.items():
-        if k in ("tf", "sides", "session", "htf", "tp_mode", "stoch_req"): continue   # categorical
+        if k in CATEGORICAL: continue
         if k == "tp_rr" and best["tp_mode"] == 0: continue                              # inert
         if k in ("anticip",) and best["tp_mode"] == 1: continue
         if k == "trail_dist" and best["trail_start"] == 0: continue
