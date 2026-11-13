@@ -1,0 +1,164 @@
+{
+ "strategy": "asia_open_fade",
+ "symbol": "SOLUSDT",
+ "tf": "1h",
+ "mechanism": "Fade the first bar after 00:00 UTC when it moves more than atr_mult ATR. Mechanism: thin Asian liquidity",
+ "oos": {
+  "trades": 173,
+  "net": -385.88,
+  "ret_pct": -3.86,
+  "pf": 0.9,
+  "win": 39.3,
+  "avg_r": -0.04,
+  "maxdd_pct": 9.48,
+  "losing_streak": 12,
+  "trades_per_month": 7.1,
+  "sharpe": -0.39
+ },
+ "stressed": {
+  "trades": 173,
+  "net": -898.96,
+  "ret_pct": -8.99,
+  "pf": 0.79,
+  "win": 37.6,
+  "avg_r": -0.1,
+  "maxdd_pct": 13.2,
+  "losing_streak": 12,
+  "trades_per_month": 7.1,
+  "sharpe": -0.93
+ },
+ "score": {
+  "profit": 1,
+  "drawdown": 4,
+  "trades": 3,
+  "streak": 3,
+  "regimes": 2,
+  "total": 13
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 6
+   },
+   "n": 24
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 3
+   },
+   "n": 15
+  },
+  {
+   "test_start": "2024-11-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 3
+   },
+   "n": 21
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 27
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 22
+  },
+  {
+   "test_start": "2025-08-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 35
+  },
+  {
+   "test_start": "2025-11-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 19
+  },
+  {
+   "test_start": "2026-02-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 10
+  }
+ ],
+ "worst_month": {
+  "month": "2024-06",
+  "pnl": -229.97
+ },
+ "regimes": [
+  {
+   "exit_time": "2024Q2",
+   "trades": "15",
+   "net_r": "-6.3",
+   "win": "13.0"
+  },
+  {
+   "exit_time": "2024Q3",
+   "trades": "19",
+   "net_r": "-3.2",
+   "win": "21.0"
+  },
+  {
+   "exit_time": "2024Q4",
+   "trades": "18",
+   "net_r": "-1.6",
+   "win": "50.0"
+  },
+  {
+   "exit_time": "2025Q1",
+   "trades": "31",
+   "net_r": "-5.2",
+   "win": "39.0"
+  },
+  {
+   "exit_time": "2025Q2",
+   "trades": "23",
+   "net_r": "1.2",
+   "win": "43.0"
+  },
+  {
+   "exit_time": "2025Q3",
+   "trades": "31",
+   "net_r": "-3.2",
+   "win": "39.0"
+  },
+  {
+   "exit_time": "2025Q4",
+   "trades": "18",
+   "net_r": "9.1",
+   "win": "61.0"
+  },
+  {
+   "exit_time": "2026Q1",
+   "trades": "15",
+   "net_r": "0.1",
+   "win": "40.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "3",
+   "net_r": "2.2",
+   "win": "67.0"
+  }
+ ]
+}

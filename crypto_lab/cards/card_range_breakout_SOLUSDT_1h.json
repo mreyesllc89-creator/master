@@ -1,0 +1,78 @@
+{
+ "strategy": "range_breakout",
+ "symbol": "SOLUSDT",
+ "tf": "1h",
+ "mechanism": "Breakout from the tightest N-bar range of the last `tight_window` days. Mechanism: compression",
+ "oos": {
+  "trades": 26,
+  "net": 893.1,
+  "ret_pct": 8.93,
+  "pf": 1.81,
+  "win": 19.2,
+  "avg_r": 0.737,
+  "maxdd_pct": 7.03,
+  "losing_streak": 10,
+  "trades_per_month": 4.4,
+  "sharpe": 1.07
+ },
+ "stressed": {
+  "trades": 26,
+  "net": 738.56,
+  "ret_pct": 7.39,
+  "pf": 1.61,
+  "win": 19.2,
+  "avg_r": 0.624,
+  "maxdd_pct": 7.96,
+  "losing_streak": 10,
+  "trades_per_month": 4.4,
+  "sharpe": 0.9
+ },
+ "score": {
+  "total": 0,
+  "note": "fewer than 50 OOS trades"
+ },
+ "windows": [
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 1.5,
+    "hold": 72
+   },
+   "n": 18
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 1.5,
+    "hold": 72
+   },
+   "n": 8
+  }
+ ],
+ "worst_month": {
+  "month": "2026-07",
+  "pnl": -453.8
+ },
+ "regimes": [
+  {
+   "exit_time": "2026Q2",
+   "trades": "3",
+   "net_r": "8.5",
+   "win": "33.0"
+  },
+  {
+   "exit_time": "2026Q3",
+   "trades": "21",
+   "net_r": "6.8",
+   "win": "14.0"
+  },
+  {
+   "exit_time": "2026Q4",
+   "trades": "2",
+   "net_r": "3.9",
+   "win": "50.0"
+  }
+ ]
+}

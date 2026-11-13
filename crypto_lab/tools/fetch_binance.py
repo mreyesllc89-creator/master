@@ -128,7 +128,7 @@ def metrics(sym, start, end, out):
             df = pd.concat(days)
             df["time"] = pd.to_datetime(df.create_time, utc=True)
             num = [c for c in df.columns if c not in ("time", "create_time", "symbol", "source")]
-            df = df.drop_duplicates("time").set_index("time")[num].astype(float).resample("1h").last().dropna(how="all").reset_index()
+            df = df.drop_duplicates("time").set_index("time")[num].astype(float).resample("1h", label="right", closed="right").last().dropna(how="all").reset_index()
             df["source"] = f"{BASE}/daily/metrics/{sym}/ (hourly last of 5-minute rows)"
             df.to_parquet(mp)
         frames.append(pd.read_parquet(mp))

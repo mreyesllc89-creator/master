@@ -1,0 +1,15 @@
+BTCUSDT 5m: 318816 bars 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:55:00+00:00
+BTCUSDT 1h: 26568 bars 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:00:00+00:00
+  missing https://data.binance.vision/data/futures/um/monthly/fundingRate/BTCUSDT/BTCUSDT-fundingRate-2026-11.zip (current month: funding lags a month in the archive)
+BTCUSDT funding: 3288 rows 2023-11-01 00:00:00+00:00 -> 2026-10-31 16:00:00+00:00
+BTCUSDT metrics: 26558 hourly rows 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:00:00+00:00
+ETHUSDT 5m: 318816 bars 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:55:00+00:00
+ETHUSDT 1h: 26568 bars 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:00:00+00:00
+  missing https://data.binance.vision/data/futures/um/monthly/fundingRate/ETHUSDT/ETHUSDT-fundingRate-2026-11.zip (current month: funding lags a month in the archive)
+ETHUSDT funding: 3288 rows 2023-11-01 00:00:00+00:00 -> 2026-10-31 16:00:00+00:00
+ETHUSDT metrics: 26558 hourly rows 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:00:00+00:00
+SOLUSDT 5m: 318816 bars 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:55:00+00:00
+SOLUSDT 1h: 26568 bars 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:00:00+00:00
+  missing https://data.binance.vision/data/futures/um/monthly/fundingRate/SOLUSDT/SOLUSDT-fundingRate-2026-11.zip (current month: funding lags a month in the archive)
+SOLUSDT funding: 3288 rows 2023-11-01 00:00:00+00:00 -> 2026-10-31 16:00:00+00:00
+SOLUSDT metrics: 26558 hourly rows 2023-11-01 00:00:00+00:00 -> 2026-11-11 23:00:00+00:00

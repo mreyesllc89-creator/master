@@ -1,0 +1,211 @@
+{
+ "strategy": "range_breakout",
+ "symbol": "ETHUSDT",
+ "tf": "5m",
+ "mechanism": "Breakout from the tightest N-bar range of the last `tight_window` days. Mechanism: compression",
+ "oos": {
+  "trades": 631,
+  "net": -5959.08,
+  "ret_pct": -59.59,
+  "pf": 0.72,
+  "win": 29.6,
+  "avg_r": -0.196,
+  "maxdd_pct": 66.03,
+  "losing_streak": 10,
+  "trades_per_month": 20.6,
+  "sharpe": -1.76
+ },
+ "stressed": {
+  "trades": 632,
+  "net": -11136.31,
+  "ret_pct": -111.36,
+  "pf": 0.51,
+  "win": 23.7,
+  "avg_r": -0.446,
+  "maxdd_pct": 116.67,
+  "losing_streak": 18,
+  "trades_per_month": 20.7,
+  "sharpe": -3.91
+ },
+ "score": {
+  "profit": 1,
+  "drawdown": 1,
+  "trades": 5,
+  "streak": 3,
+  "regimes": 1,
+  "total": 11
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 2.5,
+    "hold": 72
+   },
+   "n": 121
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "lookback": 288,
+    "atr_mult": 2.5,
+    "hold": 24
+   },
+   "n": 45
+  },
+  {
+   "test_start": "2024-11-01",
+   "params": {
+    "lookback": 288,
+    "atr_mult": 2.5,
+    "hold": 72
+   },
+   "n": 61
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "lookback": 288,
+    "atr_mult": 2.5,
+    "hold": 72
+   },
+   "n": 48
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 2.5,
+    "hold": 72
+   },
+   "n": 99
+  },
+  {
+   "test_start": "2025-08-01",
+   "params": {
+    "lookback": 288,
+    "atr_mult": 2.5,
+    "hold": 24
+   },
+   "n": 48
+  },
+  {
+   "test_start": "2025-11-01",
+   "params": {
+    "lookback": 288,
+    "atr_mult": 2.5,
+    "hold": 72
+   },
+   "n": 47
+  },
+  {
+   "test_start": "2026-02-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 2.5,
+    "hold": 24
+   },
+   "n": 60
+  },
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 2.5,
+    "hold": 24
+   },
+   "n": 52
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "lookback": 288,
+    "atr_mult": 2.5,
+    "hold": 24
+   },
+   "n": 44
+  },
+  {
+   "test_start": "2026-11-01",
+   "params": {
+    "lookback": 288,
+    "atr_mult": 2.5,
+    "hold": 24
+   },
+   "n": 6
+  }
+ ],
+ "worst_month": {
+  "month": "2024-06",
+  "pnl": -1146.79
+ },
+ "regimes": [
+  {
+   "exit_time": "2024Q2",
+   "trades": "107",
+   "net_r": "-37.5",
+   "win": "24.0"
+  },
+  {
+   "exit_time": "2024Q3",
+   "trades": "47",
+   "net_r": "-9.3",
+   "win": "34.0"
+  },
+  {
+   "exit_time": "2024Q4",
+   "trades": "54",
+   "net_r": "-15.5",
+   "win": "31.0"
+  },
+  {
+   "exit_time": "2025Q1",
+   "trades": "51",
+   "net_r": "5.9",
+   "win": "31.0"
+  },
+  {
+   "exit_time": "2025Q2",
+   "trades": "98",
+   "net_r": "-47.5",
+   "win": "24.0"
+  },
+  {
+   "exit_time": "2025Q3",
+   "trades": "60",
+   "net_r": "-10.4",
+   "win": "33.0"
+  },
+  {
+   "exit_time": "2025Q4",
+   "trades": "43",
+   "net_r": "-1.6",
+   "win": "30.0"
+  },
+  {
+   "exit_time": "2026Q1",
+   "trades": "52",
+   "net_r": "-3.8",
+   "win": "38.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "48",
+   "net_r": "-7.4",
+   "win": "25.0"
+  },
+  {
+   "exit_time": "2026Q3",
+   "trades": "52",
+   "net_r": "-7.9",
+   "win": "35.0"
+  },
+  {
+   "exit_time": "2026Q4",
+   "trades": "19",
+   "net_r": "11.5",
+   "win": "26.0"
+  }
+ ]
+}

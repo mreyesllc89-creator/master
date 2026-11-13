@@ -1,0 +1,200 @@
+{
+ "strategy": "asia_open_fade",
+ "symbol": "BTCUSDT",
+ "tf": "1h",
+ "mechanism": "Fade the first bar after 00:00 UTC when it moves more than atr_mult ATR. Mechanism: thin Asian liquidity",
+ "oos": {
+  "trades": 193,
+  "net": -742.54,
+  "ret_pct": -7.43,
+  "pf": 0.85,
+  "win": 42.0,
+  "avg_r": -0.073,
+  "maxdd_pct": 9.89,
+  "losing_streak": 6,
+  "trades_per_month": 6.5,
+  "sharpe": -0.57
+ },
+ "stressed": {
+  "trades": 193,
+  "net": -1848.41,
+  "ret_pct": -18.48,
+  "pf": 0.66,
+  "win": 37.3,
+  "avg_r": -0.192,
+  "maxdd_pct": 20.32,
+  "losing_streak": 8,
+  "trades_per_month": 6.5,
+  "sharpe": -1.45
+ },
+ "score": {
+  "profit": 1,
+  "drawdown": 4,
+  "trades": 3,
+  "streak": 4,
+  "regimes": 2,
+  "total": 14
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 6
+   },
+   "n": 17
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 19
+  },
+  {
+   "test_start": "2024-11-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 6
+   },
+   "n": 18
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 6
+   },
+   "n": 15
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 25
+  },
+  {
+   "test_start": "2025-08-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 3
+   },
+   "n": 14
+  },
+  {
+   "test_start": "2025-11-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 3
+   },
+   "n": 21
+  },
+  {
+   "test_start": "2026-02-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 16
+  },
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 18
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 12
+   },
+   "n": 27
+  },
+  {
+   "test_start": "2026-11-01",
+   "params": {
+    "atr_mult": 0.75,
+    "hold": 3
+   },
+   "n": 3
+  }
+ ],
+ "worst_month": {
+  "month": "2026-09",
+  "pnl": -377.82
+ },
+ "regimes": [
+  {
+   "exit_time": "2024Q2",
+   "trades": "6",
+   "net_r": "-1.8",
+   "win": "50.0"
+  },
+  {
+   "exit_time": "2024Q3",
+   "trades": "25",
+   "net_r": "-8.9",
+   "win": "32.0"
+  },
+  {
+   "exit_time": "2024Q4",
+   "trades": "14",
+   "net_r": "3.6",
+   "win": "50.0"
+  },
+  {
+   "exit_time": "2025Q1",
+   "trades": "17",
+   "net_r": "2.2",
+   "win": "41.0"
+  },
+  {
+   "exit_time": "2025Q2",
+   "trades": "28",
+   "net_r": "-1.4",
+   "win": "50.0"
+  },
+  {
+   "exit_time": "2025Q3",
+   "trades": "15",
+   "net_r": "0.2",
+   "win": "60.0"
+  },
+  {
+   "exit_time": "2025Q4",
+   "trades": "16",
+   "net_r": "-0.5",
+   "win": "44.0"
+  },
+  {
+   "exit_time": "2026Q1",
+   "trades": "18",
+   "net_r": "-5.6",
+   "win": "28.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "19",
+   "net_r": "4.5",
+   "win": "42.0"
+  },
+  {
+   "exit_time": "2026Q3",
+   "trades": "27",
+   "net_r": "-10.5",
+   "win": "30.0"
+  },
+  {
+   "exit_time": "2026Q4",
+   "trades": "8",
+   "net_r": "4.1",
+   "win": "62.0"
+  }
+ ]
+}

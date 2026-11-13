@@ -47,6 +47,6 @@ The 07:30 brief reads `crypto_lab/bot/logs/*.jsonl` from the repo. On the server
 
 ```bash
 # crontab -e
-5 * * * * cd /root/master && mkdir -p crypto_lab/bot/logs && cp crypto_lab/bot/decisions.jsonl crypto_lab/bot/logs/$(hostname).jsonl && git add crypto_lab/bot/logs && git commit -qm "bot log $(date -u +\%FT\%H)" && git push -q origin claude/intelligent-turing-7uhnvg
+5 * * * * cd /root/master && mkdir -p crypto_lab/bot/logs && cp crypto_lab/bot/decisions.jsonl crypto_lab/bot/logs/$(hostname).jsonl && git add crypto_lab/bot/logs && git commit -qm "bot log $(date -u +\%FT\%H)" && git push -q origin main
 ```
 The log never contains keys (the bot logs decisions and order ids only).

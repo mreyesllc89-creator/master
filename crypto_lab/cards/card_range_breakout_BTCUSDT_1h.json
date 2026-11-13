@@ -1,0 +1,84 @@
+{
+ "strategy": "range_breakout",
+ "symbol": "BTCUSDT",
+ "tf": "1h",
+ "mechanism": "Breakout from the tightest N-bar range of the last `tight_window` days. Mechanism: compression",
+ "oos": {
+  "trades": 32,
+  "net": -493.11,
+  "ret_pct": -4.93,
+  "pf": 0.62,
+  "win": 21.9,
+  "avg_r": -0.327,
+  "maxdd_pct": 7.41,
+  "losing_streak": 10,
+  "trades_per_month": 1.8,
+  "sharpe": -0.88
+ },
+ "stressed": {
+  "trades": 32,
+  "net": -702.4,
+  "ret_pct": -7.02,
+  "pf": 0.51,
+  "win": 18.8,
+  "avg_r": -0.481,
+  "maxdd_pct": 8.42,
+  "losing_streak": 15,
+  "trades_per_month": 1.8,
+  "sharpe": -1.28
+ },
+ "score": {
+  "total": 0,
+  "note": "fewer than 50 OOS trades"
+ },
+ "windows": [
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 1.5,
+    "hold": 72
+   },
+   "n": 24
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 1.5,
+    "hold": 72
+   },
+   "n": 8
+  }
+ ],
+ "worst_month": {
+  "month": "2025-06",
+  "pnl": -316.25
+ },
+ "regimes": [
+  {
+   "exit_time": "2025Q2",
+   "trades": "14",
+   "net_r": "-5.9",
+   "win": "21.0"
+  },
+  {
+   "exit_time": "2025Q3",
+   "trades": "10",
+   "net_r": "-2.1",
+   "win": "20.0"
+  },
+  {
+   "exit_time": "2026Q3",
+   "trades": "6",
+   "net_r": "-3.3",
+   "win": "17.0"
+  },
+  {
+   "exit_time": "2026Q4",
+   "trades": "2",
+   "net_r": "0.9",
+   "win": "50.0"
+  }
+ ]
+}

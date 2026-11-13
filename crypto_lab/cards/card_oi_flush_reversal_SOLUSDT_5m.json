@@ -1,0 +1,200 @@
+{
+ "strategy": "oi_flush_reversal",
+ "symbol": "SOLUSDT",
+ "tf": "5m",
+ "mechanism": "After an OI flush with price down, go long once a close recovers above the flush window's midpoint.",
+ "oos": {
+  "trades": 296,
+  "net": -4736.2,
+  "ret_pct": -47.36,
+  "pf": 0.45,
+  "win": 29.4,
+  "avg_r": -0.352,
+  "maxdd_pct": 48.37,
+  "losing_streak": 22,
+  "trades_per_month": 9.6,
+  "sharpe": -3.57
+ },
+ "stressed": {
+  "trades": 296,
+  "net": -6428.64,
+  "ret_pct": -64.29,
+  "pf": 0.33,
+  "win": 27.0,
+  "avg_r": -0.507,
+  "maxdd_pct": 64.98,
+  "losing_streak": 22,
+  "trades_per_month": 9.6,
+  "sharpe": -5.06
+ },
+ "score": {
+  "profit": 1,
+  "drawdown": 1,
+  "trades": 4,
+  "streak": 1,
+  "regimes": 1,
+  "total": 8
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 6
+   },
+   "n": 46
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 12
+   },
+   "n": 47
+  },
+  {
+   "test_start": "2024-11-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 12
+   },
+   "n": 19
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 12
+   },
+   "n": 69
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 6
+   },
+   "n": 10
+  },
+  {
+   "test_start": "2025-08-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 6
+   },
+   "n": 15
+  },
+  {
+   "test_start": "2025-11-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 24
+   },
+   "n": 34
+  },
+  {
+   "test_start": "2026-02-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 6
+   },
+   "n": 17
+  },
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 6
+   },
+   "n": 17
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 12
+   },
+   "n": 19
+  },
+  {
+   "test_start": "2026-11-01",
+   "params": {
+    "oi_drop": 0.02,
+    "hold": 6
+   },
+   "n": 3
+  }
+ ],
+ "worst_month": {
+  "month": "2025-03",
+  "pnl": -907.86
+ },
+ "regimes": [
+  {
+   "exit_time": "2024Q2",
+   "trades": "34",
+   "net_r": "-14.5",
+   "win": "35.0"
+  },
+  {
+   "exit_time": "2024Q3",
+   "trades": "53",
+   "net_r": "-16.5",
+   "win": "32.0"
+  },
+  {
+   "exit_time": "2024Q4",
+   "trades": "17",
+   "net_r": "4.6",
+   "win": "59.0"
+  },
+  {
+   "exit_time": "2025Q1",
+   "trades": "58",
+   "net_r": "-24.7",
+   "win": "29.0"
+  },
+  {
+   "exit_time": "2025Q2",
+   "trades": "21",
+   "net_r": "-4.2",
+   "win": "38.0"
+  },
+  {
+   "exit_time": "2025Q3",
+   "trades": "14",
+   "net_r": "-11.0",
+   "win": "0.0"
+  },
+  {
+   "exit_time": "2025Q4",
+   "trades": "32",
+   "net_r": "-25.3",
+   "win": "9.0"
+  },
+  {
+   "exit_time": "2026Q1",
+   "trades": "22",
+   "net_r": "-4.8",
+   "win": "36.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "16",
+   "net_r": "4.5",
+   "win": "38.0"
+  },
+  {
+   "exit_time": "2026Q3",
+   "trades": "18",
+   "net_r": "-11.0",
+   "win": "17.0"
+  },
+  {
+   "exit_time": "2026Q4",
+   "trades": "11",
+   "net_r": "-1.1",
+   "win": "27.0"
+  }
+ ]
+}
