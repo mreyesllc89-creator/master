@@ -1,0 +1,807 @@
+{
+ "M5_Buy_H1": {
+  "base": {
+   "n": 143,
+   "pf": 2.0,
+   "net": 49.7,
+   "dd": 6.6,
+   "pf25": 1.93,
+   "pf26": 2.23,
+   "n26": 33
+  },
+  "costs": {
+   "slip 0.05": {
+    "n": 143,
+    "pf": 1.99,
+    "net": 49.5,
+    "dd": 6.9,
+    "pf25": 1.93,
+    "pf26": 2.2,
+    "n26": 33
+   },
+   "slip 0.10": {
+    "n": 143,
+    "pf": 1.95,
+    "net": 48.0,
+    "dd": 7.2,
+    "pf25": 1.88,
+    "pf26": 2.18,
+    "n26": 33
+   },
+   "slip 0.20": {
+    "n": 143,
+    "pf": 1.82,
+    "net": 43.1,
+    "dd": 7.8,
+    "pf25": 1.75,
+    "pf26": 2.05,
+    "n26": 33
+   },
+   "commission 0.07": {
+    "n": 143,
+    "pf": 1.97,
+    "net": 48.7,
+    "dd": 6.8,
+    "pf25": 1.9,
+    "pf26": 2.21,
+    "n26": 33
+   },
+   "harsh: slip 0.10 + comm 0.07": {
+    "n": 143,
+    "pf": 1.92,
+    "net": 47.1,
+    "dd": 7.4,
+    "pf25": 1.85,
+    "pf26": 2.16,
+    "n26": 33
+   },
+   "brutal: slip 0.20 + comm 0.07": {
+    "n": 143,
+    "pf": 1.79,
+    "net": 42.1,
+    "dd": 8.0,
+    "pf25": 1.72,
+    "pf26": 2.03,
+    "n26": 33
+   }
+  },
+  "execution": {
+   "entry 1 min late": {
+    "n": 144,
+    "pf": 1.99,
+    "net": 48.9,
+    "dd": 5.4,
+    "pf25": 1.93,
+    "pf26": 2.18,
+    "n26": 34
+   },
+   "entry 2 min late": {
+    "n": 145,
+    "pf": 1.8,
+    "net": 41.5,
+    "dd": 10.5,
+    "pf25": 1.62,
+    "pf26": 2.46,
+    "n26": 33
+   },
+   "pessimistic trailing": {
+    "n": 143,
+    "pf": 1.94,
+    "net": 46.8,
+    "dd": 7.4,
+    "pf25": 1.85,
+    "pf26": 2.23,
+    "n26": 33
+   },
+   "late 1 + pessimistic trailing": {
+    "n": 144,
+    "pf": 1.97,
+    "net": 48.0,
+    "dd": 6.1,
+    "pf25": 1.91,
+    "pf26": 2.18,
+    "n26": 34
+   },
+   "late 1 + pess. trailing + harsh costs": {
+    "n": 144,
+    "pf": 1.84,
+    "net": 43.4,
+    "dd": 7.4,
+    "pf25": 1.76,
+    "pf26": 2.11,
+    "n26": 34
+   },
+   "no trailing at all": {
+    "n": 125,
+    "pf": 1.46,
+    "net": 39.3,
+    "dd": 14.0,
+    "pf25": 1.56,
+    "pf26": 1.17,
+    "n26": 29
+   }
+  },
+  "settings_mc": {
+   "runs": 400,
+   "pf_p5": 1.15,
+   "pf_median": 1.42,
+   "share_profitable": 0.99,
+   "share_pf_above_1_3": 0.73,
+   "pf26_median": 1.27,
+   "share_2026_profitable": 0.89
+  },
+  "statistics_harsh": {
+   "trades": 143,
+   "pf": 1.92,
+   "pf_ci5": 1.32,
+   "pf_ci95": 2.72,
+   "prob_pf_below_1": 0.003,
+   "trades_per_year": 104,
+   "year_dd_median_R": 6.3,
+   "year_dd_p95_R": 11.9,
+   "losing_streak_p95": 10,
+   "prob_losing_year": 0.008,
+   "expectancy_R": 0.329
+  },
+  "luck_test": {
+   "zero_cross_trades": 525,
+   "zero_cross_pf": 1.2,
+   "hump_pf": 2.0,
+   "random_subset_pf_p95": 1.62,
+   "p_value": 0.0016
+  },
+  "calendar": {
+   "months": 17,
+   "losing_months": 5,
+   "worst_month_R": -2.1,
+   "best_month_R": 8.4,
+   "losing_quarters": 1,
+   "worst_quarter_R": -0.9,
+   "top3_months_share": 0.47
+  }
+ },
+ "M5_Buy_H4": {
+  "base": {
+   "n": 138,
+   "pf": 1.44,
+   "net": 17.4,
+   "dd": 3.6,
+   "pf25": 1.43,
+   "pf26": 1.49,
+   "n26": 32
+  },
+  "costs": {
+   "slip 0.05": {
+    "n": 138,
+    "pf": 1.42,
+    "net": 16.4,
+    "dd": 3.7,
+    "pf25": 1.4,
+    "pf26": 1.46,
+    "n26": 32
+   },
+   "slip 0.10": {
+    "n": 138,
+    "pf": 1.38,
+    "net": 15.3,
+    "dd": 3.7,
+    "pf25": 1.37,
+    "pf26": 1.44,
+    "n26": 32
+   },
+   "slip 0.20": {
+    "n": 138,
+    "pf": 1.34,
+    "net": 13.5,
+    "dd": 3.8,
+    "pf25": 1.32,
+    "pf26": 1.39,
+    "n26": 32
+   },
+   "commission 0.07": {
+    "n": 138,
+    "pf": 1.42,
+    "net": 16.5,
+    "dd": 3.7,
+    "pf25": 1.4,
+    "pf26": 1.47,
+    "n26": 32
+   },
+   "harsh: slip 0.10 + comm 0.07": {
+    "n": 138,
+    "pf": 1.36,
+    "net": 14.4,
+    "dd": 3.8,
+    "pf25": 1.34,
+    "pf26": 1.42,
+    "n26": 32
+   },
+   "brutal: slip 0.20 + comm 0.07": {
+    "n": 138,
+    "pf": 1.31,
+    "net": 12.6,
+    "dd": 3.9,
+    "pf25": 1.29,
+    "pf26": 1.38,
+    "n26": 32
+   }
+  },
+  "execution": {
+   "entry 1 min late": {
+    "n": 138,
+    "pf": 1.51,
+    "net": 19.0,
+    "dd": 3.7,
+    "pf25": 1.41,
+    "pf26": 1.89,
+    "n26": 32
+   },
+   "entry 2 min late": {
+    "n": 138,
+    "pf": 1.35,
+    "net": 14.4,
+    "dd": 5.0,
+    "pf25": 1.12,
+    "pf26": 2.45,
+    "n26": 32
+   },
+   "pessimistic trailing": {
+    "n": 138,
+    "pf": 1.3,
+    "net": 11.9,
+    "dd": 4.2,
+    "pf25": 1.29,
+    "pf26": 1.34,
+    "n26": 32
+   },
+   "late 1 + pessimistic trailing": {
+    "n": 138,
+    "pf": 1.39,
+    "net": 14.4,
+    "dd": 3.7,
+    "pf25": 1.29,
+    "pf26": 1.74,
+    "n26": 32
+   },
+   "late 1 + pess. trailing + harsh costs": {
+    "n": 138,
+    "pf": 1.3,
+    "net": 11.4,
+    "dd": 4.1,
+    "pf25": 1.19,
+    "pf26": 1.68,
+    "n26": 32
+   },
+   "no trailing at all": {
+    "n": 113,
+    "pf": 1.44,
+    "net": 34.1,
+    "dd": 11.0,
+    "pf25": 1.62,
+    "pf26": 0.93,
+    "n26": 25
+   }
+  },
+  "settings_mc": {
+   "runs": 400,
+   "pf_p5": 1.07,
+   "pf_median": 1.33,
+   "share_profitable": 0.99,
+   "share_pf_above_1_3": 0.55,
+   "pf26_median": 1.41,
+   "share_2026_profitable": 0.84
+  },
+  "statistics_harsh": {
+   "trades": 138,
+   "pf": 1.36,
+   "pf_ci5": 0.99,
+   "pf_ci95": 1.91,
+   "prob_pf_below_1": 0.058,
+   "trades_per_year": 101,
+   "year_dd_median_R": 5.3,
+   "year_dd_p95_R": 10.7,
+   "losing_streak_p95": 5,
+   "prob_losing_year": 0.09,
+   "expectancy_R": 0.104
+  },
+  "luck_test": {
+   "zero_cross_trades": 714,
+   "zero_cross_pf": 0.93,
+   "hump_pf": 1.44,
+   "random_subset_pf_p95": 1.25,
+   "p_value": 0.005
+  },
+  "calendar": {
+   "months": 17,
+   "losing_months": 2,
+   "worst_month_R": -2.6,
+   "best_month_R": 4.0,
+   "losing_quarters": 1,
+   "worst_quarter_R": -1.2,
+   "top3_months_share": 0.53
+  }
+ },
+ "M2_Sell_London_H1": {
+  "base": {
+   "n": 128,
+   "pf": 1.82,
+   "net": 25.3,
+   "dd": 5.6,
+   "pf25": 1.8,
+   "pf26": 1.87,
+   "n26": 40
+  },
+  "costs": {
+   "slip 0.05": {
+    "n": 128,
+    "pf": 1.84,
+    "net": 26.2,
+    "dd": 5.7,
+    "pf25": 1.85,
+    "pf26": 1.82,
+    "n26": 40
+   },
+   "slip 0.10": {
+    "n": 128,
+    "pf": 1.74,
+    "net": 24.1,
+    "dd": 5.7,
+    "pf25": 1.81,
+    "pf26": 1.6,
+    "n26": 40
+   },
+   "slip 0.20": {
+    "n": 128,
+    "pf": 1.51,
+    "net": 17.9,
+    "dd": 7.9,
+    "pf25": 1.64,
+    "pf26": 1.27,
+    "n26": 40
+   },
+   "commission 0.07": {
+    "n": 128,
+    "pf": 1.77,
+    "net": 24.1,
+    "dd": 5.7,
+    "pf25": 1.74,
+    "pf26": 1.84,
+    "n26": 40
+   },
+   "harsh: slip 0.10 + comm 0.07": {
+    "n": 128,
+    "pf": 1.7,
+    "net": 22.9,
+    "dd": 5.8,
+    "pf25": 1.75,
+    "pf26": 1.57,
+    "n26": 40
+   },
+   "brutal: slip 0.20 + comm 0.07": {
+    "n": 128,
+    "pf": 1.47,
+    "net": 16.7,
+    "dd": 7.9,
+    "pf25": 1.59,
+    "pf26": 1.25,
+    "n26": 40
+   }
+  },
+  "execution": {
+   "entry 1 min late": {
+    "n": 127,
+    "pf": 1.57,
+    "net": 19.4,
+    "dd": 6.5,
+    "pf25": 1.47,
+    "pf26": 1.81,
+    "n26": 39
+   },
+   "entry 2 min late": {
+    "n": 129,
+    "pf": 1.48,
+    "net": 17.6,
+    "dd": 7.2,
+    "pf25": 1.67,
+    "pf26": 1.06,
+    "n26": 38
+   },
+   "pessimistic trailing": {
+    "n": 128,
+    "pf": 1.38,
+    "net": 11.8,
+    "dd": 5.7,
+    "pf25": 1.35,
+    "pf26": 1.44,
+    "n26": 40
+   },
+   "late 1 + pessimistic trailing": {
+    "n": 127,
+    "pf": 1.28,
+    "net": 9.6,
+    "dd": 6.5,
+    "pf25": 1.23,
+    "pf26": 1.41,
+    "n26": 39
+   },
+   "late 1 + pess. trailing + harsh costs": {
+    "n": 127,
+    "pf": 1.1,
+    "net": 3.6,
+    "dd": 6.8,
+    "pf25": 1.1,
+    "pf26": 1.1,
+    "n26": 39
+   },
+   "no trailing at all": {
+    "n": 106,
+    "pf": 1.08,
+    "net": 6.0,
+    "dd": 16.0,
+    "pf25": 1.0,
+    "pf26": 1.25,
+    "n26": 34
+   }
+  },
+  "settings_mc": {
+   "runs": 400,
+   "pf_p5": 0.92,
+   "pf_median": 1.23,
+   "share_profitable": 0.85,
+   "share_pf_above_1_3": 0.4,
+   "pf26_median": 1.24,
+   "share_2026_profitable": 0.78
+  },
+  "statistics_harsh": {
+   "trades": 128,
+   "pf": 1.7,
+   "pf_ci5": 1.14,
+   "pf_ci95": 2.52,
+   "prob_pf_below_1": 0.014,
+   "trades_per_year": 93,
+   "year_dd_median_R": 4.6,
+   "year_dd_p95_R": 9.0,
+   "losing_streak_p95": 5,
+   "prob_losing_year": 0.026,
+   "expectancy_R": 0.179
+  },
+  "luck_test": {
+   "zero_cross_trades": 278,
+   "zero_cross_pf": 0.95,
+   "hump_pf": 1.82,
+   "random_subset_pf_p95": 1.24,
+   "p_value": 0.0002
+  },
+  "calendar": {
+   "months": 17,
+   "losing_months": 4,
+   "worst_month_R": -3.7,
+   "best_month_R": 5.0,
+   "losing_quarters": 1,
+   "worst_quarter_R": -0.5,
+   "top3_months_share": 0.5
+  }
+ },
+ "M3_Sell_H4": {
+  "base": {
+   "n": 164,
+   "pf": 1.43,
+   "net": 18.4,
+   "dd": 4.6,
+   "pf25": 1.52,
+   "pf26": 1.26,
+   "n26": 55
+  },
+  "costs": {
+   "slip 0.05": {
+    "n": 164,
+    "pf": 1.41,
+    "net": 17.8,
+    "dd": 4.7,
+    "pf25": 1.48,
+    "pf26": 1.29,
+    "n26": 55
+   },
+   "slip 0.10": {
+    "n": 164,
+    "pf": 1.41,
+    "net": 17.9,
+    "dd": 4.8,
+    "pf25": 1.49,
+    "pf26": 1.26,
+    "n26": 55
+   },
+   "slip 0.20": {
+    "n": 162,
+    "pf": 1.32,
+    "net": 14.3,
+    "dd": 4.9,
+    "pf25": 1.35,
+    "pf26": 1.25,
+    "n26": 55
+   },
+   "commission 0.07": {
+    "n": 164,
+    "pf": 1.4,
+    "net": 17.3,
+    "dd": 4.7,
+    "pf25": 1.48,
+    "pf26": 1.24,
+    "n26": 55
+   },
+   "harsh: slip 0.10 + comm 0.07": {
+    "n": 164,
+    "pf": 1.38,
+    "net": 16.8,
+    "dd": 4.9,
+    "pf25": 1.46,
+    "pf26": 1.25,
+    "n26": 55
+   },
+   "brutal: slip 0.20 + comm 0.07": {
+    "n": 162,
+    "pf": 1.29,
+    "net": 13.2,
+    "dd": 5.0,
+    "pf25": 1.32,
+    "pf26": 1.24,
+    "n26": 55
+   }
+  },
+  "execution": {
+   "entry 1 min late": {
+    "n": 162,
+    "pf": 1.37,
+    "net": 16.9,
+    "dd": 8.5,
+    "pf25": 1.56,
+    "pf26": 1.06,
+    "n26": 56
+   },
+   "entry 2 min late": {
+    "n": 158,
+    "pf": 1.18,
+    "net": 9.2,
+    "dd": 7.9,
+    "pf25": 1.26,
+    "pf26": 1.07,
+    "n26": 54
+   },
+   "pessimistic trailing": {
+    "n": 164,
+    "pf": 1.18,
+    "net": 7.8,
+    "dd": 6.1,
+    "pf25": 1.31,
+    "pf26": 0.95,
+    "n26": 55
+   },
+   "late 1 + pessimistic trailing": {
+    "n": 163,
+    "pf": 1.13,
+    "net": 5.9,
+    "dd": 9.9,
+    "pf25": 1.35,
+    "pf26": 0.79,
+    "n26": 56
+   },
+   "late 1 + pess. trailing + harsh costs": {
+    "n": 161,
+    "pf": 0.99,
+    "net": -0.3,
+    "dd": 10.1,
+    "pf25": 1.15,
+    "pf26": 0.74,
+    "n26": 55
+   },
+   "no trailing at all": {
+    "n": 138,
+    "pf": 1.1,
+    "net": 9.0,
+    "dd": 11.0,
+    "pf25": 1.07,
+    "pf26": 1.17,
+    "n26": 46
+   }
+  },
+  "settings_mc": {
+   "runs": 400,
+   "pf_p5": 1.1,
+   "pf_median": 1.3,
+   "share_profitable": 0.99,
+   "share_pf_above_1_3": 0.47,
+   "pf26_median": 1.27,
+   "share_2026_profitable": 0.94
+  },
+  "statistics_harsh": {
+   "trades": 164,
+   "pf": 1.38,
+   "pf_ci5": 1.03,
+   "pf_ci95": 1.92,
+   "prob_pf_below_1": 0.036,
+   "trades_per_year": 120,
+   "year_dd_median_R": 5.3,
+   "year_dd_p95_R": 10.3,
+   "losing_streak_p95": 5,
+   "prob_losing_year": 0.056,
+   "expectancy_R": 0.102
+  },
+  "luck_test": {
+   "zero_cross_trades": 368,
+   "zero_cross_pf": 1.08,
+   "hump_pf": 1.43,
+   "random_subset_pf_p95": 1.35,
+   "p_value": 0.0198
+  },
+  "calendar": {
+   "months": 16,
+   "losing_months": 5,
+   "worst_month_R": -1.3,
+   "best_month_R": 3.6,
+   "losing_quarters": 0,
+   "worst_quarter_R": 1.0,
+   "top3_months_share": 0.56
+  }
+ },
+ "M2_Sell_NY_H1": {
+  "base": {
+   "n": 140,
+   "pf": 1.55,
+   "net": 40.5,
+   "dd": 5.7,
+   "pf25": 1.64,
+   "pf26": 1.38,
+   "n26": 45
+  },
+  "costs": {
+   "slip 0.05": {
+    "n": 139,
+    "pf": 1.41,
+    "net": 31.3,
+    "dd": 5.8,
+    "pf25": 1.47,
+    "pf26": 1.29,
+    "n26": 45
+   },
+   "slip 0.10": {
+    "n": 139,
+    "pf": 1.39,
+    "net": 29.8,
+    "dd": 5.8,
+    "pf25": 1.44,
+    "pf26": 1.28,
+    "n26": 45
+   },
+   "slip 0.20": {
+    "n": 139,
+    "pf": 1.28,
+    "net": 22.6,
+    "dd": 5.9,
+    "pf25": 1.28,
+    "pf26": 1.29,
+    "n26": 45
+   },
+   "commission 0.07": {
+    "n": 140,
+    "pf": 1.53,
+    "net": 39.3,
+    "dd": 5.8,
+    "pf25": 1.61,
+    "pf26": 1.37,
+    "n26": 45
+   },
+   "harsh: slip 0.10 + comm 0.07": {
+    "n": 139,
+    "pf": 1.37,
+    "net": 28.6,
+    "dd": 5.8,
+    "pf25": 1.42,
+    "pf26": 1.27,
+    "n26": 45
+   },
+   "brutal: slip 0.20 + comm 0.07": {
+    "n": 139,
+    "pf": 1.27,
+    "net": 21.5,
+    "dd": 5.9,
+    "pf25": 1.26,
+    "pf26": 1.28,
+    "n26": 45
+   }
+  },
+  "execution": {
+   "entry 1 min late": {
+    "n": 140,
+    "pf": 1.34,
+    "net": 26.8,
+    "dd": 8.0,
+    "pf25": 1.46,
+    "pf26": 1.14,
+    "n26": 46
+   },
+   "entry 2 min late": {
+    "n": 143,
+    "pf": 1.32,
+    "net": 25.6,
+    "dd": 8.0,
+    "pf25": 1.39,
+    "pf26": 1.19,
+    "n26": 48
+   },
+   "pessimistic trailing": {
+    "n": 140,
+    "pf": 1.39,
+    "net": 28.8,
+    "dd": 5.7,
+    "pf25": 1.46,
+    "pf26": 1.27,
+    "n26": 45
+   },
+   "late 1 + pessimistic trailing": {
+    "n": 140,
+    "pf": 1.25,
+    "net": 19.4,
+    "dd": 8.0,
+    "pf25": 1.32,
+    "pf26": 1.12,
+    "n26": 46
+   },
+   "late 1 + pess. trailing + harsh costs": {
+    "n": 140,
+    "pf": 1.16,
+    "net": 12.6,
+    "dd": 8.1,
+    "pf25": 1.19,
+    "pf26": 1.09,
+    "n26": 46
+   },
+   "no trailing at all": {
+    "n": 126,
+    "pf": 1.21,
+    "net": 20.0,
+    "dd": 13.9,
+    "pf25": 1.42,
+    "pf26": 0.86,
+    "n26": 40
+   }
+  },
+  "settings_mc": {
+   "runs": 400,
+   "pf_p5": 1.08,
+   "pf_median": 1.25,
+   "share_profitable": 0.99,
+   "share_pf_above_1_3": 0.28,
+   "pf26_median": 1.19,
+   "share_2026_profitable": 0.87
+  },
+  "statistics_harsh": {
+   "trades": 139,
+   "pf": 1.37,
+   "pf_ci5": 1.02,
+   "pf_ci95": 1.83,
+   "prob_pf_below_1": 0.037,
+   "trades_per_year": 101,
+   "year_dd_median_R": 9.0,
+   "year_dd_p95_R": 17.2,
+   "losing_streak_p95": 10,
+   "prob_losing_year": 0.072,
+   "expectancy_R": 0.206
+  },
+  "luck_test": {
+   "zero_cross_trades": 313,
+   "zero_cross_pf": 1.15,
+   "hump_pf": 1.55,
+   "random_subset_pf_p95": 1.43,
+   "p_value": 0.011
+  },
+  "calendar": {
+   "months": 17,
+   "losing_months": 5,
+   "worst_month_R": -2.3,
+   "best_month_R": 9.2,
+   "losing_quarters": 0,
+   "worst_quarter_R": 2.5,
+   "top3_months_share": 0.6
+  }
+ }
+}
