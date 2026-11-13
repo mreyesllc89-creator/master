@@ -123,8 +123,13 @@ def signals(hi, lo, macd, stk, big_mult, hist, big_min_bars, stoch_req, pb_min_b
 
 @nb.njit(cache=True)
 def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, tp_mode, tp_rr,
-             trail_start, trail_dist, max_spread, min_risk, max_risk, slip, comm, delay, trail_worst, wk):
-    """Sequential trades on the M1 path. Returns rows (entry_row, exit_row, side, R, risk)."""
+             trail_start, trail_dist, max_spread, min_risk, max_risk, slip, comm, delay, trail_worst, wk,
+             sl_mode, sl_val, tp_val, trail_mode):
+    """Sequential trades on the M1 path. Returns rows (entry_row, exit_row, side, R, risk).
+    Units: sl_mode 0 hump extreme + buf, 1 points (price distance sl_val), 2 percent of price, 3 ATR multiple.
+    tp_mode 0 previous hump, 1 multiple of risk (tp_rr), 2 points, 3 percent, 4 ATR multiple (tp_val).
+    trail_mode 0 multiples of risk, 1 points, 2 percent, 3 ATR multiple (trail_start / trail_dist in that unit).
+    sig column 5 is the ATR(14) of the trigger timeframe at the signal bar."""
     n = len(o)
     out = np.empty((len(sig), 5))
     m = 0
@@ -145,15 +150,32 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
         side = int(sig[k, 1])
         if side < 0:
             entry = o[e] - hs[e] - slip                    # sell at bid (minus slippage)
-            sl = sig[k, 2] + buf + hs[e]                   # ask-side stop above the hump high
+            atr = sig[k, 5]
+            if sl_mode == 0:
+                sl = sig[k, 2] + buf + hs[e]               # ask-side stop above the hump high
+            elif sl_mode == 1:
+                sl = entry + sl_val
+            elif sl_mode == 2:
+                sl = entry + sl_val * 0.01 * entry
+            else:
+                sl = entry + sl_val * atr
             risk = sl - entry
+            if not (risk == risk):
+                continue
             if risk < min_risk or risk > max_risk:
                 continue
             if tp_mode == 0:
                 ref = sig[k, 3]
                 tp = ref + anticip * (entry - ref) + hs[e]  # ask-side target, a little before the low
-            else:
+            elif tp_mode == 1:
                 tp = entry - tp_rr * risk
+            elif tp_mode == 2:
+                tp = entry - tp_val
+            elif tp_mode == 3:
+                tp = entry - tp_val * 0.01 * entry
+            else:
+                tp = entry - tp_val * atr
+            unit = risk if trail_mode == 0 else (1.0 if trail_mode == 1 else (0.01 * entry if trail_mode == 2 else atr))
             if entry - tp < min_rr * risk:
                 continue
             best = 1e300; stop = sl; px = np.nan; j = e
@@ -165,8 +187,8 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
                     px = stop + slip; break
                 if al <= tp:
                     px = min(tp, ao); break
-                if trail_start > 0 and entry - al >= trail_start * risk:
-                    cand = al + trail_dist * risk
+                if trail_start > 0 and entry - al >= trail_start * unit:
+                    cand = al + trail_dist * unit
                     if cand < stop:
                         stop = cand
                         if c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop):
@@ -179,15 +201,32 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
             r = (entry - px - comm) / risk
         else:
             entry = o[e] + hs[e] + slip                    # buy at ask (plus slippage)
-            sl = sig[k, 2] - buf - hs[e]                   # bid-side stop below the hump low
+            atr = sig[k, 5]
+            if sl_mode == 0:
+                sl = sig[k, 2] - buf - hs[e]               # bid-side stop below the hump low
+            elif sl_mode == 1:
+                sl = entry - sl_val
+            elif sl_mode == 2:
+                sl = entry - sl_val * 0.01 * entry
+            else:
+                sl = entry - sl_val * atr
             risk = entry - sl
+            if not (risk == risk):
+                continue
             if risk < min_risk or risk > max_risk:
                 continue
             if tp_mode == 0:
                 ref = sig[k, 3]
                 tp = ref - anticip * (ref - entry) - hs[e]
-            else:
+            elif tp_mode == 1:
                 tp = entry + tp_rr * risk
+            elif tp_mode == 2:
+                tp = entry + tp_val
+            elif tp_mode == 3:
+                tp = entry + tp_val * 0.01 * entry
+            else:
+                tp = entry + tp_val * atr
+            unit = risk if trail_mode == 0 else (1.0 if trail_mode == 1 else (0.01 * entry if trail_mode == 2 else atr))
             if tp - entry < min_rr * risk:
                 continue
             stop = sl; px = np.nan; j = e
@@ -199,8 +238,8 @@ def simulate(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
                     px = stop - slip; break
                 if bh >= tp:
                     px = max(tp, bo); break
-                if trail_start > 0 and bh - entry >= trail_start * risk:
-                    cand = bh - trail_dist * risk
+                if trail_start > 0 and bh - entry >= trail_start * unit:
+                    cand = bh - trail_dist * unit
                     if cand > stop:
                         stop = cand
                         if c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop):
@@ -223,7 +262,8 @@ DEFAULT = dict(tf="M2", big_mult=1.5, hist=20, big_min_bars=5, stoch_req=1, pb_m
                break_ratio=1.0, max_signals=2, trend_max_bars=120, sides=0, classic=0, session="all",
                buf=0.30, anticip=0.10, min_rr=0.8, tp_mode=0, tp_rr=1.5, trail_start=0.0, trail_dist=0.5,
                max_spread=0.60, min_risk=0.50, max_risk=1e9, htf="none", slip=0.0, comm=0.0, delay=0, trail_worst=0,
-               skip_big_pb=0, weekend_close=0, weekend_min=1380)
+               skip_big_pb=0, weekend_close=0, weekend_min=1380,
+               sl_mode=0, sl_val=0.0, tp_val=0.0, trail_mode=0)
 
 
 class Market:
@@ -257,6 +297,9 @@ class Market:
             ok = (row < len(self.t))
             gap = np.where(ok, self.t[np.clip(row, 0, len(self.t) - 1)] - nxt, np.timedelta64(10 ** 9, "m"))
             row = np.where(ok & (gap <= np.timedelta64(B.TF_MIN[name], "m")), row, -1)
+            pc = t["close"].shift(1)
+            tr = pd.concat([t["high"] - t["low"], (t["high"] - pc).abs(), (t["low"] - pc).abs()], axis=1).max(axis=1)
+            atr = tr.ewm(alpha=1 / 14, adjust=False, min_periods=14).mean().values     # Wilder ATR(14)
             bias = {}
             for htf in ("H1", "H4"):                 # last CLOSED higher-timeframe bar: close vs EMA50
                 hb = B.resample(self.m1, htf)
@@ -264,18 +307,40 @@ class Market:
                 b.index = b.index + pd.Timedelta(minutes=B.TF_MIN[htf])      # known from its close
                 bias[htf] = b.reindex(t.index + pd.Timedelta(minutes=B.TF_MIN[name]), method="ffill").values
             self._tf[name] = (t["high"].values.astype(float), t["low"].values.astype(float), macd,
-                              stk.values.astype(float), row.astype(np.int64), bias)
+                              stk.values.astype(float), row.astype(np.int64), bias, atr)
         return self._tf[name]
 
     def run(self, cfg):
         c = dict(DEFAULT); c.update(cfg)
-        hi, lo, macd, stk, row, bias = self.tf(c["tf"])
+        hi, lo, macd, stk, row, bias, atr = self.tf(c["tf"])
         sg = signals(hi, lo, macd, stk, c["big_mult"], int(c["hist"]), int(c["big_min_bars"]), int(c["stoch_req"]),
                      int(c["pb_min_bars"]), c["pb_max_ratio"], c["break_ratio"], int(c["max_signals"]),
                      int(c["trend_max_bars"]), int(c["sides"]), int(c["classic"]), int(c["skip_big_pb"]))
         if c.get("htf", "none") != "none" and len(sg):      # optional: trade only with the HTF EMA50 side
             sg = sg[bias[c["htf"]][sg[:, 0].astype(np.int64)] == sg[:, 1]]
-        er = row[sg[:, 0].astype(np.int64)] if len(sg) else np.zeros(0, np.int64)
+        ix = sg[:, 0].astype(np.int64) if len(sg) else np.zeros(0, np.int64)
+        sg = np.column_stack([sg, atr[ix]]) if len(sg) else np.zeros((0, 6))
+        er = row[ix]
+        return self._sim(sg, er, c)
+
+    def prepare(self, cfg):
+        """Signals of a configuration, to re-simulate many exit settings quickly (see sim)."""
+        c = dict(DEFAULT); c.update(cfg)
+        hi, lo, macd, stk, row, bias, atr = self.tf(c["tf"])
+        sg = signals(hi, lo, macd, stk, c["big_mult"], int(c["hist"]), int(c["big_min_bars"]), int(c["stoch_req"]),
+                     int(c["pb_min_bars"]), c["pb_max_ratio"], c["break_ratio"], int(c["max_signals"]),
+                     int(c["trend_max_bars"]), int(c["sides"]), int(c["classic"]), int(c["skip_big_pb"]))
+        if c.get("htf", "none") != "none" and len(sg):
+            sg = sg[bias[c["htf"]][sg[:, 0].astype(np.int64)] == sg[:, 1]]
+        ix = sg[:, 0].astype(np.int64) if len(sg) else np.zeros(0, np.int64)
+        sg = np.column_stack([sg, atr[ix]]) if len(sg) else np.zeros((0, 6))
+        return sg, row[ix], c
+
+    def sim(self, prep, exits):
+        sg, er, c = prep
+        return self._sim(sg, er, dict(c, **exits))
+
+    def _sim(self, sg, er, c):
         s0, s1 = SESSIONS[c["session"]]
         if c["weekend_close"]:           # Friday from weekend_min (server time) on, and the last bar before any long closure
             wk = ((self.dow == 4) & (self.tod >= int(c["weekend_min"]))) | self.pre_gap
@@ -284,7 +349,7 @@ class Market:
         tr = simulate(sg, er, self.o, self.h, self.l, self.c, self.hs, self.tod, s0, s1, c["buf"], c["anticip"],
                       c["min_rr"], int(c["tp_mode"]), c["tp_rr"], c["trail_start"], c["trail_dist"],
                       c["max_spread"], c["min_risk"], c["max_risk"], c["slip"], c["comm"], int(c["delay"]),
-                      int(c["trail_worst"]), wk)
+                      int(c["trail_worst"]), wk, int(c["sl_mode"]), c["sl_val"], c["tp_val"], int(c["trail_mode"]))
         df = pd.DataFrame(tr, columns=["entry_row", "exit_row", "side", "r", "risk"])
         df["entry_time"] = self.t[df.entry_row.astype(int).values] if len(df) else pd.Series(dtype="datetime64[ns]")
         df.attrs["signals"] = len(sg)
