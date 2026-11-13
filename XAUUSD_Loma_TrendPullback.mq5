@@ -62,7 +62,10 @@
 //    R9  Optional weekend flat (CloseBeforeWeekend): on Friday from WeekendCloseTime (broker
 //        server time) on, no new entries are taken and the open position is closed at market
 //        on the first tick. A position found open on a Saturday or Sunday (restart, missed
-//        close) is closed on the first tick available.
+//        close) is closed on the first tick available, unless it was opened on that same
+//        day: entries are blocked on Friday only, so on a broker whose week opens on Sunday
+//        (server time) the Sunday session trades normally. A failed close is retried at
+//        most once every WEEKEND_RETRY_SEC seconds, and not at all while algo trading is off.
 //
 //  STATE AFTER ATTACH / RESTART
 //  ----------------------------
@@ -226,6 +229,9 @@ int      g_sessEndMin     = 0;
 int      g_weekendMin     = 0;     // WeekendCloseTime in minutes from midnight
 bool     g_weekendLogged  = false; // weekend close announced (once per weekend window)
 bool     g_weekendFailLog = false; // failed weekend close reported (once per weekend window)
+datetime g_weekendLastTry = 0;     // server time of the last failed weekend close (retry throttle)
+// minimum seconds between weekend close retries
+#define  WEEKEND_RETRY_SEC 5
 
 datetime g_lastBarTime    = 0;     // last evaluated trigger bar (open time of the forming bar)
 datetime g_signalBarTime  = 0;     // forming bar on which a valid signal is active
@@ -511,7 +517,7 @@ void OnDeinit(const int reason)
 //====================================================================
 void OnTick()
   {
-   //--- R9: flat before the weekend (Friday from WeekendCloseTime on, Saturday, Sunday)
+   //--- R9: flat before the weekend (Friday from WeekendCloseTime on; leftovers on Saturday, Sunday)
    WeekendClosePositions();
 
    //--- always manage what is already open (trailing)
@@ -593,7 +599,7 @@ void OnTick()
       g_signalActive = false;
       return;
      }
-   if(InWeekendWindow())                       // R9: no new entries before the weekend
+   if(PreWeekendEntryBlock())                  // R9: no new entries before the weekend
      {
       LogSkip(StringFormat("pre-weekend window (no new entries from Friday %s server time)", WeekendTimeText()));
       g_signalActive = false;
@@ -1293,7 +1299,17 @@ string WeekendTimeText()
    return StringFormat("%02d:%02d", g_weekendMin / 60, g_weekendMin % 60);
   }
 
-//--- R9: Friday at or after WeekendCloseTime, Saturday or Sunday (broker server time)
+//--- R9 entry filter: Friday at or after WeekendCloseTime only (broker server time)
+bool PreWeekendEntryBlock()
+  {
+   if(!CloseBeforeWeekend)
+      return false;
+   MqlDateTime dt;
+   TimeToStruct(TimeTradeServer(), dt);
+   return (dt.day_of_week == 5 && dt.hour * 60 + dt.min >= g_weekendMin);
+  }
+
+//--- R9 close window: Friday at or after WeekendCloseTime, Saturday or Sunday (broker server time)
 bool InWeekendWindow()
   {
    if(!CloseBeforeWeekend)
@@ -1438,7 +1454,8 @@ void ManageOpenPositions()
   }
 
 //--- R9: close this EA's position at market inside the weekend window. A failed close is
-//    retried on every later tick; the journal gets one line per window.
+//    retried at most once every WEEKEND_RETRY_SEC seconds; the journal gets one line per window.
+//    On Saturday/Sunday a position opened on that same day is left alone (Sunday-open brokers).
 void WeekendClosePositions()
   {
    if(!CloseBeforeWeekend)
@@ -1447,8 +1464,16 @@ void WeekendClosePositions()
      {
       g_weekendLogged  = false;
       g_weekendFailLog = false;
+      g_weekendLastTry = 0;
       return;
      }
+   datetime now = TimeTradeServer();
+   if(g_weekendLastTry > 0 && now >= g_weekendLastTry && now - g_weekendLastTry < WEEKEND_RETRY_SEC)
+      return;                                  // throttle retries after a failed close
+   MqlDateTime wdt;
+   TimeToStruct(now, wdt);
+   bool     onWeekendDay = (wdt.day_of_week == 6 || wdt.day_of_week == 0);
+   datetime dayStart     = now - (now % 86400);
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
       if(!g_pos.SelectByIndex(i))
@@ -1456,7 +1481,21 @@ void WeekendClosePositions()
       if(g_pos.Symbol() != _Symbol || (ulong)g_pos.Magic() != MagicNumber)
          continue;
 
+      if(onWeekendDay && g_pos.Time() >= dayStart)
+         continue;                             // opened today (Sunday session): not a leftover
+
       ulong ticket = g_pos.Ticket();
+      if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
+        {
+         if(!g_weekendFailLog)
+           {
+            g_weekendFailLog = true;
+            Print(StringFormat("[LOMA] Weekend close of #%I64u not sent: algo trading disabled in terminal/EA settings - retrying once it is enabled",
+                               ticket));
+           }
+         g_weekendLastTry = now;
+         return;
+        }
       if(!g_weekendLogged)
         {
          g_weekendLogged = true;
@@ -1468,10 +1507,11 @@ void WeekendClosePositions()
       uint rc   = g_trade.ResultRetcode();
       if(sent && (rc == TRADE_RETCODE_DONE || rc == TRADE_RETCODE_DONE_PARTIAL || rc == TRADE_RETCODE_PLACED))
          continue;
+      g_weekendLastTry = now;
       if(!g_weekendFailLog)
         {
          g_weekendFailLog = true;
-         Print(StringFormat("[LOMA] Weekend close of #%I64u failed: retcode=%u (%s) lastError=%d - retrying on the next ticks",
+         Print(StringFormat("[LOMA] Weekend close of #%I64u failed: retcode=%u (%s) lastError=%d - retrying every few seconds",
                             ticket, rc, g_trade.ResultRetcodeDescription(), GetLastError()));
         }
      }

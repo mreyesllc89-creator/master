@@ -49,7 +49,7 @@ def main():
     os.makedirs("presets", exist_ok=True)
     for fname, row, magic, desc in PICKS:
         p = {k: X.cast(L.iloc[row][k], X.SPACE[k]) for k in X.SPACE}
-        df = mk.run(p); t = df.entry_time.values; r = df.r.values
+        df = mk.run(dict(p, skip_big_pb=1, weekend_close=1)); t = df.entry_time.values; r = df.r.values
         m25 = t < np.datetime64("2026-01-01")
         s = H.stats(r)
         o = dict(MagicNumber=magic, TradeComment=fname.replace("Loma_Gold_", "LOMA_"),
@@ -63,17 +63,20 @@ def main():
                  UseHTFFilter="false" if p["htf"] == "none" else "true",
                  HTF_Timeframe=TF.get(p["htf"], 16388), RiskPercent=0.5, MaxSpread_Points=60,
                  TrailStartR=p["trail_start"], TrailDistanceR=p["trail_dist"],
-                 UseTradingHours="false" if SESS[p["session"]] is None else "true")
+                 UseTradingHours="false" if SESS[p["session"]] is None else "true",
+                 SkipBigPullback="true", CloseBeforeWeekend="true", WeekendCloseTime="23:00")
         if SESS[p["session"]]:
             o["TradingHoursStart"], o["TradingHoursEnd"] = SESS[p["session"]]
         missing = set(o) - names
         if missing: raise SystemExit(f"preset keys not in the EA: {missing}")
-        head = [f"; XAUUSD_Loma_TrendPullback v1.30 - {desc}",
+        head = [f"; XAUUSD_Loma_TrendPullback v1.31 - {desc}",
                 "; Loma (MACD hump) method: big hump = trend, small pullback hump, entry on the first bar back across zero.",
+                "; v1.31: no signal when the pullback hump is itself a big opposite hump; positions closed Friday 23:00 server time.",
                 f"; Backtest (FTMO XAUUSD M1 path, Jan 2025-May 2026, risk-% sizing): {s['n']} trades, PF {s['pf']:.2f}, "
                 f"net {s['net']:+.0f}R, max drawdown {s['dd']:.1f}R; 2025 PF {pf(r[m25]):.2f} ({int(m25.sum())}), "
                 f"2026 (out of sample) PF {pf(r[~m25]):.2f} ({int((~m25).sum())} trades).",
-                "; Settings were chosen with 2025 data only, but this setup is one of five kept after seeing 2026: expect less live.",
+                "; Settings were chosen with 2025 data only, but this setup is one of five kept after seeing 2026, and the two v1.31 rules",
+                "; were added after seeing all the data: expect roughly PF 1.1-1.5 live. Stress verdicts are in LOMA_START_HERE.md.",
                 "; Trailing in R multiples cannot be fully judged on one-minute bars: confirm with real ticks in the MT5 tester.",
                 "; Session hours are BROKER SERVER TIME, calibrated on FTMO data (GMT+2 winter / GMT+3 summer).",
                 "; UseNewsFilter=true was NOT part of the backtest; set it to false to match the backtest exactly."]

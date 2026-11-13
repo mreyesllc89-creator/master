@@ -1,4 +1,4 @@
-# Loma EA v1.30: start here
+# Loma EA v1.31: start here
 
 `XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method on XAUUSD in MetaTrader 5, buys and sells. It is a new, separate EA: the XLZC Bearish EA is not changed.
 
@@ -25,53 +25,54 @@ A **hump** (loma) is a run of bars with the MACD on one side of zero.
 
 The EA has not been compiled here (no MetaEditor was available). Two independent reviews read it for compile errors and found none. If MetaEditor reports an error, send it to me.
 
-## Presets
+## What changed in v1.31
 
-Backtest: FTMO XAUUSD one-minute data, January 2025 to May 2026, real spreads, risk-% sizing. Settings were chosen with 2025 only; 2026 is out of sample.
+- **`SkipBigPullback` (on):** when the pullback hump is itself a big opposite hump, that is a trend change, so no signal is taken. In the backtest those trades were about break-even.
+- **`CloseBeforeWeekend` (on in the presets, off by default in the EA):** positions are closed on Friday from `WeekendCloseTime` (23:00 server time) and no new trades open after it. This removes the dependence on weekend gaps. A position still open on Saturday or Sunday is closed on the first tick.
+
+## Presets (v1.31)
+
+Backtest: FTMO XAUUSD one-minute data, January 2025 to May 2026, real spreads, risk-% sizing. Settings were chosen with 2025 only; 2026 is out of sample. The two v1.31 rules were added after seeing all the data.
 
 | Preset | Chart / trend filter | Session (server time) | Trades | PF | 2025 PF | 2026 PF |
 |---|---|---|---|---|---|---|
-| `Loma_Gold_M5_Buy_H1.set` | M5 buys / H1 | all day | 144 | 2.24 | 2.20 | 2.35 |
-| `Loma_Gold_M5_Buy_H4.set` | M5 buys / H4 | all day | 138 | 2.06 | 2.03 | 2.17 |
-| `Loma_Gold_M2_Sell_London_H1.set` | M2 sells / H1 | 07:00-12:00 | 130 | 2.16 | 2.35 | 1.71 |
-| `Loma_Gold_M3_Sell_H4.set` | M3 sells / H4 | 07:00-20:00 | 165 | 1.70 | 1.86 | 1.41 |
-| `Loma_Gold_M2_Sell_NY_H1.set` | M2 sells / H1 | 12:00-20:00 | 140 | 1.70 | 1.90 | 1.36 |
+| `Loma_Gold_M5_Buy_H1.set` | M5 buys / H1 | all day | 134 | 1.84 | 1.93 | 1.49 |
+| `Loma_Gold_M5_Buy_H4.set` | M5 buys / H4 | all day | 126 | 2.05 | 2.03 | 2.14 |
+| `Loma_Gold_M2_Sell_London_H1.set` | M2 sells / H1 | 07:00-12:00 | 116 | 2.22 | 2.30 | 2.00 |
+| `Loma_Gold_M3_Sell_H4.set` | M3 sells / H4 | 07:00-20:00 | 124 | 2.05 | 2.14 | 1.89 |
+| `Loma_Gold_M2_Sell_NY_H1.set` | M2 sells / H1 | 12:00-20:00 | 106 | 1.74 | 1.80 | 1.61 |
 
-All five stay profitable with the spread doubled, and the hump rules beat taking every zero-cross in the same setting (PF 1.0-1.3, with three to six times the drawdown).
+## Stress test of v1.31 (13 November 2026)
+
+The backtest engine was audited by three independent reviews: no look-ahead was found (corrupting future data left every earlier signal and trade unchanged in 40 of 40 runs), and a from-scratch re-implementation reproduced two presets trade for trade.
+
+"Worst combination" = entry one minute late + pessimistic trailing + 0.10 slippage + commission.
+
+| Preset | Normal PF (2026) | Slippage 0.10 + commission | Worst combination (2026) | Same at 2x spread | No trailing (2026) | 400 nudged versions: median PF, share profitable in 2026 |
+|---|---|---|---|---|---|---|
+| M5 Buy H1 | 1.84 (1.49) | 1.76 | 1.61 (1.37) | 1.49 | 1.38 (0.78) | 1.42, 68% |
+| M5 Buy H4 | 2.05 (2.14) | 1.96 | 1.49 (2.22) | 1.26 | 1.44 (0.77) | 1.38, 83% |
+| M2 Sell London H1 | 2.22 (2.00) | 2.02 | 1.25 (1.65) | 1.14 | 1.30 (1.42) | 1.57, 94% |
+| M3 Sell H4 | 2.05 (1.89) | 1.77 | 1.21 (0.88) | 1.06 | 1.43 (1.62) | 1.58, 98% |
+| M2 Sell NY H1 | 1.74 (1.61) | 1.69 | 1.42 (1.59) | 1.32 | 1.30 (1.23) | 1.60, 97% |
+
+- **Expect roughly PF 1.1-1.5 live, not the table above.** The presets are the best of a family (setups calibrated the same way but not shipped had a median 2026 PF of 1.05), each has only 30 to 44 trades in 2026, and the v1.31 rules were chosen with all the data in view.
+- **The trailing stop still carries much of the edge**, most of all for the buy presets (2026 PF below 1 without it). One-minute bars judge trailing optimistically: real ticks are required.
+- **Entry timing matters for the sells:** the worst combination cuts them to PF 1.2-1.4, and M3 Sell H4 loses in 2026 under it (0.88); at triple spread it is at break-even over the whole period.
+- **M5 Buy H1 lost its weekend-gap profit** with the weekend close: 2026 PF 2.35 fell to 1.49. What is left is the honest figure.
+- **The two buy presets take about 80% the same trades.** Run one, not both.
+- **What held:** every preset stays profitable over the whole period under every stress except M3 Sell H4 at triple spread; no losing quarter; the hump filter beats random selection (chance by luck under 2% for each); 98-100% of nudged versions stay profitable over the whole period.
+- **One-year risk at the harsher costs:** 95th-percentile drawdown 6.4R to 11.3R per preset; losing streaks up to 9 trades.
+- **Not tested:** data before 2025 or after May 2026 (the download source kept dropping connections), swaps.
+
+Use these presets for Strategy Tester (real ticks) and demo testing only until they are confirmed there.
 
 ## Read before trading
 
-- **Small samples.** Each preset has 28 to 55 trades in 2026. The direction is consistent; the exact numbers are not reliable.
-- **Second selection.** These five were kept after looking at 2026, so expect live results below the table.
-- **Buy presets ran in a rising gold market** (2025-26). The sell presets are the harder test.
-- **Trailing** is in R multiples and tight (0.3 to 1.0 R). One-minute bars cannot fully judge it: run each preset in the MT5 Strategy Tester with **Every tick based on real ticks**, then on demo.
-- **Session hours are broker server time**, calibrated on FTMO (GMT+2 winter, GMT+3 summer). Shift them if your broker's clock differs.
+- **Session hours are broker server time**, calibrated on FTMO (GMT+2 winter, GMT+3 summer). Shift them, and `WeekendCloseTime`, if your broker's clock differs.
 - **News filter** is on in the presets but was not in the backtest. Set `UseNewsFilter=false` to match it.
+- **Weekend close on holidays:** the backtest also closes before any closure of a day or more; the EA only knows Fridays and weekends.
 - **Not built yet:** extending the target to the middle of a liquidity candle.
-
-## Stress test (13 November 2026)
-
-The backtest engine was audited by three independent reviews: no look-ahead was found (corrupting future data left every earlier signal and trade unchanged in 40 of 40 runs), and a from-scratch re-implementation reproduced two presets trade for trade. The presets themselves are **not proven**:
-
-| Preset | Normal PF | Slippage 0.10 + commission | Late entry + pessimistic trailing + those costs | No trailing | Verdict |
-|---|---|---|---|---|---|
-| M5 Buy H1 | 2.24 | 2.14 | 2.00 | 1.50 | unproven |
-| M5 Buy H4 | 2.06 | 1.88 | 1.53 | 1.50 | fragile |
-| M2 Sell London H1 | 2.16 | 1.96 | 1.26 | 1.22 | unproven |
-| M3 Sell H4 | 1.70 | 1.53 | 1.18 | 1.26 | fragile |
-| M2 Sell NY H1 | 1.70 | 1.65 | 1.20 | 1.23 | fragile |
-
-- **The 2026 figures are the best of a family.** The 19 setups calibrated the same way but not shipped have a median 2026 PF of 1.05. Expect roughly PF 1.05-1.4 live, not 1.7-2.2.
-- **2026 rests on few trades.** Without its best five trades of 2026, each preset is at PF 0.63-1.25.
-- **The trailing stop carries the edge**, and one-minute bars judge it optimistically. Real ticks are required to confirm it.
-- **Timing matters for the sells:** one minute of delay cuts M2 Sell London to PF 1.64 and M2 Sell NY to 1.35.
-- **The timeframe is knife-edge:** moving a preset one timeframe up or down usually drops it to PF 0.9-1.3.
-- **M5 Buy H1 earns mostly from trades held overnight and over weekends;** one weekend gap is 53% of its 2026 profit. Its same-day trades lost in 2026.
-- **The two buy presets take about 80% the same trades.** Run one, not both.
-- **All five together at 0.5% risk:** PF 1.93, worst drawdown 11.7R (5.8%); under pessimistic trailing and slippage PF 1.64 and 16.9R (8.4%).
-- **What held:** the hump filter beats random entries with the same exits (under 1% chance by luck), doubled spread alone leaves PF 1.4-2.0, no losing quarter, and 99-100% of 400 randomly nudged versions of each preset stayed profitable.
-
-Use these presets for Strategy Tester (real ticks) and demo testing only until they are confirmed there.
 
 ## What you see on the chart
 
