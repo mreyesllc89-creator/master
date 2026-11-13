@@ -1,0 +1,253 @@
+symbol,tf,style,direction,evaluated,is_profitable,pass_is_oos,rules_tested,pass_rules,in_final,best_final_oos_net_usd
+BTCUSD,M1,BOT/TOP square,Both,80,0,0,0,0,0,
+BTCUSD,M1,BOT/TOP square,Long only,108,16,0,0,0,0,
+BTCUSD,M1,BOT/TOP square,Short only,80,0,0,0,0,0,
+BTCUSD,M1,"Turn, predict stop",Both,80,0,0,0,0,0,
+BTCUSD,M1,"Turn, predict stop",Long only,110,17,0,0,0,0,
+BTCUSD,M1,"Turn, predict stop",Short only,109,14,0,0,0,0,
+BTCUSD,M1,"Turn, at cross",Both,80,0,0,0,0,0,
+BTCUSD,M1,"Turn, at cross",Long only,80,0,0,0,0,0,
+BTCUSD,M1,"Turn, at cross",Short only,80,0,0,0,0,0,
+BTCUSD,M1,"Turn, after hold",Both,96,2,0,0,0,0,
+BTCUSD,M1,"Turn, after hold",Long only,117,17,0,0,0,0,
+BTCUSD,M1,"Turn, after hold",Short only,80,0,0,0,0,0,
+BTCUSD,M1,BOT/TOP tick,Both,80,0,0,0,0,0,
+BTCUSD,M1,BOT/TOP tick,Long only,80,0,0,0,0,0,
+BTCUSD,M1,BOT/TOP tick,Short only,80,0,0,0,0,0,
+BTCUSD,M1,"CONT, at close",Both,80,0,0,0,0,0,
+BTCUSD,M1,"CONT, at close",Long only,80,0,0,0,0,0,
+BTCUSD,M1,"CONT, at close",Short only,80,0,0,0,0,0,
+BTCUSD,M1,"CONT, stop entry",Both,111,14,0,0,0,0,
+BTCUSD,M1,"CONT, stop entry",Long only,148,38,0,0,0,0,
+BTCUSD,M1,"CONT, stop entry",Short only,80,0,0,0,0,0,
+BTCUSD,M5,BOT/TOP square,Both,324,101,0,0,0,0,
+BTCUSD,M5,BOT/TOP square,Long only,346,106,0,0,0,0,
+BTCUSD,M5,BOT/TOP square,Short only,200,0,0,0,0,0,
+BTCUSD,M5,"Turn, predict stop",Both,352,91,1,1,0,0,
+BTCUSD,M5,"Turn, predict stop",Long only,352,116,1,1,0,0,
+BTCUSD,M5,"Turn, predict stop",Short only,246,17,7,7,3,3,137.25
+BTCUSD,M5,"Turn, at cross",Both,339,94,6,5,5,0,
+BTCUSD,M5,"Turn, at cross",Long only,342,107,17,17,3,3,82.21
+BTCUSD,M5,"Turn, at cross",Short only,248,12,0,0,0,0,
+BTCUSD,M5,"Turn, after hold",Both,324,76,0,0,0,0,
+BTCUSD,M5,"Turn, after hold",Long only,344,113,0,0,0,0,
+BTCUSD,M5,"Turn, after hold",Short only,264,33,7,7,6,6,80.68
+BTCUSD,M5,BOT/TOP tick,Both,342,94,4,4,1,1,102.67
+BTCUSD,M5,BOT/TOP tick,Long only,342,102,0,0,0,0,
+BTCUSD,M5,BOT/TOP tick,Short only,320,59,4,4,4,3,190.21
+BTCUSD,M5,"CONT, at close",Both,320,66,0,0,0,0,
+BTCUSD,M5,"CONT, at close",Long only,350,128,3,3,3,3,180.16
+BTCUSD,M5,"CONT, at close",Short only,295,47,0,0,0,0,
+BTCUSD,M5,"CONT, stop entry",Both,353,113,2,2,1,1,133.66
+BTCUSD,M5,"CONT, stop entry",Long only,348,134,3,3,3,3,140.64
+BTCUSD,M5,"CONT, stop entry",Short only,302,46,0,0,0,0,
+BTCUSD,M15,BOT/TOP square,Both,1123,481,38,38,33,4,651.6
+BTCUSD,M15,BOT/TOP square,Long only,1124,631,2,2,2,2,226.53
+BTCUSD,M15,BOT/TOP square,Short only,1147,407,34,34,27,5,300.1
+BTCUSD,M15,"Turn, predict stop",Both,1158,519,43,43,36,5,615.07
+BTCUSD,M15,"Turn, predict stop",Long only,1125,611,62,58,53,5,376.36
+BTCUSD,M15,"Turn, predict stop",Short only,1119,365,66,59,52,5,143.81
+BTCUSD,M15,"Turn, at cross",Both,1125,488,21,21,20,3,230.04
+BTCUSD,M15,"Turn, at cross",Long only,1127,588,32,32,27,5,234.7
+BTCUSD,M15,"Turn, at cross",Short only,1167,479,43,43,29,5,88.31
+BTCUSD,M15,"Turn, after hold",Both,1160,579,51,49,42,5,483.0
+BTCUSD,M15,"Turn, after hold",Long only,1124,582,29,26,20,4,257.78
+BTCUSD,M15,"Turn, after hold",Short only,1156,447,79,60,49,5,231.68
+BTCUSD,M15,BOT/TOP tick,Both,1131,489,32,32,30,4,205.39
+BTCUSD,M15,BOT/TOP tick,Long only,1055,443,0,0,0,0,
+BTCUSD,M15,BOT/TOP tick,Short only,1095,372,54,54,43,5,163.04
+BTCUSD,M15,"CONT, at close",Both,1149,618,29,29,28,4,320.59
+BTCUSD,M15,"CONT, at close",Long only,1115,569,108,60,60,5,294.51
+BTCUSD,M15,"CONT, at close",Short only,1159,509,70,60,57,5,183.52
+BTCUSD,M15,"CONT, stop entry",Both,1123,608,85,60,59,26,894.26
+BTCUSD,M15,"CONT, stop entry",Long only,1129,657,64,60,7,5,203.54
+BTCUSD,M15,"CONT, stop entry",Short only,1140,413,79,60,53,5,214.56
+BTCUSD,M30,BOT/TOP square,Both,1148,593,148,60,60,17,690.71
+BTCUSD,M30,BOT/TOP square,Long only,1113,654,47,47,37,5,184.18
+BTCUSD,M30,BOT/TOP square,Short only,1136,410,35,35,28,5,149.46
+BTCUSD,M30,"Turn, predict stop",Both,1176,576,53,53,12,2,164.31
+BTCUSD,M30,"Turn, predict stop",Long only,1034,558,6,6,3,3,85.29
+BTCUSD,M30,"Turn, predict stop",Short only,1162,442,74,60,37,5,190.06
+BTCUSD,M30,"Turn, at cross",Both,1162,563,128,60,57,5,570.84
+BTCUSD,M30,"Turn, at cross",Long only,1152,637,80,60,56,5,292.93
+BTCUSD,M30,"Turn, at cross",Short only,1141,499,30,30,21,5,83.3
+BTCUSD,M30,"Turn, after hold",Both,1164,583,77,60,48,5,472.26
+BTCUSD,M30,"Turn, after hold",Long only,1086,621,37,37,33,5,217.13
+BTCUSD,M30,"Turn, after hold",Short only,1123,446,141,60,53,5,247.92
+BTCUSD,M30,BOT/TOP tick,Both,1052,418,18,18,9,1,99.57
+BTCUSD,M30,BOT/TOP tick,Long only,1068,437,40,40,23,5,142.98
+BTCUSD,M30,BOT/TOP tick,Short only,1088,435,49,49,34,5,95.41
+BTCUSD,M30,"CONT, at close",Both,1157,581,86,60,43,5,591.74
+BTCUSD,M30,"CONT, at close",Long only,1122,609,71,60,46,5,357.89
+BTCUSD,M30,"CONT, at close",Short only,1152,461,72,60,60,5,346.4
+BTCUSD,M30,"CONT, stop entry",Both,1147,571,147,60,2,2,357.82
+BTCUSD,M30,"CONT, stop entry",Long only,1138,661,67,60,36,4,268.79
+BTCUSD,M30,"CONT, stop entry",Short only,1145,514,29,29,23,5,81.96
+BTCUSD,H1,BOT/TOP square,Both,1126,548,73,60,55,5,467.2
+BTCUSD,H1,BOT/TOP square,Long only,1116,727,59,59,50,5,394.85
+BTCUSD,H1,BOT/TOP square,Short only,1100,456,78,60,59,5,221.15
+BTCUSD,H1,"Turn, predict stop",Both,1171,634,118,60,60,5,401.63
+BTCUSD,H1,"Turn, predict stop",Long only,1109,686,28,28,15,5,188.08
+BTCUSD,H1,"Turn, predict stop",Short only,1159,470,84,60,57,5,126.14
+BTCUSD,H1,"Turn, at cross",Both,1104,603,113,60,60,24,719.37
+BTCUSD,H1,"Turn, at cross",Long only,1141,708,75,60,55,5,275.68
+BTCUSD,H1,"Turn, at cross",Short only,1131,504,46,46,38,5,554.14
+BTCUSD,H1,"Turn, after hold",Both,1148,652,110,60,52,5,568.5
+BTCUSD,H1,"Turn, after hold",Long only,1103,651,52,52,44,4,240.33
+BTCUSD,H1,"Turn, after hold",Short only,1147,550,45,45,30,5,151.17
+BTCUSD,H1,BOT/TOP tick,Both,1087,435,20,20,20,3,223.6
+BTCUSD,H1,BOT/TOP tick,Long only,1049,513,6,6,4,2,51.84
+BTCUSD,H1,BOT/TOP tick,Short only,1097,430,121,60,58,5,81.08
+BTCUSD,H1,"CONT, at close",Both,1137,543,63,60,44,5,403.0
+BTCUSD,H1,"CONT, at close",Long only,1119,654,73,60,55,5,240.43
+BTCUSD,H1,"CONT, at close",Short only,1117,417,73,60,42,5,258.55
+BTCUSD,H1,"CONT, stop entry",Both,1149,650,155,60,54,5,474.2
+BTCUSD,H1,"CONT, stop entry",Long only,1138,712,216,60,0,0,
+BTCUSD,H1,"CONT, stop entry",Short only,1130,488,136,60,20,5,255.09
+BTCUSD,H4,BOT/TOP square,Both,1093,610,187,60,56,20,708.01
+BTCUSD,H4,BOT/TOP square,Long only,1127,682,54,54,39,5,367.12
+BTCUSD,H4,BOT/TOP square,Short only,1077,415,42,42,19,5,85.82
+BTCUSD,H4,"Turn, predict stop",Both,1146,700,97,60,60,5,606.19
+BTCUSD,H4,"Turn, predict stop",Long only,1125,733,99,60,49,5,379.15
+BTCUSD,H4,"Turn, predict stop",Short only,1100,405,55,55,42,5,212.76
+BTCUSD,H4,"Turn, at cross",Both,1112,644,102,60,56,5,424.1
+BTCUSD,H4,"Turn, at cross",Long only,1126,729,77,60,32,5,278.07
+BTCUSD,H4,"Turn, at cross",Short only,1121,518,174,60,56,5,341.93
+BTCUSD,H4,"Turn, after hold",Both,1162,699,98,60,56,5,338.53
+BTCUSD,H4,"Turn, after hold",Long only,1100,687,49,49,43,5,174.66
+BTCUSD,H4,"Turn, after hold",Short only,1106,447,195,60,34,5,287.03
+BTCUSD,H4,BOT/TOP tick,Both,1100,588,36,36,23,5,484.92
+BTCUSD,H4,BOT/TOP tick,Long only,1077,634,42,42,30,5,231.68
+BTCUSD,H4,BOT/TOP tick,Short only,1110,411,139,60,28,5,314.48
+BTCUSD,H4,"CONT, at close",Both,1112,594,207,60,18,5,540.47
+BTCUSD,H4,"CONT, at close",Long only,1125,712,214,60,59,5,355.37
+BTCUSD,H4,"CONT, at close",Short only,1138,497,133,60,58,5,126.59
+BTCUSD,H4,"CONT, stop entry",Both,1172,580,142,60,51,5,603.47
+BTCUSD,H4,"CONT, stop entry",Long only,1139,681,102,60,47,5,333.09
+BTCUSD,H4,"CONT, stop entry",Short only,1114,432,76,60,33,5,383.75
+XAUUSD,M1,BOT/TOP square,Both,174,83,0,0,0,0,
+XAUUSD,M1,BOT/TOP square,Long only,165,88,0,0,0,0,
+XAUUSD,M1,BOT/TOP square,Short only,175,78,4,4,1,1,249.39
+XAUUSD,M1,"Turn, predict stop",Both,169,104,60,25,15,15,18319.59
+XAUUSD,M1,"Turn, predict stop",Long only,169,112,50,25,20,5,7449.81
+XAUUSD,M1,"Turn, predict stop",Short only,162,95,47,25,25,5,6910.88
+XAUUSD,M1,"Turn, at cross",Both,167,71,5,5,2,2,235.91
+XAUUSD,M1,"Turn, at cross",Long only,170,89,4,4,1,1,275.87
+XAUUSD,M1,"Turn, at cross",Short only,170,69,4,4,1,1,1022.35
+XAUUSD,M1,"Turn, after hold",Both,169,81,1,1,0,0,
+XAUUSD,M1,"Turn, after hold",Long only,170,93,1,1,0,0,
+XAUUSD,M1,"Turn, after hold",Short only,165,66,4,4,2,2,587.01
+XAUUSD,M1,BOT/TOP tick,Both,167,83,0,0,0,0,
+XAUUSD,M1,BOT/TOP tick,Long only,166,100,0,0,0,0,
+XAUUSD,M1,BOT/TOP tick,Short only,146,57,7,7,2,2,549.61
+XAUUSD,M1,"CONT, at close",Both,172,96,2,2,0,0,
+XAUUSD,M1,"CONT, at close",Long only,169,97,6,6,6,5,383.89
+XAUUSD,M1,"CONT, at close",Short only,174,85,11,11,0,0,
+XAUUSD,M1,"CONT, stop entry",Both,171,127,78,25,21,7,9526.5
+XAUUSD,M1,"CONT, stop entry",Long only,167,129,73,25,23,5,3518.89
+XAUUSD,M1,"CONT, stop entry",Short only,169,123,101,25,18,5,2413.72
+XAUUSD,M5,BOT/TOP square,Both,353,181,22,22,22,5,733.72
+XAUUSD,M5,BOT/TOP square,Long only,343,189,6,6,6,5,289.11
+XAUUSD,M5,BOT/TOP square,Short only,343,111,13,13,13,5,235.85
+XAUUSD,M5,"Turn, predict stop",Both,351,217,32,32,25,5,1130.28
+XAUUSD,M5,"Turn, predict stop",Long only,344,213,7,7,5,5,1304.17
+XAUUSD,M5,"Turn, predict stop",Short only,353,162,24,24,18,5,1555.67
+XAUUSD,M5,"Turn, at cross",Both,349,164,4,4,4,4,195.86
+XAUUSD,M5,"Turn, at cross",Long only,349,191,2,2,2,2,420.58
+XAUUSD,M5,"Turn, at cross",Short only,352,115,40,40,40,5,500.98
+XAUUSD,M5,"Turn, after hold",Both,354,197,25,25,25,5,683.35
+XAUUSD,M5,"Turn, after hold",Long only,343,197,11,11,10,3,342.55
+XAUUSD,M5,"Turn, after hold",Short only,348,130,35,35,31,5,682.08
+XAUUSD,M5,BOT/TOP tick,Both,346,194,33,33,33,5,1036.4
+XAUUSD,M5,BOT/TOP tick,Long only,340,192,14,14,13,5,375.77
+XAUUSD,M5,BOT/TOP tick,Short only,345,100,7,7,7,5,392.95
+XAUUSD,M5,"CONT, at close",Both,348,177,16,16,15,5,863.47
+XAUUSD,M5,"CONT, at close",Long only,345,182,3,3,3,3,118.73
+XAUUSD,M5,"CONT, at close",Short only,351,105,22,22,21,5,623.11
+XAUUSD,M5,"CONT, stop entry",Both,351,222,61,40,39,21,1715.91
+XAUUSD,M5,"CONT, stop entry",Long only,344,208,58,40,38,5,723.25
+XAUUSD,M5,"CONT, stop entry",Short only,344,188,80,40,17,5,1276.58
+XAUUSD,M15,BOT/TOP square,Both,1117,673,78,60,60,5,1050.51
+XAUUSD,M15,BOT/TOP square,Long only,1150,636,20,20,18,4,371.27
+XAUUSD,M15,BOT/TOP square,Short only,1121,482,269,60,60,5,666.52
+XAUUSD,M15,"Turn, predict stop",Both,1135,754,146,60,57,30,4318.09
+XAUUSD,M15,"Turn, predict stop",Long only,1070,773,68,60,58,5,1966.43
+XAUUSD,M15,"Turn, predict stop",Short only,1142,592,122,60,60,5,644.95
+XAUUSD,M15,"Turn, at cross",Both,1144,713,108,60,60,5,956.92
+XAUUSD,M15,"Turn, at cross",Long only,1134,654,28,28,13,4,366.62
+XAUUSD,M15,"Turn, at cross",Short only,1096,503,92,60,59,5,541.15
+XAUUSD,M15,"Turn, after hold",Both,1130,665,80,60,55,5,927.79
+XAUUSD,M15,"Turn, after hold",Long only,1111,637,36,36,34,5,539.0
+XAUUSD,M15,"Turn, after hold",Short only,1148,514,125,60,60,5,345.29
+XAUUSD,M15,BOT/TOP tick,Both,1084,644,113,60,58,5,1095.13
+XAUUSD,M15,BOT/TOP tick,Long only,1095,681,32,32,28,4,255.99
+XAUUSD,M15,BOT/TOP tick,Short only,1129,536,205,60,60,5,1019.07
+XAUUSD,M15,"CONT, at close",Both,1119,637,64,60,58,5,1252.17
+XAUUSD,M15,"CONT, at close",Long only,1113,650,26,26,25,5,292.78
+XAUUSD,M15,"CONT, at close",Short only,1153,574,171,60,60,5,472.44
+XAUUSD,M15,"CONT, stop entry",Both,1141,701,157,60,60,5,1584.34
+XAUUSD,M15,"CONT, stop entry",Long only,1108,724,69,60,56,5,794.92
+XAUUSD,M15,"CONT, stop entry",Short only,1162,586,305,60,60,5,943.98
+XAUUSD,M30,BOT/TOP square,Both,1121,658,27,27,26,5,1532.06
+XAUUSD,M30,BOT/TOP square,Long only,1100,720,83,60,58,5,2050.74
+XAUUSD,M30,BOT/TOP square,Short only,1106,534,15,15,15,5,801.35
+XAUUSD,M30,"Turn, predict stop",Both,1167,546,212,60,60,6,2397.04
+XAUUSD,M30,"Turn, predict stop",Long only,1108,610,88,60,59,5,950.18
+XAUUSD,M30,"Turn, predict stop",Short only,1027,276,56,56,41,5,646.26
+XAUUSD,M30,"Turn, at cross",Both,1159,603,50,50,49,5,1783.97
+XAUUSD,M30,"Turn, at cross",Long only,1138,662,163,60,58,8,1358.14
+XAUUSD,M30,"Turn, at cross",Short only,1006,295,97,60,59,5,176.87
+XAUUSD,M30,"Turn, after hold",Both,1138,664,123,60,60,5,1056.05
+XAUUSD,M30,"Turn, after hold",Long only,1127,643,147,60,60,5,2263.57
+XAUUSD,M30,"Turn, after hold",Short only,1112,417,47,47,41,5,201.0
+XAUUSD,M30,BOT/TOP tick,Both,1135,611,149,60,60,5,4738.27
+XAUUSD,M30,BOT/TOP tick,Long only,1135,701,172,60,60,5,1408.94
+XAUUSD,M30,BOT/TOP tick,Short only,1018,372,2,2,2,2,180.36
+XAUUSD,M30,"CONT, at close",Both,1133,608,152,60,60,5,2247.69
+XAUUSD,M30,"CONT, at close",Long only,1121,646,136,60,60,5,1320.71
+XAUUSD,M30,"CONT, at close",Short only,1081,385,49,49,46,5,394.23
+XAUUSD,M30,"CONT, stop entry",Both,1153,567,96,60,59,5,1014.29
+XAUUSD,M30,"CONT, stop entry",Long only,1143,626,94,60,59,5,1192.78
+XAUUSD,M30,"CONT, stop entry",Short only,1044,317,67,60,21,5,254.51
+XAUUSD,H1,BOT/TOP square,Both,1126,660,233,60,59,5,1986.85
+XAUUSD,H1,BOT/TOP square,Long only,1098,752,182,60,60,5,1787.11
+XAUUSD,H1,BOT/TOP square,Short only,1098,454,26,26,19,4,251.57
+XAUUSD,H1,"Turn, predict stop",Both,1160,576,317,60,60,30,4475.14
+XAUUSD,H1,"Turn, predict stop",Long only,1096,594,143,60,51,5,1463.79
+XAUUSD,H1,"Turn, predict stop",Short only,1028,232,42,42,3,0,
+XAUUSD,H1,"Turn, at cross",Both,1149,601,106,60,58,5,1700.55
+XAUUSD,H1,"Turn, at cross",Long only,1114,614,215,60,58,5,1924.86
+XAUUSD,H1,"Turn, at cross",Short only,1101,411,15,15,13,5,95.69
+XAUUSD,H1,"Turn, after hold",Both,1154,682,371,60,60,5,3390.77
+XAUUSD,H1,"Turn, after hold",Long only,1136,743,255,60,56,5,1823.63
+XAUUSD,H1,"Turn, after hold",Short only,1159,422,140,60,60,5,209.13
+XAUUSD,H1,BOT/TOP tick,Both,1065,608,114,60,60,5,1732.9
+XAUUSD,H1,BOT/TOP tick,Long only,1081,689,138,60,57,5,1981.45
+XAUUSD,H1,BOT/TOP tick,Short only,1019,290,87,60,59,5,80.6
+XAUUSD,H1,"CONT, at close",Both,1138,642,225,60,60,5,1602.71
+XAUUSD,H1,"CONT, at close",Long only,1124,657,315,60,60,5,1558.59
+XAUUSD,H1,"CONT, at close",Short only,1132,337,82,60,58,5,273.45
+XAUUSD,H1,"CONT, stop entry",Both,1164,609,160,60,60,5,2233.06
+XAUUSD,H1,"CONT, stop entry",Long only,1114,633,313,60,60,5,1704.66
+XAUUSD,H1,"CONT, stop entry",Short only,1061,267,76,60,35,5,576.93
+XAUUSD,H4,BOT/TOP square,Both,1119,668,267,60,59,5,3234.16
+XAUUSD,H4,BOT/TOP square,Long only,1103,682,407,60,60,5,2190.37
+XAUUSD,H4,BOT/TOP square,Short only,1109,342,81,60,42,5,394.41
+XAUUSD,H4,"Turn, predict stop",Both,1159,653,389,60,60,5,2044.4
+XAUUSD,H4,"Turn, predict stop",Long only,1077,679,460,60,60,5,2428.8
+XAUUSD,H4,"Turn, predict stop",Short only,1140,386,115,60,13,5,643.96
+XAUUSD,H4,"Turn, at cross",Both,1165,678,318,60,60,5,1882.77
+XAUUSD,H4,"Turn, at cross",Long only,1109,661,387,60,60,5,2177.03
+XAUUSD,H4,"Turn, at cross",Short only,1149,498,75,60,53,5,644.77
+XAUUSD,H4,"Turn, after hold",Both,1128,703,418,60,60,11,3565.53
+XAUUSD,H4,"Turn, after hold",Long only,1126,691,388,60,60,5,1957.25
+XAUUSD,H4,"Turn, after hold",Short only,1115,462,118,60,54,5,663.31
+XAUUSD,H4,BOT/TOP tick,Both,1135,687,474,60,60,8,4320.67
+XAUUSD,H4,BOT/TOP tick,Long only,1055,663,390,60,60,5,2242.99
+XAUUSD,H4,BOT/TOP tick,Short only,1081,404,0,0,0,0,
+XAUUSD,H4,"CONT, at close",Both,1137,637,102,60,43,5,1655.75
+XAUUSD,H4,"CONT, at close",Long only,1122,636,307,60,57,5,1785.95
+XAUUSD,H4,"CONT, at close",Short only,1110,480,101,60,54,5,524.62
+XAUUSD,H4,"CONT, stop entry",Both,1130,590,147,60,53,5,2475.16
+XAUUSD,H4,"CONT, stop entry",Long only,1115,603,242,60,34,5,1933.08
+XAUUSD,H4,"CONT, stop entry",Short only,1054,278,44,44,11,5,752.9
