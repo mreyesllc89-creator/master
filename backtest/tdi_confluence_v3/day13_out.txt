@@ -1,0 +1,66 @@
+
+== 1m chart, day start 13:00, SL 5xATR(60m) TP 2R, 0.02%/side ==
+ Apr-Oct :  167 tr  win 58.7%  avg  +22.4bp  t +1.49  PF 1.35  sum   +3744bp
+ Nov 1-12:    6 tr  win 50.0%  avg  -94.6bp  t -0.88  PF 0.42  sum    -568bp
+  long :   87 tr  win 58.6%  avg  +20.5bp  t +1.02  PF 1.34  sum   +1783bp
+  short:   86 tr  win 58.1%  avg  +16.2bp  t +0.72  PF 1.22  sum   +1393bp
+  monthly sum bp: 04:+2298(19)  05:+473(23)  06:+242(23)  07:+366(25)  08:+563(29)  09:-457(22)  10:+260(26)  11:-568(6)
+  max drawdown 1502bp of notional;  fees 0%: +22.4bp  0.05%: +12.4bp
+  random entries: avg -5.1bp, beat real 1.0% of the time
+
+== 1m chart, day start 00:00, SL 5xATR(60m) TP 2R, 0.02%/side ==
+ Apr-Oct :  179 tr  win 59.2%  avg   -2.2bp  t -0.16  PF 0.97  sum    -399bp
+ Nov 1-12:    3 tr  win 33.3%  avg -168.8bp  t -0.82  PF 0.32  sum    -507bp
+
+== 5m chart, day start 13:00, SL 5xATR(60m) TP 2R, 0.02%/side ==
+ Apr-Oct :  134 tr  win 61.9%  avg  +55.5bp  t +2.92  PF 1.89  sum   +7443bp
+ Nov 1-12:    3 tr  win 33.3%  avg -146.8bp  t -1.03  PF 0.23  sum    -440bp
+  long :   67 tr  win 64.2%  avg  +62.5bp  t +2.26  PF 2.02  sum   +4188bp
+  short:   70 tr  win 58.6%  avg  +40.2bp  t +1.54  PF 1.58  sum   +2815bp
+  monthly sum bp: 04:+2463(15)  05:-543(16)  06:+1803(19)  07:+768(27)  08:+1263(17)  09:+567(23)  10:+1122(17)  11:-440(3)
+  max drawdown 1225bp of notional;  fees 0%: +55.1bp  0.05%: +45.1bp
+  random entries: avg -7.3bp, beat real 0.0% of the time
+
+== 5m chart, day start 00:00, SL 5xATR(60m) TP 2R, 0.02%/side ==
+ Apr-Oct :  145 tr  win 55.9%  avg  +13.1bp  t +0.74  PF 1.17  sum   +1905bp
+ Nov 1-12:    5 tr  win 20.0%  avg -154.5bp  t -1.55  PF 0.17  sum    -772bp
+
+== 15m chart, day start 13:00, SL 5xATR(60m) TP 2R, 0.02%/side ==
+ Apr-Oct :  102 tr  win 59.8%  avg  +37.0bp  t +1.46  PF 1.45  sum   +3776bp
+ Nov 1-12:    4 tr  win  0.0%  avg  -97.4bp  t -3.00  PF 0.00  sum    -390bp
+  long :   52 tr  win 57.7%  avg  +37.7bp  t +1.08  PF 1.47  sum   +1959bp
+  short:   54 tr  win 57.4%  avg  +26.4bp  t +0.76  PF 1.30  sum   +1427bp
+  monthly sum bp: 04:+2370(19)  05:-1410(14)  06:-148(10)  07:+1818(15)  08:-472(16)  09:+27(21)  10:+1592(7)  11:-390(4)
+  max drawdown 1999bp of notional;  fees 0%: +35.9bp  0.05%: +25.9bp
+  random entries: avg -6.4bp, beat real 4.7% of the time
+
+== 15m chart, day start 00:00, SL 5xATR(60m) TP 2R, 0.02%/side ==
+ Apr-Oct :  114 tr  win 62.3%  avg  +39.1bp  t +1.68  PF 1.50  sum   +4459bp
+ Nov 1-12:    2 tr  win 50.0%  avg +127.5bp  t  +nan  PF 1.75  sum    +255bp
+
+== 5m chart, day 13:00: stop/target neighbourhood, avg bp | trades (all data incl. Nov) ==
+                    TP1.5R         TP1R         TP2R         TP3R
+12xATR(chart)  +46.0 | 150  +38.0 | 160  +46.8 | 147  +51.9 | 145
+2xATR(60m)      +7.8 | 186   -0.0 | 194  +12.8 | 184  +23.2 | 179
+3xATR(60m)     +34.4 | 161  +20.9 | 166  +46.3 | 156  +44.6 | 149
+4xATR(60m)     +50.7 | 148  +32.5 | 153  +48.0 | 141  +51.9 | 139
+5xATR(60m)     +51.1 | 139  +44.7 | 146  +51.1 | 137  +55.5 | 136
+5xATR(chart)    +3.7 | 194   +0.2 | 205  +11.0 | 192  +17.3 | 186
+6xATR(60m)     +47.8 | 134  +51.8 | 140  +48.6 | 132  +50.9 | 132
+8xATR(60m)     +58.3 | 131  +55.5 | 133  +60.2 | 131  +62.0 | 131
+8xATR(chart)   +41.5 | 166  +28.7 | 173  +47.6 | 160  +51.5 | 153
+
+== 5m chart, day 13:00, default exits: other inputs one at a time (all data) ==
+ default         137 tr  win 61.3%  avg  +51.1bp  t +2.69  PF 1.78  sum   +7003bp
+ pivot 3/3       142 tr  win 55.6%  avg   +7.8bp  t +0.45  PF 1.10  sum   +1101bp
+ pivot 8/8        93 tr  win 43.0%  avg  -23.3bp  t -0.94  PF 0.79  sum   -2168bp
+ swing 10-120     97 tr  win 50.5%  avg  +28.0bp  t +1.13  PF 1.34  sum   +2720bp
+ div RB+RR       137 tr  win 61.3%  avg  +51.1bp  t +2.69  PF 1.78  sum   +7003bp
+ div all4        137 tr  win 61.3%  avg  +51.1bp  t +2.69  PF 1.78  sum   +7003bp
+ levels 38/62     80 tr  win 57.5%  avg  +34.1bp  t +1.17  PF 1.36  sum   +2728bp
+ levels 45/55    101 tr  win 58.4%  avg  +43.4bp  t +1.74  PF 1.49  sum   +4381bp
+ levels 30/70     33 tr  win 48.5%  avg  +24.2bp  t +0.38  PF 1.16  sum    +797bp
+ 4th signal on     3 tr  win 33.3%  avg   +6.2bp  t +0.02  PF 1.04  sum     +19bp
+ gated no1m       68 tr  win 61.8%  avg  +67.5bp  t +2.11  PF 1.91  sum   +4590bp
+ gated 15-60      65 tr  win 58.5%  avg  +62.4bp  t +1.89  PF 1.82  sum   +4055bp
+ trail 1R/0.5R   144 tr  win 64.6%  avg  +50.2bp  t +2.88  PF 1.83  sum   +7235bp

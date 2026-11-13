@@ -83,9 +83,52 @@ All rows use 5m or 15m charts, all 7 months, and 0.02% per side. The random-entr
 
 So it is a broad plateau, not a single lucky point.
 
-**Day-start hour (5m chart, 5× ATR(60m), TP 2R, all 24 hours):** all 24 hours are profitable, averaging +22 bp. On a 15m chart, 20 of 24 are profitable, averaging +19 bp. 13:00 UTC is the best on 5m, at +56 bp with t = 2.9. Other hours mostly fall between +4 and +41 bp with t ≈ 0.2–2.2. The **ATR stop is the robust part. 13:00 is probably a lucky pick**, so the default stays at 00:00. Full table: `dayhour_out.txt`.
+**Day-start hour (5m chart, 5× ATR(60m), TP 2R, all 24 hours):** all 24 hours are profitable, averaging +22 bp. On a 15m chart, 20 of 24 are profitable, averaging +19 bp. 13:00 UTC is the best on 5m, at +56 bp with t = 2.9. Other hours mostly fall between +4 and +41 bp with t ≈ 0.2–2.2. The **ATR stop is the robust part. 13:00 is probably a lucky pick**, so I originally kept 00:00; the default is now 13:00 at the user's request (see the update below). Full table: `dayhour_out.txt`.
 
 **Avoid D:** its edge is about 7 bp per trade before costs above 0.02%, and it disappears at 0.05% per side.
+
+## Update: day start 13:00 UTC is now the default
+
+At your request, v3.1 now defaults to a 13:00 UTC day start. Re-test of the full defaults (5× ATR(60m) stop, TP 2R, no trail, 0.02% per side), from `day13.py`; full output in `day13_out.txt`.
+
+**April–October (the period the settings were chosen on):**
+
+| Chart | Trades | Win % | bp/trade | t | Profit factor | Random entries beat it |
+|---|---|---|---|---|---|---|
+| 1m | 167 | 59 | +22.4 | 1.5 | 1.35 | 1% |
+| **5m** | 134 | 62 | **+55.5** | 2.9 | 1.89 | <0.3% |
+| 15m | 102 | 60 | +37.0 | 1.5 | 1.45 | 5% |
+
+On the 5m chart (including the November trades below): longs +62.5 bp, shorts +40.2 bp; 6 of 7 full months positive (May was −543 bp in total); +45 bp per trade at 0.05% fees; worst drawdown about 12% of the position's notional.
+
+**November 1–12 (new data, not used to choose anything):**
+
+| Chart | Trades | Won | bp/trade |
+|---|---|---|---|
+| 1m | 6 | 3 | −94.6 |
+| 5m | 3 | 1 | −146.8 |
+| 15m | 4 | 0 | −97.4 |
+
+The first unseen stretch lost on every chart. Three to six trades is far too few to judge the strategy, and one losing trade at this stop size costs about 150–250 bp, so a start like this is within normal variation. It is still the only truly out-of-sample evidence so far, and it is negative. The 00:00 day start also lost on 1m and 5m in the same window.
+
+**How sensitive the 5m result is to other inputs** (all data, default exits):
+
+| Change from default | Trades | bp/trade |
+|---|---|---|
+| none | 137 | +51.1 |
+| Stop 3× to 8× ATR(60m), TP 1R to 3R | 131–166 | +21 to +62 |
+| Stop 2× ATR(60m) | 179–194 | 0 to +23 |
+| Trailing on (1R / 0.5R) | 144 | +50.2 |
+| Divergence toggles (any) | 137 | +51.1 (no effect on entries) |
+| TDI levels 45/55 | 101 | +43.4 |
+| TDI levels 38/62 | 80 | +34.1 |
+| Toggles gate entries, no 1m | 68 | +67.5 |
+| Swing bars 10–120 | 97 | +28.0 |
+| **Pivot strength 3** | 142 | **+7.8** |
+| **Pivot strength 8** | 93 | **−23.3** |
+| Require 4th signal | 3 | too few trades |
+
+The stop and target settings are robust. The result depends heavily on pivot strength staying at 5: 3 is roughly break-even and 8 loses. Together with 13:00 being the single best of 24 hours, that means the +55 bp figure is probably optimistic; expect less going forward.
 
 ## Recommendation
 - **Use the v3.1 defaults on a 5m chart:**
@@ -102,11 +145,12 @@ So it is a broad plateau, not a single lucky point.
 
 ## Reproduce
 ```bash
-./fetch_data.sh        # Binance BTCUSDT 1m into ./data
+./fetch_data.sh        # Binance BTCUSDT 1m into ./data (Apr-Oct + Nov 1-12)
 python3 test_mtf.py    # MTF / ATR alignment regression tests
 python3 sweep3.py      # stages A+B, ~5 min on 4 cores
 python3 wf31.py        # mode comparison + walk-forward + plateaus
 python3 finalists.py   # stress tests
 python3 dayhour.py     # day-start hour sweep
+python3 day13.py       # 13:00 default re-test incl. November
 ```
 `v31_top_results.csv` lists the top 3,000 combinations, by t-stat, that have at least 100 trades.
