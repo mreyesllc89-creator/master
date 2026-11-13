@@ -1,7 +1,8 @@
 # Champion configuration. The Engineer role rewrites this file; the code never changes for a new champion.
-# No champion has been crowned yet: dry_run keeps the bot from sending any order.
+# Testnet keys live on the server (OWNER_NOTES.md); orders go to the Binance futures TESTNET only.
+# No champion yet: the placeholder below exercises the order path (fills, stops, Sentinel), it is not an edge.
 testnet: true
-dry_run: true
+dry_run: false
 symbol: BTCUSDT
 tf: 1h
 strategy: donchian_trend        # placeholder benchmark until the Judge crowns a champion
