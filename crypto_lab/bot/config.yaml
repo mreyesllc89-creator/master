@@ -1,0 +1,19 @@
+# Champion configuration. The Engineer role rewrites this file; the code never changes for a new champion.
+# No champion has been crowned yet: dry_run keeps the bot from sending any order.
+testnet: true
+dry_run: true
+symbol: BTCUSDT
+tf: 5m
+strategy: donchian_trend        # placeholder benchmark until the Judge crowns a champion
+params: {n: 96, atr_mult: 3.0}
+paper_equity: 10000
+risk_pct: 0.5
+max_leverage: 5
+entry_timeout_s: 240
+history_bars: 3000
+log: decisions.jsonl
+sentinel:
+  daily_halt_pct: 3.0
+  max_consecutive_losses: 3
+  stale_s: 30
+  max_fill_dev_pct: 0.5
