@@ -61,3 +61,21 @@ VERDICT (pre-registered, Amendment 1: T1a, T1b, T2, T3 below 0.02 and T4 below 0
 ====================================================================================================
 OTHER COINS (surviving large caps): frozen rule. Clean = before 2024-11-01, same calendar period as the BTC test. After = descriptive
 ====================================================================================================
+   ETHUSDT   clean:   626 trades  win 44.1%  avg  -35.6 bp  t -1.25  PF 0.88  | month-clustered t -1.40 p 0.9176  6-month-clustered t -2.17 p 0.9753  | bootstrap p 0.9226 | vs random timing p 0.9334
+   ETHUSDT   after:   189 trades  win 48.7%  avg   -7.4 bp  t -0.20  PF 0.97  | month-clustered t -0.17 p 0.5659  6-month-clustered t -0.17 p 0.5636  | bootstrap p 0.5789
+   BNBUSDT   clean:   656 trades  win 47.3%  avg  -42.1 bp  t -1.52  PF 0.86  | month-clustered t -1.66 p 0.9497  6-month-clustered t -2.84 p 0.9930  | bootstrap p 0.9556 | vs random timing p 0.9426
+   BNBUSDT   after:   243 trades  win 52.3%  avg   +3.8 bp  t +0.16  PF 1.03  | month-clustered t +0.14 p 0.4465  6-month-clustered t +0.19 p 0.4306  | bootstrap p 0.4462
+   SOLUSDT   clean:   421 trades  win 50.6%  avg  +31.8 bp  t +0.64  PF 1.08  | month-clustered t +0.65 p 0.2595  6-month-clustered t +0.74 p 0.2427  | bootstrap p 0.2603 | vs random timing p 0.2078
+   SOLUSDT   after:   230 trades  win 53.0%  avg  +42.9 bp  t +1.10  PF 1.19  | month-clustered t +0.97 p 0.1713  6-month-clustered t +0.92 p 0.2052  | bootstrap p 0.1658
+   XRPUSDT   clean:   548 trades  win 53.8%  avg  +49.8 bp  t +1.44  PF 1.17  | month-clustered t +1.42 p 0.0800  6-month-clustered t +1.56 p 0.0725  | bootstrap p 0.0770 | vs random timing p 0.0757
+   XRPUSDT   after:   218 trades  win 51.8%  avg  +14.1 bp  t +0.33  PF 1.06  | month-clustered t +0.33 p 0.3728  6-month-clustered t +0.31 p 0.3873  | bootstrap p 0.3710
+   DOGEUSDT  clean:   316 trades  win 44.0%  avg -124.8 bp  t -2.35  PF 0.71  | month-clustered t -2.42 p 0.9902  6-month-clustered t -2.85 p 0.9876  | bootstrap p 0.9941 | vs random timing p 0.9867
+   DOGEUSDT  after:   215 trades  win 53.0%  avg  +56.3 bp  t +1.24  PF 1.23  | month-clustered t +1.48 p 0.0763  6-month-clustered t +1.99 p 0.0584  | bootstrap p 0.0659
+   ADAUSDT   clean:   517 trades  win 51.5%  avg  +35.9 bp  t +0.96  PF 1.12  | month-clustered t +0.88 p 0.1915  6-month-clustered t +0.72 p 0.2437  | bootstrap p 0.1914 | vs random timing p 0.1978
+   ADAUSDT   after:   206 trades  win 52.9%  avg  +24.5 bp  t +0.48  PF 1.08  | month-clustered t +0.46 p 0.3256  6-month-clustered t +0.39 p 0.3569  | bootstrap p 0.3076
+   POOLED clean:  3084 trades  win 48.6%  avg   -9.8 bp  PF 0.97  | month-clustered t -0.61 p 0.7278  6-month-clustered t -1.12 p 0.8580  | bootstrap p 0.7272 | coins positive 3/6 | in R: avg -0.019, p 0.8351
+   POOLED after:  1301 trades  win 52.0%  avg  +22.8 bp  PF 1.10  | month-clustered t +1.25 p 0.1125  6-month-clustered t +1.60 p 0.0920  | bootstrap p 0.1041 | coins positive 5/6 | in R: avg 0.003, p 0.4639
+
+OTHER COINS (supporting, same period as the BTC test, so not independent confirmation): pooled clean month-clustered p 0.7278, 6-month p 0.8580 -> BTC-only or no edge; correlation of monthly average bp with BTC 0.02
+
+written: validation.json, trades_BTC_oos.csv, trades_alts.csv, validation_out.txt
