@@ -2,7 +2,7 @@
 //|                                  XAUUSD_Loma_TrendPullback.mq5   |
 //|                                                                  |
 //|  Strategy : XAUUSD "Loma" (MACD hump) Trend Pullback, both sides |
-//|  Version  : 1.31                                                 |
+//|  Version  : 1.32                                                 |
 //+------------------------------------------------------------------+
 //
 //  "No signal = no trade."
@@ -66,6 +66,13 @@
 //        day: entries are blocked on Friday only, so on a broker whose week opens on Sunday
 //        (server time) the Sunday session trades normally. A failed close is retried at
 //        most once every WEEKEND_RETRY_SEC seconds, and not at all while algo trading is off.
+//    R10 Optional time exits; neither blocks new entries:
+//        MaxHoldMinutes > 0: the position is closed at market once it has been open that many
+//        minutes (server time now - position open time).
+//        CloseAtEndOfDay: the position is closed at market once the server time of day is at
+//        or after EndOfDayTime, if it was opened before today's EndOfDayTime. A position
+//        opened after that time is kept until the next day's EndOfDayTime.
+//        Failed closes are retried like the weekend close (WEEKEND_RETRY_SEC).
 //
 //  STATE AFTER ATTACH / RESTART
 //  ----------------------------
@@ -98,9 +105,12 @@
 //    the first M1 bar inside the Friday window, and also on the last bar before any closure of
 //    24 hours or more (holidays). The EA closes on the first tick of the window and cannot
 //    foresee a holiday closure: only Friday and Saturday/Sunday are handled.
+//  * Time exits: the reference backtest (max_hold / eod) closes at the close of the M1 bar that
+//    reaches the holding limit or crosses the end-of-day time; the EA closes on the first tick
+//    at or after that moment. MaxHoldMinutes counts clock minutes, weekend included.
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
-#property version     "1.31"
+#property version     "1.32"
 #property strict
 #property description "XAUUSD Loma (MACD hump) Trend Pullback, sells and buys."
 #property description "Big MACD hump defines the trend; trade the zero-cross after a small pullback hump."
@@ -213,6 +223,11 @@ input bool    UseNewsFilter            = true;     // Skip around high-impact ne
 input string  NewsCurrency             = "USD";    // News currency
 input int     NewsWindowMinutes        = 30;       // +/- minutes around the event
 
+input group "=== R10: Time exits ==="
+input int     MaxHoldMinutes           = 0;        // Close the position after this many minutes open (0 = off)
+input bool    CloseAtEndOfDay          = false;    // Close the open position at EndOfDayTime every day
+input string  EndOfDayTime             = "22:00";  // End of day HH:MM, server time
+
 //====================================================================
 // GLOBALS
 //====================================================================
@@ -230,8 +245,12 @@ int      g_weekendMin     = 0;     // WeekendCloseTime in minutes from midnight
 bool     g_weekendLogged  = false; // weekend close announced (once per weekend window)
 bool     g_weekendFailLog = false; // failed weekend close reported (once per weekend window)
 datetime g_weekendLastTry = 0;     // server time of the last failed weekend close (retry throttle)
-// minimum seconds between weekend close retries
+// minimum seconds between weekend close retries (also used by the R10 time exits)
 #define  WEEKEND_RETRY_SEC 5
+int      g_eodMin         = 0;     // EndOfDayTime in minutes from midnight
+ulong    g_timeExitLogged  = 0;    // ticket whose time exit was announced (once per position)
+ulong    g_timeExitFailLog = 0;    // ticket whose failed time exit was reported (once per position)
+datetime g_timeExitLastTry = 0;    // server time of the last failed time exit (retry throttle)
 
 datetime g_lastBarTime    = 0;     // last evaluated trigger bar (open time of the forming bar)
 datetime g_signalBarTime  = 0;     // forming bar on which a valid signal is active
@@ -446,6 +465,16 @@ int OnInit()
       Print("[LOMA] WeekendCloseTime must be HH:MM");
       return INIT_PARAMETERS_INCORRECT;
      }
+   if(MaxHoldMinutes < 0)
+     {
+      Print("[LOMA] MaxHoldMinutes must be >= 0 (0 = off). Got ", MaxHoldMinutes);
+      return INIT_PARAMETERS_INCORRECT;
+     }
+   if(CloseAtEndOfDay && !ParseHHMM(EndOfDayTime, g_eodMin))
+     {
+      Print("[LOMA] EndOfDayTime must be HH:MM");
+      return INIT_PARAMETERS_INCORRECT;
+     }
    if(UseHTFFilter && PeriodSeconds(HTF_Timeframe) <= PeriodSeconds(TriggerTimeframe))
      {
       Print("[LOMA] HTF_Timeframe must be higher than TriggerTimeframe");
@@ -519,6 +548,9 @@ void OnTick()
   {
    //--- R9: flat before the weekend (Friday from WeekendCloseTime on; leftovers on Saturday, Sunday)
    WeekendClosePositions();
+
+   //--- R10: time exits (maximum holding time, end-of-day close); new entries are not blocked
+   TimeExitPositions();
 
    //--- always manage what is already open (trailing)
    ManageOpenPositions();
@@ -1517,6 +1549,75 @@ void WeekendClosePositions()
      }
   }
 
+//--- "hh:mm" of the parsed EndOfDayTime
+string EndOfDayTimeText()
+  {
+   return StringFormat("%02d:%02d", g_eodMin / 60, g_eodMin % 60);
+  }
+
+//--- R10: close this EA's position at market when it has been open MaxHoldMinutes, or when the
+//    server time of day is at or after EndOfDayTime and it was opened before today's
+//    EndOfDayTime. A failed close is retried at most once every WEEKEND_RETRY_SEC seconds;
+//    the journal gets one line per position.
+void TimeExitPositions()
+  {
+   if(MaxHoldMinutes <= 0 && !CloseAtEndOfDay)
+      return;
+   datetime now = TimeCurrent();
+   if(g_timeExitLastTry > 0 && now >= g_timeExitLastTry && now - g_timeExitLastTry < WEEKEND_RETRY_SEC)
+      return;                                  // throttle retries after a failed close
+   datetime eodMoment = now - (now % 86400) + (datetime)(g_eodMin * 60);   // today's EndOfDayTime
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      if(!g_pos.SelectByIndex(i))
+         continue;
+      if(g_pos.Symbol() != _Symbol || (ulong)g_pos.Magic() != MagicNumber)
+         continue;
+
+      datetime opened = g_pos.Time();
+      string   why    = "";
+      if(MaxHoldMinutes > 0 && (long)(now - opened) >= (long)MaxHoldMinutes * 60)
+         why = StringFormat("open for %d minutes or more (MaxHoldMinutes)", MaxHoldMinutes);
+      else if(CloseAtEndOfDay && now >= eodMoment && opened < eodMoment)
+         why = StringFormat("end of day (%s server time or later)", EndOfDayTimeText());
+      if(why == "")
+         continue;
+
+      ulong ticket = g_pos.Ticket();
+      if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
+        {
+         if(g_timeExitFailLog != ticket)
+           {
+            g_timeExitFailLog = ticket;
+            Print(StringFormat("[LOMA] Time exit of #%I64u not sent: algo trading disabled in terminal/EA settings - retrying once it is enabled",
+                               ticket));
+           }
+         g_timeExitLastTry = now;
+         return;
+        }
+      if(g_timeExitLogged != ticket)
+        {
+         g_timeExitLogged = ticket;
+         Log(StringFormat("Time exit: closing position #%I64u at market, %s", ticket, why));
+        }
+      ResetLastError();
+      bool sent = g_trade.PositionClose(ticket);
+      uint rc   = g_trade.ResultRetcode();
+      if(sent && (rc == TRADE_RETCODE_DONE || rc == TRADE_RETCODE_DONE_PARTIAL || rc == TRADE_RETCODE_PLACED))
+        {
+         g_timeExitLastTry = 0;
+         continue;
+        }
+      g_timeExitLastTry = now;
+      if(g_timeExitFailLog != ticket)
+        {
+         g_timeExitFailLog = ticket;
+         Print(StringFormat("[LOMA] Time exit of #%I64u failed: retcode=%u (%s) lastError=%d - retrying every few seconds",
+                            ticket, rc, g_trade.ResultRetcodeDescription(), GetLastError()));
+        }
+     }
+  }
+
 //====================================================================
 // VISUALS
 //====================================================================
@@ -1668,7 +1769,7 @@ void UpdatePanel()
   {
    if(!ShowStatusPanel || VisualsOff())
       return;
-   string build = "Loma TrendPullback v1.31";
+   string build = "Loma TrendPullback v1.32";
 
    string anchorTxt = "none";
    if(g_trend != 0)
@@ -1692,6 +1793,10 @@ void UpdatePanel()
                                     : "all day";
    if(CloseBeforeWeekend)
       sessTxt += "  |  weekend close ON " + WeekendTimeText();
+   if(MaxHoldMinutes > 0)
+      sessTxt += StringFormat("  |  max hold %d min", MaxHoldMinutes);
+   if(CloseAtEndOfDay)
+      sessTxt += "  |  EOD close " + EndOfDayTimeText();
    string htfTxt  = UseHTFFilter ? TFName(HTF_Timeframe) + StringFormat(" EMA(%d)", HTF_EMA_Period) : "off";
    string sigTxt  = g_signalActive ? "ACTIVE " + SideName(g_sigSide) : "none";
    double spreadPts = (Ask() - Bid()) / (_Point * g_ptScale);
