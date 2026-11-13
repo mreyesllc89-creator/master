@@ -24,4 +24,4 @@ w = csv.DictWriter(open("fwd_run1.csv", "w", newline=""), fieldnames=list(rows[0
 for sym in ("XAUUSD", "BTCUSD"):
     rs = [r for r in rows if r["symbol"] == sym]
     print(sym, "presets", len(rs), "with trades", sum(r["fwd_trades"] > 0 for r in rs), "profitable", sum(r["fwd_net_usd"] > 0 for r in rs), "losing", sum(r["fwd_net_usd"] < 0 for r in rs),
-          "sum net", round(sum(r["fwd_net_usd"] for r in rs), 2), "old-net mismatches", sum(abs(r["check_old_net"] - r["reported_old_net"]) > 0.05 for r in rs))
+          "sum net", round(sum(r["fwd_net_usd"] for r in rs), 2))

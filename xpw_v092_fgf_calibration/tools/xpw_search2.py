@@ -8,7 +8,8 @@ from multiprocessing import Pool
 import xpw_run as R
 import xpw_search as S1
 
-OUT = os.environ.get("XPW_OUT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "results2")
+QUICK = len(sys.argv) > 1 and sys.argv[1] == "quick"
+OUT = os.environ.get("XPW_OUT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "results2_quick" if QUICK else "results2")
 TS = lambda y, m, d: int(dt.datetime(y, m, d, tzinfo=dt.timezone.utc).timestamp())
 TF_LABEL = {1: "M1", 5: "M5", 15: "M15", 30: "M30", 60: "H1", 240: "H4"}
 YEAR = 365.25 * 86400
@@ -186,8 +187,9 @@ WARMUP = 120 * 86400
 def windows(symbol, tf):
     """Data starts WARMUP before the in-sample window (indicator and filter warm-up only: no entry before is_[0])."""
     if symbol == "XAUUSD" and tf <= 15:
-        w = dict(is_=(TS(2025, 5, 1), TS(2026, 4, 1)), oos=(TS(2026, 4, 1), TS(2026, 11, 1)),
-                 blocks=[TS(2025, 5, 1), TS(2025, 11, 1), TS(2026, 5, 1), TS(2026, 11, 1)], label="2025-05 to 2026-10")
+        # PAX Gold is quoted in cents only from 2025-05-16; the window starts on the first full day after that
+        w = dict(is_=(TS(2025, 5, 17), TS(2026, 4, 1)), oos=(TS(2026, 4, 1), TS(2026, 11, 1)),
+                 blocks=[TS(2025, 5, 17), TS(2025, 11, 1), TS(2026, 5, 1), TS(2026, 11, 1)], label="2025-05-17 to 2026-10")
     else:
         w = dict(is_=(TS(2023, 1, 1), TS(2025, 7, 1)), oos=(TS(2025, 7, 1), TS(2026, 11, 1)),
                  blocks=[TS(2023, 1, 1), TS(2024, 1, 1), TS(2025, 1, 1), TS(2026, 1, 1), TS(2026, 11, 1)], label="2023-01 to 2026-10")
@@ -236,8 +238,14 @@ def passes_basic(r, min_is, min_oos):
             and r["is_"]["pf"] >= 1.15 and r["oos"]["pf"] >= 1.15)
 
 
-def trade_sig(res):
-    return (int(res["n"]), res["entry_i"].tobytes(), res["exit_i"].tobytes(), res["side"].tobytes(), np.round(res["pnl"], 8).tobytes())
+def trade_sig(res, lo=None, hi=None):
+    """Trade list as a hashable signature, optionally only trades closing in [lo, hi)."""
+    m = np.ones(int(res["n"]), bool)
+    if res["n"] and (lo is not None or hi is not None):
+        xt = res["time"][res["exit_i"]]
+        if lo is not None: m &= xt >= lo
+        if hi is not None: m &= xt < hi
+    return (int(m.sum()), res["entry_i"][m].tobytes(), res["exit_i"][m].tobytes(), res["side"][m].tobytes(), np.round(res["pnl"][m], 8).tobytes())
 
 
 def stratum_file(symbol, tf, si, direction):
@@ -289,21 +297,57 @@ def stratum_task(args):
         sigs.add(sg); uniq.append(r)
     out = []
     for r in uniq[:keep]:
-        res = run(mk, r["params"], w)
-        r["blocks"] = [usd_metrics(mk, res, w["blocks"][i], w["blocks"][i + 1])["net"] for i in range(len(w["blocks"]) - 1)]
-        r["fwd"] = usd_metrics(mk, res, *w["fwd"])
-        rs = run(mk, r["params"], w, cost_mult=2.0)
-        r["stress_is"] = usd_metrics(mk, rs, *w["is_"]); r["stress_oos"] = usd_metrics(mk, rs, *w["oos"])
-        r["stress_all"] = usd_metrics(mk, rs, w["is_"][0], w["oos"][1])
-        r["balanced"] = balanced(r, w); r["style"] = style[3]; r["style_i"] = si; r["direction"] = direction
+        full_score(mk, w, r); r["style"] = style[3]; r["style_i"] = si; r["direction"] = direction
         out.append(r)
     best = max(rows, key=lambda r: r["score"])
     result = dict(symbol=symbol, tf=tf, style_i=si, style=style[3], direction=direction, evaluated=len(rows), is_profitable=n_is_pos,
                   pass_is_oos=len(cands), pass_is_oos_distinct=len(uniq), best_is_net=best["is_"]["net"] if best["score"] > -1e8 else None,
-                  best_is_oos_net=best["oos"]["net"] if best["score"] > -1e8 else None, elapsed=time.time() - t0, candidates=out)
+                  best_is_oos_net=best["oos"]["net"] if best["score"] > -1e8 else None, elapsed=time.time() - t0, candidates=out,
+                  stamp=stamp_for(symbol, tf, budget, seed))
     tmp = stratum_file(symbol, tf, si, direction) + ".tmp"
     json.dump(result, open(tmp, "w"), default=str); os.replace(tmp, stratum_file(symbol, tf, si, direction))
     return {k: v for k, v in result.items() if k != "candidates"}
+
+
+def full_score(mk, w, r):
+    """All window figures of one candidate: in-sample, out-of-sample, both, calendar blocks, unseen days, 2x costs."""
+    res = run(mk, r["params"], w)
+    r["is_"] = usd_metrics(mk, res, *w["is_"]); r["oos"] = usd_metrics(mk, res, *w["oos"]); r["all"] = usd_metrics(mk, res, w["is_"][0], w["oos"][1])
+    r["blocks"] = [usd_metrics(mk, res, w["blocks"][i], w["blocks"][i + 1])["net"] for i in range(len(w["blocks"]) - 1)]
+    r["fwd"] = usd_metrics(mk, res, *w["fwd"])
+    rs = run(mk, r["params"], w, cost_mult=2.0)
+    r["stress_is"] = usd_metrics(mk, rs, *w["is_"]); r["stress_oos"] = usd_metrics(mk, rs, *w["oos"])
+    r["stress_all"] = usd_metrics(mk, rs, w["is_"][0], w["oos"][1])
+    r["balanced"] = balanced(r, w)
+    return r
+
+
+def stamp_for(symbol, tf, budget, seed):
+    w = windows(symbol, tf)
+    return dict(budget=list(budget), seed=seed, is_=list(w["is_"]), oos=list(w["oos"]), blocks=list(w["blocks"]), start=w["start"], min_is=MIN_IS[tf])
+
+
+def stratum_done(symbol, tf, si, d, budget, seed):
+    """A saved stratum is reused only if it was produced with the same budget, seed and windows."""
+    f = stratum_file(symbol, tf, si, d)
+    if not os.path.exists(f): return False
+    try: return json.load(open(f)).get("stamp") == stamp_for(symbol, tf, budget, seed)
+    except Exception: return False
+
+
+def rescore_task(args):
+    """Re-score the saved candidates of one stratum with the current accounting and re-apply the IS/OOS gate."""
+    symbol, tf, si, d = args
+    s = json.load(open(stratum_file(symbol, tf, si, d)))
+    w = windows(symbol, tf); mk = market(symbol, w["start"])
+    for c in (mk._ind, mk._evt, mk._fgf): c.clear()
+    min_is = MIN_IS[tf]; min_oos = max(10, min_is // 4)
+    kept = []
+    for r in s["candidates"]:
+        full_score(mk, w, r)
+        if passes_basic(r, min_is, min_oos): kept.append(r)
+    s["saved"] = len(s["candidates"]); s["candidates"] = kept
+    return s
 
 
 def accept(r):
@@ -317,21 +361,23 @@ N_NEIGHBOURS, MIN_NEIGHBOURS, MIN_STABLE = 24, 12, 0.5
 
 
 def stability_task(args):
-    """Share of one-step neighbours (one input changed, trades actually different from the base and from each
-    other) that stay profitable overall and out of sample."""
+    """Share of neighbours that stay profitable overall and out of sample. A neighbour changes one input to
+    another value of its search grid (any value, not only the adjacent one) and only counts if its trades in the
+    scored windows differ from the base and from every earlier neighbour."""
     symbol, tf, plist, seed = args
     w = windows(symbol, tf); mk = market(symbol, w["start"])
     for c in (mk._ind, mk._evt, mk._fgf): c.clear()
     rng = random.Random(seed); out = []
     for p in plist:
-        keys = {key_of(p)}; sigs = {trade_sig(run(mk, p, w))}; ok = 0; n = 0; tries = 0
+        lo, hi = w["is_"][0], w["oos"][1]       # neighbours must differ inside the scored windows
+        keys = {key_of(p)}; sigs = {trade_sig(run(mk, p, w), lo, hi)}; ok = 0; n = 0; tries = 0
         while n < N_NEIGHBOURS and tries < 240:
             tries += 1
             q = mutate(rng, p, symbol, tf, 1)
             k = key_of(q)
             if k in keys: continue
             keys.add(k)
-            res = run(mk, q, w); sg = trade_sig(res)
+            res = run(mk, q, w); sg = trade_sig(res, lo, hi)
             if sg in sigs: continue          # same trades as the base or an earlier neighbour: not a real neighbour
             sigs.add(sg); n += 1
             if R.metrics(res, w["is_"][0], w["oos"][1])["net"] > 0 and R.metrics(res, *w["oos"])["net"] > 0: ok += 1
@@ -358,15 +404,17 @@ def is_stable(r):
 def merge(pool, pairs):
     """Merge the saved strata per symbol/timeframe, apply acceptance, check neighbour stability for the overall
     leaders AND the leaders of every way of playing, and write one JSON per symbol/timeframe."""
-    merged = {}
+    merged = {}; todo = []; by_pair = {}
     for symbol, tf in pairs:
-        ss = []
-        for si in range(len(STYLES)):
-            for d, _ in DIRS:
-                f = stratum_file(symbol, tf, si, d)
-                if os.path.exists(f): ss.append(json.load(open(f)))
-        if len(ss) != len(STYLES) * len(DIRS):
-            print("incomplete", symbol, TF_LABEL[tf], len(ss), flush=True); continue
+        have = [(symbol, tf, si, d) for si in range(len(STYLES)) for d, _ in DIRS if os.path.exists(stratum_file(symbol, tf, si, d))]
+        if len(have) != len(STYLES) * len(DIRS):
+            print("incomplete", symbol, TF_LABEL[tf], len(have), flush=True); continue
+        todo += have
+    for s in pool.imap_unordered(rescore_task, todo):
+        by_pair.setdefault((s["symbol"], s["tf"]), []).append(s)
+    for symbol, tf in pairs:
+        if (symbol, tf) not in by_pair: continue
+        ss = by_pair[(symbol, tf)]
         cands = sorted([c for s in ss for c in s["candidates"]], key=lambda r: r["balanced"], reverse=True)
         acc = [r for r in cands if accept(r)]
         chk = list(acc[:30]); ids = {id(r) for r in chk}; per = {}
@@ -389,8 +437,9 @@ def merge(pool, pairs):
         out = dict(symbol=symbol, tf=tf, tf_label=TF_LABEL[tf], window=w["label"], is_window=list(w["is_"]), oos_window=list(w["oos"]),
                    blocks=w["blocks"], bars=bases[(symbol, tf)][1], baseline=bases[(symbol, tf)][0],
                    evaluated=sum(s["evaluated"] for s in ss), pass_is_oos=sum(s["pass_is_oos_distinct"] for s in ss),
-                   pass_rules=len(acc), checked_for_stability=len(chk), final=len(final),
-                   strata=[dict({k: v for k, v in s.items() if k != "candidates"}, pass_rules=sum(1 for c in s["candidates"] if accept(c)))
+                   rules_tested=len(cands), pass_rules=len(acc), checked_for_stability=len(chk), final=len(final),
+                   strata=[dict({k: v for k, v in s.items() if k not in ("candidates", "stamp")}, rules_tested=len(s["candidates"]),
+                                pass_rules=sum(1 for c in s["candidates"] if accept(c)))
                            for s in sorted(ss, key=lambda s: (s["style_i"], s["direction"]))],
                    top=final, unstable=[r for r in chk if not is_stable(r)])
         json.dump(out, open(os.path.join(OUT, f"{symbol}_{TF_LABEL[tf]}.json"), "w"), default=str)
@@ -416,7 +465,7 @@ if __name__ == "__main__":
         for si in range(len(STYLES)):
             for d, _ in DIRS:
                 seed += 1
-                if not os.path.exists(stratum_file(symbol, tf, si, d)):      # resumable: finished strata are kept
+                if not stratum_done(symbol, tf, si, d, budget_for(tf, quick), seed):      # resumable: matching finished strata are kept
                     tasks.append((symbol, tf, si, d, budget_for(tf, quick), seed))
     t0 = time.time()
     with Pool(4, maxtasksperchild=8) as pool:

@@ -11,10 +11,11 @@ for symbol, tf in (("XAUUSD", 15), ("BTCUSD", 240), ("XAUUSD", 240)):
         for d, _ in S.DIRS:
             p = S.sample(rng, symbol, tf, style, d, True); res = S.run(mk, p, w); n += 1
             if res["n"] and bt[res["entry_i"]].min() < w["is_"][0]: bad += 1; print("EARLY ENTRY", symbol, tf, style[3])
-            m = R.metrics(res, *w["is_"])
-            pnl = res["pnl"][(bt[res["exit_i"]] >= w["is_"][0]) & (bt[res["exit_i"]] < w["is_"][1])]
-            closed = float((np.maximum.accumulate(np.concatenate(([0.0], np.cumsum(pnl))))[1:] - np.cumsum(pnl)).max()) if len(pnl) else 0.0
-            assert m["maxdd"] >= closed - 1e-9
-            if m["maxdd"] > closed + 1e-9: dd_up += 1
-            assert m["wins"] == int((pnl > 0).sum())
-print("runs", n, "early entries", bad, "runs where mark-to-market drawdown exceeds closed-trade drawdown", dd_up)
+            m = R.metrics(res, *w["is_"]); mo = R.metrics(res, *w["oos"]); mf = R.metrics(res, *w["fwd"]); ma = R.metrics(res, w["is_"][0], w["oos"][1])
+            # windows add up: every dollar is booked exactly once
+            assert abs(m["net"] + mo["net"] + mf["net"] - float(res["pnl"].sum())) < 1e-6, (symbol, tf, style[3])
+            assert abs(m["net"] + mo["net"] - ma["net"]) < 1e-6
+            i1 = int(np.searchsorted(bt, w["oos"][1]))
+            assert abs(ma["net"] - float(res["equity"][i1 - 1])) < 1e-6      # in+out of sample net == equity at the out-of-sample end
+            if m["maxdd"] > 0: dd_up += 1
+print("runs", n, "early entries", bad, "runs with drawdown", dd_up)

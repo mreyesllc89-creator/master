@@ -39,11 +39,11 @@ def main():
         j = json.load(open(f)); sym = j["symbol"]; tf = int(j["tf"]); lab = j["tf_label"]; spec = R.SYMBOLS[sym]
         chosen = pick(j["top"])
         summary.append(dict(symbol=sym, tf=lab, clock="Live" if tf in LIVE else "Tester only", window=j["window"], bars=j["bars"], evaluated=j["evaluated"],
-                            pass_is_oos=j["pass_is_oos"], pass_rules=j["pass_rules"], checked_for_stability=j["checked_for_stability"], stable=j["final"], saved=len(chosen),
+                            pass_is_oos=j["pass_is_oos"], rules_tested=j["rules_tested"], pass_rules=j["pass_rules"], checked_for_stability=j["checked_for_stability"], stable=j["final"], saved=len(chosen),
                             ref_trades=j["baseline"]["trades"], ref_net_usd=round(j["baseline"]["net"], 2), ref_pf=round(j["baseline"]["pf"], 3)))
         for s in j["strata"]:
             strata.append(dict(symbol=sym, tf=lab, style=s["style"], direction=DIRN[s["direction"]], evaluated=s["evaluated"], is_profitable=s["is_profitable"],
-                               pass_is_oos=s["pass_is_oos_distinct"], pass_rules=s["pass_rules"], in_final=sum(1 for r in j["top"] if r["style_i"] == s["style_i"] and r["direction"] == s["direction"]),
+                               pass_is_oos=s["pass_is_oos_distinct"], rules_tested=s["rules_tested"], pass_rules=s["pass_rules"], in_final=sum(1 for r in j["top"] if r["style_i"] == s["style_i"] and r["direction"] == s["direction"]),
                                best_final_oos_net_usd=max([round(r["oos"]["net"], 2) for r in j["top"] if r["style_i"] == s["style_i"] and r["direction"] == s["direction"]], default="")))
         nb = len(j["blocks"]) - 1
         for rank, r in enumerate(chosen, 1):
@@ -90,13 +90,13 @@ def main():
     for sym in ("XAUUSD", "BTCUSD"):
         rs = [r for r in fwd1 if r["symbol"] == sym]
         L.append(f"| {sym} | {len(rs)} | {sum(float(r['fwd_net_usd']) > 0 for r in rs)} | {sum(float(r['fwd_net_usd']) < 0 for r in rs)} | {sum(int(r['fwd_trades']) == 0 for r in rs)} | {sum(float(r['fwd_net_usd']) for r in rs):.0f} |")
-    L += ["", "Twelve days is a short test. It is the only fully independent evidence available, and it is mixed: fewer than half the presets made money. Per-preset figures are in `data/run1_forward_test.csv`.\n",
+    L += ["", "Twelve days is a short test. It is the only fully independent evidence available, and it is mixed: fewer than half the presets made money. Figures count only what was earned after 2026-11-01. Per-preset figures are in `data/run1_forward_test.csv`.\n",
           "## Search summary\n",
-          "| Symbol | TF | Clock | Window | Combos tested | Pass in and out of sample | Pass cost, block and winner rules | Stability-checked | Stable | Saved | Reference preset net |",
-          "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|"]
+          "| Symbol | TF | Clock | Window | Combos tested | Pass in and out of sample | Leaders kept and re-scored | Pass cost, block and winner rules | Stability-checked | Stable | Saved | Reference preset net |",
+          "|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for s in summary:
-        L.append(f"| {s['symbol']} | {s['tf']} | {s['clock']} | {s['window']} | {s['evaluated']} | {s['pass_is_oos']} | {s['pass_rules']} | {s['checked_for_stability']} | {s['stable']} | {s['saved']} | {s['ref_net_usd']:.0f} ({s['ref_trades']} trades) |")
-    L += ["", f"Total combinations tested: **{sum(s['evaluated'] for s in summary):,}**.\n", "## Which ways of playing survive\n",
+        L.append(f"| {s['symbol']} | {s['tf']} | {s['clock']} | {s['window']} | {s['evaluated']} | {s['pass_is_oos']} | {s['rules_tested']} | {s['pass_rules']} | {s['checked_for_stability']} | {s['stable']} | {s['saved']} | {s['ref_net_usd']:.0f} ({s['ref_trades']} trades) |")
+    L += ["", f"Total combinations tested: **{sum(s['evaluated'] for s in summary):,}**. Of the combinations that pass in and out of sample, the best 60 of each way of playing are kept and re-scored against the cost, block and winner rules.\n", "## Which ways of playing survive\n",
           "Count of timeframes (out of 6) where at least one stable preset exists for that entry style and direction.\n"]
     for sym in ("XAUUSD", "BTCUSD"):
         L += [f"**{sym}**\n", "| Entry style | Both | Long only | Short only |", "|---|---:|---:|---:|"]
@@ -105,7 +105,7 @@ def main():
             L.append(f"| {st[3]} | " + " | ".join(cells) + " |")
         L.append("")
     L += ["Per-timeframe detail is in `data/strata_summary.csv`.\n", "## Saved presets\n",
-          "USD per 0.01 lot (gold: 1 oz; BTC: 0.01 BTC) after modeled spread and commission. Forward = the untouched 2026-11-01 to 2026-11-12 window, never used to pick or accept a preset.\n",
+          "USD per 0.01 lot (gold: 1 oz; BTC: 0.01 BTC) after modeled spread and commission. Fwd = profit earned on the unseen days 2026-11-01 to 2026-11-12, never used to pick or accept a preset. A position carried in from October counts only its change after 2026-11-01, and a position still open at the end is valued at the last price.\n",
           "| Preset | Clock | Way of playing | IS trades | IS net | IS PF | OOS trades | OOS net | OOS PF | OOS maxDD | 2x-cost net | Blocks | Stability | Fwd trades | Fwd net | Note |",
           "|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|---:|---:|---:|---|"]
     for a in accepted:
@@ -122,17 +122,20 @@ def main():
 - **Every way of playing gets its own search.** 7 entry styles (BOT/TOP square; Turn with predict stop, at cross, after hold; BOT/TOP tick; CONT at close, CONT stop entry) x 3 directions (both, long only, short only) = 21 searches per symbol and timeframe, half of each starting with the FlashGold filter on.
 - **Wider grid.** New or widened inputs: TradeDir, InvertFill, AtrLen, ExAtrLen, MaxChase, ContStopBars, BotMinW/TopMinW, BotNeedLow/TopNeedHigh, FlashGold hold bars, drift bars, TDI lengths, D1 filter/parent/zone timeframes, and more values for stops, targets, trailing, time stop, RSI/MA lengths, squares, wicks and CONT thresholds.
 - **Stricter acceptance.** On top of run 1's rules (in-sample and out-of-sample net > 0 with PF >= 1.15, minimum trades and winners, profitable at 2x costs): at most one losing calendar block (yearly blocks, or half-year blocks for the short gold window), and neighbour stability of at least 50 %.
-- **Neighbour stability.** For each leading candidate, 24 variants are built by changing one input one step. Only variants whose trades actually differ from the candidate and from each other count. The share that stays profitable overall and out of sample is the stability score. The overall top 30 and the top 5 of every way of playing are checked, so no way of playing is skipped.
+- **Neighbour stability.** For each leading candidate, up to 24 variants are built by changing a single input to another value from its search grid (any value, not only the adjacent one). Only variants whose trades inside the scored windows differ from the candidate and from each other count, and at least 12 such variants are required. The share that stays profitable overall and out of sample is the stability score. The overall top 30 and the top 5 of every way of playing are checked, so no way of playing is skipped.
 - **Drawdown is mark-to-market.** Maximum drawdown includes the paper loss of open positions at each bar close, not only closed trades. Run 1 used closed trades only, so run-2 drawdowns read higher for the same behaviour.
 - **Warm-up.** Indicators and the FlashGold filter get 120 days of history before the in-sample window; no trade may open in the warm-up. Run 1 started cold.
-- **Unseen days.** 2026-11-01 to 2026-11-12 is reported for every preset and used for nothing else. Positions still open at the end are valued at the last price.
+- **Window accounting.** A position that is open across a window edge is split at the last bar close before the edge, so each window's profit is what was earned inside it and the windows add up exactly. In particular a loss already on the books at the end of the out-of-sample window counts against it.
+- **Gold short window.** PAX Gold is quoted in cents only from 2025-05-16, so gold M1/M5/M15 now start on 2025-05-17 (run 1 started on 2025-05-01 and included two weeks of whole-dollar prices).
+- **Unseen days.** 2026-11-01 to 2026-11-12 is reported for every preset and used for nothing else.
 - **Diverse picks.** Up to 3 presets per symbol and timeframe, preferring different entry style / direction combinations.
 
 ## Checks on the tooling
 
 - **No look-ahead.** 168 configurations across all styles and directions produce identical trades with and without later data (`tools/causality_test.py`).
 - **Search-space bookkeeping is sound.** Inputs that cannot matter for a given way of playing are reset to defaults so duplicates are not re-tested; 1,890 cases confirm that resetting them never changes a single trade (`tools/canon_test.py`).
-- **Independent review.** The run-2 search code was reviewed by three reviewers with two adversarial verifiers per finding. Thirteen findings were confirmed and all were fixed before this run, including an inflated stability score, stability checks limited to the overall leaders, closed-trade-only drawdown, a forward window that dropped the final hours, and BTC point inputs re-entering the search at gold scale.
+- **Windows add up.** In-sample + out-of-sample + unseen-days profit equals the total, and in-sample + out-of-sample profit equals the equity at the out-of-sample end, in every test run; no trade can open in the warm-up (`tools/warmup_test.py`).
+- **Independent review, twice.** The run-2 search code was reviewed by three reviewers with adversarial verification of each finding, and the fixes were then checked again the same way. All confirmed findings were fixed before the results below were produced, including an inflated stability score, stability checks limited to the overall leaders, closed-trade-only drawdown, positions open at a window end not being counted, and BTC point inputs re-entering the search at gold scale. BTC M1, M5 and part of M15 were searched before the window-accounting fix; all of their saved candidates were re-scored with the corrected accounting.
 
 ## Caveats
 

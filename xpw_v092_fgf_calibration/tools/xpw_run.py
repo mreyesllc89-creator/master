@@ -171,19 +171,30 @@ class Market:
 
 
 def metrics(r, t_lo=None, t_hi=None):
-    """Trade metrics restricted to trades whose EXIT time is in [t_lo, t_hi).
-    Max drawdown is the larger of the closed-trade drawdown and the mark-to-market
-    drawdown of the bar-close equity curve inside the window (open positions count)."""
-    t = r["time"]
-    xt = t[r["exit_i"]] if r["n"] else np.zeros(0, np.int64)
-    m = np.ones(r["n"], bool)
-    if t_lo is not None: m &= xt >= t_lo
-    if t_hi is not None: m &= xt < t_hi
-    pnl = r["pnl"][m]
-    n = len(pnl)
-    e = r["equity"]
+    """Metrics of the window [t_lo, t_hi). A trade is booked where it closes. A position that straddles a window
+    edge is split at the last bar close before the edge (mark-to-market), so every window's net equals what was
+    earned inside it and windows add up: the open position at the window end is booked as a marked trade, and the
+    part of a carried-in trade earned before the window start is taken off it.
+    Max drawdown is the larger of the closed-trade drawdown and the bar-close equity drawdown inside the window."""
+    t = r["time"]; e = r["equity"]; n_all = int(r["n"])
+    ei = r["entry_i"]; xi = r["exit_i"]; p = r["pnl"]
     i0 = int(np.searchsorted(t, t_lo)) if t_lo is not None else 0
     i1 = int(np.searchsorted(t, t_hi)) if t_hi is not None else len(t)
+    m = (xi >= i0) & (xi < i1)
+    pnl = p[m].astype(np.float64).copy()
+    if n_all:
+        u_lo = 0.0; k_lo = -1
+        if i0 > 0:
+            s = np.flatnonzero((ei < i0) & (xi >= i0))
+            if len(s):
+                k_lo = int(s[0]); u_lo = float(e[i0 - 1] - p[xi < i0].sum())
+                if xi[k_lo] < i1: pnl[int(m[:k_lo].sum())] -= u_lo
+        if 0 < i1 < len(t):
+            s = np.flatnonzero((ei < i1) & (xi >= i1))
+            if len(s):
+                k_hi = int(s[0]); u_hi = float(e[i1 - 1] - p[xi < i1].sum())
+                pnl = np.append(pnl, u_hi - (u_lo if k_hi == k_lo else 0.0))
+    n = len(pnl)
     eq_dd = 0.0
     if i1 > i0:
         base = e[i0 - 1] if i0 > 0 else 0.0
