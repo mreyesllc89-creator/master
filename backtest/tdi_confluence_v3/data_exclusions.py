@@ -1,8 +1,9 @@
 """Pre-registered data-quality exclusion (Amendment 1): a calendar month is excluded for a coin when more than 1% of
 its 1-minute bars have zero traded volume (stale prices: the 1-minute indicators see artificial flat stretches and
-fills cannot be simulated realistically). Indicators still run through excluded months; only trades ENTERED in an
-excluded month are dropped from the statistics. Uses only the volume column of the Binance zips - no prices,
-no strategy, no returns. Writes data_exclusions.json."""
+fills cannot be simulated realistically). Indicators still run through excluded months. validate.Ctx opens no trade
+whose signal bar or fill lies in an excluded month; a position already open when an excluded block starts is left to
+its stop / target (signals inside the block do not reverse it) - see PREREGISTRATION.md 8.2. Uses only the volume
+column of the Binance zips - no prices, no strategy, no returns. Writes data_exclusions.json."""
 import glob, json, os, sys
 import numpy as np, pandas as pd
 

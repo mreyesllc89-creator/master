@@ -32,7 +32,8 @@ def assemble(files):
 
 def report(sym, t, o, h, l, c, files):
     idx = pd.to_datetime(t, unit="ms", utc=True)
-    gaps = np.diff(t) // 60000 - 1
+    m = t // 60000                                     # minute index: off-grid stamps count in the minute they start in
+    gaps = np.maximum(np.diff(m) - 1, 0)
     big = np.argsort(gaps)[::-1][:5]
     print(f"\n{sym}: {len(t):,} bars  {idx[0]} -> {idx[-1]}  files {len(files)}")
     print(f"  off-grid timestamps: {(t % 60000 != 0).sum()}  bad OHLC rows: {((h < l) | (h < o) | (h < c) | (l > o) | (l > c) | (l <= 0)).sum()}")

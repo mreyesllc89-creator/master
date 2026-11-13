@@ -1,0 +1,10 @@
+40000 no-edge histories per row, seed 20261113, bootstrap B=20000 for the registered T1
+  common month effect 60 bp                    verdict T1a&T1b&T4  0.86% (+-0.05) | registered T1  2.20% (+-0.07) | T1a  2.00%  T1b  1.93%  T4  1.06%  [5s]
+  month effect carried over, autocorrelation 0.5 verdict T1a&T1b&T4  1.75% (+-0.07) | registered T1  4.60% (+-0.10) | T1a  4.27%  T1b  2.45%  T4  2.33%  [5s]
+  volatility profile by year                   verdict T1a&T1b&T4  0.77% (+-0.04) | registered T1  2.13% (+-0.07) | T1a  1.83%  T1b  1.74%  T4  0.96%  [5s]
+  month effect carried over, autocorrelation 0.7 verdict T1a&T1b&T4  2.93% (+-0.08) | registered T1  7.51% (+-0.13) | T1a  7.10%  T1b  3.55%  T4  3.98%  [5s]
+  regimes +-30 bp, about 6 months              verdict T1a&T1b&T4  1.39% (+-0.06) | registered T1  3.57% (+-0.09) | T1a  3.21%  T1b  2.38%  T4  1.73% | verdict passes with a positive realised regime average: 94%; pass rate when the realised regime average is <= 0: 0.18%  [5s]
+  regimes +-50 bp, about 6 months              verdict T1a&T1b&T4  2.33% (+-0.08) | registered T1  5.97% (+-0.12) | T1a  5.59%  T1b  3.13%  T4  3.12% | verdict passes with a positive realised regime average: 98%; pass rate when the realised regime average is <= 0: 0.07%  [5s]
+  regimes +-30 bp, about 12 months             verdict T1a&T1b&T4  2.70% (+-0.08) | registered T1  5.84% (+-0.12) | T1a  5.45%  T1b  3.86%  T4  3.28% | verdict passes with a positive realised regime average: 97%; pass rate when the realised regime average is <= 0: 0.14%  [5s]
+  regimes +-50 bp, about 12 months             verdict T1a&T1b&T4  5.19% (+-0.11) | registered T1 10.70% (+-0.15) | T1a 10.20%  T1b  5.95%  T4  6.62% | verdict passes with a positive realised regime average: 100%; pass rate when the realised regime average is <= 0: 0.02%  [5s]
+  regimes +-50 bp, about 24 months             verdict T1a&T1b&T4 10.75% (+-0.15) | registered T1 17.86% (+-0.19) | T1a 17.32%  T1b 11.57%  T4 12.78% | verdict passes with a positive realised regime average: 100%; pass rate when the realised regime average is <= 0: 0.01%  [5s]

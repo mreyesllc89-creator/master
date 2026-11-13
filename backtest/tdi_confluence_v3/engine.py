@@ -1,5 +1,5 @@
 """Python port of 'TDI Confluence Strategy v3.0 [Full]' + a TradingView-style broker emulator."""
-import glob, os
+import glob, os, zlib
 import numpy as np, pandas as pd
 from numba import njit
 
@@ -148,12 +148,19 @@ TFS = [1, 5, 15, 30, 60]
 _cache = {}
 
 
+def data_fingerprint(df1):
+    """crc32 over the timestamps and all four price columns (no copies; ~0.1 s on 5M bars)."""
+    crc = zlib.crc32(np.ascontiguousarray(df1.index.values.astype("int64")))
+    for k in "ohlc":
+        crc = zlib.crc32(np.ascontiguousarray(df1[k].to_numpy()), crc)
+    return (len(df1), crc)
+
+
 def security_block(df1, chart_tf, L, R, mn, mx):
     """returns dict tf -> (tdiL, tdiS, rb, rr, hb, hr) mapped to chart bars + chart df."""
-    # the dataset is part of the key: without it a second symbol / date range in the same process
-    # would silently get the first dataset's signals back
-    key = (len(df1), int(df1.index[0].value), int(df1.index[-1].value), float(df1.c.iloc[0]), float(df1.c.iloc[-1]),
-           chart_tf, L, R, mn, mx)
+    # the dataset's full content is part of the key: otherwise a second symbol, date range or modified
+    # copy of the data in the same process would silently get the first dataset's signals back
+    key = (data_fingerprint(df1), chart_tf, L, R, mn, mx)
     if key in _cache:
         return _cache[key]
     ch = resample(df1, chart_tf)
@@ -164,7 +171,12 @@ def security_block(df1, chart_tf, L, R, mn, mx):
         o, h, l, c = (s[k].to_numpy() for k in "ohlc")
         tl, ts = calc_tdi(c)
         rb, rr, hb, hr = calc_div(o, h, l, c, L, R, mn, mx)
-        sct = s.index.values.astype("int64") + tf * 60_000_000_000
+        # A bar closes at the end of the minute grid slot it starts in. For tf > 1 the resampled bars already sit
+        # on the grid; for tf == 1 the raw stamps are used, and some exchange data (Binance 2017-12 / 2018-02) is
+        # stamped seconds after the minute. Without flooring, such a 1m bar would "close" after its 15m bar and the
+        # 15m bar would read the previous 1m bar (TradingView always puts 1m bars on the minute grid).
+        w = tf * 60_000_000_000
+        sct = s.index.values.astype("int64") // w * w + w
         out[tf] = map_security(sct, [tl, ts, rb, rr, hb, hr], cct)
     _cache[key] = (ch, out)
     return ch, out
@@ -418,3 +430,58 @@ def simulate_d(o, h, l, c, sigL, sigS, slA, tpA, actA, offA, use_trail, arm_on_f
         elif ok and sigS[i] and not sigL[i] and pos != -1:
             pend = -1; psl = slA[i]; ptp = tpA[i]; pact = actA[i]; poff = offA[i]
     return ret[:nt], ebar[:nt], side[:nt]
+
+
+@njit(cache=True)
+def simulate_x(o, h, l, c, sigL, sigS, slA, tpA, comm, stop_at_extreme):
+    """simulate_d for the frozen rule (no trailing, exits armed from the fill bar), with two additions used by the
+    realistic-execution scenario of Amendment 1: (1) stop_at_extreme=True fills a stop that is hit inside a bar at
+    that bar's adverse extreme (low for a long, high for a short) instead of at the stop price; (2) the exit bar
+    is returned so that holding costs can be charged. With stop_at_extreme=False the trades equal simulate_d(...,
+    use_trail=False, arm_on_fill=True) exactly. Returns ret (bp, after commission), entry bar, side, exit bar."""
+    n = o.size
+    ret = np.zeros(n); ebar = np.zeros(n, np.int64); xbar = np.zeros(n, np.int64); side = np.zeros(n, np.int64); nt = 0
+    pos = 0; E = 0.0; eb = 0; sl = 0.0; tp = 0.0
+    pend = 0; psl = 0.0; ptp = 0.0
+    pts = np.empty(4)
+    for i in range(n):
+        if pend != 0 and pend != pos:
+            if pos != 0:
+                ret[nt] = 1e4 * (pos * (o[i] - E) / E - comm * (o[i] + E) / E)
+                ebar[nt] = eb; side[nt] = pos; xbar[nt] = i; nt += 1
+            pos = pend; E = o[i]; eb = i; sl = psl; tp = ptp
+        pend = 0
+        if pos != 0:
+            if abs(o[i] - h[i]) < abs(o[i] - l[i]):
+                pts[0] = o[i]; pts[1] = h[i]; pts[2] = l[i]; pts[3] = c[i]
+            else:
+                pts[0] = o[i]; pts[1] = l[i]; pts[2] = h[i]; pts[3] = c[i]
+            if pos < 0:
+                for k in range(4): pts[k] = -pts[k]
+            Ea = E if pos > 0 else -E
+            stop = Ea - sl; tgt = Ea + tp
+            px = np.nan
+            if pts[0] <= stop or pts[0] >= tgt:          # gap through a level: fill at the open
+                px = pts[0]
+            else:
+                for s in range(3):
+                    a = pts[s]; b = pts[s + 1]
+                    if b > a and b >= tgt:
+                        px = tgt; break
+                    if b < a and b <= stop:
+                        if stop_at_extreme:
+                            px = min(min(pts[0], pts[1]), min(pts[2], pts[3]))
+                        else:
+                            px = stop
+                        break
+            if not np.isnan(px):
+                xp = px if pos > 0 else -px
+                ret[nt] = 1e4 * (pos * (xp - E) / E - comm * (xp + E) / E)
+                ebar[nt] = eb; side[nt] = pos; xbar[nt] = i; nt += 1
+                pos = 0
+        ok = not np.isnan(slA[i])
+        if ok and sigL[i] and not sigS[i] and pos != 1:
+            pend = 1; psl = slA[i]; ptp = tpA[i]
+        elif ok and sigS[i] and not sigL[i] and pos != -1:
+            pend = -1; psl = slA[i]; ptp = tpA[i]
+    return ret[:nt], ebar[:nt], side[:nt], xbar[:nt]

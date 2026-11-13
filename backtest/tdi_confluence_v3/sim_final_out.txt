@@ -1,0 +1,14 @@
+3000 worlds per row; columns: T1a, T1b, T4, all three
+  no edge, month effect                                  2.1%    2.3%    1.2%    1.0%
+  no edge, carry-over 0.5                                4.6%    2.5%    2.3%    1.7%
+  no edge, vol profile                                   2.1%    2.0%    1.1%    0.8%
+  edge 20 bp, month effect                              26.4%   23.0%   18.6%   16.5%
+  edge 35 bp, month effect                              65.0%   58.7%   53.6%   50.1%
+  edge 45 bp, month effect                              86.9%   81.6%   78.6%   75.5%
+  edge 62.9 bp, month effect                            99.3%   98.0%   98.3%   97.5%
+  edge 20 bp in 2024-26 units, scaled with volatility   24.7%   21.7%   16.9%   14.8%
+  edge 35 bp in 2024-26 units, scaled with volatility   64.2%   57.4%   52.5%   48.4%
+  edge 45 bp in 2024-26 units, scaled with volatility   85.0%   78.0%   75.5%   72.0%
+  edge 62.9 bp in 2024-26 units, scaled with volatility  98.9%   97.3%   97.3%   96.3%
+  edge 35 bp constant, vol profile                      34.9%   31.7%   26.7%   23.9%
+  edge 62.9 bp constant, vol profile                    85.3%   80.1%   77.4%   74.2%
