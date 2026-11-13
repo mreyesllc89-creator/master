@@ -935,21 +935,28 @@ int EvaluateSignal(const datetime barTime)
       return SIG_NONE;
      }
 
+   //--- R7: optional higher-timeframe filter, last CLOSED HTF bar: close vs EMA.
+   //    Read before the signal is logged: a not-ready read is retried on every tick
+   //    and must not print the signal line again each time.
+   double ema = 0.0;
+   double c   = 0.0;
+   if(UseHTFFilter)
+     {
+      if(!CopyOne(g_hEmaHTF, 0, 1, ema))
+         return SIG_NOTREADY;                        // the pending signal is kept for the retry
+      c = iClose(_Symbol, HTF_Timeframe, 1);
+      if(c <= 0.0)
+         return SIG_NOTREADY;
+     }
+
    Log(StringFormat("%s signal on the %s bar of %s: MACD zero-cross after a %d-bar pullback hump "
                     "(peak %.2f x anchor) | SL ref %.2f | TP ref %.2f | signal %d/%d of this trend",
                     SideName(g_sigSide), TFName(TriggerTimeframe),
                     TimeToString(g_sigClosedBar, TIME_DATE | TIME_MINUTES), g_sigPbBars, g_sigRatio,
                     g_sigSlRef, g_sigTpRef, g_used, MaxSignalsPerBigHump));
 
-   //--- R7: optional higher-timeframe filter, last CLOSED HTF bar: close vs EMA
    if(UseHTFFilter)
      {
-      double ema = 0.0;
-      if(!CopyOne(g_hEmaHTF, 0, 1, ema))
-         return SIG_NOTREADY;                        // the pending signal is kept for the retry
-      double c = iClose(_Symbol, HTF_Timeframe, 1);
-      if(c <= 0.0)
-         return SIG_NOTREADY;
       bool ok = (g_sigSide < 0) ? (c < ema) : (c > ema);
       if(!ok)
         {
