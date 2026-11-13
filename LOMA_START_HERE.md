@@ -59,6 +59,24 @@ These are the ten best all-round setups from both gold calibrations (about 54,00
 - Several use MACD periods other than 12/26: set your chart's MACD to the preset's values if you want the chart to match what the EA sees.
 - Expect roughly PF 1.1-1.4 live. Strategy Tester with real ticks, then demo, before anything else.
 
+## BTCUSD presets (`Loma_BTC01` to `Loma_BTC04`)
+
+The same EA runs on BTCUSD with these four presets. **Do not load them on gold, or the gold presets on BTC:** the distances are BTC-sized (points are 0.01 USD, so 2000 points = 20 USD), `MaxSpread_Points` is 3000 (30 USD) and the weekend close is off.
+
+Backtest: Binance BTCUSDT one-minute data, January 2025 to May 2026, an assumed 10 USD spread. Stress = entry one minute late, pessimistic trailing, 3 USD slippage and 2 USD commission. Figures in brackets are with a 20 USD spread.
+
+| # | Chart | Direction | Session (server time) | Trend filter | Trades | PF | 2026 PF | Stress PF | Stress 2026 |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | M3 | both | 07:00-12:00 | M15 EMA 20 | 136 | 2.22 (2.11) | 2.14 (2.12) | 1.85 (1.83) | 1.80 (1.80) |
+| 2 | M5 | both | 12:00-16:30 | H4 EMA 50 | 129 | 2.22 (2.20) | 2.80 (3.15) | 1.64 (1.42) | 1.98 (1.49) |
+| 3 | M10 | sell | 07:00-20:00 | none | 124 | 2.21 (2.06) | 1.86 (1.64) | 2.08 (1.96) | 1.51 (1.57) |
+| 4 | M10 | sell | 07:00-20:00 | M30 EMA 50 | 132 | 1.72 (1.53) | 1.50 (1.36) | 1.49 (1.42) | 1.48 (1.34) |
+
+- **BTC is much weaker evidence than gold.** Across 54,000 random BTC setups, a good 2025 did not predict 2026 (median 2026 PF about 1.0), and only 56% of the 48 refined setups were profitable in 2026. These four are the ones that stay at PF 1.3 or better on every measure, chosen with all the data: four survivors out of 48 is not far from what luck gives.
+- #3 and #4 are both M10 sells in the same session and share many trades: run one of them.
+- The data is Binance spot; your broker's BTC CFD has its own prices, spread, commission, swaps and weekend behaviour.
+- Demo and Strategy Tester (real ticks) only until confirmed there.
+
 ## Original five presets
 
 Backtest: FTMO XAUUSD one-minute data, January 2025 to May 2026, real spreads, risk-% sizing. Settings were chosen with 2025 only; 2026 is out of sample. The two v1.31 rules were added after seeing all the data.
