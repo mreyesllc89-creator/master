@@ -1,0 +1,158 @@
+{
+ "strategy": "funding_time_premium",
+ "symbol": "SOLUSDT",
+ "tf": "5m",
+ "mechanism": "Short the last `bars_before` bars before each 8-hour funding timestamp when the last funding print was above",
+ "oos": {
+  "trades": 124,
+  "net": -1812.06,
+  "ret_pct": -18.12,
+  "pf": 0.37,
+  "win": 33.1,
+  "avg_r": -0.328,
+  "maxdd_pct": 19.26,
+  "losing_streak": 12,
+  "trades_per_month": 6.1,
+  "sharpe": -3.57
+ },
+ "stressed": {
+  "trades": 124,
+  "net": -3262.5,
+  "ret_pct": -32.63,
+  "pf": 0.14,
+  "win": 17.7,
+  "avg_r": -0.66,
+  "maxdd_pct": 33.05,
+  "losing_streak": 24,
+  "trades_per_month": 6.1,
+  "sharpe": -7.11
+ },
+ "score": {
+  "profit": 1,
+  "drawdown": 2,
+  "trades": 3,
+  "streak": 3,
+  "regimes": 1,
+  "total": 10
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "thresh": 0.0004,
+    "bars_before": 2
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "thresh": 0.0004,
+    "bars_before": 2
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "thresh": 0.0002,
+    "bars_before": 1
+   },
+   "n": 10
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "thresh": 0.0002,
+    "bars_before": 1
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2025-08-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 2
+   },
+   "n": 16
+  },
+  {
+   "test_start": "2026-02-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 2
+   },
+   "n": 77
+  },
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 2
+   },
+   "n": 19
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 2
+   },
+   "n": 2
+  }
+ ],
+ "worst_month": {
+  "month": "2026-02",
+  "pnl": -706.05
+ },
+ "regimes": [
+  {
+   "exit_time": "2025Q1",
+   "trades": "8",
+   "net_r": "2.3",
+   "win": "62.0"
+  },
+  {
+   "exit_time": "2025Q2",
+   "trades": "2",
+   "net_r": "-0.6",
+   "win": "50.0"
+  },
+  {
+   "exit_time": "2025Q3",
+   "trades": "4",
+   "net_r": "1.0",
+   "win": "75.0"
+  },
+  {
+   "exit_time": "2025Q4",
+   "trades": "12",
+   "net_r": "-4.6",
+   "win": "25.0"
+  },
+  {
+   "exit_time": "2026Q1",
+   "trades": "73",
+   "net_r": "-27.9",
+   "win": "30.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "21",
+   "net_r": "-6.6",
+   "win": "33.0"
+  },
+  {
+   "exit_time": "2026Q3",
+   "trades": "3",
+   "net_r": "-3.2",
+   "win": "0.0"
+  },
+  {
+   "exit_time": "2026Q4",
+   "trades": "1",
+   "net_r": "-1.1",
+   "win": "0.0"
+  }
+ ]
+}

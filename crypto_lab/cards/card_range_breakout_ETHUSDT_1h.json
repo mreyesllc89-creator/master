@@ -1,0 +1,57 @@
+{
+ "strategy": "range_breakout",
+ "symbol": "ETHUSDT",
+ "tf": "1h",
+ "mechanism": "Breakout from the tightest N-bar range of the last `tight_window` days. Mechanism: compression",
+ "oos": {
+  "trades": 11,
+  "net": 138.09,
+  "ret_pct": 1.38,
+  "pf": 1.39,
+  "win": 36.4,
+  "avg_r": 0.285,
+  "maxdd_pct": 1.87,
+  "losing_streak": 3,
+  "trades_per_month": 7.5,
+  "sharpe": 1.01
+ },
+ "stressed": {
+  "trades": 11,
+  "net": 85.06,
+  "ret_pct": 0.85,
+  "pf": 1.22,
+  "win": 36.4,
+  "avg_r": 0.184,
+  "maxdd_pct": 2.12,
+  "losing_streak": 3,
+  "trades_per_month": 7.5,
+  "sharpe": 0.64
+ },
+ "score": {
+  "total": 0,
+  "note": "fewer than 50 OOS trades"
+ },
+ "windows": [
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "lookback": 144,
+    "atr_mult": 1.5,
+    "hold": 72
+   },
+   "n": 11
+  }
+ ],
+ "worst_month": {
+  "month": "2026-06",
+  "pnl": 53.97
+ },
+ "regimes": [
+  {
+   "exit_time": "2026Q2",
+   "trades": "11",
+   "net_r": "3.1",
+   "win": "36.0"
+  }
+ ]
+}

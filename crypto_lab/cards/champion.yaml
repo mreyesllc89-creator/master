@@ -1,0 +1,7 @@
+date: 2026-11-13
+champion: null   # NO CHAMPION TONIGHT
+challengers: []
+watch:
+  - {strategy: oi_flush_continuation, symbol: ETHUSDT, tf: 1h, params: {oi_drop: 0.04, hold: 48}, note: "positive OOS (+25.7 %, PF 1.18) but negative in 2026 H1 and on BTC/SOL; watch, do not trade"}
+why: "67 combinations tested; only one positive after costs and it fails cross-asset and recent-quarter checks. See cards/leaderboard_2026-11-13.md."
+leak_fixed: "hourly OI metrics were stamped at hour start (55-minute look-ahead on 5m bars); fixed in tools/fetch_binance.py before judging"

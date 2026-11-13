@@ -1,0 +1,120 @@
+{
+ "strategy": "funding_time_premium",
+ "symbol": "ETHUSDT",
+ "tf": "1h",
+ "mechanism": "Short the last `bars_before` bars before each 8-hour funding timestamp when the last funding print was above",
+ "oos": {
+  "trades": 17,
+  "net": 78.95,
+  "ret_pct": 0.79,
+  "pf": 1.27,
+  "win": 41.2,
+  "avg_r": 0.098,
+  "maxdd_pct": 2.11,
+  "losing_streak": 5,
+  "trades_per_month": 0.6,
+  "sharpe": 0.17
+ },
+ "stressed": {
+  "trades": 17,
+  "net": -48.32,
+  "ret_pct": -0.48,
+  "pf": 0.86,
+  "win": 29.4,
+  "avg_r": -0.053,
+  "maxdd_pct": 2.42,
+  "losing_streak": 5,
+  "trades_per_month": 0.6,
+  "sharpe": -0.11
+ },
+ "score": {
+  "total": 0,
+  "note": "fewer than 50 OOS trades"
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "thresh": 0.0002,
+    "bars_before": 2
+   },
+   "n": 1
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 2
+   },
+   "n": 1
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "thresh": 0.0002,
+    "bars_before": 2
+   },
+   "n": 1
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 1
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 2
+   },
+   "n": 6
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 2
+   },
+   "n": 8
+  }
+ ],
+ "worst_month": {
+  "month": "2026-05",
+  "pnl": -25.56
+ },
+ "regimes": [
+  {
+   "exit_time": "2024Q2",
+   "trades": "1",
+   "net_r": "0.1",
+   "win": "100.0"
+  },
+  {
+   "exit_time": "2024Q3",
+   "trades": "1",
+   "net_r": "0.1",
+   "win": "100.0"
+  },
+  {
+   "exit_time": "2025Q1",
+   "trades": "1",
+   "net_r": "-0.4",
+   "win": "0.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "6",
+   "net_r": "-0.6",
+   "win": "33.0"
+  },
+  {
+   "exit_time": "2026Q4",
+   "trades": "8",
+   "net_r": "2.4",
+   "win": "38.0"
+  }
+ ]
+}

@@ -1,0 +1,80 @@
+{
+ "strategy": "funding_reset",
+ "symbol": "SOLUSDT",
+ "tf": "1h",
+ "mechanism": "After an extreme funding print (crowded longs pay shorts), fade the crowd for `hold` bars.",
+ "oos": {
+  "trades": 3,
+  "net": 42.28,
+  "ret_pct": 0.42,
+  "pf": 1.43,
+  "win": 33.3,
+  "avg_r": 0.305,
+  "maxdd_pct": 0.5,
+  "losing_streak": 2,
+  "trades_per_month": 90.0,
+  "sharpe": 5.22
+ },
+ "stressed": {
+  "trades": 3,
+  "net": 34.55,
+  "ret_pct": 0.35,
+  "pf": 1.34,
+  "win": 33.3,
+  "avg_r": 0.253,
+  "maxdd_pct": 0.53,
+  "losing_streak": 2,
+  "trades_per_month": 90.0,
+  "sharpe": 4.31
+ },
+ "score": {
+  "total": 0,
+  "note": "fewer than 50 OOS trades"
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "thresh": 0.0005,
+    "hold": 12
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 36
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 36
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 72
+   },
+   "n": 3
+  }
+ ],
+ "worst_month": {
+  "month": "2026-06",
+  "pnl": 42.28
+ },
+ "regimes": [
+  {
+   "exit_time": "2026Q2",
+   "trades": "3",
+   "net_r": "0.9",
+   "win": "33.0"
+  }
+ ]
+}

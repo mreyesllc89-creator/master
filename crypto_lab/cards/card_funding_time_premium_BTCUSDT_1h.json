@@ -1,0 +1,80 @@
+{
+ "strategy": "funding_time_premium",
+ "symbol": "BTCUSDT",
+ "tf": "1h",
+ "mechanism": "Short the last `bars_before` bars before each 8-hour funding timestamp when the last funding print was above",
+ "oos": {
+  "trades": 1,
+  "net": 19.66,
+  "ret_pct": 0.2,
+  "pf": 99.0,
+  "win": 100.0,
+  "avg_r": 0.406,
+  "maxdd_pct": 0.0,
+  "losing_streak": 0,
+  "trades_per_month": 30.0,
+  "sharpe": 0.0
+ },
+ "stressed": {
+  "trades": 1,
+  "net": 9.37,
+  "ret_pct": 0.09,
+  "pf": 99.0,
+  "win": 100.0,
+  "avg_r": 0.201,
+  "maxdd_pct": 0.0,
+  "losing_streak": 0,
+  "trades_per_month": 30.0,
+  "sharpe": 0.0
+ },
+ "score": {
+  "total": 0,
+  "note": "fewer than 50 OOS trades"
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "thresh": 0.0004,
+    "bars_before": 2
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "thresh": 0.0004,
+    "bars_before": 1
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 1
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "thresh": 0.0001,
+    "bars_before": 1
+   },
+   "n": 1
+  }
+ ],
+ "worst_month": {
+  "month": "2025-05",
+  "pnl": 19.66
+ },
+ "regimes": [
+  {
+   "exit_time": "2025Q2",
+   "trades": "1",
+   "net_r": "0.4",
+   "win": "100.0"
+  }
+ ]
+}

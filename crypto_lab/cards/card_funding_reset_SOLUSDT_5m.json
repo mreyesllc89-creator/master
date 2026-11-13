@@ -1,0 +1,132 @@
+{
+ "strategy": "funding_reset",
+ "symbol": "SOLUSDT",
+ "tf": "5m",
+ "mechanism": "After an extreme funding print (crowded longs pay shorts), fade the crowd for `hold` bars.",
+ "oos": {
+  "trades": 53,
+  "net": -108.48,
+  "ret_pct": -1.08,
+  "pf": 0.95,
+  "win": 17.0,
+  "avg_r": -0.016,
+  "maxdd_pct": 10.5,
+  "losing_streak": 13,
+  "trades_per_month": 2.2,
+  "sharpe": -0.07
+ },
+ "stressed": {
+  "trades": 53,
+  "net": -506.31,
+  "ret_pct": -5.06,
+  "pf": 0.8,
+  "win": 17.0,
+  "avg_r": -0.191,
+  "maxdd_pct": 13.21,
+  "losing_streak": 13,
+  "trades_per_month": 2.2,
+  "sharpe": -0.36
+ },
+ "score": {
+  "profit": 1,
+  "drawdown": 3,
+  "trades": 2,
+  "streak": 2,
+  "regimes": 3,
+  "total": 11
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 36
+   },
+   "n": 7
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 36
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 12
+   },
+   "n": 34
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "thresh": 0.0003,
+    "hold": 12
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2025-08-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 12
+   },
+   "n": 10
+  },
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 12
+   },
+   "n": 2
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 72
+   },
+   "n": 0
+  }
+ ],
+ "worst_month": {
+  "month": "2025-02",
+  "pnl": -362.96
+ },
+ "regimes": [
+  {
+   "exit_time": "2024Q2",
+   "trades": "7",
+   "net_r": "1.6",
+   "win": "29.0"
+  },
+  {
+   "exit_time": "2025Q1",
+   "trades": "25",
+   "net_r": "-11.5",
+   "win": "16.0"
+  },
+  {
+   "exit_time": "2025Q2",
+   "trades": "9",
+   "net_r": "-0.8",
+   "win": "11.0"
+  },
+  {
+   "exit_time": "2025Q4",
+   "trades": "10",
+   "net_r": "7.5",
+   "win": "10.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "2",
+   "net_r": "2.4",
+   "win": "50.0"
+  }
+ ]
+}

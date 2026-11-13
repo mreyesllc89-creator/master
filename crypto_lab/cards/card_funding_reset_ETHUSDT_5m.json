@@ -1,0 +1,86 @@
+{
+ "strategy": "funding_reset",
+ "symbol": "ETHUSDT",
+ "tf": "5m",
+ "mechanism": "After an extreme funding print (crowded longs pay shorts), fade the crowd for `hold` bars.",
+ "oos": {
+  "trades": 4,
+  "net": 4.19,
+  "ret_pct": 0.04,
+  "pf": 1.02,
+  "win": 25.0,
+  "avg_r": 0.189,
+  "maxdd_pct": 0.86,
+  "losing_streak": 3,
+  "trades_per_month": 0.5,
+  "sharpe": 0.02
+ },
+ "stressed": {
+  "trades": 4,
+  "net": -27.73,
+  "ret_pct": -0.28,
+  "pf": 0.85,
+  "win": 25.0,
+  "avg_r": -0.104,
+  "maxdd_pct": 1.05,
+  "losing_streak": 3,
+  "trades_per_month": 0.5,
+  "sharpe": -0.17
+ },
+ "score": {
+  "total": 0,
+  "note": "fewer than 50 OOS trades"
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 72
+   },
+   "n": 3
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 12
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 12
+   },
+   "n": 1
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "thresh": 0.0002,
+    "hold": 12
+   },
+   "n": 0
+  }
+ ],
+ "worst_month": {
+  "month": "2024-05",
+  "pnl": -168.23
+ },
+ "regimes": [
+  {
+   "exit_time": "2024Q2",
+   "trades": "3",
+   "net_r": "-2.8",
+   "win": "0.0"
+  },
+  {
+   "exit_time": "2025Q1",
+   "trades": "1",
+   "net_r": "3.5",
+   "win": "100.0"
+  }
+ ]
+}

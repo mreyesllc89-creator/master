@@ -1,0 +1,200 @@
+{
+ "strategy": "donchian_trend",
+ "symbol": "SOLUSDT",
+ "tf": "5m",
+ "mechanism": "Classic Donchian channel trend following; always in the market direction of the last breakout.",
+ "oos": {
+  "trades": 1777,
+  "net": -8844.41,
+  "ret_pct": -88.44,
+  "pf": 0.85,
+  "win": 20.8,
+  "avg_r": -0.097,
+  "maxdd_pct": 92.29,
+  "losing_streak": 29,
+  "trades_per_month": 57.9,
+  "sharpe": -1.13
+ },
+ "stressed": {
+  "trades": 1780,
+  "net": -13867.39,
+  "ret_pct": -138.67,
+  "pf": 0.74,
+  "win": 20.3,
+  "avg_r": -0.205,
+  "maxdd_pct": 138.07,
+  "losing_streak": 29,
+  "trades_per_month": 58.0,
+  "sharpe": -2.22
+ },
+ "score": {
+  "profit": 1,
+  "drawdown": 1,
+  "trades": 5,
+  "streak": 1,
+  "regimes": 2,
+  "total": 10
+ },
+ "windows": [
+  {
+   "test_start": "2024-05-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 3.0
+   },
+   "n": 177
+  },
+  {
+   "test_start": "2024-08-01",
+   "params": {
+    "n": 96,
+    "atr_mult": 4.0
+   },
+   "n": 251
+  },
+  {
+   "test_start": "2024-11-01",
+   "params": {
+    "n": 96,
+    "atr_mult": 4.0
+   },
+   "n": 236
+  },
+  {
+   "test_start": "2025-02-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 4.0
+   },
+   "n": 151
+  },
+  {
+   "test_start": "2025-05-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 2.0
+   },
+   "n": 237
+  },
+  {
+   "test_start": "2025-08-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 4.0
+   },
+   "n": 133
+  },
+  {
+   "test_start": "2025-11-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 4.0
+   },
+   "n": 176
+  },
+  {
+   "test_start": "2026-02-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 4.0
+   },
+   "n": 128
+  },
+  {
+   "test_start": "2026-05-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 4.0
+   },
+   "n": 128
+  },
+  {
+   "test_start": "2026-08-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 4.0
+   },
+   "n": 141
+  },
+  {
+   "test_start": "2026-11-01",
+   "params": {
+    "n": 192,
+    "atr_mult": 4.0
+   },
+   "n": 19
+  }
+ ],
+ "worst_month": {
+  "month": "2025-11",
+  "pnl": -1607.07
+ },
+ "regimes": [
+  {
+   "exit_time": "2024Q2",
+   "trades": "127",
+   "net_r": "-23.2",
+   "win": "19.0"
+  },
+  {
+   "exit_time": "2024Q3",
+   "trades": "209",
+   "net_r": "-39.5",
+   "win": "19.0"
+  },
+  {
+   "exit_time": "2024Q4",
+   "trades": "258",
+   "net_r": "-41.2",
+   "win": "22.0"
+  },
+  {
+   "exit_time": "2025Q1",
+   "trades": "162",
+   "net_r": "18.4",
+   "win": "26.0"
+  },
+  {
+   "exit_time": "2025Q2",
+   "trades": "243",
+   "net_r": "-64.0",
+   "win": "14.0"
+  },
+  {
+   "exit_time": "2025Q3",
+   "trades": "139",
+   "net_r": "53.1",
+   "win": "26.0"
+  },
+  {
+   "exit_time": "2025Q4",
+   "trades": "170",
+   "net_r": "-59.4",
+   "win": "22.0"
+  },
+  {
+   "exit_time": "2026Q1",
+   "trades": "130",
+   "net_r": "22.7",
+   "win": "22.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "135",
+   "net_r": "-21.0",
+   "win": "24.0"
+  },
+  {
+   "exit_time": "2026Q3",
+   "trades": "132",
+   "net_r": "14.0",
+   "win": "22.0"
+  },
+  {
+   "exit_time": "2026Q4",
+   "trades": "72",
+   "net_r": "-32.5",
+   "win": "17.0"
+  }
+ ]
+}
