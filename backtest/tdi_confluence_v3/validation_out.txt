@@ -10,3 +10,54 @@ result        :   626 trades  win 45.7%  avg  -27.9 bp  t -1.21  PF 0.88  | mont
    at 0.05% per side:   626 trades  win 45.7%  avg  -33.9 bp  t -1.47  PF 0.86  | month-clustered t -1.41 p 0.9188  6-month-clustered t -1.11 p 0.8566  | bootstrap p 0.9214
    at 0.10% per side:   626 trades  win 45.2%  avg  -43.9 bp  t -1.90  PF 0.82  | month-clustered t -1.83 p 0.9643  6-month-clustered t -1.44 p 0.9131  | bootstrap p 0.9689
    realistic execution (0.05%/side, stops at the bar's worst price, 3 bp/day holding cost):   626 trades  win 45.5%  avg  -52.9 bp  t -2.25  PF 0.79  | month-clustered t -2.16 p 0.9831  6-month-clustered t -1.73 p 0.9459  | bootstrap p 0.9878
+T2 vs random timing  (10000 runs, 681 trades per run vs 626 real): null average 1.99 bp vs real -27.89 bp -> month-clustered t -1.24, p = 0.891212 (verdict) | permutation p, reported only: on t 0.903610 (9036 runs), on the average 0.925807 (9258 runs)
+T3 vs shuffled sides (10000 runs, 685 trades per run vs 626 real): null average 7.35 bp vs real -27.89 bp -> month-clustered t -1.47, p = 0.926681 (verdict) | permutation p, reported only: on t 0.940006 (9400 runs), on the average 0.947305 (9473 runs)
+
+VERDICT (pre-registered, Amendment 1: T1a, T1b, T2, T3 below 0.02 and T4 below 0.05):
+   T1a_month_clustered    p = 0.875262  FAIL
+   T1b_6month_clustered   p = 0.811355  FAIL
+   T2_random_timing       p = 0.891212  FAIL
+   T3_shuffled_sides      p = 0.926681  FAIL
+   T4_consistency         worst p with one year removed = 0.940770  FAIL   (2017: 0.883  2018: 0.514  2019: 0.907  2020: 0.831  2021: 0.908  2022: 0.941  2023: 0.815  2024: 0.882)
+   realistic execution: T1a p = 0.983083, T1b p = 0.945908
+   -> NOT PASSED: edge not significant at the 98% level
+   98% one-sided bounds on the average: above -78.1 bp, below +22.3 bp (month-clustered)
+
+-- by year --
+   2017:   12 trades  avg   +46.5 bp  win 50.0%  total     +559 bp
+   2018:   76 trades  avg  -224.1 bp  win 31.6%  total   -17034 bp
+   2019:   79 trades  avg   +21.9 bp  win 44.3%  total    +1730 bp
+   2020:   75 trades  avg   -45.2 bp  win 48.0%  total    -3391 bp
+   2021:  107 trades  avg    +9.5 bp  win 51.4%  total    +1012 bp
+   2022:  100 trades  avg   +40.5 bp  win 54.0%  total    +4047 bp
+   2023:   85 trades  avg   -49.1 bp  win 36.5%  total    -4178 bp
+   2024:   92 trades  avg    -2.2 bp  win 48.9%  total     -204 bp
+   long :   305 trades  win 46.2%  avg  -10.4 bp  t -0.28  PF 0.96  | month-clustered t -0.29 p 0.6147  6-month-clustered t -0.29 p 0.6112  | bootstrap p 0.6053
+   short:   321 trades  win 45.2%  avg  -44.5 bp  t -1.56  PF 0.80  | month-clustered t -1.56 p 0.9388  6-month-clustered t -1.31 p 0.8928  | bootstrap p 0.9417
+   shorts dropped before 2019-09-13:   551 trades  win 47.0%  avg  -17.2 bp  t -0.71  PF 0.93  | month-clustered t -0.71 p 0.7603  6-month-clustered t -0.68 p 0.7468  | bootstrap p 0.7579
+   in R (return / stop distance): 626 trades, avg -0.076 R, month-clustered p 0.9552, 6-month p 0.9339
+   month boundaries shifted 0..29 days: month-clustered p from 0.8633 to 0.8902 (median 0.8728), below 0.02 in 0% of shifts
+   max drawdown 26672 bp of notional, worst trade -2279 bp
+   power, each test alone: an edge of about 71 bp (T1a) / 96 bp (T1b) would pass that test 80% of the time (67 bp if trades were independent); the full verdict has lower power
+   without the stale-price exclusion:   666 trades  win 45.8%  avg  -31.1 bp  t -1.37  PF 0.87  | month-clustered t -1.33 p 0.9062  6-month-clustered t -1.24 p 0.8816  | bootstrap p 0.9127
+
+-- neighbours of the frozen rule on the same unseen BTC data (descriptive, not part of the verdict) --
+   pivot 3                    670 trades  win 47.6%  avg   +4.3 bp  t +0.18  PF 1.02  | month-clustered t +0.19 p 0.4234  6-month-clustered t +0.13 p 0.4510  | bootstrap p 0.4377
+   pivot 4                    653 trades  win 47.9%  avg  -15.6 bp  t -0.71  PF 0.93  | month-clustered t -0.74 p 0.7701  6-month-clustered t -0.67 p 0.7423  | bootstrap p 0.7724
+   pivot 6                    569 trades  win 44.1%  avg  -42.6 bp  t -1.59  PF 0.84  | month-clustered t -1.74 p 0.9575  6-month-clustered t -2.28 p 0.9799  | bootstrap p 0.9621
+   pivot 8                    548 trades  win 43.6%  avg  -16.5 bp  t -0.61  PF 0.93  | month-clustered t -0.63 p 0.7335  6-month-clustered t -0.68 p 0.7470  | bootstrap p 0.7340
+   swing 10-120               457 trades  win 42.0%  avg  -37.0 bp  t -1.24  PF 0.86  | month-clustered t -1.38 p 0.9151  6-month-clustered t -1.43 p 0.9113  | bootstrap p 0.9165
+   levels off                1109 trades  win 48.6%  avg  -20.7 bp  t -1.45  PF 0.89  | month-clustered t -1.39 p 0.9161  6-month-clustered t -1.50 p 0.9216  | bootstrap p 0.9214
+   levels 38/62               488 trades  win 43.4%  avg  -23.3 bp  t -0.79  PF 0.91  | month-clustered t -0.75 p 0.7723  6-month-clustered t -0.68 p 0.7470  | bootstrap p 0.7690
+   levels 45/55               694 trades  win 46.5%  avg  -39.7 bp  t -1.89  PF 0.83  | month-clustered t -1.88 p 0.9681  6-month-clustered t -1.41 p 0.9084  | bootstrap p 0.9720
+   day start 00:00            664 trades  win 48.3%  avg  -29.5 bp  t -1.36  PF 0.87  | month-clustered t -1.17 p 0.8767  6-month-clustered t -1.19 p 0.8730  | bootstrap p 0.8779
+   day start 12:00            634 trades  win 47.0%  avg  -29.3 bp  t -1.29  PF 0.88  | month-clustered t -1.14 p 0.8717  6-month-clustered t -0.81 p 0.7849  | bootstrap p 0.8720
+   day start 14:00            606 trades  win 46.0%  avg  -30.7 bp  t -1.31  PF 0.87  | month-clustered t -1.15 p 0.8738  6-month-clustered t -1.17 p 0.8693  | bootstrap p 0.8739
+   stop 3xATR(60m) TP 2R      762 trades  win 39.6%  avg  -17.9 bp  t -1.11  PF 0.90  | month-clustered t -1.06 p 0.8542  6-month-clustered t -0.86 p 0.7967  | bootstrap p 0.8544
+   stop 8xATR(60m) TP 3R      533 trades  win 52.5%  avg  -48.2 bp  t -1.58  PF 0.83  | month-clustered t -1.50 p 0.9308  6-month-clustered t -1.09 p 0.8530  | bootstrap p 0.9354
+   stop 5xATR(240m) TP 2R     500 trades  win 55.6%  avg  -45.9 bp  t -1.40  PF 0.84  | month-clustered t -1.33 p 0.9063  6-month-clustered t -0.98 p 0.8263  | bootstrap p 0.9083
+   1 of 14 neighbours have a positive average -> pre-set reading: isolated peak (plateau needs at least 9)
+
+====================================================================================================
+OTHER COINS (surviving large caps): frozen rule. Clean = before 2024-11-01, same calendar period as the BTC test. After = descriptive
+====================================================================================================
