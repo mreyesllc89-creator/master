@@ -346,6 +346,22 @@
    "gross_pf": 0.18114557169378614
   }
  ],
+ "vt_periods": [
+  {
+   "period": "Mar-May",
+   "trades": 126,
+   "gross": 750.14,
+   "gross_pf": 1.2455482232173254,
+   "net_pf": 0.649149381160376
+  },
+  {
+   "period": "Jun-Nov 6",
+   "trades": 247,
+   "gross": -1608.56,
+   "gross_pf": 0.7411135324090912,
+   "net_pf": 0.2845646342347568
+  }
+ ],
  "vt_total": {
   "trades": 373,
   "gross": -858.42,
@@ -361,8 +377,10 @@
    "stress": false,
    "windows": 13,
    "profitable": 5,
+   "empty": 1,
    "trades": 143,
-   "netR": 3.7
+   "netR": 3.7,
+   "pooled_pf": 1.0596565028296552
   },
   {
    "train": 4,
@@ -371,8 +389,10 @@
    "stress": true,
    "windows": 13,
    "profitable": 6,
+   "empty": 1,
    "trades": 144,
-   "netR": -2.3
+   "netR": -2.3,
+   "pooled_pf": 0.9620090698978563
   },
   {
    "train": 4,
@@ -381,8 +401,10 @@
    "stress": false,
    "windows": 13,
    "profitable": 6,
+   "empty": 1,
    "trades": 698,
-   "netR": 11.8
+   "netR": 11.8,
+   "pooled_pf": 1.0369487882067336
   },
   {
    "train": 4,
@@ -391,8 +413,10 @@
    "stress": true,
    "windows": 13,
    "profitable": 6,
+   "empty": 1,
    "trades": 706,
-   "netR": -17.0
+   "netR": -17.0,
+   "pooled_pf": 0.9472212394469434
   },
   {
    "train": 6,
@@ -401,8 +425,10 @@
    "stress": false,
    "windows": 11,
    "profitable": 5,
+   "empty": 0,
    "trades": 74,
-   "netR": 7.8
+   "netR": 7.8,
+   "pooled_pf": 1.226326885012006
   },
   {
    "train": 6,
@@ -411,8 +437,10 @@
    "stress": true,
    "windows": 11,
    "profitable": 3,
+   "empty": 0,
    "trades": 74,
-   "netR": 1.0
+   "netR": 1.0,
+   "pooled_pf": 1.0268632167838305
   },
   {
    "train": 6,
@@ -421,8 +449,10 @@
    "stress": false,
    "windows": 11,
    "profitable": 5,
+   "empty": 0,
    "trades": 409,
-   "netR": 21.4
+   "netR": 21.4,
+   "pooled_pf": 1.1044157616192851
   },
   {
    "train": 6,
@@ -431,8 +461,10 @@
    "stress": true,
    "windows": 11,
    "profitable": 5,
+   "empty": 0,
    "trades": 411,
-   "netR": 20.0
+   "netR": 20.0,
+   "pooled_pf": 1.0976599174234416
   },
   {
    "train": 6,
@@ -441,8 +473,10 @@
    "stress": false,
    "windows": 6,
    "profitable": 2,
+   "empty": 0,
    "trades": 81,
-   "netR": 1.6
+   "netR": 1.6,
+   "pooled_pf": 1.0410339885493092
   },
   {
    "train": 6,
@@ -451,8 +485,10 @@
    "stress": true,
    "windows": 6,
    "profitable": 3,
+   "empty": 0,
    "trades": 83,
-   "netR": 1.8
+   "netR": 1.8,
+   "pooled_pf": 1.0431486037564461
   },
   {
    "train": 6,
@@ -461,8 +497,10 @@
    "stress": false,
    "windows": 6,
    "profitable": 2,
+   "empty": 0,
    "trades": 373,
-   "netR": -18.2
+   "netR": -18.2,
+   "pooled_pf": 0.9081790694174583
   },
   {
    "train": 6,
@@ -471,8 +509,10 @@
    "stress": true,
    "windows": 6,
    "profitable": 2,
+   "empty": 0,
    "trades": 374,
-   "netR": -19.7
+   "netR": -19.7,
+   "pooled_pf": 0.9029963075473258
   },
   {
    "train": 9,
@@ -481,8 +521,10 @@
    "stress": false,
    "windows": 4,
    "profitable": 2,
+   "empty": 0,
    "trades": 59,
-   "netR": 3.4
+   "netR": 3.4,
+   "pooled_pf": 1.2151351928682868
   },
   {
    "train": 9,
@@ -491,8 +533,10 @@
    "stress": true,
    "windows": 4,
    "profitable": 1,
+   "empty": 0,
    "trades": 59,
-   "netR": 1.2
+   "netR": 1.2,
+   "pooled_pf": 1.0647078531201382
   },
   {
    "train": 9,
@@ -501,8 +545,10 @@
    "stress": false,
    "windows": 4,
    "profitable": 3,
+   "empty": 0,
    "trades": 259,
-   "netR": 33.7
+   "netR": 33.7,
+   "pooled_pf": 1.3172974030013351
   },
   {
    "train": 9,
@@ -511,8 +557,10 @@
    "stress": true,
    "windows": 4,
    "profitable": 2,
+   "empty": 0,
    "trades": 259,
-   "netR": 22.8
+   "netR": 22.8,
+   "pooled_pf": 1.2065354104995585
   },
   {
    "train": 9,
@@ -521,8 +569,10 @@
    "stress": false,
    "windows": 3,
    "profitable": 1,
+   "empty": 0,
    "trades": 29,
-   "netR": 0.9
+   "netR": 0.9,
+   "pooled_pf": 1.0577383109989784
   },
   {
    "train": 9,
@@ -531,8 +581,10 @@
    "stress": true,
    "windows": 3,
    "profitable": 0,
+   "empty": 0,
    "trades": 29,
-   "netR": -5.1
+   "netR": -5.1,
+   "pooled_pf": 0.6609770584614089
   },
   {
    "train": 9,
@@ -541,8 +593,10 @@
    "stress": false,
    "windows": 3,
    "profitable": 2,
+   "empty": 0,
    "trades": 169,
-   "netR": 15.7
+   "netR": 15.7,
+   "pooled_pf": 1.1572166946290727
   },
   {
    "train": 9,
@@ -551,8 +605,10 @@
    "stress": true,
    "windows": 3,
    "profitable": 1,
+   "empty": 0,
    "trades": 169,
-   "netR": -7.1
+   "netR": -7.1,
+   "pooled_pf": 0.9306934643977007
   }
  ],
  "wf_6_1_top5": [

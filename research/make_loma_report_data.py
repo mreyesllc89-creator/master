@@ -68,6 +68,8 @@ out["dukascopy"] = [{k: v for k, v in x.items() if not k.startswith("_")} for x 
 va = pd.concat(vt_all); va["month"] = va.entry.dt.strftime("%Y-%m")
 out["vt_monthly"] = [dict(month=mo, trades=len(g), gross=round(g.gross.sum(), 2), comm=round(g.comm.sum(), 2), gross_pf=pf(g.gross))
                      for mo, g in va.groupby("month")]
+out["vt_periods"] = [dict(period=n, trades=len(g), gross=round(g.gross.sum(), 2), gross_pf=pf(g.gross), net_pf=pf(g.gross + g.comm))
+                     for n, g in [("Mar-May", va[va.entry < "2026-06-01"]), ("Jun-Nov 6", va[va.entry >= "2026-06-01"])]]
 out["vt_total"] = dict(trades=len(va), gross=round(va.gross.sum(), 2), comm=round(va.comm.sum(), 2),
                        net=round(va.gross.sum() + va.comm.sum(), 2), gross_pf=pf(va.gross))
 
@@ -75,8 +77,11 @@ wf = []
 for f in sorted(glob.glob("results/walkforward/wf_*_windows.csv")):
     tr, te = re.findall(r"wf_(\d+)_(\d+)_", f)[0]; w = pd.read_csv(f)
     for (var, st), g in w.groupby(["variant", "stress"]):
+        gl = np.where(g.pf != 1, g.net / (g.pf - 1), 0.0); gw = g.pf * gl      # per-window gross loss / win in R
+        gl, gw = np.nan_to_num(gl), np.nan_to_num(gw)
         wf.append(dict(train=int(tr), test=int(te), variant=var, stress=bool(st), windows=len(g),
-                       profitable=int((g.net > 0).sum()), trades=int(g.n.sum()), netR=round(float(g.net.sum()), 1)))
+                       profitable=int((g.net > 0).sum()), empty=int((g.n == 0).sum()), trades=int(g.n.sum()),
+                       netR=round(float(g.net.sum()), 1), pooled_pf=float(gw.sum() / gl.sum()) if gl.sum() > 0 else None))
 out["walkforward"] = wf
 w = pd.read_csv("results/walkforward/wf_6_1_windows.csv")
 out["wf_6_1_top5"] = [dict(window=r.window, n=int(r.n), netR=round(r.net, 2)) for r in w[(w.variant == "top5") & (~w.stress)].itertuples()]
