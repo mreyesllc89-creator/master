@@ -46,8 +46,10 @@ Backtest: FTMO one-minute data, January 2025 – 15 May 2026, the period the pre
 - **Strategy Tester:** model "Every tick based on real ticks", your broker's XAUUSD, deposit currency equal to your account's (USC for a cent account). Test January 2025 – May 2026 and June 2026 – today **separately**, and compare profit before commission, commission and swap.
 - **Demo only.** Top02 and Top05 were the least bad out of sample. Expect break-even minus costs at best.
 - **Server time:** session, weekend and end-of-day times are broker server time, calibrated on a GMT+2 (winter) / GMT+3 (summer) clock. VT Markets matches. Shift them if your broker's clock differs.
-- **One account, several presets:** only on a **hedging** account. On a netting account all presets on one symbol share a single position, so one preset's trade changes another's. v1.34 prints a warning when it starts on a netting account.
-- **News filter** (`UseNewsFilter`) is on in the presets but was not in the backtest. It does nothing in the Strategy Tester.
+- **Commission and contract size:** VT's Strategy Tester charged $6 per lot round trip on a 1-ounce contract, which is $6 per ounce. At that cost the six presets lose even on the calibration data (backtest PF 0.53–0.97); the stress test assumed $0.07 per ounce. Check the contract size and commission in the symbol's **Specification**, and set `CommissionPerLot` to your round-trip commission per lot so a stop-out costs `RiskPercent` including commission.
+- **Account size:** with a 100-ounce contract (minimum 0.01 lot) and `RiskPercent=0.5`, use about $10,000 or more. On smaller balances the EA skips the trades whose stop is too wide for the minimum lot.
+- **One account, several presets:** only on a **hedging** account. On a netting account all presets on one symbol share a single position, so one preset's trade changes another's. v1.34 warns on a netting account and sends no entry while another position on the symbol is open.
+- **News filter** (`UseNewsFilter`) is on in the presets but was not in the backtest. It does nothing in the Strategy Tester, so tester results equal `UseNewsFilter=false`.
 
 ### Asking Codex to compile without changing anything
 
@@ -68,17 +70,22 @@ Steps:
 
 ## The rules in short
 
-1. **Trend first:** a big MACD hump below zero (bearish) or above zero (bullish). "Big" = peak at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps, at least `BigHumpMinBars` bars, and the Stochastic reached `StochLow` / `StochHigh` if `RequireStochLevel` is on. No big hump in force = lineal market = no trades.
+1. **Trend first:** a big MACD hump below zero (bearish) or above zero (bullish). "Big" = peak at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and at least `BigHumpMinBars` bars. With `RequireStochLevel` on (Top04: 25/75, Top07: 20/80) the Stochastic must also reach `StochLow` / `StochHigh`; Top01, Top02, Top03 and Top05 do not require it. No big hump in force = lineal market = no trades.
 2. **Trend break:** an opposite hump as large as `TrendBreakRatio` times the big hump.
-3. **Signal:** a small pullback hump (at least `PullbackMinBars` bars, at most `PullbackMaxRatio` times the big hump), then the first bar with the MACD back across zero. Only `MaxSignalsPerBigHump` signals per big hump, and none after `TrendMaxBars` bars.
-4. **Stop:** beyond the pullback hump's extreme, plus `SL_Buffer_Points` and (for sells) the spread. **Target:** `TP_RR` times the risk in the presets.
+3. **Signal:** a pullback hump of at least `PullbackMinBars` bars (1 in Top01, Top04 and Top07, so one bar across zero counts) and at most `PullbackMaxRatio` times the big hump, then the first bar with the MACD back across zero. Only `MaxSignalsPerBigHump` signals per big hump, and none after `TrendMaxBars` bars.
+4. **Stop:** beyond the pullback hump's extreme, plus `SL_Buffer_Points` and (for sells) the spread. **Target:** `TP_RR` times the risk in every preset.
 5. **Filters and exits:** higher-timeframe EMA filter, trading hours, spread limit, trailing in multiples of the risk, maximum holding time, end-of-day close and Friday close, as set in each preset.
 
 ## What changed
 
 **v1.34** (this zip)
-- A failed trailing-stop change, for example while the market is closed at the daily open, is retried at most every few seconds instead of on every tick. The MT5 test printed 295 such failures.
-- A warning is printed at start on a netting account, where several presets on one symbol cannot be kept apart.
+- **Trailing stop:** after a failed stop change (the MT5 test logged 295, all while the market was closed at the daily open) it pauses for 5 seconds instead of retrying on every tick, and it does not try while Algo Trading is off. Its original risk (1R) is read from the opening deal, so a crash or a move to another terminal no longer shrinks the trailing distance.
+- **Weekend close:** a Friday close that was missed (EA or Algo Trading off, market closed early) is made up on the next tick.
+- **Netting accounts:** a warning, and no entry while another position on the symbol is open.
+- **`MaxHoldMinutes`:** no early close when the one-minute history is not loaded yet.
+- **New input `CommissionPerLot`** (0 = off), counted in the risk. `MaxLotSize` is rounded to the volume step; margin cuts are logged.
+- **Checks:** `HTF_Timeframe=MN1` is rejected, a data stall prints a warning every 5 bars, and a BTC preset loaded on gold prints a warning.
+- **Chart:** the previous-hump line is drawn only when it is the target, which is never the case in these presets.
 
 **v1.33**
 - Strategy Tester fix: the EA now asks for an indicator value before checking that the indicator is ready. In the non-visual tester, v1.32 never traded.
@@ -88,4 +95,4 @@ Steps:
 ## What you see on the chart
 
 - **Status panel:** trend state (BEARISH / BULLISH / LINEAL), the big hump's size, signals used, the current hump, the session and the last reason a signal was skipped.
-- **Labels** on big humps, **arrows** on signals, and the stop and target lines of the last trade.
+- **Labels** on big humps and **arrows** on signals. **Dashed red line:** the pullback hump's extreme (the stop reference). **Dotted lines:** the stop and target of the trade that was opened.
