@@ -66,10 +66,26 @@
 // False, fgfLvMode = Signal close, fgfBandAtr = 0.5, fgfUseBurst = False,
 // fgfAnyCombo = True, fgfMinAligned = 0, amviTradeDir = Inverted. Seconds
 // timeframes (1s-45s) are off because they could not be tested (no seconds data).
+//
+// SIZING (S3, added 2026-11-14; not part of the calibration above)
+//  - Group "S3. Sizing", the Danny Phantom FX rule (f_qty). Risk % (default):
+//    quantity = equity x Risk % / (stop distance x point value), with stop
+//    distance = Stop Loss x the exit ATR(14) at the signal, the stop the bracket
+//    places. A stop-out loses about Risk % of equity before costs and gaps: at
+//    the default 1%, 1R = 1% of equity. Fixed mode trades 10 oz every time.
+//  - Then capped at Max quantity (50 oz) and at what the equity can margin
+//    (equity / (price x point value x Margin %)), and rounded down to the step
+//    (0.001 oz). An entry that rounds to 0 is skipped; an opposite position is
+//    still closed. Risk % needs a stop: with Stop Loss = 0 nothing trades.
+//  - Properties: Margin for long / short positions = 1% in this file; keep it
+//    equal to "Margin %". Order size is not used (S3 sizes every entry).
+//  - R results above do not depend on size. The % figures above were measured
+//    at the former size, 10% of equity per trade.
 // =====================================================================================
 strategy("AMVI FGF | XAUUSD 15m (calibrated)", shorttitle="AMVI XAU 15m", overlay=false, precision=2,
-     initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10,
-     commission_type=strategy.commission.percent, commission_value=0.04, slippage=1, pyramiding=0)
+     initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1,
+     commission_type=strategy.commission.percent, commission_value=0.04, slippage=1, pyramiding=0,
+     margin_long=1, margin_short=1)
 
 // =====================================================================================
 // AMVI Full MTF -> Strategy
@@ -83,6 +99,9 @@ strategy("AMVI FGF | XAUUSD 15m (calibrated)", shorttitle="AMVI XAU 15m", overla
 //   3. EXITS     : ATR stop / ATR target / optional ATR trailing stop, optional
 //                  "volatility collapse" exit (average AMVI crosses below Low Vol),
 //                  optional time stop, optional reversal on opposite signal.
+//   4. SIZING    : "S3. Sizing": the quantity that loses Risk % of equity at the
+//                  stop, or a fixed quantity; capped at Max quantity and at the
+//                  available margin, rounded down to the quantity step.
 // -------------------------------------------------------------------------------------
 // FGF build (2026-11-07): the FlashGold Direction Filter v1.2 is fused below, between
 // BEGIN and END FLASHGOLD DIRECTION FILTER, byte-identical to
@@ -153,6 +172,17 @@ trailActMul = input.float(1.5, "Trail Activation (x ATR)", minval=0.0, step=0.1,
 trailOffMul = input.float(1.0, "Trail Offset (x ATR)", minval=0.0, step=0.1, group=gEx)
 useVolExit  = input.bool(false, "Exit on Volatility Collapse (avg AMVI < Low Vol)", group=gEx, tooltip="Calibrated for XAUUSD 15m (see the header).")
 maxBars     = input.int(0, "Time Stop (bars, 0 = off)", minval=0, group=gEx)
+
+// --- S3. Sizing (as in Danny Phantom FX: Fixed or Risk % quantity, max quantity,
+// quantity step, cap to available margin; see SIZING in the header) ---
+gS3 = "S3. Sizing"
+QtyMode     = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3)
+fixedQtyS3  = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3)
+riskPctS3   = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Quantity = equity x risk% / (stop distance x point value). Stop distance = Stop Loss x the exit ATR at the signal, so a stop-out loses about this % of equity (before costs and gaps). Needs a stop loss > 0: with Stop Loss = 0, Risk % places no trades.")
+maxQtyS3    = input.float(50, "Max quantity", minval=0.0, group=gS3)
+qtyStepS3   = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
+capMarginS3 = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
+marginPctS3 = input.float(1.0, "Margin % (match Properties -> Margin)", minval=0.0, step=0.5, group=gS3)
 
 // --- Global Toggles ---
 showOverlay = input.bool(true, "Master Toggle: Show Price Overlay Lines", group="Overlay")
@@ -833,12 +863,42 @@ plot(ta.cum(fgdTrigNone  ? 1 : 0), "FGD triggers with no direction", display = d
 float atrX = ta.atr(exitAtrLen)
 var float entryAtr = na
 
-if goLong
+// S3. Sizing (Danny Phantom FX f_qty, unchanged): Risk % = the quantity that loses
+// Risk % of equity at the stop, else the fixed quantity; capped at Max quantity and,
+// when on, at what the equity can margin; rounded down to the step. 0 = no entry.
+f_qty(float stopDistance) =>
+    float pointValue = syminfo.pointvalue > 0 ? syminfo.pointvalue : 1.0
+    float q = fixedQtyS3
+    if QtyMode == "Risk %"
+        float stopCash = stopDistance * pointValue
+        q := stopCash > 0 ? strategy.equity * riskPctS3 / 100.0 / stopCash : 0.0
+    q := math.min(q, maxQtyS3)
+    if capMarginS3 and marginPctS3 > 0
+        q := math.min(q, strategy.equity / (close * pointValue * marginPctS3 / 100.0))
+    math.floor(q / qtyStepS3 + 1e-9) * qtyStepS3
+
+// The quantity of an entry on this bar, sized on the stop the bracket below places
+// for it (Stop Loss x the exit ATR on this bar). A trigger whose quantity rounds to
+// 0 opens nothing, but still closes an opposite position (its reversal exit).
+float s3Qty      = f_qty(slMult * atrX)
+bool  enterLong  = goLong and s3Qty > 0
+bool  enterShort = goShort and s3Qty > 0
+
+if enterLong
     entryAtr := atrX
-    strategy.entry("Long", strategy.long, comment="AMVI L " + str.tostring(hotCount) + "TF")
-if goShort
+    strategy.entry("Long", strategy.long, qty=s3Qty, comment="AMVI L " + str.tostring(hotCount) + "TF")
+if enterShort
     entryAtr := atrX
-    strategy.entry("Short", strategy.short, comment="AMVI S " + str.tostring(hotCount) + "TF")
+    strategy.entry("Short", strategy.short, qty=s3Qty, comment="AMVI S " + str.tostring(hotCount) + "TF")
+if goLong and not enterLong and strategy.position_size < 0
+    strategy.close("Short", comment="Reverse (qty 0)")
+if goShort and not enterShort and strategy.position_size > 0
+    strategy.close("Long", comment="Reverse (qty 0)")
+
+// S3 diagnostics (Data Window only): the quantity an entry on this bar gets, and what
+// its stop would lose as a % of equity (= Risk % unless Max quantity or margin caps it).
+plot(s3Qty, "S3 quantity (entry on this bar)", display = display.data_window, precision = 3)
+plot(strategy.equity > 0 ? 100.0 * s3Qty * slMult * atrX * syminfo.pointvalue / strategy.equity : na, "S3 risk at the stop, % of equity", display = display.data_window)
 
 // Exit orders are (re)placed on the signal bar too, so protection is active from the fill bar.
 float trailPts = useTrail and not na(entryAtr) ? math.max(1, math.round(entryAtr * trailActMul / syminfo.mintick)) : na
@@ -847,14 +907,14 @@ float trailOff = useTrail and not na(entryAtr) ? math.max(1, math.round(entryAtr
 float longSL = na, float longTP = na, float shortSL = na, float shortTP = na
 bool hasBracket = slMult > 0 or tpMult > 0 or useTrail
 
-if hasBracket and (strategy.position_size > 0 or goLong)
+if hasBracket and (strategy.position_size > 0 or enterLong)
     float ep = strategy.position_size > 0 ? strategy.position_avg_price : close
     longSL := slMult > 0 ? ep - entryAtr * slMult : na
     longTP := tpMult > 0 ? ep + entryAtr * tpMult : na
     strategy.exit("L-Exit", "Long", stop=longSL, limit=longTP, trail_points=trailPts, trail_offset=trailOff,
          comment_loss="L SL", comment_profit="L TP", comment_trailing="L Trail")
 
-if hasBracket and (strategy.position_size < 0 or goShort)
+if hasBracket and (strategy.position_size < 0 or enterShort)
     float ep = strategy.position_size < 0 ? strategy.position_avg_price : close
     shortSL := slMult > 0 ? ep + entryAtr * slMult : na
     shortTP := tpMult > 0 ? ep - entryAtr * tpMult : na
@@ -884,8 +944,8 @@ hline(highVolThreshold, "High Vol", color.new(color.blue, 50)), hline(lowVolThre
 bgcolor(trigger ? color.new(color.yellow, 85) : na, title="Trigger BG")
 
 // --- Signal markers on price chart ---
-plotshape(goLong, "Long Signal", shape.triangleup, location.belowbar, color.lime, size=size.small, force_overlay=true)
-plotshape(goShort, "Short Signal", shape.triangledown, location.abovebar, color.red, size=size.small, force_overlay=true)
+plotshape(enterLong, "Long Signal", shape.triangleup, location.belowbar, color.lime, size=size.small, force_overlay=true)
+plotshape(enterShort, "Short Signal", shape.triangledown, location.abovebar, color.red, size=size.small, force_overlay=true)
 plot(showLevels and strategy.position_size > 0 ? longSL : na, "Long SL", color.red, 1, plot.style_linebr, force_overlay=true)
 plot(showLevels and strategy.position_size > 0 ? longTP : na, "Long TP", color.lime, 1, plot.style_linebr, force_overlay=true)
 plot(showLevels and strategy.position_size < 0 ? shortSL : na, "Short SL", color.red, 1, plot.style_linebr, force_overlay=true)
