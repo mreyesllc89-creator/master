@@ -120,17 +120,19 @@ So it is a broad plateau, not a single lucky point.
 | T4: consistent without any single year (worst p) | 0.941 | < 0.05 | fail |
 | Realistic execution: T1a / T1b | 0.983 / 0.946 | < 0.02 | fail |
 
-**98% one-sided bounds on the true average** (month-clustered): **−78.1 to +22.3 bp per trade.**
+**98% one-sided bounds on the true average** (month-clustered): **above −78.1 bp, and below +22.3 bp per trade.** Each bound holds at 98% on its own, so the range −78.1 to +22.3 is a 96% interval. The upper bound is the one that matters: it shows which edge sizes the data rule out.
 
-- **Worse than chance entries:**
+- **No better than chance entries:**
   - Random entry timing averaged +2.0 bp per trade over 10,000 runs.
   - The rule's own signal bars with shuffled long/short labels averaged +7.3 bp.
-  - The rule averaged −27.9 bp.
+  - The rule averaged −27.9 bp, below both. The gap is not significant: tested the other way, for worse than chance, the month-clustered p-values are 0.11 and 0.07.
+  - So the entries showed no skill. The data do not show that they were worse than chance.
 - **Costs only make it worse:** −23.9 bp before fees, −52.9 bp under realistic execution (0.05% per side, stops at the bar's worst price, 3 bp/day holding cost).
-- **Not one bad year:**
-  - 2018 lost heavily, at −224 bp per trade with a median trade of −369 bp. Without 2018 the average is still −0.8 bp (p 0.51).
+- **Mostly one bad year, but no edge without it either:**
+  - 2018 lost heavily, at −224 bp per trade with a median trade of −369 bp. Its −17,034 bp is 98% of the whole period's −17,459 bp.
+  - Without 2018 the average is −0.8 bp (p 0.51). That is break-even, not an edge. So the size of the loss rests on 2018, but the missing edge does not.
   - 38 of 83 months and 11 of 29 quarters were positive.
-  - Without its 10 worst trades the rule still makes −3.3 bp per trade. These descriptive figures come from `trades_BTC_oos.csv`.
+  - Without its 10 worst trades the average is −3.3 bp, still not positive. These descriptive figures come from `trades_BTC_oos.csv`.
 - **Every view agrees:**
   - In R (return ÷ stop distance): −0.076 R per trade.
   - Longs −10.4 bp, shorts −44.5 bp.
@@ -179,12 +181,18 @@ These readings were fixed before the run.
   - There was no code error, and no result file had been written.
   - As pre-registered (8.6), its partial log is kept unchanged as `validation_out_crash1.txt`, and the run was started again at 23:41 UTC.
   - The new run started from commit a51780c, which only renamed that log; the code and data hashes were identical. It reproduced the partial log's result lines exactly. Nothing was fixed in between.
-- **Log snapshots** were committed while the run was in progress (6602d44, 1c3db1b, 7c17617). The final log is in 04a8f78.
+- **Log snapshots** were committed while each run was in progress:
+  - 6602d44 holds the first run's log, committed before the restart. It is identical to `validation_out_crash1.txt`.
+  - 1c3db1b and 7c17617 hold the new run's log part-way through.
+  - The final log is in 04a8f78.
 - **Nothing else deviated.** No setting was changed after the data was seen.
 
 ### What this means
 
-- **The tuning result did not hold up.** The rule made +62.9 bp per trade in the tuning period, but its true average over 2017-12 → 2024-10 was below +22.3 bp at 98% confidence. That excludes both the tuning figure and the 35–45 bp edges the test was sized to detect. The estimate is also negative, so the data argue against an edge of that size, not just fail to show one.
+- **The tuning result did not hold up.** The rule made +62.9 bp per trade in the tuning period, but its true average over 2017-12 → 2024-10 was below +22.3 bp at 98% confidence.
+  - That excludes both the tuning figure and edges of 35–45 bp. The estimate is also negative, so the data argue against an edge of that size, not just fail to show one.
+  - This comes from the bound, not from the test's power. Amendment 1 (8.5) gave a 35–45 bp edge only about a 50–76% chance of passing. On this data's wider spread, an edge of about 71 bp (T1a) or 96 bp (T1b) would have been needed to pass each test alone 80% of the time.
+  - The exclusion of 35–45 bp edges leans on 2018: without 2018 the upper bound is +44.1 bp. The tuning figure is excluded either way.
 - **This is what Update 3 warned of:** a sharp peak at pivot 5, no benefit from walk-forward optimisation, and a t-statistic within what chance produces across this many settings. The reality check (`reality_check_out.txt`) said the same.
 - **No re-tuning.** As pre-registered, the rule is not re-tuned on this data. Pivot 3's +4.3 bp is not a new candidate: any setting chosen after seeing this data would need new unseen data of its own.
 
@@ -333,19 +341,19 @@ The stop and target settings are robust. The result depends heavily on pivot str
   - None of its 14 neighbours worked either, including the earlier 15m default with the levels filter off.
   - The 5m and 1m charts never showed a lasting edge on the two-year data (Update 2), and were not tested on 2017–2024.
 - **What remains useful from v3.1 is mechanics, not edge:**
-  - ATR-based stops, which beat tick stops in every comparison here;
   - the position protected from the fill bar;
   - conflicting bars skipped;
   - commission in the strategy properties.
 
   These make the script behave correctly. They do not make the TDI confluence signal profitable.
+- **ATR stops are a better design, not a proven gain.** They scale with volatility and did better than tick stops in most comparisons here, but not all: in the first study's walk-forward, ticks made +7.5 bp per trade against +3.9 bp for ATR.
 - **If you want to keep working on it:**
   - treat each new idea as a new hypothesis and fix it before looking;
   - test it on data it has never seen, for example a forward test on live data from 2026-11-13 on, or another market;
   - use the same kind of pre-registered test.
 
   Expect most ideas to fail: the reality check shows how often the best of a large search looks good by chance.
-- **Don't use tick-based stops on BTC.**
+- **Don't use tick-based stops on BTC.** A fixed distance does not scale with price or volatility. v3.0's 200 ticks is only $2 on BTC, inside the noise, and it lost after fees in every test here.
 - **Caveats:**
   - Binance data, while TradingView may chart a different BTC feed;
   - the Python engine reproduces TradingView's broker emulator closely, but not tick-for-tick;
@@ -353,7 +361,7 @@ The stop and target settings are robust. The result depends heavily on pivot str
 
 ## Reproduce
 ```bash
-./fetch_data.sh        # Binance BTCUSDT 1m into ./data (Apr-Oct + Nov 1-12)
+./fetch_data.sh        # Binance BTCUSDT 1m into ./data (Nov 2024 - Oct 2026 + Nov 1-12 2026)
 python3 test_mtf.py    # MTF / ATR alignment regression tests
 python3 sweep3.py      # stages A+B, ~5 min on 4 cores
 python3 wf31.py        # mode comparison + walk-forward + plateaus
@@ -367,7 +375,8 @@ python3 opt15m.py && python3 opt15_wf.py opt15m    # 15m sweep, exits on 1m bars
 python3 opt15_pick.py                              # stress test of the pick
 # confirmation test (Update 4): protocol in PREREGISTRATION.md, audit in AUDIT.md
 ./fetch_full.sh && python3 build_npz.py            # Binance 1m history 2017-2026 for 7 coins (~1.6 GB)
-sha256sum -c data_manifest.sha256                  # data must match the pinned hashes
+python3 build_npz.py --insample                    # the tuning data (BTC Nov 2024 - Nov 12 2026, from ./fetch_data.sh) as one file; the steps below need it
+sha256sum -c data_manifest.sha256                  # data must match the pinned hashes (7 coins + the tuning data)
 python3 validate.py selftest && python3 validate.py dryrun   # checks on the tuning data only
 python3 validate.py run                            # the one-shot test; refuses changed code/data and existing outputs (move the committed ones away to reproduce)
 python3 report_validation.py > validation_report.md
