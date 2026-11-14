@@ -182,14 +182,17 @@ def fmt_s(s):
             f"98% bounds {s['lcb98_cr']:+.1f} / {s['ucb98_cr']:+.1f}")
 
 
-print("   TradingView reference cases (published with PineTS and PyneCore; TradingView output):")
-x = np.array([80107.99, 80028.01, 80107.99, 79989.13, 79865.89])     # BINANCE:BTCUSDT 60m highs, pivothigh(2, 2)
-print(f"     highs {x.tolist()}, pivothigh(2, 2) on the last bar: TradingView 80107.99 | "
+print("   Two ties with TradingView's own output:")
+# (a) BINANCE:BTCUSDT 60m highs with a tie on the left, quoted with TradingView's value in PineTS's CHANGELOG (0.10.0)
+x = np.array([80107.99, 80028.01, 80107.99, 79989.13, 79865.89])
+print(f"     (a) highs {x.tolist()}, pivothigh(2, 2) on the last bar: TradingView 80107.99 | "
       f"engine {engine._pivots(x, 2, 2, x)[1][-1]} | TradingView rule {_pivots_tv(x, 2, 2)[1][-1]}")
-x = np.array([100., 101., 105., 105., 102., 100., 100., 100.])         # pivothigh(1, 1)
-print(f"     highs {x.tolist()}, pivothigh(1, 1) at bars 3 / 4: TradingView nan / 105 | "
-      f"engine {engine._pivots(x, 1, 1, x)[1][3]} / {engine._pivots(x, 1, 1, x)[1][4]} | "
-      f"TradingView rule {_pivots_tv(x, 1, 1)[1][3]} / {_pivots_tv(x, 1, 1)[1][4]}")
+# (b) BINANCE:BTCUSDT 30m highs 2025-01-05 05:30 .. 09:00 with a tie on the right, from PyneCore's TradingView export
+#     tests/t01_lib/t20_ta/data/pivot_zero_strength.csv (column ph_0_5 = ta.pivothigh(high, 0, 5))
+x = np.array([98500.00, 98393.94, 98500.00, 98464.84, 98355.83, 98268.78, 97941.97, 97943.02])
+print(f"     (b) highs {x.tolist()}, pivothigh(0, 5) at 08:00 / 09:00: TradingView nan / 98500.0 | "
+      f"engine {engine._pivots(x, 0, 5, x)[1][5]} / {engine._pivots(x, 0, 5, x)[1][7]} | "
+      f"TradingView rule {_pivots_tv(x, 0, 5)[1][5]} / {_pivots_tv(x, 0, 5)[1][7]}")
 
 df = V.load("BTCUSDT", end=V.CUT)
 cb = ctx_with(df, EXC, False); ct_ = ctx_with(df, EXC, True)

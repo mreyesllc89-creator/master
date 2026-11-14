@@ -34,7 +34,7 @@ After the confirmation test (`RESULTS.md`, Update 4: NOT PASSED), a second indep
   - Built from the raw Binance zips, with its own parser, 60m ATR, exclusion logic, 1-minute exit walk and commission. Only the signal flags came from the engine.
   - It rebuilt all 626 trades to within 0.0005 bp: 300 stops, 60 targets, 266 reversals, 0 gap fills.
   - No exit bar touched both the stop and the target, so the order of high and low inside a bar never decided a trade.
-  - Pine's rounding of stop and target to ticks changes 6 trades by at most 0.014 bp.
+  - Pine's rounding of stop and target to ticks moves no trade by more than 0.014 bp and changes no exit. Only 6 of the 360 stop and target exits move by more than 0.01 bp.
 
 ### Signals
 - **Six windows chosen for trouble:** the independent Pine emulator from the pre-run audit matched the engine on every 15m bar in each of them:
@@ -44,7 +44,7 @@ After the confirmation test (`RESULTS.md`, Update 4: NOT PASSED), a second indep
   - 2023: a gap over the 13:00 bar;
   - 2024-08/10.
 - **The whole test period:** one bar differs, in an excluded month (a floating-point tie). The emulator's flags give the same 626 trades.
-- **Other data:** the six other coins (0 differing bars in tradable months), the ten signal-side neighbours and the tuning data all agree too.
+- **Other data:** the six other coins (0 differing bars in tradable months), the 11 signal-side neighbours and the tuning data all agree too.
 - **Floating-point variants:**
   - other SMA and RSI forms, and exact-tie arithmetic, change 0 BTC signal bars;
   - a Wilder-form RMA changes 2 and no trade.
@@ -58,7 +58,7 @@ After the confirmation test (`RESULTS.md`, Update 4: NOT PASSED), a second indep
   - the centred T2 and T3 p-values.
 - **New null draws with a different random generator:**
   - T2 (10,000 runs): null mean +2.2 bp, centred p 0.893. The registered run had +2.0 bp, p 0.891.
-  - T3 (2,400 runs): +6.9 bp, p 0.924. The registered run had +7.3 bp, p 0.927.
+  - T3 (2,400 runs): +6.8 bp, p 0.924. The registered run had +7.3 bp, p 0.927.
   - To pass T2 or T3, the rule would have needed a null mean below about −78 bp.
 - **About 40 other statistics and cuts:**
   - medians, trimmed and winsorised means, Wilcoxon and sign tests;
@@ -85,7 +85,7 @@ After the confirmation test (`RESULTS.md`, Update 4: NOT PASSED), a second indep
 - **Shorting and costs:** longs only −10.4 bp (p 0.61). With shorts dropped before Binance's margin launch (2019-07-11): −16.1 bp.
 - **Amendment 1 helped the rule:**
   - Without the off-grid fix the average would be −33.6 bp.
-  - Any stale-price threshold from 0.1% to 40% gives −28.9 to −33.2 bp, and no exclusion gives −31.1 bp. So the registered 1% rule is the most favourable choice.
+  - Thresholds from 0.1% to 40% give 10 distinct sets of excluded months, and all 10 were tried. The registered set is the one every threshold from 0.23% to 3.8% gives, and it has the best average (−27.9 bp). The other nine give −28.9 to −34.5 bp, among them −31.1 bp with no exclusion. So the registered 1% rule is the most favourable choice.
 - **All doubts at once:** dropping all 43 trades open to any of these doubts gives −33.1 bp (T1a p 0.90).
 
 ## Findings
@@ -117,6 +117,15 @@ After the confirmation test (`RESULTS.md`, Update 4: NOT PASSED), a second indep
 **Found while verifying:**
 - **Update 2's day-start counts were wrong when first written.** Per `hist2y_out.txt`, the unseen months had 22 of 24 positive hours on 15m, not 23 (21:00 was −0.2 bp, 22:00 −17.8 bp). On 5m they had 3 of 24, not 4. Both are corrected.
 - **A broken pointer:** the first study's "(see the update below)" no longer pointed at the day-start update once newer updates were added above it. It is now a link.
+- **This review's own text:** a final independent check found 8 small inaccuracies in it, none of which changes a result. They were:
+  - the neighbour count;
+  - a rounded null mean;
+  - the coverage of the threshold sweep;
+  - the description of the tie evidence, where one example was a re-implementation's prediction and not TradingView output;
+  - the tick-rounding sentence;
+  - two over-short phrasings.
+
+  All are corrected. The prediction was replaced by a TradingView export.
 
 ## The pivot tie rule
 
@@ -130,16 +139,18 @@ So the newer of two equal bars becomes the pivot. `engine._pivots` does the reve
 
 **Evidence:** TradingView output published with two independent Pine re-implementations.
 - **PineTS:**
-  - `tests/namespaces/ta/tie-handling.test.ts` holds a 28-cell TradingView table with left ties, right ties and both, at (1,1) and (2,2). TradingView's rule gets every cell right, and the engine's rule gets 10 of the 112 cells wrong.
+  - `tests/namespaces/ta/tie-handling.test.ts` holds TradingView's output for a 28-bar repeating series under four calls, `pivothigh` and `pivotlow` at (1,1) and (2,2). That is 112 cells, with ties on the left and on the right. TradingView's rule gets every cell right, and the engine's rule gets 10 of the 112 wrong.
   - Its CHANGELOG (0.10.0, 2026-09-25) gives the BINANCE:BTCUSDT 60m example below.
-- **PyneCore:** two TradingView exports (`pivot.csv`, in the repository since 2025-04-06, and `pivot_zero_strength.csv`) each contain one tie. In both, TradingView gives no pivot and the engine's rule gives one.
+- **PyneCore:** two TradingView exports (`pivot.csv`, in the repository since 2025-04-06, and `pivot_zero_strength.csv`) each contain one bar where a tie decides the pivot. In both, TradingView gives no pivot and the engine's rule gives one.
 
-Two cases, from `postrun_checks_out.txt`:
+Two ties with TradingView's own output, from `postrun_checks_out.txt`:
 
-| Highs | Call | TradingView | `engine.py` |
+| BINANCE:BTCUSDT highs | Call | TradingView | `engine.py` |
 |---|---|---|---|
-| 80107.99, 80028.01, 80107.99, 79989.13, 79865.89 | `pivothigh(2, 2)`, last bar | 80107.99 | na |
-| 100, 101, 105, 105, 102, 100, 100, 100 | `pivothigh(1, 1)`, bars 3 / 4 | na / 105 | 105 / na |
+| 60m, quoted in PineTS's CHANGELOG: 80107.99, 80028.01, 80107.99, 79989.13, 79865.89 | `pivothigh(2, 2)`, last bar | 80107.99 | na |
+| 30m, 2025-01-05 05:30 → 09:00, from PyneCore's `pivot_zero_strength.csv`: 98500.00, 98393.94, 98500.00, 98464.84, 98355.83, 98268.78, 97941.97, 97943.02 | `pivothigh(high, 0, 5)` at 08:00 / 09:00 | na / 98500.00 | 98500.00 / 98500.00 |
+
+In the first case the tie is on the candidate's left, and TradingView keeps the pivot. In the second it is on the right: TradingView rejects the older 98500.00 and reports the newer one at 09:00, while `engine.py` reports a pivot at both bars.
 
 **Effect** (`postrun_checks.py` §5, the engine with only the tie rule swapped):
 

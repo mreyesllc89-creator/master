@@ -33,9 +33,9 @@
    BTC on its tuning data, for comparison: 232 trades, +62.87 bp, +0.1728 R per trade (p 0.025)
 ====================================================================================================
 5. Pivot tie rule: engine.py (tie -> older bar) against TradingView (tie -> newer bar)
-   TradingView reference cases (published with PineTS and PyneCore; TradingView output):
-     highs [80107.99, 80028.01, 80107.99, 79989.13, 79865.89], pivothigh(2, 2) on the last bar: TradingView 80107.99 | engine nan | TradingView rule 80107.99
-     highs [100.0, 101.0, 105.0, 105.0, 102.0, 100.0, 100.0, 100.0], pivothigh(1, 1) at bars 3 / 4: TradingView nan / 105 | engine 105.0 / nan | TradingView rule nan / 105.0
+   Two ties with TradingView's own output:
+     (a) highs [80107.99, 80028.01, 80107.99, 79989.13, 79865.89], pivothigh(2, 2) on the last bar: TradingView 80107.99 | engine nan | TradingView rule 80107.99
+     (b) highs [98500.0, 98393.94, 98500.0, 98464.84, 98355.83, 98268.78, 97941.97, 97943.02], pivothigh(0, 5) at 08:00 / 09:00: TradingView nan / 98500.0 | engine 98500.0 / 98500.0 | TradingView rule nan / 98500.0
    BTC test data: signal bars in tradable months: engine 509 long + 523 short; 4 differ under TradingView's rule:
      2018-02-14 12:15:00+00:00  engine long 0 short 1 -> TradingView rule long 0 short 0
      2023-07-30 06:15:00+00:00  engine long 1 short 0 -> TradingView rule long 0 short 0
@@ -57,4 +57,4 @@
    other coins pooled, engine              : 3084 trades, -9.76 bp, month-clustered p 0.728
    other coins pooled, TradingView tie rule: 3092 trades, -9.06 bp, month-clustered p 0.711
 
-done in 53 s
+done in 50 s

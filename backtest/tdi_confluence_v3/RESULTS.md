@@ -197,9 +197,9 @@ These readings were fixed before the run.
 
 ### Review after the run
 
-A second independent review, made after the run, tried to break the result. It is recorded in `REVIEW_AFTER_RUN.md`. Nothing registered was changed or re-run.
+A second independent review, made after the run, tried to break the result. It is recorded in `REVIEW_AFTER_RUN.md`. No registered file was changed, and the registered test was not re-run.
 
-- **The result reproduces.** An independent Pine emulator gave the same signal bars. An independent simulator, built from the raw Binance files, rebuilt all 626 trades to within the 3-decimal rounding. The verdict statistics were recomputed with separate code, and the T2 and T3 nulls were redrawn with a different random generator. All agree.
+- **The result reproduces.** An independent Pine emulator gave the same signal bars in every tradable month and the same 626 trades. One bar differs, in an excluded month. An independent simulator, built from the raw Binance files, rebuilt all 626 trades to within the 3-decimal rounding. The verdict statistics were recomputed with separate code, and the T2 and T3 nulls were redrawn with a different random generator. All agree.
 - **No artifact was found** that could change a test. The review checked outages and gaps, gap fills, the largest losses, stale minutes, the off-grid stretches, costs and shorting.
 - **One port bug was found:** `engine.py` breaks pivot ties the other way from TradingView (see the Caveats under Recommendation). With TradingView's rule the test gives 625 trades at −27.6 bp per trade (T1a p 0.872), so the verdict is the same.
 - **The write-up was corrected** where the review found it inaccurate or incomplete. `REVIEW_AFTER_RUN.md` lists the changes.
