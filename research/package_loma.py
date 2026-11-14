@@ -15,7 +15,7 @@ assert f'#property version     "{VER}"' in src and f"Loma TrendPullback v{VER}" 
 
 
 def build(name, presets, docs, extra):
-    root = os.path.join(OUT, name)
+    root = os.path.join(BUILD, name)                     # staging folder, removed after zipping
     shutil.rmtree(root, ignore_errors=True)
     for d in ("MQL5/Experts", "MQL5/Include/EVK", "MQL5/Presets"):
         os.makedirs(os.path.join(root, d))
@@ -51,11 +51,12 @@ def build(name, presets, docs, extra):
         for dp, _, fs in sorted(os.walk(root)):
             for fn in sorted(fs):
                 full = os.path.join(dp, fn)
-                f.write(full, os.path.relpath(full, OUT))
+                f.write(full, os.path.relpath(full, BUILD))
     return z
 
 
 os.makedirs(OUT, exist_ok=True)
+BUILD = os.path.join(OUT, "_build")
 gold_sets = sorted(p for p in (os.path.join("presets/top10", f) for f in os.listdir("presets/top10"))
                    if p.endswith(".set") and re.search(r"Loma_(Top\d\d)_", p).group(1) in GOLD)
 assert len(gold_sets) == 6
@@ -67,6 +68,7 @@ btc_sets = sorted(os.path.join("presets/btc", f) for f in os.listdir("presets/bt
 assert len(btc_sets) == 4
 z2 = build(f"Loma_BTCUSD_v{TAG}", btc_sets, "packages/loma_btcusd/START_HERE.md",
            {"BTC_PRESETS_SUMMARY.csv": "presets/btc/BTC_PRESETS_SUMMARY.csv"})
+shutil.rmtree(BUILD)
 for z in (z1, z2):
     print(z)
     for i in zipfile.ZipFile(z).infolist():
