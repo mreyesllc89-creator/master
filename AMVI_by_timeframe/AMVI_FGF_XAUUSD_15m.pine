@@ -77,15 +77,27 @@
 //    (equity / (price x point value x Margin %)), and rounded down to the step
 //    (0.001 oz). An entry that rounds to 0 is skipped; an opposite position is
 //    still closed. Risk % needs a stop: with Stop Loss = 0 nothing trades.
-//  - Properties: Margin for long / short positions = 1% in this file; keep it
-//    equal to "Margin %". Order size is not used (S3 sizes every entry).
+//  - Costs come on top. The 0.04%/side commission is charged on the whole order
+//    value: about 0.08% x price / stop distance per round trip, roughly 0.28R on
+//    this record (price / ATR14 about 350). At Risk 1% a stop-out therefore costs
+//    about 1.3% of equity. The 9.4R drawdown above was measured at the $0.30
+//    spread; at the file's costs each trade gives up about 0.26R more (+199.6R
+//    vs +226.9R), so drawdowns run deeper.
+//  - Properties: margin for long / short positions = 0.2% in this file, as in
+//    Danny Phantom FX (a Properties tab that shows leverage instead reads 500).
+//    Keep it below "Margin %" (1%): a capped entry then needs at most a fifth of
+//    the equity as margin, leaving room for commission, slippage and gaps; at
+//    equal values a capped entry can be margin-called on its fill bar. At Pine
+//    v6's default of 100%, TradingView does not open entries that cost more than
+//    the equity, so almost no S3-sized entry would fill. Order size is not used
+//    (S3 sizes every entry).
 //  - R results above do not depend on size. The % figures above were measured
 //    at the former size, 10% of equity per trade.
 // =====================================================================================
 strategy("AMVI FGF | XAUUSD 15m (calibrated)", shorttitle="AMVI XAU 15m", overlay=false, precision=2,
      initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1,
      commission_type=strategy.commission.percent, commission_value=0.04, slippage=1, pyramiding=0,
-     margin_long=1, margin_short=1)
+     margin_long=0.2, margin_short=0.2)
 
 // =====================================================================================
 // AMVI Full MTF -> Strategy
@@ -178,7 +190,7 @@ maxBars     = input.int(0, "Time Stop (bars, 0 = off)", minval=0, group=gEx)
 gS3 = "S3. Sizing"
 QtyMode     = input.string("Risk %", "Quantity", options=["Fixed", "Risk %"], group=gS3)
 fixedQtyS3  = input.float(10, "Fixed quantity (contracts = oz, 100 = 1 lot)", minval=0.0, group=gS3)
-riskPctS3   = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Quantity = equity x risk% / (stop distance x point value). Stop distance = Stop Loss x the exit ATR at the signal, so a stop-out loses about this % of equity (before costs and gaps). Needs a stop loss > 0: with Stop Loss = 0, Risk % places no trades.")
+riskPctS3   = input.float(1.0, "Risk % of equity per trade (Risk mode)", minval=0.0, step=0.25, group=gS3, tooltip="Quantity = equity x risk% / (stop distance x point value). Stop distance = Stop Loss x the exit ATR at the signal, so a stop-out loses about this % of equity before commission and gaps; this file's 0.04%/side commission adds roughly a quarter more on 15m gold (see SIZING in the header). Needs a stop loss > 0: with Stop Loss = 0, Risk % places no trades.")
 maxQtyS3    = input.float(50, "Max quantity", minval=0.0, group=gS3)
 qtyStepS3   = input.float(0.001, "Quantity step (rounds down)", minval=0.000001, group=gS3)
 capMarginS3 = input.bool(true, "Cap quantity to available margin", group=gS3, tooltip="Quantity is also limited to equity / (price x point value x margin %), so an order never needs more margin than the account has.")
@@ -895,10 +907,11 @@ if goLong and not enterLong and strategy.position_size < 0
 if goShort and not enterShort and strategy.position_size > 0
     strategy.close("Long", comment="Reverse (qty 0)")
 
-// S3 diagnostics (Data Window only): the quantity an entry on this bar gets, and what
-// its stop would lose as a % of equity (= Risk % unless Max quantity or margin caps it).
-plot(s3Qty, "S3 quantity (entry on this bar)", display = display.data_window, precision = 3)
-plot(strategy.equity > 0 ? 100.0 * s3Qty * slMult * atrX * syminfo.pointvalue / strategy.equity : na, "S3 risk at the stop, % of equity", display = display.data_window)
+// S3 diagnostics (Data Window only): the quantity of an order placed at this bar's close
+// (it fills at the next open), and what its stop would lose before costs, as a % of
+// equity (= Risk % unless Max quantity or the margin cap binds).
+plot(s3Qty, "S3 quantity (order at this bar's close)", display = display.data_window, precision = 3)
+plot(strategy.equity > 0 ? 100.0 * s3Qty * slMult * atrX * syminfo.pointvalue / strategy.equity : na, "S3 stop risk before costs, % of equity", display = display.data_window)
 
 // Exit orders are (re)placed on the signal bar too, so protection is active from the fill bar.
 float trailPts = useTrail and not na(entryAtr) ? math.max(1, math.round(entryAtr * trailActMul / syminfo.mintick)) : na
