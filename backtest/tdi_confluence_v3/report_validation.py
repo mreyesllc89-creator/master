@@ -48,6 +48,8 @@ sr = R["btc_oos_R"]
 print(f"\nIn R (return ÷ stop distance): {sr['n']} trades, average {f(sr.get('mean_bp'), '+.3f')} R, month-clustered p {f(sr.get('p_cr_month'), '.4f')}, 6-month p {f(sr.get('p_cr_6m'), '.4f')}.")
 ph = R["btc_oos_phase_shift"]
 print(f"Month boundaries shifted by 0–29 days: month-clustered p between {ph['min']:.4f} and {ph['max']:.4f} (median {ph['median']:.4f}).")
+print(f"Checks of the first T1 registered in section 5: week-block bootstrap p {f(b.get('p_week'), '.4f')}; "
+      f"plain t-test on single trades t {f(b.get('t'), '+.2f')}, p {f(b.get('p_t'), '.4f')}.")
 nt, nd = R["btc_null_timing"], R["btc_null_direction"]
 for lab, nn in (("Random timing (T2)", nt), ("Shuffled long/short labels (T3)", nd)):
     print(f"\n- **{lab}:** {nn['n']} runs with {f(nn['trades_avg'], '.0f')} trades each on average (real: {b['n']}); their average {f(nn['mean'], '+.1f')} bp "

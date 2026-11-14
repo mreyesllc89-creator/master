@@ -27,6 +27,7 @@ Months without trading (stale prices, Amendment 1): 2017-08, 2017-09, 2017-10, 2
 
 In R (return ÷ stop distance): 626 trades, average -0.076 R, month-clustered p 0.9552, 6-month p 0.9339.
 Month boundaries shifted by 0–29 days: month-clustered p between 0.8633 and 0.8902 (median 0.8728).
+Checks of the first T1 registered in section 5: week-block bootstrap p 0.8895; plain t-test on single trades t -1.21, p 0.8863.
 
 - **Random timing (T2):** 10000 runs with 681 trades each on average (real: 626); their average +2.0 bp vs the rule's -27.9 bp. Verdict statistic: month-clustered t -1.24, p = 0.8912. Permutation p-values, reported only (not the verdict, see Amendment 1): on the trade-level t 0.9036 (9036 runs reached it), on the raw average 0.9258 (9258 runs).
 - **Shuffled long/short labels (T3):** 10000 runs with 685 trades each on average (real: 626); their average +7.3 bp vs the rule's -27.9 bp. Verdict statistic: month-clustered t -1.47, p = 0.9267. Permutation p-values, reported only (not the verdict, see Amendment 1): on the trade-level t 0.9400 (9400 runs reached it), on the raw average 0.9473 (9473 runs).

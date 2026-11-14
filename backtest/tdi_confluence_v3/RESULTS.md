@@ -5,7 +5,7 @@
 > - **The result:** it lost 27.9 bp per trade over 626 trades, every test failed by a wide margin, and 13 of the 14 neighbouring settings lost too.
 > - **What it means:** none of the results below show an edge that holds on unseen data. See [Update 4](#update-4-the-pre-registered-confirmation-test-not-passed) and the revised [Recommendation](#recommendation).
 
-**Data:** Binance BTCUSDT, 1-minute bars, 2026-04-01 → 2026-10-31 (308,160 bars). Tick size 0.01, so 100 ticks = $1.
+**Data:** Binance 1-minute bars. The first study (every section from the top through "Finalists") uses BTCUSDT 2026-04-01 → 2026-10-31 (308,160 bars). Updates 2 and 3 use BTCUSDT 2024-11-01 → 2026-11-12, and Update 4 tests on BTCUSDT 2017-12 → 2024-10 and six other coins. Each update states its own data. BTCUSDT's tick size is 0.01, so 100 ticks = $1.
 **Costs:** 0.02% commission per side unless stated. Sizing: 1% of equity per trade, as in the script.
 **Units:** "bp" is the average trade result in basis points of the position's notional value, after commission. It does not depend on position size: at 1% of equity, +50 bp per trade is +0.005% of the account per trade, and it scales linearly with size.
 
@@ -68,7 +68,9 @@ Choosing by in-sample average instead gave ATR +46.9 bp (33 trades, 3/4 months),
 | 8× | +0.5 | +7.2 | +9.2 |
 | 12× | +2.5 | +7.6 | +9.8 |
 
-Tight stops lose under every mode. Profit appears once the stop sits beyond the 1-hour noise, at roughly 3× ATR(60m) or more, which is about 1.5–3% on BTC. The percent mode shows the same pattern: 1.5–2% stops are positive and anything under 0.75% is negative. ATR beats percent because the distance adapts to volatility. Trailing helps tight stops a little and adds nothing at 5× ATR(60m), so it is off by default.
+On these 7 months, tight stops lose under every mode. Profit appears once the stop sits beyond the 1-hour noise, at roughly 3× ATR(60m) or more, which is about 1.5–3% on BTC. The percent mode shows the same pattern: 1.5–2% stops are positive and anything under 0.75% is negative. ATR beats percent because the distance adapts to volatility. Trailing helps tight stops a little and adds nothing at 5× ATR(60m), so it is off by default.
+
+**This did not hold on unseen data.** No stop width showed an edge there, and wider stops did not do better. On the 17 unseen months of Update 2, the 5m chart made +2.1 and +6.1 bp per trade with 1× and 2× ATR(60m), and lost 11.8 bp with 5× (`hist2y_out.txt`). On 2017–2024 (Update 4), the 15m pick lost 17.9 bp per trade with 3× ATR(60m), 27.9 bp with 5×, and 48.2 bp with 8× and TP 3R.
 
 ## Finalists: stress test
 All rows use 5m or 15m charts, all 7 months, and 0.02% per side. The random-entry check places the same number of long and short signals at random times with the same exits, 300 times.
@@ -86,9 +88,9 @@ All rows use 5m or 15m charts, all 7 months, and 0.02% per side. The random-entr
 - **Day start 00:00:** every stop from 3× to 8× and every TP from 1.5R to 3R is positive, from +5 to +24.
 - **Day start 13:00:** the same grid ranges from +28 to +62.
 
-So it is a broad plateau, not a single lucky point.
+So on these 7 months it is a broad plateau, not a single lucky point. It did not hold on unseen data: on the 17 unseen months of Update 2, with the 13:00 day start, stops of 3×, 5× and 8× ATR(60m) with TP 1R to 3R made between −13 and +2 bp per trade.
 
-**Day-start hour (5m chart, 5× ATR(60m), TP 2R, all 24 hours):** all 24 hours are profitable, averaging +22 bp. On a 15m chart, 20 of 24 are profitable, averaging +19 bp. 13:00 UTC is the best on 5m, at +56 bp with t = 2.9. Other hours mostly fall between +4 and +41 bp with t ≈ 0.2–2.2. The **ATR stop is the robust part. 13:00 is probably a lucky pick**, so I originally kept 00:00; the default is now 13:00 at the user's request (see the update below). Full table: `dayhour_out.txt`.
+**Day-start hour (5m chart, 5× ATR(60m), TP 2R, all 24 hours):** all 24 hours are profitable, averaging +22 bp. On a 15m chart, 20 of 24 are profitable, averaging +19 bp. 13:00 UTC is the best on 5m, at +56 bp with t = 2.9. Other hours mostly fall between +4 and +41 bp with t ≈ 0.2–2.2. On these 7 months the **ATR stop is the robust part. 13:00 is probably a lucky pick**, so I originally kept 00:00; the default is now 13:00 at the user's request (see [Update: day start 13:00 UTC](#update-day-start-1300-utc-is-now-the-default) further down). Full table: `dayhour_out.txt`. Only the second part held: on the 17 unseen months of Update 2, just 3 of 24 day-start hours were positive on the 5m chart, and 13:00 was not one of them.
 
 **Avoid D:** its edge is about 7 bp per trade before costs above 0.02%, and it disappears at 0.05% per side.
 
@@ -128,17 +130,20 @@ So it is a broad plateau, not a single lucky point.
   - The rule averaged −27.9 bp, below both. The gap is not significant: tested the other way, for worse than chance, the month-clustered p-values are 0.11 and 0.07.
   - So the entries showed no skill. The data do not show that they were worse than chance.
 - **Costs only make it worse:** −23.9 bp before fees, −52.9 bp under realistic execution (0.05% per side, stops at the bar's worst price, 3 bp/day holding cost).
-- **Mostly one bad year, but no edge without it either:**
+- **Mostly one bad year in bp, but no edge without it either:**
   - 2018 lost heavily, at −224 bp per trade with a median trade of −369 bp. Its −17,034 bp is 98% of the whole period's −17,459 bp.
-  - Without 2018 the average is −0.8 bp (p 0.51). That is break-even, not an edge. So the size of the loss rests on 2018, but the missing edge does not.
+  - Without 2018 the average is −0.8 bp (p 0.51). That is break-even, not an edge. So in bp the size of the loss rests on 2018, but the missing edge does not.
+  - In R, where each trade counts in units of its own risk, it is two bad years, not one. bp gives more weight to trades with wide stops, and 2018's stops were wider than in most years. In R, 2018 is 47% of the −47.7 R total and 2023, the year with the narrowest stops, another 36%. The other six years together average −0.017 R. Without 2018 the average is −0.046 R (p 0.84), still no edge.
   - 38 of 83 months and 11 of 29 quarters were positive.
-  - Without its 10 worst trades the average is −3.3 bp, still not positive. These descriptive figures come from `trades_BTC_oos.csv`.
+  - Without its 10 worst trades the average is −3.3 bp, still not positive.
+  - These descriptive figures come from `trades_BTC_oos.csv`. The R figures by year were added after the run, in `postrun_checks_out.txt`.
 - **Every view agrees:**
   - In R (return ÷ stop distance): −0.076 R per trade.
   - Longs −10.4 bp, shorts −44.5 bp.
   - Dropping shorts before Binance listed its perpetual (2019-09-13): −17.2 bp.
   - Without the stale-price exclusion: −31.1 bp.
   - Shifting the month boundaries by 0–29 days: month-clustered p between 0.86 and 0.89.
+  - The checks of the first T1 registered in section 5: with week blocks instead of months, bootstrap p 0.89; a plain t-test on single trades, t −1.21, p 0.89.
 - **Risk:** worst trade −2,279 bp, a short on 2020-03-16 stopped in the COVID-crash rebound. Worst drawdown 26,672 bp of one position's notional.
 
 | Cost per side | Trades | Win % | Avg bp/trade | Profit factor | Month-clustered t / p |
@@ -172,7 +177,10 @@ These readings were fixed before the run.
   - Pooled −9.8 bp per trade over 3,084 trades (month-clustered p 0.73).
   - 3 of 6 coins positive, none significant (best: XRP +49.8 bp, p 0.08).
   - Pre-set reading: **BTC-only or no edge**. Their monthly results are uncorrelated with BTC's (0.02).
-- **After 2024-11** (the BTC tuning window; descriptive only): the other coins pooled +22.8 bp (p 0.11). This fits a rule that did better in 2024–26 than before, i.e. a tuning result specific to that period.
+- **After 2024-11** (the BTC tuning window; descriptive only):
+  - The other coins pooled +22.8 bp (p 0.11), up from −9.8 bp before 2024-11. The rise is not significant (p 0.09). Without DOGE, which lost 124.8 bp per trade before, the rise is +12.8 bp (p 0.31).
+  - In R they were about break-even: +0.003 R per trade (p 0.46), against +0.17 R for BTC on its tuning data.
+  - So the other coins give no clear sign that the rule did better in 2024–26. The rise and R figures were added after the run, in `postrun_checks_out.txt`.
 
 ### Deviations from the protocol
 
@@ -187,12 +195,21 @@ These readings were fixed before the run.
   - The final log is in 04a8f78.
 - **Nothing else deviated.** No setting was changed after the data was seen.
 
+### Review after the run
+
+A second independent review, made after the run, tried to break the result. It is recorded in `REVIEW_AFTER_RUN.md`. Nothing registered was changed or re-run.
+
+- **The result reproduces.** An independent Pine emulator gave the same signal bars. An independent simulator, built from the raw Binance files, rebuilt all 626 trades to within the 3-decimal rounding. The verdict statistics were recomputed with separate code, and the T2 and T3 nulls were redrawn with a different random generator. All agree.
+- **No artifact was found** that could change a test. The review checked outages and gaps, gap fills, the largest losses, stale minutes, the off-grid stretches, costs and shorting.
+- **One port bug was found:** `engine.py` breaks pivot ties the other way from TradingView (see the Caveats under Recommendation). With TradingView's rule the test gives 625 trades at −27.6 bp per trade (T1a p 0.872), so the verdict is the same.
+- **The write-up was corrected** where the review found it inaccurate or incomplete. `REVIEW_AFTER_RUN.md` lists the changes.
+
 ### What this means
 
-- **The tuning result did not hold up.** The rule made +62.9 bp per trade in the tuning period, but its true average over 2017-12 → 2024-10 was below +22.3 bp at 98% confidence.
+- **The tuning result did not hold up.** The rule made +62.9 bp per trade in the tuning period, but its true average over 2017-12 → 2024-10 was below +22.3 bp at 98% confidence, with months as clusters.
   - That excludes both the tuning figure and edges of 35–45 bp. The estimate is also negative, so the data argue against an edge of that size, not just fail to show one.
   - This comes from the bound, not from the test's power. Amendment 1 (8.5) gave a 35–45 bp edge only about a 50–76% chance of passing. On this data's wider spread, an edge of about 71 bp (T1a) or 96 bp (T1b) would have been needed to pass each test alone 80% of the time.
-  - The exclusion of 35–45 bp edges leans on 2018: without 2018 the upper bound is +44.1 bp. The tuning figure is excluded either way.
+  - The exclusion of 35–45 bp edges leans on 2018 and on month clusters. Without 2018 the upper bound is +44.1 bp. With T1b's 6-month blocks it is +41.7 bp, mostly because the losses of 2017-12 → 2018-05 then count as one bad stretch rather than six independent months. The tuning figure is excluded either way, and also with 12-month blocks (+56.5 bp). These bounds were added after the run, in `postrun_checks_out.txt`.
 - **This is what Update 3 warned of:** a sharp peak at pivot 5, no benefit from walk-forward optimisation, and a t-statistic within what chance produces across this many settings. The reality check (`reality_check_out.txt`) said the same.
 - **No re-tuning.** As pre-registered, the rule is not re-tuned on this data. Pivot 3's +4.3 bp is not a new candidate: any setting chosen after seeing this data would need new unseen data of its own.
 
@@ -264,6 +281,8 @@ Changing one input of the pick (all / year 1 / year 2 bp per trade):
 
 Expect materially less than +63 bp per trade going forward. Forward-test on a 15m chart with Bar Magnifier on before using real money.
 
+*Later tested in Update 4: on BTC 2017-12 → 2024-10 the pick lost 27.9 bp per trade and did not pass.*
+
 ## Update 2: two-year backtest (Nov 2024 → Nov 12 2026)
 
 Data: 1,068,480 one-minute bars, no gaps. The settings were chosen on April–October 2026, so **November 2024 – March 2026 (17 months) is data nothing was tuned on**. Script `hist2y.py`, full output `hist2y_out.txt`. v3.1 defaults: stop 5× ATR(60m), TP 2R, no trail, 0.02% per side.
@@ -280,14 +299,16 @@ Data: 1,068,480 one-minute bars, no gaps. The settings were chosen on April–Oc
 
 **What the longer history shows**
 - **The 5m result did not hold.** The +55 bp per trade on the 5m chart with a 13:00 day start was specific to Apr–Oct 2026. On the 17 unseen months the same settings lost 11.8 bp per trade, on both longs (−13.4) and shorts (−10.0). Over two years the 5m chart is about break-even after fees, with a worst drawdown of 91% of one position's notional, and random entries beat it 18% of the time.
-- **The 13:00 day start was a lucky pick.** Over two years no hour stands out on the 5m chart: results range from −9 to +10 bp, and only 4 of 24 hours are positive on the unseen months.
-- **The 15m chart is the part that held up.** It made +22 bp per trade on the unseen months and +26 bp over two years, with both longs (+29) and shorts (+24) positive. 23 of 24 day-start hours are positive on the unseen months, so it does not depend on the hour. Random entries beat it 1.5% of the time, and it keeps +20 bp at 0.05% fees.
+- **The 13:00 day start was a lucky pick.** Over two years no hour stands out on the 5m chart: results range from −9 to +10 bp, and only 3 of 24 hours are positive on the unseen months.
+- **The 15m chart is the part that held up.** It made +22 bp per trade on the unseen months and +26 bp over two years, with both longs (+29) and shorts (+24) positive. 22 of 24 day-start hours are positive on the unseen months, so it does not depend on the hour. Random entries beat it 1.5% of the time, and it keeps +20 bp at 0.05% fees.
 - **It is still not statistically proven.** t = 1.7 over two years, 15 of 25 months positive, and the worst drawdown is 47% of one position's notional (0.47% of the account at 1% sizing).
 - **Pivot strength 8 loses everywhere** (−26 bp over two years on 5m). Gating entries by the TF toggles, which looked best on 2026, lost heavily on unseen data (−55 bp). TDI levels 38/62 was the only 5m variant positive on unseen data (+12 bp, 194 trades).
 - **Tick stops still lose:** v3.0-style 200/400 ticks made −3.9 bp per trade over 951 trades.
 - **Stop width on 5m:** no ATR or percent setting produced more than about +6 bp on unseen data.
 
 **Takeaway:** run v3.1 on a **15m chart**. The day-start hour matters little there; 13:00 and 00:00 perform the same. Treat it as a small, unproven edge.
+
+*Later tested in Update 4: on BTC 2017-12 → 2024-10 this 15m setting (levels off, day start 13:00) lost 20.7 bp per trade over 1,109 trades.*
 
 ## Update: day start 13:00 UTC is now the default
 
@@ -348,6 +369,7 @@ The stop and target settings are robust. The result depends heavily on pivot str
   These make the script behave correctly. They do not make the TDI confluence signal profitable.
 - **ATR stops are a better design, not a proven gain.** They scale with volatility and did better than tick stops in most comparisons here, but not all: in the first study's walk-forward, ticks made +7.5 bp per trade against +3.9 bp for ATR.
 - **If you want to keep working on it:**
+  - first fix the pivot tie rule in `engine.py` (`REVIEW_AFTER_RUN.md` gives the change), and compare the engine's trades with TradingView's Strategy Tester on a recent stretch of the same data;
   - treat each new idea as a new hypothesis and fix it before looking;
   - test it on data it has never seen, for example a forward test on live data from 2026-11-13 on, or another market;
   - use the same kind of pre-registered test.
@@ -356,23 +378,29 @@ The stop and target settings are robust. The result depends heavily on pivot str
 - **Don't use tick-based stops on BTC.** A fixed distance does not scale with price or volatility. v3.0's 200 ticks is only $2 on BTC, inside the noise, and it lost after fees in every test here.
 - **Caveats:**
   - Binance data, while TradingView may chart a different BTC feed;
-  - the Python engine reproduces TradingView's broker emulator closely, but not tick-for-tick;
+  - the Python engine follows the Pine code and TradingView's documented fill rules, but it was never compared trade by trade with TradingView's Strategy Tester;
+  - the Python port breaks pivot ties the other way from TradingView. When the RSI at a pivot candidate equals the RSI of a bar beside it, TradingView's `ta.pivotlow` / `ta.pivothigh` take the newer bar as the pivot, and `engine.py` takes the older one. This was found after the run, from TradingView output published with two independent Pine re-implementations (PineTS and PyneCore). It changes 4 of the 1,032 BTC signal bars in the test. With TradingView's rule the test gives 625 trades at −27.6 bp per trade (T1a p 0.872, T1b p 0.808, worst T4 p 0.939), so the verdict is the same. The other coins change more (SOL +31.8 → +24.4 bp per trade; pooled −9.1 bp, p 0.71), and the tuning result would have been +58.2 bp instead of +62.9 bp (`postrun_checks_out.txt`);
   - 0.02% per side is a low cost assumption, and realistic retail costs make every result above worse.
 
 ## Reproduce
 ```bash
 ./fetch_data.sh        # Binance BTCUSDT 1m into ./data (Nov 2024 - Oct 2026 + Nov 1-12 2026)
 python3 test_mtf.py    # MTF / ATR alignment regression tests
+# the first study used Apr-Oct 2026 only (day13.py: plus Nov 1-12); the scripts read every CSV in ./data, so set the rest aside
+mkdir -p data/aside && mv data/BTCUSDT-1m-2024-*.csv data/BTCUSDT-1m-2025-*.csv data/BTCUSDT-1m-2026-0[123].csv data/BTCUSDT-1m-2026-11-*.csv data/aside/
 python3 sweep3.py      # stages A+B, ~5 min on 4 cores
 python3 wf31.py        # mode comparison + walk-forward + plateaus
 python3 finalists.py   # stress tests
 python3 dayhour.py     # day-start hour sweep
+mv data/aside/BTCUSDT-1m-2026-11-*.csv data/
 python3 day13.py       # 13:00 default re-test incl. November
-python3 hist2y.py      # two-year backtest (needs the full download)
+mv data/aside/*.csv data/ && rmdir data/aside      # all two years again; every step below needs them
+python3 hist2y.py      # two-year backtest (all of ./data)
 python3 opt15.py && python3 opt15_wf.py opt15      # 15m sweep, exits on 15m bars (~15 min)
 python3 opt15_final.py                             # finalists with exits on 1m bars
 python3 opt15m.py && python3 opt15_wf.py opt15m    # 15m sweep, exits on 1m bars (~20 min)
 python3 opt15_pick.py                              # stress test of the pick
+python3 reality_check.py                           # data-snooping check of the 15m search (reads opt15m.py's output)
 # confirmation test (Update 4): protocol in PREREGISTRATION.md, audit in AUDIT.md
 ./fetch_full.sh && python3 build_npz.py            # Binance 1m history 2017-2026 for 7 coins (~1.6 GB)
 python3 build_npz.py --insample                    # the tuning data (BTC Nov 2024 - Nov 12 2026, from ./fetch_data.sh) as one file; the steps below need it
@@ -381,5 +409,8 @@ python3 validate.py selftest && python3 validate.py dryrun   # checks on the tun
 python3 validate.py run                            # the one-shot test; refuses changed code/data and existing outputs (move the committed ones away to reproduce)
 python3 report_validation.py > validation_report.md
 python3 sim_final.py 3000 1 && python3 sim_regimes.py      # false-positive rate and power simulations
+python3 postrun_checks.py                          # checks added after the run (REVIEW_AFTER_RUN.md), ~1 min
 ```
+The scripts print their results. Each committed `*_out.txt` file is that console output, for example `python3 sim_regimes.py > sim_regimes_out.txt`. `sim_regimes.py` also needs scipy.
+
 `v31_top_results.csv` lists the top 3,000 combinations, by t-stat, that have at least 100 trades.
