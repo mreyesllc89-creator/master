@@ -1,0 +1,285 @@
+<title>Loma Out-of-Sample Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a single reading column like a strategy-tester audit, with full-width data tables and SVG charts. */
+:root {
+  --bg: #f6f6f3; --surface: #ffffff; --fg: #1d2126; --muted: #5c636b; --line: #dcdcd5;
+  --brass: #9a6b12; --brass-soft: #f3e7cc;
+  --loss: #b3261e; --loss-soft: #f8dedb; --gain: #1f7a4a; --gain-soft: #d9efe2; --comm: #7a6f9b;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15181c; --surface: #1d2126; --fg: #e8e6e1; --muted: #a2a7ad; --line: #343a41;
+  --brass: #e0b25a; --brass-soft: #3a3020;
+  --loss: #f08a80; --loss-soft: #43221f; --gain: #6fcf9c; --gain-soft: #1c3a2a; --comm: #b3a8d6; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15181c; --surface: #1d2126; --fg: #e8e6e1; --muted: #a2a7ad; --line: #343a41;
+  --brass: #e0b25a; --brass-soft: #3a3020;
+  --loss: #f08a80; --loss-soft: #43221f; --gain: #6fcf9c; --gain-soft: #1c3a2a; --comm: #b3a8d6; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--body); }
+.wrap { max-width: 920px; margin: 0 auto; padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 48px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(30px, 5vw, 44px); font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 24px; font-weight: 700; }
+h3 { font-size: 16px; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--brass); }
+section { display: grid; gap: 16px; min-width: 0; }
+.lede { font-size: 17px; color: var(--muted); }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.verdict { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--loss);
+  border-radius: 6px; padding: 20px 22px; display: grid; gap: 8px; }
+.verdict strong { font-family: var(--display); font-size: 19px; }
+
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.tile .v { font: 500 24px/1.1 var(--mono); font-variant-numeric: tabular-nums; }
+.tile .k { font-size: 13px; color: var(--muted); line-height: 1.4; }
+@media (max-width: 720px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+.tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { padding: 9px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+th { font: 500 12px/1.3 var(--body); color: var(--muted); text-align: right; vertical-align: bottom; white-space: normal; min-width: 72px; }
+th:first-child, td:first-child { text-align: left; }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td:first-child { font-family: var(--body); font-weight: 500; }
+tr:last-child td { border-bottom: 0; }
+tr.total td { font-weight: 600; background: var(--brass-soft); }
+.sub { display: block; font-size: 12px; color: var(--muted); font-family: var(--body); font-weight: 400; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 13px; }
+.pill.bad { background: var(--loss-soft); color: var(--loss); }
+.pill.ok { background: var(--gain-soft); color: var(--gain); }
+.loss { color: var(--loss); } .gain { color: var(--gain); }
+
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; overflow-x: auto; }
+.chart svg { display: block; width: 100%; min-width: 560px; height: auto; }
+.chart text { fill: var(--muted); font: 11px var(--mono); }
+.legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.note { font-size: 13px; color: var(--muted); }
+ol.steps, ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 10px; max-width: 70ch; }
+.cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.opt { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 6px; align-content: start; }
+.opt.rec { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); }
+.opt .tag { font: 500 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--brass); }
+@media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+footer { font-size: 13px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; display: grid; gap: 8px; }
+code { font-family: var(--mono); font-size: 13px; }
+</style>
+
+<main class="wrap">
+  <header style="display:grid;gap:14px">
+    <span class="eyebrow">XAUUSD · Loma TrendPullback v1.32/v1.33 · six presets with backtest PF ≥ 1.3</span>
+    <h1>Loma Out-of-Sample Review</h1>
+    <p class="lede">The six gold presets were tested on prices they were never fitted to: VT Markets real ticks in MetaTrader 5 (Codex's run, 1 Mar – 6 Nov 2026), a second data source (Dukascopy), and a rolling walk-forward recalibration on FTMO data.</p>
+    <div class="verdict">
+      <strong>Verdict: do not trade these presets with real money.</strong>
+      <p>The EA reproduces its backtest closely, so the code is not the problem. The edge the backtest showed did not continue after the data used to choose the presets: from June on, all six lose money even before commission, on both VT and Dukascopy prices. Recalibrating every few months does not rescue it.</p>
+    </div>
+  </header>
+
+  <section aria-label="Key figures">
+    <div class="tiles">
+      <div class="tile"><span class="v loss">−$8,914</span><span class="k">VT MT5 net, six presets, 373 trades, $10k each</span></div>
+      <div class="tile"><span class="v">0.74</span><span class="k">VT profit factor before commission, Jun – Nov 6 (247 trades)</span></div>
+      <div class="tile"><span class="v">220 / 247</span><span class="k">VT trades that Dukascopy also found, Jun – Nov 6</span></div>
+      <div class="tile"><span class="v">0 of 20</span><span class="k">walk-forward variants passing PF &gt; 1.2 on ≥ 100 untouched trades</span></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">1 · Backtest vs broker test</span>
+    <h2>What the backtest promised and what VT delivered</h2>
+    <p>Backtest figures are FTMO data, Jan 2025 – mid-May 2026, the period the presets were chosen on. VT figures are Codex's MT5 run with 100% real ticks, 1 Mar – 6 Nov 2026, using the tester-fixed EA.</p>
+    <div class="tablebox">
+      <table>
+        <thead><tr>
+          <th>Preset</th><th>Backtest PF<span class="sub">2025 – May 2026</span></th><th>Backtest PF<span class="sub">2026 part</span></th>
+          <th>VT trades</th><th>VT PF<span class="sub">before commission</span></th><th>VT PF<span class="sub">after commission</span></th>
+          <th>VT gross</th><th>VT commission</th><th>VT net</th>
+        </tr></thead>
+        <tbody>
+          <tr><td>Top01 · M10 Both</td><td>2.09</td><td>1.72</td><td>56</td><td>0.74</td><td>0.48</td><td class="loss">−495</td><td>−794</td><td class="loss">−1,289</td></tr>
+          <tr><td>Top02 · M3 Sell</td><td>1.98</td><td>2.07</td><td>79</td><td>1.38</td><td>0.50</td><td class="gain">+656</td><td>−2,225</td><td class="loss">−1,569</td></tr>
+          <tr><td>Top03 · M2 Sell</td><td>2.03</td><td>1.46</td><td>69</td><td>0.85</td><td>0.34</td><td class="loss">−281</td><td>−1,729</td><td class="loss">−2,010</td></tr>
+          <tr><td>Top04 · M5 Both</td><td>1.82</td><td>1.40</td><td>60</td><td>0.82</td><td>0.32</td><td class="loss">−269</td><td>−1,524</td><td class="loss">−1,793</td></tr>
+          <tr><td>Top05 · M10 Buy</td><td>1.96</td><td>1.47</td><td>65</td><td>0.81</td><td>0.41</td><td class="loss">−246</td><td>−863</td><td class="loss">−1,108</td></tr>
+          <tr><td>Top07 · M5 Buy</td><td>2.17</td><td>1.84</td><td>44</td><td>0.75</td><td>0.28</td><td class="loss">−224</td><td>−922</td><td class="loss">−1,145</td></tr>
+          <tr class="total"><td>All six</td><td></td><td></td><td>373</td><td>0.91</td><td></td><td class="loss">−858</td><td>−8,056</td><td class="loss">−8,914</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Dollar figures are US$ on a $10,000 test deposit per preset. Commission is about 90% of the loss. VT's tester charged roughly $6 per lot round trip on a 1-ounce contract, which looks like a cent-account setting; check the XAUUSD-ECNc specification before trusting the net figures. The before-commission column does not depend on that setting.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">2 · Month by month on VT</span>
+    <h2>Profitable while it overlapped the fitting data, losing after</h2>
+    <p>March to mid-May 2026 was part of the data used to pick the presets, so those months are not a fair test. From June, the first fully untouched month, five of six months lose before commission.</p>
+    <div class="chart">
+      <svg viewBox="0 0 720 300" role="img" aria-labelledby="mtitle">
+        <title id="mtitle">VT gross profit and commission by month, six presets combined</title>
+        <g id="monthly"></g>
+      </svg>
+      <div class="legend">
+        <span><span class="sw" style="background:var(--gain)"></span>Gross profit (before commission)</span>
+        <span><span class="sw" style="background:var(--loss)"></span>Gross loss</span>
+        <span><span class="sw" style="background:var(--comm)"></span>Commission</span>
+      </div>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Period</th><th>Trades</th><th>Gross</th><th>PF before commission</th><th>PF after commission</th></tr></thead>
+        <tbody>
+          <tr><td>Mar – May 2026 <span class="sub">overlaps the fitting data</span></td><td>126</td><td class="gain">+750</td><td>1.25</td><td>0.65</td></tr>
+          <tr><td>Jun – Nov 6 2026 <span class="sub">untouched</span></td><td>247</td><td class="loss">−1,609</td><td>0.74</td><td>0.29</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">3 · Second data source</span>
+    <h2>Dukascopy prices give the same trades and the same losses</h2>
+    <p>Dukascopy is a third broker's feed, separate from FTMO (calibration) and VT (Codex). I ran the six presets through the Python backtest on Dukascopy one-minute bid/ask prices and compared each VT trade with the nearest Dukascopy entry within one bar. The spread cap was raised to $5 so Dukascopy's slightly wider spreads did not block trades.</p>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Preset</th>
+          <th>Dukascopy<span class="sub">trades · PF · net</span></th><th>VT<span class="sub">trades · PF before comm.</span></th><th>Matched</th>
+          <th>Dukascopy<span class="sub">trades · PF · net</span></th><th>VT<span class="sub">trades · PF before comm.</span></th><th>Matched</th>
+        </tr>
+        <tr><th></th><th colspan="3" style="text-align:center;color:var(--fg)">Jun 1 – Aug 30</th><th colspan="3" style="text-align:center;color:var(--fg)">Aug 31 – Nov 6</th></tr></thead>
+        <tbody>
+          <tr><td>Top01 · M10</td><td>20 · 0.93 · −0.8R</td><td>20 · 0.71</td><td>19/20</td><td>11 · 0.07 · −9.1R</td><td>12 · 0.09</td><td>9/12</td></tr>
+          <tr><td>Top02 · M3</td><td>23 · 1.05 · +0.6R</td><td>23 · 1.17</td><td>23/23</td><td>25 · 0.94 · −0.7R</td><td>25 · 0.93</td><td>19/25</td></tr>
+          <tr><td>Top03 · M2</td><td>22 · 0.72 · −4.0R</td><td>23 · 0.60</td><td>21/23</td><td>16 · 0.62 · −3.7R</td><td>21 · 1.01</td><td>16/21</td></tr>
+          <tr><td>Top04 · M5</td><td>26 · 0.50 · −7.7R</td><td>27 · 0.71</td><td>26/27</td><td>16 · 0.66 · −3.0R</td><td>15 · 0.36</td><td>13/15</td></tr>
+          <tr><td>Top05 · M10</td><td>24 · 1.01 · +0.2R</td><td>23 · 1.08</td><td>23/23</td><td>21 · 0.66 · −3.4R</td><td>26 · 0.65</td><td>20/26</td></tr>
+          <tr><td>Top07 · M5</td><td>22 · 0.65 · −3.9R</td><td>22 · 0.75</td><td>22/22</td><td>10 · 0.62 · −1.7R</td><td>10 · 0.64</td><td>9/10</td></tr>
+          <tr class="total"><td>All six</td><td>137 · 0.79 · −15.7R</td><td>138 · 0.81</td><td>134/138</td><td>99 · 0.60 · −21.6R</td><td>109 · 0.64</td><td>86/109</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">R is the trade result in units of its own risk (a full stop-loss = −1R). The match rate fell in Sep – Nov (79% vs 97%); I have not traced why, but the totals still agree closely. The comparison stops on 6 Nov, where Codex's run ends.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">4 · Walk-forward recalibration</span>
+    <h2>Recalibrating on recent months does not find a lasting edge</h2>
+    <p>On FTMO data (Jan 2025 – mid-May 2026) I kept the method's fixed values (MACD 12/26, Stochastic 7 at 20/80, the hump rules) and let seven settings vary: 576 setups. Each window chooses the best setups on the past months, trades the next months untouched, then rolls forward. "Top 5" trades the five best setups together. "Stressed" adds a one-minute delay, slippage, commission and worst-case trailing.</p>
+    <div class="tablebox">
+      <table>
+        <thead><tr><th>Calibrate / trade<span class="sub">months</span></th><th>Windows</th>
+          <th>Best setup<span class="sub">trades · net R · stressed</span></th><th>Top 5<span class="sub">trades · net R · stressed</span></th><th>Profitable windows<span class="sub">top 5</span></th></tr></thead>
+        <tbody>
+          <tr><td>4 / 1</td><td>13</td><td>143 · +3.7 · −2.3</td><td>698 · +11.8 · −17.0</td><td>6 of 13</td></tr>
+          <tr><td>6 / 1</td><td>11</td><td>74 · +7.8 · +1.0</td><td>409 · +21.4 · +20.0</td><td>5 of 11</td></tr>
+          <tr><td>6 / 2</td><td>6</td><td>81 · +1.6 · +1.8</td><td>373 · −18.2 · −19.7</td><td>2 of 6</td></tr>
+          <tr><td>9 / 2</td><td>4</td><td>59 · +3.4 · +1.2</td><td>259 · +33.7 · +22.8</td><td>3 of 4</td></tr>
+          <tr><td>9 / 3</td><td>3</td><td>29 · +0.9 · −5.1</td><td>169 · +15.7 · −7.1</td><td>2 of 3</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The pass mark, set before running, was PF above 1.2 on at least 100 untouched trades. None of the 20 variants passes. The totals swing between small gains and small losses depending on window length, and about half the windows lose.</p>
+    <div class="chart">
+      <svg viewBox="0 0 720 260" role="img" aria-labelledby="wtitle">
+        <title id="wtitle">Walk-forward, 6 months calibrate and 1 month trade, top 5 setups: net R per untouched month</title>
+        <g id="wf"></g>
+      </svg>
+      <p class="note" style="margin-top:8px">6-month calibration, 1-month trading, top 5 setups, net R per untouched month. The two months of the gold surge, January and February 2026, made +34.5R; the other nine months total −13.1R.</p>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">5 · What this means</span>
+    <h2>The EA is right; the pattern is not enough on its own</h2>
+    <ul class="plain">
+      <li><strong>The EA is correct.</strong> It reproduces the Python backtest about 95% trade-for-trade on VT real ticks (Mar – mid-May), and two independent price feeds agree on the later months.</li>
+      <li><strong>The backtest numbers came from fitting,</strong> mainly to the gold rally of late 2025 and early 2026. Out of that period the results are close to a coin flip before costs and clearly negative after.</li>
+      <li><strong>New presets will not fix it.</strong> The walk-forward test is exactly "recalibrate regularly", and it fails.</li>
+    </ul>
+    <div class="cols">
+      <div class="opt rec"><span class="tag">Recommended</span><h3>Stop here</h3><p>Do not run the Loma presets on real money.</p></div>
+      <div class="opt"><span class="tag">Optional</span><h3>Demo only</h3><p>Top02 or Top05 on a demo account for a few months, with commission set correctly. Expect roughly break-even minus costs.</p></div>
+      <div class="opt"><span class="tag">Next idea</span><h3>Test a new rule</h3><p>Bring another rule you trade by eye. It gets the same bar: walk-forward plus two data sources.</p></div>
+    </div>
+  </section>
+
+  <footer>
+    <p><strong>Sources.</strong> Backtest: FTMO M1 mid prices with hourly spread, Jan 2025 – May 15 2026 (<code>presets/top10/TOP10_SUMMARY.csv</code>). VT: Codex's MT5 reports, XAUUSD-ECNc, 100% real ticks, $10,000 deposit, 1:100 (<code>research/results/mt5_vt_2026/</code>). Dukascopy: bid/ask M1, 11 May – 12 Nov 2026, converted with <code>research/duk_to_m1.py</code>. Walk-forward: <code>research/results/walkforward/</code>.</p>
+    <p>Every figure on this page is generated by <code>research/make_loma_report_data.py</code> into <code>research/results/loma_report_data.json</code>. Report date: 14 Nov 2026.</p>
+  </footer>
+</main>
+
+<script>
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, parent, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    parent.appendChild(e); return e;
+  }
+  function css(name) { return "var(" + name + ")"; }
+
+  // VT, six presets combined, US$ (from loma_report_data.json -> vt_monthly)
+  var months = [
+    ["Mar", 528.96, -620.76], ["Apr", 356.89, -826.26], ["May", -135.71, -915.24], ["Jun", 184.95, -1036.32],
+    ["Jul", -382.62, -1276.20], ["Aug", -656.71, -1060.38], ["Sep", -254.73, -939.36], ["Oct", -199.52, -1116.72],
+    ["Nov*", -299.93, -264.78]
+  ];
+  (function () {
+    var g = document.getElementById("monthly");
+    var L = 56, R = 708, T = 16, B = 262, lo = -1400, hi = 600;
+    var y = function (v) { return T + (hi - v) / (hi - lo) * (B - T); };
+    [-1200, -800, -400, 0, 400].forEach(function (v) {
+      el("line", { x1: L, x2: R, y1: y(v), y2: y(v), stroke: css("--line"), "stroke-width": v === 0 ? 1.5 : 1 }, g);
+      el("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end" }, g, (v > 0 ? "+" : v < 0 ? "−" : "") + "$" + Math.abs(v));
+    });
+    var step = (R - L) / months.length, bw = step * 0.3;
+    // shade the months that overlap the fitting data (Mar – mid-May)
+    el("rect", { x: L, y: T, width: step * 2.5, height: B - T, fill: css("--brass-soft"), opacity: 0.6 }, g);
+    el("text", { x: L + step * 1.25, y: B - 8, "text-anchor": "middle" }, g, "overlaps fitting data");
+    months.forEach(function (m, i) {
+      var cx = L + step * i + step / 2;
+      var gv = m[1], cv = m[2];
+      el("rect", { x: cx - bw - 2, y: Math.min(y(gv), y(0)), width: bw, height: Math.abs(y(gv) - y(0)),
+        fill: gv >= 0 ? css("--gain") : css("--loss"), rx: 1 }, g);
+      el("rect", { x: cx + 2, y: y(0), width: bw, height: y(cv) - y(0), fill: css("--comm"), rx: 1 }, g);
+      el("text", { x: cx, y: B + 18, "text-anchor": "middle" }, g, m[0]);
+    });
+    el("text", { x: R, y: B + 34, "text-anchor": "end" }, g, "* Nov 1–6 only");
+  })();
+
+  // Walk-forward 6/1 top5, net R per untouched month (wf_6_1_top5)
+  var wf = [["Jul 25", -5.06], ["Aug", -3.36], ["Sep", 3.87], ["Oct", 7.5], ["Nov", -0.33], ["Dec", 3.68],
+            ["Jan 26", 13.94], ["Feb", 20.59], ["Mar", -13.0], ["Apr", -1.49], ["May*", -4.95]];
+  (function () {
+    var g = document.getElementById("wf");
+    var L = 44, R = 708, T = 14, B = 214, lo = -15, hi = 25;
+    var y = function (v) { return T + (hi - v) / (hi - lo) * (B - T); };
+    [-10, 0, 10, 20].forEach(function (v) {
+      el("line", { x1: L, x2: R, y1: y(v), y2: y(v), stroke: css("--line"), "stroke-width": v === 0 ? 1.5 : 1 }, g);
+      el("text", { x: L - 8, y: y(v) + 4, "text-anchor": "end" }, g, (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) + "R");
+    });
+    var step = (R - L) / wf.length, bw = step * 0.56;
+    wf.forEach(function (d, i) {
+      var cx = L + step * i + step / 2, v = d[1];
+      el("rect", { x: cx - bw / 2, y: Math.min(y(v), y(0)), width: bw, height: Math.max(1, Math.abs(y(v) - y(0))),
+        fill: v >= 0 ? css("--gain") : css("--loss"), rx: 1 }, g);
+      el("text", { x: cx, y: v >= 0 ? y(v) - 5 : y(v) + 13, "text-anchor": "middle" }, g, (v > 0 ? "+" : "−") + Math.abs(v).toFixed(1));
+      el("text", { x: cx, y: B + 18, "text-anchor": "middle" }, g, d[0]);
+    });
+    el("text", { x: R, y: B + 36, "text-anchor": "end" }, g, "* May 1–15 only");
+  })();
+})();
+</script>
