@@ -91,7 +91,7 @@ code { font-family: var(--mono); font-size: 13px; }
     <div class="tiles">
       <div class="tile"><span class="v loss">−$8,914</span><span class="k">VT MT5 net, six presets, 373 trades, $10k each</span></div>
       <div class="tile"><span class="v">0.74</span><span class="k">VT profit factor before commission, Jun – Nov 6 (247 trades)</span></div>
-      <div class="tile"><span class="v">220 / 247</span><span class="k">VT trades that Dukascopy also found, Jun – Nov 6</span></div>
+      <div class="tile"><span class="v">240 / 247</span><span class="k">VT trades that Dukascopy also found, Jun – Nov 6</span></div>
       <div class="tile"><span class="v">2 of 20</span><span class="k">walk-forward variants passing PF &gt; 1.2 on ≥ 100 untouched trades, both the same 9/2 schedule</span></div>
     </div>
   </section>
@@ -149,7 +149,7 @@ code { font-family: var(--mono); font-size: 13px; }
 
   <section>
     <span class="eyebrow">3 · Second data source</span>
-    <h2>Dukascopy prices give mostly the same trades and similar losses</h2>
+    <h2>Dukascopy prices give the same trades (97%) and similar losses</h2>
     <p>Dukascopy is a third broker's feed, separate from FTMO (calibration) and VT (Codex). I ran the six presets through the Python backtest on Dukascopy one-minute bid/ask prices and counted a VT trade as matched when a Dukascopy entry falls within one bar of it (entry time only; exits are not compared). The spread cap was raised to $5 so Dukascopy's slightly wider spreads did not block trades.</p>
     <div class="tablebox">
       <table>
@@ -159,17 +159,17 @@ code { font-family: var(--mono); font-size: 13px; }
         </tr>
         <tr><th></th><th colspan="3" style="text-align:center;color:var(--fg)">Jun 1 – Aug 30</th><th colspan="3" style="text-align:center;color:var(--fg)">Aug 31 – Nov 6</th></tr></thead>
         <tbody>
-          <tr><td>Top01 · M10</td><td>20 · 0.93 · −0.8R</td><td>20 · 0.71</td><td>19/20</td><td>11 · 0.07 · −9.1R</td><td>12 · 0.09</td><td>9/12</td></tr>
-          <tr><td>Top02 · M3</td><td>23 · 1.05 · +0.6R</td><td>23 · 1.17</td><td>23/23</td><td>25 · 0.94 · −0.7R</td><td>25 · 0.93</td><td>19/25</td></tr>
-          <tr><td>Top03 · M2</td><td>22 · 0.72 · −4.0R</td><td>23 · 0.60</td><td>21/23</td><td>16 · 0.62 · −3.7R</td><td>21 · 1.01</td><td>16/21</td></tr>
-          <tr><td>Top04 · M5</td><td>26 · 0.50 · −7.7R</td><td>27 · 0.71</td><td>26/27</td><td>16 · 0.66 · −3.0R</td><td>15 · 0.36</td><td>13/15</td></tr>
-          <tr><td>Top05 · M10</td><td>24 · 1.01 · +0.2R</td><td>23 · 1.08</td><td>23/23</td><td>21 · 0.66 · −3.4R</td><td>26 · 0.65</td><td>20/26</td></tr>
-          <tr><td>Top07 · M5</td><td>22 · 0.65 · −3.9R</td><td>22 · 0.75</td><td>22/22</td><td>10 · 0.62 · −1.7R</td><td>10 · 0.64</td><td>9/10</td></tr>
-          <tr class="total"><td>All six</td><td>137 · 0.79 · −15.7R</td><td>138 · 0.81</td><td>134/138</td><td>99 · 0.60 · −21.6R</td><td>109 · 0.64</td><td>86/109</td></tr>
+          <tr><td>Top01 · M10</td><td>20 · 0.93 · −0.8R</td><td>20 · 0.71</td><td>19/20</td><td>14 · 0.39 · −6.2R</td><td>12 · 0.09</td><td>12/12</td></tr>
+          <tr><td>Top02 · M3</td><td>23 · 1.05 · +0.6R</td><td>23 · 1.17</td><td>23/23</td><td>28 · 0.57 · −6.3R</td><td>25 · 0.93</td><td>25/25</td></tr>
+          <tr><td>Top03 · M2</td><td>22 · 0.72 · −4.0R</td><td>23 · 0.60</td><td>21/23</td><td>22 · 0.96 · −0.4R</td><td>21 · 1.01</td><td>20/21</td></tr>
+          <tr><td>Top04 · M5</td><td>26 · 0.50 · −7.7R</td><td>27 · 0.71</td><td>26/27</td><td>17 · 0.38 · −6.8R</td><td>15 · 0.36</td><td>15/15</td></tr>
+          <tr><td>Top05 · M10</td><td>24 · 1.01 · +0.2R</td><td>23 · 1.08</td><td>23/23</td><td>25 · 0.65 · −3.6R</td><td>26 · 0.65</td><td>25/26</td></tr>
+          <tr><td>Top07 · M5</td><td>22 · 0.65 · −3.9R</td><td>22 · 0.75</td><td>22/22</td><td>10 · 0.56 · −2.0R</td><td>10 · 0.64</td><td>9/10</td></tr>
+          <tr class="total"><td>All six</td><td>137 · 0.79 · −15.7R</td><td>138 · 0.81</td><td>134/138</td><td>116 · 0.60 · −25.3R</td><td>109 · 0.64</td><td>106/109</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="note">R is the trade result in units of its own risk (a full stop-loss = −1R). The match rate fell in Sep – Nov (79% vs 97%) and single presets can differ (Top03: 0.62 vs 1.01); I have not traced why. The six-preset totals still agree closely. The comparison stops on 6 Nov, where Codex's run ends.</p>
+    <p class="note">R is the trade result in units of its own risk (a full stop-loss = −1R). 97% of the VT trades are matched in both periods. Single presets can differ because the two price feeds are not identical (Top02 in Sep – Nov: 0.57 vs 0.93); the six-preset totals agree closely. The comparison stops on 6 Nov, where Codex's run ends.</p>
   </section>
 
   <section>
@@ -203,7 +203,7 @@ code { font-family: var(--mono); font-size: 13px; }
     <span class="eyebrow">5 · What this means</span>
     <h2>The EA is right; the pattern is not enough on its own</h2>
     <ul class="plain">
-      <li><strong>The EA is correct.</strong> On VT real ticks (Mar – mid-May), 100 of its 107 entries match a Python backtest entry within one bar, on the same side. Two independent price feeds also agree on the six-preset totals for the later months.</li>
+      <li><strong>The EA is correct.</strong> On VT real ticks (Mar – mid-May), 100 of its 107 entries match a Python backtest entry within one bar, on the same side. Two independent price feeds also agree on the later months: 97% of the trades match and the six-preset totals are close.</li>
       <li><strong>The backtest numbers came from fitting,</strong> mainly to the gold rally of late 2025 and early 2026. After that period the results lose even before costs (VT PF 0.74 before commission, Jun – Nov 6) and lose heavily after them.</li>
       <li><strong>Recalibrating is not a reliable fix.</strong> Only one of five recalibration schedules passes, on four windows that lean on the rally. A schedule that works only for one window length is more likely luck than an edge.</li>
     </ul>

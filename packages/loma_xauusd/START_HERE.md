@@ -30,15 +30,15 @@ Backtest: FTMO one-minute data, January 2025 – 15 May 2026, the period the pre
 
 | Preset | Chart | Direction | Session (server time) | Trend filter | Backtest trades / PF | 2026 PF (in sample) | VT trades, Jun – Nov 6 | VT PF before / after commission | Dukascopy PF |
 |---|---|---|---|---|---|---|---|---|---|
-| `Loma_Top01` | M10 | both | 07:00-20:00 | H1 EMA 20 | 129 / 2.09 | 1.72 | 32 | 0.46 / 0.28 | 0.55 |
-| `Loma_Top02` | M3 | sell | all day | none | 143 / 1.98 | 2.07 | 48 | 1.04 / 0.31 | 1.00 |
-| `Loma_Top03` | M2 | sell | 12:00-20:00 | H1 EMA 20 | 117 / 2.03 | 1.46 | 44 | 0.77 / 0.27 | 0.68 |
-| `Loma_Top04` | M5 | both | 07:00-12:00 | H1 EMA 50 | 124 / 1.82 | 1.40 | 42 | 0.58 / 0.19 | 0.56 |
+| `Loma_Top01` | M10 | both | 07:00-20:00 | H1 EMA 20 | 129 / 2.09 | 1.72 | 32 | 0.46 / 0.28 | 0.69 |
+| `Loma_Top02` | M3 | sell | all day | none | 143 / 1.98 | 2.07 | 48 | 1.04 / 0.31 | 0.77 |
+| `Loma_Top03` | M2 | sell | 12:00-20:00 | H1 EMA 20 | 117 / 2.03 | 1.46 | 44 | 0.77 / 0.27 | 0.83 |
+| `Loma_Top04` | M5 | both | 07:00-12:00 | H1 EMA 50 | 124 / 1.82 | 1.40 | 42 | 0.58 / 0.19 | 0.45 |
 | `Loma_Top05` | M10 | buy | all day | M30 EMA 20 | 141 / 1.96 | 1.47 | 49 | 0.87 / 0.42 | 0.84 |
-| `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 1.84 | 32 | 0.72 / 0.26 | 0.64 |
+| `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 1.84 | 32 | 0.72 / 0.26 | 0.62 |
 
 - The VT Markets figures come from Codex's MT5 run with 100% real ticks. VT charged about $6 per lot round trip, which may be a cent-account setting; the before-commission column does not depend on it.
-- Dukascopy is a third price source, separate from FTMO (calibration) and VT. It found 220 of the 247 VT trades.
+- Dukascopy is a third price source, separate from FTMO (calibration) and VT. It found 240 of the 247 VT trades.
 - A walk-forward test (recalibrating every few months on recent data) did not rescue the method: only one of five schedules passed, and only on four windows that include the 2025–26 gold rally.
 
 ## If you still want to test it

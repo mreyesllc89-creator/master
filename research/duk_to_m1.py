@@ -17,15 +17,19 @@ def read_day(path, day):
 
 
 def load(folder):
-    days = sorted({os.path.basename(f)[:10] for f in glob.glob(os.path.join(folder, "*_BID.bi5"))})
-    parts = []
+    days = sorted({os.path.basename(f)[:10] for f in glob.glob(os.path.join(folder, "*_???.bi5"))})
+    parts = []; half_missing = []
     for d in days:
         b = read_day(os.path.join(folder, f"{d}_BID.bi5"), d); a = read_day(os.path.join(folder, f"{d}_ASK.bi5"), d)
+        if (b is None) != (a is None):
+            half_missing.append(d)                 # one side failed to download: the day would be silently lost
         if b is None or a is None:
             continue
         j = b.join(a, lsuffix="_b", rsuffix="_a", how="inner")
         j = j[(j.vol_b > 0) | (j.vol_a > 0)]                       # Dukascopy fills closed minutes with flat bars
         parts.append(j)
+    if half_missing:
+        raise SystemExit(f"Dukascopy data incomplete: BID or ASK file missing for {half_missing}. Re-run duk_download.py.")
     j = pd.concat(parts)
     m = pd.DataFrame({k: (j[f"{k}_b"] + j[f"{k}_a"]) / 2 for k in ("open", "high", "low", "close")})
     m["high"] = np.maximum(m["high"], m[["open", "close"]].max(axis=1))
