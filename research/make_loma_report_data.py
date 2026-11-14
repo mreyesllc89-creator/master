@@ -56,6 +56,11 @@ for rank in RANKS:
         match = sum(1 for e in v.itertuples() if len(pt) and abs(pd.Timestamp(pt[np.argmin(np.abs(pt - np.datetime64(e.entry)))]) - e.entry) <= tol)
         duk_rows.append(dict(preset=f"Top{rank:02d}", tf=p["tf"], period=name, duk_n=len(d), duk_pf=pf(d.r), duk_netR=round(float(d.r.sum()), 1),
                              vt_n=len(v), vt_gross_pf=pf(v.gross), matched=match, _r=d.r.tolist(), _g=v.gross.tolist()))
+    # whole untouched period per preset (Jun 1 - Nov 6 2026), for the preset headers and summary CSV
+    d = df[(df.entry_time >= "2026-06-01") & (df.entry_time < "2026-11-07")]; v = vt[(vt.entry >= "2026-06-01") & (vt.entry < "2026-11-07")]
+    presets[-1].update(oos_vt_n=len(v), oos_vt_gross=round(float(v.gross.sum()), 2), oos_vt_gross_pf=pf(v.gross),
+                       oos_vt_net=round(float((v.gross + v.comm).sum()), 2), oos_vt_net_pf=pf(v.gross + v.comm),
+                       oos_duk_n=len(d), oos_duk_pf=pf(d.r), oos_duk_netR=round(float(d.r.sum()), 2))
 out["presets"] = presets
 tot = []
 for per in ["Jun-Aug", "Sep-Nov 6"]:

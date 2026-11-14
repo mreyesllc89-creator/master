@@ -22,7 +22,15 @@
    "vt_comm": -794.1,
    "vt_net": -1289.36,
    "vt_gross_pf": 0.7391034083127008,
-   "vt_net_pf": 0.4769627688488279
+   "vt_net_pf": 0.4769627688488279,
+   "oos_vt_n": 32,
+   "oos_vt_gross": -595.96,
+   "oos_vt_gross_pf": 0.4570087923101452,
+   "oos_vt_net": -1034.86,
+   "oos_vt_net_pf": 0.27709513597339913,
+   "oos_duk_n": 31,
+   "oos_duk_pf": 0.5526075971706715,
+   "oos_duk_netR": -9.88
   },
   {
    "preset": "Top02",
@@ -42,7 +50,15 @@
    "vt_comm": -2224.68,
    "vt_net": -1568.92,
    "vt_gross_pf": 1.380788683649709,
-   "vt_net_pf": 0.5042953779269075
+   "vt_net_pf": 0.5042953779269075,
+   "oos_vt_n": 48,
+   "oos_vt_gross": 48.96,
+   "oos_vt_gross_pf": 1.0432841494788394,
+   "oos_vt_net": -1484.7,
+   "oos_vt_net_pf": 0.3067203347092773,
+   "oos_duk_n": 48,
+   "oos_duk_pf": 0.9953310195816001,
+   "oos_duk_netR": -0.1
   },
   {
    "preset": "Top03",
@@ -62,7 +78,15 @@
    "vt_comm": -1729.2,
    "vt_net": -2009.74,
    "vt_gross_pf": 0.8534013356604624,
-   "vt_net_pf": 0.3426937995905205
+   "vt_net_pf": 0.3426937995905205,
+   "oos_vt_n": 44,
+   "oos_vt_gross": -289.6,
+   "oos_vt_gross_pf": 0.7652627824790066,
+   "oos_vt_net": -1500.34,
+   "oos_vt_net_pf": 0.2733480890963952,
+   "oos_duk_n": 38,
+   "oos_duk_pf": 0.6777187707940462,
+   "oos_duk_netR": -7.69
   },
   {
    "preset": "Top04",
@@ -82,7 +106,15 @@
    "vt_comm": -1523.76,
    "vt_net": -1793.02,
    "vt_gross_pf": 0.8224452518645029,
-   "vt_net_pf": 0.32110605848342927
+   "vt_net_pf": 0.32110605848342927,
+   "oos_vt_n": 42,
+   "oos_vt_gross": -444.74,
+   "oos_vt_gross_pf": 0.5830770961451928,
+   "oos_vt_net": -1572.32,
+   "oos_vt_net_pf": 0.19113932516063317,
+   "oos_duk_n": 42,
+   "oos_duk_pf": 0.5575891055278676,
+   "oos_duk_netR": -10.76
   },
   {
    "preset": "Top05",
@@ -102,7 +134,15 @@
    "vt_comm": -862.68,
    "vt_net": -1108.19,
    "vt_gross_pf": 0.812240933633124,
-   "vt_net_pf": 0.41058112693735577
+   "vt_net_pf": 0.41058112693735577,
+   "oos_vt_n": 49,
+   "oos_vt_gross": -126.95,
+   "oos_vt_gross_pf": 0.8691048192522633,
+   "oos_vt_net": -805.43,
+   "oos_vt_net_pf": 0.42452021320681926,
+   "oos_duk_n": 45,
+   "oos_duk_pf": 0.8420077183575947,
+   "oos_duk_netR": -3.29
   },
   {
    "preset": "Top07",
@@ -122,7 +162,15 @@
    "vt_comm": -921.6,
    "vt_net": -1145.21,
    "vt_gross_pf": 0.7543287189628654,
-   "vt_net_pf": 0.2809947450039868
+   "vt_net_pf": 0.2809947450039868,
+   "oos_vt_n": 32,
+   "oos_vt_gross": -200.27,
+   "oos_vt_gross_pf": 0.7196668533034714,
+   "oos_vt_net": -904.67,
+   "oos_vt_net_pf": 0.2618253029252173,
+   "oos_duk_n": 32,
+   "oos_duk_pf": 0.6417351381935624,
+   "oos_duk_netR": -5.57
   }
  ],
  "dukascopy": [
