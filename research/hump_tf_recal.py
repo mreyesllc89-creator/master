@@ -23,9 +23,11 @@ Usage:
   python3 hump_tf_recal.py build  <work_dir> [dukascopy_dir]          # once per symbol: combined M1 series
   python3 hump_tf_recal.py run    <work_dir> <TF> <N> [workers]       # candidates of one timeframe, base + stress
   python3 hump_tf_recal.py runx   <work_dir> <TF> <N> [workers]       # the same with every trailing family (hump_trail.py)
+  python3 hump_tf_recal.py runy   <work_dir> <TF> <N> [workers]       # twelve more trailing systems (hump_trail2.py)
   python3 hump_tf_recal.py select <work_dir> <out_json> [cand|candx]  # in-sample pick and out-of-sample test
   python3 hump_tf_recal.py sens   <work_dir> <out_json> [cand|candx]  # other selection rules (robustness)
-  python3 hump_tf_recal.py kinds  <work_dir> <out_json>               # candx only: the same test per trailing family
+  python3 hump_tf_recal.py kinds  <work_dir> <out_json> [prefix]      # the same test per trailing family
+  (prefix: cand = run 1, candx = run 2, candx+candy = runs 2 and 3 together)
   python3 hump_tf_recal.py vt     <work_dir> <out_json> [cand|candx]  # gold: the picks at VT Markets' own costs
 Environment: HUMP_SYMBOL=XAUUSD|BTCUSD, HUMP_BTC_DATA=<dir with BTCUSD_m1.csv> for BTC.
 """
@@ -37,6 +39,7 @@ os.environ["HUMP_SPACE"] = "2"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hump_engine as H, hump_search as X, xlzc_backtest as B
 import hump_trail as T
+import hump_trail2 as T2
 
 SYM = H.SYMBOL
 TFS = ["M1", "M2", "M3", "M5", "M10", "M15", "M30", "H1"]
@@ -84,7 +87,7 @@ def market(work, real_spread=False, flat_spread=None):
     hs = np.load(os.path.join(work, "hs_real.npy" if real_spread else "hs.npy"))
     if flat_spread is not None:
         hs = np.full(len(m1), flat_spread / 2.0)
-    return T.MarketX(m1=m1, half_spread=hs)
+    return T2.MarketY(m1=m1, half_spread=hs)
 
 
 # ----------------------------------------------------------------------------- candidates
@@ -143,6 +146,56 @@ def candidates_x(tf, n):
     return out
 
 
+def trail_space_y(tf):
+    """The twelve further trailing systems of hump_trail2.py (run 3)."""
+    starts = (0.0, 0.5, 1.0)
+    htf = [m for m in (15, 30, 60, 240) if m > B.TF_MIN[tf] and m % B.TF_MIN[tf] == 0]
+    return {
+        "chandelier": [dict(trail_start=a, trail_dist=k) for a in starts for k in (1.5, 2.0, 3.0)],
+        "profitlock": [dict(trail_start=a, trail_dist=k) for a in (0.5, 1.0, 1.5) for k in (0.3, 0.5, 0.7)],
+        "timestop": [dict(trail_dist=float(m)) for m in (30, 60, 120, 240, 480)],
+        "partial": [dict(trail_start=a, trail_dist=k) for a in (0.5, 1.0, 1.5) for k in (0.0, 0.5, 1.0)],
+        "supertrend": [dict(trail_p=v, trail_start=a) for v in (0, 1, 2) for a in starts],
+        "keltner": [dict(trail_p=v, trail_start=a) for v in (0, 1, 2) for a in starts],
+        "bollinger": [dict(trail_p=v, trail_start=a) for v in (0, 1) for a in starts],
+        "kijun": [dict(trail_p=n, trail_start=a) for n in (13, 26, 52) for a in starts],
+        "pivots": [dict(trail_p=n, trail_start=a) for n in (2, 3, 5) for a in starts],
+        "sma": [dict(trail_p=n, trail_start=a) for n in (10, 20, 50) for a in starts],
+        "donchian": [dict(trail_p=n, trail_start=a) for n in (20, 55) for a in starts],
+        "htfcandle": [dict(trail_p=m, trail_start=a) for m in htf for a in starts],
+    }
+
+
+def candidates_y(tf, n):
+    rng = random.Random(f"{SYM}-{tf}-trail2-2026-11")
+    keys = [k for k in X.SPACE if k not in ("tf", "htf", "trail_start", "trail_dist")]
+    ts = trail_space_y(tf); kinds = [k for k in ts if ts[k]]
+    seen, out = set(), []
+    hl = valid_htfs(tf)
+    while len(out) < n:
+        p = {k: rng.choice(X.SPACE[k]) for k in keys}
+        p["tf"] = tf; p["htf"] = rng.choice(hl)
+        kind = rng.choice(kinds)
+        p.update(trail_kind=kind, trail_start=0.0, trail_dist=0.5, trail_p=0)
+        p.update(rng.choice(ts[kind]))
+        key = json.dumps(p, sort_keys=True)
+        if key not in seen:
+            seen.add(key); out.append(p)
+    return out
+
+
+def load_cands(work, prefix, tf):
+    """Stored candidates of one timeframe; prefix may join several runs with '+', e.g. candx+candy."""
+    P, Bs, Ss = [], [], []
+    for pre in prefix.split("+"):
+        fn = os.path.join(work, f"{pre}_{tf}.pkl")
+        if not os.path.exists(fn):
+            return None
+        d = pickle.load(open(fn, "rb"))
+        P += d["params"]; Bs += d["base"]; Ss += d["stress"]
+    return P, Bs, Ss
+
+
 MK = None
 
 
@@ -174,6 +227,28 @@ def _trades_x(p, extra=None):
 
 def _one_x(p):
     return _trades_x(p), _trades_x(p, STRESS)
+
+
+def _trades_y(p, extra=None):
+    c = dict(X.BASE); c.update(p)
+    if extra:
+        c.update(extra)
+    df = MK.run_y(X.engine_cfg(c))
+    return (df.entry_time.values.astype("datetime64[m]").astype(np.int64).astype(np.int32), df.r.values.astype(np.float32))
+
+
+def _one_y(p):
+    return _trades_y(p), _trades_y(p, STRESS)
+
+
+def run_y(work, tf, n, workers=3):
+    cand = candidates_y(tf, n)
+    t0 = time.time()
+    with Pool(workers, initializer=_init, initargs=(work,)) as pool:
+        res = pool.map(_one_y, cand, chunksize=16)
+    with open(os.path.join(work, f"candy_{tf}.pkl"), "wb") as f:
+        pickle.dump(dict(tf=tf, params=cand, base=[r[0] for r in res], stress=[r[1] for r in res]), f, protocol=4)
+    print(f"{SYM} {tf}: {n} setups x 2 (twelve more trailing systems) in {time.time() - t0:.0f}s", flush=True)
 
 
 def run_x(work, tf, n, workers=3):
@@ -244,11 +319,10 @@ OOS_MID = np.datetime64("2026-08-15T00:00")
 def select(work, out_json, prefix="cand"):
     rows, picks_all = [], []
     for tf in TFS:
-        fn = os.path.join(work, f"{prefix}_{tf}.pkl")
-        if not os.path.exists(fn):
+        loaded = load_cands(work, prefix, tf)
+        if loaded is None:
             continue
-        d = pickle.load(open(fn, "rb"))
-        P, Bs, Ss = d["params"], d["base"], d["stress"]
+        P, Bs, Ss = loaded
         sc = np.array([is_score(Bs[i], Ss[i]) for i in range(len(P))])
         elig = np.where(sc > 0)[0]
         order = elig[np.argsort(-sc[elig], kind="stable")]
@@ -315,14 +389,13 @@ def vt_costs(work, out_json, prefix="candx"):
     mk = market(work, flat_spread=VT_SPREAD)
     vt = dict(comm=VT_COMM, max_spread=5.0)
     vt_hard = dict(vt, trail_worst=1, delay=1, slip=0.10)
-    runner = mk.run_x if prefix == "candx" else mk.run
+    runner = mk.run if prefix == "cand" else mk.run_y
     rows = []
     for tf in TFS:
-        fn = os.path.join(work, f"{prefix}_{tf}.pkl")
-        if not os.path.exists(fn):
+        loaded = load_cands(work, prefix, tf)
+        if loaded is None:
             continue
-        d = pickle.load(open(fn, "rb"))
-        P, Bs, Ss = d["params"], d["base"], d["stress"]
+        P, Bs, Ss = loaded
         sc = np.array([is_score(Bs[i], Ss[i]) for i in range(len(P))])
         elig = np.where(sc > 0)[0]
         order = elig[np.argsort(-sc[elig], kind="stable")]
@@ -369,11 +442,10 @@ def sensitivity(work, out_json, prefix="cand"):
     the protocol's own rule is select())."""
     rows = []
     for tf in TFS:
-        fn = os.path.join(work, f"{prefix}_{tf}.pkl")
-        if not os.path.exists(fn):
+        loaded = load_cands(work, prefix, tf)
+        if loaded is None:
             continue
-        d = pickle.load(open(fn, "rb"))
-        P, Bs, Ss = d["params"], d["base"], d["stress"]
+        P, Bs, Ss = loaded
         n = len(P)
         main = np.array([is_score(Bs[i], Ss[i]) for i in range(n)])
         base3 = np.array([min(b) if (b := block_pfs(*Bs[i])) else 0.0 for i in range(n)])
@@ -409,20 +481,20 @@ def sensitivity(work, out_json, prefix="cand"):
     print("passing cells:", df[df.get("passes", False) == True][["tf", "rule", "oos_n", "oos_pf", "oos_stress_pf"]].round(2).to_dict("records"))
 
 
-def by_kind(work, out_json):
+def by_kind(work, out_json, prefix="candx"):
     """candx only: the protocol's pick-and-test for each trailing family, per timeframe and over all timeframes
     (information on whether any family helps; 11 families x 8 timeframes are many cells, so single passes
     can be luck)."""
     rows = []
     pooled = {}
     for tf in TFS:
-        fn = os.path.join(work, f"candx_{tf}.pkl")
-        if not os.path.exists(fn):
+        loaded = load_cands(work, prefix, tf)
+        if loaded is None:
             continue
-        d = pickle.load(open(fn, "rb"))
-        P, Bs, Ss = d["params"], d["base"], d["stress"]
+        P, Bs, Ss = loaded
         sc = np.array([is_score(Bs[i], Ss[i]) for i in range(len(P))])
-        for kind in trail_space():
+        kinds_here = list(dict.fromkeys(P[i]["trail_kind"] for i in range(len(P))))
+        for kind in kinds_here:
             idx = np.array([i for i in range(len(P)) if P[i]["trail_kind"] == kind])
             elig = idx[sc[idx] > 0]
             order = elig[np.argsort(-sc[elig], kind="stable")]
@@ -474,7 +546,9 @@ if __name__ == "__main__":
         select(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "cand")
     elif cmd == "sens":
         sensitivity(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "cand")
+    elif cmd == "runy":
+        run_y(sys.argv[2], sys.argv[3], int(sys.argv[4]), int(sys.argv[5]) if len(sys.argv) > 5 else 3)
     elif cmd == "kinds":
-        by_kind(sys.argv[2], sys.argv[3])
+        by_kind(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "candx")
     elif cmd == "vt":
         vt_costs(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "candx")
