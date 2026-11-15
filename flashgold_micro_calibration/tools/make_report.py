@@ -126,6 +126,11 @@ def build():
         st = stats(real.pts[real.flow == k])
         rows.append({"order-flow label on the entry": name, "trades": st["trades"], "profit factor": st["pf"], "win %": st["win"], "points per trade": st["avg"]})
     V["T_real_flow"] = md(pd.DataFrame(rows), {"profit factor": 2, "points per trade": 1})
+    fa_, fd_ = real.pts[real.flow == "agrees"].to_numpy(), real.pts[real.flow == "disagrees"].to_numpy()
+    rng_ = np.random.default_rng(7)
+    diffs_ = [rng_.choice(fd_, len(fd_)).mean() - rng_.choice(fa_, len(fa_)).mean() for _ in range(4000)]
+    V["flow_diff"] = f"{fd_.mean() - fa_.mean():+.1f}"
+    V["flow_ci_lo"], V["flow_ci_hi"] = f"{np.percentile(diffs_, 2.5):+.1f}", f"{np.percentile(diffs_, 97.5):+.1f}"
     hb = pd.cut(real.hold_s, [-1, 10, 40, 1e9], labels=["closed within 10 s", "10 to 40 s", "longer than 40 s"])
     rows = []
     for k in hb.cat.categories:
@@ -402,6 +407,13 @@ def build():
     V["T_final_month"] = md(fm_, {"profit factor": 2, "points per trade": 1})
     V["fin_months_pos"] = f"{int((fm_['net points'] > 0).sum())} of {len(fm_)}"
     V["fin_months_top"] = ", ".join(fm_.sort_values("net points", ascending=False).head(3).month)
+    day_ = tr_.assign(day=pd.to_datetime(tr_.entry_time).dt.date).groupby("day").pts.sum().sort_values(ascending=False)
+    top5 = day_.index[:5]
+    rest_ = tr_[~pd.to_datetime(tr_.entry_time).dt.date.isin(top5)]
+    st_rest = stats(rest_.pts)
+    V["fin_days"] = str(len(day_))
+    V["fin_top5_share"] = f"{100 * day_.head(5).sum() / day_.sum():.0f}%"
+    V["fin_wo5_avg"], V["fin_wo5_pf"] = f"{st_rest['avg']:+.1f}", f"{st_rest['pf']:.2f}"
     top3 = fm_.sort_values("net points", ascending=False).head(3)["net points"].sum()
     V["fin_top3_net"] = f"{top3:,.0f}"
     V["fin_rest_net"] = f"{fm_['net points'].sum() - top3:+,.0f}"
@@ -412,6 +424,14 @@ def build():
         rows.append({"side": name_, "trades": st["trades"], "profit factor": st["pf"], "win %": st["win"], "points per trade": st["avg"], "net points": st["net"]})
     V["T_final_side"] = md(pd.DataFrame(rows), {"profit factor": 2, "points per trade": 1})
     V["fin_buy_pf"], V["fin_sell_pf"] = f"{rows[0]['profit factor']:.2f}", f"{rows[1]['profit factor']:.2f}"
+    mm_ = []
+    for m_, g_ in tr_.sort_values("entry_time").groupby("month"):
+        mm_.append(dict(month=m_, chg=100 * (g_.entry.iloc[-1] / g_.entry.iloc[0] - 1), buy=g_.pts[g_.side > 0].sum(), sell=g_.pts[g_.side < 0].sum()))
+    mm_ = pd.DataFrame(mm_)
+    fall_ = mm_.loc[mm_.chg.idxmin()]
+    V["fin_buywin_months"] = f"{int((mm_.buy > mm_.sell).sum())} of {len(mm_)}"
+    V["fin_fall_month"], V["fin_fall_chg"] = str(fall_.month), f"{-fall_.chg:.0f}%"
+    V["fin_fall_buy"], V["fin_fall_sell"] = f"{fall_.buy:+,.0f}", f"{fall_.sell:+,.0f}"
     rows = []
     kind_ = tr_.exit_reason.map(lambda x: {"SL": "stop loss (original)", "LAYER_SL": "trailing stop (trail layer)", "TRAIL_SL": "trailing stop (simple trailing)",
                                            "TP": "take profit"}.get(x, "EA-side close"))

@@ -36,7 +36,9 @@ regenerated with the commands in section 13.
    under the median (table in section 11).
 6. **That number is thin, and it should be read as "about 1.0 to 1.15".** The average of {{jg_n}}
    neighbouring input sets is {{jg_pf_mean}}. {{fin_months_pos}} months are positive. The profit comes from
-   buys ({{fin_buy_pf}}) and not from sells ({{fin_sell_pf}}). A 7 point commission leaves {{fin_comm7_pf}},
+   buys ({{fin_buy_pf}}) and not from sells ({{fin_sell_pf}}); the best five of {{fin_days}} trading days make
+   {{fin_top5_share}} of the net, and without them it averages {{fin_wo5_avg}} points per trade (profit factor
+   {{fin_wo5_pf}}). A 7 point commission leaves {{fin_comm7_pf}},
    strict fills {{fin_strict_pf}}, both together {{fin_worst_pf}}. If stop losses slip twice as far as quoted
    instead of 1.5 times, it is {{fin_slip20_pf}}.
 7. **Three things to know before any Strategy Tester run.**
@@ -91,8 +93,11 @@ seconds: those carry nearly the whole loss.
 
 {{T_real_hold}}
 
-And the order-flow feed did not pick better trades. Entries the feed agreed with did worse than the ones it
-disagreed with:
+The order-flow label ("agrees" or "disagrees" with the side the EA is about to trade) does not tell the result
+reliably. Entries the feed disagreed with made {{flow_diff}} points per trade more than the ones it agreed with, but
+the 95% bootstrap range of that difference is {{flow_ci_lo}} to {{flow_ci_hi}}, so it is within noise. The sign also
+flips between buy market entries (agreeing is better) and sell market entries (disagreeing is better), while gold fell
+about 7% over this window.
 
 {{T_real_flow}}
 
@@ -331,7 +336,9 @@ points. The t-statistic of the mean trade is {{fin_t}}; resampling the trades gi
 {{T_final_month}}
 
 {{fin_months_pos}} months are positive. The three best ({{fin_months_top}}) earn {{fin_top3_net}} points; the
-other {{fin_rest_n}} together make {{fin_rest_net}}.
+other {{fin_rest_n}} together make {{fin_rest_net}}. By day it is more concentrated still: the best five of {{fin_days}} trading
+days make {{fin_top5_share}} of the net, and without them the preset averages {{fin_wo5_avg}} points per trade (profit factor
+{{fin_wo5_pf}}).
 
 These are very short trades in the fastest part of the market: the average alert is {{fin_alert}} points,
 half the trades are over within {{fin_hold_med}} seconds, the average spread at entry is
@@ -344,8 +351,9 @@ And the profit is one-sided:
 
 {{T_final_side}}
 
-Gold rose over most of the replayed months, so this may be the market and not the EA. It is not a reason to
-switch sells off.
+The skew does not follow the gold trend: buys beat sells in {{fin_buywin_months}} months, including {{fin_fall_month}}, when
+gold fell {{fin_fall_chg}} (buys {{fin_fall_buy}} points, sells {{fin_fall_sell}}). It is not a reason to switch sells off, and
+it is a reason not to trust the buy edge before it shows on data the search has not seen.
 
 ### How much of that is real: {{jg_n}} neighbouring sets
 
@@ -542,7 +550,7 @@ filter can use; an hour filter is *not* supported by the data (no hour is reliab
   {{fin_slip20_pf}}. It trades during the fastest moves, where real slippage is hardest to predict.
 - The preset was chosen with all three samples in view, and the region around it averages
   {{jg_pf_mean}}. Its own profit factor is not an estimate of what a forward run will show.
-- The profit came from buys in a rising market and from {{fin_months_pos}} months.
+- The profit came from buys, from {{fin_months_pos}} months and from five days ({{fin_top5_share}} of the net).
 - Nothing was tested with the order-flow feed, because nothing can be: the feed is not in the tester.
 - June to September 2026 is missing from the data.
 

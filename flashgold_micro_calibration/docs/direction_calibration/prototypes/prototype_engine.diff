@@ -1,0 +1,834 @@
+--- /home/user/master/flashgold_micro_calibration/tools/engine.py	2026-11-15 03:34:45.327410685 +0000
++++ work/tools/engine.py	2026-11-15 16:11:12.482799777 +0000
+@@ -27,9 +27,11 @@
+ has passed its price by then. Server-side events (stop loss, take profit, pending triggers) have no
+ latency. 0 = the Strategy Tester without a delay.
+ 
+-Not replayed (see REPORT.md): the order-flow feed (global variables written by a separate program do
+-not exist in the Strategy Tester either, so flow is neutral exactly as in a tester run), PERCENTILE
+-threshold modes, CandleIndexToCheck other than 0, frozen-order retry paths, all telemetry.
++[PLAN prototype] The order-flow feed is an input: fl_ix/fl_t/fl_ok/fl_v (empty = neutral flow = a Strategy
++Tester run, bit for bit the previous behaviour). lgi/lgf (zero rows = off) receive the decision log.
++
++Not replayed (see REPORT.md): PERCENTILE threshold modes, CandleIndexToCheck other than 0, frozen-order
++retry paths, all telemetry.
+ """
+ import numpy as np
+ from numba import njit
+@@ -121,6 +123,12 @@
+     "X_LimitAtMarket",         # 1 = limit orders and take profits fill at the market (price improvement), 0 = at their price
+     "X_LatencyMs",             # round trip of an order sent by the EA (market entry, market close, pending placement)
+     "X_StopLossSlipMult",      # a stop loss filled beyond its level slips this many times the quoted distance
++    # [PLAN] the 11 order-flow inputs (EA 248-253, 206, 218, 226-229); appended so every existing index is unchanged
++    "UseOrderFlow", "MaxFlowAgeMs", "MinFlowImbalance", "FlowComponentScore", "BlockStrongFlowAgainst",
++    "FlowDisagreeMakesDefenseImmediate", "FOLMFlowDisagreeDangerLossPoints", "UseStopFlowDisagreeDangerClose",
++    "StopFlowDisagreeDangerLossPoints", "StopFlowDisagreeDangerMinHoldMs", "StopFlowDisagreeDangerNeedsOppositePressure",
++    "X_LogMinGapMs",           # [PLAN] decision log: keep at most one skip row per this many ms (0 = every evaluation)
++    "X_SignalOnly",            # [PLAN] 1 = the entry chain only: a placement is written as a signal row, no order / position exists
+ ]
+ I = {n: k for k, n in enumerate(NAMES)}
+ for _n, _k in I.items():
+@@ -143,8 +151,13 @@
+           11: "SA_V40_RETEST_SHIELD", 12: "SA_FLXQ_SS_PRESSURE/V40", 13: "SAR_HOLD_KILL", 14: "SA_FOLM_SM_EARLY",
+           15: "SA_FOLM_WARN24", 16: "SA_FOLM_MARKET_HARD", 17: "SA_FOLM_RETEST_DANGER", 18: "SA_PRE_SPEED_DEFENSE",
+           19: "SA_NO_FOLLOW_EARLY", 20: "SA_NO_FOLLOW", 21: "END_OF_WEEK"}
++R_SIGNAL = 23                   # [PLAN] pseudo trade written by X_SignalOnly
++R_STOP_FLOW = 22                # [PLAN] TryStopFlowDisagreeDangerClose (EA 11218)
++REASON[22] = "SA_STOP_FLOW_DANGER"
++REASON[23] = "SIGNAL"
+ TRADE_COLS = ["entry_ms", "exit_ms", "side", "action", "scenario", "entry", "exit", "reason", "pts", "mfe", "mae",
+-              "decision_ms", "requested", "released", "sl_moved", "opp_pressure", "alert_pts", "spread_pts"]
++              "decision_ms", "requested", "released", "sl_moved", "opp_pressure", "alert_pts", "spread_pts",
++              "flow_label", "signal_ms"]       # [PLAN] +1 ':FA', -1 ':FD', 0 none; tick time of the BuildDirectionState that chose the trade
+ NC = len(TRADE_COLS)
+ MAXP = 12
+ MAXO = 12
+@@ -156,7 +169,31 @@
+ COUNTERS = ["alerts", "decisions", "skip_mixed", "skip_spread", "skip_body_against", "flashgold_block", "hold_armed",
+             "hold_fail", "hold_same_bar", "prior60_block", "burst_block", "cap_skip", "continuation_block", "placed",
+             "pending_expired", "continuation_cancel", "lockout_skip", "lockout_armed", "filled", "alert_expired",
+-            "pending_rejected_price_passed"]
++            "pending_rejected_price_passed",
++            # [PLAN] appended counters
++            "skip_flow_block", "skip_tradeside", "hold_pass_rows", "log_rows", "log_rows_dropped"]
++C_SKIP_FLOW, C_SKIP_SIDE, C_HOLD_PASS, C_LOG_ROWS, C_LOG_DROPPED = range(21, 26)
++
++# [PLAN] decision-log layout. Everything that is later compared with an input is stored as a TICK INDEX (the offline
++# scorer re-reads the float64 price from the feed, so ties behave exactly as in the engine), flow values are
++# binary-exact quantised float32.
++(LI_TICK, LI_TOFF, LI_EP, LI_KIND, LI_STAGE, LI_ACTION, LI_SCN, LI_WIN, LI_SPDIR, LI_BODYDIR, LI_MICRODIR, LI_FLK,
++ LI_FLFRESH, LI_FLDIR, LI_VB, LI_VS, LI_FLAGS, LI_FGZ, LI_FGFI, LI_NPOS, LI_NPEND, LI_NMK, LI_LOCK, LI_FLLAB,
++ LI_ISTART, LI_IBAROPEN, LI_IBARHI, LI_IBARLO, LI_ARMROW) = range(29)
++LI_MHI, LI_MLO, LI_OREF, LI_OMIN, LI_OMAX, LI_DRIFT, LI_B1 = 29, 35, 41, 45, 49, 53, 57
++NLI = 58
++(LF_BUY, LF_SELL, LF_MFE, LF_MAE, LF_FORCE, LF_NEAR, LF_BOOK, LF_SPEEDPTS, LF_HOLDMOVE, LF_CPN60, LF_CPGAP, LF_CPR60,
++ LF_CPR300, LF_CPMSP) = range(14)
++NLF = 14
++LG_MICRO_L = np.array([2000, 5000, 10000, 20000, 30000, 60000], np.int64)        # micro-break lookbacks (ms)
++LG_OPP_W = np.array([2000, 3000, 5000, 10000], np.int64)                          # opposite-pressure windows (ms)
++LG_DRIFT = np.array([900000, 1800000, 3600000, 7200000], np.int64)                # prior drift horizons (ms)
++# stage = last test the evaluation passed or the one that stopped it
++(ST_MIXED, ST_SPREAD, ST_FLOWBLK, ST_BODYAG, ST_TRADESIDE, ST_FGBLOCK, ST_HOLDBAR, ST_HOLDARM, ST_PRIOR60, ST_BURST, ST_CAP,
++ ST_CPBLOCK, ST_PLACED, ST_HOLDFAIL, ST_HOLDPASS_FG) = range(1, 16)
++# flag bits in LI_FLAGS
++(FB_STABLE, FB_F21, FB_F37, FB_OPP, FB_SNAP, FB_WICK, FB_EXH, FB_CONT, FB_FOLLOW, FB_GOODMM, FB_CP60, FB_CP300) = (
++    1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048)
+ 
+ 
+ @njit(cache=True, nogil=True)
+@@ -215,9 +252,128 @@
+ 
+ 
+ @njit(cache=True, nogil=True)
++def _lg_flush(lgi, lgf, nlog, rowi, rowf, stage, gap, last, cnt):
++    """[PLAN] append the pending decision row unless the decimation drops it. Returns (nlog, last_toff)."""
++    toff = rowi[LI_TOFF]
++    if stage == ST_MIXED and gap > 0 and last >= 0 and toff - last < gap:
++        return nlog, last
++    if nlog >= lgi.shape[0]:
++        cnt[C_LOG_DROPPED] += 1
++        return nlog, last
++    rowi[LI_STAGE] = stage
++    lgi[nlog, :] = rowi
++    lgf[nlog, :] = rowf
++    cnt[C_LOG_ROWS] += 1
++    return nlog + 1, toff
++
++
++@njit(cache=True, nogil=True)
++def _lg_micro_grid(T, B, A, i, t, rowi):
++    """[PLAN] tick index of the highest / lowest mid of the previous L ms (ticks [first >= t-L, i-1]), one backward pass."""
++    k = i - 1
++    hi = -1e18
++    lo = 1e18
++    hi_i = -1
++    lo_i = -1
++    for q in range(len(LG_MICRO_L)):
++        lim = t - LG_MICRO_L[q]
++        while k >= 0 and T[k] >= lim:
++            m = (B[k] + A[k]) * 0.5
++            if m > hi:
++                hi = m
++                hi_i = k
++            if m < lo:
++                lo = m
++                lo_i = k
++            k -= 1
++        rowi[LI_MHI + q] = hi_i
++        rowi[LI_MLO + q] = lo_i
++
++
++@njit(cache=True, nogil=True)
++def _lg_opp_grid(T, B, A, i, t, rowi):
++    """[PLAN] opposite-pressure inputs per window W: first tick of the window, tick of its lowest and highest mid (ticks [j, i])."""
++    k = i
++    hi = -1e18
++    lo = 1e18
++    hi_i = -1
++    lo_i = -1
++    for q in range(len(LG_OPP_W)):
++        lim = t - LG_OPP_W[q]
++        while k >= 0 and T[k] >= lim:
++            m = (B[k] + A[k]) * 0.5
++            if m > hi:
++                hi = m
++                hi_i = k
++            if m < lo:
++                lo = m
++                lo_i = k
++            k -= 1
++        rowi[LI_OREF + q] = k + 1
++        rowi[LI_OMIN + q] = lo_i
++        rowi[LI_OMAX + q] = hi_i
++
++
++@njit(cache=True, nogil=True)
++def _lg_drift(T, i, t, rowi):
++    """[PLAN] EntryPrior60Approved reference tick for several horizons (nearest tick to t - H within +-5 s, -1 = none)."""
++    for q in range(len(LG_DRIFT)):
++        target = t - LG_DRIFT[q]
++        lo_i = np.searchsorted(T[: i + 1], target - 5000)
++        hi_i = np.searchsorted(T[: i + 1], target + 5000, side="right")
++        best = -1
++        if hi_i > lo_i:
++            best = lo_i
++            bd = abs(T[lo_i] - target)
++            for k in range(lo_i + 1, hi_i):
++                d = abs(T[k] - target)
++                if d < bd:
++                    bd = d
++                    best = k
++        rowi[LI_DRIFT + q] = best
++
++
++@njit(cache=True, nogil=True)
++def _fg_z(t, bid, fg_micro, fg_interval, fg_warm, fg_wm, fg_minutes, fg_bars, fg_band, fg_against, fg_buy, fg_sell,
++          fg_time, fg_end, fg_li, fg_aat, fg_abar, fg_aprice, fg_adir, fg_aatr):
++    """[PLAN] FlashGoldAllowsEntry up to the gate verdict (the former inline block). Returns z (+1 BUY area, -1 SELL area,
++    0 none), fi (filter bar, -1 none) and fq (the armed-state bar, -1 none)."""
++    nfg = len(fg_time)
++    if fg_micro:
++        bucket = (t // fg_interval) * fg_interval
++        fi = np.searchsorted(fg_time, bucket)
++        if fi >= nfg or fg_time[fi] != bucket or fg_li[fi] < fg_warm:
++            fi = -1
++        bar_time = bucket
++        bar_end = bucket + fg_interval
++    else:
++        m1 = (t // 60000) * 60000
++        fi = np.searchsorted(fg_time, m1, side="right") - 1
++        bar_time = m1
++        bar_end = m1 + 60000
++    z = 0
++    fq = -1
++    if fi >= 0 and fg_li[fi] >= 1:
++        fq = fi - 1
++        clock = t
++        if bar_end - 1 < clock:
++            clock = bar_end - 1
++        if fg_end[fi] - 1 < clock:
++            clock = fg_end[fi] - 1
++        if clock < bar_time:
++            clock = bar_time
++        index = fg_li[fi] - 1 if clock == fg_end[fq] else fg_li[fi]
++        z = fg_gate(fg_aat[fq], fg_abar[fq], fg_aprice[fq], fg_adir[fq], fg_aatr[fq], clock, index, bid,
++                    fg_wm, fg_minutes, fg_bars, fg_band, fg_against, fg_buy, fg_sell)
++    return z, fi, fq
++
++
++@njit(cache=True, nogil=True)
+ def run_chunk(T, B, A, P, idxL, cand, ep_start,
+               fg_time, fg_end, fg_li, fg_aat, fg_abar, fg_aprice, fg_adir, fg_aatr,
+               ext_i, ext_side, ext_act, ext_scn, ext_entry, ext_sl, ext_tp, ext_id,
++              fl_ix, fl_t, fl_ok, fl_v,
++              lgi, lgf,
+               out, cnt):
+     """Replay one chunk. T ms, B bid, A ask; P inputs; idxL[i] = FirstTickAtOrAfter(t - lookback);
+     cand = indices where the alert condition holds; ep_start[i] = time of the first tick after the
+@@ -225,10 +381,36 @@
+ 
+     ext_* = externally supplied fills (used to replay real trades with other exit inputs): at tick
+     ext_i[k] a position opens at ext_entry[k] with the given stop and target. Their trades carry
+-    ext_id in the decision_ms column. Pass empty arrays for a normal run."""
++    ext_id in the decision_ms column. Pass empty arrays for a normal run.
++
++    [PLAN] fl_* = the order-flow feed of this chunk: fl_t update (heartbeat) times, fl_ok the feed's OK flag,
++    fl_v [n,3] FORCE_IMB / NEAR_IMB / BOOK_IMB, fl_ix[i] = last update at or before tick i (-1 = none). Empty =
++    neutral flow. lgi [rows, NLI] int32 / lgf [rows, NLF] float32 = decision log (zero rows = log off)."""
+     n = len(T)
+     nt = 0
+     maxt = out.shape[0]
++    log_on = lgi.shape[0] > 0
++    nlog = 0
++    lg_gap = int(P[I_X_LogMinGapMs])
++    lg_last = -1
++    lg_pending = False
++    lg_stage = 0
++    lg_cp_sec = -1
++    lg_c60 = False
++    lg_c300 = False
++    lg_n60 = 0
++    lg_gap2 = -1.0
++    lg_r60 = -1.0
++    lg_r300 = -1.0
++    lg_msp = -1.0
++    rowi = np.zeros(NLI, np.int32)
++    rowf = np.zeros(NLF, np.float32)
++    use_flow = P[I_UseOrderFlow] > 0.5 and len(fl_ix) > 0
++    signal_only = P[I_X_SignalOnly] > 0.5
++    ep_id = 0
++    hold_fl = 0
++    hold_row = -1
++    hold_sig_i = 0
+ 
+     # ---- inputs -------------------------------------------------------------------------------
+     router = int(P[I_EntryRouterMode])
+@@ -295,6 +477,9 @@
+     bar_open = 0.0
+     bar_hi = 0.0
+     bar_lo = 0.0
++    bar_j = 0                           # [PLAN] tick indices behind bar_open / bar_hi / bar_lo (the log stores indices)
++    bar_hi_i = 0
++    bar_lo_i = 0
+ 
+     # positions
+     p_on = np.zeros(MAXP, np.bool_)
+@@ -345,6 +530,8 @@
+     p_bs_ok = np.zeros(MAXP, np.bool_)
+     p_cl_ms = np.zeros(MAXP, np.int64)          # > 0: a market close was sent, it fills at the first quote at or after this time
+     p_cl_reason = np.zeros(MAXP, np.int64)
++    p_fl = np.zeros(MAXP, np.int64)             # [PLAN] flow label of the entry: +1 ':FA', -1 ':FD', 0 none
++    p_sig = np.zeros(MAXP, np.int64)            # [PLAN] time of the BuildDirectionState that chose the trade
+     npos = 0
+     # market entries on their way to the server (only with X_LatencyMs > 0)
+     m_on = np.zeros(MAXO, np.bool_)
+@@ -359,6 +546,8 @@
+     m_op = np.zeros(MAXO, np.bool_)
+     m_alert = np.zeros(MAXO)
+     m_spread = np.zeros(MAXO)
++    m_fl = np.zeros(MAXO, np.int64)
++    m_sig = np.zeros(MAXO, np.int64)
+     nmk = 0
+     # pending orders
+     o_on = np.zeros(MAXO, np.bool_)
+@@ -374,6 +563,8 @@
+     o_spread = np.zeros(MAXO)
+     o_live = np.zeros(MAXO, np.int64)           # the order rests at the server from this time on
+     o_ok = np.zeros(MAXO, np.bool_)             # the server has accepted it
++    o_fl = np.zeros(MAXO, np.int64)
++    o_sig = np.zeros(MAXO, np.int64)
+     npend = 0
+ 
+     cp = 0
+@@ -382,6 +573,9 @@
+     next_ = len(ext_i)
+     i = 0
+     while i < n:
++        if lg_pending:                      # [PLAN] the previous tick's decision row is complete (stage is final)
++            nlog, lg_last = _lg_flush(lgi, lgf, nlog, rowi, rowf, lg_stage, lg_gap, lg_last, cnt)
++            lg_pending = False
+         if (not speed_active) and npos == 0 and npend == 0 and nmk == 0 and (not hold_armed):
+             # idle: nothing can change until the alert condition is next true (or an external fill arrives)
+             while cp < ncand and cand[cp] < i:
+@@ -437,6 +631,7 @@
+                         out[nt, 11] = p_dec[s]; out[nt, 12] = p_req[s]; out[nt, 13] = 1.0 if p_rel[s] else 0.0
+                         out[nt, 14] = p_slmod[s]; out[nt, 15] = 1.0 if p_op[s] else 0.0
+                         out[nt, 16] = p_alert[s]; out[nt, 17] = p_spread[s]
++                        out[nt, 18] = p_fl[s]; out[nt, 19] = p_sig[s]
+                         nt += 1
+                     p_on[s] = False
+                     npos -= 1
+@@ -479,7 +674,7 @@
+                             p_side[s] = side; p_entry[s] = fill; p_sl[s] = o_sl[q]; p_tp[s] = o_tp[q]
+                             p_fill[s] = t; p_scn[s] = o_scn[q]; p_act[s] = ty; p_slmod[s] = 0
+                             p_dec[s] = o_dec[q]; p_req[s] = o_price[q]; p_op[s] = o_op[q]
+-                            p_alert[s] = o_alert[q]; p_spread[s] = o_spread[q]
++                            p_alert[s] = o_alert[q]; p_spread[s] = o_spread[q]; p_fl[s] = o_fl[q]; p_sig[s] = o_sig[q]
+                             p_trk[s] = False; p_rel[s] = False; p_tl_init[s] = False; p_bs_init[s] = False
+                             p_cl_ms[s] = 0
+                             cnt[C_FILLED] += 1
+@@ -499,7 +694,7 @@
+                             p_sl[s] = m_sl[q]; p_tp[s] = m_tp[q]
+                             p_fill[s] = t; p_scn[s] = m_scn[q]; p_act[s] = m_act[q]; p_slmod[s] = 0
+                             p_dec[s] = m_dec[q]; p_req[s] = m_req[q]; p_op[s] = m_op[q]
+-                            p_alert[s] = m_alert[q]; p_spread[s] = m_spread[q]
++                            p_alert[s] = m_alert[q]; p_spread[s] = m_spread[q]; p_fl[s] = m_fl[q]; p_sig[s] = m_sig[q]
+                             p_trk[s] = False; p_rel[s] = False; p_tl_init[s] = False; p_bs_init[s] = False
+                             p_cl_ms[s] = 0
+                             cnt[C_FILLED] += 1
+@@ -512,7 +707,7 @@
+                     p_side[s] = ext_side[xp]; p_entry[s] = ext_entry[xp]; p_sl[s] = ext_sl[xp]; p_tp[s] = ext_tp[xp]
+                     p_fill[s] = t; p_scn[s] = ext_scn[xp]; p_act[s] = ext_act[xp]; p_slmod[s] = 0
+                     p_dec[s] = ext_id[xp]; p_req[s] = ext_entry[xp]; p_op[s] = False
+-                    p_alert[s] = 0.0; p_spread[s] = spread
++                    p_alert[s] = 0.0; p_spread[s] = spread; p_fl[s] = 0; p_sig[s] = 0
+                     p_trk[s] = False; p_rel[s] = False; p_tl_init[s] = False; p_bs_init[s] = False
+                     p_cl_ms[s] = 0
+                     break
+@@ -588,6 +783,7 @@
+                 al_mae = BIG
+                 al_last = idx - 1
+                 cnt[C_ALERTS] += 1
++                ep_id += 1
+ 
+         # =========================== ManagePendingExpiry =======================================
+         if npend > 0 and P[I_PendingExpirySeconds] > 0:
+@@ -779,7 +975,13 @@
+                         normal = P[I_FLXQSellStopPressureDangerLossPoints] > 0.0 and fav <= -P[I_FLXQSellStopPressureDangerLossPoints]
+                         if (v40 or normal) and not ((not pressure) and ((not v40) or P[I_V40FLXQSellStopPressureShieldNeedsPressure] > 0.5)):
+                             close_reason = R_FLXQ_SS
+-                    # (TryStopFlowDisagreeDangerClose needs a FLOW_DISAGREES label: never with neutral flow)
++                    # TryStopFlowDisagreeDangerClose (EA 11218-11262): a stop-order FLXQ / CONT entry whose label was ':FD'
++                    if (close_reason == 0 and P[I_UseStopFlowDisagreeDangerClose] > 0.5 and p_fl[s] < 0
++                            and (scn == S_FLXQ or scn == S_CONT) and (act == A_BS or act == A_SS)
++                            and (P[I_StopFlowDisagreeDangerLossPoints] <= 0.0 or fav <= -P[I_StopFlowDisagreeDangerLossPoints])
++                            and (P[I_StopFlowDisagreeDangerMinHoldMs] <= 0.0 or held >= P[I_StopFlowDisagreeDangerMinHoldMs])
++                            and (P[I_StopFlowDisagreeDangerNeedsOppositePressure] < 0.5 or pressure)):
++                        close_reason = R_STOP_FLOW
+                     if close_reason == 0:
+                         if p_h21[s] and (not p_rheld[s]) and fav >= 0.0:
+                             p_rheld[s] = True
+@@ -859,7 +1061,7 @@
+                                 v40p = (P[I_UseV40ExecutionShield] > 0.5 and P[I_V40PreSpeedExecutionShield] > 0.5
+                                         and P[I_V40PreSpeedExecutionShieldLossPoints] > 0.0
+                                         and fav <= -P[I_V40PreSpeedExecutionShieldLossPoints]
+-                                        and (P[I_V40PreSpeedExecutionShieldNeedsPressureOrFlow] < 0.5 or pressure))
++                                        and (P[I_V40PreSpeedExecutionShieldNeedsPressureOrFlow] < 0.5 or pressure or p_fl[s] < 0))
+                                 dmin = P[I_PreSpeedAgainstDefenseMinLossPoints]
+                                 if flxq_ss and P[I_FLXQSellStopFastPreSpeedDefenseLossPoints] > 0.0:
+                                     dmin = min(dmin, P[I_FLXQSellStopFastPreSpeedDefenseLossPoints])
+@@ -868,8 +1070,11 @@
+                                 if not (fav > -dmin):
+                                     exhl_d = (P[I_EXHLPreSpeedDangerClose] > 0.5 and scn == S_EXHL
+                                               and P[I_EXHLPreSpeedDangerLossPoints] > 0.0 and fav <= -P[I_EXHLPreSpeedDangerLossPoints])
+-                                    folm_d = (P[I_FOLMMarketDangerClose] > 0.5 and folm and P[I_FOLMMarketDangerLossPoints] > 0.0
+-                                              and fav <= -P[I_FOLMMarketDangerLossPoints])
++                                    folm_loss = P[I_FOLMMarketDangerLossPoints]
++                                    if p_fl[s] < 0 and P[I_FOLMFlowDisagreeDangerLossPoints] > 0.0:
++                                        folm_loss = P[I_FOLMFlowDisagreeDangerLossPoints]
++                                    folm_d = (P[I_FOLMMarketDangerClose] > 0.5 and folm and folm_loss > 0.0
++                                              and fav <= -folm_loss)
+                                     flxq_h = (flxq_ss and P[I_FLXQSellStopFastPreSpeedDefenseLossPoints] > 0.0
+                                               and fav <= -P[I_FLXQSellStopFastPreSpeedDefenseLossPoints])
+                                     okd = True
+@@ -890,7 +1095,8 @@
+                                         n_hard = (P[I_PreSpeedAgainstDefenseHardClose] > 0.5 and P[I_PreSpeedAgainstDefenseHardMaxLossPoints] > 0.0
+                                                   and fav <= -P[I_PreSpeedAgainstDefenseHardMaxLossPoints])
+                                         hard_c = n_hard or flxq_h
+-                                        if v40p or exhl_d or folm_d or hard_c or wait_ok:
++                                        imm_flow = P[I_FlowDisagreeMakesDefenseImmediate] > 0.5 and p_fl[s] < 0
++                                        if v40p or exhl_d or folm_d or hard_c or wait_ok or imm_flow:
+                                             # RecentPreSpeedAgainstTrade
+                                             rec = pre_dir != 0 and pre_ms > 0 and pre_dir == -side
+                                             if rec:
+@@ -944,6 +1150,7 @@
+                             out[nt, 9] = p_mfe[s]; out[nt, 10] = p_mae[s]; out[nt, 11] = p_dec[s]; out[nt, 12] = p_req[s]
+                             out[nt, 13] = 1.0 if p_rel[s] else 0.0; out[nt, 14] = p_slmod[s]
+                             out[nt, 15] = 1.0 if p_op[s] else 0.0; out[nt, 16] = p_alert[s]; out[nt, 17] = p_spread[s]
++                            out[nt, 18] = p_fl[s]; out[nt, 19] = p_sig[s]
+                             nt += 1
+                         p_on[s] = False
+                         npos -= 1
+@@ -1033,6 +1240,8 @@
+         action = 0
+         scn = 0
+         opp = False
++        fl_lab = 0
++        sig_ms = t
+         from_hold = False
+         if P[I_InpUseEntryHold] > 0.5 and hold_armed:
+             # ---- ProcessArmedEntryHold
+@@ -1043,10 +1252,43 @@
+             action = hold_action
+             scn = hold_scn
+             opp = hold_op
++            fl_lab = hold_fl                    # [PLAN] ArmEntryHold stores the whole DirectionState (EA 1781), flow included
++            sig_ms = hold_sig_ms
+             from_hold = True
++            if log_on:                          # [PLAN] kind-1 row: the hold-pass evaluation
++                cnt[C_HOLD_PASS] += 1
++                rowi[:] = 0
++                rowf[:] = 0.0
++                lg_pending = True
++                lg_stage = ST_HOLDPASS_FG
++                rowi[LI_TICK] = i
++                rowi[LI_TOFF] = t - T[0]
++                rowi[LI_EP] = ep_id
++                rowi[LI_KIND] = 1
++                rowi[LI_ACTION] = action
++                rowi[LI_SCN] = scn
++                rowi[LI_FLLAB] = fl_lab
++                rowi[LI_ARMROW] = hold_row
++                rowi[LI_NPOS] = npos
++                rowi[LI_NPEND] = npend
++                rowi[LI_NMK] = nmk
+         else:
+             # ---- BuildDirectionState
+             cnt[C_DECISIONS] += 1
++            if log_on:                          # [PLAN] kind-0 row, completed below and flushed at the top of the next iteration
++                rowi[:] = 0
++                rowf[:] = 0.0
++                lg_pending = True
++                lg_stage = ST_MIXED
++                rowi[LI_TICK] = i
++                rowi[LI_TOFF] = t - T[0]
++                rowi[LI_EP] = ep_id
++                rowi[LI_SPDIR] = speed_dir
++                rowi[LI_ISTART] = speed_idx
++                rowi[LI_NPOS] = npos
++                rowi[LI_NPEND] = npend
++                rowi[LI_NMK] = nmk
++                rowf[LF_SPEEDPTS] = speed_pts
+             spread_stable = spread <= P[I_MaxSpreadPoints]
+             buy = 0.0
+             sell = 0.0
+@@ -1067,18 +1309,25 @@
+                 bar_open = B[j]
+                 bar_hi = B[j]
+                 bar_lo = B[j]
++                bar_j = j
++                bar_hi_i = j
++                bar_lo_i = j
+                 for k in range(j + 1, i + 1):
+                     if B[k] > bar_hi:
+                         bar_hi = B[k]
++                        bar_hi_i = k
+                     if B[k] < bar_lo:
+                         bar_lo = B[k]
++                        bar_lo_i = k
+                 bar_i = i
+             else:
+                 for k in range(bar_i + 1, i + 1):
+                     if B[k] > bar_hi:
+                         bar_hi = B[k]
++                        bar_hi_i = k
+                     if B[k] < bar_lo:
+                         bar_lo = B[k]
++                        bar_lo_i = k
+                 bar_i = i
+             body_signed = (mid - bar_open) / PT
+             body = abs(body_signed)
+@@ -1111,6 +1360,35 @@
+                 if mid < lo - buf:
+                     micro_dir = -1
+                     sell += P[I_MicroBreakScore]
++            # [PLAN] ScoreOrderFlow (EA 2463-2493) + AddFlowVote (EA 2556-2569), in the EA's order: after the micro-break
++            fl_k = -1
++            fl_fresh = False
++            fl_dir = 0
++            fl_f = 0.0
++            fl_n = 0.0
++            fl_b = 0.0
++            vb = 0
++            vs = 0
++            if use_flow:
++                fl_k = fl_ix[i]
++                if fl_k >= 0 and fl_ok[fl_k] != 0 and (t - fl_t[fl_k]) <= P[I_MaxFlowAgeMs]:
++                    fl_fresh = True
++                    fl_f = fl_v[fl_k, 0]
++                    fl_n = fl_v[fl_k, 1]
++                    fl_b = fl_v[fl_k, 2]
++                    for q in range(3):
++                        fv_ = fl_v[fl_k, q]
++                        if abs(fv_) >= P[I_MinFlowImbalance]:
++                            if fv_ > 0.0:
++                                vb += 1
++                                buy += P[I_FlowComponentScore]
++                            else:
++                                vs += 1
++                                sell += P[I_FlowComponentScore]
++                    if vb >= 2:
++                        fl_dir = 1
++                    elif vs >= 2:
++                        fl_dir = -1
+             # ScoreFollowAndMfeMae (running extremes of the move since the alert's start tick)
+             for k in range(al_last + 1, i + 1):
+                 fv = speed_dir * ((B[k] + A[k]) * 0.5 - speed_start_mid) / PT
+@@ -1131,6 +1409,8 @@
+                 winner = 1
+             elif sell >= P[I_MinDirectionScore] and (sell - buy) >= P[I_MinScoreEdge]:
+                 winner = -1
++            fa = winner != 0 and fl_dir == winner           # [PLAN] flowAgreesWithWinner (EA 2345)
++            fd = winner != 0 and fl_dir == -winner          # [PLAN] flowDisagreesWithWinner (EA 2346)
+             # DetectOppositePressure
+             if winner != 0:
+                 j = _first_at_or_after(T, i, t - P[I_OppositePressureSeconds] * 1000)
+@@ -1152,9 +1432,86 @@
+                     or (lo_wick > max(20.0, body * 1.25) and speed_dir < 0))
+             exhaustion = wick or snapback or opp or (not spread_stable)
+             body_with = body_dir != 0 and winner == body_dir
++            if log_on:                          # [PLAN] every raw input of the verdict, for the offline re-scorer
++                rowf[LF_BUY] = buy
++                rowf[LF_SELL] = sell
++                rowi[LI_WIN] = winner
++                rowi[LI_BODYDIR] = body_dir
++                rowi[LI_MICRODIR] = micro_dir
++                rowi[LI_FLK] = fl_k
++                rowi[LI_FLFRESH] = 1 if fl_fresh else 0
++                rowi[LI_FLDIR] = fl_dir
++                rowi[LI_VB] = vb
++                rowi[LI_VS] = vs
++                rowf[LF_FORCE] = fl_f
++                rowf[LF_NEAR] = fl_n
++                rowf[LF_BOOK] = fl_b
++                rowf[LF_MFE] = s_mfe
++                rowf[LF_MAE] = s_mae
++                rowi[LI_IBAROPEN] = bar_j
++                rowi[LI_IBARHI] = bar_hi_i
++                rowi[LI_IBARLO] = bar_lo_i
++                fb = 0
++                if spread_stable:
++                    fb |= FB_STABLE
++                if f21:
++                    fb |= FB_F21
++                if f37:
++                    fb |= FB_F37
++                if opp:
++                    fb |= FB_OPP
++                if snapback:
++                    fb |= FB_SNAP
++                if wick:
++                    fb |= FB_WICK
++                if exhaustion:
++                    fb |= FB_EXH
++                if continuation:
++                    fb |= FB_CONT
++                if has_follow:
++                    fb |= FB_FOLLOW
++                if good_mm:
++                    fb |= FB_GOODMM
++                _lg_micro_grid(T, B, A, i, t, rowi)
++                _lg_opp_grid(T, B, A, i, t, rowi)
++                _lg_drift(T, i, t, rowi)
++                rowi[LI_B1] = -1
++                if t - ep_start[i] >= 1000:
++                    jb = _first_at_or_after(T, i, t - 1000)
++                    if jb < i and t > T[jb]:
++                        rowi[LI_B1] = jb
++                rowi[LI_FGFI] = -1
++                if fg_on:
++                    zz, fi_l, fq_l = _fg_z(t, bid, fg_micro, fg_interval, fg_warm, fg_wm, int(P[I_FG_InpMinutes]),
++                                           int(P[I_FG_InpBars]), P[I_FG_InpBandAtr], P[I_FG_InpAgainst] > 0.5,
++                                           P[I_FG_InpAllowBuy] > 0.5, P[I_FG_InpAllowSell] > 0.5, fg_time, fg_end,
++                                           fg_li, fg_aat, fg_abar, fg_aprice, fg_adir, fg_aatr)
++                    rowi[LI_FGZ] = zz
++                    rowi[LI_FGFI] = fi_l
++                if cp_on:                       # per-second tape statistics, kept apart from the trading path's cache
++                    sec_l = t // 1000
++                    if sec_l != lg_cp_sec:
++                        lg_c60, lg_c300, lg_n60, lg_gap2, lg_r60, lg_r300, lg_msp = _cp_stats(T, B, A, i, cp_unit)
++                        lg_cp_sec = sec_l
++                    rowf[LF_CPN60] = lg_n60
++                    rowf[LF_CPGAP] = lg_gap2
++                    rowf[LF_CPR60] = lg_r60
++                    rowf[LF_CPR300] = lg_r300
++                    rowf[LF_CPMSP] = lg_msp
++                    if lg_c60:
++                        fb |= FB_CP60
++                    if lg_c300:
++                        fb |= FB_CP300
++                rowi[LI_FLAGS] = fb
+             # ---- DecideAction
+             if not spread_stable:
+                 cnt[C_SKIP_SPREAD] += 1
++                lg_stage = ST_SPREAD
++                i += 1
++                continue
++            if P[I_BlockStrongFlowAgainst] > 0.5 and fd:     # [PLAN] EA 2748
++                cnt[C_SKIP_FLOW] += 1
++                lg_stage = ST_FLOWBLK
+                 i += 1
+                 continue
+             if exhaustion and router >= 2 and speed_dir != 0:
+@@ -1166,11 +1523,12 @@
+             else:
+                 market = False
+                 if speed_dir == winner and (f21 or f37) and router >= 1:
+-                    # MarketEntryAllowedByFlow with neutral flow
++                    # MarketEntryAllowedByFlow (EA 2770-2789), [PLAN] with the flow state
++                    neutral = (not fl_fresh) or fl_dir == 0
+                     market = True
+-                    if winner < 0 and P[I_DowngradeNeutralSellMarketToStop] > 0.5:
++                    if winner < 0 and P[I_DowngradeNeutralSellMarketToStop] > 0.5 and neutral:
+                         market = False
+-                    elif P[I_WeakFlowMarketNeedsBodyAndMicro] > 0.5:
++                    elif P[I_WeakFlowMarketNeedsBodyAndMicro] > 0.5 and (neutral or fd):
+                         sc = buy if winner > 0 else sell
+                         market = (body_dir == winner and body >= P[I_MinCandleBodyPoints] and micro_dir == winner
+                                   and sc >= P[I_WeakFlowMarketMinScore] and abs(buy - sell) >= P[I_WeakFlowMarketMinScoreEdge])
+@@ -1178,21 +1536,30 @@
+                     action = A_BM if winner > 0 else A_SM
+                 else:
+                     action = A_BS if winner > 0 else A_SS
++            if log_on:
++                rowi[LI_ACTION] = action
+             if (action == A_BS or action == A_SS) and winner != 0 and body_dir != 0 and body_dir == -winner:
+                 cnt[C_SKIP_BODY] += 1
++                lg_stage = ST_BODYAG
+                 i += 1
+                 continue
+-            # ScenarioKeyForAction
++            # ScenarioKeyForAction (EA 3159-3186). [PLAN] with flowAgreesWithWinner the BFNF / FLXQ / BFNO / BFA keys exist
+             if action == A_BM or action == A_SM:
+                 scn = S_FOLM
+             elif action == A_BL or action == A_SL:
+                 scn = S_EXHL
+-            elif body_with and spread_stable and (not opp) and (has_follow or good_mm):
++            elif body_with and fa and (not opp) and has_follow:
++                scn = S_BFNF
++            elif body_with and spread_stable and (not opp) and (has_follow or good_mm or fa):
+                 scn = S_FLXQ
+             elif body_with and spread_stable and (good_mm or has_follow):
+                 scn = S_QUAL
++            elif body_with and fa and (not opp):
++                scn = S_BFNO
+             elif body_with and not opp:
+                 scn = S_BNO
++            elif body_with and fa:
++                scn = S_BFA
+             elif (not exhaustion) and (not continuation) and body_with:
+                 scn = S_BODY
+             elif continuation:
+@@ -1201,9 +1568,16 @@
+                 scn = S_EXH
+             else:
+                 scn = S_OTHER
++            fl_lab = 1 if fa else (-1 if fd else 0)
++            if log_on:
++                rowi[LI_ACTION] = action
++                rowi[LI_SCN] = scn
++                rowi[LI_FLLAB] = fl_lab
+ 
+         aside = 1 if (action == A_BS or action == A_BM or action == A_BL) else -1
+         if (aside > 0 and P[I_X_TradeBuys] < 0.5) or (aside < 0 and P[I_X_TradeSells] < 0.5):
++            cnt[C_SKIP_SIDE] += 1
++            lg_stage = ST_TRADESIDE
+             speed_active = False
+             hold_armed = False
+             i += 1
+@@ -1211,41 +1585,21 @@
+         # ---- FlashGoldAllowsEntry
+         fg_ok = True
+         if fg_on:
++            z, fi, fq = _fg_z(t, bid, fg_micro, fg_interval, fg_warm, fg_wm, int(P[I_FG_InpMinutes]), int(P[I_FG_InpBars]),
++                              P[I_FG_InpBandAtr], P[I_FG_InpAgainst] > 0.5, P[I_FG_InpAllowBuy] > 0.5,
++                              P[I_FG_InpAllowSell] > 0.5, fg_time, fg_end, fg_li, fg_aat, fg_abar, fg_aprice, fg_adir, fg_aatr)
+             fg_ok = False
+-            fi = -1
+-            bar_time = 0
+-            bar_end = 0
+-            if fg_micro:
+-                bucket = (t // fg_interval) * fg_interval
+-                fi = np.searchsorted(fg_time, bucket)
+-                if fi >= nfg or fg_time[fi] != bucket or fg_li[fi] < fg_warm:
+-                    fi = -1
+-                bar_time = bucket
+-                bar_end = bucket + fg_interval
+-            else:
+-                m1 = (t // 60000) * 60000
+-                fi = np.searchsorted(fg_time, m1, side="right") - 1
+-                bar_time = m1
+-                bar_end = m1 + 60000
+             if fi >= 0 and fg_li[fi] >= 1:
+-                fq = fi - 1
+-                clock = t
+-                if bar_end - 1 < clock:
+-                    clock = bar_end - 1
+-                if fg_end[fi] - 1 < clock:
+-                    clock = fg_end[fi] - 1
+-                if clock < bar_time:
+-                    clock = bar_time
+-                index = fg_li[fi] - 1 if clock == fg_end[fq] else fg_li[fi]
+-                z = fg_gate(fg_aat[fq], fg_abar[fq], fg_aprice[fq], fg_adir[fq], fg_aatr[fq], clock, index, bid,
+-                            fg_wm, int(P[I_FG_InpMinutes]), int(P[I_FG_InpBars]), P[I_FG_InpBandAtr],
+-                            P[I_FG_InpAgainst] > 0.5, P[I_FG_InpAllowBuy] > 0.5, P[I_FG_InpAllowSell] > 0.5)
+                 fg_ok = z == aside
+                 if fg_ok and fg_dur > 0:
+                     at = fg_aat[fq]
+                     fg_ok = at >= 0 and t >= at and t < at + fg_dur
++            if log_on and from_hold:
++                rowi[LI_FGZ] = z
++                rowi[LI_FGFI] = fi
+         if not fg_ok:
+             cnt[C_FG_BLOCK] += 1
++            lg_stage = ST_FGBLOCK
+             speed_active = False
+             hold_armed = False
+             i += 1
+@@ -1256,6 +1610,7 @@
+             if not from_hold:
+                 if hold_failed_bar == t // 60000:
+                     cnt[C_HOLD_SAME_BAR] += 1
++                    lg_stage = ST_HOLDBAR
+                     speed_active = False
+                     i += 1
+                     continue
+@@ -1265,15 +1620,21 @@
+                 hold_action = action
+                 hold_scn = scn
+                 hold_op = opp
++                hold_fl = fl_lab                # [PLAN] the label is part of the stored DirectionState (EA 1781)
++                hold_row = nlog                 # [PLAN] row index this evaluation gets when it is flushed
+                 cnt[C_HOLD_ARMED] += 1
++                lg_stage = ST_HOLDARM
+                 i += 1
+                 continue
+             hold_move = aside * (mid - hold_sig_mid) / PT
++            if log_on:
++                rowf[LF_HOLDMOVE] = hold_move
+             if not (hold_move >= P[I_InpEntryHoldMinFavPoints]):
+                 hold_failed_bar = t // 60000
+                 hold_armed = False
+                 speed_active = False
+                 cnt[C_HOLD_FAIL] += 1
++                lg_stage = ST_HOLDFAIL
+                 i += 1
+                 continue
+ 
+@@ -1296,6 +1657,7 @@
+                 ok60 = (aside > 0 and drift > 0.0) or (aside < 0 and drift < 0.0)
+             if not ok60:
+                 cnt[C_PRIOR60_BLOCK] += 1
++                lg_stage = ST_PRIOR60
+                 hold_armed = False
+                 speed_active = False
+                 i += 1
+@@ -1310,6 +1672,7 @@
+                     okb = abs(b1) >= P[I_InpBurstThresholdPts] and ((aside > 0 and b1 > 0.0) or (aside < 0 and b1 < 0.0))
+             if not okb:
+                 cnt[C_BURST_BLOCK] += 1
++                lg_stage = ST_BURST
+                 hold_armed = False
+                 speed_active = False
+                 i += 1
+@@ -1338,6 +1701,7 @@
+                 can = False
+         if not can:
+             cnt[C_CAP_SKIP] += 1
++            lg_stage = ST_CAP
+             hold_armed = False          # speedActive stays true, as in the EA
+             i += 1
+             continue
+@@ -1376,9 +1740,18 @@
+                     send = False
+         if not send:
+             cnt[C_CP_BLOCK] += 1
++            lg_stage = ST_CPBLOCK
+         else:
+             cnt[C_PLACED] += 1
+-            if (action == A_BM or action == A_SM) and latency > 0:
++            lg_stage = ST_PLACED
++            if signal_only:
++                if nt < maxt:
++                    out[nt, 0] = t; out[nt, 1] = t; out[nt, 2] = aside; out[nt, 3] = action
++                    out[nt, 4] = scn; out[nt, 5] = ask if aside > 0 else bid; out[nt, 6] = out[nt, 5]; out[nt, 7] = R_SIGNAL
++                    out[nt, 8] = 0.0; out[nt, 11] = t; out[nt, 12] = out[nt, 5]; out[nt, 15] = 1.0 if opp else 0.0
++                    out[nt, 16] = speed_pts; out[nt, 17] = spread; out[nt, 18] = fl_lab; out[nt, 19] = sig_ms
++                    nt += 1
++            elif (action == A_BM or action == A_SM) and latency > 0:
+                 ref = ask if action == A_BM else bid
+                 for q in range(MAXO):
+                     if not m_on[q]:
+@@ -1388,7 +1761,7 @@
+                         m_sl[q] = round((ref - aside * P[I_MarketSLPoints] * PT) / PT) * PT
+                         m_tp[q] = round((ref + aside * P[I_MarketTPPoints] * PT) / PT) * PT
+                         m_scn[q] = scn; m_act[q] = action; m_dec[q] = t; m_req[q] = ref; m_op[q] = opp
+-                        m_alert[q] = speed_pts; m_spread[q] = spread
++                        m_alert[q] = speed_pts; m_spread[q] = spread; m_fl[q] = fl_lab; m_sig[q] = sig_ms
+                         break
+             elif action == A_BM or action == A_SM:
+                 fill = ask + slip if action == A_BM else bid - slip
+@@ -1402,6 +1775,7 @@
+                         p_tp[s] = round((ref + aside * P[I_MarketTPPoints] * PT) / PT) * PT
+                         p_fill[s] = t; p_scn[s] = scn; p_act[s] = action; p_slmod[s] = 0
+                         p_dec[s] = t; p_req[s] = ref; p_op[s] = opp; p_alert[s] = speed_pts; p_spread[s] = spread
++                        p_fl[s] = fl_lab; p_sig[s] = sig_ms
+                         p_trk[s] = False; p_rel[s] = False; p_tl_init[s] = False; p_bs_init[s] = False
+                         p_cl_ms[s] = 0
+                         cnt[C_FILLED] += 1
+@@ -1428,7 +1802,7 @@
+                         o_sl[q] = round((price - aside * slp * PT) / PT) * PT
+                         o_tp[q] = round((price + aside * tpp * PT) / PT) * PT
+                         o_sec[q] = t // 1000; o_scn[q] = scn; o_dec[q] = t; o_op[q] = opp
+-                        o_alert[q] = speed_pts; o_spread[q] = spread
++                        o_alert[q] = speed_pts; o_spread[q] = spread; o_fl[q] = fl_lab; o_sig[q] = sig_ms
+                         o_live[q] = t + latency
+                         o_ok[q] = False
+                         break
+@@ -1436,6 +1810,9 @@
+         speed_active = False
+         i += 1
+ 
++    if lg_pending:                       # [PLAN] the last evaluation of the chunk
++        nlog, lg_last = _lg_flush(lgi, lgf, nlog, rowi, rowf, lg_stage, lg_gap, lg_last, cnt)
++        lg_pending = False
+     # positions still open at the end of the week are closed at the last quote
+     if npos > 0:
+         bid = B[n - 1]
+@@ -1449,5 +1826,6 @@
+                 out[nt, 9] = p_mfe[s]; out[nt, 10] = p_mae[s]; out[nt, 11] = p_dec[s]; out[nt, 12] = p_req[s]
+                 out[nt, 13] = 1.0 if p_rel[s] else 0.0; out[nt, 14] = p_slmod[s]
+                 out[nt, 15] = 1.0 if p_op[s] else 0.0; out[nt, 16] = p_alert[s]; out[nt, 17] = p_spread[s]
++                out[nt, 18] = p_fl[s]; out[nt, 19] = p_sig[s]
+                 nt += 1
+     return nt

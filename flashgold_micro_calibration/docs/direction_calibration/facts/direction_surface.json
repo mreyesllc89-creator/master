@@ -1,0 +1,786 @@
+{
+ "headline": [
+  "WHICH SIDE. Without the order-flow feed (replay, Strategy Tester, and the calibrated preset, which sets UseOrderFlow=false) the traded side is ALWAYS the side of the 10-second speed alert. At the shipped weights (spread-stable 0.5, speed 1.0, body 1.5, micro-break 1.5; winner needs score >= 4.0 and lead >= 1.5) only 2 of the 18 (speed, body, micro) states give a winner: speed+body+micro all agreeing (4.5 vs 0.5); MinScoreEdge is dead for any value 0.5-4.0. Trading against the burst needs EntryRouterMode >= 2 (limit-order fade on a wick/snapback/opposite-pressure flag, taken even with no winner) or 2-3 live flow votes against it (13 of 90 flow states per alert direction produce an against-alert winner). So 'direction accuracy' here means deciding WHEN a burst continues, plus vetoes (FlashGold, hold, drift). Cites: SpeedAlert_FlashGold_Micro.mq5:2639-2646, 2742-2767; re-derived in score_lattice.py.",
+  "WHETHER. A serial stack is re-evaluated on EVERY tick while an alert is active; any veto sets speedActive=false and the alert re-fires on the next tick if the 10-s move still qualifies (replay Nov 2026, shipped: 146,251 alert starts for 26,502 independent episodes). Order: spread cap -> score winner -> body-against-stop rule -> FlashGold zone (decision tick, again at hold release, twice more in PlaceAction) -> entry hold (1,100 ms, then mid move >= +5 pts; a failed hold blocks new holds for the rest of the M1 bar) -> prior-60-minute drift sign -> burst gate (off) -> per-scenario caps -> continuation/tape filter at OrderSend -> the stop order must fill within 5 s. Calibrated preset, replay Nov 2026 counters: 106,090 decision ticks (74,994 mixed, 27,515 spread-skipped), FlashGold blocks 1,560, holds armed 1,150 / failed 474, drift blocks 227, cap skips 87, tape blocks 13, 312 stop orders placed, 168 expired, 141 filled (Mar 2026: 543 placed, 295 filled; 504,186 of 555,483 decision ticks spread-skipped at a 17-pt median spread).",
+  "FLASHGOLD is not a rare-event trend filter: it is an ATR-scaled breakout re-arming gate (RSI/TDI slope alignment on M1/M5/M15 + a close-to-close burst of >= 0.5 ATR on M5 bars) whose armed level and band define BUY / SELL / no-trade price areas; it fires a signal on 31-33% of M5 bars, flips area ~1,700 times a day, and 66-77% of the entries it passes trade the OPPOSITE side to its last signal. Full mechanics in flashgold_summary. Effect: calibrated PF 1.150 with the gate vs 1.053 without (n 1,234 vs 1,771); shipped 0.719 vs 0.706; no FG input lifts PF above 0.753 with n >= 2,000 at a shipped base, but wider band / larger entry distance lift the calibrated base to 1.24-1.27 on 619-867 trades (grid average 1.15 -> 1.20 for band 0.25 -> 1.0).",
+  "ORDER FLOW enters only through ScoreOrderFlow (mq5:2463-2493): up to three terminal global-variable votes (FORCE_IMB, NEAR_IMB, BOOK_IMB; |v| >= 5.0 gives one +1.0 vote; >= 2 same-sign votes = flowDir) that change the score/edge, the market-route permission, the scenario labels and the :FA/:FD comment that exit rules read. Absent from the replay and the tester. Only live evidence = the 2,584 real trades: FA 1,609 (62.3%, PF 0.805), FD 409 (15.8%, PF 0.916), none 566 (21.9%, PF 0.853), and 1,911 (74.0%) took the market route FOLM, which under the shipped settings cannot occur without at least one flow vote (no-flow maximum score 4.5 < WeakFlowMarketMinScore 5.0).",
+  "SENSITIVITY (calibrated base PF 1.150, 1,234 trades; one input at a time): entry hold OFF 1.005 (n 2,960); 60-min drift OFF 0.998 (n 1,843); FlashGold OFF 1.053 (n 1,771); EntryRouterMode 2 -> 0.965; MaxTrailingMultiplier 7.5 -> 0.816 (30 is a peak: 25 -> 1.053, 40 -> 1.042); MinDirectionScore <= 3.0 -> 1.069 (n 1,737); FG band 1.0 -> 1.268 (n 619); FG entry distance 1.0 -> 1.243 (n 867); micro-break lookback 60 s -> 1.180; spread cap 12 -> 1.175. DEAD or near-dead: MinScoreEdge, InpBurstThresholdPts (gate was off while varied), DowngradeNeutralSellMarketToStop, WeakFlowMarket*, MarketFollow37, InpUse1000msHold, Limit* (router 0), FG_InpMinutes/Seconds/Milliseconds/Bars/DriftBars (their modes were off), InpCPRequireCostCoverage, FG_InpMinAligned 0 = 1. Around the SHIPPED preset every direction input stays inside PF 0.64-0.78 (n >= 2,000).",
+  "NOISE. A ~1,200-trade replay has a bootstrap SD of PF 0.093 (re-derived: 5-95% range 1.00-1.31; the 158-day block bootstrap gives the same). In the 384-set joint grid the rank correlation of PF between periods is 0.06 (Nov-Feb vs Mar-May) and 0.27 (to-May vs Oct-Nov). SpeedLookbackSeconds is jagged (2/3/5/7/10/15 s -> 1.004/1.072/0.939/0.936/1.150/0.935) and the calibrated preset was chosen with all three samples in view. Whole-EA PF therefore cannot rank small direction-rule changes; the supply of direction EVENTS is large by comparison: independent alert episodes per day 2,208 at the shipped threshold vs 150 at the calibrated one (Nov 2026, 12 days), 233 per day calibrated in Mar 2026 (27 days).",
+  "EXECUTION COUPLING. The entry is a stop order (calibrated: 50 pts beyond ask/bid, 5 s life, median 1.3 s from placement to fill), so direction only counts if price continues: 141 of 312 orders filled in Nov 2026, 295 of 543 in Mar 2026. EA-side exits, including the post-entry validation (the only post-fill direction re-check), are locked until the trade has first been > 6.8 pips (68 pts) in profit (hard-coded constant, mq5:12193-12202), so a wrong-way entry can only end at the broker stop or trailing. Entry hold, pending expiry and stop distance are therefore part of the direction confirmation chain and cannot be tuned independently of it.",
+  "FIDELITY CAVEATS. (a) PARENT_EA_SOURCE.txt (header 1.499; ORIGIN.json calls the parent 1.500) differs from the micro EA only in version, TradingEnabled default, tester-only OnInit guard and one FlashGoldCaptureMicroQuote() call, so the direction logic is the live logic. (b) But the 2,584 real trades came from the older embedded build SpeedAlert_FlashGold_Embedded (saved chart header; it has no FG_InpBandAtr / FG_InpAgainst), so the v1.2 gate has no live validation. (c) The replay uses closed-bar parent/zone values (the EA keeps intrabar 'observed live' commits that depend on when the gate was called), nominal M5 bar ends (no quote-session calendar), CandleIndexToCheck 0 only and FIXED alert thresholds only. (d) The micro presets as shipped block after 4,096 occupied buckets (0 trades; the replay needs X_MicroRestart=1). (e) The shipped presets have TradingEnabled=false (the tester needs true) and v1.501 runs only in the Strategy Tester.",
+  "STRUCTURAL BIASES. The candle-body vote mixes the MID close with the BID-based candle open (+spread/2, about +4.9 pts at the replay's 10-pt trigger spread, +6.6 at 13). It shifts BUY/SELL body-vote shares by only ~3 pp in Nov 2026 (77.6% vs 71.2% with mid close, 76.2% vs 73.2% with bid close) and not at all in Mar 2026. The calibrated replay is one-sided: BUY 489 trades PF 1.49 vs SELL 747 trades PF 0.97, while the shipped replay is balanced (0.724 / 0.718), so calibrate side-balanced. Calibrated scenario split: FLXQ (no opposite pressure) PF 1.08 (n 759) vs QUAL (opposite pressure present) PF 1.26 (n 477), about 1.5 SD apart.",
+  "PARITY CHECK (re-derived with a private copy of tools/, one month of ticks at a time): the calibrated preset gives 1,236 trades, PF 1.148 (REPORT: 1,234 / 1.15) and the shipped preset 9,241 trades, PF 0.720 (REPORT: 9,282 / 0.72); Mar 2026 is 295 trades PF 1.19, identical to REPORT; Nov 2026 is 141 / 1.71 vs REPORT 139 / 1.75 because a one-month feed restarts the FlashGold series. Month-by-month PFs match REPORT to two decimals elsewhere, so the replay can be trusted as the base for event-level extraction."
+ ],
+ "components": [
+  {
+   "name": "Speed alert (event detector)",
+   "rule": "Every tick while no alert is active: idx = first stored tick with time >= now - SpeedLookbackSeconds*1000 (the EA keeps 240 s of ticks); move = (mid_now - mid_idx)/_Point; threshold = max(MinSpeedAlertPoints, CURRENT tick spread in points x MaxTrailingMultiplier); the alert fires when |move| >= threshold, direction = sign(move). The alert reference (start tick and start mid) is tick idx, not the trigger tick. While active the alert is frozen (no re-evaluation) and expires when now - start_ms > SpeedAlertHoldSeconds*1000, so the decision window after the trigger is hold - (trigger - start) >= hold - lookback (about 10 s at 20/10); lookback >= hold kills every alert on its trigger tick (calibrated sweep: 21 trades at 20 s, 0 at 30 s). Placement or ANY veto (FlashGold, hold failure, drift, burst gate, lockout) sets speedActive=false; the next tick re-evaluates the 10-s move and re-fires at once if it still qualifies (new start tick and mid), so the gates are effectively polled every tick of a burst. The threshold counts in spreads: multiplier x median spread ~ 450 pts is the invariant (REPORT s.11, not re-run). PreSpeed radar (move >= 0.5 / 0.7 of threshold) only feeds exit defences and logs. PERCENTILE mode (1-s velocity vs a rolling percentile) is an unexplored alternative detector, not replayed.",
+   "inputs": "MaxTrailingMultiplier 7.5 shipped -> 30 calibrated; SpeedLookbackSeconds 10; MinSpeedAlertPoints 37; SpeedAlertHoldSeconds 20; InpSpeedThresholdMode FIXED (InpSpeedPercentile 99, InpSpeedWindowSamples 2000 unused); UsePreSpeedRadar true, PreSpeedEarlyRatio 0.5, PreSpeedStrongRatio 0.7 (exit/log only)",
+   "where": "SpeedAlert_FlashGold_Micro.mq5:2042-2173 (threshold 2085-2096, expiry 2075-2083, alert start 2163-2171), StoreTick 1886-1909; tools/engine.py:557-590"
+  },
+  {
+   "name": "Spread-stable flag and spread skip",
+   "rule": "spreadStable = (ask-bid)/_Point <= MaxSpreadPoints at the decision tick. It adds SpreadStableScore to BOTH sides and, when false, DecideAction returns Skip before anything else (no stop, no fade), even though the exhaustion flag also contains !spreadStable. The cap acts mostly AFTER the trigger: 98.9% of Nov-2026 calibrated trigger ticks are spread-stable, but 27,515 of 106,090 decision ticks fail the cap of 14 (spreads widen during bursts); in Mar 2026 (median spread 17) 504,186 of 555,483 fail it. Counts in spreads together with the alert multiplier.",
+   "inputs": "MaxSpreadPoints 31 shipped -> 14 calibrated; SpreadStableScore 0.5",
+   "where": "mq5:2327-2332, 2745-2746; engine.py:1050-1058, 1156-1159"
+  },
+  {
+   "name": "Speed vote",
+   "rule": "+SpeedDirectionScore to the alert's side only. Without flow this makes the alert side the only side that can reach 4.0 (the other side maxes at 0.5 + 1.5 + 1.5 = 3.5).",
+   "inputs": "SpeedDirectionScore 1.0",
+   "where": "mq5:2334-2337; engine.py:1056-1059"
+  },
+  {
+   "name": "Candle-body vote (ScoreCandle)",
+   "rule": "Forming candle of the CHART timeframe (PERIOD_CURRENT, CandleIndexToCheck=0; the author's chart and the replay are M1): bodySigned = (mid_now - candle_open)/_Point, where open/high/low are BID based but the close is the MID, so every body carries +spread/2 in favour of BUY. If |body| >= MinCandleBodyPoints the sign votes +CandleBodyScore for that side. Upper/lower wick (high - max(open, mid); min(open, mid) - low) are computed for the exhaustion flag. First-tick check, Nov 2026 shipped feed: body votes with the alert on 77.6% of up alerts vs 71.2% of down alerts (mid close) and 76.2% vs 73.2% (bid close); against the alert 14.4% overall; Mar 2026 calibrated 86.1/89.1 (mid) vs 85.9/89.3 (bid).",
+   "inputs": "MinCandleBodyPoints 21; CandleBodyScore 1.5; CandleIndexToCheck 0 (non-zero not replayed); chart period is a hidden input (M1 assumed)",
+   "where": "mq5:2400-2427; engine.py:1060-1094"
+  },
+  {
+   "name": "Micro-break vote",
+   "rule": "hi/lo of the stored MID ticks from the first tick >= now - MicroBreakLookbackSeconds up to the PREVIOUS tick (current tick excluded); mid > hi + MicroBreakBufferPoints*_Point votes BUY, mid < lo - buffer votes SELL, each +MicroBreakScore. With lookback = SpeedLookbackSeconds the break can only point with the alert at the trigger tick; after a reversal inside the alert hold it can point the other way. First-tick check: micro vote with the alert on 45.3% (Nov 2026 shipped), 56.3% (Nov calibrated) and 50.3% (Mar calibrated) of alert episodes; against the alert 0% in all three.",
+   "inputs": "MicroBreakLookbackSeconds 10; MicroBreakBufferPoints 3; MicroBreakScore 1.5",
+   "where": "mq5:2430-2460; engine.py:1095-1113"
+  },
+  {
+   "name": "Order-flow votes (live only)",
+   "rule": "Needs terminal global variables <FlowGVPrefix>OK >= 0.5 and HEARTBEAT with GetTickCount64() - HEARTBEAT <= MaxFlowAgeMs; then FORCE_IMB, NEAR_IMB and BOOK_IMB each cast one vote of FlowComponentScore for BUY if value >= +MinFlowImbalance or SELL if <= -MinFlowImbalance; flowDir = +1/-1 when >= 2 votes agree (BUY checked first), else 0. Votes add to buyScore/sellScore: they can complete a winner without body/micro (speed + 0.5 + 3 votes = 4.5), create an against-alert winner (body+micro+votes against), or veto one through the edge rule (3 opposing votes: 4.5 vs 3.5 < 1.5 lead); 2 opposing votes keep the winner but label it :FD. flowDir also drives MarketEntryAllowedByFlow, the scenario labels (BFNF/BFNO/BFA and the flow term of FLXQ), the :FA/:FD comment suffix read by exit rules (FOLM flow-disagree danger loss, FlowDisagreeMakesDefenseImmediate, TryStopFlowDisagreeDangerClose) and BlockStrongFlowAgainst (off). Global variables do not exist in the Strategy Tester and the heartbeat is compared with the host GetTickCount64, so tester and replay run with neutral flow. Single injection point for a simulated feed: ScoreOrderFlow(). ReadMasterVwapTelemetry (VWAP_VALID, VWAP_PRICE, LIVE_FEEDS) is telemetry only.",
+   "inputs": "UseOrderFlow true shipped -> false calibrated; FlowGVPrefix XPW_XAU_; MaxFlowAgeMs 4000; MinFlowImbalance 5.0; FlowComponentScore 1.0; BlockStrongFlowAgainst false; FlowDisagreeMakesDefenseImmediate true; UseStopFlowDisagreeDangerClose true (StopFlowDisagreeDangerLossPoints 37, MinHoldMs 0, NeedsOppositePressure true); FOLMFlowDisagreeDangerLossPoints 37",
+   "where": "mq5:2463-2499, 2556-2570, 2345-2346, 3140-3141, 10921-10948, 11218-11260; not in engine.py (neutral flow)"
+  },
+  {
+   "name": "Winner (WinnerSide)",
+   "rule": "BUY wins if buyScore >= MinDirectionScore and buyScore - sellScore >= MinScoreEdge; SELL mirrored; else 0 = mixed. At shipped weights with no flow only speed+body+micro all agreeing wins (2 of 18 states); MinDirectionScore <= 3.0 also admits speed+body and speed+micro (calibrated n 1,234 -> 1,737, PF 1.150 -> 1.069) and a both-against body+micro state (3.5 vs 1.5); 3.5 would admit only that against-alert state and was never swept. With flow, 45 of 90 states (speed up) have a winner, 13 of them against the alert.",
+   "inputs": "MinDirectionScore 4.0; MinScoreEdge 1.5 (weights: spread 0.5, speed 1.0, body 1.5, micro 1.5, flow 1.0 per vote)",
+   "where": "mq5:2639-2646; engine.py:1128-1133; prompt_work/direction-surface/score_lattice.py"
+  },
+  {
+   "name": "Exhaustion / continuation / opposite-pressure / snapback / follow flags",
+   "rule": "oppositePressure (needs a winner) = worst adverse excursion of the mid against the winner within the last OppositePressureSeconds (5 s), measured from the first tick of that window, >= OppositePressurePoints (21). snapback = mid has returned >= RetestFailPoints (10) beyond the alert START mid against the alert direction. wick = upper wick > max(20, 1.25 x body) for an up alert (lower wick for a down alert; 20 and 1.25 hard-coded). exhaustion = wick || snapback || oppositePressure || !spreadStable. follow21 = favourable move from the alert start mid >= MarketFollow21Points within MarketFollow21Seconds of the alert start; follow37 likewise (37 pts, 30 s); mfe/mae = running extremes since the alert start; continuation = winner && spreadStable && (follow || mfe > |mae|) && !oppositePressure && (body or micro agrees). With EntryRouterMode 0 none of these changes the side or the permission: they only choose the scenario key (cap bucket and comment label) and feed exits; with mode 2 exhaustion turns the entry into a fade.",
+   "inputs": "OppositePressurePoints 21; OppositePressureSeconds 5; RetestFailPoints 10; MarketFollow21Points 21 / Seconds 10; MarketFollow37Points 37 / Seconds 30 (all unchanged by calibration)",
+   "where": "mq5:2573-2636, 2349-2362, 2649-2739; engine.py:1114-1153"
+  },
+  {
+   "name": "Router (DecideAction + body-against rule)",
+   "rule": "(1) !spreadStable -> Skip; (2) BlockStrongFlowAgainst && flow disagrees -> Skip; (3) exhaustion && EntryRouterMode >= 2 -> limit order AGAINST the burst (SELL_LIMIT after an up alert, BUY_LIMIT after a down alert), even with no winner; (4) no winner -> Skip; (5) winner == alert side && (follow21 || follow37) && mode >= 1 && MarketEntryAllowedByFlow -> market order (neutral flow: sells are downgraded to stop; otherwise WeakFlowMarketNeedsBodyAndMicro needs body and micro with the winner, own score >= 5.0 and lead >= 2.0, unreachable without flow because the no-flow maximum is 4.5); (6) else a stop order in the winner's direction. Then a stop whose winner has a candle body AGAINST it is skipped without cancelling the alert (zero cases in every no-flow run). Modes 0 and 1 are identical with neutral flow (same n and PF in both sweeps). A fade is judged by FlashGold on the limit order's own side (opposite to the alert).",
+   "inputs": "EntryRouterMode 2 shipped -> 0 (StopOnly) calibrated; DowngradeNeutralSellMarketToStop true; WeakFlowMarketNeedsBodyAndMicro true; WeakFlowMarketMinScore 5.0; WeakFlowMarketMinScoreEdge 2.0",
+   "where": "mq5:2742-2789, 1200-1216, 3231-3238; engine.py:1155-1184"
+  },
+  {
+   "name": "Scenario key and per-scenario caps",
+   "rule": "ScenarioKeyForAction labels the decision: FOLM (market), EXHL (limit), else from labels FLXQ (body with trade, spread ok, no opposite pressure, follow or mfe > |mae|), QUAL (same without the pressure condition), BNO, BODY, CONT, EXH, OTHER; BFNF/BFNO/BFA need flow; BFOL is unreachable. With ScenarioIndependentPerformance the caps are per scenario (1 position and 1 pending each); a new decision cancels its own scenario's old pending (CancelOldPendings). Exits therefore change which later alerts become orders (cap_skip 87 in Nov 2026 calibrated; ScenarioIndependentPerformance=false gives PF 1.154 vs 1.150).",
+   "inputs": "ScenarioIndependentPerformance true; MaxOpenPositionsPerScenario 1; MaxPendingOrdersPerScenario 1; MaxOpenPositions 1; MaxPendingOrders 1 (global caps only when independence is off); CancelOldPendings true; CancelOnlySameScenarioPendings true",
+   "where": "mq5:3159-3186, 8010-8040, 8127-8144, 1273-1293; engine.py:1185-1203, 1317-1349"
+  },
+  {
+   "name": "FlashGold direction gate (FlashGoldAllowsEntry)",
+   "rule": "True only if the embedded FlashGold v1.2 gate of the newest M1 chart bar is open and its zone equals the ORDER side (+1 BUY area, -1 SELL area). Called at the decision tick (OnTick 1220), again when the entry hold releases (1809) and twice in PlaceAction (2902 and FlashGoldApproveAction 2985-3040); a failed FlashGold init blocks every entry; any refusal ends the alert (it can re-fire next tick). Details in flashgold_summary.",
+   "inputs": "UseFlashGoldDirectionFilter true; all FG_* inputs (see flashgold_inputs); calibrated preset leaves every FG_* input at its shipped value",
+   "where": "SpeedAlertFlashGoldPermission.mqh:554-583 (446-552, 314-371); FlashGold/DirectionFilterCore.mqh:147-377; FlashGold/DirectionFilterClock.mqh:113-142; FlashGold/QuoteBucketSeries.mqh:65-102; engine.py:1211-1252; flashgold.py:166-362"
+  },
+  {
+   "name": "Entry hold",
+   "rule": "With InpUseEntryHold the first tick that passes score and FlashGold arms a hold (signal time, signal mid, action, direction state frozen) instead of ordering. At the first tick >= InpEntryHoldMs later: FlashGold is re-checked (refusal cancels the alert, no same-minute block); then side x (mid_now - signal mid)/_Point must be >= InpEntryHoldMinFavPoints (the move at that single tick, not a maximum). A failure cancels the alert and sets entryHoldFailedBar = current M1 bar, which blocks any new hold in that minute (BLOCKED_SAME_M1: 40,169 blocks vs 12,127 arms in shipped Nov 2026; 893 vs 1,150 calibrated). A pass continues to drift, burst gate, caps and PlaceAction. Alert expiry or a lockout cancels an armed hold. Hold OFF in the sweeps: shipped n 9,282 -> 45,706 (PF 0.719 -> 0.725); calibrated n 1,234 -> 2,960 (PF 1.150 -> 1.005).",
+   "inputs": "InpUseEntryHold false in source -> true shipped and calibrated; InpEntryHoldMs 1000 in source -> 1100; InpEntryHoldMinFavPoints 5",
+   "where": "mq5:1226-1245, 1770-1883, 1417-1421, 1181-1195; engine.py:1037-1047, 1254-1278"
+  },
+  {
+   "name": "Prior-60-minute drift filter",
+   "rule": "Mid now minus the mid of the tick nearest to (now - 60 min) among ticks within +/-5 s of that time (CopyTicksRange); BUY needs drift > 0, SELL needs drift < 0; no tick in the window = fail. 60 min and 5 s are hard-coded constants, not inputs. Evaluated after the hold passes (hold path) or at the decision tick (no-hold path); a failure cancels the alert. In the replay the first hour of each weekly chunk always fails it (no history); whether the tester has pre-start ticks is unverified.",
+   "inputs": "InpUsePrior60Filter false in source -> true shipped and calibrated",
+   "where": "mq5:1456-1526, 1247-1262, 1836-1845, 1555-1595; engine.py:1280-1302"
+  },
+  {
+   "name": "One-second burst gate",
+   "rule": "InpUseHighBurstGate: |signed velocity over the last ~1 s in points per second| (from the first tick >= now - 1000 ms; needs >= 1 s of continuous quotes since the last gap > 1 s) must be >= InpBurstThresholdPts and have the order side's sign. PERCENTILE threshold mode not replayed. Off in every preset; ON gives calibrated PF 1.438 but only 139 trades (4 in Oct-Nov 2026), shipped PF 0.613 on 497.",
+   "inputs": "InpUseHighBurstGate false; InpBurstThresholdMode FIXED; InpBurstThresholdPts 145 (source 172); InpBurstPercentile 99; InpBurstWindowSamples 2000",
+   "where": "mq5:1963-1982, 1555-1595, 2042-2073; engine.py:1303-1316"
+  },
+  {
+   "name": "Continuation (tape-quality) filter",
+   "rule": "Side-agnostic regime gate inside CContinuationTrade::OrderSend (every entry order of any type) and re-checked at most 4 times a second for resting pendings (deletes them on failure, only when TradingEnabled). Uses the 60 s / 300 s of ticks before the current second (history must be complete): tick rate >= InpCPMinTickRate60 (3.8 /s); median gap between consecutive ticks <= InpCPMaxMedianGapMs (215); range60 >= InpCPMinRange60 and range300 >= InpCPMinRange300 (0 = off); cost coverage: range60 >= ceil(max(InpCPGrossFloor 16, max(current spread, 60-s median spread) + InpCPSlipReserve 4 + InpCPCommission 0)); the 1,500 ms silence rule never binds in the tester. Feed-density dependent (replay feed: 5.3 ticks/s, median gap 101 ms). Neutral at the calibrated base (OFF gives PF 1.177 vs 1.150).",
+   "inputs": "InpCPMode CP_FILTER; InpCPPriceUnit 0.01; InpCPMinTickRate60 3.8; InpCPMaxMedianGapMs 215; InpCPMinRange60 0; InpCPMinRange300 0; InpCPRequireCostCoverage true; InpCPGrossFloor 16; InpCPSlipReserve 4; InpCPCommission 0; InpCPMaxSilenceMs 1500; InpCPCancelBadPendings true",
+   "where": "SpeedAlertContinuationFilter.mqh:87-191, 389-455; engine.py:171-215, 521-555, 1350-1378"
+  },
+  {
+   "name": "Defensive-close lockout",
+   "rule": "Every successful EA-side close whose log event is not SPEED_PROFIT_EXIT counts one defensive close (broker SL/TP hits do not); DefensiveLockoutCloseCount (3) in a row arm a DefensiveLockoutSeconds (90) entry blackout (cancelling pendings if configured); a SPEED_PROFIT_EXIT resets the streak. During the blackout every tick sets speedActive=false (also cancelling an armed hold). With UseSpeedProfitExit=false (calibrated) nothing resets the streak except arming. Replay: 6 arms / 88 skipped decision ticks (Nov 2026 calibrated), 4 / 112 (Mar 2026); PF effect <= 0.013 in the sweeps. This is an exit input steering the entry schedule.",
+   "inputs": "UseDefensiveCloseLockout true; DefensiveLockoutCloseCount 3; DefensiveLockoutSeconds 90; DefensiveLockoutCancelPendings true",
+   "where": "mq5:8323-8417, 1188, 13425-13451; engine.py:950-964, 1027-1031"
+  },
+  {
+   "name": "Order lifetime and entry distance (fill confirmation, execution-coupled)",
+   "rule": "The decision becomes a stop order StopEntryDistancePoints beyond the current ask (BUY) / bid (SELL) that lives PendingExpirySeconds (whole server seconds: placed late in a second it lives ~4 s at 5) unless cancelled by a newer same-scenario decision, a tape-filter recheck or a lockout. A fill therefore needs price to keep going by distance + spread inside the expiry window, which is an extra direction confirmation: calibrated Nov 2026 placed 312 / filled 141 / expired 168 / refused 3 (price already past the level after the 150 ms delay); Mar 2026 543 / 295 / 213 / 35.",
+   "inputs": "StopEntryDistancePoints 35 -> 50 calibrated; PendingExpirySeconds 5 (source 45); LimitRetestDistancePoints 35 (inert at router 0)",
+   "where": "mq5:2999-3020, 7698-7773, 8165-8183; engine.py:592-599, 1409-1434"
+  },
+  {
+   "name": "EXIT_GATE_68 and post-entry validation (post-fill direction re-check; out of scope)",
+   "rule": "No EA-side exit rule acts until the position has first been > 6.8 pips (68 pts, TrailingPipSizePrice 0.10 for gold) in profit; the post-entry validation (retest failure, no-follow-through, pre-speed opposite defence, FOLM/FLXQ danger closes), the speed profit exit and the post-fill 1000 ms hold all sit behind it. Before release only the broker SL/TP/trailing can end a trade. Replay what-if without the gate: shipped PF 0.515, calibrated 1.018 (X_ExitGatePips 0).",
+   "inputs": "constant 6.8 pips (not an input; replay switch X_ExitGatePips); UsePostEntryValidation true; InpUse1000msHold true; InpHoldMinFavPts 5",
+   "where": "mq5:12193-12202, 10113-10160, 9463-9529, 11643-11700, 12642-12680; engine.py:669-673, 755-921"
+  },
+  {
+   "name": "Run permissions",
+   "rule": "TradingEnabled (shipped false) makes PlaceAction return a SHADOW decision (mq5:2943) and also switches off the pending re-checks; the v1.501 OnInit refuses non-tester charts; a failed FlashGoldFilterInit only blocks new entries (position management continues); CP_Init failure, ValidateTrailLayerInputs (internalMaxTrailing must equal internalMinTrailing x internalMultiplier) and ValidateBurstSettleInputs refuse to start the EA. Lot factors never suppress a trade (NormalizeLots clamps to the 0.01 minimum).",
+   "inputs": "TradingEnabled false (must be true in the tester); FixedLot 0.01",
+   "where": "mq5:1103-1147, 2943-2966, 7797-7805, 7817-7851, 1165-1166"
+  }
+ ],
+ "flashgold_summary": "PROVENANCE. Literal MQL5 port of the Pine v6 'FlashGold Direction Filter v1.2' (core reference SHA256 387f49dc...), files FlashGold/DirectionFilterCore.mqh and DirectionFilterClock.mqh, wired in by SpeedAlertFlashGoldPermission.mqh. The EA asks it one question per tick: FlashGoldAllowsEntry(side, tick). It is a stateful per-bar SIGNAL generator plus a price-AREA gate.\n\n1) SERIES (computed per filter bar; shipped native mode = M5 bars built from BID, FG_InpTf=5).\n- ATR(14): Wilder RMA of true range seeded with the SMA of the first 14 true ranges (length hard-coded).\n- TDI direction of a timeframe = sign of the slope of fast = SMA(RSI(close, 14 Wilder), 2): +1 rising, -1 falling, 0 equal (1e-10 tolerance), 99 = not enough history.\n- Parent direction = TDI direction of FG_InpParentTf (M5) at the filter bar's close. Children Z1..Z6 (active: Z1 M1, Z2 M5, Z3 M15; Z4 H8, Z5 M1, Z6 M2 off) are the TDI directions of their timeframes (children longer than the filter TF use the previous COMPLETED bar when FG_InpHtfClosed; same or shorter TFs use the bar that closed at the filter bar's end). Because parent TF = Z2 TF = filter TF, Z2 always equals the parent, so FG_InpMinAligned 0 and 1 are identical in the sweeps and 2 really means 'M1 or M15 also agrees'.\n- zoneBuy = parent == +1 and aligned >= min(MinAligned, active children); zoneSell = parent == -1 and the same; parent 0 only passes with FG_InpFlatParent; FG_InpUseZones=false makes zones always ready.\n- burst = close(i) - close(i-1) in points (bid/ask are built as close -/+ FG_InpSpreadPts*tick/2, so the spread cancels); threshold = FG_InpBurstAtr (0.5) x ATR in points (FG_InpDistUnit=Points uses FG_InpBurstPts). BUY signal on bar i = zoneBuy and burst >= +threshold (and, if FG_InpUseDrift, close drift over FG_InpDriftBars > 0); SELL mirrored. FG_InpAnyCombo=true replaces the burst requirement by 'burst or parent already agrees' (FG_InpUseBurst then matters). FG_InpHoldBars > 0 adds a confirmation hold; 0 fires at once.\n- On a signal: armedAt = bar END time, armedBar = i, armedDir = +/-1, armedAtr = ATR(i), armedPrice = signal entry price in level mode 0 (BUY: ask + FG_InpEntryDistAtr (0.25) x ATR; SELL: bid - 0.25 x ATR; ask/bid = close +/- FG_InpSpreadPts (25) / 2 = +/-12.5 pts); level mode 1 uses the bar close. The armed state is carried forward bar by bar until the next signal (FG_InpLast=0, shipped); other modes close the window after FG_InpMinutes, FG_InpBars filter bars, or an absolute FG_InpSeconds / FG_InpMilliseconds deadline after armedAt.\n- Replay statistics (re-derived, Dukascopy-mid feed, bid bars): signals on 32.8% of M5 bars in Nov 2026 (905 of 2,760; about 75 a day; ATR(14) median 426 pts) and 30.9% in Mar 2026 (1,885 of 6,096; ATR median 825 pts); median 2 bars between signals.\n\n2) GATE (per tick). band = FG_InpBandAtr (0.25) x armedAtr; upper = ceil((armedPrice + band)/tick) x tick, lower = floor((armedPrice - band)/tick) x tick (tick 0.01). BUY area <=> price > upper + tick/2; SELL area <=> price < lower - tick/2; in between = no-trade band (width 2 x band, median 218 pts in Nov 2026; with band 0 the test is price vs armedPrice and the signal bar is treated specially). Price = current BID in Tick check mode (FG_InpCheck=0). buyOK = open && FG_InpAllowBuy && inUp && (FG_InpAgainst || armedDir > 0); sellOK = open && FG_InpAllowSell && inDn && (FG_InpAgainst || armedDir < 0); zone = +1 / -1 / 0 (2 when the filter is disabled); 'open' = armed (mode 0) or inside the minutes/candles window. Per chart bar the core also returns armed, onSigBar, sigOk, newSignal, ended, expired, displayOpen, band, upper, lower (the EA reads only open and zone of the newest chart bar). In Tick mode the gate reads the armed state after the last COMPLETED filter bar (FgfChartPick picks the previous filter bar; the bar forming now is never used), so permission changes only when price crosses a band edge or a filter bar closes with a new signal. With FG_InpAgainst=true a BUY signal's level also defines a SELL area below it and vice versa; with false only continuation of the last signal is tradable (shipped sweep: n 4,287 vs 9,282, PF 0.752 vs 0.719; calibrated n 761, PF 1.134 vs 1.150).\n- Replay statistics: gate in BUY area / SELL area / no-trade for 30.7 / 46.9 / 22.4% of seconds in Nov 2026 (24.7 / 48.1 / 27.1% in Mar 2026), about 1,700 area changes a day, median dwell 5 s. At the FIRST tick of an alert episode the zone agrees with the alert direction in 45.5% (shipped, Nov 2026), 55.3% (calibrated, Nov) and 52.3% (calibrated, Mar), is the no-trade band in 25.5 / 20.0 / 25.0% and points against the alert in 29.0 / 24.7 / 22.8%. Among the entries it passes at that tick, 77% (shipped Nov, 3,630 of 4,707) and 66% (calibrated Nov, 362 of 545) are on the OPPOSITE side to the last FlashGold signal (price has come back through its level); the rest continue it. Blocked winners are mostly alerts in the SAME direction as the last signal whose price is still inside the band (75% in shipped Nov). Trades by state: shipped stop entries continuing the last signal PF 0.817 (n 3,003) vs reversal 0.750 (n 3,409); fades 0.589 either way (n 2,829); calibrated continuation 1.125 (n 761) vs reversal 1.187 (n 475), buys 1.49 vs sells 0.97; PF by distance beyond the level in ATR quartiles 1.12 / 1.08 / 1.17 / 1.22 (calibrated), 0.76 / 0.74 / 0.82 / 0.80 (shipped stops): all within noise.\n\n3) HOW THE EA USES IT. FlashGoldAllowsEntry(side) = gate[newest M1 chart bar].open && zone == side, where side is the side of the ORDER (a fade's own side). It runs on the M1 chart (FGV12_Update iterates chart bars), at the decision tick, at hold release and twice in PlaceAction. A refusal ends the alert (it re-fires next tick if the burst persists). The stale-level effect matters: with sparse signals the armed level can be old, and the gate then behaves like 'price above / below some earlier price', a slow side bias.\n\n4) MICRO MODE (FG_Resolution=1). Filter bars are occupied buckets of the callback-observed BID (FG_IntervalMs 1000 shipped, 250 in Micro250ms); the first bucket of each epoch is dropped; no empty bars; a bar closes when a later bucket arrives; warm-up FG_MicroWarmupBars=100 occupied buckets; at most FG_MicroMaxBars=4096 per epoch, then the stream blocks until the EA restarts (68 min at 1 s, 17 min at 250 ms); a quote gap > FG_MicroMaxGapMs (60 s) starts a new epoch. Parent and zones stay native: each micro bucket reads the last native bar CLOSED at its open (no request-time look). ATR(14), burst, drift, hold and the candle window all count micro bars, so ATR is a ~14-second range and signals / area flips are far more frequent. FG_InpLast modes 3 / 4 (seconds / ms) apply an absolute deadline after armedAt (5,195 trades at 5 s, 343 at 500 ms in the sweep, PF 0.708 / 0.823). Replay with restart at capacity (X_MicroRestart=1): PF 0.713 shipped (9,111 trades); as shipped 0 trades (X_MicroRestart=0). FG_IntervalMs 100-60,000 ms gave PF 0.689-0.746 (best 15 s).\n\n5) CALIBRATION STRUCTURE (see fg_key / FilterSeries in tools/flashgold.py). Inputs that change the SERIES (armedAt, armedBar, armedPrice, armedDir, armedAtr per bar) and force a rebuild: UseFlashGoldDirectionFilter, FG_Resolution, FG_IntervalMs, FG_MicroMaxBars, FG_MicroMaxGapMs, FG_InpTf, FG_InpLvMode, FG_InpSpreadPts, FG_InpEntryDistPts / FG_InpEntryDistAtr, FG_InpHoldBars / HoldFavPts / HoldFavAtr, FG_InpOnePerBar, FG_InpDistUnit, FG_InpBurstAtr / BurstPts, FG_InpUseBurst, FG_InpAnyCombo, FG_InpDriftBars, FG_InpUseDrift, FG_InpUseZones, FG_InpParentTf, FG_InpRsiLen, FG_InpFastLen, FG_InpMinAligned, FG_InpFlatParent, FG_InpIgnoreNa, FG_InpHtfClosed, FG_InpUseZ1-6, FG_InpZTf1-6, X_MicroRestart. GATE-ONLY inputs, re-evaluable per tick from stored (armedPrice, armedAtr, armedDir, armedAt, bar index, price) without rebuilding anything: FG_InpBandAtr, FG_InpAgainst, FG_InpAllowBuy, FG_InpAllowSell, FG_InpLast, FG_InpMinutes, FG_InpBars, FG_InpSeconds, FG_InpMilliseconds, FG_MicroWarmupBars. Not replayed: FG_InpCheck (Tick only), the intrabar 'observed live' parent/zone commits (the EA's native signal history depends on when the gate was called; the replay uses closed-bar values), the quote-session calendar for bar ends. For a labelled-dataset calibration the needed per-decision features are: order side, alert direction, armedDir, (price - armedPrice)/armedAtr, armedAtr, armedAt age, and the parent / child TDI directions at the signal bar; the gate-only inputs are then free to sweep, the series inputs need a signal-time recomputation (cheap in native M5: ~2,800 bars a month; heavy in micro mode: ~1 million buckets a month).",
+ "direction_inputs": [
+  {
+   "name": "LEGEND (read first)",
+   "shipped_value": "-",
+   "calibrated_value": "-",
+   "explored_range": "N = results/oat_native_all.csv (one input at a time around the shipped NativeReference preset, 9 months, base PF 0.719 on 9,282 trades); C = results/oat_calibrated.csv (around the calibrated preset, base PF 1.150 on 1,234 trades); J = results/grid_joint.csv (384 sets: multiplier 25-40 x spread cap 12-20 x trailing x hold 1100/2000 ms x stop 90/130); G = results/grid_flashgold.csv (96 sets: band 0.25-1.5 x entry distance 0.25-1.0 x multiplier 28-35 x cap 12/14); M = results/oat_micro1s_fg.csv (around the shipped Micro1s preset, base 0.713 on 9,111). Calibrated differs from shipped only in 13 inputs: EntryRouterMode, MaxTrailingMultiplier, MaxSpreadPoints, UseOrderFlow, StopEntryDistancePoints, StopTPPoints, MarketTPPoints, LimitTPPoints, UseSpeedProfitExit, UseTrailing, InpWaitForBurstSettle, InpUseTrailLayer, InpReferenceSpreadPts.",
+   "pf_span_or_effect": "Class tags used below: [DETECT] alert event detector, [VOTE] score weights/thresholds, [ROUTE] side to order type, [FG] FlashGold, [HOLD] time/price confirmation, [DRIFT] 60-min drift, [REGIME] tape/spread regime gate, [PATH] state-dependent caps/lockout, [FLOW] needs the feed, [COUPLED] execution input acting as direction confirmation. Single-run PF noise is about +/-0.09 at 1,200 trades."
+  },
+  {
+   "name": "MaxTrailingMultiplier",
+   "shipped_value": "7.5",
+   "calibrated_value": "30",
+   "explored_range": "N 3,4,5,6,7.5,9,11,13,16,20,25; C 3-60 (16 values); J 25,28,30,32,35,40",
+   "pf_span_or_effect": "[DETECT] biggest single lever; counts in spreads (multiplier x median spread ~ 450 pts). N PF 0.699-0.778 (n 10,553 -> 2,396, best 25). C: 0.78-0.85 for 3-13, 0.894 at 16, 0.930 at 20, 1.053 at 25, 1.150 at 30 (n 1,234), 1.148 at 35, 1.042 at 40, 0.944 at 50, 0.974 at 60 (n 381). J averages 1.035 / 1.068 / 1.107 / 1.084 / 1.068 / 1.015 at 25 / 28 / 30 / 32 / 35 / 40 (97% of sets >= 1 at 30, 53% at 40)."
+  },
+  {
+   "name": "SpeedLookbackSeconds",
+   "shipped_value": "10",
+   "calibrated_value": "10",
+   "explored_range": "N and C: 2,3,5,7,10,15,20,30",
+   "pf_span_or_effect": "[DETECT] N PF 0.711-0.737 for n >= 2,000 (20 s: n 399, 0.781; 30 s: 0 trades). C: 2 s 1.004 (n 436), 3 s 1.072, 5 s 0.939, 7 s 0.936, 10 s 1.150, 15 s 0.935 (n 1,418): jagged, 10 s is a local peak (selection effect). 20 s / 30 s give 21 / 0 trades because lookback >= SpeedAlertHoldSeconds kills the alert on its trigger tick."
+  },
+  {
+   "name": "MinSpeedAlertPoints",
+   "shipped_value": "37",
+   "calibrated_value": "37",
+   "explored_range": "N and C: 20,37,60,80,100,120,150,200,250,300",
+   "pf_span_or_effect": "[DETECT] floor only binds when spread x multiplier is below it. N PF 0.710-0.720 (n 3,173-9,284). C: 20 and 37 give identical sets (n 1,234); 1.116 at 300 (n 853) to 1.179 at 150 (n 1,196). Near-dead below ~120 at multiplier 30."
+  },
+  {
+   "name": "SpeedAlertHoldSeconds",
+   "shipped_value": "20",
+   "calibrated_value": "20",
+   "explored_range": "N and C: 11,13,15,20,30,45,60",
+   "pf_span_or_effect": "[DETECT] N PF 0.707-0.764 (n 3,286-9,503; best 11). C: 11 s 0.736 (n 243, window ~1 s), 13 s 1.153, 15 s 1.150, 20 s 1.150, 30 s 1.105, 45 s 1.034, 60 s 1.038 (n 1,415): windows longer than ~20 s hurt. Must exceed SpeedLookbackSeconds."
+  },
+  {
+   "name": "InpSpeedThresholdMode (+ InpSpeedPercentile, InpSpeedWindowSamples)",
+   "shipped_value": "FIXED (0), 99, 2000",
+   "calibrated_value": "unchanged",
+   "explored_range": "never",
+   "pf_span_or_effect": "[DETECT] PERCENTILE alert (|1-s velocity| vs rolling percentile of prior 1-s observations) is not replayed; an unexplored alternative to multiplier x spread."
+  },
+  {
+   "name": "InpUseHighBurstGate / InpBurstThresholdMode / InpBurstThresholdPts",
+   "shipped_value": "false / FIXED / 145 (source 172)",
+   "calibrated_value": "unchanged",
+   "explored_range": "N and C: gate 0/1; threshold 40,80,145,172,250 varied with the gate OFF",
+   "pf_span_or_effect": "[HOLD] threshold: DEAD (identical n and PF) because it was varied with the gate off. Gate ON at 145 pts/s: N PF 0.613 (n 497) vs 0.719; C PF 1.438 on only 139 trades (4 in Oct-Nov 2026) vs 1.150; the threshold itself was never swept with the gate on."
+  },
+  {
+   "name": "MinDirectionScore",
+   "shipped_value": "4.0",
+   "calibrated_value": "4.0",
+   "explored_range": "N and C: 2.0,2.5,3.0,4.0,4.5",
+   "pf_span_or_effect": "[VOTE] N PF 0.719-0.744 (n 9,282-9,341). C: 2.0, 2.5 and 3.0 are identical (n 1,737, PF 1.069, i.e. 2-of-3 agreement admitted) vs 4.0 and 4.5 identical (n 1,234, PF 1.150). 3.5 (admits only the both-against body+micro state) was never tested."
+  },
+  {
+   "name": "MinScoreEdge",
+   "shipped_value": "1.5",
+   "calibrated_value": "1.5",
+   "explored_range": "N and C: 0.5,1,1.5,2.5,4.0",
+   "pf_span_or_effect": "[VOTE] DEAD without flow: identical n and PF for every value (any no-flow winner has lead >= 4.0 at MinDirectionScore 4.0). Live only with flow votes."
+  },
+  {
+   "name": "SpeedDirectionScore / CandleBodyScore / MicroBreakScore / SpreadStableScore",
+   "shipped_value": "1.0 / 1.5 / 1.5 / 0.5",
+   "calibrated_value": "unchanged",
+   "explored_range": "never swept",
+   "pf_span_or_effect": "[VOTE] weights fix the score lattice (2 of 18 winning states without flow); a re-weighting study is open."
+  },
+  {
+   "name": "MinCandleBodyPoints",
+   "shipped_value": "21",
+   "calibrated_value": "21",
+   "explored_range": "N and C: 0,10,21,40,60,80,100,150",
+   "pf_span_or_effect": "[VOTE] near-dead. N PF 0.704-0.720 (n 7,879-9,348); C 1.121 (150, n 1,139) to 1.158 (100, n 1,180)."
+  },
+  {
+   "name": "MicroBreakLookbackSeconds",
+   "shipped_value": "10",
+   "calibrated_value": "10",
+   "explored_range": "N and C: 2,5,10,20,30,60",
+   "pf_span_or_effect": "[VOTE] N PF 0.719-0.728 (n 8,443-9,494). C monotone: 2 s 1.061 (n 1,388), 5 s 1.133, 10 s 1.150, 20 s 1.165, 30 s 1.168, 60 s 1.180 (n 1,134); not tried beyond 60 s."
+  },
+  {
+   "name": "MicroBreakBufferPoints",
+   "shipped_value": "3",
+   "calibrated_value": "3",
+   "explored_range": "N and C: 0,3,6,10,20",
+   "pf_span_or_effect": "[VOTE] N PF 0.675-0.719 (n 7,821-9,367, 3 best). C 1.096 (6) to 1.154 (0); n 857 at 20."
+  },
+  {
+   "name": "MaxSpreadPoints",
+   "shipped_value": "31",
+   "calibrated_value": "14",
+   "explored_range": "N 12,14,16,20,31,60; C 10,11,12,13,14,16,20,31,60; J 12,14,16,20; G 12,14",
+   "pf_span_or_effect": "[REGIME/VOTE] counts in spreads (calibrated for a 15-pt median). N 14 gives 0.780 (n 5,680), 12 0.742, 16 0.753, 31 0.719, 60 0.700. C 10 1.089 (n 808), 11 1.056, 12 1.175 (n 1,064), 13 1.157, 14 1.150, 16 1.110, 20 1.126, 31 1.041 (n 1,801), 60 1.030. J averages 1.093 / 1.077 / 1.049 / 1.032 at 12 / 14 / 16 / 20; G 1.201 at 12 vs 1.141 at 14."
+  },
+  {
+   "name": "UseOrderFlow (+ FlowComponentScore, MinFlowImbalance, MaxFlowAgeMs, BlockStrongFlowAgainst, FlowGVPrefix)",
+   "shipped_value": "true / 1.0 / 5.0 / 4000 / false / XPW_XAU_",
+   "calibrated_value": "UseOrderFlow false; others unchanged",
+   "explored_range": "never (no effect in replay or tester)",
+   "pf_span_or_effect": "[FLOW] unmeasurable offline; the calibrated preset switches it off so that a live run equals the tester run it was calibrated on. Real-trade labels: FA 62.3% / FD 15.8% / none 21.9%."
+  },
+  {
+   "name": "EntryRouterMode",
+   "shipped_value": "2 (StopMarketLimit)",
+   "calibrated_value": "0 (StopOnly)",
+   "explored_range": "N and C: 0,1,2",
+   "pf_span_or_effect": "[ROUTE] 0 and 1 are identical with neutral flow (market route unreachable): N 0.777 (n 8,948) vs 2: 0.719 (n 9,282); C 1.150 (n 1,234) vs 2: 0.965 (n 993). The limit fade loses from the first second (REPORT s.6; shipped replay fades PF 0.589 on 2,829 trades vs stops 0.781 on 6,412)."
+  },
+  {
+   "name": "DowngradeNeutralSellMarketToStop / WeakFlowMarketNeedsBodyAndMicro / WeakFlowMarketMinScore / WeakFlowMarketMinScoreEdge",
+   "shipped_value": "true / true / 5.0 / 2.0",
+   "calibrated_value": "unchanged",
+   "explored_range": "N and C: Downgrade 0/1; MinScore 4.5, 5.0",
+   "pf_span_or_effect": "[ROUTE] DEAD with neutral flow, except N MinScore 4.5 which opens the neutral-flow BUY market route (n 13,566, PF 0.691). C: all dead (router 0)."
+  },
+  {
+   "name": "MarketFollow21Points / MarketFollow21Seconds / MarketFollow37Points / MarketFollow37Seconds",
+   "shipped_value": "21 / 10 / 37 / 30",
+   "calibrated_value": "unchanged",
+   "explored_range": "21 pts: 10,21,40,70,110; 37 pts: 20,37,60,100 (seconds never)",
+   "pf_span_or_effect": "[ROUTE/PATH] near-dead: N PF 0.718-0.720; C 21 pts 1.136-1.150 (n 1,231-1,234), 37 pts DEAD (1.150). Only affect scenario labels and the market route."
+  },
+  {
+   "name": "OppositePressurePoints / OppositePressureSeconds / RetestFailPoints",
+   "shipped_value": "21 / 5 / 10",
+   "calibrated_value": "unchanged",
+   "explored_range": "pressure pts 10,21,35,50; retest pts 5,10,20,35; seconds never",
+   "pf_span_or_effect": "[PATH, also exit inputs] N PF 0.716-0.722 / 0.718-0.723; C 1.134-1.151 / 1.136-1.153. Set the scenario key (FLXQ vs QUAL) and exhaustion; calibrated trades with pressure present PF 1.26 (n 477) vs without 1.08 (n 759)."
+  },
+  {
+   "name": "StopEntryDistancePoints",
+   "shipped_value": "35",
+   "calibrated_value": "50",
+   "explored_range": "N 5,10,20,35,50,70,100; C 5,10,20,35,50,60,70,100",
+   "pf_span_or_effect": "[COUPLED] N PF 0.679 (100, n 5,278) to 0.731 (20, n 10,817). C non-monotone: 5 1.093, 10 1.064, 20 1.109, 35 1.069, 50 1.150, 60 1.098, 70 1.058, 100 1.084 (n 767-1,502): inside noise."
+  },
+  {
+   "name": "PendingExpirySeconds",
+   "shipped_value": "5 (source 45)",
+   "calibrated_value": "5",
+   "explored_range": "N and C: 2,3,5,8,12,20,45,120",
+   "pf_span_or_effect": "[COUPLED] N PF 0.706 (2 s, n 5,222) to 0.733 (120 s, n 16,774). C 2 s 1.095 (n 754), 3 s 1.123, 5 s 1.150, 8 s 1.159, 12 s 1.159 (n 1,579), 20 s 1.141, 45 s 1.088, 120 s 1.095 (n 2,064): flat optimum 5-12 s."
+  },
+  {
+   "name": "InpUseEntryHold",
+   "shipped_value": "true (source false)",
+   "calibrated_value": "true",
+   "explored_range": "N and C: 0/1",
+   "pf_span_or_effect": "[HOLD] N OFF: n 45,706, PF 0.725 vs 0.719 (ON). C OFF: n 2,960, PF 1.005 vs 1.150: the hold is worth ~0.15 PF at the calibrated base."
+  },
+  {
+   "name": "InpEntryHoldMs",
+   "shipped_value": "1100 (source 1000)",
+   "calibrated_value": "1100",
+   "explored_range": "N and C: 250,500,800,1100,1500,2000,3000; J 1100 vs 2000",
+   "pf_span_or_effect": "[HOLD] N PF 0.710 (500) to 0.734 (3000). C 250 ms 1.000, 500 1.034, 800 1.162, 1100 1.150, 1500 1.179, 2000 1.135, 3000 1.124 (n 1,175-1,265). J averages 1.094 at 1100 vs 1.031 at 2000 (93% vs 72% of sets >= 1)."
+  },
+  {
+   "name": "InpEntryHoldMinFavPoints",
+   "shipped_value": "5",
+   "calibrated_value": "5",
+   "explored_range": "N -20,0,5,10,20,35; C -20,0,5,10,20,35,50",
+   "pf_span_or_effect": "[HOLD] N PF 0.736 (-20, n 19,216) to 0.657 (35, n 3,760). C -20 1.079 (n 1,695), 0 1.181 (n 1,330), 5 1.150, 10 1.184 (n 1,151), 20 1.132, 35 1.075 (n 760), 50 1.071 (n 614): plateau 0-10."
+  },
+  {
+   "name": "InpUsePrior60Filter",
+   "shipped_value": "true (source false)",
+   "calibrated_value": "true",
+   "explored_range": "N and C: 0/1 (the 60-min horizon and +/-5 s sample window are hard-coded, never varied)",
+   "pf_span_or_effect": "[DRIFT] N OFF n 17,349 PF 0.714 vs 0.719. C OFF n 1,843 PF 0.998 vs 1.150: worth ~0.15 PF at the calibrated base."
+  },
+  {
+   "name": "InpUse1000msHold / InpHoldMinFavPts",
+   "shipped_value": "true / 5",
+   "calibrated_value": "unchanged",
+   "explored_range": "N and C: 0/1",
+   "pf_span_or_effect": "[PATH] DEAD (identical n; PF 0.719 / 1.149-1.150): the post-fill check only runs after the +68-pt release."
+  },
+  {
+   "name": "ScenarioIndependentPerformance / MaxOpenPositionsPerScenario / MaxPendingOrdersPerScenario / global caps",
+   "shipped_value": "true / 1 / 1 / 1 / 1",
+   "calibrated_value": "unchanged",
+   "explored_range": "independence 0/1 only",
+   "pf_span_or_effect": "[PATH] N PF 0.715-0.719 (n 9,141-9,282); C 1.150-1.154 (n 1,153-1,234)."
+  },
+  {
+   "name": "UseDefensiveCloseLockout / DefensiveLockoutCloseCount / DefensiveLockoutSeconds",
+   "shipped_value": "true / 3 / 90",
+   "calibrated_value": "unchanged",
+   "explored_range": "0/1; 1,2,3,5; 30,90,300,900",
+   "pf_span_or_effect": "[PATH] N PF 0.717-0.719; C 1.149-1.163 (900 s best, n 1,220). Near-dead."
+  },
+  {
+   "name": "InpCPMode",
+   "shipped_value": "2 (CP_FILTER)",
+   "calibrated_value": "2",
+   "explored_range": "N and C: 0,2",
+   "pf_span_or_effect": "[REGIME] N OFF n 11,380 PF 0.730 vs 0.719. C OFF n 1,289 PF 1.177 vs 1.150 (the filter costs ~0.03 at the calibrated base)."
+  },
+  {
+   "name": "InpCPMinTickRate60",
+   "shipped_value": "3.8",
+   "calibrated_value": "3.8",
+   "explored_range": "N and C: 0,2,3,3.8,5,6.5,8",
+   "pf_span_or_effect": "[REGIME] feed-density dependent. N 0 gives 0.730 (n 11,285) ... 8 gives 0.676 (n 3,740). C 0 1.180, 2 1.182 (n 1,284), 3 1.170, 3.8 1.150, 5 1.166, 6.5 1.151, 8 1.143 (n 764); 0 and 2 beat the preset in all three samples."
+  },
+  {
+   "name": "InpCPMaxMedianGapMs",
+   "shipped_value": "215",
+   "calibrated_value": "215",
+   "explored_range": "N and C: 0,100,150,215,300",
+   "pf_span_or_effect": "[REGIME] N 100 ms: 0.639 (n 2,022); 150 0.720; 0, 215 and 300 identical (inert). C 100 1.162 (n 488), 150 1.155, others 1.150."
+  },
+  {
+   "name": "InpCPRequireCostCoverage / InpCPGrossFloor / InpCPSlipReserve / InpCPCommission / InpCPMinRange60 / InpCPMinRange300 / InpCPCancelBadPendings / InpCPMaxSilenceMs",
+   "shipped_value": "true / 16 / 4 / 0 / 0 / 0 / true / 1500",
+   "calibrated_value": "unchanged",
+   "explored_range": "cost cover 0/1; floor 16-400; range60 0-400; range300 0-800; cancel 0/1; slip reserve, commission, silence never",
+   "pf_span_or_effect": "[REGIME] cost coverage and cancel-pendings DEAD at C; floor N 0.685-0.719 (n 5,240-9,282), C 1.145-1.150; range60 N 0.685-0.719, C 1.147-1.151; range300 N 0.711-0.719, C 1.138-1.154. Silence never binds in the tester."
+  },
+  {
+   "name": "UseFlashGoldDirectionFilter",
+   "shipped_value": "true",
+   "calibrated_value": "true",
+   "explored_range": "N, C, M: 0/1",
+   "pf_span_or_effect": "[FG] N OFF n 11,108 PF 0.706 vs 0.719; C OFF n 1,771 PF 1.053 vs 1.150 (+0.10 PF for 537 fewer trades); M 0.706 vs 0.713."
+  },
+  {
+   "name": "FG_InpBandAtr",
+   "shipped_value": "0.25",
+   "calibrated_value": "0.25 (unchanged; candidates left to the tester range file 0.25-1.5 step 0.25)",
+   "explored_range": "N and C: 0,0.1,0.25,0.5,1,2; M 0-4; G 0.25,0.5,1,1.5",
+   "pf_span_or_effect": "[FG] gate-only. N PF 0.696 (2.0, n 999) to 0.729 (0.5; n 7,130). C 0 1.091 (n 1,455), 0.1 1.086, 0.25 1.150, 0.5 1.161 (n 1,000), 1.0 1.268 (n 619), 2.0 1.166 (n 231). G averages (n, PF, Nov-May PF, Oct-Nov PF): 0.25 939 / 1.152 / 1.067 / 1.622; 0.5 790 / 1.172 / 1.072 / 1.711; 1.0 537 / 1.202 / 1.094 / 1.734; 1.5 357 / 1.159 / 1.048 / 1.763; all 96 sets >= 0.989."
+  },
+  {
+   "name": "FG_InpEntryDistAtr",
+   "shipped_value": "0.25",
+   "calibrated_value": "0.25 (unchanged; tester range 0.25-1.0)",
+   "explored_range": "N and C: 0,0.25,0.5,1; M 0-2; G 0.25,0.5,1",
+   "pf_span_or_effect": "[FG] series input (moves the armed level). N PF 0.701 (1.0, n 7,446) to 0.728 (0, n 10,156). C 0 1.095 (n 1,376), 0.25 1.150, 0.5 1.151 (n 1,084), 1.0 1.243 (n 867). G averages 1.162 / 1.177 / 1.174 (n 720 / 660 / 587); the band x distance pivot ranges 1.106 (1.5 x 0.25) to 1.250 (1.0 x 0.25, n 554)."
+  },
+  {
+   "name": "FG_InpAgainst",
+   "shipped_value": "true",
+   "calibrated_value": "true",
+   "explored_range": "N, C, M: 0/1",
+   "pf_span_or_effect": "[FG] gate-only. N false: n 4,287, PF 0.752 vs 0.719. C false: n 761, PF 1.134 vs 1.150. M 0.732 (n 3,873) vs 0.713."
+  },
+  {
+   "name": "FG_InpBurstAtr",
+   "shipped_value": "0.5",
+   "calibrated_value": "0.5",
+   "explored_range": "N and C: 0.25,0.5,1,1.5,2.5; M 0.1-4",
+   "pf_span_or_effect": "[FG] series input. N PF 0.702-0.730 (n 9,174-11,695). C 0.25 1.149, 0.5 1.150, 1.0 1.088, 1.5 1.034, 2.5 1.041: larger bursts hurt."
+  },
+  {
+   "name": "FG_InpMinAligned / FG_InpUseZones",
+   "shipped_value": "2 / true",
+   "calibrated_value": "unchanged",
+   "explored_range": "MinAligned 0,1,2,3; UseZones 0/1",
+   "pf_span_or_effect": "[FG] series inputs. MinAligned 0 = 1 exactly (Z2 duplicates the parent TF); N 0.719-0.721 (n 9,282-9,925), C 1.147-1.151. UseZones off: N 0.723 (n 9,096), C 1.133 (n 1,253); M 0.666 (n 6,656)."
+  },
+  {
+   "name": "FG_InpTf / FG_InpParentTf (and zone TFs)",
+   "shipped_value": "M5 / M5 (zones M1, M5, M15; source defaults H1 / H1 / H1, H2, H4)",
+   "calibrated_value": "unchanged",
+   "explored_range": "Tf 1,5,15,16385(H1); ParentTf 5,15,16385 (M for micro 1,5,15,16385); zone TFs and UseZ1-6 never varied individually",
+   "pf_span_or_effect": "[FG] series inputs. N Tf: M1 0.728, M5 0.719, M15 0.717, H1 0.695 (n 9,275-10,488); ParentTf M5 0.719, M15 0.729 (n 7,968), H1 0.737. C Tf: M1 1.092, M5 1.150, M15 1.114, H1 1.102; ParentTf M5 1.150, M15 1.085, H1 1.105: M5 is a local peak inside noise."
+  },
+  {
+   "name": "FG_InpLast / FG_InpMinutes / FG_InpSeconds / FG_InpMilliseconds / FG_InpBars",
+   "shipped_value": "0 (until next signal) / 60 / 5 / 500 / 1",
+   "calibrated_value": "unchanged",
+   "explored_range": "Last 0,1,3 (N, C), 0-4 (M); minutes 5,15,60; seconds 5,30,120 (1-60 in M); ms 100-2000; bars 1,5,30",
+   "pf_span_or_effect": "[FG] gate-only. Minutes / seconds / ms / bars values are DEAD as swept (their mode was off). Mode 1 (60 min) = mode 0 (N 0.717 n 9,186; C 1.154 n 1,225). Mode 3 (5 s): N n 95 PF 0.824, C n 5 PF 0.181 (the window closes before a speed alert can use it). M: mode 2 gives 0 trades (reads the previous bar), mode 3 n 5,195 PF 0.708, mode 4 n 343 PF 0.823."
+  },
+  {
+   "name": "FG micro-only inputs (FG_Resolution, FG_IntervalMs, FG_MicroWarmupBars, FG_MicroMaxGapMs, FG_MicroMaxBars, FG_InpDistUnit, FG_InpSpreadPts, FG_InpHoldBars, FG_InpFlatParent, FG_InpAnyCombo, FG_InpUseDrift, FG_InpDriftBars, FG_InpRsiLen, FG_InpFastLen, FG_InpAllowBuy, FG_InpAllowSell)",
+   "shipped_value": "0 / 1000 / 100 / 60000 / 4096 / ATR / 25 / 0 / false / false / false / 60 / 14 / 2 / true / true",
+   "calibrated_value": "unchanged (micro1s calibrated preset only adds the 13 changes)",
+   "explored_range": "M only (native sweep never varied them): interval 100-60,000 ms; warm-up 20-1,500; gap 5,000-300,000; DistUnit 0/1; spread 0,12,25,50; hold bars 0,1,3; flat parent 0/1; any-combo 0/1; drift 0/1 and 5-300 bars; RsiLen 7,14,28; FastLen 2,5; allow buy / sell 0/1; X_MicroRestart 0/1",
+   "pf_span_or_effect": "[FG] around a base of 0.713: interval 0.689 (100 ms) to 0.746 (15 s); warm-up 0.712-0.719 (n 6,027-9,242); gap 0.713-0.716; DistUnit points 0.683 (n 6,414); hold bars 3 0.731; any-combo 0.694; drift 0.707; RsiLen / FastLen 0.708-0.713; allow-buy off 0.695 (n 5,874), allow-sell off 0.725 (n 4,973); DriftBars DEAD; X_MicroRestart 0 = 0 trades. Nothing moves a weak base above 0.75."
+  },
+  {
+   "name": "Never swept FlashGold inputs",
+   "shipped_value": "FG_InpLvMode 0; FG_InpOnePerBar true; FG_InpUseBurst true; FG_InpIgnoreNa true; FG_InpHtfClosed true; FG_InpHoldFavAtr 0.1; FG_InpHoldFavPts 5; FG_InpBurstPts 172; FG_InpEntryDistPts 50; FG_InpUseZ1-6 true,true,true,false,false,false; FG_InpZTf1-6 M1,M5,M15,H8,M1,M2",
+   "calibrated_value": "unchanged",
+   "explored_range": "none in the native sweeps (FlatParent, AnyCombo, UseDrift, DistUnit, HoldBars, SpreadPts, RsiLen, FastLen only in M)",
+   "pf_span_or_effect": "[FG] open ground for a direction study: TDI lengths and zone timeframes on the native filter, level mode 1, signal hold, drift mode."
+  },
+  {
+   "name": "Chart timeframe and CandleIndexToCheck (not inputs of the strategy file)",
+   "shipped_value": "M1 chart; CandleIndexToCheck 0",
+   "calibrated_value": "unchanged",
+   "explored_range": "never",
+   "pf_span_or_effect": "[VOTE] the candle vote and the FlashGold chart loop use PERIOD_CURRENT; running the tester on another period changes the body vote and the gate chart bars. EntryHoldFailureCurrentBar always uses M1."
+  },
+  {
+   "name": "X_ExitGatePips (replay what-if, not an input)",
+   "shipped_value": "6.8",
+   "calibrated_value": "6.8",
+   "explored_range": "N and C: 0,2,4,6.8,10",
+   "pf_span_or_effect": "[exit-side direction re-check] N PF 0.515 at 0 to 0.728 at 10; C 1.018 at 0 to 1.176 at 2: the 68-pt release matters."
+  }
+ ],
+ "execution_inputs_to_freeze": [
+  {
+   "name": "EntryRouterMode",
+   "value": "0 (StopOnly), shipped 2; routing, frozen so only BUY_STOP / SELL_STOP orders exist (modes 0 and 1 are identical with neutral flow)"
+  },
+  {
+   "name": "StopSLPoints / LimitSLPoints / MarketSLPoints",
+   "value": "90 / 90 / 80 (unchanged from shipped); only StopSLPoints is live at router 0; calibrated-OAT best 110 (1.186); 40 -> 0.976, 60 -> 1.048, 300 -> 1.065"
+  },
+  {
+   "name": "StopTPPoints / LimitTPPoints / MarketTPPoints",
+   "value": "600 / 600 / 600 (shipped 180 / 160 / 160)"
+  },
+  {
+   "name": "StopEntryDistancePoints",
+   "value": "50 (shipped 35); acts as fill confirmation, freeze with the direction study"
+  },
+  {
+   "name": "LimitRetestDistancePoints",
+   "value": "35 (inert at router 0)"
+  },
+  {
+   "name": "PendingExpirySeconds",
+   "value": "5 (source default 45); also freeze CancelOldPendings true and CancelOnlySameScenarioPendings true"
+  },
+  {
+   "name": "UseSpeedProfitExit",
+   "value": "false (shipped true); resets the defensive-lockout streak when true"
+  },
+  {
+   "name": "SpeedProfitExitPoints / RequireProfitSideSpeed / UsePredictiveSpeedProfitExit",
+   "value": "100 / true / true (unchanged; dead while the exit is off)"
+  },
+  {
+   "name": "PredictiveExit* group",
+   "value": "PredictiveExitMinProfitPoints 370 (source 70), PredictiveExitMinProjectedNetPoints 37, PredictiveExitLatencyMs 250, PredictiveExitVelocityLookbackMs 1000, PredictiveExitVelocityMultiplier 1.5, PredictiveExitExtraBufferPoints 5, PredictiveExitMinRiskBufferPoints 21, PredictiveExitMaxRiskBufferPoints 180, BlockSpeedExitIfProjectedNegative true; SpeedProfitExitRetrySeconds 2 / MaxRetries 8"
+  },
+  {
+   "name": "UseTrailing / TrailStartPoints / TrailBehindPoints / TrailStepPoints",
+   "value": "false (shipped true) / 270 / 60 / 10 (start 270 lies beyond the target in the shipped preset)"
+  },
+  {
+   "name": "InpWaitForBurstSettle group",
+   "value": "false (shipped true); InpBurstSettleQuietMs 7000 (source 1500), InpBurstSettleSpeedFraction 0.35, InpBurstSettleMaxSpeedPipsSec 100 (source 2.0), InpBurstSettlePullbackPips 100 (source 2.0)"
+  },
+  {
+   "name": "InpUseTrailLayer",
+   "value": "true (shipped false)"
+  },
+  {
+   "name": "Trail layer geometry",
+   "value": "internalOrderDistance 3.0; internalMinTrailing 3.33333333; internalMaxTrailing 6.6666667; internalMultiplier 2.0 (must satisfy Max = Min x Multiplier or the EA refuses to start); InpTrailOuterCapPts 200; InpStopBufferPts 3; InpModifyMinIntervalMs 1000"
+  },
+  {
+   "name": "InpReferenceSpreadPts",
+   "value": "45 (shipped 30): trail about 150 points behind the best price (3.33 x 45); 30 = 100 points, 60 = 200"
+  },
+  {
+   "name": "Trail layer arming",
+   "value": "InpArmOnFavPts true; InpTrailArmFavPts 35; InpArmOnCostDigested true; InpArmOnTimeMs false; InpTrailArmTimeMs 2900; InpCommissionPts 0; InpExitSlipReservePts 14; InpCostLockInPts 0 (arming also needs the 68-pt release)"
+  },
+  {
+   "name": "EXIT_GATE_68 constant",
+   "value": "6.8 pips = 68 points, hard-coded in TrailingActivationProfitReached (mq5:12193); replay switch X_ExitGatePips 6.8; what-if 0 gives PF 0.515 shipped / 1.018 calibrated"
+  },
+  {
+   "name": "InpUse1000msHold / InpHoldMinFavPts",
+   "value": "true / 5 (post-fill kill after 1 s, only after the 68-pt release; dead in every sweep)"
+  },
+  {
+   "name": "UsePostEntryValidation group",
+   "value": "true; OppositePressurePoints 21 / Seconds 5; CloseIfNoFollowThrough true, ValidationSeconds 30, NoFollowCloseMinLossPoints 37; CloseOnRetestFailure true, RetestFailPoints 10, RetestFailCloseMinLossPoints 37, RetestFailConfirmSeconds 2; RetestFailedEarlyClose true / 25 / BypassHold true; NoFollowEarlyClose true / 12 s / 25 pts / needs pressure true; UseEmergencyRetestCollapseClose true (37 pts, 35 pts/s, 21 pts jump, 1000 ms, 2 ticks, 250 ms, hold 1000 ms, hard 75); FOLM and FLXQ danger closes, V40 shields, PreSpeedAgainstDefense group, all unchanged from shipped"
+  },
+  {
+   "name": "UseDefensiveCloseLockout group",
+   "value": "true / DefensiveLockoutCloseCount 3 / DefensiveLockoutSeconds 90 / DefensiveLockoutCancelPendings true (entry-schedule side effect; freeze)"
+  },
+  {
+   "name": "Scenario caps",
+   "value": "ScenarioIndependentPerformance true; MaxOpenPositionsPerScenario 1; MaxPendingOrdersPerScenario 1; MaxOpenPositions 1; MaxPendingOrders 1"
+  },
+  {
+   "name": "Sizing and order plumbing",
+   "value": "FixedLot 0.01; BodyOnlyLotFactor 0.65; ContinuationStopLotFactor 1.0; FollowThroughMarketLotFactor 1.0; ExhaustionLimitLotFactor 0.5 (none suppress a trade at the 0.01 minimum); SlippagePoints 50; InpUseSplitStopFloor false; InpUseTrueStopRiskSizing false; TradingEnabled must be true in the tester (shipped false)"
+  },
+  {
+   "name": "Replay execution model (REAL_FILLS in tools/sweep.py)",
+   "value": "X_FillSnapPts 10; X_LimitAtMarket 1; X_LatencyMs 150; X_StopLossSlipMult 1.5; X_SlipPts 0; X_CommissionPts 0; X_StopsLevelPts 0; STRICT_FILLS and TESTER_FILLS variants exist; Strategy Tester: every tick based on real ticks, execution delay about 150 ms"
+  }
+ ],
+ "flashgold_inputs": [
+  {
+   "name": "UseFlashGoldDirectionFilter",
+   "shipped_value": "true",
+   "meaning": "Master switch; false makes FlashGoldAllowsEntry always true (gate zone 2).",
+   "changes_filter_series": "yes (off = no series at all)"
+  },
+  {
+   "name": "FG_Resolution",
+   "shipped_value": "0 (NativeReference); 1 in the four micro presets",
+   "meaning": "0 = native MT5 timeframe bars as filter bars; 1 = micro mode, occupied quote buckets of FG_IntervalMs built from callback-observed BID.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_IntervalMs",
+   "shipped_value": "1000 (250 in Micro250ms)",
+   "meaning": "Micro bucket length in ms; micro only.",
+   "changes_filter_series": "yes (micro only)"
+  },
+  {
+   "name": "FG_MicroWarmupBars",
+   "shipped_value": "100",
+   "meaning": "Occupied buckets needed before the micro gate is ready (minimum max(20, RsiLen+FastLen+2)); every epoch restart re-warms.",
+   "changes_filter_series": "no (applied at gate time as bucket index >= warm-up)"
+  },
+  {
+   "name": "FG_MicroMaxBars",
+   "shipped_value": "4096",
+   "meaning": "Capacity of occupied buckets per capture epoch; the 4,097th makes the stream fail and every later entry is refused until the EA restarts (about 68 min at 1 s, 17 min at 250 ms); no rolling reseed.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_MicroMaxGapMs",
+   "shipped_value": "60000",
+   "meaning": "Quote gap that starts a new epoch (clears bars, re-warms, resets indicators).",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpTf",
+   "shipped_value": "5 (M5; source default H1)",
+   "meaning": "Native filter timeframe: the bars on which ATR(14), burst and signals are computed.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpLvMode",
+   "shipped_value": "0 (entry price)",
+   "meaning": "0 = armed level is the signal entry price (BUY ask + distance, SELL bid - distance); 1 = the signal bar close.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpLast",
+   "shipped_value": "0 (until next signal)",
+   "meaning": "Permission window: 0 until next signal; 1 minutes (FG_InpMinutes after armedAt); 2 candles (FG_InpBars filter bars; Tick mode reads the previous bar so it gives 0 trades at 1); 3 seconds / 4 milliseconds = absolute deadline after armedAt (FG_InpSeconds / FG_InpMilliseconds) checked again after price selection.",
+   "changes_filter_series": "no (gate only)"
+  },
+  {
+   "name": "FG_InpMinutes",
+   "shipped_value": "60",
+   "meaning": "Window length for mode 1 only.",
+   "changes_filter_series": "no"
+  },
+  {
+   "name": "FG_InpSeconds",
+   "shipped_value": "5",
+   "meaning": "Deadline for mode 3 only.",
+   "changes_filter_series": "no"
+  },
+  {
+   "name": "FG_InpMilliseconds",
+   "shipped_value": "500 (250 in the 250 ms expiry preset)",
+   "meaning": "Deadline for mode 4 only.",
+   "changes_filter_series": "no"
+  },
+  {
+   "name": "FG_InpBars",
+   "shipped_value": "1",
+   "meaning": "Window length in filter bars for mode 2 only.",
+   "changes_filter_series": "no"
+  },
+  {
+   "name": "FG_InpCheck",
+   "shipped_value": "0 (Tick)",
+   "meaning": "When price is tested: 0 current bid, 1 candle open, 2 candle close; all presets use Tick, other modes not replayed.",
+   "changes_filter_series": "not replayed"
+  },
+  {
+   "name": "FG_InpAllowBuy",
+   "shipped_value": "true",
+   "meaning": "Refuse all BUY permissions when false.",
+   "changes_filter_series": "no (gate only)"
+  },
+  {
+   "name": "FG_InpAllowSell",
+   "shipped_value": "true",
+   "meaning": "Refuse all SELL permissions when false.",
+   "changes_filter_series": "no (gate only)"
+  },
+  {
+   "name": "FG_InpSpreadPts",
+   "shipped_value": "25",
+   "meaning": "Fixed spread (points) used to build the armed level: bid = close - 12.5 pts, ask = close + 12.5 pts; not the live spread.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpEntryDistPts",
+   "shipped_value": "50",
+   "meaning": "Armed-level offset in points; used only when FG_InpDistUnit = Points.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpHoldBars",
+   "shipped_value": "0",
+   "meaning": "0 fires a signal at once; N > 0 needs the zone to persist N filter bars with a favourable move (FG_InpHoldFavAtr / FG_InpHoldFavPts) before the signal fires.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpHoldFavPts",
+   "shipped_value": "5",
+   "meaning": "Favourable move required by the signal hold in Points unit.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpHoldFavAtr",
+   "shipped_value": "0.1",
+   "meaning": "Favourable move required by the signal hold in ATR unit (only with HoldBars > 0).",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpOnePerBar",
+   "shipped_value": "true",
+   "meaning": "At most one signal per filter bar; matters only in hold mode.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpDistUnit",
+   "shipped_value": "0 (ATR)",
+   "meaning": "Unit of burst threshold, entry distance and hold move: 0 ATR multiples, 1 fixed points.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpBurstAtr",
+   "shipped_value": "0.5",
+   "meaning": "Signal bar close-to-close move needed for a signal, in multiples of ATR(14) in points.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpEntryDistAtr",
+   "shipped_value": "0.25",
+   "meaning": "Armed level sits this many ATR beyond the ask (BUY) / bid (SELL) of the signal bar close.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpBurstPts",
+   "shipped_value": "172",
+   "meaning": "Burst threshold in Points unit only.",
+   "changes_filter_series": "yes (unused at ATR unit)"
+  },
+  {
+   "name": "FG_InpUseBurst",
+   "shipped_value": "true",
+   "meaning": "Read only when FG_InpAnyCombo is true.",
+   "changes_filter_series": "yes (dead while AnyCombo is false)"
+  },
+  {
+   "name": "FG_InpAnyCombo",
+   "shipped_value": "false",
+   "meaning": "true: signal = zone ok and (burst or parent already agrees); false: zone ok and burst required.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpUseDrift / FG_InpDriftBars",
+   "shipped_value": "false / 60",
+   "meaning": "Optional test that the close drift over DriftBars filter bars agrees with the signal side (drift > 0 for BUY, < 0 for SELL).",
+   "changes_filter_series": "yes (DriftBars dead while UseDrift is false)"
+  },
+  {
+   "name": "FG_InpUseZones",
+   "shipped_value": "true",
+   "meaning": "Require TDI alignment of parent and children for a signal; false = zones always ready.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpParentTf",
+   "shipped_value": "5 (M5; source default H1)",
+   "meaning": "Timeframe whose TDI direction is the parent direction (the signal's required direction).",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpRsiLen / FG_InpFastLen",
+   "shipped_value": "14 / 2",
+   "meaning": "TDI parameters: Wilder RSI length and the SMA length of RSI whose slope sign is the TDI direction.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpMinAligned",
+   "shipped_value": "2",
+   "meaning": "Children that must equal the parent direction (capped at the number of active children); 0 and 1 are identical when a child shares the parent timeframe.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpFlatParent",
+   "shipped_value": "false",
+   "meaning": "Allow parent direction 0 to arm both sides (children still counted).",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpIgnoreNa",
+   "shipped_value": "true",
+   "meaning": "Children with missing direction (not enough history, 99) are not counted as active.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpHtfClosed",
+   "shipped_value": "true",
+   "meaning": "Children on a timeframe longer than the filter TF read the previous COMPLETED bar (native mode only; micro mode always uses closed native bars).",
+   "changes_filter_series": "yes (native only)"
+  },
+  {
+   "name": "FG_InpUseZ1..FG_InpUseZ6",
+   "shipped_value": "true, true, true, false, false, false",
+   "meaning": "Which of the six child timeframes are active.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpZTf1..FG_InpZTf6",
+   "shipped_value": "M1, M5, M15, H8, M1, M2 (source defaults H1, H2, H4, H8, M1, M2)",
+   "meaning": "Child timeframes whose TDI directions are compared with the parent.",
+   "changes_filter_series": "yes"
+  },
+  {
+   "name": "FG_InpBandAtr",
+   "shipped_value": "0.25",
+   "meaning": "Half-width of the no-trade band around the armed level in ATR of the signal bar; 0 = price compared with the armed level itself.",
+   "changes_filter_series": "no (gate only)"
+  },
+  {
+   "name": "FG_InpAgainst",
+   "shipped_value": "true",
+   "meaning": "true: the area opposite to the armed signal is tradable too (SELL area below a BUY level, BUY area above a SELL level); false: only continuation of the last signal's side.",
+   "changes_filter_series": "no (gate only)"
+  },
+  {
+   "name": "FG_InpTickSize / FG_InpMaxBars / FG_InpWarmup",
+   "shipped_value": "0.0 / 20000 / 500",
+   "meaning": "Compatibility check (0 or the broker tick size) and legacy history inputs, ignored by v1.2 (full history is used).",
+   "changes_filter_series": "n/a"
+  },
+  {
+   "name": "Hard-coded inside the core (not inputs)",
+   "shipped_value": "ATR length 14; scoreWindow 500 / scoreHorizon 10; compare epsilon 1e-10; tick size = SYMBOL_TRADE_TICK_SIZE (0.01)",
+   "meaning": "The hit-rate scoreboard (scores[0..6]) is display-only and never gates an entry; ATR(14) length cannot be changed.",
+   "changes_filter_series": "n/a"
+  }
+ ],
+ "notes": "PATHS. EA package (read-only): /tmp/claude-0/-home-user-master/8b335e1d-7919-5695-aa16-fdeb3605b836/scratchpad/upload/components/speedalert-flashgold-micro/. My scripts and outputs: /tmp/claude-0/-home-user-master/8b335e1d-7919-5695-aa16-fdeb3605b836/scratchpad/prompt_work/direction-surface/ (score_lattice.py, oat_summary.py, oat_detail.py, sweep_table.py + sweep_table.txt, grid_summary.py, trigger_snapshot.py + snapshot_*.txt, fg_series_stats.py, trade_fg_state.py, agg_fg_state.py + agg_*.txt, run_month.py + funnel_*.txt, real_flow_labels.py, and replay/ = a private copy of tools/ with symlinked data; the repository was not written to). mq5 = SpeedAlert_FlashGold_Micro.mq5.\n\nHOW THE NUMBERS WERE OBTAINED. Sweep tables come from the five CSVs; counts and PFs are the CSV rows (n = trades). Funnel counters, first-tick snapshots, FlashGold series statistics and trade-by-FlashGold-state tables come from month-by-month replays on one month of ticks at a time (Nov 2026, Mar 2026 for snapshots and funnels; all nine months for the trade tables). A first-tick snapshot is an independent re-implementation of the engine's score arithmetic at the first tick of each alert episode (an episode = first qualifying tick, next one after the alert hold has expired, ignoring vetoes), so later ticks of the same alert can still produce winners; the engine counters count every decision tick. Bootstrap, lattice and real-trade tables were recomputed from scratch. Numbers taken from REPORT.md and not re-run: the spread rescaling rule (multiplier = 450 / median spread, cap = 0.93 x median), micro calibrated PF 1.14 on 955 trades, 86% of calibrated trades ending at a stop.\n\nINTERACTIONS BETWEEN DIRECTION AND EXECUTION INPUTS.\n1. Entry hold x pending expiry x stop distance x alert window: the order is placed only after InpEntryHoldMs (1,100) on a tick that still passes FlashGold and the +5 pts hold, then must be hit within PendingExpirySeconds (5, whole seconds) at StopEntryDistancePoints (50) beyond the market; the alert itself dies SpeedAlertHoldSeconds after the START of its lookback window, so the decision window is hold - lookback (about 10 s); SpeedLookbackSeconds >= SpeedAlertHoldSeconds gives 0-21 trades. Calibrated Nov 2026: 312 orders, 141 fills, 168 expired, 3 refused; median placement-to-fill 1.3 s (p90 3.4 s, 1,236-trade replay). Do not tune any of these in isolation from a direction label.\n2. A failed hold blocks new holds for the rest of that M1 minute (BLOCKED_SAME_M1), a time-coupled lockout of up to 60 s; it is the biggest single skip in the shipped replay (40,169 vs 12,127 arms in Nov 2026).\n3. FlashGold is polled on every tick of a burst and a veto re-fires the alert (146,251 alert starts vs 26,502 independent episodes, shipped Nov 2026; 4,199 vs 1,804 calibrated). A labelled dataset should therefore use first-approval ticks or episodes, not raw alert ticks.\n4. UseSpeedProfitExit (execution) is the only thing that resets the defensive-lockout streak; with it off, 3 EA-side defensive closes blank entries for 90 s (6 arms, 88 skipped ticks in Nov 2026). Position state also feeds the per-scenario caps, so exits change which alerts become orders (cap_skip 87): extract alert events independent of position state.\n5. No EA-side exit, including the post-entry validation and post-fill hold, acts before +68 pts of profit, so the entry decision cannot be corrected except by the broker stop or trailing; a direction calibration judged on whole-trade PF is therefore confounded with stop distance, trail layer and the 150 ms order delay.\n6. MaxSpreadPoints and MaxTrailingMultiplier both act through the CURRENT spread (and CP cost coverage uses max(current, 60-s median) spread): the rescale invariant is multiplier x median spread ~ 450 pts, cap ~ 0.93 x median spread. At a 12-pt median 26% of calibrated decision ticks fail the cap, at 17 pts 91%.\n7. Order flow also changes exits: the :FA/:FD comment suffix and flow-disagree danger-close inputs are read by exit rules (mq5:10921-10948, 11218-11260), so a simulated flow feed must keep entry labels and exit behaviour consistent.\n\nLIVE-VS-REPLAY GAPS ON THE DIRECTION SURFACE. (a) Flow is neutral, so the market route (74% of real entries) and the flow labels do not exist in the replay. (b) Native-mode FlashGold: the EA overrides recomputed parent/zone values with intrabar 'observed live' commits (SpeedAlertFlashGoldPermission.mqh:338-369) that depend on when the gate was called; the replay uses closed values (effect unquantified). (c) Bar ends are nominal (no quote-session calendar). (d) The 60-min drift needs history: first hour of each weekly chunk fails in the replay; tester behaviour unverified. (e) CandleIndexToCheck != 0, PERCENTILE modes, FG_InpCheck != Tick are not replayed. (f) Spread is rebuilt around the Dukascopy mid (median 12 pts in Oct-Nov 2026, about 15 over all months) and tick density is the Dukascopy one (5.3 ticks/s), while the CP filter and every spread-scaled rule are feed specific. (g) June-September 2026 is missing. (h) Single-month replays restart FlashGold from scratch, so a few trades differ from the full run (Nov 2026 calibrated: 141 vs REPORT 139). (i) MT5 was not available: nothing here is checked against a Strategy Tester run.\n\nUNCERTAINTIES I COULD NOT RESOLVE. Units, scale and distribution of FORCE_IMB / NEAR_IMB / BOOK_IMB and the identity of the producer (it must run inside the terminal to write global variables, and its heartbeat must use the terminal's GetTickCount64 clock); nothing in the package describes it. Which parent version is live: PARENT_EA_SOURCE.txt says 1.499, ORIGIN.json says 1.500, basis/parent.mq5 says 1.498 (a diff shows the direction logic of PARENT_EA_SOURCE.txt equals the micro EA). Whether the real chart's embedded FlashGold (older build, no BandAtr / Against) behaves like v1.2 with BandAtr 0.25 and Against true (the preset header calls those 'two v1.2 controls' added to the saved inputs). Whether the tester exposes pre-start ticks to CopyTicksRange for the drift filter.\n\nDATA FACTS FOR A FLOW SIMULATION. data/ticks/*.npz keep only t, bid, ask; the Hugging Face parquet files (data/hf, Nov 2025-May 2026) and the raw Dukascopy hourly bi5 files (data/raw, Oct-Nov 2026 and the real-trade hours) also carry bid_volume / ask_volume (top of book), the only imbalance-like field available offline. Real-trade flow labels (results/real/real_trades_sar.csv): FA 1,609 / FD 409 / none 566 of 2,584; by route FOLM:BM FA 701 (PF 0.867) / FD 113 (0.597) / none 132 (0.758); FOLM:SM FA 826 (0.788) / FD 139 (1.496) / none 0 (the neutral-sell downgrade rule, matching the code); EXHL FA 66 (0.522) / FD 43 (1.310) / none 127 (0.751). No consistent edge from the label.\n\nSEARCH-SPACE GAPS WORTH KNOWING. Never swept: the four score weights, flow weights, zone timeframes and enables, TDI lengths and level mode on the native filter, signal hold, drift mode, burst-gate threshold with the gate on, MinDirectionScore 3.5, MicroBreakLookbackSeconds above 60 s, the 60-minute drift horizon (hard-coded), and PERCENTILE alerts. Interactions were only probed by the joint grid (multiplier x cap x trailing x hold x stop) and the FlashGold grid (band x entry distance x multiplier x cap); all other results are one input at a time, with sets of ~1,200 trades whose PF noise (SD 0.093) exceeds most of the effects listed.\n\nDEAD LISTS. Calibrated base (C, identical n and PF): InpBurstThresholdPts, MinScoreEdge, LimitRetestDistancePoints, LimitSLPoints, LimitTPPoints, MarketFollow37Points, DowngradeNeutralSellMarketToStop, WeakFlowMarketMinScore, InpUse1000msHold, RetestFailedEarlyLossPoints, SpeedProfitExitPoints, RequireProfitSideSpeed, UsePredictiveSpeedProfitExit, PredictiveExitMinProfitPoints, TrailStartPoints, TrailBehindPoints, TrailStepPoints, InpCPRequireCostCoverage, InpCPCancelBadPendings, FG_InpMinutes, FG_InpSeconds. Shipped base (N): InpBurstThresholdPts, MinScoreEdge, DowngradeNeutralSellMarketToStop, InpUse1000msHold, RetestFailedEarlyLossPoints, UseTrailing, TrailStartPoints, TrailBehindPoints, TrailStepPoints, InpWaitForBurstSettle, InpUseTrailLayer, InpCPRequireCostCoverage, FG_InpMinutes, FG_InpSeconds (plus near-dead MarketFollow37Points, UseDefensiveCloseLockout). Several are dead only because the sweep never enabled the mode they belong to (burst gate, FG_InpLast modes 1-4, drift).\n\nINPUT COUNTS (results/inputs_classification.csv, re-counted): 400 inputs = 224 replayed, 82 telemetry/logging/visuals/shadow scorecards, 53 labels/comments/file names, 11 order-flow, 8 sizing, 22 not replayed. Source defaults differ from the shipped presets in 11 EA inputs (PendingExpirySeconds 45 -> 5, InpBurstThresholdPts 172 -> 145, InpUseEntryHold, InpEntryHoldMs 1000 -> 1100, InpUsePrior60Filter, InpUse1000msHold, PredictiveExitMinProfitPoints 70 -> 370, TrailStartPoints 70 -> 270, InpBurstSettleQuietMs 1500 -> 7000, InpBurstSettleMaxSpeedPipsSec 2 -> 100, InpBurstSettlePullbackPips 2 -> 100) and in the FlashGold timeframes (H1 / H1 / H1, H2, H4 -> M5 / M5 / M1, M5, M15). The shipped NativeReference preset equals PARENT_PRESET.txt except TradingEnabled and the new micro / seconds fields."
+}

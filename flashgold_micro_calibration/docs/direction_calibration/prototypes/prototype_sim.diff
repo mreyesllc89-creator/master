@@ -1,0 +1,70 @@
+--- /home/user/master/flashgold_micro_calibration/tools/sim.py	2026-11-15 02:55:32.333986505 +0000
++++ work/tools/sim.py	2026-11-15 15:56:52.232594697 +0000
+@@ -58,14 +58,22 @@
+             self.cand_cache[key] = np.flatnonzero(move >= thr - 1e-7).astype(np.int64)
+         return self.cand_cache[key]
+ 
+-    def run(self, p, with_counters=False, external=None):
++    def run(self, p, with_counters=False, external=None, flow=None, log=None, by_chunk=False):
+         """external = DataFrame of fills to inject (columns ms, side, action, scenario, entry, sl, tp, id);
+-        each opens a position at the first tick at or after `ms`."""
++        each opens a position at the first tick at or after `ms`.
++        [PLAN] flow = a flowsim.FlowSeries (None = neutral flow); log = list with the row capacity of every chunk
++        (None = no decision log); returns (df, counters[, logs]) when asked."""
+         fg = self._fg(p)
+         vec = params.vector(p)
+         lookback = float(p["SpeedLookbackSeconds"])
+         minpts = float(p["MinSpeedAlertPoints"])
+         mult = float(p["MaxTrailingMultiplier"])
++        nch = len(self.feed.chunks)
++        # [PLAN] build every cache in the calling thread (the old _cand cache could be cleared by a worker thread
++        # between another worker's insert and read)
++        idxs = [self._idx(c, lookback) for c in range(nch)]
++        cands = [self._cand(c, lookback, minpts, mult) for c in range(nch)]
++        fls = [flow.chunk(c) if flow is not None else self._no_flow for c in range(nch)]
+ 
+         def one(c):
+             a, b = self.feed.chunks[c]
+@@ -82,21 +90,36 @@
+                 z = np.zeros(0, np.int64)
+                 f = np.zeros(0, np.float64)
+                 ext = (z, z, z, z, f, f, f, z)
++            rows = log[c] if log is not None else 0
++            lgi = np.zeros((rows, engine.NLI), np.int32)
++            lgf = np.zeros((rows, engine.NLF), np.float32)
++            fl = fls[c]
+             n = engine.run_chunk(self.feed.t[a:b], self.feed.bid[a:b], self.feed.ask[a:b], vec,
+-                                 self._idx(c, lookback), self._cand(c, lookback, minpts, mult), self.ep[c],
++                                 idxs[c], cands[c], self.ep[c],
+                                  fg.time, fg.end, fg.li, fg.a_at, fg.a_bar, fg.a_price, fg.a_dir, fg.a_atr,
+-                                 ext[0], ext[1], ext[2], ext[3], ext[4], ext[5], ext[6], ext[7], out, cnt)
+-            return out[:n], cnt
++                                 ext[0], ext[1], ext[2], ext[3], ext[4], ext[5], ext[6], ext[7],
++                                 fl[0], fl[1], fl[2], fl[3], lgi, lgf, out, cnt)
++            return out[:n], cnt, (lgi[: cnt[engine.C_LOG_ROWS]], lgf[: cnt[engine.C_LOG_ROWS]])
+ 
+-        res = list(self.pool.map(one, range(len(self.feed.chunks))))
++        res = list(self.pool.map(one, range(nch)))
+         tr = np.concatenate([r[0] for r in res]) if res else np.zeros((0, engine.NC))
+         df = pd.DataFrame(tr, columns=engine.TRADE_COLS)
+         df = df.sort_values("entry_ms").reset_index(drop=True)
+-        if with_counters:
++        if with_counters or log is not None or by_chunk:
+             cnt = np.sum([r[1] for r in res], axis=0)
+-            return df, dict(zip(engine.COUNTERS, cnt.tolist()))
++            counters = dict(zip(engine.COUNTERS, cnt.tolist()))
++            if log is not None or by_chunk:
++                extra = {}
++                if by_chunk:
++                    extra["cnt_by_chunk"] = [r[1] for r in res]
++                if log is not None:
++                    extra["logs"] = [r[2] for r in res]
++                return df, counters, extra
++            return df, counters
+         return df
+ 
++    _no_flow = (np.zeros(0, np.int32), np.zeros(0, np.int64), np.zeros(0, np.uint8), np.zeros((0, 3), np.float64))
++
+ 
+ def metrics(df):
+     """Profit factor and friends, in points per 0.01 lot (1 point = 0.01 USD per 0.01 lot)."""

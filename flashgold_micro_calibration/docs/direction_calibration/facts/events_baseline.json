@@ -1,0 +1,1213 @@
+{
+ "headline": [
+  "RUNTIME: a full replay is already fast, so speed is not the case for an event table. Warm replay of one month: 0.13-0.47 s (shipped preset), 0.01-0.08 s (calibrated). Nine one-month runs sum to 2.20 s warm / 6.0 s cold (shipped) and 0.31 s / 3.8 s (calibrated), plus 8 s feed loading and a one-time numba compile of 34.3 s (empty cache; 0.13-0.17 s when loaded from cache). The project's own queue logs agree: 0.34 s per replay in the calibrated one-at-a-time sweep (329 in 113 s), 1.7-2.0 s in shipped-preset sweeps, about 5 s when the FlashGold micro series changes. Reason: the engine skips idle ticks and visits only 36.6% (22.97M of 62.73M) of ticks for the shipped preset and 3.3% (2.06M) for the calibrated one, not 60 million.",
+  "MEMORY: peak RSS 0.59-0.95 GB for one month (2026-03, 9.2M ticks, is the largest at 0.95 GB; the peak is the feed load; 1.35 GB in the process that also compiled numba), so 2026-03 was run, the 4 GB limit was never near. Full feed extrapolates to about 6.5-7 GB (not run).",
+  "EVENT VOLUMES, 9 months (sum of nine one-month runs; the project's continuous run has 20,688,003 decisions, match within 0.02%): shipped preset 20.69M direction evaluations (C_DECISIONS; Oct 1.37M, Mar 4.26M), 2.31M engine alerts, 12.55M alert-candidate ticks at x7.5 (20.0% of ticks) in 127,418 episodes (20 s merge; 311k at a 5 s merge, 43k at 60 s), 23.5k orders, 9.2k fills; 81% of decisions end with no winning side, 8% at the spread cap, 7% at the FlashGold gate. Calibrated preset (x30, cap 14): 1.80M decisions, 39k alerts, 330,585 candidate ticks (0.53%) in 17,845 episodes, 2,643 orders, 1,236 fills; 75% of its decisions die at the spread cap, 24% have no winner, 1.4% reach the FlashGold gate.",
+  "EVENT TABLE SIZE AND SPEED (prototype built and timed on 2026-03 and 2026-10): one row per decision = 136 B (tick index + 21 decision features + 11 forward outcomes: mid move at 1/2/5/10/20/30/60 s and max up/down within 30/60 s) = 2.81 GB for 20.7M shipped-style rows, 245 MB for 1.8M calibrated-style rows (about 65 B/row estimated with int16 columns: 1.35 GB / 0.12 GB). Build 7.5 s per 4.26M-row month (2.3 GB peak), about 30-36 s for nine months single-threaded. Re-scoring one candidate direction rule: numba 11 ms per 4.26M rows (55-75 ms for nine months) vs numpy 0.40 s (about 2 s) against 2.2 s for a full shipped-style replay; calibrated-style table 3.5-7 ms numba / 0.08-0.11 s numpy against 0.31 s. So the table pays only with compiled scoring and only for large searches.",
+  "TABLE FIDELITY: re-scoring from the logged features reproduced the engine's winner in 99.77-99.97% of rows; every mismatch (0 exceptions) is an exact-threshold tie (spread == cap, |body| == 21, micro distance == 3) decided by float64 noise in the engine; 6.0% (Mar 2026) and 6.5% (Oct 2026) of the calibrated preset's decision rows sit exactly at the 14-point cap, and 64% (Mar) and 46% (Oct) of those fail the engine's float test (Nov 2026: 9.2% and 39%). Episodes are very unequal (median 36-55 rows, p99 1,248-3,743, max 151,484 rows in one March episode); 1 s thinning keeps only 10-20% of rows.",
+  "DIRECTION STRUCTURE: in the replay (no order flow) the winning side equals the burst direction in 100% of decisions that have a winner (checked on 0.45M winner rows, Oct and Mar, both presets), so direction means continue the burst or skip; only the EXHL fade (shipped router mode 2, about 5% of decisions) trades against it. Only the flow votes (up to +3.0) can make the score pick the other side or the market route FOLM, which carried 74% of the real trades and which the replay never takes.",
+  "SHIPPED PRESET BASELINE (9,282 trades): PF 0.72, win 36.0%, -17.9 pts/trade (calibration 0.69 / validation 0.72 / hold-out 0.83). MFE reached 10/30/60/100 pts in 68.9/59.8/49.7/37.4% of trades, but a driftless path with the same 90-pt stop and 17-pt spread gives 72.3/60.5/48.7/38.7%, so the shares show no skill (excess -3.7/-0.8/+0.8/-1.4). Mid-to-mid move before costs +0.7 +/- 1.2 pts (t 0.6; about 0 in every split, month, side); costs of 18.6 pts vs the quote (half-spreads 17.3) are the whole loss (order-price convention: spread 17.3 + entry slip 3.4 + stop slip 11.8 = 32.5 against gross 14.7).",
+  "CALIBRATED PRESET BASELINE (1,234 trades): PF 1.15, win 33.1%, +10.0 pts/trade; gross mid-to-mid +28.3 +/- 5.8 pts before costs (t 4.9; 35.1/22.9/29.8 in calibration/validation/hold-out). Costs per trade: 18.5 vs the quote (spread 16.9, net slippage 1.6) or 51.5 in the order-price convention (spread 16.9 + entry slip 17.5 + stop slip 17.0; 86% of trades end at a stop). Skill is concentrated in buys (+44.5, t 4.8; sells +17.7 but net -2.5), bursts of 150-400 and >=600 pts, spread <=13 at order, and 4 of 9 months; costs differ by 2x between splits (61.8 / 54.1 / 27.7), which is why the hold-out looks best.",
+  "REAL ACCOUNT (2,584 trades, 7 Sep-8 Oct 2026): PF 0.83, win 36.2%, -8.5 pts/trade. The flow label does not separate outcomes (agrees 1,609: PF 0.80; disagrees 409: 0.92; none 566: 0.85; disagrees minus agrees +5.7 pts, 95% range about -5.3 to +16.7 (it moves with the seed); the sign flips between BM and SM). Re-managing the 1,621 real entries in the engine gives MFE excess over no-skill of only +1.4/+1.5/+1.8/+0.2 pts for FOLM market entries (z about 1). No hour or session effect in any data set (rank correlation of hourly means between splits -0.3..+0.3).",
+  "STATISTICAL POWER: a calibrated trade has SD about 200 pts (SE of the mean 5.8 for 1,236 trades), so two candidates 10 pts apart need about 6,300 trades per arm (25,000 for 5 pts). Nine months hold 1,236 calibrated trades but 17.8k x30 alert episodes and 127k x7.5 episodes, so ranking on fixed-horizon forward moves per episode has 10-100x the samples of ranking on trades."
+ ],
+ "event_counts": [
+  {
+   "month": "2025-11",
+   "preset": "shipped",
+   "decisions": "1,555,598",
+   "alert_candidate_ticks": "883,727 (x7.5) / 8,793 (x30)",
+   "alert_episodes": "14,555 (x7.5) / 615 (x30)",
+   "trades": "624 filled; 1,930 orders sent; 168,315 alerts; 1,760,606 of 6,364,248 ticks visited",
+   "runtime_s": "replay cold 0.50 / warm 0.14; feed load 0.9",
+   "peak_rss_gb": "0.73"
+  },
+  {
+   "month": "2025-12",
+   "preset": "shipped",
+   "decisions": "1,480,326",
+   "alert_candidate_ticks": "818,187 (x7.5) / 10,743 (x30)",
+   "alert_episodes": "13,309 (x7.5) / 643 (x30)",
+   "trades": "702 filled; 2,108 orders sent; 147,976 alerts; 1,697,415 of 7,779,412 ticks visited",
+   "runtime_s": "replay cold 0.53 / warm 0.13; feed load 0.9",
+   "peak_rss_gb": "0.85"
+  },
+  {
+   "month": "2026-01",
+   "preset": "shipped",
+   "decisions": "3,201,714",
+   "alert_candidate_ticks": "1,969,762 (x7.5) / 58,143 (x30)",
+   "alert_episodes": "14,387 (x7.5) / 2,636 (x30)",
+   "trades": "1,366 filled; 3,380 orders sent; 318,391 alerts; 3,514,647 of 8,914,899 ticks visited",
+   "runtime_s": "replay cold 1.08 / warm 0.47; feed load 1.1",
+   "peak_rss_gb": "0.94"
+  },
+  {
+   "month": "2026-02",
+   "preset": "shipped",
+   "decisions": "2,960,712",
+   "alert_candidate_ticks": "1,799,879 (x7.5) / 47,249 (x30)",
+   "alert_episodes": "15,511 (x7.5) / 2,804 (x30)",
+   "trades": "1,313 filled; 2,850 orders sent; 284,038 alerts; 3,228,337 of 7,343,324 ticks visited",
+   "runtime_s": "replay cold 0.84 / warm 0.39; feed load 1.0",
+   "peak_rss_gb": "0.84"
+  },
+  {
+   "month": "2026-03",
+   "preset": "shipped",
+   "decisions": "4,258,958",
+   "alert_candidate_ticks": "2,850,510 (x7.5) / 109,957 (x30)",
+   "alert_episodes": "17,085 (x7.5) / 4,454 (x30)",
+   "trades": "2,129 filled; 4,418 orders sent; 565,158 alerts; 4,646,846 of 9,240,338 ticks visited",
+   "runtime_s": "replay cold 0.94 / warm 0.36; feed load 1.2",
+   "peak_rss_gb": "0.95"
+  },
+  {
+   "month": "2026-04",
+   "preset": "shipped",
+   "decisions": "2,261,891",
+   "alert_candidate_ticks": "1,365,263 (x7.5) / 36,313 (x30)",
+   "alert_episodes": "16,864 (x7.5) / 1,878 (x30)",
+   "trades": "1,018 filled; 2,688 orders sent; 273,477 alerts; 2,528,119 of 7,278,598 ticks visited",
+   "runtime_s": "replay cold 0.61 / warm 0.20; feed load 0.9",
+   "peak_rss_gb": "0.81"
+  },
+  {
+   "month": "2026-05",
+   "preset": "shipped",
+   "decisions": "2,203,722",
+   "alert_candidate_ticks": "1,315,965 (x7.5) / 30,135 (x30)",
+   "alert_episodes": "13,240 (x7.5) / 2,190 (x30)",
+   "trades": "958 filled; 2,701 orders sent; 242,494 alerts; 2,456,882 of 6,431,996 ticks visited",
+   "runtime_s": "replay cold 0.59 / warm 0.19; feed load 0.8",
+   "peak_rss_gb": "0.74"
+  },
+  {
+   "month": "2026-10",
+   "preset": "shipped",
+   "decisions": "1,365,667",
+   "alert_candidate_ticks": "767,293 (x7.5) / 11,670 (x30)",
+   "alert_episodes": "13,797 (x7.5) / 1,315 (x30)",
+   "trades": "586 filled; 1,735 orders sent; 163,018 alerts; 1,553,502 of 4,995,670 ticks visited",
+   "runtime_s": "replay cold 0.42 / warm 0.13; feed load 0.7",
+   "peak_rss_gb": "0.63"
+  },
+  {
+   "month": "2026-11",
+   "preset": "shipped",
+   "decisions": "1,404,279",
+   "alert_candidate_ticks": "779,121 (x7.5) / 17,582 (x30)",
+   "alert_episodes": "8,670 (x7.5) / 1,310 (x30)",
+   "trades": "545 filled; 1,735 orders sent; 146,251 alerts; 1,579,106 of 4,383,562 ticks visited",
+   "runtime_s": "replay cold 0.49 / warm 0.19; feed load 0.7",
+   "peak_rss_gb": "0.59"
+  },
+  {
+   "month": "TOTAL 9 months (sum of nine one-month runs)",
+   "preset": "shipped",
+   "decisions": "20,692,867",
+   "alert_candidate_ticks": "12,549,707 (x7.5, 20.0% of ticks) / 330,585 (x30, 0.53%)",
+   "alert_episodes": "127,418 (x7.5) / 17,845 (x30)",
+   "trades": "9,241 filled; 23,545 orders sent; 2,309,118 alerts; 22,965,460 of 62,732,047 ticks visited (36.6%)",
+   "runtime_s": "replay cold 6.0 / warm 2.20; feed load 8.3",
+   "peak_rss_gb": "0.95 (max month, 2026-03)"
+  },
+  {
+   "month": "2025-11",
+   "preset": "calibrated",
+   "decisions": "40,856",
+   "alert_candidate_ticks": "883,727 (x7.5) / 8,793 (x30)",
+   "alert_episodes": "14,555 (x7.5) / 615 (x30)",
+   "trades": "57 filled; 131 orders sent; 1,256 alerts; 52,491 of 6,364,248 ticks visited",
+   "runtime_s": "replay cold 0.30 / warm 0.01; feed load 0.8",
+   "peak_rss_gb": "0.73"
+  },
+  {
+   "month": "2025-12",
+   "preset": "calibrated",
+   "decisions": "53,553",
+   "alert_candidate_ticks": "818,187 (x7.5) / 10,743 (x30)",
+   "alert_episodes": "13,309 (x7.5) / 643 (x30)",
+   "trades": "54 filled; 144 orders sent; 1,282 alerts; 66,164 of 7,779,412 ticks visited",
+   "runtime_s": "replay cold 0.39 / warm 0.01; feed load 0.9",
+   "peak_rss_gb": "0.85"
+  },
+  {
+   "month": "2026-01",
+   "preset": "calibrated",
+   "decisions": "316,626",
+   "alert_candidate_ticks": "1,969,762 (x7.5) / 58,143 (x30)",
+   "alert_episodes": "14,387 (x7.5) / 2,636 (x30)",
+   "trades": "167 filled; 341 orders sent; 5,937 alerts; 353,105 of 8,914,899 ticks visited",
+   "runtime_s": "replay cold 0.62 / warm 0.08; feed load 1.0",
+   "peak_rss_gb": "0.93"
+  },
+  {
+   "month": "2026-02",
+   "preset": "calibrated",
+   "decisions": "319,011",
+   "alert_candidate_ticks": "1,799,879 (x7.5) / 47,249 (x30)",
+   "alert_episodes": "15,511 (x7.5) / 2,804 (x30)",
+   "trades": "134 filled; 246 orders sent; 4,449 alerts; 341,728 of 7,343,324 ticks visited",
+   "runtime_s": "replay cold 0.49 / warm 0.05; feed load 0.8",
+   "peak_rss_gb": "0.81"
+  },
+  {
+   "month": "2026-03",
+   "preset": "calibrated",
+   "decisions": "555,483",
+   "alert_candidate_ticks": "2,850,510 (x7.5) / 109,957 (x30)",
+   "alert_episodes": "17,085 (x7.5) / 4,454 (x30)",
+   "trades": "295 filled; 543 orders sent; 9,058 alerts; 598,121 of 9,240,338 ticks visited",
+   "runtime_s": "replay cold 0.57 / warm 0.07; feed load 1.1",
+   "peak_rss_gb": "0.95"
+  },
+  {
+   "month": "2026-04",
+   "preset": "calibrated",
+   "decisions": "164,747",
+   "alert_candidate_ticks": "1,365,263 (x7.5) / 36,313 (x30)",
+   "alert_episodes": "16,864 (x7.5) / 1,878 (x30)",
+   "trades": "120 filled; 290 orders sent; 4,026 alerts; 190,447 of 7,278,598 ticks visited",
+   "runtime_s": "replay cold 0.48 / warm 0.02; feed load 1.0",
+   "peak_rss_gb": "0.81"
+  },
+  {
+   "month": "2026-05",
+   "preset": "calibrated",
+   "decisions": "167,146",
+   "alert_candidate_ticks": "1,315,965 (x7.5) / 30,135 (x30)",
+   "alert_episodes": "13,240 (x7.5) / 2,190 (x30)",
+   "trades": "165 filled; 403 orders sent; 5,617 alerts; 209,406 of 6,431,996 ticks visited",
+   "runtime_s": "replay cold 0.37 / warm 0.02; feed load 0.9",
+   "peak_rss_gb": "0.74"
+  },
+  {
+   "month": "2026-10",
+   "preset": "calibrated",
+   "decisions": "78,562",
+   "alert_candidate_ticks": "767,293 (x7.5) / 11,670 (x30)",
+   "alert_episodes": "13,797 (x7.5) / 1,315 (x30)",
+   "trades": "103 filled; 233 orders sent; 3,263 alerts; 106,503 of 4,995,670 ticks visited",
+   "runtime_s": "replay cold 0.30 / warm 0.01; feed load 0.8",
+   "peak_rss_gb": "0.63"
+  },
+  {
+   "month": "2026-11",
+   "preset": "calibrated",
+   "decisions": "106,090",
+   "alert_candidate_ticks": "779,121 (x7.5) / 17,582 (x30)",
+   "alert_episodes": "8,670 (x7.5) / 1,310 (x30)",
+   "trades": "141 filled; 312 orders sent; 4,199 alerts; 143,264 of 4,383,562 ticks visited",
+   "runtime_s": "replay cold 0.30 / warm 0.03; feed load 0.6",
+   "peak_rss_gb": "0.59"
+  },
+  {
+   "month": "TOTAL 9 months (sum of nine one-month runs)",
+   "preset": "calibrated",
+   "decisions": "1,802,074",
+   "alert_candidate_ticks": "12,549,707 (x7.5, 20.0% of ticks) / 330,585 (x30, 0.53%)",
+   "alert_episodes": "127,418 (x7.5) / 17,845 (x30)",
+   "trades": "1,236 filled; 2,643 orders sent; 39,087 alerts; 2,061,229 of 62,732,047 ticks visited (3.3%)",
+   "runtime_s": "replay cold 3.8 / warm 0.31; feed load 7.8",
+   "peak_rss_gb": "0.95 (max month, 2026-03)"
+  }
+ ],
+ "nine_month_estimate": "9 months = nine one-month runs (a continuous nine-month run needs about 7 GB and was not made; the project's own continuous shipped-preset run has 20,688,003 decisions and 2,308,197 alerts against my 20,692,867 and 2,309,118). Shipped preset: 62.73M ticks, 20.69M decisions, 2.31M alerts, 12.55M candidate ticks (x7.5), 127,418 episodes (20 s merge), 22.97M ticks visited (36.6%), replay 6.0 s cold / 2.20 s warm (+8.3 s feed load, +34.3 s one-time compile, 0.15 s from cache). Calibrated preset: 1.80M decisions, 39,087 alerts, 330,585 candidate ticks (x30), 17,845 episodes, 2.06M ticks visited (3.3%), 3.8 s cold / 0.31 s warm. Decision-event table (one row per C_DECISIONS evaluation, prototype layout 136 B/row): shipped-style 20.69M rows = 2.81 GB (about 1.35 GB at an estimated 65 B/row with int16 columns; 3.3-4.1M rows = 0.45-0.56 GB after 1 s thinning), calibrated-style 1.80M rows = 245 MB (about 117 MB compact; 0.19-0.23M rows after 1 s thinning). Build time 29-36 s single-threaded for the shipped-style table (month by month, 2.3 GB peak for March) and 3.5-5.4 s for the calibrated-style one. Evaluating one candidate over the whole table: 55-75 ms (numba) / about 2 s (numpy) shipped-style; 3.5-7 ms (numba) / 0.08-0.11 s (numpy) calibrated-style; the numba-vs-engine gain is about 30-90x, numpy gives none at shipped-style volume. Candidate-level units: 12.55M candidate ticks (x7.5) or 0.33M (x30); episodes 127k or 17.8k; orders 23.5k or 2.6k; fills 9.2k or 1.2k.",
+ "baselines": [
+  {
+   "source": "DEFINITIONS",
+   "slice": "sources, splits, trade metrics",
+   "n": "-",
+   "win_pct": "-",
+   "pf": "-",
+   "avg_points": "-",
+   "mfe_ge_30_pct": "-",
+   "notes": "Sources: replay-ref = results/trades_reference_preset.csv (shipped NativeReference preset, 9,282 trades, 9 months, real-fill execution model); replay-cal = results/center_final_center_trades.csv (calibrated preset, 1,234 trades); real = results/real/real_trades_sar.csv (2,584 real trades, 7 Sep-8 Oct 2026, broker server time, UTC = server - 3 h as in tools/real_replay.py); real-entries-replay = results/real/real_replay_baseline_trades.csv (1,621 real entries re-managed by the engine); cost-cal / cost-ref / fg-gate = my rerun of the engine with extra logging (trades and counters identical to the repository engine in all 18 month runs; adds fill and exit spread, stop level in force, mid at fill and exit; nine one-month runs give 1,236 / 9,241 trades vs 1,234 / 9,282 in the CSVs because the filter and week state restart each month). Metrics: n = closed trades; win_pct = share with pts > 0; pf = sum of winning pts / abs(sum of losing pts); avg_points = mean pts, pts = side x (exit fill - entry fill)/0.01 per 0.01 lot after spread and slippage, commission 0 (1 point = $0.01); t = mean/(sd/sqrt(n)). Splits by entry time: calibration 2025-11-01..2026-02-28, validation 2026-03-01..2026-05-31, hold-out Oct-Nov 2026 (June-Sep 2026 is missing; the calibrated preset was chosen with all three in view). Slices: alert size = abs(mid move) in points over the 10 s lookback at alert start; spread = points at order placement; hour = UTC entry hour (sessions 00-06, 07-11, 12-16, 17-20, 21-23)."
+  },
+  {
+   "source": "DEFINITIONS",
+   "slice": "MFE, no-skill reference, gross edge",
+   "n": "-",
+   "win_pct": "-",
+   "pf": "-",
+   "avg_points": "-",
+   "mfe_ge_30_pct": "-",
+   "notes": "MFE (replays only; the real CSV has none) = highest favourable excursion in points between fill and exit on the exit-side quote (bid for longs, ask for shorts) against the entry fill, so it is net of the spread paid on entry, floored at 0 and cut at the exit (stop, target, defensive or speed exit): a lower bound on how far price went the trade's way. mfe_ge_30_pct = share of trades with MFE >= 30 points (10/60/100 shares are in the notes as MFE>=10/60/100). Because a 90-point stop makes small MFE levels easy to reach, notes give MFE30 excess = observed minus a no-skill reference in percentage points; reference for a driftless path: P(MFE >= x before the stop) = D/(D + x + s), s = spread at the fill, D = 90 + entry slippage - s, averaged over the trades (other exits only lower MFE, so it is an upper bound for no skill). gross = mean of side x (mid at exit tick - mid at fill tick)/0.01 before any spread or slippage, with t = mean/SE; for a driftless mid price this averages 0 for any entry and exit rule, so a gross mean away from 0 is direction skill; net = gross - entry cost - exit cost (identity checked on every trade)."
+  },
+  {
+   "source": "DEFINITIONS",
+   "slice": "cost conventions",
+   "n": "-",
+   "win_pct": "-",
+   "pf": "-",
+   "avg_points": "-",
+   "mfe_ge_30_pct": "-",
+   "notes": "Cost vs the quote: entry cost = side x (entry fill - mid at fill tick); exit cost = side x (mid at exit tick - exit fill); both in points (half-spread plus slippage against the quote; snapped fills make the slippage part negative). Order-price convention of REPORT.md: spread = (spread at fill + spread at exit)/2; entry slip = side x (fill - order price)/0.01 (> 0 worse; limit fills with price improvement < 0); stop slip = side x (stop level - exit fill)/0.01 on stop exits (original stop and trailing layer), else 0; gross before costs on that convention = net + the three. The two conventions differ because a stop order that gaps through its price is charged slippage against the order price, but only the half-spread against the quote."
+  },
+  {
+   "source": "replay-ref",
+   "slice": "ALL 9 months",
+   "n": "9282",
+   "win_pct": "36.0",
+   "pf": "0.72",
+   "avg_points": "-17.9",
+   "mfe_ge_30_pct": "59.8",
+   "notes": "MFE>=10/60/100 69/50/37; gross +0.7 (t +0.6); MFE30 excess -0.8"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "split calibration Nov25-Feb26",
+   "n": "4014",
+   "win_pct": "34.8",
+   "pf": "0.69",
+   "avg_points": "-20.5",
+   "mfe_ge_30_pct": "59.0",
+   "notes": "MFE>=10/60/100 67/49/36; gross +1.1 (t +0.6); MFE30 excess +0.5"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "split validation Mar-May26",
+   "n": "4134",
+   "win_pct": "36.7",
+   "pf": "0.72",
+   "avg_points": "-17.9",
+   "mfe_ge_30_pct": "58.6",
+   "notes": "MFE>=10/60/100 68/49/38; gross +0.3 (t +0.2); MFE30 excess -2.7"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "split hold-out Oct-Nov26",
+   "n": "1134",
+   "win_pct": "37.7",
+   "pf": "0.83",
+   "avg_points": "-9.0",
+   "mfe_ge_30_pct": "66.8",
+   "notes": "MFE>=10/60/100 76/55/39; gross +0.7 (t +0.2); MFE30 excess +1.1"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "route EXHL:BL",
+   "n": "1171",
+   "win_pct": "28.6",
+   "pf": "0.62",
+   "avg_points": "-24.8",
+   "mfe_ge_30_pct": "53.0",
+   "notes": "MFE>=10/60/100 61/42/32; gross -1.2 (t -0.4); MFE30 excess +0.5"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "route EXHL:SL",
+   "n": "1671",
+   "win_pct": "26.9",
+   "pf": "0.57",
+   "avg_points": "-29.0",
+   "mfe_ge_30_pct": "47.8",
+   "notes": "MFE>=10/60/100 57/40/30; gross -5.2 (t -2.0); MFE30 excess -3.9"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "route FLXQ:BS",
+   "n": "2901",
+   "win_pct": "39.5",
+   "pf": "0.76",
+   "avg_points": "-14.9",
+   "mfe_ge_30_pct": "64.7",
+   "notes": "MFE>=10/60/100 74/54/40; gross +1.1 (t +0.5); MFE30 excess +0.1"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "route FLXQ:SS",
+   "n": "3539",
+   "win_pct": "39.8",
+   "pf": "0.80",
+   "avg_points": "-12.9",
+   "mfe_ge_30_pct": "63.7",
+   "notes": "MFE>=10/60/100 73/54/40; gross +3.8 (t +1.8); MFE30 excess -0.6"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "side buy",
+   "n": "4072",
+   "win_pct": "36.3",
+   "pf": "0.72",
+   "avg_points": "-17.7",
+   "mfe_ge_30_pct": "61.3",
+   "notes": "MFE>=10/60/100 70/50/38; gross +0.4 (t +0.2); MFE30 excess +0.3"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "side sell",
+   "n": "5210",
+   "win_pct": "35.7",
+   "pf": "0.72",
+   "avg_points": "-18.1",
+   "mfe_ge_30_pct": "58.6",
+   "notes": "MFE>=10/60/100 68/49/37; gross +0.9 (t +0.5); MFE30 excess -1.7"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "alert size <100 pts",
+   "n": "1567",
+   "win_pct": "36.7",
+   "pf": "0.78",
+   "avg_points": "-12.3",
+   "mfe_ge_30_pct": "64.0",
+   "notes": "MFE>=10/60/100 74/52/38; gross -1.2 (t -0.5); MFE30 excess -1.2"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "alert size 100-150 pts",
+   "n": "3188",
+   "win_pct": "35.4",
+   "pf": "0.73",
+   "avg_points": "-16.6",
+   "mfe_ge_30_pct": "61.5",
+   "notes": "MFE>=10/60/100 71/50/37; gross -1.4 (t -0.7); MFE30 excess -1.0"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "alert size 150-200 pts",
+   "n": "1800",
+   "win_pct": "35.6",
+   "pf": "0.67",
+   "avg_points": "-21.7",
+   "mfe_ge_30_pct": "57.9",
+   "notes": "MFE>=10/60/100 68/49/37; gross -1.8 (t -0.7); MFE30 excess -1.8"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "alert size 200-300 pts",
+   "n": "1524",
+   "win_pct": "36.3",
+   "pf": "0.71",
+   "avg_points": "-19.4",
+   "mfe_ge_30_pct": "57.2",
+   "notes": "MFE>=10/60/100 65/48/37; gross +4.4 (t +1.4); MFE30 excess +0.2"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "alert size 300-400 pts",
+   "n": "579",
+   "win_pct": "35.8",
+   "pf": "0.70",
+   "avg_points": "-22.1",
+   "mfe_ge_30_pct": "57.0",
+   "notes": "MFE>=10/60/100 64/49/36; gross +5.5 (t +1.0); MFE30 excess +1.9"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "alert size 400-600 pts",
+   "n": "405",
+   "win_pct": "33.3",
+   "pf": "0.58",
+   "avg_points": "-32.2",
+   "mfe_ge_30_pct": "52.3",
+   "notes": "MFE>=10/60/100 58/43/34; gross -3.9 (t -0.6); MFE30 excess -3.7"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "alert size >=600 pts",
+   "n": "219",
+   "win_pct": "45.7",
+   "pf": "1.02",
+   "avg_points": "+1.7",
+   "mfe_ge_30_pct": "58.9",
+   "notes": "MFE>=10/60/100 63/54/47; gross +34.8 (t +3.2); MFE30 excess +3.0 (the one skilled slice of the shipped preset)"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "spread at order <=10 pts",
+   "n": "554",
+   "win_pct": "38.8",
+   "pf": "0.86",
+   "avg_points": "-7.6",
+   "mfe_ge_30_pct": "64.8",
+   "notes": "MFE>=10/60/100 74/54/40; gross +2.5 (t +0.6); MFE30 excess -1.7"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "spread at order 11-13 pts",
+   "n": "2506",
+   "win_pct": "38.0",
+   "pf": "0.81",
+   "avg_points": "-10.7",
+   "mfe_ge_30_pct": "65.7",
+   "notes": "MFE>=10/60/100 76/53/39; gross +0.7 (t +0.3); MFE30 excess +0.6"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "spread at order 14-16 pts",
+   "n": "2398",
+   "win_pct": "36.4",
+   "pf": "0.73",
+   "avg_points": "-16.8",
+   "mfe_ge_30_pct": "61.3",
+   "notes": "MFE>=10/60/100 71/50/38; gross -1.0 (t -0.4); MFE30 excess -1.4"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "spread at order 17-20 pts",
+   "n": "2137",
+   "win_pct": "35.7",
+   "pf": "0.70",
+   "avg_points": "-20.0",
+   "mfe_ge_30_pct": "57.5",
+   "notes": "MFE>=10/60/100 67/49/37; gross +0.6 (t +0.2); MFE30 excess -2.3"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "spread at order >=21 pts",
+   "n": "1687",
+   "win_pct": "31.8",
+   "pf": "0.60",
+   "avg_points": "-31.1",
+   "mfe_ge_30_pct": "50.1",
+   "notes": "MFE>=10/60/100 57/43/34; gross +2.5 (t +0.8); MFE30 excess +0.2"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "entry hour UTC 00-06",
+   "n": "2430",
+   "win_pct": "37.2",
+   "pf": "0.77",
+   "avg_points": "-14.7",
+   "mfe_ge_30_pct": "59.8",
+   "notes": "MFE>=10/60/100 68/51/38; gross +5.7 (t +2.3); MFE30 excess +0.2"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "entry hour UTC 07-11",
+   "n": "1314",
+   "win_pct": "37.3",
+   "pf": "0.80",
+   "avg_points": "-12.7",
+   "mfe_ge_30_pct": "60.0",
+   "notes": "MFE>=10/60/100 69/51/39; gross +6.0 (t +1.8); MFE30 excess -0.6"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "entry hour UTC 12-16",
+   "n": "4043",
+   "win_pct": "35.8",
+   "pf": "0.70",
+   "avg_points": "-19.1",
+   "mfe_ge_30_pct": "60.5",
+   "notes": "MFE>=10/60/100 69/49/37; gross -1.5 (t -0.8); MFE30 excess -0.7"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "entry hour UTC 17-20",
+   "n": "1410",
+   "win_pct": "32.7",
+   "pf": "0.62",
+   "avg_points": "-25.9",
+   "mfe_ge_30_pct": "57.7",
+   "notes": "MFE>=10/60/100 68/47/34; gross -7.8 (t -2.6); MFE30 excess -3.2"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "entry hour UTC 21-23",
+   "n": "85",
+   "win_pct": "43.5",
+   "pf": "0.93",
+   "avg_points": "-4.7",
+   "mfe_ge_30_pct": "56.5",
+   "notes": "MFE>=10/60/100 67/49/44; gross +21.4 (t +1.5); MFE30 excess +0.7"
+  },
+  {
+   "source": "replay-ref",
+   "slice": "by month (YY-MM)",
+   "n": "9282",
+   "win_pct": "n/a",
+   "pf": "n/a",
+   "avg_points": "n/a",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "25-11: n624 pf0.77 avg-13.2; 25-12: n710 pf0.75 avg-14.8; 26-01: n1366 pf0.72 avg-18.4; 26-02: n1314 pf0.61 avg-29.2; 26-03: n2138 pf0.71 avg-20.0; 26-04: n1038 pf0.71 avg-18.5; 26-05: n958 pf0.79 avg-12.7; 26-10: n589 pf0.77 avg-12.3; 26-11: n545 pf0.89 avg-5.5; gross mid-to-mid is within +/-4.4 pts of 0 in every month (|t| < 1)"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "ALL 9 months",
+   "n": "1234",
+   "win_pct": "33.1",
+   "pf": "1.15",
+   "avg_points": "+10.0",
+   "mfe_ge_30_pct": "67.8",
+   "notes": "MFE>=10/60/100 76/57/46; gross +28.3 (t +4.9); MFE30 excess +2.7"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "split calibration Nov25-Feb26",
+   "n": "412",
+   "win_pct": "34.5",
+   "pf": "1.16",
+   "avg_points": "+11.6",
+   "mfe_ge_30_pct": "67.7",
+   "notes": "MFE>=10/60/100 74/56/47; gross +35.1 (t +3.3); MFE30 excess +4.1"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "split validation Mar-May26",
+   "n": "580",
+   "win_pct": "32.9",
+   "pf": "1.06",
+   "avg_points": "+4.2",
+   "mfe_ge_30_pct": "66.9",
+   "notes": "MFE>=10/60/100 76/57/46; gross +22.9 (t +2.8); MFE30 excess +1.1"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "split hold-out Oct-Nov26",
+   "n": "242",
+   "win_pct": "31.4",
+   "pf": "1.39",
+   "avg_points": "+21.0",
+   "mfe_ge_30_pct": "70.2",
+   "notes": "MFE>=10/60/100 82/59/46; gross +29.8 (t +2.4); MFE30 excess +4.0 (not a clean hold-out: preset chosen with it in view)"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "route FLXQ:BS",
+   "n": "306",
+   "win_pct": "36.6",
+   "pf": "1.50",
+   "avg_points": "+29.1",
+   "mfe_ge_30_pct": "71.6",
+   "notes": "MFE>=10/60/100 79/62/52; gross +44.2 (t +3.8); MFE30 excess +5.5; gross +48.8/+50.1/+29.6 in cal/val/hold"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "route FLXQ:SS",
+   "n": "451",
+   "win_pct": "29.0",
+   "pf": "0.84",
+   "avg_points": "-11.0",
+   "mfe_ge_30_pct": "65.0",
+   "notes": "MFE>=10/60/100 75/53/42; gross +7.3 (t +0.9); MFE30 excess -0.0; gross +22.7/-1.6/-1.0 in cal/val/hold: no skill outside the calibration months"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "route QUAL:BS",
+   "n": "182",
+   "win_pct": "36.8",
+   "pf": "1.47",
+   "avg_points": "+28.3",
+   "mfe_ge_30_pct": "67.0",
+   "notes": "MFE>=10/60/100 75/58/48; gross +45.0 (t +2.9); MFE30 excess +2.2"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "route QUAL:SS",
+   "n": "295",
+   "win_pct": "33.6",
+   "pf": "1.15",
+   "avg_points": "+10.8",
+   "mfe_ge_30_pct": "68.8",
+   "notes": "MFE>=10/60/100 77/58/46; gross +33.7 (t +2.6); MFE30 excess +4.0"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "side buy",
+   "n": "488",
+   "win_pct": "36.7",
+   "pf": "1.49",
+   "avg_points": "+28.8",
+   "mfe_ge_30_pct": "69.9",
+   "notes": "MFE>=10/60/100 77/61/51; gross +44.5 (t +4.8); MFE30 excess +4.3; PF by split 1.52/1.53/1.38"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "side sell",
+   "n": "746",
+   "win_pct": "30.8",
+   "pf": "0.97",
+   "avg_points": "-2.4",
+   "mfe_ge_30_pct": "66.5",
+   "notes": "MFE>=10/60/100 76/55/43; gross +17.7 (t +2.4); MFE30 excess +1.6; PF by split 1.00/0.84/1.39"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "alert size <100 pts",
+   "n": "18",
+   "win_pct": "22.2",
+   "pf": "0.82",
+   "avg_points": "-9.7",
+   "mfe_ge_30_pct": "66.7",
+   "notes": "MFE>=10/60/100 78/61/50; gross -0.0 (t -0.0); MFE30 excess +1.4"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "alert size 100-150 pts",
+   "n": "38",
+   "win_pct": "21.1",
+   "pf": "0.28",
+   "avg_points": "-46.1",
+   "mfe_ge_30_pct": "57.9",
+   "notes": "MFE>=10/60/100 68/53/34; gross -32.7 (t -2.4); MFE30 excess -7.5"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "alert size 150-200 pts",
+   "n": "133",
+   "win_pct": "36.1",
+   "pf": "1.36",
+   "avg_points": "+19.2",
+   "mfe_ge_30_pct": "72.9",
+   "notes": "MFE>=10/60/100 82/59/48; gross +30.0 (t +2.0); MFE30 excess +7.1"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "alert size 200-300 pts",
+   "n": "343",
+   "win_pct": "35.3",
+   "pf": "1.41",
+   "avg_points": "+24.2",
+   "mfe_ge_30_pct": "70.0",
+   "notes": "MFE>=10/60/100 80/60/50; gross +38.0 (t +3.5); MFE30 excess +3.5"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "alert size 300-400 pts",
+   "n": "290",
+   "win_pct": "33.8",
+   "pf": "1.20",
+   "avg_points": "+13.1",
+   "mfe_ge_30_pct": "67.6",
+   "notes": "MFE>=10/60/100 74/57/44; gross +29.8 (t +2.5); MFE30 excess +2.3"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "alert size 400-600 pts",
+   "n": "319",
+   "win_pct": "29.8",
+   "pf": "0.82",
+   "avg_points": "-14.5",
+   "mfe_ge_30_pct": "63.6",
+   "notes": "MFE>=10/60/100 71/54/43; gross +9.2 (t +0.8); MFE30 excess -1.3"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "alert size >=600 pts",
+   "n": "93",
+   "win_pct": "37.6",
+   "pf": "1.59",
+   "avg_points": "+45.0",
+   "mfe_ge_30_pct": "72.0",
+   "notes": "MFE>=10/60/100 81/61/55; gross +81.3 (t +3.0); MFE30 excess +12.2"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "spread at order <=10 pts",
+   "n": "120",
+   "win_pct": "33.3",
+   "pf": "1.37",
+   "avg_points": "+20.0",
+   "mfe_ge_30_pct": "76.7",
+   "notes": "MFE>=10/60/100 88/61/52; gross +30.9 (t +1.8); MFE30 excess +9.4"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "spread at order 11-13 pts",
+   "n": "349",
+   "win_pct": "36.7",
+   "pf": "1.41",
+   "avg_points": "+23.6",
+   "mfe_ge_30_pct": "69.3",
+   "notes": "MFE>=10/60/100 79/60/50; gross +35.8 (t +3.4); MFE30 excess +2.4"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "spread at order 14-16 pts",
+   "n": "353",
+   "win_pct": "30.3",
+   "pf": "0.96",
+   "avg_points": "-2.7",
+   "mfe_ge_30_pct": "64.3",
+   "notes": "MFE>=10/60/100 74/52/42; gross +12.5 (t +1.3); MFE30 excess -1.7"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "spread at order 17-20 pts",
+   "n": "237",
+   "win_pct": "30.8",
+   "pf": "1.01",
+   "avg_points": "+0.6",
+   "mfe_ge_30_pct": "67.1",
+   "notes": "MFE>=10/60/100 75/59/44; gross +21.3 (t +1.7); MFE30 excess +2.0"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "spread at order >=21 pts",
+   "n": "175",
+   "win_pct": "34.9",
+   "pf": "1.16",
+   "avg_points": "+14.1",
+   "mfe_ge_30_pct": "66.9",
+   "notes": "MFE>=10/60/100 72/56/47; gross +53.0 (t +2.6); MFE30 excess +8.1 (costs 38.9 per trade)"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "entry hour UTC 00-06",
+   "n": "231",
+   "win_pct": "29.9",
+   "pf": "0.93",
+   "avg_points": "-5.0",
+   "mfe_ge_30_pct": "66.7",
+   "notes": "MFE>=10/60/100 77/57/44; gross +15.8 (t +1.3); MFE30 excess +2.8"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "entry hour UTC 07-11",
+   "n": "167",
+   "win_pct": "36.5",
+   "pf": "1.38",
+   "avg_points": "+25.7",
+   "mfe_ge_30_pct": "67.1",
+   "notes": "MFE>=10/60/100 74/57/47; gross +45.7 (t +2.6); MFE30 excess +1.8"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "entry hour UTC 12-16",
+   "n": "636",
+   "win_pct": "33.0",
+   "pf": "1.18",
+   "avg_points": "+12.0",
+   "mfe_ge_30_pct": "68.2",
+   "notes": "MFE>=10/60/100 77/57/47; gross +29.0 (t +3.5); MFE30 excess +2.9"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "entry hour UTC 17-20",
+   "n": "183",
+   "win_pct": "36.1",
+   "pf": "1.20",
+   "avg_points": "+12.6",
+   "mfe_ge_30_pct": "69.4",
+   "notes": "MFE>=10/60/100 78/60/49; gross +30.7 (t +2.1); MFE30 excess +2.9"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "entry hour UTC 21-23",
+   "n": "17",
+   "win_pct": "17.6",
+   "pf": "0.48",
+   "avg_points": "-44.2",
+   "mfe_ge_30_pct": "58.8",
+   "notes": "MFE>=10/60/100 65/41/29; gross -22.1 (t -0.5); n too small"
+  },
+  {
+   "source": "replay-cal",
+   "slice": "by month (YY-MM)",
+   "n": "1234",
+   "win_pct": "n/a",
+   "pf": "n/a",
+   "avg_points": "n/a",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "25-11: n57 pf0.74 avg-16.3; 25-12: n54 pf0.82 avg-11.0; 26-01: n167 pf1.40 avg+27.9; 26-02: n134 pf1.14 avg+12.2; 26-03: n295 pf1.19 avg+13.7; 26-04: n120 pf0.92 avg-5.3; 26-05: n165 pf0.90 avg-6.0; 26-10: n103 pf0.98 avg-1.1; 26-11: n139 pf1.75 avg+37.4; gross mid-to-mid by month: -0.3, +6.6, +49.6, +43.6, +36.7, +11.4, +6.5, +8.2, +45.5 (t >= 2.0 only in 26-01, 26-02, 26-03, 26-11)"
+  },
+  {
+   "source": "cost-cal",
+   "slice": "calibrated ALL (1,236 trades)",
+   "n": "1236",
+   "win_pct": "33.1",
+   "pf": "1.15",
+   "avg_points": "+9.8",
+   "mfe_ge_30_pct": "67.9",
+   "notes": "net +9.8 = gross mid-to-mid +28.3 (SE 5.8, t +4.9) - entry cost vs mid 6.2 - exit cost vs mid 12.3 [half-spreads 8.3 + 8.6]. Order-price convention: spread 16.9 + entry slip 17.5 (exact fill 54%) + stop slip 17.0 (86% of trades end at a stop, 19.9 per stop exit, exact 56%) = 51.5 total; gross before costs +61.3; spread at decision 16.4"
+  },
+  {
+   "source": "cost-cal",
+   "slice": "split calibration Nov25-Feb26",
+   "n": "412",
+   "win_pct": "34.5",
+   "pf": "1.16",
+   "avg_points": "+11.6",
+   "mfe_ge_30_pct": "67.7",
+   "notes": "net +11.6 = gross +35.1 (SE 10.7, t +3.3) - entry cost 8.0 - exit cost 15.5. Order-price: spread 20.4 + entry slip 20.7 (exact 49%) + stop slip 20.8 (87% end at a stop, 24.0 per stop exit) = 61.8; gross +73.5"
+  },
+  {
+   "source": "cost-cal",
+   "slice": "split validation Mar-May26",
+   "n": "580",
+   "win_pct": "32.9",
+   "pf": "1.06",
+   "avg_points": "+4.2",
+   "mfe_ge_30_pct": "66.9",
+   "notes": "net +4.2 = gross +22.9 (SE 8.2, t +2.8) - entry cost 6.1 - exit cost 12.6. Order-price: spread 16.5 + entry slip 19.6 (exact 48%) + stop slip 18.1 (87% end at a stop, 20.8 per stop exit) = 54.1; gross +58.3"
+  },
+  {
+   "source": "cost-cal",
+   "slice": "split hold-out Oct-Nov26",
+   "n": "244",
+   "win_pct": "31.1",
+   "pf": "1.37",
+   "avg_points": "+20.3",
+   "mfe_ge_30_pct": "70.5",
+   "notes": "net +20.3 = gross +29.8 (SE 12.3, t +2.4) - entry cost 3.1 - exit cost 6.4. Order-price: spread 12.1 + entry slip 7.4 (exact 75%) + stop slip 8.2 (81% end at a stop, 10.2 per stop exit) = 27.7; gross +48.0"
+  },
+  {
+   "source": "cost-cal",
+   "slice": "side buys",
+   "n": "489",
+   "win_pct": "36.6",
+   "pf": "1.49",
+   "avg_points": "+28.7",
+   "mfe_ge_30_pct": "69.9",
+   "notes": "net +28.7 = gross +44.5 (SE 9.3, t +4.8) - entry cost 5.5 - exit cost 10.3. Order-price: spread 15.5 + entry slip 15.7 + stop slip 14.5 = 45.8; gross +74.4"
+  },
+  {
+   "source": "cost-cal",
+   "slice": "side sells",
+   "n": "747",
+   "win_pct": "30.8",
+   "pf": "0.97",
+   "avg_points": "-2.5",
+   "mfe_ge_30_pct": "66.5",
+   "notes": "net -2.5 = gross +17.7 (SE 7.3, t +2.4) - entry cost 6.6 - exit cost 13.6. Order-price: spread 17.8 + entry slip 18.7 + stop slip 18.7 = 55.2; gross +52.7"
+  },
+  {
+   "source": "cost-ref",
+   "slice": "shipped ALL (9,241 trades)",
+   "n": "9241",
+   "win_pct": "36.0",
+   "pf": "0.72",
+   "avg_points": "-17.9",
+   "mfe_ge_30_pct": "59.7",
+   "notes": "net -17.9 = gross +0.7 (SE 1.2, t +0.6) - entry cost 7.0 - exit cost 11.5 [half-spreads 8.6 + 8.7]. Order-price: spread 17.3 + entry slip 3.4 (exact 45%; limit fades are negative = price improvement) + stop slip 11.8 (54% end at a stop, 22.0 per stop exit) = 32.5; gross +14.7"
+  },
+  {
+   "source": "cost-ref",
+   "slice": "split calibration Nov25-Feb26",
+   "n": "4005",
+   "win_pct": "34.8",
+   "pf": "0.69",
+   "avg_points": "-20.4",
+   "mfe_ge_30_pct": "59.0",
+   "notes": "net -20.4 = gross +1.1 (t +0.6) - costs 21.4 vs mid. Order-price: spread 19.5 + entry slip 2.7 + stop slip 13.7 = 35.9"
+  },
+  {
+   "source": "cost-ref",
+   "slice": "split validation Mar-May26",
+   "n": "4105",
+   "win_pct": "36.6",
+   "pf": "0.72",
+   "avg_points": "-18.0",
+   "mfe_ge_30_pct": "58.4",
+   "notes": "net -18.0 = gross +0.3 (t +0.2) - costs 18.3 vs mid. Order-price: spread 16.8 + entry slip 4.3 + stop slip 12.3 = 33.4"
+  },
+  {
+   "source": "cost-ref",
+   "slice": "split hold-out Oct-Nov26",
+   "n": "1131",
+   "win_pct": "37.9",
+   "pf": "0.83",
+   "avg_points": "-8.7",
+   "mfe_ge_30_pct": "66.8",
+   "notes": "net -8.7 = gross +0.7 (t +0.2) - costs 9.4 vs mid. Order-price: spread 11.7 + entry slip 2.1 + stop slip 3.9 = 17.6; stop-loss slip mean 7-9 pts in Oct-Nov 2026 vs 22-37 pts in Jan-Mar 2026"
+  },
+  {
+   "source": "fg-gate",
+   "slice": "calibrated: trades taken with and without the FlashGold gate (cost-cal reruns)",
+   "n": "1142 taken in both; 628 only without the gate",
+   "win_pct": "n/a",
+   "pf": "n/a",
+   "avg_points": "+12.5 in both; -12.6 only without",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "gate ON all n=1,236 gross +28.3 (t 4.9); gate OFF all n=1,770 gross +22.6 (t 4.9). Taken in both: gross +31.3 (t 5.2). Taken only without the gate (blocked + knock-on): gross +7.0 (t 1.0). Difference 24.3 +/- 9.2 pts (t 2.6), net difference 25.1 +/- 9.3. Project CSV: PF 1.150 on vs 1.053 off, blocked trades average -11.2 pts"
+  },
+  {
+   "source": "fg-gate",
+   "slice": "shipped: gate ON vs OFF",
+   "n": "9241 on; 11100 off",
+   "win_pct": "n/a",
+   "pf": "0.719 on; 0.706 off",
+   "avg_points": "-17.9 on; -18.6 off",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "gross +0.7 (t 0.6) on vs +0.1 (t 0.1) off: no direction skill with or without the gate; matching by decision time is unreliable for the shipped preset (knock-on state changes), so the kept/blocked split was not used. Project CSV: the 1,826 extra trades without the gate average -22.2 pts"
+  },
+  {
+   "source": "real",
+   "slice": "ALL",
+   "n": "2584",
+   "win_pct": "36.2",
+   "pf": "0.83",
+   "avg_points": "-8.5",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -4.3; median hold 19 s; no split possible (all in Sep 7-Oct 8 2026)"
+  },
+  {
+   "source": "real",
+   "slice": "flow=agrees (FA)",
+   "n": "1609",
+   "win_pct": "35.2",
+   "pf": "0.80",
+   "avg_points": "-9.8",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -4.0; median hold 20 s"
+  },
+  {
+   "source": "real",
+   "slice": "flow=disagrees (FD)",
+   "n": "409",
+   "win_pct": "38.9",
+   "pf": "0.92",
+   "avg_points": "-4.2",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -0.8; difference to agrees +5.7 pts, bootstrap 95% range about -5.3 to +16.7 (it moves with the seed)"
+  },
+  {
+   "source": "real",
+   "slice": "flow=none",
+   "n": "566",
+   "win_pct": "37.1",
+   "pf": "0.85",
+   "avg_points": "-7.8",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -1.7; median hold 16 s"
+  },
+  {
+   "source": "real",
+   "slice": "FOLM:BM (market buy)",
+   "n": "946",
+   "win_pct": "34.6",
+   "pf": "0.81",
+   "avg_points": "-9.2",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -2.9; FA n701 pf0.87 avg-6.4; FD n113 pf0.60 avg-22.7"
+  },
+  {
+   "source": "real",
+   "slice": "FOLM:SM (market sell)",
+   "n": "965",
+   "win_pct": "36.9",
+   "pf": "0.87",
+   "avg_points": "-6.5",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -2.0; FA n826 pf0.79 avg-10.8; FD n139 pf1.50 avg+19.2 (t +2.2): the flow label flips sign between BM and SM"
+  },
+  {
+   "source": "real",
+   "slice": "FLXQ stop with burst",
+   "n": "394",
+   "win_pct": "39.1",
+   "pf": "0.87",
+   "avg_points": "-7.4",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -1.3; median hold 19 s"
+  },
+  {
+   "source": "real",
+   "slice": "EXHL limit fade",
+   "n": "236",
+   "win_pct": "34.3",
+   "pf": "0.74",
+   "avg_points": "-13.4",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -2.1; median hold 10 s"
+  },
+  {
+   "source": "real",
+   "slice": "CONT/BNO/OTHER stop",
+   "n": "43",
+   "win_pct": "39.5",
+   "pf": "0.67",
+   "avg_points": "-20.0",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -1.2"
+  },
+  {
+   "source": "real",
+   "slice": "side buy",
+   "n": "1272",
+   "win_pct": "35.5",
+   "pf": "0.81",
+   "avg_points": "-9.8",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -3.5 (gold fell about 7% over the window)"
+  },
+  {
+   "source": "real",
+   "slice": "side sell",
+   "n": "1312",
+   "win_pct": "36.9",
+   "pf": "0.86",
+   "avg_points": "-7.3",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -2.6"
+  },
+  {
+   "source": "real",
+   "slice": "first half Sep 7-22",
+   "n": "1759",
+   "win_pct": "37.0",
+   "pf": "0.84",
+   "avg_points": "-8.3",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "stability check instead of a split"
+  },
+  {
+   "source": "real",
+   "slice": "second half Sep 23-Oct 8",
+   "n": "825",
+   "win_pct": "34.5",
+   "pf": "0.82",
+   "avg_points": "-9.0",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "stability check instead of a split"
+  },
+  {
+   "source": "real",
+   "slice": "held 10 s or less",
+   "n": "821",
+   "win_pct": "31.9",
+   "pf": "0.58",
+   "avg_points": "-24.7",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -7.3; median hold 5 s"
+  },
+  {
+   "source": "real",
+   "slice": "held 10-40 s",
+   "n": "1114",
+   "win_pct": "35.5",
+   "pf": "0.78",
+   "avg_points": "-11.3",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -3.8"
+  },
+  {
+   "source": "real",
+   "slice": "held longer than 40 s",
+   "n": "649",
+   "win_pct": "42.8",
+   "pf": "1.44",
+   "avg_points": "+16.9",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t +4.2 (survivorship of the exit rules, not a direction signal)"
+  },
+  {
+   "source": "real",
+   "slice": "entry hour UTC 00-06",
+   "n": "905",
+   "win_pct": "35.5",
+   "pf": "0.82",
+   "avg_points": "-9.4",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -2.8"
+  },
+  {
+   "source": "real",
+   "slice": "entry hour UTC 07-11",
+   "n": "603",
+   "win_pct": "36.2",
+   "pf": "0.90",
+   "avg_points": "-5.1",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -1.2"
+  },
+  {
+   "source": "real",
+   "slice": "entry hour UTC 12-16",
+   "n": "674",
+   "win_pct": "38.0",
+   "pf": "0.82",
+   "avg_points": "-9.2",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -2.4"
+  },
+  {
+   "source": "real",
+   "slice": "entry hour UTC 17-20",
+   "n": "338",
+   "win_pct": "34.3",
+   "pf": "0.79",
+   "avg_points": "-10.8",
+   "mfe_ge_30_pct": "n/a",
+   "notes": "t -2.0; 21-23 UTC n64 pf0.83 avg-8.6; no hour is significant (24 hours: max abs t 3.2)"
+  },
+  {
+   "source": "real-entries-replay",
+   "slice": "ALL 1,621 real entries inside downloaded ticks",
+   "n": "1621",
+   "win_pct": "37.4",
+   "pf": "0.87",
+   "avg_points": "-6.4",
+   "mfe_ge_30_pct": "61.4",
+   "notes": "real results; MFE from the engine managing the real entries with shipped exits. MFE>=10/60/100 75.3/48.9/36.0; no-skill reference 72.9/59.8/47.2/36.9 at 10/30/60/100; excess +2.4/+1.6/+1.7/-0.9 (z 2.2/1.4/1.4/-0.8)"
+  },
+  {
+   "source": "real-entries-replay",
+   "slice": "FOLM market entries (flow route)",
+   "n": "1243",
+   "win_pct": "37.7",
+   "pf": "0.90",
+   "avg_points": "-4.8",
+   "mfe_ge_30_pct": "60.8",
+   "notes": "excess over no-skill +1.4/+1.5/+1.8/+0.2 at 10/30/60/100 (z 1.1/1.1/1.3/0.2): no measurable direction skill"
+  },
+  {
+   "source": "real-entries-replay",
+   "slice": "FOLM flow agrees",
+   "n": "1009",
+   "win_pct": "37.4",
+   "pf": "0.89",
+   "avg_points": "-5.5",
+   "mfe_ge_30_pct": "61.0",
+   "notes": "excess +1.7/+1.7/+2.1/+0.3 (z 1.2/1.1/1.4/0.2)"
+  },
+  {
+   "source": "real-entries-replay",
+   "slice": "FOLM flow disagrees",
+   "n": "155",
+   "win_pct": "40.6",
+   "pf": "1.09",
+   "avg_points": "+3.8",
+   "mfe_ge_30_pct": "63.2",
+   "notes": "excess +2.8/+3.9/+3.2/+3.9 (z 0.8/1.0/0.8/1.0): not different from agrees"
+  },
+  {
+   "source": "real-entries-replay",
+   "slice": "FOLM no flow label",
+   "n": "79",
+   "win_pct": "35.4",
+   "pf": "0.78",
+   "avg_points": "-12.1",
+   "mfe_ge_30_pct": "54.4",
+   "notes": "excess -4.4/-6.4/-5.0/-7.2 (z -0.9/-1.1/-0.9/-1.4)"
+  },
+  {
+   "source": "real-entries-replay",
+   "slice": "EXHL limit fades",
+   "n": "158",
+   "win_pct": "36.7",
+   "pf": "0.82",
+   "avg_points": "-8.9",
+   "mfe_ge_30_pct": "69.6",
+   "notes": "excess +14.5/+11.1/+5.5/-3.6 (z 5.2/3.1/1.4/-1.0) unlike the replay's own EXHL (-3.8 at 10 pts); the real limit fills sit at the limit price while the replay fills at the market; unexplained, treat as feed-offset noise"
+  },
+  {
+   "source": "real-entries-replay",
+   "slice": "FLXQ stop entries",
+   "n": "188",
+   "win_pct": "36.2",
+   "pf": "0.77",
+   "avg_points": "-13.3",
+   "mfe_ge_30_pct": "59.6",
+   "notes": "excess -0.1/-3.6/-0.7/-4.5 (z -0.0/-1.0/-0.2/-1.3)"
+  }
+ ],
+ "where_direction_skill_exists": "GENUINE EDGE BEFORE COSTS exists only in the calibrated regime (alert of at least 30 spreads, spread cap 14, stop entries): gross mid-to-mid +28.3 pts/trade (SE 5.8, t 4.9; +35.1/+22.9/+29.8 in calibration/validation/hold-out, t 3.3/2.8/2.4) against 18.5 pts of cost vs the quote (51.5 in the order-price convention), net +9.8. It is concentrated in: buys (+44.5, t 4.8; sells +17.7, t 2.4, but net -2.5 because sells cost 20.2 vs 15.8); FLXQ:BS +44.2 (t 3.8) and QUAL:BS/SS +45.0/+33.7 (t 2.9/2.6) but not FLXQ:SS (+7.3, t 0.9; -1.6 and -1.0 in validation and hold-out); bursts of 150-400 pts (+30..+38, t 2.0-3.5) and >=600 pts (+81, t 3.0, n 93) but not 400-600 (+9) or 100-150 (-33); spread <=13 at order (+31..+36, t 1.8-3.4) vs 14-16 (+12.5, t 1.3); and four months (Jan, Feb, Mar, Nov 2026: +37..+50, t 2.0-2.8) while the other five are about 0 (-0.3..+11). The FlashGold gate adds direction information in this regime: trades the gate keeps average +31.3 gross (t 5.2), trades taken only without it +7.0 (t 1.0), difference 24.3 +/- 9.2. NO SKILL in: the shipped preset overall (gross +0.7 +/- 1.2, t 0.6; MFE excess -3.7/-0.8/+0.8/-1.4 pts at 10/30/60/100 against a no-skill reference; zero in every split, side and month; its only exception is alerts >=600 pts: n 219, gross +34.8, t 3.2); its EXHL limit fades (-1.2 / -5.2, t -0.4 / -2.0; the market keeps going against them); its FlashGold gate (gross +0.7 on vs +0.1 off); the real account's flow label (disagrees minus agrees +5.7 pts, CI -5.4..+16.7; FOLM re-managed MFE excess +1.4/+1.5/+1.8/+0.2); hour of day or session (rank correlation of hourly mean points between splits -0.3..+0.3 in both replays). Caveats: the calibrated preset was chosen with all three splits in view; costs swing 3x by month (stop-loss slip mean 7-9 pts Oct-Nov 2026 vs 22-37 pts Jan-Mar 2026) and the cost model was fitted on one month of real fills; the replay cannot take the flow-driven market route that made 74% of the real trades; real trades carry no MFE; June-Sep 2026 is missing.",
+ "design_implications": [
+  "Do not justify the event table by replay speed: a 9-month engine replay is 0.3 s (calibrated-style) to 2.2 s (shipped-style) warm, so 1,000 candidates cost 5-37 minutes. The table pays from about 10^4-10^5 candidates (joint search over 10+ weights and thresholds): numba re-scoring is 30-90x faster than a replay, numpy only 1-3x (about 2 s per candidate over a shipped-style 20.7M-row table, equal to the replay).",
+  "Decide what the table is for: (a) an execution-independent direction objective (forward mid move at 1-60 s and max up/down within 30/60 s, signed by the chosen side; metrics gross mid-to-mid edge and MFE-excess-over-no-skill) and (b) a cheap pre-screen; always confirm finalists in the full replay (0.3-2.2 s). Stops, trailing and order types stay out of the objective and are calibrated by hand.",
+  "Build it month by month with the engine's own decision branch (logging-only patch; trades and counters identical in all 18 month runs; scratch copy in events-baseline/xtools, built by make_patched.py): one row per C_DECISIONS evaluation at the lowest alert multiplier of interest (x7.5: 20.7M rows) or only x>=20 (about 2M rows); keep alert size in spreads as a column so thresholds re-apply offline; cost about 1.8 s per million rows and 2.3 GB peak per 4.3M-row month; add an episode id and weight by episode (1 to 151,484 rows per episode).",
+  "Store integer-valued features (points x2 as int16, spread as integer points) and reproduce the engine's tie rules (spread <= cap, body >= 21, micro > buffer): float32 storage made 0.03-3% of rows disagree, all at exact thresholds, and 6% of the calibrated preset's decision rows sit exactly at the 14-point cap. The replay's rebuilt quotes make those ties float-noise decisions; the live EA has its own noise from broker doubles.",
+  "The replay has no direction choice beyond with-the-burst or skip (winner equals burst direction in 100% of rows with a winner; against-burst trades come only from the EXHL fade). The order-flow simulator creates every other direction decision (up to +3.0 of votes, market route FOLM = 74% of real trades). Generate flow features per decision tick (23M shipped-style, 2M calibrated-style rows) or as per-tick float32 columns (250 MB per column for 62.7M ticks). The engine's npz store holds only t/bid/ask; the Hugging Face parquet (Nov 2025-May 2026) and the Dukascopy .bi5 files carry top-of-book bid/ask volume and would have to be re-extracted.",
+  "Validate any simulated flow label against the real account before using it: 2,584 real trades carry FA/FD/none labels (1,609/409/566), FD rates per route are FOLM:SM 139/965 = 14% and FOLM:BM 113/946 = 12%, the label did not predict outcomes (+5.7 pts, CI -5.4..+16.7), and 1,621 real entries lie inside downloaded ticks for a path check.",
+  "Plan statistics around episodes and folds, not trades: SE of the mean gross edge is 5.8 pts for 1,236 calibrated trades (SD about 200), a 10-pt difference needs about 6,300 trades per arm; the data hold 17.8k x30 and 127k x7.5 alert episodes (the episode count depends on the merge gap: 311k at 5 s, 127k at 20 s, 43k at 60 s at x7.5). Use the three splits as nested folds, keep the hold-out untouched during the search (the calibrated preset has already seen it) and correct for the number of candidates searched.",
+  "The bar to beat is concrete: shipped logic gross edge 0 (+0.7 +/- 1.2); calibrated entries +28.3 +/- 5.8 with total cost 18.5 vs the quote. A direction rule is better only if it raises gross edge (or MFE excess) on both buys and sells and in at least 4 of 9 months; sells (+17.7 vs +44.5 gross, 4 pts higher cost) and FLXQ:SS (about 0 outside the calibration months) are where the headroom is.",
+  "FlashGold-gate calibration is the slow axis: a native M5 series costs 0.14-0.31 s per month per distinct FG configuration (2.1 s for nine months) and about 5 s per replay in micro mode (project log: 97 replays in 489 s). Precompute the gate state per decision row for a grid of FG configurations instead of rebuilding per candidate. Evidence it matters: kept-by-gate trades +31.3 gross vs +7.0 for trades only taken without it (calibrated); no effect for the shipped preset.",
+  "Run settings for any new script: python -I -B, NUMBA_CACHE_DIR outside the repository (cold compile 34.3 s, cached load 0.15 s; the repository's tools/__pycache__ already holds a cache indexed at the current run_chunk line, I did not write to it), one month in memory at a time (0.6-1.0 GB), and the engine's cache keys: idx by lookback, candidates by (lookback, min points, multiplier), FilterSeries by FlashGold parameters."
+ ],
+ "script_path": "/tmp/claude-0/-home-user-master/8b335e1d-7919-5695-aa16-fdeb3605b836/scratchpad/prompt_work/events-baseline/measure.py (Part 1 harness; same folder: make_patched.py + xtools/ = logging-only engine copy, ptest.py, proto.py = decision-table prototype, dlog_stats.py, fgoff.py, fg_marginal.py, costs.py, mfe_base.py, gross_slices.py, part2.py, part2_real.py, real_mfe.py, compact_rows.py; per-month JSON/CSV outputs and tables/ alongside; run as NUMBA_CACHE_DIR=<scratch dir> python3 -I -B measure.py 2026-10 ref|cal [--compile])"
+}

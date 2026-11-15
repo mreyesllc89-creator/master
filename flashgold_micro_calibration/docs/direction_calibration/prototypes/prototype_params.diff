@@ -1,0 +1,11 @@
+--- /home/user/master/flashgold_micro_calibration/tools/params.py	2026-11-15 03:34:45.328143125 +0000
++++ work/tools/params.py	2026-11-15 16:11:12.483138618 +0000
+@@ -13,7 +13,7 @@
+ # replay-only switches (prefix X_), not EA inputs
+ EXTRA = {"X_ExitGatePips": 6.8, "X_SlipPts": 0.0, "X_CommissionPts": 0.0, "X_StopsLevelPts": 0.0,
+          "X_MicroRestart": 1.0, "X_TradeBuys": 1.0, "X_TradeSells": 1.0, "X_FillSnapPts": 0.0, "X_LimitAtMarket": 1.0, "X_LatencyMs": 0.0,
+-         "X_StopLossSlipMult": 1.0}
++         "X_StopLossSlipMult": 1.0, "X_LogMinGapMs": 0.0, "X_SignalOnly": 0.0}
+ 
+ 
+ def defaults():

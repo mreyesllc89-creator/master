@@ -1,0 +1,315 @@
+{
+ "headline": [
+  "1. The feed is five live numbers read at ONE place. ScoreOrderFlow (SpeedAlert_FlashGold_Micro.mq5:2463-2493) reads terminal globals XPW_XAU_OK, _HEARTBEAT, _FORCE_IMB, _NEAR_IMB, _BOOK_IMB on every direction-decision tick. VWAP_VALID, VWAP_PRICE and LIVE_FEEDS are read only by ReadMasterVwapTelemetry (2515-2553), whose single call site (5058, inside SarOrderFlowDecisionLog) only fills SAR_OrderFlowDecision_v2.csv: the master VWAP never changes a decision. A simulator only has to supply, per quote tick, OK, a fresh HEARTBEAT and three signed numbers. The flow code is byte-identical in the live parent: the Micro file differs from PARENT_EA_SOURCE.txt in exactly 4 hunks (version, TradingEnabled default true->false, tester-only OnInit guard 1105-1107, FlashGoldCaptureMicroQuote() at 1163); basis/parent.mq5 differs from PARENT_EA_SOURCE.txt only in version/description. Parent file says #property version 1.499, ORIGIN.json says parent_version 1.500.",
+  "2. Exact vote/score arithmetic. A feature with |value| >= MinFlowImbalance 5.0 casts one vote (value>0 buy, else sell) and adds FlowComponentScore 1.0 to that side; flowDir = +1/-1 only when >= 2 of the 3 votes agree. Side score = 0.5 (spread ok) + 1.0 (speed side) + 1.5 (M1 body >= 21 pts) + 1.5 (10 s micro-break by 3 pts) + 1.0 per vote; winner needs >= 4.0 and a lead >= 1.5. No feed: max 4.5, so the ONLY winning pattern is speed+body+micro all agreeing. With feed (speed fixed, 3 body x 3 micro x 27 vote assignments = 243 combos, decision_table.py): 87 give a winner on the speed side (speed + body-or-micro + 1 vote wins; speed + 3 votes wins alone), 32 give a winner AGAINST the speed direction (e.g. body and micro both against speed + 1 vote), 124 none. So flow can create entries the neutral logic never takes and can flip the side.",
+  "3. The market route (FOLM, 74% of real trades) is controlled by flow. DecideAction (2742-2767) goes market only if speedDir==winner and follow21/37 and MarketEntryAllowedByFlow (2770-2789): flow agrees (flowDir==winner) allows it with no further test; neutral or disagreeing flow needs body AND micro with the winner, score >= 5.0 and lead >= 2.0; a SELL with neutral flow is always downgraded to a stop. Neutral max is 4.5 < 5.0, so without a feed the market route can never fire. Verified: replay of the shipped preset, Oct 2026 (my instrumented run), 586 trades, 0 market (FLXQ 464, EXHL 122). Opening it (WeakFlowMarketMinScore 4.5, DowngradeNeutralSellMarketToStop 0) makes 1,207 of 1,329 trades FOLM and FLXQ vanishes, because every neutral winner tick has follow-through (98,733 of 98,733).",
+  "4. Flow matters for ENTRY only. BuildDirectionState runs on every tick while a speed alert is active (OnTick 1198; no winner = SKIP and try again next tick; alert lasts SpeedAlertHoldSeconds 20 s from the start of the 10 s lookback window, 2077/2164) and the first passing tick wins. With InpUseEntryHold (true, 1100 ms) the DirectionState is frozen at the arm tick (1781, 1807, 1856, 1874) and the result is written into the order comment as :FA/:FD (3140-3141). Exits read that comment, never live flow, and both flow-reading exits (TryPreSpeedAgainstDefenseClose 10888, TryStopFlowDisagreeDangerClose 11218) are inside ValidatePosition behind the 6.8-pip release gate (9461, 9519-9521, 12195); the first is also dead once the trade hit +21 (10894). The real chart has 0 exit comments SA_STOP_FLOW_DANGER or SA_PRE_SPEED_DEFENSE in 2,584 trades. All V45/V48/V451/V452/V461/AI-journal consumers are telemetry or shadow scorecards without execution authority. For direction calibration only ScoreOrderFlow -> score -> WinnerSide -> route matters.",
+  "5. Real account (results/real/real_trades_sar.csv, 2,584 trades, PF 0.83): flow label FA 1,609 (62%, PF 0.80), FD 409 (16%, PF 0.92), none 566 (22%, PF 0.85); scenario FOLM 1,911 (74%, PF 0.84), FLXQ 394 (15%, 0.87), EXHL 236 (9%, 0.74), CONT/BNO/OTHER 43; actions BM 946 (36.6%), SM 965 (37.3%), BS 201 (7.8%), SS 236 (9.1%), BL 125 (4.8%), SL 111 (4.3%). Per-trade SD is about 100 points, so a cell of 100 trades has a standard error of about 10 points. The REPORT section 3 reading 'feed agreed, did worse' is NOT supported: FD minus FA = +5.7 pts/trade, bootstrap 95% range about -5.3 to +16.7 (it moves with the seed). The sign flips by side (SM: FD +19.2 vs FA -10.8; BM: FD -22.7 vs FA -6.4) while gold fell about 7% over the window (first to last entry 4,430.8 -> 4,113.5; daily mean entry 4,411 on 7 Sep, 4,095 on 7 Oct). Labels are relative to the WINNER side, not the order side: for EXHL fades FA means flow agrees with the burst the EA fades (EXHL FA PF 0.52 n=66 vs FD 1.31 n=43).",
+  "6. Natural experiment inside the real data: two contiguous feed-off runs (no FA/FD label for 102 and 105 consecutive trades: 2026-09-07 04:48 to 09-08 17:31 and 2026-09-28 22:20 to 09-30 22:53, server time) with 0 market orders and route mix FLXQ 79% / EXHL 21%, identical to the neutral replay's mix (79/21). This confirms the live EA without a feed behaves as the replay does. PF 1.04 (n=207) vs 0.81 on the other 2,377 trades is not significant (mean diff +11.3 pts, CI -4.4 to +26.5). Only 32 of the 207 have ticks on disk (data/real_window/ticks), so using them as a validation set needs a re-download. 'none' does not mean 'feed off': 132 real BM trades carry 'none' yet need score >= 5.0, which proves a fresh feed with exactly one buy vote at those decisions; SM has 0 'none' (downgrade rule).",
+  "7. Upper bound of the feed's leverage (instrumented replay, Oct 2026, shipped preset, 4,995,670 ticks, 1,361,797 spread-ok decision ticks): 92.7% of decision ticks have no winner; of those, 74.0% would become a winner with ONE correctly signed vote, 16.5% need two, 9.4% need three; all 98,733 neutral winner ticks are speed+body+micro. Because entry is a first-passage over the ticks of the alert window, a simulated feed must exist at tick resolution (a value at every tick of the window), not per alert or per second. Rough anchor only (different months, rebuilt 12-point spread): real FOLM about 87 per day vs about 64 per day for the neutral replay with the market route opened.",
+  "8. NOT determinable from the package: units/scale and sign convention of FORCE_IMB, NEAR_IMB, BOOK_IMB, what each measures, update rate, venues, the meaning of OK=0, the writer program. Only hints: one threshold (5.0) serves all three features and the decision CSV prints them with 1 decimal, so they share a comparable scale of tens (percent-like), not [-1,1]; MaxFlowAgeMs 4000 is only an upper bound on the update interval. No feed history exists in the package or repo (the chart has only FA/FD/none labels). The owner's live MQL5/Files logs can answer everything: SpeedAlertRouter_XAUUSD_scenario_v48_3.csv (flow_fresh, flow_dir, force_imb, near_imb, book_imb, buy_score, sell_score at every decision tick incl. SKIP rows), SAR_OrderFlowDecision_v2.csv (master_vwap_age_ms = heartbeat age = update cadence, contributors, valid/degraded) and the AI ledgers (signed *_imbalance_with_trade).",
+  "9. Strategy Tester: the Micro EA returns INIT_FAILED on any non-tester chart (1105-1107), so only the parent can read a live feed. In a tester run the XPW_XAU_* globals do not exist (REPORT says so; my recollection of the MQL5 docs is that each tester agent has its own empty global-variable store, not verifiable offline), so ScoreOrderFlow returns early: flowFresh false, flowDir 0, imbalances 0, no :FA/:FD. That is identical to UseOrderFlow=false, which the calibrated presets ship together with EntryRouterMode 0 (StopOnly). HEARTBEAT is compared with GetTickCount64() (wall clock; the continuation filter comments that tester time is simulated), so an injected feed must refresh HEARTBEAT every tick (or never rely on age).",
+  "10. State of the replay: tools/engine.py has no feed and no UseOrderFlow switch. It hard-wires neutral flow: no vote scoring, no flowAgrees/Disagrees, no :FA/:FD, scenario codes BFNF/BFNO/BFA/BFOL defined (line 133) but never assigned, no 'or flowAgrees' clause in FLXQ, flowDisagrees always false in exits, market route reduced to the neutral branch (1160-1176). tools/real_replay.py injects real entries with scenario+action only, so FD never reaches the exits. The FlashGold direction filter and the continuation filter contain no flow code (grep: 0 hits), so the filter itself can be calibrated in the replay without any feed; flow only changes which side and route reach it."
+ ],
+ "feed_variables": [
+  {
+   "name": "XPW_XAU_OK",
+   "role": "Health gate. Must exist (GlobalVariableCheck) and be >= 0.5, otherwise flow is neutral (flowFresh false, flowDir 0, all imbalances 0.0). Semantics of OK=0 are not documented anywhere. In the telemetry reader OK=0 still marks heartbeatAvailable and logs the age, then returns degraded.",
+   "read_at": "SpeedAlert_FlashGold_Micro.mq5:2469-2472 (ScoreOrderFlow, decision); 2524, 2532 (ReadMasterVwapTelemetry, telemetry)"
+  },
+  {
+   "name": "XPW_XAU_HEARTBEAT",
+   "role": "Freshness stamp. Must exist; age = GetTickCount64() - HEARTBEAT must be <= MaxFlowAgeMs (4000). ScoreOrderFlow lets a NEGATIVE age pass; the telemetry reader rejects age < 0. The writer must use the same millisecond clock as GetTickCount64() (machine uptime, wall clock).",
+   "read_at": "2469, 2474-2476 (decision); 2525-2534 (telemetry, logged as master_vwap_age_ms)"
+  },
+  {
+   "name": "XPW_XAU_FORCE_IMB",
+   "role": "Signed imbalance, vote 1 (positive = buy). |v| >= MinFlowImbalance 5.0 casts a vote. Read through GV() so a missing variable counts as 0.0 (no vote). Stored in DirectionState.forceImb; logged as force_imb (1 decimal) and force_imbalance_with_trade (6 decimals, multiplied by the order side).",
+   "read_at": "2479 (read), 2485 (vote); GV() 2496-2499"
+  },
+  {
+   "name": "XPW_XAU_NEAR_IMB",
+   "role": "Signed imbalance, vote 2 (same rule and scale threshold as FORCE_IMB). Stored in nearImb, logged near_imb.",
+   "read_at": "2480, 2486"
+  },
+  {
+   "name": "XPW_XAU_BOOK_IMB",
+   "role": "Signed imbalance, vote 3 (same rule and scale threshold). Stored in bookImb, logged book_imb.",
+   "read_at": "2481, 2487"
+  },
+  {
+   "name": "XPW_XAU_VWAP_VALID",
+   "role": "Telemetry only: must be >= 0.5 for master_vwap_valid=true. No decision uses it.",
+   "read_at": "2536-2538 (ReadMasterVwapTelemetry)"
+  },
+  {
+   "name": "XPW_XAU_VWAP_PRICE",
+   "role": "Telemetry only: must exist, be finite and > 0; written as master_vwap_value next to broker_mid in SAR_OrderFlowDecision_v2.csv. The master VWAP is used for nothing else (single call site 5058).",
+   "read_at": "2539, 2543-2546"
+  },
+  {
+   "name": "XPW_XAU_LIVE_FEEDS",
+   "role": "Telemetry only: must exist and be > 0; logged as master_vwap_contributors (number of contributing feeds/venues). No decision uses it.",
+   "read_at": "2540, 2544-2552"
+  }
+ ],
+ "vote_logic": "ScoreOrderFlow (SpeedAlert_FlashGold_Micro.mq5:2463-2493), called from BuildDirectionState (2341) on every tick while a speed alert is active. (0) UseOrderFlow false or empty FlowGVPrefix: return (neutral). (1) GlobalVariableCheck of OK and HEARTBEAT, else return. (2) GlobalVariableGet(OK) < 0.5: return. (3) age = GetTickCount64() - HEARTBEAT; age > MaxFlowAgeMs (4000): return (negative age passes). (4) flowFresh = true; forceImb/nearImb/bookImb = GV() (0.0 if the variable is missing). (5) AddFlowVote x3 (force, near, book; 2556-2570): |v| < MinFlowImbalance (5.0) casts nothing; v > 0.0 is a buy vote and buyScore += FlowComponentScore (1.0); anything else (v <= -5, and NaN, because the comparison falls through) is a sell vote and sellScore += 1.0. (6) flowDir = +1 if buyVotes >= 2, -1 if sellVotes >= 2, else 0: a single vote or a 1-1 split leaves flowDir 0 but the +1.0 stays in the scores. Per-side score (BuildDirectionState 2322-2365, defaults equal to the shipped preset) = 0.5 SpreadStableScore on BOTH sides if spread <= MaxSpreadPoints 31 + 1.0 SpeedDirectionScore for the speedDir side + 1.5 CandleBodyScore if the forming M1 body >= 21 points in that direction + 1.5 MicroBreakScore if mid breaks the 10 s high/low by 3 points + 1.0 per flow vote: max 7.5 with feed, 4.5 without. WinnerSide (2639-2646): the side with score >= MinDirectionScore 4.0 and lead >= MinScoreEdge 1.5, else 0. flowAgreesWithWinner = (winner != 0 && flowDir == winner), flowDisagreesWithWinner = (winner != 0 && flowDir == -winner) (2345-2346): the labels are relative to the winner side, not to the order side (an EXHL limit fades the burst, so FA there means flow agrees with the burst). Decision table with speed fixed at +1 and spread ok (243 = 3 body x 3 micro x 27 vote assignments, decision_table.py): without votes only body+micro+speed winning (4.5); with votes 87 combos give a buy winner (min votes: 0 if body and micro both agree, 1 if speed plus one of body/micro agree, 3 if speed stands alone), 32 combos give a SELL winner against the speed (body and micro both against speed + >= 1 sell vote scores 4.5 vs 1.5), 124 give no winner. A buy winner with follow-through (speed side): flowDir +1 -> market always allowed (38 combos); flowDir 0 -> market allowed in 9 of 37; flowDir -1 -> 3 of 12; without feed -> never.",
+ "consumers": [
+  {
+   "decision": "Direction score of each side (flow adds +1.0 per vote, up to +3.0)",
+   "where": "ScoreOrderFlow 2463-2493, AddFlowVote 2556-2570, BuildDirectionState 2341",
+   "rule": "|imbalance| >= 5.0 adds 1.0 to the buy score (v>0) or sell score; evaluated on every tick of the alert window with the then-current GV values."
+  },
+  {
+   "decision": "Winner side (whether a setup trades at all, and on which side)",
+   "where": "WinnerSide 2639-2646 (also called in DecideAction 2744, BuildScenarioAndLabels 2652)",
+   "rule": "winner = side with score >= 4.0 and lead >= 1.5. Flow turns incomplete setups (speed + one of body/micro) into winners with 1 vote and can make a winner against the speed direction (see vote_logic)."
+  },
+  {
+   "decision": "flowDir and agreement flags",
+   "where": "ScoreOrderFlow 2489-2492; BuildDirectionState 2345-2346",
+   "rule": "flowDir = +1/-1 only with >= 2 agreeing votes; flowAgreesWithWinner/flowDisagreesWithWinner need winner != 0 and flowDir == +/-winner. These two flags drive every other consumer below."
+  },
+  {
+   "decision": "Exhaustion / opposite pressure (indirect)",
+   "where": "BuildDirectionState 2347, 2358-2362; DecideAction 2751-2757",
+   "rule": "DetectOppositePressure(winner) returns false when winner == 0, so flow decides whether pressure (OppositePressurePoints 21 within 5 s) is evaluated. The exhaustion fade (limit order against speedDir, EntryRouterMode >= 2) is decided BEFORE the winner==0 skip, so EXHL does not need a winner (replay Oct 2026: 74% of exhaustion-fade ticks have winner 0)."
+  },
+  {
+   "decision": "Hard block when flow disagrees",
+   "where": "DecideAction 2748",
+   "rule": "if BlockStrongFlowAgainst (false in all presets) and flowDisagreesWithWinner: ActSkip. Inert as shipped."
+  },
+  {
+   "decision": "Market vs stop route (FOLM)",
+   "where": "DecideAction 2762-2764; MarketEntryAllowedByFlow 2770-2789",
+   "rule": "market iff speedDir == winner AND (follow21 or follow37) AND EntryRouterMode >= 1 AND allowed: neutralFlow = (!flowFresh || flowDir == 0); weakFlow = neutral or flowDisagrees. SELL + neutral + DowngradeNeutralSellMarketToStop(true) -> stop. If WeakFlowMarketNeedsBodyAndMicro(true) and weakFlow: need bodyDir == side with body >= 21, microDir == side, own score >= WeakFlowMarketMinScore 5.0 and |buy-sell| >= WeakFlowMarketMinScoreEdge 2.0. Flow agrees: allowed with no further test. Otherwise stop order."
+  },
+  {
+   "decision": "Scenario key and labels",
+   "where": "BuildScenarioAndLabels 2703-2725; ScenarioKeyForAction 3159-3186",
+   "rule": "FLOW_AGREES/FLOW_DISAGREES labels only if flowDir != 0; BODY_FLOW_AGREES, BODY_FLOW_NO_OPPOSITE, BODY_FLOW_NO_OPP_FOLLOW; FLEXIBLE_QUALITY_ROUTER = body with winner & spread ok & no opposite pressure & (follow || MFE>|MAE| || flowAgrees). Keys BFNF/FLXQ/BFNO/BFA depend on flow (BFOL is shadowed by QUAL). The real account shows only FOLM/FLXQ/EXHL/CONT/BNO/OTHER; with EntryRouterMode 0 plus a live feed, flow-agreeing stop entries would be keyed BFNF/BFNO/BFA instead of FLXQ."
+  },
+  {
+   "decision": "Per-scenario position/pending caps",
+   "where": "ScenarioCanPlace 8010-8035; ScenarioCommentMatches",
+   "rule": "ScenarioIndependentPerformance true: MaxOpenPositionsPerScenario 1 and MaxPendingOrdersPerScenario 1 per key (order-comment prefix SAR:<key>:). A FOLM position does not block FLXQ/EXHL; flow decides which key an entry gets."
+  },
+  {
+   "decision": "Order comment :FA / :FD and tracker labels",
+   "where": "ShortComment 3137-3144; ManagePosition 9317-9320 (trackedLabels = POSITION_COMMENT)",
+   "rule": "comment = SAR:<key>:<BS|SS|BM|SM|BL|SL>[:FA|:FD][:OP], cut at 31 chars. This is the only way flow reaches the exits: they test the label with TrackedLabelHas(':FD'), never the live globals."
+  },
+  {
+   "decision": "Entry-hold freeze of the flow state",
+   "where": "ArmEntryHold 1770-1785; ProcessArmedEntryHold 1788-1883 (1807, 1856, 1874)",
+   "rule": "With InpUseEntryHold true (1100 ms, +5 points) the whole DirectionState incl. flow, action, scenario key and :FA/:FD is captured at the arm tick and reused at placement; flow is not re-read at placement."
+  },
+  {
+   "decision": "Pre-speed defence close (immediate by flow, V40 shield without pressure)",
+   "where": "TryPreSpeedAgainstDefenseClose 10888-11067 (flow at 10900-10906, 10921-10927, 10948-10953; call at 12066)",
+   "rule": "FD label: (a) V40PreSpeedExecutionShield (18 pts loss) may fire without opposite pressure when V40PreSpeedExecutionShieldNeedsPressureOrFlow; (b) FlowDisagreeMakesDefenseImmediate skips the 6 s (FLXQ 4 s) wait; (c) FOLM danger loss = FOLMFlowDisagreeDangerLossPoints 37 vs FOLMMarketDangerLossPoints 37 (identical, no effect). Returns immediately if the trade hit +21/+37 (10894) and is only reached after the 6.8-pip release, so it is effectively dead; 0 SA_PRE_SPEED_DEFENSE exits in 2,584 real trades."
+  },
+  {
+   "decision": "Stop-order flow-disagree danger close",
+   "where": "TryStopFlowDisagreeDangerClose 11218-11301; called from ValidatePosition 11663",
+   "rule": "only SAR:FLXQ:BS/SS and SAR:CONT:BS/SS positions carrying :FD; closes when fav <= -StopFlowDisagreeDangerLossPoints (37), held >= StopFlowDisagreeDangerMinHoldMs (0) and, because StopFlowDisagreeDangerNeedsOppositePressure is true, MAE <= -21. Behind the 6.8-pip release gate. Real data: 0 SA_STOP_FLOW_DANGER exits among 114 FLXQ/CONT trades labelled FD."
+  },
+  {
+   "decision": "Label-only copies of the FD flag (no decision effect)",
+   "where": "TryFOLMSellMarketEarlyDangerClose 11086-11092; TryFLXQSellStopPressureDangerClose 11326-11334; PassiveWarningDetails 11441; MarkPreSpeedDefenseUrgentClose 10449",
+   "rule": "FD is only appended as FLOW_DISAGREES to labels and log strings."
+  },
+  {
+   "decision": "Gate in front of every flow-reading exit",
+   "where": "ManagePosition 9461, 9503, 9519-9521; PositionExitProfitReleased 10113-10173; TrailingActivationProfitReached 12193-12197",
+   "rule": "ValidatePosition only runs after the position first exceeded 6.8 pips (68 points) of profit (hard-coded minimumProfitPips 6.8, not an input); hit21 is set on the same tick, which kills TryPreSpeedAgainstDefenseClose."
+  },
+  {
+   "decision": "Shadow / telemetry consumers (no execution authority)",
+   "where": "BuildV45PreEntryHighShadowTelemetry 3548-3660 (flow at 3606-3617); V48Mode2OppositeFlags 3434-3449 (3440); AIPreEntryJourneyBuildContext 2835-2886 (2866-2872); OrderFlowAgreementDuringJump 6789-6800; V451* 3756-3805; V452 4849-4858, 4926; V461* 3995-4032; LogDecision 13101-13151 and header 12826-12830; PlaceAction 2922-2941",
+   "rule": "V45 raw shadow score +14 (FA) / -18 (FD); V48 mode-2 opposite-flags counts flowFresh && flowDir == -side (limit V48Mode2MaxOppositeFlags 2); AI journals store signed imbalances times side; V451/V452/V461 microscopes tag FLOW_DISAGREED / flow+pressure sources; the decision CSV logs flow_fresh, flow_dir, force_imb, near_imb, book_imb. Results are only logged (PlaceAction passes them to AIDecisionAttemptLog/PendingRequestAdd); InpAIHardGateEnabled and InpAIRiskAdjustEnabled are false and documented as recorded-only."
+  },
+  {
+   "decision": "Master VWAP telemetry",
+   "where": "ReadMasterVwapTelemetry 2515-2553; SarOrderFlowDecisionLog 5045-5109 (call 5058; row 5090-5107); LogDecision 13104",
+   "rule": "valid iff OK>=0.5, 0<=age<=4000, VWAP_VALID>=0.5, VWAP_PRICE>0 and finite, LIVE_FEEDS>0; written to SAR_OrderFlowDecision_v2.csv on every non-skip event and on every SKIP* event (so on every mixed decision tick). No order depends on it."
+  }
+ ],
+ "controlling_inputs": [
+  {
+   "name": "UseOrderFlow",
+   "role": "Master switch of ScoreOrderFlow; false = neutral flow (same as a tester run)",
+   "shipped_value": "true (all 5 shipped presets and PARENT_PRESET.txt); the calibrated presets set false"
+  },
+  {
+   "name": "FlowGVPrefix",
+   "role": "Prefix of the 8 globals (symbol-specific)",
+   "shipped_value": "XPW_XAU_"
+  },
+  {
+   "name": "MaxFlowAgeMs",
+   "role": "Max age of HEARTBEAT versus GetTickCount64() for the feed to count as fresh",
+   "shipped_value": "4000"
+  },
+  {
+   "name": "MinFlowImbalance",
+   "role": "|imbalance| needed for one vote (same threshold for all three features)",
+   "shipped_value": "5.0"
+  },
+  {
+   "name": "FlowComponentScore",
+   "role": "Score added to the voted side per vote",
+   "shipped_value": "1.0"
+  },
+  {
+   "name": "BlockStrongFlowAgainst",
+   "role": "ActSkip when flow disagrees with the winner",
+   "shipped_value": "false"
+  },
+  {
+   "name": "DowngradeNeutralSellMarketToStop",
+   "role": "Neutral-flow SELL market becomes a stop order",
+   "shipped_value": "true"
+  },
+  {
+   "name": "WeakFlowMarketNeedsBodyAndMicro",
+   "role": "Market under neutral/disagreeing flow needs body+micro with the winner and the score tests",
+   "shipped_value": "true"
+  },
+  {
+   "name": "WeakFlowMarketMinScore",
+   "role": "Own score needed for a weak-flow market order (5.0 > neutral maximum 4.5)",
+   "shipped_value": "5.0"
+  },
+  {
+   "name": "WeakFlowMarketMinScoreEdge",
+   "role": "|buy-sell| needed for a weak-flow market order",
+   "shipped_value": "2.0"
+  },
+  {
+   "name": "FlowDisagreeMakesDefenseImmediate",
+   "role": "FD skips the no-follow wait in the pre-speed defence (effectively dead behind the 6.8-pip gate)",
+   "shipped_value": "true"
+  },
+  {
+   "name": "UseStopFlowDisagreeDangerClose",
+   "role": "Enables TryStopFlowDisagreeDangerClose",
+   "shipped_value": "true"
+  },
+  {
+   "name": "StopFlowDisagreeDangerLossPoints",
+   "role": "Loss at which an FD FLXQ/CONT stop trade is closed",
+   "shipped_value": "37.0"
+  },
+  {
+   "name": "StopFlowDisagreeDangerMinHoldMs",
+   "role": "Minimum hold before that close",
+   "shipped_value": "0"
+  },
+  {
+   "name": "StopFlowDisagreeDangerNeedsOppositePressure",
+   "role": "Requires MAE <= -OppositePressurePoints",
+   "shipped_value": "true"
+  },
+  {
+   "name": "StopFlowDisagreeDangerCloseComment",
+   "role": "Exit comment (label only)",
+   "shipped_value": "SA_STOP_FLOW_DANGER"
+  },
+  {
+   "name": "FOLMFlowDisagreeDangerLossPoints",
+   "role": "FOLM danger loss when FD (equals FOLMMarketDangerLossPoints 37.0, so no effect)",
+   "shipped_value": "37.0"
+  },
+  {
+   "name": "V40PreSpeedExecutionShieldNeedsPressureOrFlow",
+   "role": "V40 pre-speed shield may use FD instead of opposite pressure (shield loss V40PreSpeedExecutionShieldLossPoints 18.0)",
+   "shipped_value": "true"
+  },
+  {
+   "name": "MinDirectionScore / MinScoreEdge",
+   "role": "Winner thresholds the flow votes add to",
+   "shipped_value": "4.0 / 1.5"
+  },
+  {
+   "name": "SpeedDirectionScore / CandleBodyScore / MicroBreakScore / SpreadStableScore",
+   "role": "Other score components (neutral maximum 1.0+1.5+1.5+0.5 = 4.5)",
+   "shipped_value": "1.0 / 1.5 / 1.5 / 0.5"
+  },
+  {
+   "name": "MinCandleBodyPoints / MicroBreakLookbackSeconds / MicroBreakBufferPoints / MaxSpreadPoints",
+   "role": "Definitions of the body, micro-break and spread-ok components",
+   "shipped_value": "21.0 / 10 / 3.0 / 31.0"
+  },
+  {
+   "name": "EntryRouterMode",
+   "role": "0 StopOnly, 1 StopAndMarket, 2 StopMarketLimit (market needs >= 1, exhaustion limit fade needs 2)",
+   "shipped_value": "2 (calibrated presets: 0)"
+  },
+  {
+   "name": "MarketFollow21Points / MarketFollow21Seconds / MarketFollow37Points / MarketFollow37Seconds",
+   "role": "Follow-through test required for the market route",
+   "shipped_value": "21.0 / 10 / 37.0 / 30"
+  },
+  {
+   "name": "OppositePressurePoints / OppositePressureSeconds / RetestFailPoints",
+   "role": "Opposite pressure and snapback (exhaustion) tests; pressure only evaluated when winner != 0",
+   "shipped_value": "21.0 / 5 / 10.0"
+  },
+  {
+   "name": "MaxTrailingMultiplier / MinSpeedAlertPoints / SpeedLookbackSeconds / SpeedAlertHoldSeconds",
+   "role": "Alert that opens the window in which direction (and so flow) is evaluated every tick",
+   "shipped_value": "7.5 / 37.0 / 10 / 20 (calibrated: multiplier 30)"
+  },
+  {
+   "name": "InpUseEntryHold / InpEntryHoldMs / InpEntryHoldMinFavPoints",
+   "role": "Freezes the flow state at the arm tick and delays placement",
+   "shipped_value": "true / 1100 / 5.0"
+  },
+  {
+   "name": "ScenarioIndependentPerformance / MaxOpenPositionsPerScenario / MaxPendingOrdersPerScenario",
+   "role": "Per-scenario caps (the scenario key depends on flow)",
+   "shipped_value": "true / 1 / 1"
+  },
+  {
+   "name": "UseV48Mode2ShadowScorecard / V48Mode2MaxOppositeFlags / UseV45PreEntryHighShadowTelemetry / UseV451ProofTelemetry / UseV461MicroTelemetry / InpAIJourneyShadowEnabled",
+   "role": "Telemetry or shadow consumers of flow, no execution authority",
+   "shipped_value": "true / 2 / true / true / true / true"
+  },
+  {
+   "name": "InpAIHardGateEnabled / InpAIRiskAdjustEnabled",
+   "role": "Recorded only; the code prints that they have no execution authority",
+   "shipped_value": "false / false"
+  }
+ ],
+ "replay_treatment": "tools/engine.py (header docstring lines 30-32: 'the order-flow feed ... not replayed ... flow is neutral exactly as in a tester run') has no feed and no UseOrderFlow input: NAMES (66-68, 100) keeps only the weak-flow switches. What it does: (a) no ScoreOrderFlow/AddFlowVote, so the maximum score is 4.5 and the only winner pattern is speed+body+micro (decision block 1049-1165); (b) market route, lines 1166-1180: market = speedDir==winner and follow and router>=1; then if winner<0 and DowngradeNeutralSellMarketToStop: stop; elif WeakFlowMarketNeedsBodyAndMicro: market = body&micro with winner and score >= WeakFlowMarketMinScore (5.0) and |buy-sell| >= 2.0, which with 4.5 maximum is always False, so with the shipped values the replay NEVER produces FOLM (BM/SM): measured, Oct 2026, 586 trades = FLXQ:SS 272, FLXQ:BS 192, EXHL:SL 74, EXHL:BL 48; PF 0.78. results/variants_latency.json and tools/joint.py open the route with WeakFlowMarketMinScore 4.5 (+ DowngradeNeutralSellMarketToStop 0): then 1,329 trades = FOLM:SM 689, FOLM:BM 518, EXHL 122, FLXQ 0, PF 0.77; (c) scenario mapping 1186-1203 lacks the flowAgrees clause of FLEXIBLE_QUALITY_ROUTER and the BFNF/BFNO/BFA keys (codes at 133, never assigned); (d) exits: flowDisagrees is always false (comment at 782; V40PreSpeedExecutionShieldNeedsPressureOrFlow reduces to 'pressure' at 862); TryStopFlowDisagreeDangerClose, immediateByFlow and the FD FOLM danger loss never act, which matches live because they are behind the 6.8-pip gate and 0 such exits occur in the real data; (e) BlockStrongFlowAgainst is false so nothing is lost; (f) tools/real_replay.py externals() injects real entries with scenario+action but no flow label, and results/inputs_classification.csv lists the flow inputs as 'no effect in the Strategy Tester' while the 4 WeakFlow/Downgrade inputs count as 'replayed' (only their neutral branch acts); (g) calibrated presets set UseOrderFlow=false so a live run is only the same program as the replay if the feed is off. Decisions that therefore differ from live: which setups pass the score threshold, side (no counter-speed winners), market vs stop route (74% of live trades), scenario key/caps, which ticks trigger the entry and the entry price, and the pressure/exhaustion evaluation (only done when a winner exists). Replay diagnostics (instrumented copy, Oct 2026, shipped preset, 4,995,670 ticks, 163,018 alerts, 1,365,667 decision ticks of which 3,870 spread-blocked): 1,263,064 no-winner (92.75% of 1,361,797 spread-ok), 98,733 winner ticks all speed+body+micro, all with follow-through; no-winner ticks one vote from a winner 935,255 (74.0%), two votes 208,693 (16.5%), three 119,116 (9.4%); per alert (alerts re-arm after every decision): 60.4% reach a neutral winner, +23.2% would with one vote, +4.7% two, +11.5% three, 0.2% never; exhaustion-fade ticks 74,345 (54,957 with winner 0); flashgold_block 96,350 vs 586 fills. Work files (repo and package untouched): /tmp/claude-0/-home-user-master/8b335e1d-7919-5695-aa16-fdeb3605b836/scratchpad/prompt_work/flow-consumers/ (replay_counts.py, replay_counts_2026-10.json, mod/engine.py = instrumented engine copy, decision_table.py, real_by_flow.py, real_by_flow2.py, outage.py, runs.py, coverage.py).",
+ "unknowns": [
+  "Units, scale and sign convention of FORCE_IMB, NEAR_IMB, BOOK_IMB; their typical magnitude and distribution; correlation between the three; what the names mean (force = aggressor/forced flow? near = near-touch depth? book = whole book?) -- nothing in the package defines them.",
+  "Update rate and latency of the writer. Only bound: MaxFlowAgeMs 4000. The owner's SAR_OrderFlowDecision_v2.csv master_vwap_age_ms (logged at every decision tick) would give the cadence directly; the package has no copy.",
+  "Venues and instruments behind the feed: LIVE_FEEDS counts contributing feeds and VWAP_PRICE is a 'master' VWAP compared with broker_mid, but no venue is named in any .mq5/.mqh/.txt/.json/.py/.set file or in the chart; 'XPW' is only the prefix (DirectionFilterCore.mqh:145 mentions 'the earlier XPW core' of the direction filter, which is a different thing).",
+  "Meaning of OK=0 and VWAP_VALID=0 (writer health? too few live feeds? stale book?). The code treats OK<0.5 as neutral and logs it as degraded; the real data show two multi-day feed-off runs (about 36 h and 48 h) but not the cause.",
+  "Who writes the globals: terminal globals can only be set by an MQL program (or a bridge to one), so a bridge exists but is not in the package. HEARTBEAT is in GetTickCount64() units (machine uptime), so the writer shares the clock/machine with the terminal.",
+  "Whether flow LEADS or LAGS price. Only indirect evidence: among real FOLM entries (speed side == order side == winner) flow agreed 80%, disagreed 13%, neutral 7%, but that is selected by first-passage entry and by the vote thresholds, so it is not an unconditional agreement rate. FA/FD profit differences are within noise and confounded by a 7% gold downtrend.",
+  "Whether the live binary equals PARENT_EA_SOURCE.txt: the chart's EA is SpeedAlert_FlashGold_Embedded (Experts\\speedalert_flashgold_embedded_v4_20261007\\...ex5), the package's parent source is the DirectionRouter test EA v1.499 (ORIGIN.json: parent 1.500); tests/test_upgrade_contract.py proves equal INPUTS (400 keys, minus 10 FlashGold/TradingEnabled keys), not equal code. The real exit comments and :FA/:FD labels do match this source.",
+  "Behaviour of the tester with the live GV store on the same machine: the claim that tester agents cannot see the terminal's XPW_XAU_* globals comes from the REPORT and my recollection of the MQL5 docs, not from this package; a 10-line tester EA printing GlobalVariableCheck('XPW_XAU_OK') while the feed runs would settle it. Also unknown: whether an injector indicator or EA sets the globals before the main EA's OnTick on each tick.",
+  "Real chart data carry no speed direction and no flow magnitudes, only :FA/:FD/none and only for entries (no skipped decisions): it cannot separate with-burst from counter-burst stop entries, nor tell 'feed off' from 'fewer than 2 votes' for a single trade. Feed-off runs are identified only in aggregate (runs of 'none' with zero market orders).",
+  "Only 32 of the 207 real feed-off trades have tick data on disk (data/real_window/ticks covers 1 h of 2026-09-07, 6 h of 09-08, 1 h of 09-29); using them as a neutral-logic validation set needs the missing Dukascopy hours (download is throttled).",
+  "Edge case: AddFlowVote counts a NaN value as a sell vote (MathAbs(NaN) < 5 is false and NaN > 0 is false); a simulated feed must never write NaN."
+ ],
+ "hints_found": [
+  "FlowGVPrefix = XPW_XAU_ in the .mq5 input (249), PARENT_PRESET.txt:105, all five *_DISABLED.set, and in the saved chart inputs; flow input values are identical in the live parent preset and in the shipped tester presets (the only differences between PARENT_PRESET.txt and FlashGold_NativeReference_DISABLED.set are TradingEnabled and 7 new FG micro keys).",
+  "struct MasterVwapTelemetry (76-85): valid, degraded, heartbeatAvailable, ageMs, value, contributors, brokerMid; SAR_OrderFlowDecision_v2.csv columns: schema_version, time_msc, symbol, magic, event, action, side, flow_gv_prefix, max_flow_age_ms, master_vwap_value, master_vwap_valid, master_vwap_age_ms, master_vwap_contributors, broker_mid, master_vwap_degraded (4997-5033).",
+  "SpeedAlertRouter_XAUUSD_scenario_v48_3.csv (CsvLogFileV483Cost, header 12788-12830, row 13101-13151) holds per decision: buy_score, sell_score, speed_dir, body_dir, micro_dir, flow_fresh, flow_dir, force_imb, near_imb, book_imb (printed with 1 decimal). LogDecision('SKIP', ...) at OnTick 1214 writes a row on every mixed tick, so the live log (if kept) holds the flow values at every decision tick of every alert.",
+  "AI ledgers (5111-5300, 5630-5800): force_imbalance_with_trade, near_imbalance_with_trade, book_imbalance_with_trade (6 decimals, times the order side), flow_direction_with_trade, flow_fresh, own/opposite_direction_score, direction_score_edge; plus V451/V452/V461 columns v451_flow_opp_*, v461_low_detect_orderflow_state, orderflow_agreed_during_jump (12875).",
+  "Scale clues: MinFlowImbalance 5.0 is a single symmetric threshold for three different features (so a common scale), values are printed with 1 decimal in the decision CSV, a [-1,1] normalisation would never vote at 5.0; 85% of real entries on feed-on days carry FA or FD (>= 2 same-sign votes), so |value| >= 5 is common in fast bursts.",
+  "Update-rate clue: MaxFlowAgeMs 4000 (default, saved chart and presets); PreSpeedAgainstDefenseMaxSignalAgeMs 8000 is unrelated (pre-speed radar).",
+  "No venue/exchange/depth/order-book/WebSocket/bridge words anywhere in the package (grep over .mq5/.mqh/.txt/.json/.py/.ps1/.set); only 'tape' (quote tape), 'master VWAP' and 'LIVE_FEEDS'. DirectionFilterCore.mqh:145 'As in the earlier XPW core' refers to the TDI direction-filter core, not the feed.",
+  "tests/test_upgrade_contract.py:65 asserts preset UseOrderFlow == 'true'; no test exercises the feed. test_micro_contract.py, test_bucket_host.py, test_permission_expiry.py, ORIGIN.json, INPUT_MIGRATION.json, compile.ps1, the fixtures and the shadow headers TheoryJourneyQualityShadowV2.mqh / TheoryMT5HistoryEntryQualityShadowV1.mqh contain no flow code.",
+  "basis/saved_chart.chr (UTF-16): one expert SpeedAlert_FlashGold_Embedded with the flow inputs, no feed-writer indicator/script on the chart; the chart also shows trades of other programs on the account (comments 'gold miner using grok version 3', 'GG1510_Continuation_v2 v1.510', 'KE_CP2 Long'); 0 exit comments contain PRE_SPEED or FLOW (the 2 'PRE_SPEED' and 1 'FLOW' hits are the input list).",
+  "Natural experiment in results/real/real_trades_sar.csv: two feed-off runs with no market orders (see headline 6). Evidence that flow-agree market entries are the bulk of live trading: 95% of FA trades are FOLM; 0 SM carry 'none'.",
+  "The OnTick guard shows the author's own tester awareness: continuation filter uses simulated TimeCurrent in the tester and GetTickCount64 only live (SpeedAlertContinuationFilter.mqh 273-276, 431-432), the exit-gate state avoids GlobalVariable* in the tester (10121-10163, 10190); ScoreOrderFlow has no such tester branch."
+ ],
+ "real_trade_label_counts": "2,584 real trades (7 Sep to 8 Oct 2026, PF 0.83, avg -8.5 pts, net -21,951), flow label from the :FA/:FD order comment (tools/chart_trades.py:65). By label: agrees 1,609 (62.3%, PF 0.80, win 35%, avg -9.8); disagrees 409 (15.8%, PF 0.92, win 39%, avg -4.2); none 566 (21.9%, PF 0.85, win 37%, avg -7.8). Scenario x flow, n (PF): FOLM agrees 1,527 (0.82), disagrees 252 (1.01), none 132 (0.76); FLXQ agrees 15 (0.55), disagrees 96 (0.67), none 283 (0.96); EXHL agrees 66 (0.52), disagrees 43 (1.31), none 127 (0.75); CONT disagrees 18 (0.72), none 19 (1.03); BNO none 5 (0.00); OTHER agrees 1. Scenario totals: FOLM 1,911 (74.0%, PF 0.84), FLXQ 394 (15.2%, 0.87), EXHL 236 (9.1%, 0.74), CONT 37 (1.4%, 0.85), BNO 5, OTHER 1. Action shares: BM 946 (36.6%, PF 0.81), SM 965 (37.3%, 0.87), BS 201 (7.8%, 0.81), SS 236 (9.1%, 0.87), BL 125 (4.8%, 0.77), SL 111 (4.3%, 0.71); route type market 74.0% / stop 16.9% / limit 9.1%. Action x flow, n (PF): BM FA 701 (0.87), FD 113 (0.60), none 132 (0.76); SM FA 826 (0.79), FD 139 (1.50), none 0; BS FA 6, FD 56 (0.72), none 139 (0.82); SS FA 10, FD 58 (0.65), none 168 (1.04); BL FA 35 (0.34), FD 14 (1.83), none 76 (0.90); SL FA 31 (0.76), FD 29 (1.10), none 51 (0.55). Inside FOLM: FA 79.9%, FD 13.2%, none 6.9%. :OP appears on 150 trades, all EXHL. Per-trade SD about 100 pts (FOLM FA SE 2.5, FOLM FD 6.4, EXHL FA 11.8, EXHL FD 13.4). FD minus FA mean (bootstrap 95% CI): all +5.7 (-5.7..+16.7); FOLM +9.2 (-4.0..+22.7); SM +30.0 (+11.7..+47.8); BM -16.3 (-34.9..+3.6); EXHL +40.1 (+6.4..+74.8) -- about eight comparisons were looked at, only SM survives a Bonferroni correction and its sign is opposite for BM (gold fell about 7% in the window). Feed-off runs: 2026-09-07 04:48:26 to 09-08 17:31:08 (102 trades: 82 stop, 20 limit, 0 market, PF 1.24) and 2026-09-28 22:20:09 to 09-30 22:53:16 (105 trades: 81 stop, 24 limit, 0 market, PF 0.85): together 207 trades, FLXQ 163 / EXHL 44, PF 1.04, avg +1.9; the other 2,377 trades PF 0.81, avg -9.4 (feed-off minus feed-on +11.3 pts, CI -4.4..+26.5); stop trades with 'none' label, feed-off 163 (PF 1.12) vs feed-on 144 (PF 0.75), diff +20.1 (CI -5.0..+44.2). Exit kinds (all trades): SL 1,370, SA_PROFIT_EXIT 785, SA_FOLM_SM_EARLY 102, TP 90, SA_V40_RETEST_SHIELD 80, SA_FOLM_WARN24 73, other 56, SA_V40_FLXQ_SS_SHIELD 28; none are SA_STOP_FLOW_DANGER or SA_PRE_SPEED_DEFENSE.",
+ "tester_behaviour": "SpeedAlert_FlashGold_Micro.mq5 refuses to initialise outside the Strategy Tester (OnInit 1105-1107: INIT_FAILED unless MQLInfoInteger(MQL_TESTER)); TradingEnabled defaults to false and all shipped presets are *_DISABLED (the REPORT says TradingEnabled must be switched on in the tester). In a tester run GlobalVariableCheck(XPW_XAU_OK/HEARTBEAT) is false (REPORT section 12 and tools/classify_inputs.py state the feed does not exist in the tester; my recollection of the MQL5 documentation is that the tester agent has its own, initially empty, global-variable store, which I could not verify offline), so ScoreOrderFlow returns at line 2469-2470 every tick: flowFresh=false, flowDir=0, forceImb=nearImb=bookImb=0.0, flowAgrees/Disagrees=false, no :FA/:FD in comments, scores max 4.5, market route impossible (WeakFlowMarketMinScore 5.0), SELL market always stop, no flow exits, telemetry columns flow_fresh=false and master_vwap_degraded=true. This equals UseOrderFlow=false (which the calibrated presets ship). Consequences for injecting a simulated feed into a tester run: (1) the globals would have to be written inside the tester process (companion indicator/EA or a code change in ScoreOrderFlow reading a file by tick time_msc); (2) HEARTBEAT is tested against GetTickCount64() (wall clock, not simulated time; the EA's own continuation filter notes tester time is simulated and avoids GetTickCount64 in the tester), so HEARTBEAT must be rewritten on every tick or the age test avoided; staleness/outages must be simulated by deleting the globals or setting OK=0, not by letting the heartbeat age; (3) the writer must run before the EA's OnTick on each tick (ordering unverified); (4) execution delay and 'every tick based on real ticks' still matter (REPORT section 10)."
+}

@@ -1,0 +1,13 @@
+--- selftest_before.py	2026-11-15 17:29:09.811825126 +0000
++++ selftest.py	2026-11-15 17:29:09.821823072 +0000
+@@ -132,7 +132,9 @@
+             cnt = np.zeros(len(engine.COUNTERS), np.int64)
+             n = engine.run_chunk(feed.t[a:b], feed.bid[a:b], feed.ask[a:b], vec, S._idx(c, 10.0), np.arange(b - a, dtype=np.int64),
+                                  S.ep[c], fg.time, fg.end, fg.li, fg.a_at, fg.a_bar, fg.a_price, fg.a_dir, fg.a_atr,
+-                                 z, z, z, z, f, f, f, z, out, cnt)
++                                 z, z, z, z, f, f, f, z,
++                                 np.zeros(0, np.int32), np.zeros(0, np.int64), np.zeros(0, np.uint8), np.zeros((0, 3)),
++                                 np.zeros((0, engine.NLI), np.int32), np.zeros((0, engine.NLF), np.float32), out, cnt)
+             outs.append(out[:n])
+         full = pd.DataFrame(np.concatenate(outs), columns=engine.TRADE_COLS).sort_values("entry_ms").reset_index(drop=True)
+         check(len(full) == len(df) and np.allclose(full[["entry_ms", "exit_ms", "pts"]], df[["entry_ms", "exit_ms", "pts"]]),

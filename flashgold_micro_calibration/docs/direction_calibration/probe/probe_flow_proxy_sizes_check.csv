@@ -1,0 +1,3 @@
+source,ticks,ask_size_unique,bid_size_unique,ask_size_modal_value,ask_size_modal_share,bid_size_modal_value,bid_size_modal_share,ask_size_p50,ask_size_p99,bid_size_p50,bid_size_p99,imbalance_mean,imbalance_sd,imbalance_exactly_zero_share,imbalance_p5,imbalance_p95,corr_ask_bid_size
+"raw Dukascopy hourly files, 40 random hours, Sep-Nov 2026",740703,74,88,0.00012,0.777494,0.00012,0.767013,0.00012,0.00027,0.00012,0.00028,0.0017714,0.134145,0.674948,-0.2,0.2,0.0531393
+"hf parquet XAUUSD-2026-03-part0002.parquet, first 2000000 ticks",2000000,57,66,0.00012,0.852575,0.00012,0.852787,0.00012,0.00067,0.00012,0.00067,-0.00490445,0.142509,0.769012,-0.294118,0.142857,0.716506

@@ -1,0 +1,545 @@
+[   3.4s] building features for 1260 market entries ...
+[   6.4s] features done: 1260 rows x 460 columns
+[   6.5s] descriptive AUCs, agrees vs disagrees ...
+[  11.9s] descriptive AUCs, none vs not-none (BM only) ...
+[  20.8s] walk-forward selection ...
+[  24.9s] planted-signal power check ...
+[  28.9s] 3-class rules and baselines ...
+[  29.8s] stochastic label model ...
+[  30.6s] gates and momentum ...
+[  31.3s] outcome analysis ...
+[  32.0s] lag scan ...
+[  38.5s] stop-order block ...
+[  39.8s] wrote 1260 feature rows and 1187 metric rows to /tmp/claude-0/-home-user-master/8b335e1d-7919-5695-aa16-fdeb3605b836/scratchpad/prompt_work/flow-proxy-probe
+
+== sample (5 rows)
+                                                           name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+                                             real trades in csv       NaN    NaN    NaN 2584    NaN    NaN
+                           market entries with ticks (analysed)       NaN    NaN    NaN 1260    NaN    NaN
+        stop-order entries BS/SS with ticks (exploratory block)       NaN    NaN    NaN  225    NaN    NaN
+distinct UTC hours (bootstrap clusters), analysed market sample       NaN    NaN    NaN  144    NaN    NaN
+     analysed market entries: n_pos = agrees, n_neg = disagrees       NaN    NaN    NaN 1260 1025.0  155.0
+
+== tz_check (3 rows)
+                                                       name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+median |entry price - Dukascopy mid| if server time = UTC+2    10.430    NaN    NaN 216    NaN    NaN
+median |entry price - Dukascopy mid| if server time = UTC+3     0.082    NaN    NaN 400    NaN    NaN
+median |entry price - Dukascopy mid| if server time = UTC+4    11.765    NaN    NaN 208    NaN    NaN
+
+== check (2 rows)
+                                                                                   name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+max |microprice minus mid in spread units - size imbalance/2| over all rows and windows     0.000    NaN    NaN 1260    NaN    NaN
+                                AUC of 'is a buy' for none vs not-none, all market rows     0.771    NaN    NaN 1260    NaN    NaN
+
+== power (2 rows)
+                                                               name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+SE of an AUC under the null, agrees vs disagrees (independent rows)     0.025    NaN    NaN 1180 1025.0  155.0
+            SE of an AUC under the null, none vs not-none (BM only)     0.035    NaN    NaN  621   80.0  541.0
+
+== power_planted (7 rows)
+                                                                                             name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+   planted logit slope 0 on lit_2000_mvs: nested out-of-sample AUC recovered by the same pipeline     0.508  0.482  0.533 1180 1025.0  155.0
+planted logit slope 0.15 on lit_2000_mvs: nested out-of-sample AUC recovered by the same pipeline     0.514  0.487  0.551 1180 1025.0  155.0
+ planted logit slope 0.3 on lit_2000_mvs: nested out-of-sample AUC recovered by the same pipeline     0.512  0.447  0.567 1180 1025.0  155.0
+ planted logit slope 0.5 on lit_2000_mvs: nested out-of-sample AUC recovered by the same pipeline     0.535  0.487  0.564 1180 1025.0  155.0
+ planted logit slope 0.8 on lit_2000_mvs: nested out-of-sample AUC recovered by the same pipeline     0.630  0.594  0.653 1180 1025.0  155.0
+ planted logit slope 1.2 on lit_2000_mvs: nested out-of-sample AUC recovered by the same pipeline     0.687  0.657  0.723 1180 1025.0  155.0
+   planted logit slope 2 on lit_2000_mvs: nested out-of-sample AUC recovered by the same pipeline     0.763  0.730  0.794 1180 1025.0  155.0
+
+== base_rate_all (3 rows)
+                            name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+   all real trades: share agrees     0.623  0.604  0.641 2584 1609.0    NaN
+all real trades: share disagrees     0.158  0.145  0.173 2584  409.0    NaN
+     all real trades: share none     0.219  0.204  0.235 2584  566.0    NaN
+
+== base_rate_scenario (15 rows)
+                                    name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+             scenario FOLM: share agrees     0.799  0.781  0.816 1911 1527.0    NaN
+          scenario FOLM: share disagrees     0.132  0.117  0.148 1911  252.0    NaN
+               scenario FOLM: share none     0.069  0.059  0.081 1911  132.0    NaN
+             scenario FLXQ: share agrees     0.038  0.023  0.062  394   15.0    NaN
+          scenario FLXQ: share disagrees     0.244  0.204  0.288  394   96.0    NaN
+               scenario FLXQ: share none     0.718  0.672  0.760  394  283.0    NaN
+             scenario EXHL: share agrees     0.280  0.226  0.340  236   66.0    NaN
+          scenario EXHL: share disagrees     0.182  0.138  0.236  236   43.0    NaN
+               scenario EXHL: share none     0.538  0.474  0.601  236  127.0    NaN
+         scenario not FOLM: share agrees     0.122  0.099  0.149  673   82.0    NaN
+      scenario not FOLM: share disagrees     0.233  0.203  0.267  673  157.0    NaN
+           scenario not FOLM: share none     0.645  0.608  0.680  673  434.0    NaN
+   scenario CONT/BNO/OTHER: share agrees     0.023  0.004  0.121   43    1.0    NaN
+scenario CONT/BNO/OTHER: share disagrees     0.419  0.284  0.567   43   18.0    NaN
+     scenario CONT/BNO/OTHER: share none     0.558  0.411  0.696   43   24.0    NaN
+
+== base_rate_action (18 rows)
+                      name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+   action BM: share agrees     0.741  0.712  0.768 946  701.0    NaN
+action BM: share disagrees     0.119  0.100  0.142 946  113.0    NaN
+     action BM: share none     0.140  0.119  0.163 946  132.0    NaN
+   action SM: share agrees     0.856  0.832  0.877 965  826.0    NaN
+action SM: share disagrees     0.144  0.123  0.168 965  139.0    NaN
+     action SM: share none     0.000  0.000  0.004 965    0.0    NaN
+   action BS: share agrees     0.030  0.014  0.064 201    6.0    NaN
+action BS: share disagrees     0.279  0.221  0.344 201   56.0    NaN
+     action BS: share none     0.692  0.625  0.751 201  139.0    NaN
+   action SS: share agrees     0.042  0.023  0.076 236   10.0    NaN
+action SS: share disagrees     0.246  0.195  0.304 236   58.0    NaN
+     action SS: share none     0.712  0.651  0.766 236  168.0    NaN
+   action BL: share agrees     0.280  0.209  0.364 125   35.0    NaN
+action BL: share disagrees     0.112  0.068  0.179 125   14.0    NaN
+     action BL: share none     0.608  0.520  0.689 125   76.0    NaN
+   action SL: share agrees     0.279  0.204  0.369 111   31.0    NaN
+action SL: share disagrees     0.261  0.189  0.350 111   29.0    NaN
+     action SL: share none     0.459  0.370  0.552 111   51.0    NaN
+
+== base_rate_market (12 rows)
+                                            name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+         market entries BM+SM, all: share agrees     0.799  0.781  0.816 1911 1527.0    NaN
+      market entries BM+SM, all: share disagrees     0.132  0.117  0.148 1911  252.0    NaN
+           market entries BM+SM, all: share none     0.069  0.059  0.081 1911  132.0    NaN
+   market entries covered by ticks: share agrees     0.813  0.791  0.834 1260 1025.0    NaN
+market entries covered by ticks: share disagrees     0.123  0.106  0.142 1260  155.0    NaN
+     market entries covered by ticks: share none     0.063  0.051  0.078 1260   80.0    NaN
+                        covered BM: share agrees     0.760  0.725  0.792  621  472.0    NaN
+                     covered BM: share disagrees     0.111  0.089  0.138  621   69.0    NaN
+                          covered BM: share none     0.129  0.105  0.157  621   80.0    NaN
+                        covered SM: share agrees     0.865  0.837  0.890  639  553.0    NaN
+                     covered SM: share disagrees     0.135  0.110  0.163  639   86.0    NaN
+                          covered SM: share none     0.000  0.000  0.006  639    0.0    NaN
+
+== nested_agrees_vs_disagrees (6 rows)
+                                                                                                                                 name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+                                              nested out-of-sample AUC agrees-vs-disagrees; candidates: all signed candidates + gates     0.537  0.479  0.597 787  689.0   98.0
+                                       nested out-of-sample AUC agrees-vs-disagrees; candidates: MT5-computable only (no quote sizes)     0.537  0.479  0.597 787  689.0   98.0
+nested out-of-sample AUC agrees-vs-disagrees; candidates: quote-size features only (Dukascopy sizes; not available in the MT5 tester)     0.504  0.441  0.567 787  689.0   98.0
+                                  nested out-of-sample AUC agrees-vs-disagrees; candidates: anchor lit only (literal brief: T-150 ms)     0.559  0.499  0.619 787  689.0   98.0
+                                      nested out-of-sample AUC agrees-vs-disagrees; candidates: anchor rel only (order-send estimate)     0.509  0.445  0.578 787  689.0   98.0
+                                     nested out-of-sample AUC agrees-vs-disagrees; candidates: anchor arm only (hold-arming estimate)     0.516  0.448  0.581 787  689.0   98.0
+
+== nested_none_vs_not_BM_only (2 rows)
+                                                                                               name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+nested out-of-sample AUC none-vs-not (BM only, |x|); candidates: all |signed| + activity candidates     0.535  0.447  0.614 417   53.0  364.0
+               nested out-of-sample AUC none-vs-not (BM only, |x|); candidates: MT5-computable only     0.535  0.447  0.614 417   53.0  364.0
+
+== nested_by_family (36 rows)
+                                                                name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+             nested out-of-sample AUC agrees-vs-disagrees, family mv     0.568  0.505  0.629 787  689.0   98.0
+      nested out-of-sample AUC none-vs-not (BM only, |x|), family mv     0.524  0.438  0.597 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family mvs     0.570  0.507  0.628 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family mvs     0.514  0.433  0.584 417   53.0  364.0
+             nested out-of-sample AUC agrees-vs-disagrees, family ti     0.548  0.476  0.622 787  689.0   98.0
+      nested out-of-sample AUC none-vs-not (BM only, |x|), family ti     0.535  0.447  0.614 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family tin     0.552  0.489  0.614 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family tin     0.516  0.419  0.591 417   53.0  364.0
+             nested out-of-sample AUC agrees-vs-disagrees, family qa     0.519  0.454  0.584 787  689.0   98.0
+      nested out-of-sample AUC none-vs-not (BM only, |x|), family qa     0.561  0.473  0.635 417   53.0  364.0
+             nested out-of-sample AUC agrees-vs-disagrees, family qb     0.481  0.424  0.533 787  689.0   98.0
+      nested out-of-sample AUC none-vs-not (BM only, |x|), family qb     0.514  0.415  0.611 417   53.0  364.0
+             nested out-of-sample AUC agrees-vs-disagrees, family qd     0.501  0.442  0.565 787  689.0   98.0
+      nested out-of-sample AUC none-vs-not (BM only, |x|), family qd     0.540  0.457  0.606 417   53.0  364.0
+             nested out-of-sample AUC agrees-vs-disagrees, family ql     0.513  0.449  0.571 787  689.0   98.0
+      nested out-of-sample AUC none-vs-not (BM only, |x|), family ql     0.503  0.422  0.582 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family sim     0.504  0.441  0.567 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family sim     0.522  0.443  0.590 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family sil     0.497  0.458  0.534 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family sil     0.521  0.469  0.584 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family mpp     0.478  0.438  0.514 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family mpp     0.521  0.469  0.584 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family mps     0.497  0.459  0.533 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family mps     0.523  0.470  0.588 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family dsi     0.547  0.507  0.596 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family dsi     0.505  0.452  0.559 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family dsh     0.534  0.458  0.612 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family dsh     0.487  0.401  0.575 417   53.0  364.0
+            nested out-of-sample AUC agrees-vs-disagrees, family cpx     0.539  0.473  0.604 787  689.0   98.0
+     nested out-of-sample AUC none-vs-not (BM only, |x|), family cpx     0.408  0.308  0.510 417   53.0  364.0
+           nested out-of-sample AUC agrees-vs-disagrees, family call     0.526  0.452  0.590 787  689.0   98.0
+    nested out-of-sample AUC none-vs-not (BM only, |x|), family call     0.473  0.374  0.570 417   53.0  364.0
+  nested out-of-sample AUC none-vs-not (BM only), unsigned family nt     0.503  0.406  0.607 417   53.0  364.0
+nested out-of-sample AUC none-vs-not (BM only), unsigned family rate     0.503  0.406  0.607 417   53.0  364.0
+ nested out-of-sample AUC none-vs-not (BM only), unsigned family spr     0.506  0.399  0.612 417   53.0  364.0
+ nested out-of-sample AUC none-vs-not (BM only), unsigned family rng     0.535  0.460  0.603 417   53.0  364.0
+
+== auc_none_vs_not_all_market (18 rows)
+               name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+AUC|x| lit_1000_mvs     0.538  0.485  0.597 1259   80.0 1179.0
+AUC|x| lit_1000_tin     0.529  0.474  0.582 1259   80.0 1179.0
+ AUC|x| lit_1000_qd     0.536  0.483  0.590 1259   80.0 1179.0
+AUC|x| lit_2000_mvs     0.580  0.515  0.644 1259   80.0 1179.0
+AUC|x| lit_2000_tin     0.565  0.512  0.617 1259   80.0 1179.0
+ AUC|x| lit_2000_qd     0.566  0.507  0.620 1259   80.0 1179.0
+AUC|x| lit_5000_mvs     0.566  0.507  0.627 1255   80.0 1175.0
+AUC|x| lit_5000_tin     0.534  0.472  0.599 1255   80.0 1175.0
+ AUC|x| lit_5000_qd     0.567  0.508  0.631 1255   80.0 1175.0
+AUC|x| arm_1000_mvs     0.586  0.515  0.646 1256   80.0 1176.0
+AUC|x| arm_1000_tin     0.572  0.511  0.624 1256   80.0 1176.0
+ AUC|x| arm_1000_qd     0.573  0.519  0.626 1256   80.0 1176.0
+AUC|x| arm_2000_mvs     0.601  0.540  0.656 1256   80.0 1176.0
+AUC|x| arm_2000_tin     0.575  0.519  0.630 1256   80.0 1176.0
+ AUC|x| arm_2000_qd     0.591  0.532  0.648 1256   80.0 1176.0
+AUC|x| arm_5000_mvs     0.573  0.517  0.631 1252   80.0 1172.0
+AUC|x| arm_5000_tin     0.551  0.489  0.616 1252   80.0 1172.0
+ AUC|x| arm_5000_qd     0.580  0.522  0.640 1252   80.0 1172.0
+
+== three_class (8 rows)
+                                                                          name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+3-class accuracy: best single-feature threshold rule, fitted on earlier blocks     0.820  0.787  0.852 840    NaN    NaN
+                                                     baseline: always 'agrees'     0.820  0.787  0.852 840    NaN    NaN
+         baseline: sign of the 10 s price move (agrees if with the trade side)     0.820  0.787  0.852 840    NaN    NaN
+         baseline: coin weighted by the training base rate (expected accuracy)     0.681  0.658  0.703 840    NaN    NaN
+                        accuracy gain of the threshold rule over always-agrees     0.000  0.000  0.000 840    NaN    NaN
+                                        recall of the selected rule for agrees     1.000    NaN    NaN 689    NaN    NaN
+                                     recall of the selected rule for disagrees     0.000    NaN    NaN  98    NaN    NaN
+                                          recall of the selected rule for none     0.000    NaN    NaN  53    NaN    NaN
+
+== three_class_by_family (16 rows)
+                                                                              name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+  3-class accuracy of the best threshold rule, family mv (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family mvs (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+  3-class accuracy of the best threshold rule, family ti (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family tin (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+  3-class accuracy of the best threshold rule, family qa (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+  3-class accuracy of the best threshold rule, family qb (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+  3-class accuracy of the best threshold rule, family qd (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+  3-class accuracy of the best threshold rule, family ql (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family sim (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family sil (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family mpp (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family mps (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family dsi (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family dsh (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+ 3-class accuracy of the best threshold rule, family cpx (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+3-class accuracy of the best threshold rule, family call (all anchors and windows)      0.82  0.787  0.852 840    NaN    NaN
+
+== stochastic_model (24 rows)
+                                                                                                                                        name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+                                  P(agrees | not none): log-loss improvement over the base-rate model, anchor lit, price/quote only, ridge 3    -0.016 -0.047  0.013 787  689.0   98.0
+                                 P(agrees | not none): log-loss improvement over the base-rate model, anchor lit, price/quote only, ridge 30    -0.001 -0.021  0.020 787  689.0   98.0
+                                        P(agrees | not none): log-loss improvement over the base-rate model, anchor lit, with sizes, ridge 3    -0.009 -0.040  0.022 787  689.0   98.0
+                                       P(agrees | not none): log-loss improvement over the base-rate model, anchor lit, with sizes, ridge 30     0.007 -0.013  0.027 787  689.0   98.0
+                                  P(agrees | not none): log-loss improvement over the base-rate model, anchor arm, price/quote only, ridge 3    -0.002 -0.035  0.030 787  689.0   98.0
+                                 P(agrees | not none): log-loss improvement over the base-rate model, anchor arm, price/quote only, ridge 30     0.007 -0.014  0.028 787  689.0   98.0
+                                        P(agrees | not none): log-loss improvement over the base-rate model, anchor arm, with sizes, ridge 3     0.006 -0.034  0.042 787  689.0   98.0
+                                       P(agrees | not none): log-loss improvement over the base-rate model, anchor arm, with sizes, ridge 30     0.014 -0.009  0.037 787  689.0   98.0
+                                          P(none | BM): log-loss improvement over the base-rate model, anchor lit, price/quote only, ridge 3    -0.042 -0.084  0.004 417   53.0  364.0
+                                         P(none | BM): log-loss improvement over the base-rate model, anchor lit, price/quote only, ridge 30    -0.012 -0.037  0.015 417   53.0  364.0
+                                                P(none | BM): log-loss improvement over the base-rate model, anchor lit, with sizes, ridge 3    -0.041 -0.081  0.004 417   53.0  364.0
+                                               P(none | BM): log-loss improvement over the base-rate model, anchor lit, with sizes, ridge 30    -0.011 -0.035  0.016 417   53.0  364.0
+                                          P(none | BM): log-loss improvement over the base-rate model, anchor arm, price/quote only, ridge 3    -0.026 -0.073  0.015 417   53.0  364.0
+                                         P(none | BM): log-loss improvement over the base-rate model, anchor arm, price/quote only, ridge 30    -0.002 -0.028  0.022 417   53.0  364.0
+                                                P(none | BM): log-loss improvement over the base-rate model, anchor arm, with sizes, ridge 3    -0.018 -0.063  0.023 417   53.0  364.0
+                                               P(none | BM): log-loss improvement over the base-rate model, anchor arm, with sizes, ridge 30     0.004 -0.021  0.028 417   53.0  364.0
+                   P(agrees | not none): log-loss improvement over the base-rate model, UTC hour-of-day table shrunk to the base rate (m=10)     0.002 -0.026  0.029 787  689.0   98.0
+                   P(agrees | not none): log-loss improvement over the base-rate model, UTC hour-of-day table shrunk to the base rate (m=30)     0.007 -0.010  0.025 787  689.0   98.0
+                           P(none | BM): log-loss improvement over the base-rate model, UTC hour-of-day table shrunk to the base rate (m=10)    -0.056 -0.103 -0.010 417   53.0  364.0
+                           P(none | BM): log-loss improvement over the base-rate model, UTC hour-of-day table shrunk to the base rate (m=30)    -0.023 -0.048  0.002 417   53.0  364.0
+ P(agrees | not none): log-loss improvement over the base-rate model, label of the previous real trade within 10 min (regime proxy), ridge 3     0.013 -0.007  0.034 787  689.0   98.0
+P(agrees | not none): log-loss improvement over the base-rate model, label of the previous real trade within 10 min (regime proxy), ridge 30     0.012 -0.003  0.028 787  689.0   98.0
+         P(none | BM): log-loss improvement over the base-rate model, label of the previous real trade within 10 min (regime proxy), ridge 3     0.002 -0.028  0.031 417   53.0  364.0
+        P(none | BM): log-loss improvement over the base-rate model, label of the previous real trade within 10 min (regime proxy), ridge 30     0.004 -0.016  0.022 417   53.0  364.0
+
+== gates (40 rows)
+                                                                                                                      name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+                                                                 share with M1 body >= 21 pts with the trade, label agrees     0.832  0.808  0.854 1025  853.0    NaN
+                                                              share with M1 body >= 21 pts with the trade, label disagrees     0.910  0.854  0.945  155  141.0    NaN
+                                                                   share with M1 body >= 21 pts with the trade, label none     1.000  0.954  1.000   80   80.0    NaN
+                                     share with break of the previous 10 s extreme by > 3 pts with the trade, label agrees     0.219  0.194  0.245 1025  224.0    NaN
+                                  share with break of the previous 10 s extreme by > 3 pts with the trade, label disagrees     0.219  0.161  0.291  155   34.0    NaN
+                                       share with break of the previous 10 s extreme by > 3 pts with the trade, label none     0.238  0.158  0.341   80   19.0    NaN
+                                                                 share with M1 body >= 21 pts with the trade, label agrees     0.841  0.817  0.862 1025  862.0    NaN
+                                                              share with M1 body >= 21 pts with the trade, label disagrees     0.916  0.862  0.950  155  142.0    NaN
+                                                                   share with M1 body >= 21 pts with the trade, label none     1.000  0.954  1.000   80   80.0    NaN
+                                     share with break of the previous 10 s extreme by > 3 pts with the trade, label agrees     0.173  0.151  0.197 1025  177.0    NaN
+                                  share with break of the previous 10 s extreme by > 3 pts with the trade, label disagrees     0.097  0.060  0.154  155   15.0    NaN
+                                       share with break of the previous 10 s extreme by > 3 pts with the trade, label none     0.250  0.168  0.355   80   20.0    NaN
+                                                                 share with M1 body >= 21 pts with the trade, label agrees     0.754  0.727  0.780 1021  770.0    NaN
+                                                              share with M1 body >= 21 pts with the trade, label disagrees     0.832  0.766  0.883  155  129.0    NaN
+                                                                   share with M1 body >= 21 pts with the trade, label none     1.000  0.954  1.000   80   80.0    NaN
+                                     share with break of the previous 10 s extreme by > 3 pts with the trade, label agrees     0.299  0.271  0.328 1021  305.0    NaN
+                                  share with break of the previous 10 s extreme by > 3 pts with the trade, label disagrees     0.290  0.225  0.366  155   45.0    NaN
+                                       share with break of the previous 10 s extreme by > 3 pts with the trade, label none     0.338  0.243  0.446   80   27.0    NaN
+                               share with M1 body >= 21 pts with the trade at ANY time in [T-1.4 s, T-0.4 s], label agrees     0.877  0.856  0.896 1025  899.0    NaN
+                            share with M1 body >= 21 pts with the trade at ANY time in [T-1.4 s, T-0.4 s], label disagrees     0.916  0.862  0.950  155  142.0    NaN
+                                 share with M1 body >= 21 pts with the trade at ANY time in [T-1.4 s, T-0.4 s], label none     1.000  0.954  1.000   80   80.0    NaN
+   share with break of the previous 10 s extreme by > 3 pts with the trade at ANY time in [T-1.4 s, T-0.4 s], label agrees     0.792  0.766  0.816 1025  812.0    NaN
+share with break of the previous 10 s extreme by > 3 pts with the trade at ANY time in [T-1.4 s, T-0.4 s], label disagrees     0.929  0.877  0.960  155  144.0    NaN
+     share with break of the previous 10 s extreme by > 3 pts with the trade at ANY time in [T-1.4 s, T-0.4 s], label none     0.962  0.895  0.987   80   77.0    NaN
+                                                          AUC agrees-vs-disagrees inside the body>=21 subset: lit_2000_mvs     0.434  0.383  0.488  994  853.0  141.0
+                                                          AUC agrees-vs-disagrees inside the body>=21 subset: lit_2000_tin     0.484  0.437  0.535  994  853.0  141.0
+                                                           AUC agrees-vs-disagrees inside the body>=21 subset: lit_5000_mv     0.461  0.412  0.512  994  853.0  141.0
+                                                          AUC agrees-vs-disagrees inside the body>=21 subset: lit_10000_mv     0.464  0.412  0.508  994  853.0  141.0
+                                                          AUC agrees-vs-disagrees inside the body>=21 subset: arm_2000_mvs     0.433  0.379  0.491  899  770.0  129.0
+                                                          AUC agrees-vs-disagrees inside the body>=21 subset: arm_2000_tin     0.462  0.412  0.512  899  770.0  129.0
+                                                           AUC agrees-vs-disagrees inside the body>=21 subset: arm_5000_mv     0.446  0.392  0.502  899  770.0  129.0
+                                                          AUC agrees-vs-disagrees inside the body>=21 subset: arm_10000_mv     0.461  0.405  0.514  899  770.0  129.0
+ AUC agrees-vs-disagrees inside the subset where BOTH weak-flow gates hold at some tick of the arming window: lit_2000_mvs     0.473  0.416  0.527  853  722.0  131.0
+ AUC agrees-vs-disagrees inside the subset where BOTH weak-flow gates hold at some tick of the arming window: lit_3000_mvs     0.468  0.419  0.517  853  722.0  131.0
+ AUC agrees-vs-disagrees inside the subset where BOTH weak-flow gates hold at some tick of the arming window: arm_2000_mvs     0.466  0.407  0.527  853  722.0  131.0
+ AUC agrees-vs-disagrees inside the subset where BOTH weak-flow gates hold at some tick of the arming window: arm_3000_mvs     0.473  0.422  0.531  853  722.0  131.0
+ AUC agrees-vs-disagrees inside the subset where BOTH weak-flow gates hold at some tick of the arming window: lit_2000_tin     0.513  0.459  0.566  853  722.0  131.0
+ AUC agrees-vs-disagrees inside the subset where BOTH weak-flow gates hold at some tick of the arming window: arm_2000_tin     0.487  0.435  0.545  853  722.0  131.0
+  AUC agrees-vs-disagrees inside the subset where BOTH weak-flow gates hold at some tick of the arming window: arm_5000_mv     0.474  0.418  0.535  853  722.0  131.0
+ AUC agrees-vs-disagrees inside the subset where BOTH weak-flow gates hold at some tick of the arming window: lit_10000_mv     0.495  0.451  0.538  853  722.0  131.0
+
+== momentum (12 rows)
+                                                                         name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+       share of market entries: trade side == direction of the last 10 s move     1.000  0.997  1.000 1253 1253.0    NaN
+           share of market entries: trade side opposite to the last 10 s move     0.000  0.000  0.003 1253    0.0    NaN
+   share agrees among agrees+disagrees when trade side == 10 s move direction     0.868  0.847  0.886 1173 1018.0    NaN
+share agrees among agrees+disagrees when trade side opposite to the 10 s move       NaN    NaN    NaN    0    0.0    NaN
+       share of market entries: trade side == direction of the last 10 s move     0.998  0.994  1.000 1254 1252.0    NaN
+           share of market entries: trade side opposite to the last 10 s move     0.002  0.000  0.006 1254    2.0    NaN
+   share agrees among agrees+disagrees when trade side == 10 s move direction     0.868  0.847  0.886 1172 1017.0    NaN
+share agrees among agrees+disagrees when trade side opposite to the 10 s move     1.000  0.342  1.000    2    2.0    NaN
+       share of market entries: trade side == direction of the last 10 s move     0.995  0.990  0.998 1250 1244.0    NaN
+           share of market entries: trade side opposite to the last 10 s move     0.005  0.002  0.010 1250    6.0    NaN
+   share agrees among agrees+disagrees when trade side == 10 s move direction     0.867  0.846  0.885 1164 1009.0    NaN
+share agrees among agrees+disagrees when trade side opposite to the 10 s move     1.000  0.610  1.000    6    6.0    NaN
+
+== regime (17 rows)
+                                                                  name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+     label heterogeneity across UTC hour of day (chi-square statistic)    68.336    NaN    NaN 1260    NaN    NaN
+      label heterogeneity across UTC hour of day (permutation p-value)     0.011    NaN    NaN 1260    NaN    NaN
+        label heterogeneity across calendar day (chi-square statistic)    40.703    NaN    NaN 1260    NaN    NaN
+         label heterogeneity across calendar day (permutation p-value)     0.270    NaN    NaN 1260    NaN    NaN
+                 P(next trade has the SAME label | any label, any gap)     0.685  0.648  0.672 1910    NaN    NaN
+      P(next trade has the SAME label | previous = disagrees, any gap)     0.175  0.095  0.171  252    NaN    NaN
+           P(next trade has the SAME label | previous = none, any gap)     0.152  0.030  0.106  132    NaN    NaN
+              P(next trade has the SAME label | any label, gap < 30 s)     0.806  0.484  0.806   31    NaN    NaN
+            P(next trade has the SAME label | any label, gap 30-120 s)     0.716  0.613  0.710  310    NaN    NaN
+ P(next trade has the SAME label | previous = disagrees, gap 30-120 s)     0.128  0.043  0.250   39    NaN    NaN
+      P(next trade has the SAME label | previous = none, gap 30-120 s)     0.154  0.000  0.192   26    NaN    NaN
+           P(next trade has the SAME label | any label, gap 120-600 s)     0.705  0.635  0.683  971    NaN    NaN
+P(next trade has the SAME label | previous = disagrees, gap 120-600 s)     0.178  0.076  0.185  129    NaN    NaN
+     P(next trade has the SAME label | previous = none, gap 120-600 s)     0.200  0.015  0.131   60    NaN    NaN
+            P(next trade has the SAME label | any label, gap >= 600 s)     0.630  0.624  0.697  598    NaN    NaN
+ P(next trade has the SAME label | previous = disagrees, gap >= 600 s)     0.200  0.064  0.212   80    NaN    NaN
+      P(next trade has the SAME label | previous = none, gap >= 600 s)     0.089  0.000  0.152   45    NaN    NaN
+
+== price_path (5 rows)
+                                                                                            name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+                                      mean mid move with the trade, T-3.40 s to T-2.15 s, points    15.376 13.727 17.202 1238    NaN    NaN
+                                      mean mid move with the trade, T-2.15 s to T-0.90 s, points    39.250 36.480 42.335 1242    NaN    NaN
+mean mid move with the trade, T-0.90 s to T+0.35 s (arm estimate to order-send estimate), points    23.764 20.934 26.822 1256    NaN    NaN
+                    mean mid move with the trade, T+0.35 s to T+1.60 s (after the order), points     1.025 -0.725  2.877 1259    NaN    NaN
+                                      mean mid move with the trade, T+1.60 s to T+2.85 s, points    -0.385 -1.887  1.139 1253    NaN    NaN
+
+== outcome (19 rows)
+                                                                                  name  estimate   ci_lo  ci_hi    n  n_pos  n_neg
+                           realised result, points per 0.01 lot: mean for label agrees    -5.735 -12.024  0.818 1025    NaN    NaN
+                        realised result, points per 0.01 lot: mean for label disagrees     3.819 -10.849 19.498  155    NaN    NaN
+                             realised result, points per 0.01 lot: mean for label none   -13.262 -37.204 11.097   80    NaN    NaN
+                          realised result, points per 0.01 lot: agrees minus disagrees    -9.554 -26.275  7.291 1180    NaN    NaN
+    forward mid move 5 s after the fill, points, with the trade: mean for label agrees     1.547  -2.059  5.396 1019    NaN    NaN
+ forward mid move 5 s after the fill, points, with the trade: mean for label disagrees     3.778  -3.332 11.342  154    NaN    NaN
+      forward mid move 5 s after the fill, points, with the trade: mean for label none     0.946  -9.115 10.087   80    NaN    NaN
+   forward mid move 5 s after the fill, points, with the trade: agrees minus disagrees    -2.231 -11.068  5.902 1173    NaN    NaN
+   forward mid move 10 s after the fill, points, with the trade: mean for label agrees     0.559  -3.884  5.352 1020    NaN    NaN
+forward mid move 10 s after the fill, points, with the trade: mean for label disagrees     7.955  -3.639 20.406  155    NaN    NaN
+     forward mid move 10 s after the fill, points, with the trade: mean for label none     2.638 -12.727 17.995   80    NaN    NaN
+  forward mid move 10 s after the fill, points, with the trade: agrees minus disagrees    -7.396 -20.510  4.363 1175    NaN    NaN
+   forward mid move 30 s after the fill, points, with the trade: mean for label agrees    -1.040  -8.375  6.552 1014    NaN    NaN
+forward mid move 30 s after the fill, points, with the trade: mean for label disagrees    13.632  -2.831 30.824  154    NaN    NaN
+     forward mid move 30 s after the fill, points, with the trade: mean for label none     9.563 -18.518 41.225   79    NaN    NaN
+  forward mid move 30 s after the fill, points, with the trade: agrees minus disagrees   -14.673 -32.957  4.596 1168    NaN    NaN
+                                 share of trades closed at the stop loss, label agrees     0.515   0.485  0.546 1025  528.0    NaN
+                              share of trades closed at the stop loss, label disagrees     0.490   0.413  0.568  155   76.0    NaN
+                                   share of trades closed at the stop loss, label none     0.575   0.466  0.677   80   46.0    NaN
+
+== outcome_all_market (3 rows)
+                                                                      name  estimate   ci_lo  ci_hi    n  n_pos  n_neg
+   realised points, label agrees (all 1911 market trades, no ticks needed)    -8.800 -13.803 -3.744 1527    NaN    NaN
+realised points, label disagrees (all 1911 market trades, no ticks needed)     0.437 -11.360 12.681  252    NaN    NaN
+     realised points, label none (all 1911 market trades, no ticks needed)   -12.674 -29.987  6.376  132    NaN    NaN
+
+== outcome_by_side (9 rows)
+                                                                                                                    name  estimate   ci_lo   ci_hi    n  n_pos  n_neg
+                                              realised points, all 1911 market trades: agrees minus disagrees, buys (BM)    16.259  -4.232  35.829  814  701.0  113.0
+                                             realised points, all 1911 market trades: agrees minus disagrees, sells (SM)   -30.049 -49.963 -12.054  965  826.0  139.0
+             realised points, all 1911 market trades: interaction (agrees minus disagrees on buys) minus (same on sells)    46.308  19.090  73.971 1779    NaN    NaN
+                                                      realised points, covered sample: agrees minus disagrees, buys (BM)    13.053 -12.740  39.346  541  472.0   69.0
+                                                     realised points, covered sample: agrees minus disagrees, sells (SM)   -27.812 -53.635  -5.668  639  553.0   86.0
+                     realised points, covered sample: interaction (agrees minus disagrees on buys) minus (same on sells)    40.865   4.463  79.291 1180    NaN    NaN
+                                 forward mid move 10 s with the trade, covered sample: agrees minus disagrees, buys (BM)    -2.510 -20.681  15.331  537  468.0   69.0
+                                forward mid move 10 s with the trade, covered sample: agrees minus disagrees, sells (SM)   -11.427 -30.261   6.334  638  552.0   86.0
+forward mid move 10 s with the trade, covered sample: interaction (agrees minus disagrees on buys) minus (same on sells)     8.917 -18.178  35.681 1180    NaN    NaN
+
+== feed_direction_vs_price (9 rows)
+                                                                   name  estimate   ci_lo  ci_hi    n  n_pos  n_neg
+  raw mid move 5 s after the fill (points, + = price up), feed says BUY     1.087  -3.316  5.406  554    NaN    NaN
+ raw mid move 5 s after the fill (points, + = price up), feed says SELL    -0.634  -5.054  4.115  619    NaN    NaN
+    raw mid move 5 s after the fill: feed says BUY minus feed says SELL     1.721  -5.051  8.243 1173  554.0  619.0
+ raw mid move 10 s after the fill (points, + = price up), feed says BUY     0.982  -5.251  6.677  554    NaN    NaN
+raw mid move 10 s after the fill (points, + = price up), feed says SELL     1.943  -4.037  8.530  621    NaN    NaN
+   raw mid move 10 s after the fill: feed says BUY minus feed says SELL    -0.962  -9.154  7.544 1175  554.0  621.0
+ raw mid move 30 s after the fill (points, + = price up), feed says BUY     1.536  -7.440 10.668  551    NaN    NaN
+raw mid move 30 s after the fill (points, + = price up), feed says SELL     6.483  -3.134 16.800  617    NaN    NaN
+   raw mid move 30 s after the fill: feed says BUY minus feed says SELL    -4.948 -17.822  8.801 1168  551.0  617.0
+
+== outcome_control (10 rows)
+                                                                                                  name  estimate   ci_lo  ci_hi   n  n_pos  n_neg
+                                                  pts: coefficient agrees minus disagrees (label only)   -20.958 -42.419  0.952 840    NaN    NaN
+                                                    pts: coefficient none minus disagrees (label only)   -40.873 -73.764 -6.244 840    NaN    NaN
+           pts: coefficient agrees minus disagrees (label + best out-of-sample proxy logit + BM dummy)   -22.169 -44.639 -0.417 840    NaN    NaN
+             pts: coefficient none minus disagrees (label + best out-of-sample proxy logit + BM dummy)   -43.605 -77.393 -8.276 840    NaN    NaN
+  pts: coefficient of the proxy logit per +1 logit (label + best out-of-sample proxy logit + BM dummy)     8.855  -9.930 27.610 840    NaN    NaN
+                                                fwd10: coefficient agrees minus disagrees (label only)   -12.919 -28.886  1.877 837    NaN    NaN
+                                                  fwd10: coefficient none minus disagrees (label only)   -17.725 -43.298  6.860 837    NaN    NaN
+         fwd10: coefficient agrees minus disagrees (label + best out-of-sample proxy logit + BM dummy)   -13.164 -29.871  2.237 837    NaN    NaN
+           fwd10: coefficient none minus disagrees (label + best out-of-sample proxy logit + BM dummy)   -19.066 -44.914  7.094 837    NaN    NaN
+fwd10: coefficient of the proxy logit per +1 logit (label + best out-of-sample proxy logit + BM dummy)     1.759 -12.775 17.702 837    NaN    NaN
+
+== family-wise check
+                                                              name  estimate  ci_lo  ci_hi   n
+family-wise check: largest |AUC-0.5| over all candidates, observed     0.094  0.061  0.098 348
+
+== auc_agrees_vs_disagrees: top 12 by |AUC-0.5| (unselected, optimistic)
+            name  estimate  ci_lo  ci_hi    n
+AUC lit_3000_mvs     0.406  0.359  0.454 1179
+AUC lit_2000_mvs     0.410  0.365  0.461 1179
+AUC arm_2000_mvs     0.415  0.364  0.466 1176
+AUC arm_1000_mvs     0.416  0.366  0.466 1176
+ AUC lit_3000_mv     0.417  0.372  0.464 1179
+ AUC lit_2000_mv     0.421  0.375  0.469 1179
+AUC arm_5000_mvs     0.424  0.373  0.478 1172
+ AUC arm_1000_mv     0.425  0.374  0.476 1176
+AUC arm_3000_mvs     0.426  0.377  0.477 1175
+ AUC arm_5000_qa     0.426  0.378  0.471 1172
+AUC lit_5000_mvs     0.426  0.378  0.475 1175
+AUC arm_3000_cpx     0.427  0.380  0.475 1175
+
+== auc_none_vs_not_BM_only: top 12 by |AUC-0.5| (unselected, optimistic)
+               name  estimate  ci_lo  ci_hi   n
+ AUC|x| lit_2000_ti     0.605  0.541  0.666 620
+ AUC|x| rel_3000_mv     0.605  0.532  0.670 620
+AUC|x| rel_3000_mvs     0.604  0.532  0.670 620
+ AUC|x| rel_3000_ti     0.603  0.537  0.661 620
+ AUC|x| lit_3000_qa     0.602  0.546  0.660 620
+   AUC arm_1000_rng     0.601  0.534  0.660 619
+AUC|x| lit_3000_mvs     0.601  0.538  0.664 620
+ AUC|x| arm_2000_qb     0.600  0.547  0.656 619
+AUC|x| arm_2000_mvs     0.598  0.528  0.663 619
+ AUC|x| lit_3000_qb     0.598  0.537  0.658 620
+ AUC|x| arm_2000_mv     0.598  0.527  0.663 619
+AUC|x| arm_3000_mvs     0.598  0.535  0.660 618
+
+== lag_scan (85 rows)
+                                                    name  estimate  ci_lo  ci_hi    n  n_pos  n_neg
+AUC agrees-vs-disagrees mvs@2s, window ends at T-3000 ms     0.512  0.464  0.564 1165 1012.0  153.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T-2750 ms     0.514  0.471  0.570 1164 1010.0  154.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T-2500 ms     0.508  0.468  0.557 1163 1010.0  153.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T-2250 ms     0.510  0.466  0.557 1163 1010.0  153.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T-2000 ms     0.496  0.455  0.539 1161 1009.0  152.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T-1750 ms     0.472  0.431  0.517 1166 1012.0  154.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T-1500 ms     0.448  0.399  0.495 1171 1016.0  155.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T-1250 ms     0.430  0.370  0.489 1172 1017.0  155.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T-1000 ms     0.428  0.374  0.488 1175 1020.0  155.0
+ AUC agrees-vs-disagrees mvs@2s, window ends at T-750 ms     0.398  0.352  0.448 1178 1023.0  155.0
+ AUC agrees-vs-disagrees mvs@2s, window ends at T-500 ms     0.402  0.357  0.449 1178 1023.0  155.0
+ AUC agrees-vs-disagrees mvs@2s, window ends at T-250 ms     0.409  0.362  0.457 1179 1024.0  155.0
+   AUC agrees-vs-disagrees mvs@2s, window ends at T+0 ms     0.401  0.352  0.449 1179 1024.0  155.0
+ AUC agrees-vs-disagrees mvs@2s, window ends at T+250 ms     0.430  0.385  0.485 1179 1024.0  155.0
+ AUC agrees-vs-disagrees mvs@2s, window ends at T+500 ms     0.469  0.424  0.524 1179 1024.0  155.0
+ AUC agrees-vs-disagrees mvs@2s, window ends at T+750 ms     0.504  0.449  0.565 1179 1024.0  155.0
+AUC agrees-vs-disagrees mvs@2s, window ends at T+1000 ms     0.506  0.452  0.561 1179 1024.0  155.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-3000 ms     0.496  0.452  0.548 1165 1012.0  153.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-2750 ms     0.482  0.433  0.533 1164 1010.0  154.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-2500 ms     0.458  0.414  0.511 1163 1010.0  153.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-2250 ms     0.440  0.398  0.482 1163 1010.0  153.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-2000 ms     0.440  0.398  0.482 1161 1009.0  152.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-1750 ms     0.437  0.400  0.481 1166 1012.0  154.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-1500 ms     0.420  0.377  0.467 1171 1016.0  155.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-1250 ms     0.423  0.380  0.470 1172 1017.0  155.0
+AUC agrees-vs-disagrees tin@2s, window ends at T-1000 ms     0.443  0.401  0.487 1175 1020.0  155.0
+ AUC agrees-vs-disagrees tin@2s, window ends at T-750 ms     0.439  0.385  0.487 1178 1023.0  155.0
+ AUC agrees-vs-disagrees tin@2s, window ends at T-500 ms     0.462  0.413  0.513 1178 1023.0  155.0
+ AUC agrees-vs-disagrees tin@2s, window ends at T-250 ms     0.487  0.436  0.538 1179 1024.0  155.0
+   AUC agrees-vs-disagrees tin@2s, window ends at T+0 ms     0.470  0.420  0.521 1179 1024.0  155.0
+ AUC agrees-vs-disagrees tin@2s, window ends at T+250 ms     0.495  0.445  0.544 1179 1024.0  155.0
+ AUC agrees-vs-disagrees tin@2s, window ends at T+500 ms     0.529  0.485  0.572 1179 1024.0  155.0
+ AUC agrees-vs-disagrees tin@2s, window ends at T+750 ms     0.534  0.483  0.583 1179 1024.0  155.0
+AUC agrees-vs-disagrees tin@2s, window ends at T+1000 ms     0.509  0.459  0.556 1179 1024.0  155.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-3000 ms     0.496  0.452  0.546 1165 1012.0  153.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-2750 ms     0.478  0.435  0.532 1164 1010.0  154.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-2500 ms     0.457  0.413  0.509 1163 1010.0  153.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-2250 ms     0.440  0.393  0.482 1163 1010.0  153.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-2000 ms     0.431  0.387  0.475 1161 1009.0  152.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-1750 ms     0.437  0.396  0.481 1166 1012.0  154.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-1500 ms     0.421  0.377  0.466 1171 1016.0  155.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-1250 ms     0.425  0.382  0.472 1172 1017.0  155.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T-1000 ms     0.447  0.398  0.494 1175 1020.0  155.0
+  AUC agrees-vs-disagrees qd@2s, window ends at T-750 ms     0.441  0.390  0.487 1178 1023.0  155.0
+  AUC agrees-vs-disagrees qd@2s, window ends at T-500 ms     0.457  0.405  0.509 1178 1023.0  155.0
+  AUC agrees-vs-disagrees qd@2s, window ends at T-250 ms     0.489  0.431  0.544 1179 1024.0  155.0
+    AUC agrees-vs-disagrees qd@2s, window ends at T+0 ms     0.468  0.413  0.520 1179 1024.0  155.0
+  AUC agrees-vs-disagrees qd@2s, window ends at T+250 ms     0.498  0.437  0.549 1179 1024.0  155.0
+  AUC agrees-vs-disagrees qd@2s, window ends at T+500 ms     0.530  0.479  0.575 1179 1024.0  155.0
+  AUC agrees-vs-disagrees qd@2s, window ends at T+750 ms     0.532  0.473  0.580 1179 1024.0  155.0
+ AUC agrees-vs-disagrees qd@2s, window ends at T+1000 ms     0.501  0.450  0.547 1179 1024.0  155.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-3000 ms     0.510  0.453  0.555 1165 1012.0  153.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-2750 ms     0.518  0.464  0.565 1164 1010.0  154.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-2500 ms     0.510  0.462  0.555 1163 1010.0  153.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-2250 ms     0.538  0.491  0.580 1163 1010.0  153.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-2000 ms     0.531  0.488  0.575 1161 1009.0  152.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-1750 ms     0.532  0.492  0.576 1166 1012.0  154.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-1500 ms     0.538  0.493  0.584 1171 1016.0  155.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-1250 ms     0.537  0.490  0.588 1172 1017.0  155.0
+AUC agrees-vs-disagrees sim@2s, window ends at T-1000 ms     0.551  0.508  0.601 1175 1020.0  155.0
+ AUC agrees-vs-disagrees sim@2s, window ends at T-750 ms     0.546  0.490  0.606 1178 1023.0  155.0
+ AUC agrees-vs-disagrees sim@2s, window ends at T-500 ms     0.557  0.506  0.612 1178 1023.0  155.0
+ AUC agrees-vs-disagrees sim@2s, window ends at T-250 ms     0.544  0.494  0.602 1179 1024.0  155.0
+   AUC agrees-vs-disagrees sim@2s, window ends at T+0 ms     0.539  0.485  0.601 1179 1024.0  155.0
+ AUC agrees-vs-disagrees sim@2s, window ends at T+250 ms     0.537  0.489  0.590 1179 1024.0  155.0
+ AUC agrees-vs-disagrees sim@2s, window ends at T+500 ms     0.533  0.487  0.588 1179 1024.0  155.0
+ AUC agrees-vs-disagrees sim@2s, window ends at T+750 ms     0.537  0.485  0.589 1179 1024.0  155.0
+AUC agrees-vs-disagrees sim@2s, window ends at T+1000 ms     0.539  0.492  0.589 1179 1024.0  155.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-3000 ms     0.568  0.524  0.621 1165 1012.0  153.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-2750 ms     0.558  0.512  0.612 1164 1010.0  154.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-2500 ms     0.561  0.516  0.614 1163 1010.0  153.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-2250 ms     0.560  0.515  0.614 1163 1010.0  153.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-2000 ms     0.562  0.517  0.617 1161 1009.0  152.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-1750 ms     0.563  0.515  0.615 1166 1012.0  154.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-1500 ms     0.565  0.520  0.615 1171 1016.0  155.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-1250 ms     0.564  0.519  0.616 1172 1017.0  155.0
+AUC agrees-vs-disagrees spr@2s, window ends at T-1000 ms     0.572  0.525  0.623 1175 1020.0  155.0
+ AUC agrees-vs-disagrees spr@2s, window ends at T-750 ms     0.574  0.528  0.625 1178 1023.0  155.0
+ AUC agrees-vs-disagrees spr@2s, window ends at T-500 ms     0.572  0.530  0.624 1178 1023.0  155.0
+ AUC agrees-vs-disagrees spr@2s, window ends at T-250 ms     0.575  0.534  0.625 1179 1024.0  155.0
+   AUC agrees-vs-disagrees spr@2s, window ends at T+0 ms     0.576  0.536  0.626 1179 1024.0  155.0
+ AUC agrees-vs-disagrees spr@2s, window ends at T+250 ms     0.577  0.537  0.626 1179 1024.0  155.0
+ AUC agrees-vs-disagrees spr@2s, window ends at T+500 ms     0.576  0.536  0.625 1179 1024.0  155.0
+ AUC agrees-vs-disagrees spr@2s, window ends at T+750 ms     0.574  0.533  0.624 1179 1024.0  155.0
+AUC agrees-vs-disagrees spr@2s, window ends at T+1000 ms     0.570  0.528  0.622 1179 1024.0  155.0
+
+== stop_orders (31 rows)
+                                                                  name  estimate  ci_lo  ci_hi   n  n_pos  n_neg
+      stop-order entries with ticks: n_pos = agrees, n_neg = disagrees       NaN    NaN    NaN 225   12.0   78.0
+  AUC disagrees-vs-none mvs@2s ending 500 ms before the stamped second     0.490  0.411  0.562 212   77.0  135.0
+  AUC disagrees-vs-none tin@2s ending 500 ms before the stamped second     0.542  0.457  0.632 212   77.0  135.0
+   AUC disagrees-vs-none qd@2s ending 500 ms before the stamped second     0.558  0.472  0.644 212   77.0  135.0
+ AUC disagrees-vs-none rate@2s ending 500 ms before the stamped second     0.465  0.368  0.558 212   77.0  135.0
+  AUC disagrees-vs-none spr@2s ending 500 ms before the stamped second     0.471  0.386  0.561 212   77.0  135.0
+ AUC disagrees-vs-none mvs@2s ending 1500 ms before the stamped second     0.460  0.377  0.538 211   78.0  133.0
+ AUC disagrees-vs-none tin@2s ending 1500 ms before the stamped second     0.496  0.424  0.587 211   78.0  133.0
+  AUC disagrees-vs-none qd@2s ending 1500 ms before the stamped second     0.493  0.412  0.582 211   78.0  133.0
+AUC disagrees-vs-none rate@2s ending 1500 ms before the stamped second     0.475  0.383  0.565 211   78.0  133.0
+ AUC disagrees-vs-none spr@2s ending 1500 ms before the stamped second     0.475  0.391  0.569 211   78.0  133.0
+ AUC disagrees-vs-none mvs@2s ending 2500 ms before the stamped second     0.529  0.450  0.614 211   78.0  133.0
+ AUC disagrees-vs-none tin@2s ending 2500 ms before the stamped second     0.568  0.495  0.647 211   78.0  133.0
+  AUC disagrees-vs-none qd@2s ending 2500 ms before the stamped second     0.556  0.478  0.631 211   78.0  133.0
+AUC disagrees-vs-none rate@2s ending 2500 ms before the stamped second     0.498  0.406  0.583 211   78.0  133.0
+ AUC disagrees-vs-none spr@2s ending 2500 ms before the stamped second     0.472  0.393  0.557 211   78.0  133.0
+ AUC disagrees-vs-none mvs@2s ending 3500 ms before the stamped second     0.591  0.522  0.670 210   78.0  132.0
+ AUC disagrees-vs-none tin@2s ending 3500 ms before the stamped second     0.573  0.493  0.641 210   78.0  132.0
+  AUC disagrees-vs-none qd@2s ending 3500 ms before the stamped second     0.563  0.488  0.637 210   78.0  132.0
+AUC disagrees-vs-none rate@2s ending 3500 ms before the stamped second     0.514  0.433  0.601 210   78.0  132.0
+ AUC disagrees-vs-none spr@2s ending 3500 ms before the stamped second     0.474  0.393  0.561 210   78.0  132.0
+ AUC disagrees-vs-none mvs@2s ending 4500 ms before the stamped second     0.535  0.464  0.609 211   78.0  133.0
+ AUC disagrees-vs-none tin@2s ending 4500 ms before the stamped second     0.509  0.421  0.579 211   78.0  133.0
+  AUC disagrees-vs-none qd@2s ending 4500 ms before the stamped second     0.509  0.419  0.585 211   78.0  133.0
+AUC disagrees-vs-none rate@2s ending 4500 ms before the stamped second     0.498  0.410  0.591 211   78.0  133.0
+ AUC disagrees-vs-none spr@2s ending 4500 ms before the stamped second     0.471  0.384  0.561 211   78.0  133.0
+ AUC disagrees-vs-none mvs@2s ending 6000 ms before the stamped second     0.471  0.392  0.554 209   77.0  132.0
+ AUC disagrees-vs-none tin@2s ending 6000 ms before the stamped second     0.526  0.445  0.599 209   77.0  132.0
+  AUC disagrees-vs-none qd@2s ending 6000 ms before the stamped second     0.504  0.430  0.581 209   77.0  132.0
+AUC disagrees-vs-none rate@2s ending 6000 ms before the stamped second     0.473  0.390  0.568 209   77.0  132.0
+ AUC disagrees-vs-none spr@2s ending 6000 ms before the stamped second     0.484  0.396  0.574 209   77.0  132.0

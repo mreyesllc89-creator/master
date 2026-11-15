@@ -36,7 +36,9 @@ regenerated with the commands in section 13.
    under the median (table in section 11).
 6. **That number is thin, and it should be read as "about 1.0 to 1.15".** The average of 384
    neighbouring input sets is 1.06. 4 of 9 months are positive. The profit comes from
-   buys (1.49) and not from sells (0.97). A 7 point commission leaves 1.04,
+   buys (1.49) and not from sells (0.97); the best five of 158 trading days make
+   96% of the net, and without them it averages +0.4 points per trade (profit factor
+   1.01). A 7 point commission leaves 1.04,
    strict fills 1.04, both together 0.95. If stop losses slip twice as far as quoted
    instead of 1.5 times, it is 1.06.
 7. **Three things to know before any Strategy Tester run.**
@@ -106,8 +108,11 @@ seconds: those carry nearly the whole loss.
 | 10 to 40 s | 1,114 | 0.78 | -12,594 |
 | longer than 40 s | 649 | 1.44 | 10,943 |
 
-And the order-flow feed did not pick better trades. Entries the feed agreed with did worse than the ones it
-disagreed with:
+The order-flow label ("agrees" or "disagrees" with the side the EA is about to trade) does not tell the result
+reliably. Entries the feed disagreed with made +5.7 points per trade more than the ones it agreed with, but
+the 95% bootstrap range of that difference is -5.2 to +16.6, so it is within noise. The sign also
+flips between buy market entries (agreeing is better) and sell market entries (disagreeing is better), while gold fell
+about 7% over this window.
 
 | order-flow label on the entry | trades | profit factor | win % | points per trade |
 | --- | ---: | ---: | ---: | ---: |
@@ -491,7 +496,9 @@ points. The t-statistic of the mean trade is 1.7; resampling the trades gives a 
 | 2026-11 | 139 | 1.75 | 37.4 | 5,199 |
 
 4 of 9 months are positive. The three best (2026-11, 2026-01, 2026-03) earn 13,903 points; the
-other 6 together make -1,617.
+other 6 together make -1,617. By day it is more concentrated still: the best five of 158 trading
+days make 96% of the net, and without them the preset averages +0.4 points per trade (profit factor
+1.01).
 
 These are very short trades in the fastest part of the market: the average alert is 360 points,
 half the trades are over within 6 seconds, the average spread at entry is
@@ -512,8 +519,9 @@ And the profit is one-sided:
 | buy stops | 488 | 1.49 | 37 | 28.8 | 14,048 |
 | sell stops | 746 | 0.97 | 31 | -2.4 | -1,762 |
 
-Gold rose over most of the replayed months, so this may be the market and not the EA. It is not a reason to
-switch sells off.
+The skew does not follow the gold trend: buys beat sells in 6 of 9 months, including 2026-03, when
+gold fell 13% (buys +4,663 points, sells -626). It is not a reason to switch sells off, and
+it is a reason not to trust the buy edge before it shows on data the search has not seen.
 
 ### How much of that is real: 384 neighbouring sets
 
@@ -870,7 +878,7 @@ filter can use; an hour filter is *not* supported by the data (no hour is reliab
   1.06. It trades during the fastest moves, where real slippage is hardest to predict.
 - The preset was chosen with all three samples in view, and the region around it averages
   1.06. Its own profit factor is not an estimate of what a forward run will show.
-- The profit came from buys in a rising market and from 4 of 9 months.
+- The profit came from buys, from 4 of 9 months and from five days (96% of the net).
 - Nothing was tested with the order-flow feed, because nothing can be: the feed is not in the tester.
 - June to September 2026 is missing from the data.
 
