@@ -40,5 +40,21 @@
   "flat": [],
   "failed": [],
   "no_final_picks": []
+ },
+ "US500": {
+  "cells": 472,
+  "cells_100": 240,
+  "passed": 1,
+  "controls_passed": 0,
+  "controls": 24,
+  "confirmed": [],
+  "flat": [],
+  "failed": [],
+  "no_final_picks": [
+   [
+    "M2",
+    "trend_h4"
+   ]
+  ]
  }
 }
