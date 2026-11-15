@@ -40,6 +40,7 @@ Backtest: FTMO one-minute data, January 2025 – 15 May 2026, the period the pre
 - The VT Markets figures come from Codex's MT5 run with 100% real ticks. That run charged $6 per lot round trip; VT's real commission is $0.60 per lot, as you reported it, and the table uses the real rate. If the $0.60 is per side, the figures are a little lower.
 - Dukascopy is a third price source, separate from FTMO (calibration) and VT. It found 240 of the 247 VT trades.
 - A walk-forward test (recalibrating every few months on recent data) did not rescue the method: only one of five schedules passed, and only on four windows that include the 2025–26 gold rally.
+- **Re-calibration per timeframe (15 November 2026):** every timeframe from M1 to H1 was re-calibrated on January 2025 – 15 May 2026 with eleven kinds of trailing stop, and the best 10 setups of each were run on 16 May – 13 November 2026. No gold timeframe holds a profit factor of 1.3 there: the range is 0.72 to 1.04, and M10 is the best. The table is in `Loma_OOS_Review.html`, section 5.
 
 ## If you still want to test it
 

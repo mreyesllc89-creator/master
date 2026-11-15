@@ -5,6 +5,7 @@
 > **Status: not recommended for live trading.** The presets were fitted to January 2025 – 15 May 2026.
 > - **Gold:** on the months after that, which they never saw, the six shipped gold presets together lost money even before commission on VT Markets real ticks: profit factor 0.74 on 247 trades, 1 June – 6 November 2026 (0.67 at VT's $0.60 commission per lot). Dukascopy prices agree.
 > - **BTC:** the four presets together broke even: profit factor 1.05 on 193 trades, 16 May – 13 November 2026.
+> - **Re-calibration (15 November 2026):** every timeframe from M1 to H1, with eleven kinds of trailing stop, was re-calibrated on the same period and tested on the months after it. No timeframe holds a profit factor of 1.3 on unseen data, on gold (0.72–1.04) or on BTC (0.56–1.20 with at least 100 trades).
 > - **The EA itself** reproduces the backtest's trades.
 
 ## Downloads

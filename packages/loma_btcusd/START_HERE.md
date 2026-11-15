@@ -38,6 +38,7 @@ Backtest: Binance BTCUSDT one-minute data with an assumed $10 spread, January 20
 - **BTC03 is the only one that stayed positive under stress**, and most of its gain came in June 2026 (+9.7R). Without June it lost.
 - **BTC03 and BTC04 are both M10 sells in the same session** and share many trades: run one of them.
 - The data is Binance spot. Your broker's BTCUSD CFD has its own prices, spread, commission, swaps and weekend behaviour.
+- **Re-calibration per timeframe (15 November 2026):** every timeframe from M1 to H1 was re-calibrated on January 2025 – 15 May 2026 with eleven kinds of trailing stop, and the best 10 setups of each were run on 16 May – 13 November 2026. No BTC timeframe holds a profit factor of 1.3 on at least 100 unseen trades: M5 is the closest at 1.20 (1.10 under stress). Moving-average trailing looked good in 2026 (1.35 on 401 trades) but scored 1.04 on 2024 and 0.80 on 2023, so it is not counted as an edge. The full tables are in the repository: `research/reports/loma_oos_review.html`, section 5.
 
 ## Settings that are specific to BTC
 
