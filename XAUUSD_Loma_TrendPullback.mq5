@@ -2,7 +2,7 @@
 //|                                  XAUUSD_Loma_TrendPullback.mq5   |
 //|                                                                  |
 //|  Strategy : XAUUSD "Loma" (MACD hump) Trend Pullback, both sides |
-//|  Version  : 1.33                                                 |
+//|  Version  : 1.34                                                 |
 //+------------------------------------------------------------------+
 //
 //  "No signal = no trade."
@@ -35,7 +35,8 @@
 //    R4  SELL signal (BEARISH and alive): on the closed bar where the MACD crosses below zero
 //        (previous bar >= 0, this bar < 0), provided the positive (pullback) hump that just
 //        ended had >= PullbackMinBars bars and a peak <= PullbackMaxRatio x the anchor peak, and
-//        a previous negative hump low exists. A bare touch of zero without a hump is no signal.
+//        a previous negative hump low exists. The pullback must last PullbackMinBars bars: with
+//        1, a single bar across zero counts as a pullback hump.
 //        With SkipBigPullback, a pullback hump that is itself BIG (R1) is a trend change, not a
 //        pullback: no signal is produced and it does not count against MaxSignalsPerBigHump.
 //        Ordering (as in signals()): the signal check uses the trend in force BEFORE the hump
@@ -61,17 +62,19 @@
 //        optional trailing in R multiples (TrailStartR / TrailDistanceR).
 //    R9  Optional weekend flat (CloseBeforeWeekend): on Friday from WeekendCloseTime (broker
 //        server time) on, no new entries are taken and the open position is closed at market
-//        on the first tick. A position found open on a Saturday or Sunday (restart, missed
-//        close) is closed on the first tick available, unless it was opened on that same
-//        day: entries are blocked on Friday only, so on a broker whose week opens on Sunday
-//        (server time) the Sunday session trades normally. A failed close is retried at
-//        most once every WEEKEND_RETRY_SEC seconds, and not at all while algo trading is off.
+//        on the first tick. Any position opened on or before that Friday that is still open
+//        later (EA or algo trading off on Friday evening, or the broker's Friday session ended
+//        before WeekendCloseTime) is closed on the first tick available, on any day. Positions
+//        opened after that Friday are left alone: entries are blocked on Friday only, so on a
+//        broker whose week opens on Sunday (server time) the Sunday session trades normally.
+//        A failed close is retried at most once every WEEKEND_RETRY_SEC seconds, and not at
+//        all while algo trading is off.
 //    R10 Optional time exits; neither blocks new entries (only the signal of the trigger bar
 //        on which the time exit happens is not traded, as in the reference backtest):
 //        MaxHoldMinutes > 0: the position is closed at market once it has been open that many
 //        minutes, counted in M1 bars after the entry bar as in the reference backtest (minutes
-//        without quotes - daily break, weekend - do not count). Without M1 history the
-//        clock time since the position was opened is used.
+//        without quotes - daily break, weekend - do not count). While the M1 history is not
+//        available yet the check is repeated; clock time decides 4 hours past the limit.
 //        CloseAtEndOfDay: the position is closed at market once the server time of day is at
 //        or after EndOfDayTime, if it was opened before today's EndOfDayTime. A position
 //        opened after that time is kept until the next day's EndOfDayTime. A close that was
@@ -108,14 +111,14 @@
 //    as in the reference backtest.
 //  * Weekend close: the reference backtest (weekend_close / weekend_min) closes at the close of
 //    the first M1 bar inside the Friday window, and also on the last bar before any closure of
-//    24 hours or more (holidays). The EA closes on the first tick of the window and cannot
-//    foresee a holiday closure: only Friday and Saturday/Sunday are handled.
+//    24 hours or more (holidays). The EA closes on the first tick of the window (or on the first
+//    tick after it, if that close was missed) and cannot foresee a holiday closure.
 //  * Time exits: the reference backtest (max_hold / eod) closes at the close of the M1 bar that
 //    reaches the holding limit or crosses the end-of-day time; the EA closes on the first tick
-//    at or after that moment.
+//    of that M1 bar, about one minute earlier.
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
-#property version     "1.33"
+#property version     "1.34"
 #property strict
 #property description "XAUUSD Loma (MACD hump) Trend Pullback, sells and buys."
 #property description "Big MACD hump defines the trend; trade the zero-cross after a small pullback hump."
@@ -209,6 +212,7 @@ input group "=== R8: Risk & Position ==="
 input double  RiskPercent              = 0.75;  // Risk per trade, % of equity
 input double  MaxLotSize               = 0.0;   // Max lot (0 = broker max)
 input bool    SkipIfBelowMinLot        = true;  // Skip trade if risk lot < broker min lot
+input double  CommissionPerLot         = 0.0;   // Round-trip commission per 1.0 lot, account currency (counted in the risk, sign ignored, 0 = off)
 input int     MaxSpread_Points         = 60;    // Max spread (points)
 input int     MaxSlippage_Points       = 20;    // Max slippage (points)
 input int     MaxEntryDelaySeconds     = 0;     // Enter only within N s of bar open (0 = no limit, first tick)
@@ -247,16 +251,21 @@ double   g_ptScale        = 1.0;   // point scale factor (AutoScalePoints)
 int      g_sessStartMin   = 0;
 int      g_sessEndMin     = 0;
 int      g_weekendMin     = 0;     // WeekendCloseTime in minutes from midnight
-bool     g_weekendLogged  = false; // weekend close announced (once per weekend window)
-bool     g_weekendFailLog = false; // failed weekend close reported (once per weekend window)
+bool     g_weekendLogged  = false; // weekend close announced (once per close episode)
+bool     g_weekendFailLog = false; // failed weekend close reported (once per close episode)
 datetime g_weekendLastTry = 0;     // server time of the last failed weekend close (retry throttle)
-// minimum seconds between weekend close retries (also used by the R10 time exits)
+// minimum seconds between weekend close retries (also used by the R10 time exits and the trailing pause)
 #define  WEEKEND_RETRY_SEC 5
 int      g_eodMin         = 0;     // EndOfDayTime in minutes from midnight
 ulong    g_timeExitLogged  = 0;    // ticket whose time exit was announced (once per position)
 ulong    g_timeExitFailLog = 0;    // ticket whose failed time exit was reported (once per position)
 datetime g_timeExitLastTry = 0;    // server time of the last failed time exit (retry throttle)
 datetime g_timeExitBar     = 0;    // trigger bar on which a time exit was last due (its signal is not traded)
+datetime g_trailLastFail   = 0;    // server time of the last failed trailing modification (retry throttle)
+uint     g_trailFailCode   = 0;    // retcode of the last reported trailing failure (one journal line per new retcode)
+bool     g_nettingWarned   = false;// netting-account warning printed
+datetime g_notReadySince   = 0;    // first tick on which the signal data was not ready (0 = ready)
+datetime g_notReadyWarned  = 0;    // last 'data not ready' warning (at most one every 5 trigger bars)
 
 datetime g_lastBarTime    = 0;     // last evaluated trigger bar (open time of the forming bar)
 datetime g_signalBarTime  = 0;     // forming bar on which a valid signal is active
@@ -476,6 +485,9 @@ int OnInit()
       Print("[LOMA] MaxHoldMinutes must be >= 0 (0 = off). Got ", MaxHoldMinutes);
       return INIT_PARAMETERS_INCORRECT;
      }
+   if(CommissionPerLot < 0.0)
+      Print("[LOMA] CommissionPerLot is negative (", CommissionPerLot, "): counted as a round-trip cost of ",
+            -CommissionPerLot, " per lot");
    if(CloseAtEndOfDay && !ParseHHMM(EndOfDayTime, g_eodMin))
      {
       Print("[LOMA] EndOfDayTime must be HH:MM");
@@ -486,8 +498,21 @@ int OnInit()
       Print("[LOMA] HTF_Timeframe must be higher than TriggerTimeframe");
       return INIT_PARAMETERS_INCORRECT;
      }
-   if(StringFind(_Symbol, "XAU") < 0 && StringFind(_Symbol, "GOLD") < 0)
-      Print("[LOMA] Warning: EA calibrated for XAUUSD, attached to ", _Symbol);
+   if(UseHTFFilter && PeriodSeconds(HTF_Timeframe) >= PeriodSeconds(PERIOD_MN1))
+     {
+      Print("[LOMA] A monthly HTF_Timeframe is not supported (too few monthly bars for the readiness check)");
+      return INIT_PARAMETERS_INCORRECT;
+     }
+   bool isGold = (StringFind(_Symbol, "XAU") >= 0 || StringFind(_Symbol, "GOLD") >= 0);
+   bool isBtc  = (StringFind(_Symbol, "BTC") >= 0);
+   if(!isGold && !isBtc)
+      Print("[LOMA] Warning: presets exist for XAUUSD and BTCUSD only; attached to ", _Symbol);
+   if(isBtc && MaxSpread_Points < 500)
+      Print("[LOMA] Warning: ", _Symbol, " with gold-sized distances (MaxSpread_Points=", MaxSpread_Points,
+            "): load a Loma_BTC preset.");
+   if(isGold && MaxSpread_Points > 500)
+      Print("[LOMA] Warning: ", _Symbol, " with BTC-sized distances (MaxSpread_Points=", MaxSpread_Points,
+            "): load a gold preset.");
 
    //--- point scaling: inputs are written for 2-digit gold (0.01 point)
    g_ptScale = 1.0;
@@ -508,7 +533,7 @@ int OnInit()
 
    //--- trade object
    g_trade.SetExpertMagicNumber(MagicNumber);
-   g_trade.SetDeviationInPoints((ulong)MathMax(0.0, MaxSlippage_Points * g_ptScale));
+   g_trade.SetDeviationInPoints((ulong)MathMax(0.0, MathCeil(MaxSlippage_Points * g_ptScale - 1e-9)));
    g_trade.SetTypeFillingBySymbol(_Symbol);
    g_trade.LogLevel(LOG_LEVEL_ERRORS);
 
@@ -552,7 +577,15 @@ void OnDeinit(const int reason)
 //====================================================================
 void OnTick()
   {
-   //--- R9: flat before the weekend (Friday from WeekendCloseTime on; leftovers on Saturday, Sunday)
+   if(!g_nettingWarned && NettingAccount())
+     {
+      g_nettingWarned = true;
+      Print("[LOMA] Warning: netting account. Every EA and manual trade on ", _Symbol,
+            " shares one position here: run only one Loma preset per symbol. No entry is sent while ",
+            "another position on ", _Symbol, " is open.");
+     }
+
+   //--- R9: flat before the weekend (Friday from WeekendCloseTime on; missed closes on the next tick)
    WeekendClosePositions();
 
    //--- R10: time exits (maximum holding time, end-of-day close); new entries are not blocked
@@ -583,9 +616,21 @@ void OnTick()
       int state = EvaluateSignal(barTime);
       if(state == SIG_NOTREADY)
         {
+         datetime nowNR = TimeCurrent();
+         if(g_notReadySince == 0)
+            g_notReadySince = nowNR;
+         else
+            if(nowNR - g_notReadySince >= 5 * PeriodSeconds(TriggerTimeframe) &&
+               nowNR - g_notReadyWarned >= 5 * PeriodSeconds(TriggerTimeframe))
+              {
+               g_notReadyWarned = nowNR;
+               Print(StringFormat("[LOMA] Warning: indicator data not ready since %s - no signals are evaluated",
+                                  TimeToString(g_notReadySince, TIME_DATE | TIME_MINUTES)));
+              }
          LogSkip("indicator data not up to date yet - retrying on next tick");
          return;
         }
+      g_notReadySince  = 0;
       g_lastBarTime    = barTime;
       g_lastSkipReason = "";
       g_signalActive   = (state == SIG_VALID);
@@ -625,6 +670,12 @@ void OnTick()
    if(CountOwnPositions() > 0)                 // max one open position
      {
       LogSkip("a position is already open (max 1)");
+      g_signalActive = false;
+      return;
+     }
+   if(NettingAccount() && PositionSelect(_Symbol))   // netting: never add to or reverse another position
+     {
+      LogSkip("netting account: another position on this symbol is open");
       g_signalActive = false;
       return;
      }
@@ -1166,34 +1217,51 @@ double CalcLots(const ENUM_ORDER_TYPE type, const double entry, const double sl)
       if(tickValue <= 0.0)
          tickValue = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_VALUE);
       if(tickSize <= 0.0 || tickValue <= 0.0)
+        {
+         LogSkip("cannot value the stop: OrderCalcProfit failed and the tick value is 0");
          return 0.0;
+        }
       lossPerLot = MathAbs(sl - entry) / tickSize * tickValue;
      }
    lossPerLot = MathAbs(lossPerLot);
    if(lossPerLot <= 0.0)
+     {
+      LogSkip("cannot value the stop distance");
       return 0.0;
+     }
+   lossPerLot += MathAbs(CommissionPerLot);             // a stop-out also pays the round-trip commission (sign ignored)
 
    double volMin  = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MIN);
    double volMax  = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_MAX);
    double volStep = SymbolInfoDouble(_Symbol, SYMBOL_VOLUME_STEP);
-   if(MaxLotSize > 0.0)
-      volMax = MathMin(volMax, MaxLotSize);
    if(volStep <= 0.0)
       volStep = 0.01;
+   if(MaxLotSize > 0.0)
+      volMax = MathMin(volMax, MathFloor(MaxLotSize / volStep + 1e-9) * volStep);
+   if(volMax < volMin)
+     {
+      LogSkip(StringFormat("lot cap %.3f (MaxLotSize %.3f on volume step %.3f, or the broker maximum) is below the broker minimum lot %.3f",
+                           volMax, MaxLotSize, volStep, volMin));
+      return 0.0;
+     }
 
    double lots = riskMoney / lossPerLot;
    lots = MathFloor(lots / volStep + 1e-9) * volStep;
 
    if(lots < volMin)
      {
-      if(SkipIfBelowMinLot)
+      double minLotPct = 100.0 * volMin * lossPerLot / equity;   // risk of the minimum lot, % of equity
+      if(SkipIfBelowMinLot || minLotPct > 2.0 * RiskPercent)
         {
-         LogSkip(StringFormat("risk lot %.4f < min lot %.2f", riskMoney / lossPerLot, volMin));
+         LogSkip(StringFormat("risk lot %.4f < min lot %.2f (the min lot would risk %.2f%%)",
+                              riskMoney / lossPerLot, volMin, minLotPct));
          return 0.0;
         }
+      Log(StringFormat("Risk lot below the broker minimum: trading the min lot %.2f = %.2f%% risk", volMin, minLotPct));
       lots = volMin;
      }
    lots = MathMin(lots, volMax);
+   double sized = lots;                                   // before the free-margin check
 
    //--- margin check: shrink until it fits the free margin
    double freeMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE);
@@ -1214,6 +1282,8 @@ double CalcLots(const ENUM_ORDER_TYPE type, const double entry, const double sl)
       LogSkip("not enough free margin");
       return 0.0;
      }
+   if(lots < sized - 0.5 * volStep)
+      Log(StringFormat("Lot cut by free margin: %.2f -> %.2f lots (risk below RiskPercent)", sized, lots));
 
    int volDigits = (int)MathMax(0, MathCeil(-MathLog10(volStep)));
    return NormalizeDouble(lots, volDigits);
@@ -1362,16 +1432,16 @@ bool PreWeekendEntryBlock()
    return (dt.day_of_week == 5 && dt.hour * 60 + dt.min >= g_weekendMin);
   }
 
-//--- R9 close window: Friday at or after WeekendCloseTime, Saturday or Sunday (broker server time)
-bool InWeekendWindow()
+//--- R9: server time of the most recent Friday WeekendCloseTime at or before 'now'
+datetime LastWeekendCloseMoment(const datetime now)
   {
-   if(!CloseBeforeWeekend)
-      return false;
    MqlDateTime dt;
-   TimeToStruct(TimeTradeServer(), dt);
-   if(dt.day_of_week == 6 || dt.day_of_week == 0)
-      return true;
-   return (dt.day_of_week == 5 && dt.hour * 60 + dt.min >= g_weekendMin);
+   TimeToStruct(now, dt);
+   int      back = (dt.day_of_week + 2) % 7;           // days since Friday: Fri 0, Sat 1, Sun 2, Mon 3 ... Thu 6
+   datetime m    = now - (now % 86400) - back * 86400 + (datetime)(g_weekendMin * 60);
+   if(m > now)
+      m -= 7 * 86400;                                    // Friday before WeekendCloseTime: last week's
+   return m;
   }
 
 bool NewsBlocked()
@@ -1445,13 +1515,63 @@ bool TradingAllowed(const int side)
    return true;
   }
 
+//--- netting / exchange account: ONE position per symbol, shared by every EA and manual trade.
+//    Read when needed (before the terminal is connected the account mode is not known yet).
+bool NettingAccount()
+  {
+   return (AccountInfoInteger(ACCOUNT_MARGIN_MODE) != (long)ACCOUNT_MARGIN_MODE_RETAIL_HEDGING);
+  }
+
 //====================================================================
 // POSITION MANAGEMENT (R8: trailing in R multiples)
 //====================================================================
+//--- a trailing modification failed: pause the trailing for WEEKEND_RETRY_SEC seconds and
+//    report each new reason once (market closed at the daily open, frozen, ...)
+void TrailFailed(const datetime now)
+  {
+   g_trailLastFail = now;
+   uint rc = g_trade.ResultRetcode();
+   if(rc != g_trailFailCode)
+     {
+      g_trailFailCode = rc;
+      Print("[LOMA] Trailing modify failed: ", g_trade.ResultRetcodeDescription(),
+            " - retrying at most every ", WEEKEND_RETRY_SEC, " s");
+     }
+  }
+
+//--- 1R of a position from its opening deal: |fill price - SL sent with the order| (0 = unknown)
+double InitialRiskFromHistory(const long positionId)
+  {
+   if(!HistorySelectByPosition(positionId))
+      return 0.0;
+   for(int k = 0; k < HistoryDealsTotal(); k++)
+     {
+      ulong d = HistoryDealGetTicket(k);
+      if(d == 0 || HistoryDealGetInteger(d, DEAL_ENTRY) != DEAL_ENTRY_IN)
+         continue;
+      double price = HistoryDealGetDouble(d, DEAL_PRICE);
+      double sl    = HistoryDealGetDouble(d, DEAL_SL);
+      if(sl <= 0.0)
+        {
+         ulong order = (ulong)HistoryDealGetInteger(d, DEAL_ORDER);
+         if(order > 0 && HistoryOrderSelect(order))
+            sl = HistoryOrderGetDouble(order, ORDER_SL);
+        }
+      if(price > 0.0 && sl > 0.0)
+         return MathAbs(price - sl);
+     }
+   return 0.0;
+  }
+
 void ManageOpenPositions()
   {
    if(TrailStartR <= 0.0)
       return;
+   if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
+      return;                                  // algo trading off: a modification cannot be sent
+   datetime nowT = TimeCurrent();
+   if(g_trailLastFail > 0 && nowT >= g_trailLastFail && nowT - g_trailLastFail < WEEKEND_RETRY_SEC)
+      return;                                  // throttle retries after a failed modification
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
       if(!g_pos.SelectByIndex(i))
@@ -1467,10 +1587,20 @@ void ManageOpenPositions()
       double minD   = StopsLevelDistance();
       double step   = Pts(TrailStep_Points);
 
-      //--- remember the initial risk (1R) the first time we see the position
+      //--- remember the initial risk (1R) the first time we see the position: from the opening
+      //    deal (the SL sent with the order), else from the SL as it is now
       string rKey = GVKey("R", ticket);
-      if(!GlobalVariableCheck(rKey) && sl > 0.0 && MathAbs(sl - open) > 0.0)
-         GlobalVariableSet(rKey, MathAbs(sl - open));
+      if(!GlobalVariableCheck(rKey))
+        {
+         double r0 = InitialRiskFromHistory(g_pos.Identifier());
+         if(r0 <= 0.0 && sl > 0.0)
+            r0 = MathAbs(sl - open);
+         if(r0 > 0.0)
+           {
+            GlobalVariableSet(rKey, r0);
+            GlobalVariablesFlush();
+           }
+        }
       double initRisk = GlobalVariableCheck(rKey) ? GlobalVariableGet(rKey) : 0.0;
       if(initRisk <= 0.0)
          continue;
@@ -1481,12 +1611,15 @@ void ManageOpenPositions()
          if(open - ask < TrailStartR * initRisk)
             continue;
          double newSL = NormalizePrice(ask + TrailDistanceR * initRisk);
-         if((sl == 0.0 || newSL <= sl - step) && newSL - ask > minD)
+         if((sl == 0.0 || (newSL <= sl - step && newSL < sl - 0.5 * _Point)) && newSL - ask > minD)
            {
             if(g_trade.PositionModify(ticket, newSL, tp))
+              {
+               g_trailFailCode = 0;
                Log(StringFormat("Trailing SL #%I64u -> %.2f", ticket, newSL));
+              }
             else
-               Print("[LOMA] Trailing modify failed: ", g_trade.ResultRetcodeDescription());
+               TrailFailed(nowT);
            }
         }
       else
@@ -1495,38 +1628,48 @@ void ManageOpenPositions()
          if(bid - open < TrailStartR * initRisk)
             continue;
          double newSL = NormalizePrice(bid - TrailDistanceR * initRisk);
-         if((sl == 0.0 || newSL >= sl + step) && bid - newSL > minD)
+         if((sl == 0.0 || (newSL >= sl + step && newSL > sl + 0.5 * _Point)) && bid - newSL > minD)
            {
             if(g_trade.PositionModify(ticket, newSL, tp))
+              {
+               g_trailFailCode = 0;
                Log(StringFormat("Trailing SL #%I64u -> %.2f", ticket, newSL));
+              }
             else
-               Print("[LOMA] Trailing modify failed: ", g_trade.ResultRetcodeDescription());
+               TrailFailed(nowT);
            }
         }
      }
   }
 
-//--- R9: close this EA's position at market inside the weekend window. A failed close is
-//    retried at most once every WEEKEND_RETRY_SEC seconds; the journal gets one line per window.
-//    On Saturday/Sunday a position opened on that same day is left alone (Sunday-open brokers).
+//--- R9: close this EA's positions opened before the end of the Friday of the most recent
+//    WeekendCloseTime: on the first tick of the Friday window, or on the first tick after it when
+//    that close was missed (EA or algo trading off, broker's Friday session ended earlier). A fill
+//    stamped inside the Friday window is closed too (the entry block reads the terminal's estimate
+//    of the server clock, the fill time is the server's). Positions opened after that Friday (a
+//    Sunday session) are left alone. A failed close is retried at most once every
+//    WEEKEND_RETRY_SEC seconds; the journal gets one line per episode.
 void WeekendClosePositions()
   {
    if(!CloseBeforeWeekend)
       return;
-   if(!InWeekendWindow())
+   datetime now     = TimeTradeServer();
+   datetime wkClose = LastWeekendCloseMoment(now);
+   datetime wkEnd   = wkClose - (wkClose % 86400) + 86400;   // the Saturday 00:00 after it: a fill inside the Friday window is closed too
+   bool     due     = false;
+   for(int k = PositionsTotal() - 1; k >= 0; k--)
+      if(g_pos.SelectByIndex(k) && g_pos.Symbol() == _Symbol && (ulong)g_pos.Magic() == MagicNumber &&
+         g_pos.Time() < wkEnd)
+         due = true;
+   if(!due)
      {
       g_weekendLogged  = false;
       g_weekendFailLog = false;
       g_weekendLastTry = 0;
       return;
      }
-   datetime now = TimeTradeServer();
    if(g_weekendLastTry > 0 && now >= g_weekendLastTry && now - g_weekendLastTry < WEEKEND_RETRY_SEC)
       return;                                  // throttle retries after a failed close
-   MqlDateTime wdt;
-   TimeToStruct(now, wdt);
-   bool     onWeekendDay = (wdt.day_of_week == 6 || wdt.day_of_week == 0);
-   datetime dayStart     = now - (now % 86400);
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
       if(!g_pos.SelectByIndex(i))
@@ -1534,8 +1677,8 @@ void WeekendClosePositions()
       if(g_pos.Symbol() != _Symbol || (ulong)g_pos.Magic() != MagicNumber)
          continue;
 
-      if(onWeekendDay && g_pos.Time() >= dayStart)
-         continue;                             // opened today (Sunday session): not a leftover
+      if(g_pos.Time() >= wkEnd)
+         continue;                             // opened after that Friday (Sunday session, new week)
 
       ulong ticket = g_pos.Ticket();
       if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
@@ -1577,14 +1720,16 @@ string EndOfDayTimeText()
   }
 
 //--- true when the position has been open MaxHoldMinutes: M1 bars after the entry bar, as in
-//    the reference backtest; clock minutes when the M1 history is not available
+//    the reference backtest. While the M1 series is not available yet the check is repeated on
+//    later ticks; clock time decides only once it is 4 hours past the limit.
 bool MaxHoldReached(const datetime opened, const datetime now)
   {
    if((long)(now - opened) < (long)MaxHoldMinutes * 60)
       return false;                            // bars after the entry bar <= clock minutes
-   int bars = Bars(_Symbol, PERIOD_M1, opened - (opened % 60), now);   // entry bar included
+   datetime t[];
+   int bars = CopyTime(_Symbol, PERIOD_M1, opened - (opened % 60), now, t);   // entry bar included
    if(bars <= 0)
-      return true;
+      return ((long)(now - opened) >= (long)MaxHoldMinutes * 60 + 4 * 3600);
    return (bars - 1 >= MaxHoldMinutes);
   }
 
@@ -1698,8 +1843,12 @@ void DrawSignalRefs()
       return;
    DrawLevel("SLref", g_sigSlRef, clrRed, STYLE_DASH,
              StringFormat("LOMA %s: pullback hump %s (SL reference)", SideName(g_sigSide), g_sigSide < 0 ? "high" : "low"));
-   DrawLevel("TPref", g_sigTpRef, clrRoyalBlue, STYLE_DASH,
-             StringFormat("LOMA %s: previous hump %s (TP reference)", SideName(g_sigSide), g_sigSide < 0 ? "low" : "high"));
+   if(TP_Mode == TP_PREV_HUMP)
+      DrawLevel("TPref", g_sigTpRef, clrRoyalBlue, STYLE_DASH,
+                StringFormat("LOMA %s: previous hump %s (TP reference)", SideName(g_sigSide), g_sigSide < 0 ? "low" : "high"));
+   else
+      if(!VisualsOff())
+         ObjectDelete(0, OBJ_PREFIX + "TPref");  // fixed-R target: the previous hump is not the target
   }
 
 //--- final SL / TP of the trade that was opened
@@ -1822,7 +1971,7 @@ void UpdatePanel()
   {
    if(!ShowStatusPanel || VisualsOff())
       return;
-   string build = "Loma TrendPullback v1.33";
+   string build = "Loma TrendPullback v1.34";
 
    string anchorTxt = "none";
    if(g_trend != 0)

@@ -10,7 +10,7 @@ Download a zip, unpack it and read its `START_HERE.md`:
 | [`dist/Loma_BTCUSD_v1_34.zip`](dist/Loma_BTCUSD_v1_34.zip) | The same EA and the four BTCUSD presets with their summary table. |
 
 **Status: not recommended for live trading.** The presets were fitted to January 2025 – May 2026.
-- **Gold:** on the months after that, all six lost money before commission on VT Markets real ticks (profit factor 0.74 on 247 trades, June – 6 November 2026), and Dukascopy prices agree.
+- **Gold:** on the months after that, the six presets together lost money on VT Markets real ticks (June – 6 November 2026, 247 trades): profit factor 0.74 before commission and 0.67 at VT's $0.60 per lot. Dukascopy prices agree.
 - **BTC:** the four together broke even on unseen data (profit factor 1.05 on 193 trades, 16 May – 13 November 2026).
 - **The EA itself** reproduces the backtest's trades.
 

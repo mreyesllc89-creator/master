@@ -1,8 +1,9 @@
-; XAUUSD_Loma_TrendPullback v1.32 on BTCUSD - rank 2: M5 both, session 1200-1630 server time, trend filter H4. DO NOT LOAD ON GOLD.
+; XAUUSD_Loma_TrendPullback v1.34 on BTCUSD - rank 2: M5 both, session 1200-1630 server time, trend filter H4. DO NOT LOAD ON GOLD.
 ; Backtest Jan 2025-May 2026 (Binance BTCUSDT M1, assumed spread 10 USD, risk-% sizing): 129 trades, PF 2.22, net +29R, max drawdown 2.0R. 2025 worse half-year PF 2.05; 2026 PF 2.80 (34 trades).
 ; Harsh stress (1 min late, pessimistic trailing, 3 USD slippage, 2 USD commission): PF 1.64; 2025 worse half 1.54; 2026 PF 1.98.
-; Chosen with ALL the data: no unseen test. Across the whole BTC search a good 2025 did not predict 2026 (median 2026 PF about 1.0).
-; UNPROVEN: Strategy Tester (real ticks) and demo only. Points are 0.01 USD: 2000 points = 20 USD. MaxSpread_Points=3000 allows a 30 USD spread.
+; Chosen with ALL the data from Jan 2025 to May 15 2026: the figures above are in-sample.
+; OUT OF SAMPLE May 16 - Nov 13 2026 (Binance BTCUSDT M1, never used for calibration): 41 trades, PF 1.79 (+7.9R); harsh stress PF 1.04; 20 USD spread PF 1.61. All four together PF 1.05: no reliable edge, demo only.
+; Strategy Tester and demo only. Points are 0.01 USD: 2000 points = 20 USD. MaxSpread_Points=3000 allows a 30 USD spread.
 ; Times are BROKER SERVER TIME (New York + 7h). The weekend close is off: BTC trades through the weekend at most brokers.
 MagicNumber=26113302
 TradeComment=LOMA_BTC02
@@ -46,12 +47,13 @@ HTF_EMA_Period=50
 RiskPercent=0.5
 MaxLotSize=0.0
 SkipIfBelowMinLot=true
+CommissionPerLot=0.0
 MaxSpread_Points=3000
-MaxSlippage_Points=20
+MaxSlippage_Points=1000
 MaxEntryDelaySeconds=0
 TrailStartR=0.5
 TrailDistanceR=0.3
-TrailStep_Points=10
+TrailStep_Points=200
 UseTradingHours=true
 TradingHoursStart=12:00
 TradingHoursEnd=16:30

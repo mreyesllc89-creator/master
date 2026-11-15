@@ -1,8 +1,9 @@
-; XAUUSD_Loma_TrendPullback v1.32 - ALL-ROUND TOP 10, rank 5: gold M10 buy, session AllDay server time, trend filter M30
+; XAUUSD_Loma_TrendPullback v1.34 - ALL-ROUND TOP 10, rank 5: gold M10 buy, session AllDay server time, trend filter M30
 ; Backtest Jan 2025-May 2026 (FTMO XAUUSD M1 path, risk-% sizing): 141 trades, PF 1.96, net +32R, max drawdown 2.9R. 2025 worse half-year PF 2.14; 2026 PF 1.47 (37 trades).
 ; Harsh stress (1 min late, pessimistic trailing, 0.10 slippage, commission): PF 1.80; 2025 worse half 1.88; 2026 PF 1.38.
-; Chosen with ALL the data (2025 and 2026): there is no unseen test behind these numbers. Expect roughly PF 1.1-1.4 live.
-; UNPROVEN: Strategy Tester (real ticks) and demo only. Session, weekend and end-of-day times are BROKER SERVER TIME (FTMO clock).
+; Chosen with ALL the data from Jan 2025 to May 15 2026: the figures above are in-sample.
+; OUT OF SAMPLE Jun 1 - Nov 6 2026 (never used for calibration): VT Markets MT5 real ticks 49 trades, PF 0.87 before commission, 0.81 at VT's 0.60 USD per lot; Dukascopy prices 49 trades, PF 0.84. The edge did not hold: NOT RECOMMENDED FOR LIVE TRADING.
+; Strategy Tester and demo only. Session, weekend and end-of-day times are BROKER SERVER TIME (FTMO clock).
 ; UseNewsFilter was not in the backtest.
 MagicNumber=26113205
 TradeComment=LOMA_T05
@@ -46,6 +47,7 @@ HTF_EMA_Period=20
 RiskPercent=0.5
 MaxLotSize=0.0
 SkipIfBelowMinLot=true
+CommissionPerLot=0.0
 MaxSpread_Points=60
 MaxSlippage_Points=20
 MaxEntryDelaySeconds=0

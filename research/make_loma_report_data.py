@@ -9,6 +9,10 @@ import hump_engine as H, hump_search as X, duk_to_m1 as D, make_loma_top10 as T
 
 DUK, RES = sys.argv[1], sys.argv[2]
 RANKS = [1, 2, 3, 4, 5, 7]
+# The Strategy Tester run charged 6 USD per lot round trip (1 lot = 1 ounce on XAUUSD-ECNc). VT Markets' real
+# commission, as the account owner reported it, is 0.60 USD per lot round trip: one tenth.
+TESTER_COMM_PER_LOT, REAL_COMM_PER_LOT = 6.0, 0.60
+REAL_COMM_SCALE = REAL_COMM_PER_LOT / TESTER_COMM_PER_LOT
 
 
 def pf(x):
@@ -60,6 +64,7 @@ for rank in RANKS:
     d = df[(df.entry_time >= "2026-06-01") & (df.entry_time < "2026-11-07")]; v = vt[(vt.entry >= "2026-06-01") & (vt.entry < "2026-11-07")]
     presets[-1].update(oos_vt_n=len(v), oos_vt_gross=round(float(v.gross.sum()), 2), oos_vt_gross_pf=pf(v.gross),
                        oos_vt_net=round(float((v.gross + v.comm).sum()), 2), oos_vt_net_pf=pf(v.gross + v.comm),
+                       oos_vt_pf_real_comm=pf(v.gross + REAL_COMM_SCALE * v.comm),
                        oos_duk_n=len(d), oos_duk_pf=pf(d.r), oos_duk_netR=round(float(d.r.sum()), 2))
 out["presets"] = presets
 tot = []
@@ -73,8 +78,13 @@ out["dukascopy"] = [{k: v for k, v in x.items() if not k.startswith("_")} for x 
 va = pd.concat(vt_all); va["month"] = va.entry.dt.strftime("%Y-%m")
 out["vt_monthly"] = [dict(month=mo, trades=len(g), gross=round(g.gross.sum(), 2), comm=round(g.comm.sum(), 2), gross_pf=pf(g.gross))
                      for mo, g in va.groupby("month")]
-out["vt_periods"] = [dict(period=n, trades=len(g), gross=round(g.gross.sum(), 2), gross_pf=pf(g.gross), net_pf=pf(g.gross + g.comm))
-                     for n, g in [("Mar-May", va[va.entry < "2026-06-01"]), ("Jun-Nov 6", va[va.entry >= "2026-06-01"])]]
+out["vt_periods"] = [dict(period=n, trades=len(g), gross=round(g.gross.sum(), 2), gross_pf=pf(g.gross), net_pf=pf(g.gross + g.comm),
+                          real_comm=round(float(REAL_COMM_SCALE * g.comm.sum()), 2),
+                          real_net=round(float((g.gross + REAL_COMM_SCALE * g.comm).sum()), 2),
+                          real_net_pf=pf(g.gross + REAL_COMM_SCALE * g.comm))
+                     for n, g in [("Mar-May", va[va.entry < "2026-06-01"]), ("Jun-Nov 6", va[va.entry >= "2026-06-01"]),
+                                  ("whole run", va)]]
+out["vt_commission"] = dict(tester_per_lot_round_trip=TESTER_COMM_PER_LOT, real_per_lot_round_trip=REAL_COMM_PER_LOT)
 out["vt_total"] = dict(trades=len(va), gross=round(va.gross.sum(), 2), comm=round(va.comm.sum(), 2),
                        net=round(va.gross.sum() + va.comm.sum(), 2), gross_pf=pf(va.gross))
 

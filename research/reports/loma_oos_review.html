@@ -83,13 +83,13 @@ code { font-family: var(--mono); font-size: 13px; }
     <p class="lede">The six gold presets were tested on prices they were never fitted to: VT Markets real ticks in MetaTrader 5 (Codex's run, 1 Mar – 6 Nov 2026), a second data source (Dukascopy), and a rolling walk-forward recalibration on FTMO data.</p>
     <div class="verdict">
       <strong>Verdict: do not trade these presets with real money.</strong>
-      <p>The EA reproduces its backtest closely, so the code is not the problem. The edge the backtest showed did not continue after the data used to choose the presets: from June on, five of the six lose money even before commission and the sixth (Top02) is about break-even, on both VT and Dukascopy prices. Recalibrating every few months gives mixed results: one schedule out of five passes, but only on four windows that include the rally.</p>
+      <p>The EA reproduces its backtest closely, so the code is not the problem. The edge the backtest showed did not continue after the data used to choose the presets: from June on, five of the six lose money on VT even before commission and the sixth (Top02) is about break-even there; on Dukascopy prices all six lose. Recalibrating every few months gives mixed results: one schedule out of five passes, but only on four windows that include the rally.</p>
     </div>
   </header>
 
   <section aria-label="Key figures">
     <div class="tiles">
-      <div class="tile"><span class="v loss">−$8,914</span><span class="k">VT MT5 net, six presets, 373 trades, $10k each</span></div>
+      <div class="tile"><span class="v loss">−$1,664</span><span class="k">VT net at its real $0.60 commission per lot, six presets, 373 trades (−$8,914 at the tester's $6)</span></div>
       <div class="tile"><span class="v">0.74</span><span class="k">VT profit factor before commission, Jun – Nov 6 (247 trades)</span></div>
       <div class="tile"><span class="v">240 / 247</span><span class="k">VT trades that Dukascopy also found, Jun – Nov 6</span></div>
       <div class="tile"><span class="v">2 of 20</span><span class="k">walk-forward variants passing PF &gt; 1.2 on ≥ 100 untouched trades, both the same 9/2 schedule</span></div>
@@ -118,7 +118,7 @@ code { font-family: var(--mono); font-size: 13px; }
         </tbody>
       </table>
     </div>
-    <p class="note">Dollar figures are US$ on a $10,000 test deposit per preset. Commission is about 90% of the loss. VT's tester charged roughly $6 per lot round trip on a 1-ounce contract, which looks like a cent-account setting; check the XAUUSD-ECNc specification before trusting the net figures. The before-commission column does not depend on that setting. PF after commission here charges both commission legs to each round trip; MT5's own report counts per deal and shows 0.50, 0.55, 0.40, 0.36, 0.45 and 0.33. Net dollar totals are identical either way.</p>
+    <p class="note">Dollar figures are US$ on a $10,000 test deposit per preset. The Strategy Tester charged $6 per lot round trip (1 lot = 1 ounce), which is where the commission column comes from. VT's real commission is $0.60 per lot, as the account owner reported it: at that rate the commission is $806, the net −$1,664 and the profit factor 0.83. The before-commission column does not depend on the commission. PF after commission here charges both commission legs to each round trip; MT5's own report counts per deal and shows 0.50, 0.55, 0.40, 0.36, 0.45 and 0.33. Net dollar totals are identical either way.</p>
   </section>
 
   <section>
@@ -138,10 +138,10 @@ code { font-family: var(--mono); font-size: 13px; }
     </div>
     <div class="tablebox">
       <table>
-        <thead><tr><th>Period</th><th>Trades</th><th>Gross</th><th>PF before commission</th><th>PF after commission</th></tr></thead>
+        <thead><tr><th>Period</th><th>Trades</th><th>Gross</th><th>PF before commission</th><th>PF at VT's $0.60 per lot</th><th>PF at the tester's $6 per lot</th></tr></thead>
         <tbody>
-          <tr><td>Mar – May 2026 <span class="sub">overlaps the fitting data</span></td><td>126</td><td class="gain">+750</td><td>1.25</td><td>0.65</td></tr>
-          <tr><td>Jun – Nov 6 2026 <span class="sub">untouched</span></td><td>247</td><td class="loss">−1,609</td><td>0.74</td><td>0.28</td></tr>
+          <tr><td>Mar – May 2026 <span class="sub">overlaps the fitting data</span></td><td>126</td><td class="gain">+750</td><td>1.25</td><td>1.16</td><td>0.65</td></tr>
+          <tr><td>Jun – Nov 6 2026 <span class="sub">untouched</span></td><td>247</td><td class="loss">−1,609</td><td>0.74</td><td>0.67</td><td>0.28</td></tr>
         </tbody>
       </table>
     </div>

@@ -1,8 +1,9 @@
-; XAUUSD_Loma_TrendPullback v1.32 - ALL-ROUND TOP 10, rank 10: gold M3 both, session 0700-1200 server time, trend filter none
+; XAUUSD_Loma_TrendPullback v1.34 - ALL-ROUND TOP 10, rank 10: gold M3 both, session 0700-1200 server time, trend filter none
 ; Backtest Jan 2025-May 2026 (FTMO XAUUSD M1 path, risk-% sizing): 140 trades, PF 1.65, net +58R, max drawdown 10.0R. 2025 worse half-year PF 1.87; 2026 PF 1.11 (37 trades).
 ; Harsh stress (1 min late, pessimistic trailing, 0.10 slippage, commission): PF 1.50; 2025 worse half 1.64; 2026 PF 1.09.
-; Chosen with ALL the data (2025 and 2026): there is no unseen test behind these numbers. Expect roughly PF 1.1-1.4 live.
-; UNPROVEN: Strategy Tester (real ticks) and demo only. Session, weekend and end-of-day times are BROKER SERVER TIME (FTMO clock).
+; Chosen with ALL the data from Jan 2025 to May 15 2026: the figures above are in-sample.
+; Not tested out of sample on broker data (only Top01-05 and Top07 were); the six that were all failed from June 2026.
+; Strategy Tester and demo only. Session, weekend and end-of-day times are BROKER SERVER TIME (FTMO clock).
 ; UseNewsFilter was not in the backtest.
 MagicNumber=26113210
 TradeComment=LOMA_T10
@@ -46,6 +47,7 @@ HTF_EMA_Period=50
 RiskPercent=0.5
 MaxLotSize=0.0
 SkipIfBelowMinLot=true
+CommissionPerLot=0.0
 MaxSpread_Points=60
 MaxSlippage_Points=20
 MaxEntryDelaySeconds=0

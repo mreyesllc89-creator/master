@@ -11,6 +11,7 @@ sys.path.insert(0, "research")
 import hump_engine as H, hump_search as X
 
 EA = "XAUUSD_Loma_TrendPullback.mq5"
+EA_VERSION = re.search(r'#property version\s+"([\d.]+)"', open(EA).read()).group(1)   # written into the preset headers
 TF = {"M1": 1, "M2": 2, "M3": 3, "M5": 5, "H1": 16385, "H4": 16388}
 ENUMS = {"PERIOD_M1": 1, "PERIOD_M2": 2, "PERIOD_M3": 3, "PERIOD_M5": 5, "PERIOD_H1": 16385, "PERIOD_H4": 16388,
          "DIR_BOTH": 0, "DIR_SELL_ONLY": 1, "DIR_BUY_ONLY": 2, "TP_PREV_HUMP": 0, "TP_FIXED_RR": 1}
@@ -75,7 +76,7 @@ def main():
             o["TradingHoursStart"], o["TradingHoursEnd"] = SESS[p["session"]]
         missing = set(o) - names
         if missing: raise SystemExit(f"preset keys not in the EA: {missing}")
-        head = [f"; XAUUSD_Loma_TrendPullback v1.31 - {desc}",
+        head = [f"; XAUUSD_Loma_TrendPullback v{EA_VERSION} - {desc}",
                 "; Loma (MACD hump) method: big hump = trend, small pullback hump, entry on the first bar back across zero.",
                 "; v1.31: no signal when the pullback hump is itself a big opposite hump; positions closed Friday 23:00 server time.",
                 f"; Backtest (FTMO XAUUSD M1 path, Jan 2025-May 2026, risk-% sizing): {s['n']} trades, PF {s['pf']:.2f}, "

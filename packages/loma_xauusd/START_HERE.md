@@ -2,7 +2,7 @@
 
 `XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method on gold in MetaTrader 5, buys and sells. This zip holds the EA and the six gold presets with a backtest profit factor of 1.3 or more under stress, in both 2025 and 2026.
 
-> **Do not trade these presets with real money.** They were fitted to January 2025 – May 2026. On the months after that, which they never saw, all six lost money. On VT Markets real ticks (MT5 Strategy Tester, 1 June – 6 November 2026), the six together had a profit factor of 0.74 before commission on 247 trades. Five of the six lost and the sixth (Top02) broke even. Dukascopy prices agree. The EA itself works: it takes the same trades as the backtest. The edge did not last. Open `Loma_OOS_Review.html` for the full test.
+> **Do not trade these presets with real money.** They were fitted to January 2025 – May 2026. On the months after that, which they never saw, all six lost money. On VT Markets real ticks (MT5 Strategy Tester, 1 June – 6 November 2026), the six together had a profit factor of 0.74 before commission on 247 trades, and 0.67 at VT's $0.60 per lot. Five of the six lost and the sixth (Top02) broke even before commission. On Dukascopy prices all six lost. The EA itself works: it takes the same trades as the backtest. The edge did not last. Open `Loma_OOS_Review.html` for the full test.
 
 ## What is in the zip
 
@@ -28,16 +28,16 @@ v1.33 was compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. 
 
 Backtest: FTMO one-minute data, January 2025 – 15 May 2026, the period the presets were chosen on. Out of sample: 1 June – 6 November 2026, never used for calibration. "PF" is the profit factor.
 
-| Preset | Chart | Direction | Session (server time) | Trend filter | Backtest trades / PF | 2026 PF (in sample) | VT trades, Jun – Nov 6 | VT PF before / after commission | Dukascopy PF |
+| Preset | Chart | Direction | Session (server time) | Trend filter | Backtest trades / PF | 2026 PF (in sample) | VT trades, Jun – Nov 6 | VT PF before commission / at $0.60 per lot | Dukascopy PF |
 |---|---|---|---|---|---|---|---|---|---|
-| `Loma_Top01` | M10 | both | 07:00-20:00 | H1 EMA 20 | 129 / 2.09 | 1.72 | 32 | 0.46 / 0.28 | 0.69 |
-| `Loma_Top02` | M3 | sell | all day | none | 143 / 1.98 | 2.07 | 48 | 1.04 / 0.31 | 0.77 |
-| `Loma_Top03` | M2 | sell | 12:00-20:00 | H1 EMA 20 | 117 / 2.03 | 1.46 | 44 | 0.77 / 0.27 | 0.83 |
-| `Loma_Top04` | M5 | both | 07:00-12:00 | H1 EMA 50 | 124 / 1.82 | 1.40 | 42 | 0.58 / 0.19 | 0.45 |
-| `Loma_Top05` | M10 | buy | all day | M30 EMA 20 | 141 / 1.96 | 1.47 | 49 | 0.87 / 0.42 | 0.84 |
-| `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 1.84 | 32 | 0.72 / 0.26 | 0.62 |
+| `Loma_Top01` | M10 | both | 07:00-20:00 | H1 EMA 20 | 129 / 2.09 | 1.72 | 32 | 0.46 / 0.43 | 0.69 |
+| `Loma_Top02` | M3 | sell | all day | none | 143 / 1.98 | 2.07 | 48 | 1.04 / 0.91 | 0.77 |
+| `Loma_Top03` | M2 | sell | 12:00-20:00 | H1 EMA 20 | 117 / 2.03 | 1.46 | 44 | 0.77 / 0.69 | 0.83 |
+| `Loma_Top04` | M5 | both | 07:00-12:00 | H1 EMA 50 | 124 / 1.82 | 1.40 | 42 | 0.58 / 0.51 | 0.45 |
+| `Loma_Top05` | M10 | buy | all day | M30 EMA 20 | 141 / 1.96 | 1.47 | 49 | 0.87 / 0.81 | 0.84 |
+| `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 1.84 | 32 | 0.72 / 0.64 | 0.62 |
 
-- The VT Markets figures come from Codex's MT5 run with 100% real ticks. VT charged about $6 per lot round trip, which may be a cent-account setting; the before-commission column does not depend on it.
+- The VT Markets figures come from Codex's MT5 run with 100% real ticks. That run charged $6 per lot round trip; VT's real commission is $0.60 per lot, as you reported it, and the table uses the real rate. If the $0.60 is per side, the figures are a little lower.
 - Dukascopy is a third price source, separate from FTMO (calibration) and VT. It found 240 of the 247 VT trades.
 - A walk-forward test (recalibrating every few months on recent data) did not rescue the method: only one of five schedules passed, and only on four windows that include the 2025–26 gold rally.
 
@@ -46,7 +46,7 @@ Backtest: FTMO one-minute data, January 2025 – 15 May 2026, the period the pre
 - **Strategy Tester:** model "Every tick based on real ticks", your broker's XAUUSD, deposit currency equal to your account's (USC for a cent account). Test January 2025 – May 2026 and June 2026 – today **separately**, and compare profit before commission, commission and swap.
 - **Demo only.** Top02 and Top05 were the least bad out of sample. Expect break-even minus costs at best.
 - **Server time:** session, weekend and end-of-day times are broker server time, calibrated on a GMT+2 (winter) / GMT+3 (summer) clock. VT Markets matches. Shift them if your broker's clock differs.
-- **Commission and contract size:** VT's Strategy Tester charged $6 per lot round trip on a 1-ounce contract, which is $6 per ounce. At that cost the six presets lose even on the calibration data (backtest PF 0.53–0.97); the stress test assumed $0.07 per ounce. Check the contract size and commission in the symbol's **Specification**, and set `CommissionPerLot` to your round-trip commission per lot so a stop-out costs `RiskPercent` including commission.
+- **Commission:** the Strategy Tester run charged $6 per lot round trip (1 lot = 1 ounce), ten times VT's real $0.60. At $0.60 the whole run's loss shrinks from $8,914 to $1,664, but the unseen months still lose (PF 0.67). On the calibration data the presets score PF 1.60–1.92 at $0.60 and 0.53–0.97 at $6. On VT set `CommissionPerLot=0.6` (1.2 if the $0.60 is per side), so a stop-out costs `RiskPercent` including commission. In the Strategy Tester, set the commission to match.
 - **Account size:** with a 100-ounce contract (minimum 0.01 lot) and `RiskPercent=0.5`, use about $10,000 or more. On smaller balances the EA skips the trades whose stop is too wide for the minimum lot.
 - **One account, several presets:** only on a **hedging** account. On a netting account all presets on one symbol share a single position, so one preset's trade changes another's. v1.34 warns on a netting account and sends no entry while another position on the symbol is open.
 - **News filter** (`UseNewsFilter`) is on in the presets but was not in the backtest. It does nothing in the Strategy Tester, so tester results equal `UseNewsFilter=false`.

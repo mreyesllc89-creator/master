@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Write presets/btc/*.set for XAUUSD_Loma_TrendPullback.mq5 (v1.32) on BTCUSD: the setups of
+Write presets/btc/*.set for XAUUSD_Loma_TrendPullback.mq5 on BTCUSD: the setups of
 research/results/hump_btc_pool_ranked.csv that stay at PF >= 1.3 on all six measures (whole period, worse
 half-year of 2025, 2026, and the same three under harsh stress), one per family. Run from the repository
 root with HUMP_SYMBOL=BTCUSD HUMP_BTC_DATA=<dir> (and HUMP_BTC_SPREAD for another spread).
@@ -53,6 +53,7 @@ def main():
                  TP_RR=p["tp_rr"], MinRewardRisk=p["min_rr"], MinSL_Points=int(round(p["min_risk"] * 100)),
                  UseHTFFilter="false" if p["htf"] == "none" else "true", HTF_Timeframe=T.TF.get(p["htf"], 16388),
                  HTF_EMA_Period=p["htf_ema"], RiskPercent=0.5, MaxSpread_Points=3000,
+                 MaxSlippage_Points=1000, TrailStep_Points=200,          # 10 USD and 2 USD: BTC-sized (gold uses 0.20 / 0.10)
                  TrailStartR=p["trail_start"], TrailDistanceR=p["trail_dist"],
                  UseTradingHours="false" if M.SESS[p["session"]] is None else "true",
                  SkipBigPullback="true", CloseBeforeWeekend="false",
@@ -62,7 +63,7 @@ def main():
             o["TradingHoursStart"], o["TradingHoursEnd"] = M.SESS[p["session"]]
         assert not (set(o) - names), set(o) - names
         sp = H.BTC_SPREAD
-        head = [f"; XAUUSD_Loma_TrendPullback v1.32 on BTCUSD - rank {rank}: {p['tf']} {T.SIDE[p['sides']].lower()}, session "
+        head = [f"; XAUUSD_Loma_TrendPullback v{M.EA_VERSION} on BTCUSD - rank {rank}: {p['tf']} {T.SIDE[p['sides']].lower()}, session "
                 f"{T.SESS_NAME[p['session']]} server time, trend filter {p['htf']}. DO NOT LOAD ON GOLD.",
                 f"; Backtest Jan 2025-May 2026 (Binance BTCUSDT M1, assumed spread {sp:.0f} USD, risk-% sizing): {b['n']} trades, PF {b['pf']:.2f}, "
                 f"net {b['net']:+.0f}R, max drawdown {b['dd']:.1f}R. 2025 worse half-year PF {b['w25']:.2f}; 2026 PF {b['pf26']:.2f} ({b['n26']} trades).",

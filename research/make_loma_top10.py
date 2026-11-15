@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Write presets/top10/*.set for XAUUSD_Loma_TrendPullback.mq5 (v1.32): the ten best ALL-ROUND gold setups from
+Write presets/top10/*.set for XAUUSD_Loma_TrendPullback.mq5: the ten best ALL-ROUND gold setups from
 both calibration passes (research/results/hump_pool_ranked.csv, column "allround" = the lowest of: worse
 half-year PF of 2025, the same under harsh stress, 2026 PF, 2026 PF under harsh stress), one per
 timeframe / direction / session / trend-filter family. Run from the repository root.
@@ -66,7 +66,7 @@ def main():
         if M.SESS[p["session"]]:
             o["TradingHoursStart"], o["TradingHoursEnd"] = M.SESS[p["session"]]
         assert not (set(o) - names), set(o) - names
-        head = [f"; XAUUSD_Loma_TrendPullback v1.32 - ALL-ROUND TOP 10, rank {rank}: gold {p['tf']} {SIDE[p['sides']].lower()}, "
+        head = [f"; XAUUSD_Loma_TrendPullback v{M.EA_VERSION} - ALL-ROUND TOP 10, rank {rank}: gold {p['tf']} {SIDE[p['sides']].lower()}, "
                 f"session {SESS_NAME[p['session']]} server time, trend filter {p['htf']}",
                 f"; Backtest Jan 2025-May 2026 (FTMO XAUUSD M1 path, risk-% sizing): {b['n']} trades, PF {b['pf']:.2f}, net {b['net']:+.0f}R, "
                 f"max drawdown {b['dd']:.1f}R. 2025 worse half-year PF {b['w25']:.2f}; 2026 PF {b['pf26']:.2f} ({b['n26']} trades).",

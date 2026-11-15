@@ -35,8 +35,8 @@ for path in sorted(glob.glob("presets/top10/Loma_Top*.set")):
     if key in gold:
         g = gold[key]
         oos = (f"; OUT OF SAMPLE Jun 1 - Nov 6 2026 (never used for calibration): VT Markets MT5 real ticks {g['oos_vt_n']} trades, "
-               f"PF {g['oos_vt_gross_pf']:.2f} before commission ({g['oos_vt_net_pf']:.2f} after); Dukascopy prices {g['oos_duk_n']} trades, "
-               f"PF {g['oos_duk_pf']:.2f}. The edge did not hold: NOT RECOMMENDED FOR LIVE TRADING.")
+               f"PF {g['oos_vt_gross_pf']:.2f} before commission, {g['oos_vt_pf_real_comm']:.2f} at VT's 0.60 USD per lot; "
+               f"Dukascopy prices {g['oos_duk_n']} trades, PF {g['oos_duk_pf']:.2f}. The edge did not hold: NOT RECOMMENDED FOR LIVE TRADING.")
     else:
         oos = "; Not tested out of sample on broker data (only Top01-05 and Top07 were); the six that were all failed from June 2026."
     head.insert(i + 1, oos)
@@ -59,14 +59,18 @@ for path in sorted(glob.glob("presets/btc/Loma_BTC*.set")):
 
 # summary CSVs: add out-of-sample columns
 s = pd.read_csv("presets/top10/TOP10_SUMMARY.csv")
-for c in ["oos_vt_trades", "oos_vt_pf_before_comm", "oos_vt_pf_after_comm", "oos_dukascopy_trades", "oos_dukascopy_pf"]:
+OOS_COLS = ["oos_vt_trades", "oos_vt_pf_before_comm", "oos_vt_pf_comm_0_60_per_lot", "oos_vt_pf_comm_6_per_lot_tester",
+            "oos_dukascopy_trades", "oos_dukascopy_pf"]
+s = s[[c for c in s.columns if not c.startswith("oos_")]]
+for c in OOS_COLS:
     s[c] = pd.NA
 for k, g in gold.items():
     m = s["rank"] == int(k[3:])
-    s.loc[m, ["oos_vt_trades", "oos_vt_pf_before_comm", "oos_vt_pf_after_comm", "oos_dukascopy_trades", "oos_dukascopy_pf"]] = \
-        [g["oos_vt_n"], round(g["oos_vt_gross_pf"], 2), round(g["oos_vt_net_pf"], 2), g["oos_duk_n"], round(g["oos_duk_pf"], 2)]
+    s.loc[m, OOS_COLS] = [g["oos_vt_n"], round(g["oos_vt_gross_pf"], 2), round(g["oos_vt_pf_real_comm"], 2),
+                          round(g["oos_vt_net_pf"], 2), g["oos_duk_n"], round(g["oos_duk_pf"], 2)]
 s.to_csv("presets/top10/TOP10_SUMMARY.csv", index=False)
 s = pd.read_csv("presets/btc/BTC_PRESETS_SUMMARY.csv")
+s = s[[c for c in s.columns if not c.startswith("oos_")]]
 for c in ["oos_trades", "oos_pf", "oos_net_r", "oos_stress_pf", "oos_pf_spread20"]:
     s[c] = pd.NA
 for i, r in s.iterrows():
