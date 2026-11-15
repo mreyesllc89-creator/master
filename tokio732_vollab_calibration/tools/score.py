@@ -1,7 +1,6 @@
 """Evaluate one gene on a set of years. Every year is run from 1000 USD at two start dates (start of
-year and 1 July) and at three tick granularities: the basket is re-evaluated every 0.05, 0.5 and
-1.5 gold-USD of price travel (x17.1 on bitcoin), i.e. from near tick-by-tick to slow execution.
-Each start counts with the WORST of the three.
+year and 1 July). The EA is evaluated once per M1 bar at the recorded close: no intrabar path is
+assumed, so nothing can be earned from price movement the data does not contain.
 Score = mean log growth (floored at 50 USD, capped at x20) - 2 * (worst equity drawdown)^2."""
 import datetime as dt
 import numpy as np
@@ -38,7 +37,7 @@ def evaluate(g, sym, yrs, **kw):
             if st is not None and st > C.load(sym, y)["t"][-1] - 30 * 86400:
                 continue
             k = C.K_BTC if sym == "BTCUSD" else 1.0
-            rs = [C.backtest(p, sym, y, t_from=st, step=s * k, **kw) for s in STEPS]
+            rs = [C.backtest(p, sym, y, t_from=st, coarse=True, **kw)]
             r = min(rs, key=lambda x: x["final"])
             gs.append(np.log(min(max(r["final"], 50.0), 20000.0) / 1000.0)); dds.append(max(x["dd"] for x in rs))
             nets.append(r["net"]); nb += r["n"]; ruin += r["final"] < 300; rr.append(r["r"])

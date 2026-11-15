@@ -1,4 +1,5 @@
-"""Stage 3: shipped preset vs the calibrated pick per symbol. Per-year table, monthly-start sweep,
+"""Stage 3: shipped preset vs the calibrated pick per symbol. Per-year table, monthly-start sweep (every
+month of every year as a separate 1000 USD start), both tick models,
 cost stress, July-August 2026, and the .set files.
 usage: python final_eval.py <shipped .set template>"""
 import datetime as dt, json, sys
@@ -7,6 +8,7 @@ import common as C, space as S, score as SC, setfile
 
 template = sys.argv[1]
 summary, yearly, configs = [], [], {}
+MODELS = [("M1 close", dict(coarse=True)), ("interpolated", dict())]
 
 
 def month_starts(sym, y):
@@ -39,29 +41,28 @@ for sym in ["XAUUSD", "BTCUSD"]:
                            "Price-distance inputs assume a 2026 volatility level; VolATRRef carries the scale."])
         for part, yrs in SC.SPLIT[sym].items():
             for y in yrs:
-                for step in SC.STEPS:
-                    r = C.backtest(p, sym, y, step=step * k)
+                for model, mk in MODELS:
+                    r = C.backtest(p, sym, y, **mk)
                     rs = r["reason"]
-                    yearly.append(dict(symbol=sym, config=name, sample=part, year=y, step=step, baskets=r["n"],
+                    yearly.append(dict(symbol=sym, config=name, sample=part, year=y, ticks=model, baskets=r["n"],
                                        final=round(r["final"]), dd_pct=round(r["dd"], 1),
                                        trail=int((rs == 2).sum()), stop=int((rs == 0).sum()), age=int((rs == 1).sum())))
-            # every monthly start, three granularities
-            fin, dds = [], []
-            for y in yrs:
-                for ts in ([None] if y == 2026 else month_starts(sym, y)):
-                    for step in SC.STEPS:
-                        r = C.backtest(p, sym, y, t_from=ts, step=step * k)
+            for model, mk in MODELS:      # every monthly start
+                fin, dds = [], []
+                for y in yrs:
+                    for ts in ([None] if y == 2026 else month_starts(sym, y)):
+                        r = C.backtest(p, sym, y, t_from=ts, **mk)
                         fin.append(r["final"]); dds.append(r["dd"])
-            fin = np.array(fin)
-            row = dict(symbol=sym, config=name, sample=part, runs=len(fin), ruined_pct=round(100 * (fin < 300).mean()),
-                       losing_pct=round(100 * (fin < 1000).mean()), median_final=round(np.median(fin)),
-                       p10_final=round(np.percentile(fin, 10)), p90_final=round(np.percentile(fin, 90)),
-                       median_dd=round(np.median(dds), 1), worst_dd=round(max(dds), 1))
-            for label, kw in (("spread x2", dict(spread_mult=2.0)), ("slip 0.25", dict(slip=0.25 * k))):
-                f2 = [C.backtest(p, sym, y, step=0.5 * k, **kw)["final"] for y in yrs]
-                row[f"median_final {label}"] = round(np.median(f2))
-            summary.append(row)
-            print(row, flush=True)
+                fin = np.array(fin)
+                row = dict(symbol=sym, config=name, sample=part, ticks=model, runs=len(fin), ruined_pct=round(100 * (fin < 300).mean()),
+                           losing_pct=round(100 * (fin < 1000).mean()), median_final=round(np.median(fin)),
+                           p10_final=round(np.percentile(fin, 10)), p90_final=round(np.percentile(fin, 90)),
+                           median_dd=round(np.median(dds), 1), worst_dd=round(max(dds), 1))
+                for label, kw in (("spread x2", dict(spread_mult=2.0)), ("slip 0.25", dict(slip=0.25 * k))):
+                    f2 = [C.backtest(p, sym, y, **mk, **kw)["final"] for y in yrs]
+                    row[f"median_final {label}"] = round(np.median(f2))
+                summary.append(row)
+                print(row, flush=True)
 
 pd.DataFrame(summary).to_csv("../results/final_summary.csv", index=False)
 pd.DataFrame(yearly).to_csv("../results/final_yearly.csv", index=False)

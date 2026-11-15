@@ -1,5 +1,5 @@
 """Shipped preset under execution assumptions from best to worst: interpolated ticks with 0 / 0.1 /
-0.25 / 0.5 gold-USD adverse slippage per fill (x17.1 on bitcoin), then OHLC points only.
+0.25 / 0.5 gold-USD adverse slippage per fill (x17.1 on bitcoin), then one evaluation per M1 close.
 Each cell: final balance of a 1000 USD start on 1 January (2026: 1 July)."""
 import pandas as pd
 import common as C
@@ -13,7 +13,7 @@ for sym in ["XAUUSD", "BTCUSD"]:
             r = C.backtest(p, sym, y, slip=s * k)
             row[f"interp slip {s}"] = round(r["final"])
         r = C.backtest(p, sym, y, coarse=True)
-        row["OHLC points"] = round(r["final"]); row["OHLC dd%"] = round(r["dd"])
+        row["M1 closes"] = round(r["final"]); row["M1 closes dd%"] = round(r["dd"])
         rows.append(row)
 df = pd.DataFrame(rows)
 df.to_csv("../results/execution_sensitivity_shipped.csv", index=False)

@@ -16,7 +16,7 @@ for name in ["cestas_2026_1ms.csv", "cestas_2026_189ms.csv", "cestas_2025-2026_1
     s = time.time()
     b = C.backtest(p, "XAUUSD", 2026, start_balance=start_bal, t_from=t0 + 86400, baskets=True)["baskets"]
     bc = C.backtest(p, "XAUUSD", 2026, start_balance=start_bal, t_from=t0 + 86400, baskets=True, coarse=True)["baskets"]
-    for label, x in (("MT5 " + name[7:-4], w), ("port, interpolated ticks", b), ("port, OHLC points only", bc)):
+    for label, x in (("MT5 " + name[7:-4], w), ("port, interpolated ticks", b), ("port, M1 closes only", bc)):
         dur = (x.end - x.start) / 60
         g = x.groupby("reason").net.agg(["size", "sum"])
         rows.append(dict(run=label, start_balance=round(start_bal), baskets=len(x), net=round(x.net.sum()),

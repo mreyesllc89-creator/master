@@ -1,0 +1,61 @@
+symbol,config,sample,year,ticks,baskets,final,dd_pct,trail,stop,age
+XAUUSD,shipped,IS,2011,M1 close,108,20,98.2,5,37,65
+XAUUSD,shipped,IS,2011,interpolated,142,7023,42.7,68,32,41
+XAUUSD,shipped,IS,2012,M1 close,171,9,99.3,1,47,123
+XAUUSD,shipped,IS,2012,interpolated,278,1874,79.5,68,164,46
+XAUUSD,shipped,IS,2013,M1 close,215,-13,100.6,36,124,54
+XAUUSD,shipped,IS,2013,interpolated,225,9209,52.3,112,33,80
+XAUUSD,shipped,IS,2014,M1 close,182,15,98.8,6,53,122
+XAUUSD,shipped,IS,2014,interpolated,281,8353,69.5,105,108,68
+XAUUSD,shipped,OOS,2015,M1 close,176,5,99.7,5,51,119
+XAUUSD,shipped,OOS,2015,interpolated,231,10390,69.1,101,54,75
+XAUUSD,shipped,OOS,2016,M1 close,217,11,99.7,47,84,85
+XAUUSD,shipped,OOS,2016,interpolated,231,3501,69.0,95,69,66
+XAUUSD,shipped,OOS,2017,M1 close,149,0,100.0,22,78,48
+XAUUSD,shipped,OOS,2017,interpolated,200,171,96.8,10,91,99
+XAUUSD,shipped,OOS,2018,M1 close,122,1321,87.2,37,59,25
+XAUUSD,shipped,OOS,2018,interpolated,106,89,94.4,6,55,44
+XAUUSD,shipped,Y26,2026,M1 close,31,486,57.0,4,18,9
+XAUUSD,shipped,Y26,2026,interpolated,32,806,34.6,6,18,8
+XAUUSD,calibrated,IS,2011,M1 close,283,2723,25.8,17,14,252
+XAUUSD,calibrated,IS,2011,interpolated,284,2527,35.2,16,18,250
+XAUUSD,calibrated,IS,2012,M1 close,508,2168,33.6,25,27,456
+XAUUSD,calibrated,IS,2012,interpolated,508,3545,25.9,29,13,466
+XAUUSD,calibrated,IS,2013,M1 close,509,2304,31.8,35,19,455
+XAUUSD,calibrated,IS,2013,interpolated,512,3290,35.6,44,23,445
+XAUUSD,calibrated,IS,2014,M1 close,510,2864,39.4,40,22,448
+XAUUSD,calibrated,IS,2014,interpolated,513,5129,30.2,52,12,449
+XAUUSD,calibrated,OOS,2015,M1 close,515,4067,27.5,26,12,477
+XAUUSD,calibrated,OOS,2015,interpolated,515,5053,20.3,34,10,471
+XAUUSD,calibrated,OOS,2016,M1 close,509,3229,27.9,24,6,479
+XAUUSD,calibrated,OOS,2016,interpolated,509,4179,27.9,34,7,468
+XAUUSD,calibrated,OOS,2017,M1 close,510,2756,33.7,15,9,486
+XAUUSD,calibrated,OOS,2017,interpolated,511,3426,27.3,18,10,483
+XAUUSD,calibrated,OOS,2018,M1 close,238,1043,38.4,10,19,208
+XAUUSD,calibrated,OOS,2018,interpolated,238,1425,30.7,12,19,206
+XAUUSD,calibrated,Y26,2026,M1 close,60,788,34.4,1,13,46
+XAUUSD,calibrated,Y26,2026,interpolated,61,795,30.5,1,15,45
+BTCUSD,shipped,IS,2015,M1 close,241,4257,62.2,111,47,82
+BTCUSD,shipped,IS,2015,interpolated,258,16727,34.1,140,27,91
+BTCUSD,shipped,IS,2016,M1 close,57,-37,103.6,3,38,15
+BTCUSD,shipped,IS,2016,interpolated,238,5058,98.4,67,94,76
+BTCUSD,shipped,IS,2017,M1 close,138,1,99.9,1,40,96
+BTCUSD,shipped,IS,2017,interpolated,182,1,99.9,12,88,81
+BTCUSD,shipped,OOS,2018,M1 close,281,7486,64.8,126,73,81
+BTCUSD,shipped,OOS,2018,interpolated,294,12367,71.1,138,81,75
+BTCUSD,shipped,OOS,2019,M1 close,174,2,99.9,11,64,98
+BTCUSD,shipped,OOS,2019,interpolated,231,12513,53.6,111,43,76
+BTCUSD,shipped,Y26,2026,M1 close,60,50,96.7,5,44,10
+BTCUSD,shipped,Y26,2026,interpolated,53,2539,38.1,20,19,13
+BTCUSD,calibrated,IS,2015,M1 close,157,5083,45.9,16,88,53
+BTCUSD,calibrated,IS,2015,interpolated,167,4286,43.7,16,104,47
+BTCUSD,calibrated,IS,2016,M1 close,138,3218,45.8,5,75,57
+BTCUSD,calibrated,IS,2016,interpolated,148,2160,48.2,5,90,52
+BTCUSD,calibrated,IS,2017,M1 close,282,15357,44.9,87,147,48
+BTCUSD,calibrated,IS,2017,interpolated,274,11223,43.3,69,162,43
+BTCUSD,calibrated,OOS,2018,M1 close,170,3288,47.9,18,99,53
+BTCUSD,calibrated,OOS,2018,interpolated,183,2749,51.4,16,118,49
+BTCUSD,calibrated,OOS,2019,M1 close,166,3967,46.5,7,101,58
+BTCUSD,calibrated,OOS,2019,interpolated,183,4832,39.2,16,120,47
+BTCUSD,calibrated,Y26,2026,M1 close,27,1018,37.9,0,14,12
+BTCUSD,calibrated,Y26,2026,interpolated,27,1066,36.3,0,14,12

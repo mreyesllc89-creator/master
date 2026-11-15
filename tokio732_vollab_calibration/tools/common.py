@@ -176,7 +176,7 @@ def pvec(p, symbol, start_balance=1000.0, slip=0.0, coarse=False, step=None):
     if step is not None:
         P[E.STEP] = step
     if coarse:
-        P[E.STEP] = 1e12          # decisions only at the four OHLC points of each M1 bar
+        P[E.STEP] = -1.0          # one evaluation per M1 bar, at the recorded close          # decisions only at the four OHLC points of each M1 bar
     return P
 
 

@@ -1,0 +1,25 @@
+symbol,config,sample,ticks,runs,ruined_pct,losing_pct,median_final,p10_final,p90_final,median_dd,worst_dd,median_final spread x2,median_final slip 0.25
+XAUUSD,shipped,IS,M1 close,38,71,76,74,-8,2011,95.1,102.2,15,13
+XAUUSD,shipped,IS,interpolated,38,11,13,3029,295,8353,59.5,98.7,5727,5618
+XAUUSD,shipped,OOS,M1 close,35,49,54,695,2,4040,93.3,115.5,1608,50
+XAUUSD,shipped,OOS,interpolated,35,14,14,3468,187,7112,56.7,96.8,1830,1763
+XAUUSD,shipped,Y26,M1 close,1,0,100,486,486,486,57.0,57.0,807,499
+XAUUSD,shipped,Y26,interpolated,1,0,100,806,806,806,34.6,34.6,808,782
+XAUUSD,calibrated,IS,M1 close,38,0,13,1718,931,2762,31.9,51.7,2421,2031
+XAUUSD,calibrated,IS,interpolated,38,0,3,2549,1234,3976,28.1,48.8,3319,3020
+XAUUSD,calibrated,OOS,M1 close,35,0,11,2196,968,3485,33.7,80.7,2923,2622
+XAUUSD,calibrated,OOS,interpolated,35,0,6,2690,1134,4178,30.4,55.3,3649,3373
+XAUUSD,calibrated,Y26,M1 close,1,0,100,788,788,788,34.4,34.4,786,728
+XAUUSD,calibrated,Y26,interpolated,1,0,100,795,795,795,30.5,30.5,746,721
+BTCUSD,shipped,IS,M1 close,33,73,76,2,-40,4426,99.9,138.9,-3,-18
+BTCUSD,shipped,IS,interpolated,33,27,30,6855,2,11748,68.5,99.9,4,10441
+BTCUSD,shipped,OOS,M1 close,22,82,95,4,-284,468,99.9,118.6,1,253
+BTCUSD,shipped,OOS,interpolated,22,0,5,7444,2242,12334,63.3,89.5,9589,9363
+BTCUSD,shipped,Y26,M1 close,1,100,100,50,50,50,96.7,96.7,105,173
+BTCUSD,shipped,Y26,interpolated,1,0,0,2539,2539,2539,38.1,38.1,41,447
+BTCUSD,calibrated,IS,M1 close,33,0,0,2913,2059,24882,42.9,60.9,4300,5001
+BTCUSD,calibrated,IS,interpolated,33,0,0,2568,2164,10052,43.7,60.0,2128,4338
+BTCUSD,calibrated,OOS,M1 close,22,0,5,1624,1043,6166,44.2,50.9,2936,2956
+BTCUSD,calibrated,OOS,interpolated,22,0,9,1562,1357,4834,40.4,51.4,3419,3428
+BTCUSD,calibrated,Y26,M1 close,1,0,0,1018,1018,1018,37.9,37.9,1003,1012
+BTCUSD,calibrated,Y26,interpolated,1,0,0,1066,1066,1066,36.3,36.3,1096,1059

@@ -6,7 +6,8 @@ Modules that are off in the preset and were not swept are not ported: paired see
 resolutions, cash stop, TP, recovery, big-order SL/BE/trail/clock, news filter, recycle, trims,
 funded pairs, inventory guard, hazard exit, strict zones, spread cap, idle/flat close.
 
-Tick model: every M1 bar is walked open -> first extreme -> second extreme -> close on bid and
+Tick models: STEP < 0 evaluates the EA once per M1 bar at the recorded close (no assumed
+intrabar path). Otherwise every M1 bar is walked open -> first extreme -> second extreme -> close on bid and
 ask, each leg interpolated in steps of `STEP` price units, so basket trailing and the basket
 stop trigger close to their level instead of at the bar extremes.
 """
@@ -84,10 +85,15 @@ def run(t, bo, bh, bl, bc, ao, ah, al, ac, trend, atr, P, out):
             pb[1] = bl[i]; pa[1] = al[i]; pb[2] = bh[i]; pa[2] = ah[i]
         else:
             pb[1] = bh[i]; pa[1] = ah[i]; pb[2] = bl[i]; pa[2] = al[i]
+        close_only = P[STEP] < 0
         for seg in range(-1, 3):
             if dead:
                 break
-            if seg < 0:
+            if close_only and seg != 2:
+                continue
+            if close_only:
+                steps = 1
+            elif seg < 0:
                 steps = 1
             else:
                 steps = int(np.ceil(abs(pb[seg + 1] - pb[seg]) / P[STEP]))
