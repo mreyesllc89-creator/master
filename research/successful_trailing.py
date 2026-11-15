@@ -142,6 +142,32 @@ for kind, items in by_kind.items():
         out["systems"].append(dict(trailing=kind, setups=len(items), unseen_trades=int(k["oos_n"]), unseen_pf=round(k["oos_pf"], 2),
                                    unseen_stress_pf=round(k["oos_stress_pf"], 2), earlier=earlier(f"trailing {kind}"),
                                    picks=[x[1] for x in items]))
+if not BTC:
+    # The figures above are at the re-calibration's base costs: FTMO's spread by hour, no commission. The account
+    # owner's broker, VT Markets, charges a 1.5-pip spread and $0.60 per ounce: every combination is re-run there
+    # on the unseen months (hump_tf_recal.vt_costs' settings), per setup and together, also with the stress on top.
+    import hump_search as X
+    mk_vt = R.market(WORK, flat_spread=R.VT_SPREAD)
+    VT = dict(comm=R.VT_COMM, max_spread=5.0)
+    VT_HARD = dict(VT, trail_worst=1, delay=1, slip=0.10)
+
+    def vt_unseen(p, extra):
+        c = dict(X.BASE); c.update(p); c.update(extra)
+        df = mk_vt.run_y(X.engine_cfg(c))
+        t = df.entry_time.values.astype("datetime64[m]")
+        return df.r.values.astype(float)[t >= R.IS_END]
+
+    for g in out["combinations"]:
+        base, hard = [], []
+        for row in g["picks"]:
+            r = vt_unseen(row["params"], VT); base.append(r); hard.append(vt_unseen(row["params"], VT_HARD))
+            row.update(vt_unseen_trades=int(len(r)), vt_unseen_pf=round(R.pf(r), 2), vt_unseen_net_r=round(float(r.sum()), 1))
+        b, h = np.concatenate(base), np.concatenate(hard)
+        g.update(vt_unseen_trades=int(len(b)), vt_unseen_pf=round(R.pf(b), 2), vt_unseen_stress_pf=round(R.pf(h), 2))
+    out.update(base_costs="FTMO spread table by hour, no commission",
+               vt_costs=dict(spread=R.VT_SPREAD, commission_per_ounce=R.VT_COMM, max_spread=5.0))
+else:
+    out.update(base_costs="10 USD spread, no commission")
 json.dump(out, open(OUT, "w"), indent=1, default=float)
 
 pd.set_option("display.width", 260); pd.set_option("display.max_colwidth", 120)

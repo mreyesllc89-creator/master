@@ -6,8 +6,8 @@
 > - **Gold:** on the months after that, which they never saw, the six shipped gold presets together lost money even before commission on VT Markets real ticks: profit factor 0.74 on 247 trades, 1 June – 6 November 2026 (0.67 at VT's $0.60 commission per lot). Dukascopy prices agree.
 > - **BTC:** the four new M5 presets passed the unseen months of 2026 (profit factor 1.42 on 133 trades, 16 May – 13 November) and lost on the two years before the calibration data (0.79 in 2024, 0.83 in 2023): unproven, demo only. The earlier `Loma_BTC01`–`BTC04` presets are withdrawn; they were fitted on a price file with a wrong clock.
 > - **Re-calibration (15 November 2026):** every timeframe from M1 to H1 was re-calibrated on the same period with 23 trailing systems and tested on the months after it. Gold: no timeframe holds a profit factor of 1.3 on unseen data (0.67–1.08, or 0.61–1.01 at VT's costs). BTC: M5 passes the 2026 months, with the EA's own trailing (1.42 on 133 trades) and with all 23 systems (1.48 on 377 trades), but the same setups scored 0.79 and 1.00 in 2024 and 0.83 and 0.69 in 2023: it did not hold on earlier data. No other BTC timeframe passes.
-> - **Year by year (15 November 2026):** the method was set up on three years and traded on the next, rolling forward (gold 2016 – 2025, BTC 2021 – 2025), with 59 entry conditions tried one at a time. Gold: nothing passed. BTC: one result passed, M30 with the Stochastic turn rule: 1.22 in 2023, 1.39 in 2024, 1.87 in 2025; the 2026 months, kept back and checked once, 1.26 on 267 trades; all four unseen years 1.46 on 753 trades. Its setups for the year ahead are in the BTC zip (EA v1.35); demo first.
-> - **Trailing presets:** the 15 combinations of timeframe and trailing system that reached a profit factor of 1.3 on the 2026 months (4 gold, 11 BTC) are in the zips as presets (v1.35). None reached 1.3 on the earlier data: unproven, Strategy Tester and demo only.
+> - **Year by year (15 November 2026):** the method was set up on three years and traded on the next, rolling forward (gold 2016 – 2025, BTC 2021 – 2025), with 58 entry conditions tried one at a time. Gold: nothing passed. BTC: M30 with the Stochastic turn rule met the pass rule (1.22 in 2023, 1.39 in 2024, 1.87 in 2025), but it does not hold up: the 2026 months, kept back, gave 1.26 on 267 trades, under 1.3; with 472 cells tested, chance alone produces one or two such passes (about 1.2 expected); counted once per signal its profit factor is 1.42, not 1.60. Its picks for the year ahead are in the BTC zip as unproven presets (EA v1.35), demo only.
+> - **Trailing presets:** the 15 combinations of timeframe and trailing system whose setups together reached a profit factor of 1.3 on the 2026 months (4 gold, 11 BTC) are in the zips as presets (v1.35). None reached 1.3 on the earlier data. The gold figures are at FTMO's spread without commission: at VT's costs 2 of the 4 fall under 1.3 (M5 chandelier 1.23, M10 percent 1.24). Unproven: Strategy Tester and demo only.
 > - **The EA itself** reproduces the backtest's trades.
 
 ## Downloads
@@ -23,14 +23,14 @@ The out-of-sample report is also in the repository: `research/reports/loma_oos_r
 
 A **hump** (loma) is a run of bars with the MACD on one side of zero.
 
-1. **Trend first.** A big hump below zero means a bearish trend; a big hump above zero means a bullish trend. "Big" means its peak is at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and it lasts at least `BigHumpMinBars` bars. If `RequireStochLevel` is on, the Stochastic must also reach `StochLow` (bearish) or `StochHigh` (bullish) during it: 20/80 by default, 25/75 in Top04 and in the BTC preset R04. Top01, Top02, Top03, Top05 and the BTC presets R01 and R02 do not require it. With no big hump in force the market is **lineal** and the EA does not trade.
+1. **Trend first.** A big hump below zero means a bearish trend; a big hump above zero means a bullish trend. "Big" means its peak is at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and it lasts at least `BigHumpMinBars` bars. If `RequireStochLevel` is on, the Stochastic must also reach `StochLow` (bearish) or `StochHigh` (bullish) during it: 20/80 by default, 25/75 in Top04 and in the BTC preset R04 (the `Loma_WF` and `Loma_T15` presets set their own levels). Top01, Top02, Top03, Top05 and the BTC presets R01 and R02 do not require it. With no big hump in force the market is **lineal** and the EA does not trade.
 2. **Trend break.** An opposite hump as large as `TrendBreakRatio` times the big hump ends the trend.
-3. **Sell signal** (bearish trend): a pullback hump above zero that lasts at least `PullbackMinBars` bars and is no larger than `PullbackMaxRatio` times the big hump, then the first bar with the MACD back below zero. Top01, Top04, Top07 and the BTC preset R01 use `PullbackMinBars=1`, so a single bar across zero counts as a pullback.
+3. **Sell signal** (bearish trend): a pullback hump above zero that lasts at least `PullbackMinBars` bars and is no larger than `PullbackMaxRatio` times the big hump, then the first bar with the MACD back below zero. Top01, Top04, Top07 and the BTC preset R01 use `PullbackMinBars=1`, so a single bar across zero counts as a pullback (the `Loma_WF` and `Loma_T15` presets set their own).
 4. **Stop loss:** above the highest high of the pullback hump (including the signal bar), plus `SL_Buffer_Points` and the spread. No hump, no stop, no trade.
 5. **Take profit:** the six gold presets and the BTC presets R02 to R04 use a fixed multiple of the risk (`TP_Mode=TP_FIXED_RR`, `TP_RR`). BTC R01 uses the other mode, `TP_PREV_HUMP`: the previous hump's extreme, taken a little early (`TP_Anticipation=0.1`).
 6. **Weak signals are skipped:** only the first `MaxSignalsPerBigHump` signals after a big hump are traded, and the trend lapses after `TrendMaxBars` bars without a new big hump.
 7. **Buys** are the exact mirror.
-8. **Trend filter** (`UseHTFFilter`): sell only if the last closed `HTF_Timeframe` bar closed below its EMA(`HTF_EMA_Period`), buy only if above. Each preset sets its own timeframe and period; Top02 and the BTC presets R01 and R04 use no filter.
+8. **Trend filter** (`UseHTFFilter`): sell only if the last closed `HTF_Timeframe` bar closed below its EMA(`HTF_EMA_Period`), buy only if above. Each preset sets its own timeframe and period; Top02, the BTC presets R01 and R04, and every preset whose name ends in `NoFilter` use no filter.
 
 ## Install
 
@@ -44,10 +44,11 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 
 ## What changed in v1.35
 
-- **`TrailMode`** chooses one of 14 trailing systems (0 = the EA's own, as before; 1 ATR at entry, 2 percent of price, 3 profit lock, 4 stepped, 5 chandelier, 6 candle lows / highs, 7 EMA, 8 SMA, 9 Parabolic SAR, 10 Bollinger band, 11 higher-timeframe candle, 12 swing pivots, 13 hump structure), with **`TrailParam`** for the period or variant. Except for 0 and 4 they move the stop once per closed one-minute bar, as the backtest does.
+- **`TrailMode`** chooses one of 14 trailing systems (0 = the EA's own, as before; 1 ATR at entry, 2 percent of price, 3 profit lock, 4 stepped, 5 chandelier, 6 candle lows / highs, 7 EMA, 8 SMA, 9 Parabolic SAR, 10 Bollinger band, 11 higher-timeframe candle, 12 swing pivots, 13 hump structure), with **`TrailParam`** for the period or variant; `TrailStartR` and `TrailDistanceR` are read in that system's units (R, ATR multiples, percent of the entry price or the share of profit kept). Except for 0 and 4 they move the stop once per closed one-minute bar, as the backtest does.
 - **`UseStochTurnFilter`** (`StochTurnBars`, `StochTurnHigh`, `StochTurnLow`): enter only when the Stochastic (7, 1, 7) came from 80 / 20 and turned.
 - **`ScaleWithPrice`** with **`ReferencePrice`**: the stop buffer, minimum and maximum stop follow the price.
-- With the new inputs at their defaults v1.35 trades exactly like v1.34.
+- With the new inputs at their defaults v1.35 trades like v1.34, with one difference: a spread exactly equal to `MaxSpread_Points` is now always accepted, as in the backtest (v1.34 refused it about half the time, by floating-point rounding).
+- Two independent reviews of v1.35 found eight defects (that spread test, the order of a history check, the entry minute of the stepped trailing and others); they were fixed and checked again.
 
 ## What changed in v1.34
 
@@ -90,9 +91,9 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 | `Loma_BTC_M5_R04` | sell | 12:00-20:00 | none | 1.5R | from 1.0R, 1.0R behind | 103 / 1.63 | 36, 1.79, +9.7R | 1.60 | 0.52 (59) | 0.96 (75) |
 | **All four** | | | | | | | **133, 1.42, +23.3R** | **1.37** | **0.79 (276)** | **0.83 (291)** |
 
-**BTC year by year** (same zip, presets `Loma_WF_BTC_M30_01` to `10`). Picked on 2024 – 13 November 2026 by the rule that passed the year-by-year test: M30 with the Stochastic turn rule (`UseStochTurnFilter=true`). The rule on its unseen years: 2023 1.22 (65 trades), 2024 1.39 (170 trades), 2025 1.87 (251 trades); the 2026 months, checked once at the end, 1.26 (267 trades). Run all 10 together on a hedging account at `RiskPercent=0.1` (set in the files). Account size, leverage and the preset table: `packages/loma_btcusd/START_HERE.md`.
+**BTC year by year** (same zip, presets `Loma_WF_BTC_M30_xlzc_stoch_01_…` to `Loma_WF_BTC_M30_xlzc_stoch_10_…`). Picked on 2024 – 13 November 2026 by the rule that met the year-by-year pass rule: M30 with the Stochastic turn rule (`UseStochTurnFilter=true`). The rule on its unseen years: 2023 1.22 (65 trades), 2024 1.39 (170 trades), 2025 1.87 (251 trades); the 2026 months, kept back, 1.26 (267 trades). Not proven: chance alone produces one or two such passes among the 472 cells tested. Demo only, all 10 together on a hedging account at `RiskPercent=0.1` (set in the files). Account size, leverage and the preset table: `packages/loma_btcusd/START_HERE.md`.
 
-**Trailing presets** (`Loma_T15_Gold_*`: 16 in the gold zip; `Loma_T15_BTC_*`: 38 in the BTC zip): the 15 combinations of timeframe and trailing system that reached a profit factor of 1.3 on the 2026 months. None reached 1.3 on the earlier data: unproven, Strategy Tester and demo only. Their tables are in the two zip guides.
+**Trailing presets** (`Loma_T15_Gold_*`: 16 in the gold zip; `Loma_T15_BTC_*`: 38 in the BTC zip): the 15 combinations of timeframe and trailing system whose setups together reached a profit factor of 1.3 on the 2026 months (4 gold, 11 BTC) are in the zips as presets (v1.35). None reached 1.3 on the earlier data. The gold figures are at FTMO's spread without commission: at VT's costs 2 of the 4 fall under 1.3 (M5 chandelier 1.23, M10 percent 1.24). Unproven: Strategy Tester and demo only. Their tables are in the two zip guides.
 
 ## Read before trading
 
@@ -160,7 +161,7 @@ Every combination of units was tested on the five presets (393,900 backtests): s
 - **Target:** multiples of the risk and ATR are about equal; the previous-hump target is the weakest.
 - **Trailing:** no unit is reliably better. Very tight trailing in points (0.30 behind price) scores PF 4 to 6 on one-minute bars but falls to about 1.2 with slippage and commission: it is an artefact, not an edge.
 - **One preset changed:** `Loma_Gold_M5_Buy_H1` now uses a 60-point stop buffer and a target of 6 x risk (was 100 points and 3 x). Under the worst combination its PF is 1.92 (was 1.61). The stress table below still shows its old exits.
-- The EA keeps the hump stop and risk-multiple target and trailing: nothing else earned a new input.
+- The EA kept the hump stop and the risk-multiple target and trailing; v1.35 later added 13 other trailing systems (`TrailMode`) for the trailing presets, which are unproven.
 
 ### Stress test of v1.31 (13 November 2026)
 

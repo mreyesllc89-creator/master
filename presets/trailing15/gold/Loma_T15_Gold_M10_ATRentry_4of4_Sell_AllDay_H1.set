@@ -1,7 +1,8 @@
 ; XAUUSD_Loma_TrendPullback v1.35 on XAUUSD - trailing result M10 + ATRentry trailing, setup 4 of 4: sell, session AllDay server time, trend filter H1 EMA 100, target 2R. DO NOT LOAD ON BTC.
 ; Trailing: 1.5 x ATR(14) of M10 at entry behind the best price once the profit reaches 0.5 x ATR, stop moved once per closed minute. Needs EA v1.35 or later (TrailMode 1, TrailParam 0).
 ; Picked on Jan 2025 - May 15 2026 only (score 1.32): 81 trades, PF 1.59.
-; UNSEEN May 16 - Nov 13 2026: this setup 44 trades, PF 0.97, net -0.4R; the 4 setups of this combination together 206 trades, PF 1.57 (stressed 1.45).
+; UNSEEN May 16 - Nov 13 2026, at the backtest's costs (FTMO spread table, no commission): this setup 44 trades, PF 0.97, net -0.4R; the 4 setups of this combination together 206 trades, PF 1.57 (stressed 1.45).
+; At VT Markets' costs (1.5-pip spread, 0.60 USD commission per ounce) on the same months: this setup 44 trades, PF 0.93; the 4 setups together 206 trades, PF 1.61 (stressed 1.39).
 ; EARLIER DATA, before the calibration period: Jul-Dec 2024: this setup 21 trades, PF 0.89. The combination together: Jul-Dec 2024 PF 0.70 (154 trades). The 2026 result did NOT hold on earlier data: UNPROVEN, demo and Strategy Tester only.
 ; Data: FTMO XAUUSD M1 to May 15 2026, Dukascopy after; FTMO spread table; no commission in the test (VT: set CommissionPerLot).
 ; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).

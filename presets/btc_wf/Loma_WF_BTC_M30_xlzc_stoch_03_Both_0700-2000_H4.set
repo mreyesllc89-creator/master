@@ -1,7 +1,8 @@
 ; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - year-by-year result M30, setup 3 of 10: both, session 0700-2000 server time, trend filter H4 EMA 50; entries only when the Stochastic (7,1,7) of the trigger timeframe came from 80 (sells) / 20 (buys) within 5 bars and turned (UseStochTurnFilter). DO NOT LOAD ON GOLD.
 ; Picked for the year ahead on 2024 - 13 Nov 2026 by the year-by-year rule: lowest of six profit factors 1.52; 2024: 26 trades PF 1.94, 2025: 27 trades PF 1.62, 2026: 20 trades PF 1.57. These are calibration figures.
 ; Year by year, setups picked by this rule on the three years before each year: 2023 PF 1.22 (65 trades), 2024 PF 1.39 (170 trades), 2025 PF 1.87 (251 trades), 2026 PF 1.26 (267 trades); all 4 unseen years together PF 1.46 (753 trades, stressed 1.41). The last year (2026) was kept back and checked once.
-; ScaleWithPrice: the *_Points distances were calibrated at 72408.79 (ReferencePrice) and follow the price.
+; ScaleWithPrice: SL_Buffer_Points, MinSL_Points and MaxSL_Points were calibrated at 72408.79 (ReferencePrice) and follow the price; the spread, slippage and trailing-step limits do not.
+; UNPROVEN: the rule met the year-by-year pass rule, but with 472 combinations tested one or two such passes are expected by chance, and the 2026 months kept back gave PF 1.26, under 1.3. Demo only.
 ; RiskPercent 0.1: the 10 presets are meant to run together on one hedging account, and they overlap.
 ; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer). Demo and Strategy Tester first.
 ; UseNewsFilter was not in the backtest.

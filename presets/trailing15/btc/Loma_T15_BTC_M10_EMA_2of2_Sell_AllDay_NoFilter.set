@@ -1,7 +1,7 @@
 ; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - trailing result M10 + EMA trailing, setup 2 of 2: sell, session AllDay server time, trend filter none, target 2R. DO NOT LOAD ON GOLD.
 ; Trailing: stop beyond the EMA(8) of M10 closes, once the profit reaches 0.5R. Needs EA v1.35 or later (TrailMode 7, TrailParam 8).
 ; Picked on Jan 2025 - May 15 2026 only (score 1.38): 121 trades, PF 1.66.
-; UNSEEN May 16 - Nov 13 2026: this setup 58 trades, PF 1.53, net +7.0R; the 2 setups of this combination together 102 trades, PF 1.95 (stressed 2.09).
+; UNSEEN May 16 - Nov 13 2026, at the backtest's costs (assumed 10 USD spread, no commission): this setup 58 trades, PF 1.53, net +7.0R; the 2 setups of this combination together 102 trades, PF 1.95 (stressed 2.09).
 ; EARLIER DATA, before the calibration period: 2024: this setup 94 trades, PF 0.77; 2023: this setup 126 trades, PF 0.97. The combination together: 2024 PF 1.04 (156 trades); 2023 PF 1.02 (201 trades). The 2026 result did NOT hold on earlier data: UNPROVEN, demo and Strategy Tester only.
 ; Data: Binance BTCUSDT M1 in broker server time, assumed spread 10 USD. Points are 0.01 USD: 2000 points = 20 USD.
 ; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).

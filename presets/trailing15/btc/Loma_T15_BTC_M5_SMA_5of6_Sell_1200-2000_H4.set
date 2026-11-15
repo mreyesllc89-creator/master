@@ -1,9 +1,9 @@
 ; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - trailing result M5 + SMA trailing, setup 5 of 6: sell, session 1200-2000 server time, trend filter H4 EMA 200, target 1R. DO NOT LOAD ON GOLD.
 ; Trailing: stop beyond the SMA(50) of M5 closes, from the minute after entry. Needs EA v1.35 or later (TrailMode 8, TrailParam 50).
 ; Picked on Jan 2025 - May 15 2026 only (score 1.31): 83 trades, PF 1.74.
-; UNSEEN May 16 - Nov 13 2026: this setup 34 trades, PF 1.06, net +0.5R; the 6 setups of this combination together 205 trades, PF 1.51 (stressed 1.43).
+; UNSEEN May 16 - Nov 13 2026, at the backtest's costs (assumed 10 USD spread, no commission): this setup 34 trades, PF 1.06, net +0.5R; the 6 setups of this combination together 205 trades, PF 1.51 (stressed 1.43).
 ; EARLIER DATA, before the calibration period: 2024: this setup 42 trades, PF 1.09; 2023: this setup 43 trades, PF 0.92. The combination together: 2024 PF 1.10 (462 trades); 2023 PF 0.71 (425 trades). The 2026 result did NOT hold on earlier data: UNPROVEN, demo and Strategy Tester only.
-; Its target (1.0R) equals its minimum reward: the backtest skipped some signals by rounding, the EA would refuse some by tick rounding. This preset takes every signal (MinRewardRisk 0.95). At that setting: Jan 2025 - May 15 2026 83 trades PF 1.74; unseen 2026 34 trades PF 1.06, net +0.5R.
+; Its target (1.0R) equals its minimum reward: the backtest takes every such signal, the EA would refuse some by tick rounding, so this preset sets MinRewardRisk 0.95. At that setting: Jan 2025 - May 15 2026 83 trades PF 1.74; unseen 2026 34 trades PF 1.06, net +0.5R.
 ; Data: Binance BTCUSDT M1 in broker server time, assumed spread 10 USD. Points are 0.01 USD: 2000 points = 20 USD.
 ; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).
 ; UseNewsFilter was not in the backtest.

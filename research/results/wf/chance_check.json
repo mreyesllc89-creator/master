@@ -1,0 +1,189 @@
+{
+ "BTCUSD": {
+  "cells": 472,
+  "real_passes": [
+   {
+    "tf": "M30",
+    "condition": "xlzc_stoch",
+    "pf": 1.601,
+    "trades": 486
+   },
+   {
+    "tf": "M30",
+    "condition": "xlzc_both",
+    "pf": 1.566,
+    "trades": 339
+   }
+  ],
+  "controls": {
+   "cells": 24,
+   "passed": 0
+  },
+  "placebo": {
+   "cells": 1155,
+   "timeframes": [
+    "M2",
+    "M3",
+    "M5",
+    "M10",
+    "M15",
+    "M30",
+    "H1"
+   ],
+   "passed": 3,
+   "expected_passes": 1.225974025974026,
+   "ci95": [
+    0.25297665908634015,
+    3.5738810398152756
+   ],
+   "passes": [
+    {
+     "tf": "H1",
+     "cell": "SHIFT0:pd_premium",
+     "pf": 1.302,
+     "trades": 425
+    },
+    {
+     "tf": "M30",
+     "cell": "SHIFT0:xlzc_stoch",
+     "pf": 1.312,
+     "trades": 264
+    },
+    {
+     "tf": "M30",
+     "cell": "KEEP:pdr_ge120",
+     "pf": 1.332,
+     "trades": 720
+    }
+   ]
+  },
+  "no_skill": {
+   "mean": 1.6,
+   "p05": 0.20000000000000018,
+   "p95": 3.0,
+   "at_least_2": 0.48,
+   "permutations": 25
+  },
+  "year_order": {
+   "mean": 5.28,
+   "p05": 1.2000000000000002,
+   "p95": 10.0,
+   "at_least_2": 0.92,
+   "permutations": 25
+  },
+  "real_passes_in_nulls": {
+   "M30 xlzc_stoch": {
+    "no_skill_share": 0.52,
+    "year_order_share": 0.04
+   },
+   "M30 xlzc_both": {
+    "no_skill_share": 0.36,
+    "year_order_share": 0.08
+   }
+  },
+  "thin_M30_xlzc_stoch": {
+   "walk_forward": {
+    "trades": 486,
+    "signals": 272,
+    "pf": 1.6011395523040421,
+    "pf_signals": 1.4226709861087103,
+    "bootstrap_signals": {
+     "p05": 1.079660931690973,
+     "p95": 1.86677754312351,
+     "below_1_3": 0.299
+    }
+   },
+   "final": {
+    "trades": 267,
+    "signals": 137,
+    "pf": 1.259601760106651,
+    "pf_signals": 1.2854974605087726,
+    "net_share_of_10_largest": 0.8670478830690248
+   },
+   "by_year": {
+    "2023": {
+     "trades": 65,
+     "signals": 47,
+     "pf": 1.2177505413063103,
+     "pf_signals": 1.3475997193406157
+    },
+    "2024": {
+     "trades": 170,
+     "signals": 81,
+     "pf": 1.3908998772255994,
+     "pf_signals": 1.3030647714137324
+    },
+    "2025": {
+     "trades": 251,
+     "signals": 144,
+     "pf": 1.8656061960832684,
+     "pf_signals": 1.503016241075883
+    },
+    "2026": {
+     "trades": 267,
+     "signals": 137,
+     "pf": 1.259601760106651,
+     "pf_signals": 1.2854974605087726
+    }
+   }
+  },
+  "walk_forward_vs_2026": {
+   "cells": 233,
+   "rank_correlation": -0.0669804281696608,
+   "permutation_p": 0.31
+  },
+  "sweep_share_of_signals_M30": 0.953
+ },
+ "XAUUSD": {
+  "cells": 472,
+  "real_passes": [],
+  "controls": {
+   "cells": 24,
+   "passed": 0
+  },
+  "placebo": {
+   "cells": 825,
+   "timeframes": [
+    "M5",
+    "M10",
+    "M15",
+    "M30",
+    "H1"
+   ],
+   "passed": 1,
+   "expected_passes": 0.5721212121212121,
+   "ci95": [
+    0.01448463273705354,
+    3.178837367563359
+   ],
+   "passes": [
+    {
+     "tf": "H1",
+     "cell": "SHIFT1:round_far",
+     "pf": 1.472,
+     "trades": 295
+    }
+   ]
+  },
+  "no_skill": {
+   "mean": 0.12,
+   "p05": 0.0,
+   "p95": 1.0,
+   "at_least_2": 0.0,
+   "permutations": 25
+  },
+  "year_order": {
+   "mean": 0.8,
+   "p05": 0.0,
+   "p95": 2.0,
+   "at_least_2": 0.16,
+   "permutations": 25
+  },
+  "real_passes_in_nulls": {},
+  "walk_forward_vs_2026": {
+   "cells": 41,
+   "rank_correlation": -0.05993031358885018,
+   "permutation_p": 0.7095
+  }
+ }
+}

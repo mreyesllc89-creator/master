@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
-"""Convert Dukascopy XAUUSD bi5 one-minute candles (BID and ASK, UTC) into the hump engine's input:
+"""Convert Dukascopy bi5 one-minute candles (BID and ASK, UTC) into the hump engine's input:
 mid-price M1 bars (with a tick-volume column) indexed by broker server time (New York + 7h) and a per-bar half spread."""
 import datetime as dt, glob, lzma, os, struct
 import numpy as np, pandas as pd
+
+# price unit of the bi5 integers, by Dukascopy instrument (DUK_INSTRUMENT, default XAUUSD)
+DIVISOR = {"XAUUSD": 1000.0, "EURUSD": 100000.0, "USA500IDXUSD": 1000.0}[os.environ.get("DUK_INSTRUMENT", "XAUUSD")]
 
 
 def read_day(path, day):
@@ -11,7 +14,7 @@ def read_day(path, day):
     raw = lzma.decompress(open(path, "rb").read())
     a = np.frombuffer(raw, dtype=">i4").reshape(-1, 6)
     t = pd.Timestamp(day) + pd.to_timedelta(a[:, 0].astype(np.int64), unit="s")
-    px = a[:, 1:5].astype(float) / 1000.0                       # open, close, low, high
+    px = a[:, 1:5].astype(float) / DIVISOR                      # open, close, low, high
     vol = np.frombuffer(raw, dtype=">f4").reshape(-1, 6)[:, 5].astype(float)
     return pd.DataFrame(dict(open=px[:, 0], close=px[:, 1], low=px[:, 2], high=px[:, 3], vol=vol), index=t)
 

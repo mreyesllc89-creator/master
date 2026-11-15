@@ -1,0 +1,410 @@
+{
+ "sym": "gold",
+ "cells": 472,
+ "tfs": [
+  "M1",
+  "M2",
+  "M3",
+  "M5",
+  "M10",
+  "M15",
+  "M30",
+  "H1"
+ ],
+ "real_passes": [],
+ "control_cells": 24,
+ "control_passes": [],
+ "controls_rate": [
+  0.0,
+  [
+   0.0,
+   0.1424735977225251
+  ]
+ ],
+ "expected_false_from_controls": {
+  "point": 0.0,
+  "ci95": [
+   0.0,
+   67.24753812503185
+  ]
+ },
+ "placebo_cells": 825,
+ "placebo_tfs": [
+  "M5",
+  "M10",
+  "M15",
+  "M30",
+  "H1"
+ ],
+ "placebo_passes": [
+  [
+   "H1",
+   "SHIFT1:round_far",
+   1.472,
+   295
+  ]
+ ],
+ "placebo_rate": [
+  0.0012121212121212121,
+  [
+   3.068778122257106e-05,
+   0.006734824931278303
+  ]
+ ],
+ "placebo_by_kind": {
+  "SHIFT": [
+   1,
+   450
+  ],
+  "TOFF": [
+   0,
+   100
+  ],
+  "KEEP": [
+   0,
+   275
+  ]
+ },
+ "placebo_by_tf": {
+  "H1": [
+   1,
+   165
+  ],
+  "M10": [
+   0,
+   165
+  ],
+  "M15": [
+   0,
+   165
+  ],
+  "M30": [
+   0,
+   165
+  ],
+  "M5": [
+   0,
+   165
+  ]
+ },
+ "expected_false_from_placebo": {
+  "point": 0.5721212121212121,
+  "ci95": [
+   0.01448463273705354,
+   3.178837367563359
+  ]
+ },
+ "expected_false_from_placebo_tf_matched": {
+  "point_on_covered_cells": 0.3575757575757576,
+  "covered_cells": 295
+ },
+ "noboundary": {
+  "H1": {
+   "windows": 649,
+   "picks_changed": 0,
+   "pass_changed": [],
+   "final_picks_changed": [],
+   "boundary_trades_per_entry_year_base_condition": {
+    "2013": 4.0,
+    "2014": 4.0,
+    "2015": 2.0,
+    "2016": 0.0,
+    "2017": 0.0,
+    "2018": 0.0,
+    "2019": 2.0,
+    "2020": 17.0,
+    "2021": 0.0,
+    "2022": 0.0,
+    "2023": 0.0,
+    "2024": 2.0,
+    "2025": 2.0,
+    "2026": 0.0
+   },
+   "boundary_trade_share_all_conditions": 2.606088892535087e-05,
+   "changed_sample": []
+  },
+  "M10": {
+   "windows": 649,
+   "picks_changed": 6,
+   "pass_changed": [],
+   "final_picks_changed": [],
+   "boundary_trades_per_entry_year_base_condition": {
+    "2013": 299.0,
+    "2014": 0.0,
+    "2015": 239.0,
+    "2016": 0.0,
+    "2017": 0.0,
+    "2018": 76.0,
+    "2019": 91.0,
+    "2020": 63.0,
+    "2021": 0.0,
+    "2022": 0.0,
+    "2023": 0.0,
+    "2024": 202.0,
+    "2025": 80.0,
+    "2026": 0.0
+   },
+   "boundary_trade_share_all_conditions": 0.00018155832496113204,
+   "changed_sample": [
+    [
+     "trend_h4",
+     2017,
+     1
+    ],
+    [
+     "trend_d1",
+     2017,
+     0
+    ],
+    [
+     "slope_h4",
+     2017,
+     1
+    ],
+    [
+     "slope_d1",
+     2022,
+     1
+    ],
+    [
+     "adx_h1_20",
+     2017,
+     0
+    ],
+    [
+     "pdr_ge80",
+     2017,
+     1
+    ]
+   ]
+  },
+  "M15": {
+   "windows": 649,
+   "picks_changed": 5,
+   "pass_changed": [],
+   "final_picks_changed": [],
+   "boundary_trades_per_entry_year_base_condition": {
+    "2013": 360.0,
+    "2014": 0.0,
+    "2015": 157.0,
+    "2016": 0.0,
+    "2017": 0.0,
+    "2018": 167.0,
+    "2019": 120.0,
+    "2020": 175.0,
+    "2021": 0.0,
+    "2022": 0.0,
+    "2023": 0.0,
+    "2024": 8.0,
+    "2025": 164.0,
+    "2026": 0.0
+   },
+   "boundary_trade_share_all_conditions": 0.00025420742782032826,
+   "changed_sample": [
+    [
+     "adx_h1_30",
+     2022,
+     1
+    ],
+    [
+     "adx_h4_30",
+     2021,
+     0
+    ],
+    [
+     "round_far",
+     2022,
+     1
+    ],
+    [
+     "round_far",
+     2023,
+     1
+    ],
+    [
+     "candle_body50",
+     2021,
+     0
+    ]
+   ]
+  },
+  "M30": {
+   "windows": 649,
+   "picks_changed": 0,
+   "pass_changed": [],
+   "final_picks_changed": [],
+   "boundary_trades_per_entry_year_base_condition": {
+    "2013": 0.0,
+    "2014": 0.0,
+    "2015": 8.0,
+    "2016": 0.0,
+    "2017": 0.0,
+    "2018": 128.0,
+    "2019": 49.0,
+    "2020": 62.0,
+    "2021": 0.0,
+    "2022": 0.0,
+    "2023": 0.0,
+    "2024": 1.0,
+    "2025": 116.0,
+    "2026": 0.0
+   },
+   "boundary_trade_share_all_conditions": 0.00015354509697931536,
+   "changed_sample": []
+  },
+  "M5": {
+   "windows": 649,
+   "picks_changed": 1,
+   "pass_changed": [],
+   "final_picks_changed": [],
+   "boundary_trades_per_entry_year_base_condition": {
+    "2013": 2.0,
+    "2014": 124.0,
+    "2015": 92.0,
+    "2016": 0.0,
+    "2017": 0.0,
+    "2018": 2.0,
+    "2019": 21.0,
+    "2020": 3.0,
+    "2021": 0.0,
+    "2022": 0.0,
+    "2023": 0.0,
+    "2024": 798.0,
+    "2025": 53.0,
+    "2026": 0.0
+   },
+   "boundary_trade_share_all_conditions": 0.0001020037098485603,
+   "changed_sample": [
+    [
+     "vol_le100",
+     2016,
+     1
+    ]
+   ]
+  }
+ },
+ "reshuffle_setup": {
+  "perms": 25,
+  "cells": 472,
+  "tfs": [
+   "M10",
+   "M15",
+   "M30",
+   "H1",
+   "M1",
+   "M2",
+   "M3",
+   "M5"
+  ],
+  "mean_passes": 0.12,
+  "p05": 0.0,
+  "p95": 1.0,
+  "max": 1,
+  "dist": [
+   22,
+   3
+  ]
+ },
+ "reshuffle_setup_pass_rate_of_real_passes": {},
+ "reshuffle_order": {
+  "perms": 25,
+  "cells": 472,
+  "tfs": [
+   "M10",
+   "M15",
+   "M30",
+   "H1",
+   "M1",
+   "M2",
+   "M3",
+   "M5"
+  ],
+  "mean_passes": 0.8,
+  "p05": 0.0,
+  "p95": 2.0,
+  "max": 6,
+  "dist": [
+   13,
+   8,
+   3,
+   0,
+   0,
+   0,
+   1
+  ]
+ },
+ "reshuffle_order_pass_rate_of_real_passes": {},
+ "stricter": {
+  "as written": {
+   "real": 0,
+   "real_cells": [],
+   "controls": 0,
+   "placebo": 1,
+   "placebo_cells": 825,
+   "expected_false_placebo": 0.5721212121212121
+  },
+  "3+ unseen years with 50+ trades": {
+   "real": 0,
+   "real_cells": [],
+   "controls": 0,
+   "placebo": 1,
+   "placebo_cells": 825,
+   "expected_false_placebo": 0.5721212121212121
+  },
+  "half of the unseen years with 50+ trades": {
+   "real": 0,
+   "real_cells": [],
+   "controls": 0,
+   "placebo": 0,
+   "placebo_cells": 825,
+   "expected_false_placebo": 0.0
+  },
+  "trades in every unseen year": {
+   "real": 0,
+   "real_cells": [],
+   "controls": 0,
+   "placebo": 0,
+   "placebo_cells": 825,
+   "expected_false_placebo": 0.0
+  },
+  "no unseen year with 20+ trades below PF 1.0": {
+   "real": 0,
+   "real_cells": [],
+   "controls": 0,
+   "placebo": 0,
+   "placebo_cells": 825,
+   "expected_false_placebo": 0.0
+  },
+  "stress PF >= 1.3": {
+   "real": 0,
+   "real_cells": [],
+   "controls": 0,
+   "placebo": 1,
+   "placebo_cells": 825,
+   "expected_false_placebo": 0.5721212121212121
+  },
+  "300+ trades": {
+   "real": 0,
+   "real_cells": [],
+   "controls": 0,
+   "placebo": 0,
+   "placebo_cells": 825,
+   "expected_false_placebo": 0.0
+  },
+  "combined: trades every year, half the years 50+, no 20+ year below 1.0": {
+   "real": 0,
+   "real_cells": [],
+   "controls": 0,
+   "placebo": 0,
+   "placebo_cells": 825,
+   "expected_false_placebo": 0.0
+  }
+ },
+ "passes_detail": [],
+ "placebo_pass_years_with_trades": [
+  7
+ ],
+ "placebo_pass_full_years": [
+  3
+ ]
+}

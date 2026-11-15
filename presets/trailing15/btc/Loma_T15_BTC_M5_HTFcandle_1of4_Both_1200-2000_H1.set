@@ -1,7 +1,7 @@
 ; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - trailing result M5 + HTFcandle trailing, setup 1 of 4: both, session 1200-2000 server time, trend filter H1 EMA 200, target 2R. DO NOT LOAD ON GOLD.
 ; Trailing: stop beyond the low / high of the last closed 15-minute candle, once the profit reaches 1R. Needs EA v1.35 or later (TrailMode 11, TrailParam 15).
 ; Picked on Jan 2025 - May 15 2026 only (score 1.41): 124 trades, PF 1.53.
-; UNSEEN May 16 - Nov 13 2026: this setup 44 trades, PF 1.54, net +9.8R; the 4 setups of this combination together 166 trades, PF 1.71 (stressed 1.51).
+; UNSEEN May 16 - Nov 13 2026, at the backtest's costs (assumed 10 USD spread, no commission): this setup 44 trades, PF 1.54, net +9.8R; the 4 setups of this combination together 166 trades, PF 1.71 (stressed 1.51).
 ; EARLIER DATA, before the calibration period: 2024: this setup 86 trades, PF 1.09; 2023: this setup 95 trades, PF 0.75. The combination together: 2024 PF 1.14 (321 trades); 2023 PF 0.70 (337 trades). The 2026 result did NOT hold on earlier data: UNPROVEN, demo and Strategy Tester only.
 ; Data: Binance BTCUSDT M1 in broker server time, assumed spread 10 USD. Points are 0.01 USD: 2000 points = 20 USD.
 ; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).

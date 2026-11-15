@@ -558,9 +558,9 @@ int OnInit()
      }
    if(!TrailInputsOK())
       return INIT_PARAMETERS_INCORRECT;
-   if(UseStochTurnFilter && (StochTurnBars < 1 || StochTurnLow < 0.0 || StochTurnHigh > 100.0))
+   if(UseStochTurnFilter && (StochTurnBars < 1 || StochTurnBars > 1000 || StochTurnLow < 0.0 || StochTurnHigh > 100.0))
      {
-      Print("[LOMA] Stochastic turn filter: StochTurnBars must be >= 1, StochTurnLow >= 0 and StochTurnHigh <= 100. Got ",
+      Print("[LOMA] Stochastic turn filter: StochTurnBars must be 1 .. 1000, StochTurnLow >= 0 and StochTurnHigh <= 100. Got ",
             StochTurnBars, ", ", StochTurnLow, ", ", StochTurnHigh);
       return INIT_PARAMETERS_INCORRECT;
      }
@@ -1596,7 +1596,9 @@ int CountOwnPositions()
 //====================================================================
 bool SpreadOK()
   {
-   double spreadPts = (Ask() - Bid()) / (_Point * g_ptScale);
+   //--- counted in whole points: (ask - bid) / point is not exact in binary floating point, and a spread
+   //    equal to MaxSpread_Points must pass every time (as in the reference backtest)
+   double spreadPts = MathRound((Ask() - Bid()) / _Point) / g_ptScale;
    if(spreadPts > MaxSpread_Points)
      {
       LogSkip(StringFormat("spread %.0f > %d points", spreadPts, MaxSpread_Points));
@@ -1792,12 +1794,14 @@ void ManageOpenPositions()
       double step   = Pts(TrailStep_Points);
 
       //--- remember the initial risk (1R) the first time we see the position: from the opening
-      //    deal (the SL sent with the order), else from the SL as it is now
+      //    deal (the SL sent with the order), else from the SL as it is now. R8b systems: the SL as it
+      //    is now only while it is still on the loss side of the open price (a stop already moved past
+      //    the entry is not the initial risk: the opening deal is looked up again on the next tick)
       string rKey = GVKey("R", ticket);
       if(!GlobalVariableCheck(rKey))
         {
          double r0 = InitialRiskFromHistory(g_pos.Identifier());
-         if(r0 <= 0.0 && sl > 0.0)
+         if(r0 <= 0.0 && sl > 0.0 && (TrailMode == TRAIL_RISK || (isSell ? sl > open : sl < open)))
             r0 = MathAbs(sl - open);
          if(r0 > 0.0)
            {
@@ -1980,10 +1984,14 @@ void TrailBarsMissing(const int need, const int have)
 
 //--- 'count' closed TriggerTimeframe bars ending at the bar of 'shift', whose open time must be
 //    'barTime' (index 0 = oldest bar). Returns 1 read, 0 the history is shorter than that, -1 not
-//    readable yet or a new bar appeared while reading (again on the next tick).
+//    readable yet (series not formed or not synchronized: Bars() is 0) or a new bar appeared while
+//    reading (again on the next tick).
 int TrailRates(const int shift, const int count, const datetime barTime, MqlRates &r[])
   {
-   int have = Bars(_Symbol, TriggerTimeframe) - shift;
+   int total = Bars(_Symbol, TriggerTimeframe);
+   if(total <= 0 || !SeriesInfoInteger(_Symbol, TriggerTimeframe, SERIES_SYNCHRONIZED))
+      return -1;
+   int have = total - shift;
    if(have < count)
      {
       TrailBarsMissing(count, have);
@@ -2052,12 +2060,15 @@ int EntryATR(const ulong ticket, const datetime opened, double &atr)
 bool BestSince(const datetime fromBar, const datetime m1, const bool isSell, double &best)
   {
    datetime lastBar = m1 - 60;                       // the newest completed M1 bar there can be
-   if(lastBar < fromBar || !SeriesInfoInteger(_Symbol, PERIOD_M1, SERIES_SYNCHRONIZED))
+   if(lastBar < fromBar)
       return false;
+   //--- request first, then check: the request makes the terminal build the M1 series when nothing
+   //    else uses it (SERIES_SYNCHRONIZED only reads its state). The bar of m1 must be in the series,
+   //    so that the bar before it is complete.
    MqlRates r[];
    ArraySetAsSeries(r, false);
    int n = CopyRates(_Symbol, PERIOD_M1, fromBar, lastBar, r);
-   if(n <= 0)
+   if(n <= 0 || !SeriesInfoInteger(_Symbol, PERIOD_M1, SERIES_SYNCHRONIZED) || iTime(_Symbol, PERIOD_M1, 0) < m1)
       return false;
    double spreadNow = MathMax(0.0, Ask() - Bid());
    bool   found     = false;
@@ -2192,8 +2203,11 @@ int TrailLevel(const bool isSell, const datetime lastClosed, const datetime m1, 
      {
       //--- last confirmed swing: a bar strictly beyond the TrailParam bars on each side of it,
       //    known TrailParam bars later
-      int w = TrailParam;
-      int n = MathMin(TRAIL_PIVOT_BARS, Bars(_Symbol, TriggerTimeframe) - 1);
+      int w     = TrailParam;
+      int total = Bars(_Symbol, TriggerTimeframe);
+      if(total <= 0)
+         return -1;                                  // series not formed or not synchronized yet
+      int n = MathMin(TRAIL_PIVOT_BARS, total - 1);
       if(n < 2 * w + 1)
         {
          TrailBarsMissing(2 * w + 1, n);
@@ -2221,8 +2235,8 @@ int TrailLevel(const bool isSell, const datetime lastClosed, const datetime m1, 
       //--- low / high of the last candle of TrailParam minutes that had closed by the close of
       //    the last closed trigger bar
       ENUM_TIMEFRAMES htf = TrailHtfPeriod();
-      if(!SeriesInfoInteger(_Symbol, htf, SERIES_SYNCHRONIZED) || !HTFBarCurrent(htf, m1))
-         return -1;
+      if(!HTFBarCurrent(htf, m1) || !SeriesInfoInteger(_Symbol, htf, SERIES_SYNCHRONIZED))
+         return -1;                                  // HTFBarCurrent's iTime requests the series first (it may be unused otherwise)
       datetime latest = lastClosed + PeriodSeconds(TriggerTimeframe) - PeriodSeconds(htf);   // latest open time it can have
       MqlRates h[];
       ArraySetAsSeries(h, false);
@@ -2343,11 +2357,12 @@ bool TrailPosition(const ulong ticket, const datetime opened, const double open,
 
    //--- TRAIL_STEP, every tick: with the best profit seen so far fav and a = TrailStartR x 1R, the
    //    stop is at entry + (floor(fav / a) - 1) x a once fav >= a. Seen so far = this tick and the
-   //    completed M1 bars after the entry bar (read from the history once per M1 bar: restart-safe)
+   //    completed M1 bars from the entry bar on (read from the history once per M1 bar: restart-safe;
+   //    the entry bar counts as a whole, as for the other systems and in the reference backtest)
    if(TrailMode == TRAIL_STEP)
      {
       double   fav  = isSell ? open - ask : bid - open;
-      datetime from = entryBar + 60;
+      datetime from = entryBar;
       if(m1 > from)
         {
          if(g_stepTicket != ticket || g_stepBar != m1)

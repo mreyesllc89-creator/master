@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Download Dukascopy XAUUSD one-minute BID and ASK candles (bi5) for a long date range, several connections at a
-time. Dukascopy resets many connections, so the list is worked through in rounds until every file is there.
+"""Download Dukascopy one-minute BID and ASK candles (bi5) for a long date range, several connections at a
+time. Instrument: XAUUSD, or the Dukascopy name in DUK_INSTRUMENT (EURUSD, USA500IDXUSD). Dukascopy resets many connections, so the list is worked through in rounds until every file is there.
 
 A file counts as done only when the server answered 200 and the content decodes (LZMA), or when it answered 404
 (no data that day: recorded as a 0-byte file). Anything else is retried in the next round.
@@ -8,6 +8,8 @@ A file counts as done only when the server answered 200 and the content decodes 
 Usage: python3 duk_download2.py <out_dir> <start YYYY-MM-DD> <end YYYY-MM-DD> [connections=8] [max_rounds=60]
 """
 import datetime as dt, lzma, os, subprocess, sys, time
+
+INST = os.environ.get("DUK_INSTRUMENT", "XAUUSD")
 
 out, a, b = sys.argv[1], dt.date.fromisoformat(sys.argv[2]), dt.date.fromisoformat(sys.argv[3])
 conns = int(sys.argv[4]) if len(sys.argv) > 4 else 8
@@ -29,7 +31,7 @@ for rnd in range(1, max_rounds + 1):
     cfg = os.path.join(out, f"_curl_{os.getpid()}.cfg")          # one list per process: several may share the folder
     with open(cfg, "w") as f:
         for d, side in batch:
-            f.write(f'url = "https://datafeed.dukascopy.com/datafeed/XAUUSD/{d.year}/{d.month - 1:02d}/{d.day:02d}/{side}_candles_min_1.bi5"\n'
+            f.write(f'url = "https://datafeed.dukascopy.com/datafeed/{INST}/{d.year}/{d.month - 1:02d}/{d.day:02d}/{side}_candles_min_1.bi5"\n'
                     f'output = "{out}/{d.isoformat()}_{side}.bi5.tmp"\n')
     r = subprocess.run(["curl", "-sS", "--http1.1", "-A", "Mozilla/5.0", "--parallel", "--parallel-max", str(conns), "--max-time", "90",
                         "-K", cfg, "-w", "%{http_code}\t%{filename_effective}\n"], capture_output=True, text=True)

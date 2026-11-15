@@ -66,7 +66,10 @@
       "trail_start": 0.5,
       "trail_dist": 0.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 40,
+     "vt_unseen_pf": 0.84,
+     "vt_unseen_net_r": -3.4
     },
     {
      "timeframe": "M5",
@@ -114,7 +117,10 @@
       "trail_start": 0.5,
       "trail_dist": 0.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 27,
+     "vt_unseen_pf": 0.9,
+     "vt_unseen_net_r": -1.6
     },
     {
      "timeframe": "M5",
@@ -162,7 +168,10 @@
       "trail_start": 1.0,
       "trail_dist": 0.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 19,
+     "vt_unseen_pf": 1.92,
+     "vt_unseen_net_r": 8.8
     },
     {
      "timeframe": "M5",
@@ -210,9 +219,15 @@
       "trail_start": 0.5,
       "trail_dist": 0.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 55,
+     "vt_unseen_pf": 1.69,
+     "vt_unseen_net_r": 19.1
     }
-   ]
+   ],
+   "vt_unseen_trades": 141,
+   "vt_unseen_pf": 1.31,
+   "vt_unseen_stress_pf": 1.12
   },
   {
    "timeframe": "M5",
@@ -274,7 +289,10 @@
       "trail_start": 1.0,
       "trail_dist": 3.0,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 40,
+     "vt_unseen_pf": 1.45,
+     "vt_unseen_net_r": 7.3
     },
     {
      "timeframe": "M5",
@@ -322,7 +340,10 @@
       "trail_start": 1.0,
       "trail_dist": 2.0,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 36,
+     "vt_unseen_pf": 1.09,
+     "vt_unseen_net_r": 1.7
     },
     {
      "timeframe": "M5",
@@ -370,7 +391,10 @@
       "trail_start": 1.0,
       "trail_dist": 1.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 42,
+     "vt_unseen_pf": 2.27,
+     "vt_unseen_net_r": 14.4
     },
     {
      "timeframe": "M5",
@@ -418,9 +442,15 @@
       "trail_start": 1.0,
       "trail_dist": 3.0,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 39,
+     "vt_unseen_pf": 0.63,
+     "vt_unseen_net_r": -8.1
     }
-   ]
+   ],
+   "vt_unseen_trades": 157,
+   "vt_unseen_pf": 1.23,
+   "vt_unseen_stress_pf": 1.14
   },
   {
    "timeframe": "M10",
@@ -482,7 +512,10 @@
       "trail_start": 0.1,
       "trail_dist": 0.2,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 48,
+     "vt_unseen_pf": 1.45,
+     "vt_unseen_net_r": 3.6
     },
     {
      "timeframe": "M10",
@@ -530,7 +563,10 @@
       "trail_start": 0.4,
       "trail_dist": 0.1,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 20,
+     "vt_unseen_pf": 0.94,
+     "vt_unseen_net_r": -0.6
     },
     {
      "timeframe": "M10",
@@ -578,7 +614,10 @@
       "trail_start": 0.2,
       "trail_dist": 0.2,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 45,
+     "vt_unseen_pf": 0.94,
+     "vt_unseen_net_r": -0.7
     },
     {
      "timeframe": "M10",
@@ -626,9 +665,15 @@
       "trail_start": 0.2,
       "trail_dist": 0.2,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 68,
+     "vt_unseen_pf": 1.52,
+     "vt_unseen_net_r": 9.2
     }
-   ]
+   ],
+   "vt_unseen_trades": 181,
+   "vt_unseen_pf": 1.24,
+   "vt_unseen_stress_pf": 1.16
   },
   {
    "timeframe": "M10",
@@ -690,7 +735,10 @@
       "trail_start": 1.0,
       "trail_dist": 1.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 45,
+     "vt_unseen_pf": 2.31,
+     "vt_unseen_net_r": 9.6
     },
     {
      "timeframe": "M10",
@@ -738,7 +786,10 @@
       "trail_start": 0.5,
       "trail_dist": 1.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 57,
+     "vt_unseen_pf": 1.42,
+     "vt_unseen_net_r": 4.7
     },
     {
      "timeframe": "M10",
@@ -786,7 +837,10 @@
       "trail_start": 2.0,
       "trail_dist": 2.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 60,
+     "vt_unseen_pf": 1.84,
+     "vt_unseen_net_r": 17.4
     },
     {
      "timeframe": "M10",
@@ -834,10 +888,22 @@
       "trail_start": 0.5,
       "trail_dist": 1.5,
       "trail_p": 0
-     }
+     },
+     "vt_unseen_trades": 44,
+     "vt_unseen_pf": 0.93,
+     "vt_unseen_net_r": -0.8
     }
-   ]
+   ],
+   "vt_unseen_trades": 206,
+   "vt_unseen_pf": 1.61,
+   "vt_unseen_stress_pf": 1.39
   }
  ],
- "timeframes": []
+ "timeframes": [],
+ "base_costs": "FTMO spread table by hour, no commission",
+ "vt_costs": {
+  "spread": 0.15,
+  "commission_per_ounce": 0.6,
+  "max_spread": 5.0
+ }
 }

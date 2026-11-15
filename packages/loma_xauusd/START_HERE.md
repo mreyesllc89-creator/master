@@ -3,14 +3,14 @@
 `XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method on gold in MetaTrader 5, buys and sells. This zip holds the EA, the six gold presets of the first calibration and the trailing presets of the re-calibration.
 
 > **Do not trade these presets with real money.**
-> - **Year-by-year test: no gold result passed.** Set up on three years and traded on the next, 2016 to 2025, with 59 entry conditions tried one at a time: none of the 472 timeframe-and-condition cells held a profit factor of 1.3 at VT Markets' costs without a losing year.
+> - **Year-by-year test: no gold result passed.** Set up on three years and traded on the next, 2016 to 2025, with 58 entry conditions tried one at a time at VT Markets' costs: none of the 472 timeframe-and-condition cells held a profit factor of 1.3 over at least two years with 50 trades without a losing year (the closest, H1 MACD of both higher timeframes on the trade's side, made 1.53 on 165 trades with no losing year, but only one of its years had 50 trades).
 > - **The six `Loma_Top` presets** lost on the months after their calibration: on VT Markets real ticks (1 June – 6 November 2026) profit factor 0.74 before commission and 0.67 at VT's $0.60 per lot, on 247 trades. Dukascopy prices agree.
-> - **The `Loma_T15_Gold_*` trailing presets** reached a profit factor of 1.3 on the 2026 months and lost on July – December 2024. Unproven: Strategy Tester and demo only.
+> - **The `Loma_T15_Gold_*` trailing presets** come from four combinations of timeframe and trailing system whose setups together reached a profit factor of 1.3 on the 2026 months at FTMO's spread without commission. At VT's costs 2 of the 4 stay at 1.3 or more (M5 hump structure 1.31 and M10 ATR at entry 1.61) and M5 chandelier (1.23) and M10 percent of price (1.24) fall under it; 7 of the 16 presets were under 1.3 on their own, and the four groups lost on July – December 2024. Unproven: Strategy Tester and demo only.
 > - The EA itself works: it takes the same trades as the backtest.
 
 ## The year-by-year test on gold
 
-Dukascopy gold one-minute prices from 2013 to 2024, FTMO for 2025 to 15 May 2026 and Dukascopy after, all in broker server time (the daily reopen at 01:00 server time checked year by year). For every year from 2016 to 2025, 12,000 setups per timeframe (M1 to H1) were scored on the three years before it, with each of 59 entry conditions added one at a time (market regime, location, confirmation, timing, the XLZC rules, and three random halves of the signals as controls), and the 10 best were traded on that year unchanged. Costs are VT Markets' own: a 1.5-pip spread shaped by the hour and $0.60 commission per ounce, scaled with the price like every dollar distance of a setup. A cell passes with a profit factor of 1.3 or more over its unseen years together, 1.1 or more stressed, at least two years with 50 trades and no such year below 1.0.
+Dukascopy gold one-minute prices from 2013 to 2024, FTMO for 2025 to 15 May 2026 and Dukascopy after, all in broker server time (the daily reopen at 01:00 server time checked year by year). For every year from 2016 to 2025, 12,000 setups per timeframe (M1 to H1) were scored on the three years before it, with each of 58 entry conditions added one at a time (market regime, location, confirmation, timing, the XLZC rules, and three random halves of the signals as controls) and the method without one, and the best of them, up to 10 (one per direction, session and trend-filter family, each with a profit factor of at least 1.3 in all three years at normal and stressed costs and an average cost under 1/8 of the risk), were traded on that year unchanged. Costs are VT Markets' own: a 1.5-pip spread shaped by the hour and $0.60 commission per ounce, scaled with the price like every dollar distance of a setup. A cell passes with a profit factor of 1.3 or more over its unseen years together, 1.1 or more stressed, at least two years with 50 trades and no such year below 1.0.
 
 **Nothing passed.** The method without an extra condition, by timeframe:
 
@@ -29,16 +29,16 @@ The best cells with at least 100 unseen trades: H1 MACD of both higher timeframe
 
 ## The trailing presets `Loma_T15_Gold_*` (unproven)
 
-These are the 4 combinations of timeframe and trailing system that reached a profit factor of 1.3 on at least 100 unseen trades in 16 May – 13 November 2026, out of 23 trailing systems tested on every timeframe (16 presets: every setup behind each combination). The setups were chosen on January 2025 – 15 May 2026 only. Then each combination was run on July – December 2024, before the calibration data: **none reached 1.3 there**; all four lost. With so many combinations, some reach 1.3 on one period by chance.
+These are the 4 combinations of timeframe and trailing system whose setups together reached a profit factor of 1.3 on at least 100 unseen trades in 16 May – 13 November 2026, out of 23 trailing systems tested on every timeframe (16 presets: every setup behind each combination). The backtest's costs were FTMO's spread by hour and no commission (stressed: one minute late, pessimistic trailing, $0.10 slippage and $0.07 commission per ounce). **At VT Markets' costs** (1.5-pip spread and $0.60 per ounce) on the same months, 2 of the 4 stay at 1.3 or more (M5 hump structure 1.31, M10 ATR at entry 1.61) and M5 chandelier (1.23) and M10 percent of price (1.24) fall under it. The setups were chosen on January 2025 – 15 May 2026 only. Then each combination was run on July – December 2024, before the calibration data: **none reached 1.3 there**; all four lost. With 23 systems on 8 timeframes, some combinations reach 1.3 on one period by chance. On their own, 7 of the 16 presets were under 1.3 in the 2026 months.
 
-| Combination | Trailing (TrailMode) | Presets | Unseen 2026: PF (trades) | Stressed | Jul – Dec 2024: PF (trades) |
-|---|---|---|---|---|---|
-| M5 | hump structure (13) | 4 | 1.41 (141) | 1.12 | 0.75 (116) |
-| M5 | chandelier (5) | 4 | 1.31 (157) | 1.21 | 0.80 (110) |
-| M10 | percent of price (2) | 4 | 1.31 (181) | 1.25 | 0.74 (137) |
-| M10 | ATR at entry (1) | 4 | 1.57 (206) | 1.45 | 0.70 (154) |
+| Combination | Trailing (TrailMode) | Presets | Unseen 2026, backtest costs: PF (trades) | Stressed | Unseen 2026 at VT's costs: PF (trades) | VT stressed | Jul – Dec 2024: PF (trades) | Presets under 1.3 on their own in 2026 |
+|---|---|---|---|---|---|---|---|---|
+| M5 | hump structure (13) | 4 | 1.41 (141) | 1.12 | 1.31 (141) | 1.12 | 0.75 (116) | 2 of 4 |
+| M5 | chandelier (5) | 4 | 1.31 (157) | 1.21 | 1.23 (157) | 1.14 | 0.80 (110) | 2 of 4 |
+| M10 | percent of price (2) | 4 | 1.31 (181) | 1.25 | 1.24 (181) | 1.16 | 0.74 (137) | 2 of 4 |
+| M10 | ATR at entry (1) | 4 | 1.57 (206) | 1.45 | 1.61 (206) | 1.39 | 0.70 (154) | 1 of 4 |
 
-- Every preset's header gives its own figures for the calibration period, the 2026 months and July – December 2024; `GOLD_TRAILING15_SUMMARY.csv` lists them all.
+- Every preset's header gives its own figures for the calibration period, the 2026 months (also at VT's costs) and July – December 2024; `GOLD_TRAILING15_SUMMARY.csv` lists them all.
 - The test is of each combination's setups together, not of the best of them by their 2026 result.
 - They need v1.35 (`TrailMode`, `TrailParam`). Strategy Tester and demo only.
 
@@ -66,11 +66,11 @@ v1.33 was compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. 
 
 ## New in v1.35
 
-- **`TrailMode`** chooses the trailing system; `TrailStartR`, `TrailDistanceR` and the new **`TrailParam`** are read in its units. 0 = the EA's own (multiples of the risk, as before), 1 = ATR at entry, 2 = percent of price, 3 = profit lock, 4 = stepped, 5 = chandelier, 6 = candle lows / highs, 7 = EMA, 8 = SMA, 9 = Parabolic SAR, 10 = Bollinger band, 11 = higher-timeframe candle, 12 = swing pivots, 13 = hump structure. Every system except 0 and 4 moves the stop once per closed one-minute bar, as the backtest does; the stop only ever moves closer.
+- **`TrailMode`** chooses the trailing system; `TrailStartR`, `TrailDistanceR` and the new **`TrailParam`** are read in its units (R, ATR multiples, percent of the entry price or the share of profit kept, as the input comments say). 0 = the EA's own (multiples of the risk, as before), 1 = ATR at entry, 2 = percent of price, 3 = profit lock, 4 = stepped, 5 = chandelier, 6 = candle lows / highs, 7 = EMA, 8 = SMA, 9 = Parabolic SAR, 10 = Bollinger band, 11 = higher-timeframe candle, 12 = swing pivots, 13 = hump structure. Every system except 0 and 4 moves the stop once per closed one-minute bar, as the backtest does; the stop only ever moves closer.
 - **`UseStochTurnFilter`** (with `StochTurnBars`, `StochTurnHigh`, `StochTurnLow`): enter only when the Stochastic (7, 1, 7) of the trigger timeframe came from 80 (sells) or 20 (buys) within the last 5 bars and turned.
-- **`ScaleWithPrice`** with **`ReferencePrice`**: the stop buffer, minimum and maximum stop follow the price, relative to the price they were calibrated at.
-- With these inputs at their defaults v1.35 trades exactly like v1.34: the earlier presets work unchanged.
-- v1.35 was checked in a C++ compile harness (the same diagnostics as v1.34) and in a simulated terminal that replays real one-minute prices: it took the same trades as the Python backtest on the shipped setups. It has not been compiled in MetaEditor: if the compiler reports anything, send me the log rather than editing the file.
+- **`ScaleWithPrice`** with **`ReferencePrice`**: the stop buffer, minimum and maximum stop follow the price, relative to the price they were calibrated at (the spread, slippage and trailing-step limits do not).
+- With these inputs at their defaults v1.35 trades like v1.34, with one difference: a spread exactly equal to `MaxSpread_Points` is now always accepted, as in the backtest (v1.34 refused it about half the time, by floating-point rounding). The earlier presets work unchanged.
+- v1.35 was checked in a C++ compile harness (the same diagnostics as v1.34) and in a simulated terminal that replays real one-minute prices, where it took the same trades as the Python backtest on the shipped setups. Two independent reviews found eight defects (the spread test above, the order of a history check, the entry minute of the stepped trailing and others), which were fixed and checked again. It has not been compiled in MetaEditor: if the compiler reports anything, send me the log rather than editing the file.
 
 ## The six Top presets (lost out of sample)
 
@@ -88,7 +88,7 @@ Backtest: FTMO one-minute data, January 2025 – 15 May 2026, the period the pre
 - The VT Markets figures come from Codex's MT5 run with 100% real ticks. That run charged $6 per lot round trip; VT's real commission is $0.60 per lot, as you reported it, and the table uses the real rate. If the $0.60 is per side, the figures are a little lower.
 - Dukascopy is a third price source, separate from FTMO (calibration) and VT. It found 240 of the 247 VT trades. The tester run ends at 00:00 on 6 November, so the last trading day in both columns is 5 November.
 - A walk-forward test (recalibrating every few months on recent data) did not rescue the method: only one of five schedules passed, and only on four windows that include the 2025–26 gold rally.
-- **Re-calibration per timeframe (15 November 2026):** every timeframe from M1 to H1 was re-calibrated on January 2025 – 15 May 2026, once with the EA's own trailing stop and once with 23 trailing systems (69,000 setups per timeframe), and the best 10 setups of each were run on 16 May – 13 November 2026. No gold timeframe holds a profit factor of 1.3 there: the range is 0.67 to 1.08 (0.61 to 1.01 at VT's costs), and M5 is the best in both runs (1.08 with the EA's own trailing, 0.98 with the 23 systems). Four single combinations of timeframe and trailing system reached 1.3 on the unseen months (M5 hump-structure, M5 chandelier, M10 percent and M10 ATR-at-entry); on July – December 2024, before the calibration data, they scored 0.75, 0.80, 0.74 and 0.70. The tables are in `Loma_OOS_Review.html`, section 5.
+- **Re-calibration per timeframe (15 November 2026):** every timeframe from M1 to H1 was re-calibrated on January 2025 – 15 May 2026, once with the EA's own trailing stop and once with 23 trailing systems (69,000 setups per timeframe), and the best 10 setups of each were run on 16 May – 13 November 2026. No gold timeframe holds a profit factor of 1.3 there: the range is 0.67 to 1.08 (0.61 to 1.01 at VT's costs), and M5 is the best in both runs (1.08 with the EA's own trailing, 0.98 with the 23 systems). Four single combinations of timeframe and trailing system reached 1.3 on the unseen months at the backtest's costs, FTMO's spread without commission (M5 hump-structure, M5 chandelier, M10 percent and M10 ATR-at-entry); at VT's costs they score 1.31, 1.23, 1.24 and 1.61, and on July – December 2024, before the calibration data, 0.75, 0.80, 0.74 and 0.70. The tables are in `Loma_OOS_Review.html`, section 5.
 
 ## If you still want to test it
 
@@ -97,7 +97,7 @@ Backtest: FTMO one-minute data, January 2025 – 15 May 2026, the period the pre
 - **Server time:** session, weekend and end-of-day times are broker server time, calibrated on a GMT+2 (winter) / GMT+3 (summer) clock. VT Markets matches. Shift them if your broker's clock differs.
 - **VT Markets costs:** a 1.5-pip spread ($0.15 per ounce) and $0.60 commission per lot (1 lot = 1 ounce), as you reported them: about $0.75 per ounce for a round trip. The Strategy Tester run used VT's real spread but charged $6 per lot, ten times the real commission. At $0.60 the whole run's loss shrinks from $8,914 to $1,664, but the unseen months still lose (PF 0.67). On the calibration data the presets score PF 1.60–1.92 at $0.60 and 0.53–0.97 at $6. On VT set `CommissionPerLot` to the round-trip commission per lot in your account's currency: 0.6 on a USD account, 60 on a USC cent account (double it if the $0.60 is per side), so a stop-out costs `RiskPercent` including commission. In the Strategy Tester, set the commission to match.
 - **Account size:** the EA skips a trade when the lot for `RiskPercent` falls below the symbol's minimum lot. On VT's XAUUSD-ECNc one lot is 1 ounce, so that limit is rarely reached (the VT test, on $10,000, traded 0.66 to 16 lots). On a broker with a 100-ounce contract (minimum 0.01 lot = 1 ounce) and `RiskPercent=0.5`, use about $10,000 or more.
-- **One account, several presets:** only on a **hedging** account. On a netting account all presets on one symbol share a single position, so one preset's trade changes another's. v1.34 warns on a netting account and sends no entry while another position on the symbol is open.
+- **One account, several presets:** only on a **hedging** account. On a netting account all presets on one symbol share a single position, so one preset's trade changes another's. The EA warns on a netting account and sends no entry while another position on the symbol is open.
 - **News filter** (`UseNewsFilter`) is on in the presets but was not in the backtest. It does nothing in the Strategy Tester, so tester results equal `UseNewsFilter=false`.
 
 ### Asking Codex to compile without changing anything
@@ -123,7 +123,7 @@ Steps:
 2. **Trend break:** an opposite hump as large as `TrendBreakRatio` times the big hump.
 3. **Signal:** a pullback hump of at least `PullbackMinBars` bars (1 in Top01, Top04 and Top07, so one bar across zero counts) and at most `PullbackMaxRatio` times the big hump, then the first bar with the MACD back across zero. Only `MaxSignalsPerBigHump` signals per big hump, and none after `TrendMaxBars` bars.
 4. **Stop:** beyond the pullback hump's extreme, plus `SL_Buffer_Points` and (for sells) the spread. **Target:** `TP_RR` times the risk in every preset.
-5. **Filters and exits:** higher-timeframe EMA filter, trading hours, spread limit, trailing in multiples of the risk, maximum holding time, end-of-day close and Friday close, as set in each preset.
+5. **Filters and exits:** higher-timeframe EMA filter, trading hours, spread limit, trailing in multiples of the risk (Top presets) or the system set in `TrailMode` (ATR at entry, percent, chandelier or hump structure in the `Loma_T15_Gold` presets), maximum holding time, end-of-day close and Friday close, as set in each preset.
 
 ## What changed
 

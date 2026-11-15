@@ -48,9 +48,13 @@ gold_best = (f"{best['own']} is the best in both runs ({F['gold']['own'][best['o
 gold_leads = {k: v for k, v in F["earlier"].items() if k.startswith("gold ")}
 gold_lead_txt = ""
 if gold_leads:
+    combos = json.load(open("research/results/recal/xauusd_successful_trailing.json"))["combinations"]
+    assert [k.split()[1] for k in gold_leads] == [c["timeframe"] for c in combos], (list(gold_leads), [c["timeframe"] for c in combos])
+    vt_pfs = [f"{c['vt_unseen_pf']:.2f}" for c in combos]
     gold_lead_txt = (f" {WORD[len(gold_leads)]} single combination{'s' if len(gold_leads) > 1 else ''} of timeframe and trailing system reached 1.3 on the unseen months "
-                     f"({join(k[5:] for k in gold_leads)}); on July – December 2024, before the calibration data, "
-                     f"{'they' if len(gold_leads) > 1 else 'it'} scored {join(f'{v[0]:.2f}' for v in gold_leads.values())}.")
+                     f"at the backtest's costs, FTMO's spread without commission ({join(k[5:] for k in gold_leads)}); at VT's costs "
+                     f"{'they score' if len(gold_leads) > 1 else 'it scores'} {join(vt_pfs)}, and on July – December 2024, before "
+                     f"the calibration data, {join(f'{v[0]:.2f}' for v in gold_leads.values())}.")
 p23 = F["btc_pass_23_systems"]
 if p23:
     def early(tf):
@@ -75,7 +79,9 @@ if p23 == ["M5"]:
     btc_line = (f"BTC: M5 passes the 2026 months, with the EA's own trailing ({m5['pf']:.2f} on {m5['n']} trades) and with all 23 systems ({a23['pf']:.2f} on {a23['n']} trades), "
                 f"but the same setups scored {m5['y2024']:.2f} and {e23[0]:.2f} in 2024 and {m5['y2023']:.2f} and {e23[1]:.2f} in 2023: it did not hold on earlier data. No other BTC timeframe passes.")
     btc_bullet = (f"- **With 23 trailing systems** instead of the EA's one, M5 again passes the 2026 months ({a23['pf']:.2f} on {a23['n']} trades), and the same setups scored "
-                  f"{e23[0]:.2f} in 2024 and {e23[1]:.2f} in 2023. No other BTC timeframe passes. The EA cannot trade the other 22 systems, and nothing in these results is a reason to add them.")
+                  f"{e23[0]:.2f} in 2024 and {e23[1]:.2f} in 2023. No other BTC timeframe passes as a whole. The single combinations of timeframe and trailing system "
+                  f"that reached 1.3 on the 2026 months are the `Loma_T15_BTC_*` presets above (v1.35 trades 13 of the other 22 systems through `TrailMode`); "
+                  f"none of them reached 1.3 on 2024 or 2023.")
 else:
     btc_line = f"BTC: M5 passes with the EA's own trailing ({m5['pf']:.2f}), and {btc23}. None of it held on earlier data."
     btc_bullet = f"- **With 23 trailing systems** instead of the EA's one: {btc23}. The EA cannot trade the other 22 systems, and nothing in these results is a reason to add them."
@@ -95,12 +101,19 @@ if os.path.exists("research/results/wf/wf_facts.json"):
     assert WF["XAUUSD"]["passed"] == 0 and cellw["passes"]
     aw = DETW["all_unseen_years"]; finw = cellw["final"]
     yrs = ", ".join(f"{f2_(y['pf'])} in {y['year']}" for y in cellw["by_year"] if y["n"])
-    wf_line = (f"the method was set up on three years and traded on the next, rolling forward (gold 2016 – 2025, BTC 2021 – 2025), with 59 entry "
-               f"conditions tried one at a time. Gold: nothing passed. BTC: one result passed, M30 with the Stochastic turn rule: {yrs}; the 2026 months, "
-               f"kept back and checked once, {f2_(finw['pf'])} on {finw['n']} trades; all four unseen years {f2_(aw['pf'])} on {aw['n']} trades. Its setups for "
-               f"the year ahead are in the BTC zip (EA v1.35); demo first.")
-    t15_line = ("the 15 combinations of timeframe and trailing system that reached a profit factor of 1.3 on the 2026 months (4 gold, 11 BTC) are in the "
-                "zips as presets (v1.35). None reached 1.3 on the earlier data: unproven, Strategy Tester and demo only.")
+    CH = json.load(open("research/results/wf/chance_check.json"))["BTCUSD"]
+    TH = CH["thin_M30_xlzc_stoch"]["walk_forward"]
+    SUCC_G = json.load(open("research/results/recal/xauusd_successful_trailing.json"))["combinations"]
+    vt_under = [c for c in SUCC_G if c["vt_unseen_pf"] < 1.3]
+    wf_line = (f"the method was set up on three years and traded on the next, rolling forward (gold 2016 – 2025, BTC 2021 – 2025), with 58 entry "
+               f"conditions tried one at a time. Gold: nothing passed. BTC: M30 with the Stochastic turn rule met the pass rule ({yrs}), but it does not hold up: "
+               f"the 2026 months, kept back, gave {f2_(finw['pf'])} on {finw['n']} trades, under 1.3; with {WF['BTCUSD']['cells']} cells tested, chance alone "
+               f"produces one or two such passes (about {CH['placebo']['expected_passes']:.1f} expected); counted once per signal its profit factor is "
+               f"{f2_(TH['pf_signals'])}, not {f2_(TH['pf'])}. Its picks for the year ahead are in the BTC zip as unproven presets (EA v1.35), demo only.")
+    t15_line = ("the 15 combinations of timeframe and trailing system whose setups together reached a profit factor of 1.3 on the 2026 months (4 gold, 11 BTC) "
+                "are in the zips as presets (v1.35). None reached 1.3 on the earlier data. The gold figures are at FTMO's spread without commission: at VT's "
+                f"costs {len(vt_under)} of the 4 fall under 1.3 ("
+                + ", ".join(f"{c['timeframe']} {c['trailing']} {c['vt_unseen_pf']:.2f}" for c in vt_under) + "). Unproven: Strategy Tester and demo only.")
     set_line("LOMA_START_HERE.md", "> - **Year by year", f"> - **Year by year (15 November 2026):** {wf_line}")
     set_line("LOMA_START_HERE.md", "> - **Trailing presets", f"> - **Trailing presets:** {t15_line}")
     set_line("README.md", "- **Year by year", f"- **Year by year (15 November 2026):** {wf_line} See `research/reports/loma_oos_review.html`, section 6.")
@@ -109,13 +122,13 @@ if os.path.exists("research/results/wf/wf_facts.json"):
     wfp = pd.read_csv("presets/btc_wf/BTC_WF_M30_xlzc_stoch_SUMMARY.csv")
     n_t15 = {s: len([f for f in os.listdir(f"presets/trailing15/{s}") if f.endswith(".set")]) for s in ("gold", "btc")}
     yrs_n = ", ".join(f"{y['year']} {f2_(y['pf'])} ({y['n']} trades)" for y in cellw["by_year"] if y["n"])
-    wf_extra = (f"\n**BTC year by year** (same zip, presets `Loma_WF_BTC_M30_01` to `{len(wfp):02d}`). Picked on 2024 – 13 November 2026 by the rule that "
-                f"passed the year-by-year test: M30 with the Stochastic turn rule (`UseStochTurnFilter=true`). The rule on its unseen years: {yrs_n}; "
-                f"the 2026 months, checked once at the end, {f2_(finw['pf'])} ({finw['n']} trades). Run all {len(wfp)} together on a hedging account at "
+    wf_extra = (f"\n**BTC year by year** (same zip, presets `Loma_WF_BTC_M30_xlzc_stoch_01_…` to `Loma_WF_BTC_M30_xlzc_stoch_{len(wfp):02d}_…`). Picked on "
+                f"2024 – 13 November 2026 by the rule that met the year-by-year pass rule: M30 with the Stochastic turn rule (`UseStochTurnFilter=true`). "
+                f"The rule on its unseen years: {yrs_n}; the 2026 months, kept back, {f2_(finw['pf'])} ({finw['n']} trades). Not proven: chance alone "
+                f"produces one or two such passes among the {WF['BTCUSD']['cells']} cells tested. Demo only, all {len(wfp)} together on a hedging account at "
                 f"`RiskPercent=0.1` (set in the files). Account size, leverage and the preset table: `packages/loma_btcusd/START_HERE.md`.\n\n"
-                f"**Trailing presets** (`Loma_T15_Gold_*`: {n_t15['gold']} in the gold zip; `Loma_T15_BTC_*`: {n_t15['btc']} in the BTC zip): the 15 "
-                f"combinations of timeframe and trailing system that reached a profit factor of 1.3 on the 2026 months. None reached 1.3 on the earlier "
-                f"data: unproven, Strategy Tester and demo only. Their tables are in the two zip guides.\n")
+                f"**Trailing presets** (`Loma_T15_Gold_*`: {n_t15['gold']} in the gold zip; `Loma_T15_BTC_*`: {n_t15['btc']} in the BTC zip): {t15_line} "
+                f"Their tables are in the two zip guides.\n")
 else:
     wf_extra = ""
 

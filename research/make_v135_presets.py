@@ -181,8 +181,8 @@ def trailing(out_dir):
                 early_txt = "; ".join(f"{y}: this setup {len(r)} trades, PF {R.pf(r):.2f}" for y, r in e.items())
                 grp_txt = "; ".join(f"{y} PF {R.pf(r):.2f} ({len(r)} trades)" for y, r in grp_early.items())
                 tf_ = tie_fig.get(id(q))
-                tie_line = ([plain(f"Its target ({p['tp_rr']}R) equals its minimum reward: the backtest skipped some signals by rounding, the EA would refuse "
-                                   f"some by tick rounding. This preset takes every signal (MinRewardRisk {round(p['tp_rr'] - 0.05, 2)}). At that setting: "
+                tie_line = ([plain(f"Its target ({p['tp_rr']}R) equals its minimum reward: the backtest takes every such signal, the EA would refuse "
+                                   f"some by tick rounding, so this preset sets MinRewardRisk {round(p['tp_rr'] - 0.05, 2)}. At that setting: "
                                    f"Jan 2025 - May 15 2026 {tf_['is_n']} trades PF {tf_['is_pf']:.2f}; unseen 2026 {tf_['oos_n']} trades PF {tf_['oos_pf']:.2f}, net {tf_['oos_net']:+.1f}R.")]
                             if tf_ else [])
                 head = [plain(f"XAUUSD_Loma_TrendPullback v{EA_VERSION} on {sym} - trailing result {c['timeframe']} + {TRAIL_NAME[c['trailing']]} trailing, setup {k} of {k_total}: "
@@ -190,8 +190,12 @@ def trailing(out_dir):
                               + ("DO NOT LOAD ON GOLD." if btc else "DO NOT LOAD ON BTC.")),
                         plain(f"Trailing: {q['trailing_rule']}. Needs EA v1.35 or later (TrailMode {TRAIL_MODE[p['trail_kind']]}, TrailParam {int(p.get('trail_p', 0))})."),
                         plain(f"Picked on Jan 2025 - May 15 2026 only (score {q['in_sample_score']:.2f}): {q['in_sample_trades']} trades, PF {q['in_sample_pf']:.2f}."),
-                        plain(f"UNSEEN May 16 - Nov 13 2026: this setup {q['unseen_trades']} trades, PF {q['unseen_pf']:.2f}, net {q['unseen_net_r']:+.1f}R; "
+                        plain(f"UNSEEN May 16 - Nov 13 2026, at the backtest's costs ({'assumed 10 USD spread' if btc else 'FTMO spread table'}, no commission): "
+                              f"this setup {q['unseen_trades']} trades, PF {q['unseen_pf']:.2f}, net {q['unseen_net_r']:+.1f}R; "
                               f"the {k_total} setups of this combination together {c['unseen_trades']} trades, PF {c['unseen_pf']:.2f} (stressed {c['unseen_stress_pf']:.2f})."),
+                        *([] if btc else [plain(f"At VT Markets' costs (1.5-pip spread, 0.60 USD commission per ounce) on the same months: this setup "
+                                                f"{q['vt_unseen_trades']} trades, PF {q['vt_unseen_pf']:.2f}; the {k_total} setups together "
+                                                f"{c['vt_unseen_trades']} trades, PF {c['vt_unseen_pf']:.2f} (stressed {c['vt_unseen_stress_pf']:.2f}).")]),
                         plain(f"EARLIER DATA, before the calibration period: {early_txt}. The combination together: {grp_txt}. "
                               "The 2026 result did NOT hold on earlier data: UNPROVEN, demo and Strategy Tester only."),
                         *tie_line,
@@ -205,6 +209,10 @@ def trailing(out_dir):
                                  in_sample_score=q["in_sample_score"], in_sample_trades=q["in_sample_trades"], in_sample_pf=q["in_sample_pf"],
                                  unseen_trades=q["unseen_trades"], unseen_pf=q["unseen_pf"], unseen_net_r=q["unseen_net_r"], unseen_stress_pf=q["unseen_stress_pf"],
                                  combination_unseen_trades=c["unseen_trades"], combination_unseen_pf=c["unseen_pf"], combination_unseen_stress_pf=c["unseen_stress_pf"],
+                                 costs="assumed 10 USD spread, no commission" if btc else "FTMO spread table, no commission",
+                                 **({} if btc else dict(vt_unseen_trades=q["vt_unseen_trades"], vt_unseen_pf=q["vt_unseen_pf"],
+                                                        combination_vt_unseen_trades=c["vt_unseen_trades"], combination_vt_unseen_pf=c["vt_unseen_pf"],
+                                                        combination_vt_unseen_stress_pf=c["vt_unseen_stress_pf"])),
                                  **{f"earlier_{y.replace(' ', '_').replace('-', '_')}_trades": len(r) for y, r in e.items()},
                                  **{f"earlier_{y.replace(' ', '_').replace('-', '_')}_pf": round(R.pf(r), 2) for y, r in e.items()},
                                  **{f"combination_earlier_{y.replace(' ', '_').replace('-', '_')}_pf": round(R.pf(r), 2) for y, r in grp_early.items()},
@@ -261,14 +269,19 @@ def wf(work, tf, key, out_dir, magic, detail_json=None):
                 plain(f"Picked for the year ahead on {years[cal[0]]} - 13 Nov {years[cal[-1]]} by the year-by-year rule: lowest of six profit factors {score[i]:.2f}; "
                       + ", ".join(f"{y}: {n} trades PF {pf:.2f}" for y, (n, pf) in yr.items()) + ". These are calibration figures."),
                 *([plain(hist)] if hist else []),
-                plain(f"ScaleWithPrice: the *_Points distances were calibrated at {meta['anchor_price']:.2f} (ReferencePrice) and follow the price."),
+                plain(f"ScaleWithPrice: SL_Buffer_Points, MinSL_Points and MaxSL_Points were calibrated at {meta['anchor_price']:.2f} (ReferencePrice) "
+                      "and follow the price; the spread, slippage and trailing-step limits do not."),
+                plain("UNPROVEN: the rule met the year-by-year pass rule, but with 472 combinations tested one or two such passes are expected by "
+                      "chance, and the 2026 months kept back gave PF 1.26, under 1.3. Demo only."),
                 f"RiskPercent 0.1: the {len(picks)} presets are meant to run together on one hedging account, and they overlap.",
                 "Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer). Demo and Strategy Tester first.",
                 "UseNewsFilter was not in the backtest."]
         write_set(os.path.join(out_dir, fname + ".set"), head, o)
         rows.append(dict(file=fname, timeframe=tf, condition=key, direction=side, session=sess, trend_filter=p["htf"], htf_ema=p["htf_ema"],
                          macd=p["macd"], target=f"{p['tp_rr']}R" if p["tp_mode"] == 1 else "previous hump",
-                         trailing="off" if p["trail_start"] <= 0 else f"from {p['trail_start']}R, {p['trail_dist']}R behind",
+                         trailing=("off" if p["trail_start"] <= 0 else
+                                   f"never active (would start at {p['trail_start']}R, {'at' if p['trail_start'] == p['tp_rr'] else 'beyond'} the {p['tp_rr']}R target)" if p["tp_mode"] == 1 and p["trail_start"] >= p["tp_rr"] else
+                                   f"from {p['trail_start']}R, {p['trail_dist']}R behind"),
                          score=round(float(score[i]), 3), **{f"cal_{y}_trades": n for y, (n, pf) in yr.items()},
                          **{f"cal_{y}_pf": round(pf, 2) for y, (n, pf) in yr.items()}, magic=magic + k))
     s = pd.DataFrame(rows)
