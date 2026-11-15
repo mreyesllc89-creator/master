@@ -89,6 +89,19 @@ def picks_of(tf):
     return picked
 
 
+def boot_shares(times, r, reps=2000, seed=7):
+    """The weekly resampling of hump_tf_recal.weekly_boot (same recipe and seed): shares of resamples below 1.0 and 1.3."""
+    wk = times.astype("datetime64[W]").astype(np.int64)
+    groups = [r[wk == w] for w in np.unique(wk)]
+    rng = np.random.default_rng(seed); out = []
+    for _ in range(reps):
+        pick = rng.integers(0, len(groups), len(groups))
+        out.append(R.pf(np.concatenate([groups[i] for i in pick])))
+    out = np.asarray(out); out = out[np.isfinite(out)]
+    return dict(p05=float(np.percentile(out, 5)), p95=float(np.percentile(out, 95)),
+                share_below_1_0=float((out < 1.0).mean()), share_below_1_3=float((out < 1.3).mean()))
+
+
 def exposure(frames, mk, risk_pct=0.5):
     """Position size in multiples of the balance at RiskPercent, per trade and for all picks together, and how
     often positions of two different presets are open at the same time."""
@@ -160,6 +173,8 @@ def detail(tfs):
             pf_by_extra_cost_per_btc=({str(k): R.pf(np.concatenate(v)) for k, v in extra.items()} if BTC else None),
             earlier_years_no_spread=({y: R.pf(np.concatenate(v)) for y, v in free.items()} if pre_free is not None else None),
             shared_entry_minutes=shared,
+            weekly_resampling=boot_shares(np.concatenate([f.entry_time.values.astype("datetime64[m]") for f in frames]),
+                                          np.concatenate([f.r.values.astype(np.float32) for f in frames])),
             exposure_unseen=exposure(frames, mk), exposure_whole_series=exposure(full, mk),
             picks=len(frames), trades=int(len(a)), pf=R.pf(r), net_r=float(r.sum()), win_rate=float((r > 0).mean()),
             distinct_entry_minutes=int(a.entry_time.nunique()), buys=int((a.side > 0).sum()), sells=int((a.side < 0).sum()),

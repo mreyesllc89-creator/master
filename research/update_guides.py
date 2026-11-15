@@ -131,7 +131,7 @@ expect = [
     f"{words[m5['positive_months']]} of the {words[m5['months']]} months were positive (September −{abs(sept['net_r']):.1f}R)",
     f"The largest drawdown was {DET['max_drawdown_r']:.1f}R",
     f"It falls to {m5['pf_no_top3']:.2f} without the three largest wins and to {m5['pf_double_spread']:.2f} at a $20 spread",
-    f"a range of {m5['p05']:.2f} to {m5['p95']:.2f}",
+    f"Resampling the weeks gives {m5['p05']:.2f} to {m5['p95']:.2f} in nine cases out of ten, and about a third of the resamples are below 1.3",
     f"the result is {', '.join(rules[:-1])} and {rules[-1]}",
     others,
     f"the {DET['trades']} trades start on {DET['distinct_entry_minutes']} different minutes",
@@ -148,6 +148,7 @@ expect = [
     f"open together {ex['pairs_open_together']} times, {ex['pairs_same_direction']} of them in the same direction, and up to {words[ex['max_positions_open']]} at once: {0.5 * ex['max_positions_open']:.0f}% at risk",
     f"typically {ex['per_trade_median']:.1f} times the balance (up to {ex['per_trade_max']:.1f} times in the unseen months), and the four presets together held up to {ex['all_presets_max']:.1f} times",
 ]
+assert 0.30 <= DET["weekly_resampling"]["share_below_1_3"] <= 0.37, "the guide says about a third"
 assert set(DET["shared_entry_minutes"]) == {"R02+R03", "R01+R02", "R03+R04"} and DET["unseen_low_date"][5:7] == "07" and DET["unseen_high_date"][5:7] == "09"
 assert ex["all_presets_max"] < 10 and DET["exposure_whole_series"]["all_presets_max"] < 10, "the leverage sentence says about 1:10"
 assert len(neg) == 1 and neg[0] is sept, neg

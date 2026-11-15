@@ -45,6 +45,12 @@
    "R03+R04": 1,
    "R01+R02": 3
   },
+  "weekly_resampling": {
+   "p05": 1.025080867133819,
+   "p95": 1.9575616319706037,
+   "share_below_1_0": 0.0405,
+   "share_below_1_3": 0.3395
+  },
   "exposure_unseen": {
    "per_trade_median": 1.3485768053748237,
    "per_trade_p90": 2.1006032466663065,

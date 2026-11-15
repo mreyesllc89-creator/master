@@ -97,7 +97,7 @@ code { font-family: var(--mono); font-size: 13px; }
       <div class="tile"><span class="v">240 / 247</span><span class="k">VT trades that Dukascopy also found, Jun – Nov 6</span></div>
 <!-- recal-tiles:start -->
       <div class="tile"><span class="v">23</span><span class="k">trailing systems tested on every timeframe from M1 to H1, 69,000 setups per timeframe and symbol</span></div>
-      <div class="tile"><span class="v">0 of 8</span><span class="k">gold timeframes that hold PF ≥ 1.3 on unseen data after re-calibration, with any trailing system (best: 1.08)</span></div>
+      <div class="tile"><span class="v">0 of 8</span><span class="k">gold timeframes that hold PF ≥ 1.3 on unseen data, with the EA's own trailing or with the best 10 setups of all 23 systems (best: 1.08)</span></div>
       <div class="tile"><span class="v">1 of 8</span><span class="k">BTC timeframes that pass the 2026 test (M5); the same setups did not reach 1.3 on 2024 or 2023 (M5 presets: 0.79 and 0.83)</span></div>
 <!-- recal-tiles:end -->
     </div>
@@ -126,7 +126,7 @@ code { font-family: var(--mono); font-size: 13px; }
         </tbody>
       </table>
     </div>
-    <p class="note">Dollar figures are US$ on a $10,000 test deposit per preset. The Strategy Tester charged $6 per lot round trip (1 lot = 1 ounce): −8,056 in all. VT's real commission is $0.60 per lot, as the account owner reported it, which makes −806. The before-commission column does not depend on the commission. The profit factor at $0.60 charges both commission legs to each round trip. MT5's own report, at its $6 rate and counted per deal, shows 0.50, 0.55, 0.40, 0.36, 0.45 and 0.33.</p>
+    <p class="note">Dollar figures are US$ on a $10,000 test deposit per preset. The Strategy Tester charged $6 per lot round trip (1 lot = 1 ounce): −8,056 in all. VT's real commission is $0.60 per lot, as the account owner reported it, which makes −806. The $0.60 figures re-price the tester's trades with the lot sizes of the $6 run. The EA risks a percentage of equity, so with the smaller commission the later trades would have been somewhat larger and the dollar loss roughly a tenth larger (an estimate, not a re-run); the profit factors would move by about 0.01. The profit factor at $0.60 charges both commission legs to each round trip. MT5's own report, at its $6 rate and counted per deal, shows 0.50, 0.55, 0.40, 0.36, 0.45 and 0.33.</p>
 <!-- s1:end -->
   </section>
 
@@ -230,9 +230,9 @@ code { font-family: var(--mono); font-size: 13px; }
         </tbody>
       </table>
     </div>
-    <p class="note">2 of 32 pass (green). Stressed = entry one minute late, pessimistic trailing, slippage and commission. VT costs = the same gold setups at VT Markets' own costs as the account owner reported them, a 1.5-pip spread ($0.15) and $0.60 commission per lot, $0.75 per ounce in all: 0.61 to 1.01. Gold: FTMO prices to 15 May 2026, Dukascopy after. BTC: Binance prices from 1 January 2025, read in UTC and converted to broker time once.</p>
+    <p class="note">2 of 32 pass (green). Stressed = entry one minute late, pessimistic trailing, slippage and commission. VT costs = the same gold setups at VT Markets' own costs as the account owner reported them, a 1.5-pip spread ($0.15) and $0.60 commission per lot, $0.75 per ounce in all: 0.61 to 1.01. Gold: FTMO prices to 15 May 2026, Dukascopy after. BTC: Binance prices from 1 January 2025, read in UTC and converted to broker time once, with an assumed $10 spread and no commission.</p>
     <h3>BTC M5 with the EA's own trailing: one pass, then a second test</h3>
-    <p>M5 is the only BTC timeframe that passes with the trailing stop the EA has: 4 setups, 133 unseen trades, PF 1.42 (1.37 stressed). Resampling the weeks gives 1.03 to 1.96, and 2.5% of random sets of M5 setups did as well. These four setups are the presets of the BTC zip. They were also run on 2023 and 2024, which lie before the calibration data:</p>
+    <p>M5 is the only BTC timeframe that passes with the trailing stop the EA has: 4 setups, 133 unseen trades, PF 1.42 (1.37 stressed). Resampling the weeks gives 1.03 to 1.96 in nine cases out of ten, and 34% of the resamples are below 1.3. 2.5% of random sets of M5 setups did as well as these four. These four setups are the presets of the BTC zip. They were also run on 2023 and 2024, which lie before the calibration data:</p>
     <div class="tablebox">
       <table>
         <thead><tr><th>BTC M5 preset</th><th>Picked on<span class="sub">trades / PF</span></th><th>Unseen 2026<span class="sub">PF (trades)</span></th><th>Stressed</th><th>2024<span class="sub">PF (trades)</span></th><th>2023<span class="sub">PF (trades)</span></th></tr></thead>
@@ -245,7 +245,7 @@ code { font-family: var(--mono); font-size: 13px; }
         </tbody>
       </table>
     </div>
-    <p class="note">The 2026 result did not repeat: the four together lost in both earlier years, also with no spread at all (0.83 and 0.94). 113 of the 133 unseen trades were sells. BTC ended those months lower (about $79,000 to $68,000) after a fall to $58,000 and a rise to $87,000; in 2023 and 2024 it rose. 6 of the 7 unseen months were positive. The unseen PF is 1.25 at a $20 spread, 1.31 without the three largest wins and 1.22 with $20 per BTC of extra round-trip cost. The stressed 1.37 includes a one-minute-late entry that happened to help; with the extra costs alone it is 1.30. One good period out of three is not an edge: demo only. With all 23 systems M5 passes again (1.48 on 377 trades, stressed 1.42); those setups are in the last table of this section.</p>
+    <p class="note">The 2026 result did not repeat: the four together lost in both earlier years, also with no spread at all (0.83 and 0.94). 113 of the 133 unseen trades were sells. BTC ended those months lower (about $79,000 to $68,000) after a fall to $58,000 and a rise to $87,000; in 2023 and 2024 it rose. 6 of the 7 unseen months were positive. The unseen PF is 1.25 at a $20 spread, 1.31 without the three largest wins and 1.22 with $20 per BTC of extra round-trip cost. The stressed 1.37 includes a one-minute-late entry that happened to help; with the extra costs alone it is 1.30. One good period out of three is not an edge: demo only. With all 23 systems M5 passes again (1.48 on 377 trades, stressed 1.42); those setups are in the last table of this section. An intermediate run with 11 of the 23 systems (33,000 setups per timeframe) also passed BTC M2 in 2026 (1.69 on 284 trades); with all 23 systems M2 scores 1.28, and those 11-system setups scored 0.93 in 2024 and 0.77 in 2023.</p>
     <h3>By trailing system, all timeframes together</h3>
     <div class="tablebox">
       <table>
@@ -312,7 +312,7 @@ code { font-family: var(--mono); font-size: 13px; }
     <ul class="plain">
       <li><strong>The EA is correct.</strong> On VT real ticks (Mar – mid-May), 100 of its 107 entries match a Python backtest entry within one bar, on the same side. Two independent price feeds also agree on the later months: 97% of the trades match and the six-preset totals are close.</li>
       <li><strong>The backtest numbers came from fitting</strong> to January 2025 – mid-May 2026 as a whole: in the backtest the six presets earned in both halves of 2025 (PF 1.89 or more) and in 2026 (1.40 to 2.07). After that period the results lose even before costs (VT PF 0.74 before commission and 0.67 at VT's $0.60 per lot, Jun – Nov 6).</li>
-<!-- recal-bullet:start --><li><strong>No timeframe and no trailing stop changes that on gold.</strong> Re-calibrated from M1 to H1 with 23 trailing systems, gold stays between 0.67 and 1.08 on unseen data. On BTC, M5 passed the 2026 months with the EA's own trailing (PF 1.42) and lost on 2023 and 2024, so it is a lead, not an edge.</li><!-- recal-bullet:end -->
+<!-- recal-bullet:start --><li><strong>No timeframe and no trailing stop changes that on gold.</strong> Re-calibrated from M1 to H1 with 23 trailing systems, the best setups of each gold timeframe score 0.67 to 1.08 on unseen data; four single timeframe-and-system combinations reached 1.31 to 1.57 in 2026 and all lost on July – December 2024. On BTC, M5 passed the 2026 months with the EA's own trailing (PF 1.42) and lost on 2023 and 2024, so it is a lead, not an edge.</li><!-- recal-bullet:end -->
       <li><strong>Recalibrating is not a reliable fix.</strong> Only one of five recalibration schedules passes, on four windows that lean on the rally. A schedule that works only for one window length is more likely luck than an edge.</li>
     </ul>
     <div class="cols">

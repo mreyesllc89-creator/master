@@ -245,6 +245,9 @@
    0.72
   ]
  },
+ "btc_pass_only_in_11_system_run": [
+  "M2"
+ ],
  "btc_m5": {
   "n": 133,
   "pf": 1.42,
