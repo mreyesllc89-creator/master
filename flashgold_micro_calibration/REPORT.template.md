@@ -13,7 +13,8 @@ regenerated with the commands in section 13.
    {{real_win}} winners, {{real_avg}} points per trade, {{real_net}} points in total. The replay of the shipped
    reference preset over nine other calendar months gives **{{ref_pf}}** on {{ref_n}} trades and is below 1 in
    every month ({{ref_month_min}} to {{ref_month_max}}). In October-November 2026, the months next to the real
-   trades, it gives {{ref_test}}.
+   trades, it gives {{ref_test}}. Given the account's own entries, the replay ends {{rr_gap_abs}} points per
+   trade below the account, so it errs on the pessimistic side.
 2. **The reason is cost, not exits.** After a fill the price keeps moving in the trade's favour by at most
    about {{fwd_best}} points on average, while a round trip costs about {{fwd_cost}} points in spread and
    slippage. Stops, targets and trailing cannot change that sign: across {{exit_n}} stop/target/exit
@@ -30,7 +31,9 @@ regenerated with the commands in section 13.
    drop the fade and market routes (`EntryRouterMode` StopOnly), move the target out (180 to 600), switch the
    fixed 100 point speed exit off and trail 150 points behind the best price. In the replay that preset makes
    **{{fin_pf}}** on {{fin_n}} trades (calibration months {{fin_is}}, validation months {{fin_val}},
-   October-November 2026 {{fin_test}}), {{fin_avg}} points per trade.
+   October-November 2026 {{fin_test}}), {{fin_avg}} points per trade. The two entry inputs count in spreads:
+   on a symbol with another median spread, keep multiplier x median spread near 450 points and the cap just
+   under the median (table in section 11).
 6. **That number is thin, and it should be read as "about 1.0 to 1.15".** The average of {{jg_n}}
    neighbouring input sets is {{jg_pf_mean}}. {{fin_months_pos}} months are positive. The profit comes from
    buys ({{fin_buy_pf}}) and not from sells ({{fin_sell_pf}}). A 7 point commission leaves {{fin_comm7_pf}},
@@ -98,8 +101,9 @@ disagreed with:
 **Data.** XAUUSD ticks from Dukascopy: November 2025 to May 2026 (via the public Hugging Face copy
 `CarlosSilva1/xauusd-ticks`, CC-BY-4.0) and 6 October to 13 November 2026 (downloaded directly): nine calendar
 months, 38 trading weeks, about 62 million quotes after rebuilding. The direct download is throttled hard
-(roughly a hundred hourly files, then a long block), so June to September 2026 is missing; of the real-trade
-window only 6 to 8 October and {{rr_stretches}} separate hours could be fetched. Dukascopy quotes 3 digits
+(roughly a hundred hourly files, then a long block), so June to September 2026 is missing as a continuous
+feed. For the real-trade window the hours with the most trades were fetched one by one: {{rr_n}} of the
+{{real_n}} real trades ({{rr_share}}) lie inside downloaded quotes. Dukascopy quotes 3 digits
 with a spread near 55 points, which the EA's own spread caps reject, so the replay keeps the Dukascopy mid
 price and tick times and rebuilds a 2-digit bid/ask around it with the spread scaled to a median of 12 points
 in October-November 2026 (15 over all months).
@@ -116,10 +120,12 @@ Dukascopy quote shows.
 {{T_fills}}
 
 The last factor matters. Without it the replay's stop losses slip {{sl_sim_quoted}} points on average against
-{{sl_real_mean}} on the account ({{sl_real_n}} real stop-loss fills). On the {{sl_pair_n}} trades where both
-the account and the replay ended at the stop, the account slipped {{sl_pair_real}} points and the replay
-(with the factor) {{sl_pair_sim}}. The calibrated preset closes nearly every trade through a stop, so its
-result moves with this factor: section 10 shows it at 1.0, 1.5 and 2.0.
+{{sl_real_mean}} on the account ({{sl_real_n}} real stop-loss fills). It was checked trade by trade: on the
+{{sl_pair_n}} real trades that ended at the stop both on the account and in the replay, the account slipped
+{{sl_pair_real}} points on average and the replay {{sl_pair_sim}} ({{sl_pair_exact_real}} and
+{{sl_pair_exact_sim}} of those fills were exact). That sample alone would give a factor of
+{{sl_pair_factor}}. The calibrated preset closes nearly every trade through a stop, so its result moves with
+this factor: section 10 shows it at 1.0, 1.5 and 2.0.
 
 "Real fills" in every table means this model. "Strict fills" means no snapping to the level, no price
 improvement on limits and targets, and a 250 ms delay.
@@ -132,15 +138,23 @@ months (the earlier months were faster and cost more):
 
 ![exit mix, real against replay](results/charts/fidelity.png)
 
-For {{rr_n}} real trades on {{rr_days}} days whose ticks could be downloaded, the replay was given the real
-entries and only managed the exits: {{rr_sim_avg}} points per trade against {{rr_real_avg}} real (profit
+For the {{rr_n}} real trades on {{rr_days}} days whose ticks could be downloaded, the replay was given the
+real entries and only managed the exits: {{rr_sim_avg}} points per trade against {{rr_real_avg}} real (profit
 factor {{rr_sim_pf}} against {{rr_real_pf}}), {{rr_sign}} of the trades ending on the same side, correlation
-{{rr_corr}}. On the same entries the replay is {{rr_gap}} points per trade away from the account, on the
-pessimistic side.
+{{rr_corr}}. So on the same entries the replay is {{rr_gap}} points per trade away from the account, on the
+pessimistic side. The gap is in the winners: of the {{rr_win_n}} trades the account closed at the speed
+profit exit or the target (average +{{rr_win_real}}), {{rr_win_lost}} end as a loss in the replay (average
++{{rr_win_sim}}), because its quotes touch a stop or a defensive close that the broker's quotes did not.
+The stop-loss side agrees. Read the replay as somewhat conservative for the shipped exits.
 
-The same real entries with other exit inputs (small sample, direction only):
+The same real entries with other exit inputs. These are the account's own entries, mostly the market route
+that the replay cannot generate itself, so the table says what other exits would have done to the real
+trades, with the replay's pessimism included:
 
 {{T_real_replay}}
+
+No trailing variant helps here either. The one thing that does is a wider stop: {{rr_stop130}} at 130 points
+and {{rr_stop200}} at 200, against {{rr_sim_pf}} as traded. It does not reach break-even.
 
 **Self-test.** `tools/selftest.py` runs the package's own quote-bucket cases (`tests/test_bucket_host.py`)
 against the port, checks the continuation filter and the TDI direction against plain numpy/pandas, and checks
@@ -284,16 +298,17 @@ seconds". That is the EA's own idea, turned up.
 {{T_grid}}
 
 (The calibrated preset with only these two inputs changed; trade counts are in the figure.) Below a
-multiplier of 20 nothing reaches break-even (best {{gc_low_max}}); the band of 25 to 40 does, at a spread cap
-of 12 to 20. The same grid without the entry hold and the post-entry validation, with a 200 point stop, stays
-between {{gs_min}} and {{gs_max}} (`results/grid_stops.csv`), so the other settings of the preset matter too.
+multiplier of 20 nothing reaches break-even (best {{gc_low_max}}). From 25 to 40 most cells are at or above
+1, with the best at 30 and 35 and a spread cap of 12 to 14. The same grid without the entry hold and the
+post-entry validation, with a 200 point stop, stays between {{gs_min}} and {{gs_max}}
+(`results/grid_stops.csv`), so the other settings of the preset matter too.
 
 ### The calibrated preset
 
 | input | shipped | calibrated | what it does |
 | --- | ---: | ---: | --- |
 | `MaxTrailingMultiplier` | 7.5 | 30 | alert only on a move of 30 spreads within the lookback |
-| `MaxSpreadPoints` | 31 | 14 | no entry while the spread is above about its median (15 over the replayed months; use your symbol's median) |
+| `MaxSpreadPoints` | 31 | 14 | no entry while the spread is above about its median (15 over the replayed months; rescale both for another spread, section 11) |
 | `EntryRouterMode` | StopMarketLimit | StopOnly | no limit fades (they lose from the first second) and no market entries (they lose to the order delay) |
 | `StopEntryDistancePoints` | 35 | 50 | the burst has to continue a little further before the stop order fills (effect inside the noise, see below) |
 | `StopTPPoints` (and market/limit targets) | 180 (160) | 600 | let the winners run |
@@ -464,14 +479,38 @@ preset, {{fin_micro_pf}} for the calibrated preset.
 
 {{T_spread_n}}
 
+The calibrated preset is best at the spread it was calibrated on and falls off on both sides. That is not
+the spread itself: `MaxTrailingMultiplier` and `MaxSpreadPoints` both count in spreads, so on a tighter feed
+the same numbers let much smaller bursts through (five times as many trades at a 5 point median). The preset
+was replayed again with those two inputs rescaled to each feed, so that the alert needs the same move in
+points (450, which is 30 x 15) and the cap sits at the same place below the median, and once more with
+`MinSpeedAlertPoints` 450 as a fixed floor instead:
+
+{{T_transfer}}
+
+{{T_transfer_n}}
+
+(Rescaled values: {{transfer_settings}}.) Rescaled, the preset keeps about the same number of trades and
+makes {{tr_scaled_5}} and {{tr_scaled_10}} at the two tighter spreads, against {{tr_asis_5}} and
+{{tr_asis_10}} unscaled. A fixed floor in points does not do the same job ({{tr_floor_5}},
+{{tr_floor_10}}): what works is the size of the burst against the spread of that moment. At a 20 point
+median nothing does better than break-even. For another symbol:
+
+| median spread of the symbol | `MaxTrailingMultiplier` | `MaxSpreadPoints` |
+| ---: | ---: | ---: |
+| 8 | 56 | 7 |
+| 10 | 45 | 9 |
+| 12 | 38 | 11 |
+| 15 (the replayed feed) | 30 | 14 |
+
 **Checking this in MetaTrader.** Use `presets/FlashGold_NativeReference_Calibrated_DISABLED.set` with
 `TradingEnabled` switched on in the tester, "Every tick based on real ticks", an execution delay of about
 150 ms, and at least three months. Things to compare with section 10: trades per day (about
 {{fin_per_day}}), share of trades that end at a stop ({{fin_stop_share}}), average win and loss
 (+{{fin_avg_win}} / {{fin_avg_loss}}). Then, if it holds:
 
-1. `FlashGold_NativeReference_Calibrated_entries_TESTER_OPT.set` optimises `MaxTrailingMultiplier` 20-45,
-   `MaxSpreadPoints` 9-16, `StopEntryDistancePoints` 20-80 and `PendingExpirySeconds` 3-15.
+1. `FlashGold_NativeReference_Calibrated_entries_TESTER_OPT.set` optimises `MaxTrailingMultiplier` 20-60,
+   `MaxSpreadPoints` 7-16, `StopEntryDistancePoints` 20-80 and `PendingExpirySeconds` 3-15.
 2. `FlashGold_NativeReference_Calibrated_exits_TESTER_OPT.set` optimises the stop, the target and the trail
    layer distance (through `InpReferenceSpreadPts`).
 3. `FlashGold_NativeReference_Calibrated_simple_trailing_TESTER_OPT.set` optimises the simple trailing in
@@ -481,9 +520,9 @@ preset, {{fin_micro_pf}} for the calibrated preset.
 5. `FlashGold_NativeReference_shipped_trailing_TESTER_OPT.set` is the trailing question on the shipped
    entries (expect section 8: no gain).
 
-Use a forward period and keep the delay on. Set `MaxSpreadPoints` from your symbol's median spread, not from
-the number 14. Count the broker's commission: 3 points per round trip leaves {{fin_comm3_pf}} in the replay
-and 7 points {{fin_comm7_pf}}.
+Use a forward period and keep the delay on. Take `MaxTrailingMultiplier` and `MaxSpreadPoints` from your
+symbol's median spread with the table above, not from the numbers 30 and 14. Count the broker's commission:
+3 points per round trip leaves {{fin_comm3_pf}} in the replay and 7 points {{fin_comm7_pf}}.
 
 **Changes in the code that the data supports**, none of them made here: a rolling or restarting bucket
 series for the micro mode; the 6.8 pip exit gate as an input; a commission input that the continuation
@@ -492,7 +531,10 @@ filter can use; an hour filter is *not* supported by the data (no hour is reliab
 ## 12. Limits
 
 - This is a replay written from the source, not MetaTrader. It matches the real account's exit mix, win rates
-  and slippage, but it has been compared trade by trade on {{rr_n}} trades only.
+  and slippage, and it was compared trade by trade on {{rr_n}} of the {{real_n}} real trades, where it ends
+  {{rr_gap_abs}} points per trade below the account. None of those real trades used the calibrated settings.
+- Stop-order entries slip as much on average in the replay as on the account, but the account's worst tenth
+  is worse. The calibrated preset enters in larger bursts than any real trade in the sample.
 - The spread is a scaled Dukascopy spread. A broker whose spread behaves differently in fast markets changes
   the result; `MaxSpreadPoints` and `MaxTrailingMultiplier` both act through the spread.
 - The calibrated preset earns {{fin_avg1}} points per trade before commission, with a stop slippage factor
@@ -522,11 +564,12 @@ tools/selftest.py              checks of the port
 pip install numpy pandas numba pyarrow matplotlib
 cd flashgold_micro_calibration/tools
 python -I fetch_hf_ticks.py ../data 2025-11 2026-05          # ticks, public copy of the Dukascopy feed
-python -I fetch_dukascopy.py fetch XAUUSD 2026-10-06 2026-11-13 ../data && python -I fetch_dukascopy.py build XAUUSD ../data
+python -I fetch_dukascopy.py fetch XAUUSD 2026-10-06 2026-11-13 ../data
+python -I fetch_dukascopy.py build XAUUSD ../data ../data 2026-10-06 2026-11-13     # main feed: only the continuous weeks
 python -I fetch_dukascopy.py hours XAUUSD ../data/real_trade_hours.txt ../data     # hours of the real-trade window, slow
 python -I fetch_dukascopy.py build XAUUSD ../data ../data/real_window 2026-09-01 2026-10-09
 python -I chart_trades.py <component>/basis/saved_chart.chr ../results/real/real_trades_sar.csv
-bash run_all.sh                                               # about 45 minutes on 4 cores, 16 GB
+bash run_all.sh                                               # about 50 minutes on 4 cores, 16 GB
 python -I classify_inputs.py ../results
 python -I make_presets.py ../presets/presets_spec.json ../presets
 python -I charts.py ../results && python -I make_report.py

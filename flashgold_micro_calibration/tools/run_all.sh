@@ -33,6 +33,8 @@ step trailing_cal      $R/study_trailing_calibrated.log $P study.py trailing_cal
 step oat_calibrated    $R/oat_calibrated.log    $P oat.py $REF $R/oat_calibrated.csv 12 main $R/center_final.json
 step latency           $R/latency.log           $P latency_study.py $R/variants_latency.json $R/latency.csv 0 50 100 150 250 400
 step spread            $R/study_spread.log      $P spread_study.py $R/variants_spread.json $R/study_spread.csv 4 8 12 16 24
+step grid_flashgold    $R/grid_flashgold.log    $P joint_grid.py $R/center_final.json $R/grid_flashgold.json $R/grid_flashgold.csv
+step spread_transfer   $R/study_spread_transfer.log $P spread_study.py $R/variants_spread_transfer.json $R/study_spread_transfer.csv 4 8 12 16
 # ---- FlashGold inputs around the 1 s micro preset
 step oat_micro         $R/oat_micro1s_fg.log    $P oat.py FlashGold_Micro1s $R/oat_micro1s_fg.csv 12 micro
 echo "$(date -u +%H:%M:%S) queue finished"

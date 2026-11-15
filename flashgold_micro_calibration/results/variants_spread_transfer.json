@@ -1,0 +1,63 @@
+{
+ "variants": [
+  {
+   "name": "calibrated preset as it is (multiplier 30, spread cap 14)",
+   "set": {
+    "EntryRouterMode": 0,
+    "MaxTrailingMultiplier": 30,
+    "MaxSpreadPoints": 14,
+    "StopEntryDistancePoints": 50,
+    "StopTPPoints": 600,
+    "LimitTPPoints": 600,
+    "MarketTPPoints": 600,
+    "UseSpeedProfitExit": 0,
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0,
+    "InpReferenceSpreadPts": 45.0
+   }
+  },
+  {
+   "name": "multiplier and spread cap rescaled to the feed (450 points / median spread, 0.93 x median)",
+   "set": {
+    "EntryRouterMode": 0,
+    "MaxTrailingMultiplier": 30,
+    "MaxSpreadPoints": 14,
+    "StopEntryDistancePoints": 50,
+    "StopTPPoints": 600,
+    "LimitTPPoints": 600,
+    "MarketTPPoints": 600,
+    "UseSpeedProfitExit": 0,
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0,
+    "InpReferenceSpreadPts": 45.0
+   },
+   "scale": {
+    "burst_points": 450,
+    "cap_ratio": 0.9333
+   }
+  },
+  {
+   "name": "as it is, with MinSpeedAlertPoints 450 and the spread cap rescaled",
+   "set": {
+    "EntryRouterMode": 0,
+    "MaxTrailingMultiplier": 30,
+    "MaxSpreadPoints": 14,
+    "StopEntryDistancePoints": 50,
+    "StopTPPoints": 600,
+    "LimitTPPoints": 600,
+    "MarketTPPoints": 600,
+    "UseSpeedProfitExit": 0,
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0,
+    "InpReferenceSpreadPts": 45.0,
+    "MinSpeedAlertPoints": 450
+   },
+   "scale": {
+    "cap_ratio": 0.9333
+   }
+  }
+ ]
+}

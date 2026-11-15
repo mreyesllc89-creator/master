@@ -1,54 +1,54 @@
 input,section,type,source_default,tester_effect,pf_min,pf_max,values_tested
-InpCPMode,Continuation - ALL enabled checks must agree,ENUM_CP_MODE,2,replayed,,,
+InpCPMode,Continuation - ALL enabled checks must agree,ENUM_CP_MODE,2,replayed,0.719,0.73,"0, 2"
 InpCPPriceUnit,Continuation - ALL enabled checks must agree,double,0.01,replayed,,,
-InpCPMinTickRate60,Continuation - ALL enabled checks must agree,double,3.8,replayed,,,
-InpCPMaxMedianGapMs,Continuation - ALL enabled checks must agree,double,215.0,replayed,,,
-InpCPMinRange60,Continuation - ALL enabled checks must agree,double,0.0,replayed,,,
-InpCPMinRange300,Continuation - ALL enabled checks must agree,double,0.0,replayed,,,
-InpCPRequireCostCoverage,Continuation - ALL enabled checks must agree,bool,True,replayed,,,
-InpCPGrossFloor,Continuation - ALL enabled checks must agree,double,16.0,replayed,,,
+InpCPMinTickRate60,Continuation - ALL enabled checks must agree,double,3.8,replayed,0.676,0.73,"0, 2, 3, 3.8, 5, 6.5, 8"
+InpCPMaxMedianGapMs,Continuation - ALL enabled checks must agree,double,215.0,replayed,0.639,0.72,"0, 100, 150, 215, 300"
+InpCPMinRange60,Continuation - ALL enabled checks must agree,double,0.0,replayed,0.685,0.719,"0, 50, 100, 200, 400"
+InpCPMinRange300,Continuation - ALL enabled checks must agree,double,0.0,replayed,0.711,0.719,"0, 200, 400, 800"
+InpCPRequireCostCoverage,Continuation - ALL enabled checks must agree,bool,True,replayed,0.719,0.719,"0, 1"
+InpCPGrossFloor,Continuation - ALL enabled checks must agree,double,16.0,replayed,0.685,0.719,"16, 40, 80, 150, 250, 400"
 InpCPSlipReserve,Continuation - ALL enabled checks must agree,double,4.0,replayed,,,
 InpCPCommission,Continuation - ALL enabled checks must agree,double,0.0,replayed,,,
 InpCPMaxSilenceMs,Continuation - ALL enabled checks must agree,int,1500,not replayed: always satisfied in the tester (simulated clock),,,
-InpCPCancelBadPendings,Continuation - ALL enabled checks must agree,bool,True,replayed,,,
+InpCPCancelBadPendings,Continuation - ALL enabled checks must agree,bool,True,replayed,0.719,0.719,"0, 1"
 InpCPWriteCsv,Continuation - ALL enabled checks must agree,bool,True,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
 InpCPPrintDecisions,Continuation - ALL enabled checks must agree,bool,False,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
 FG_Resolution,FlashGold direction resolution (development),ENUM_FGF_RESOLUTION,0,replayed,,,
-FG_IntervalMs,FlashGold direction resolution (development),int,1000,replayed,,,
-FG_MicroWarmupBars,FlashGold direction resolution (development),int,100,replayed,,,
+FG_IntervalMs,FlashGold direction resolution (development),int,1000,replayed,0.689,0.746,"100, 250, 500, 1000, 2000, 5000, 15000, 60000"
+FG_MicroWarmupBars,FlashGold direction resolution (development),int,100,replayed,0.712,0.719,"20, 100, 400, 1500"
 FG_MicroMaxBars,FlashGold direction resolution (development),int,4096,replayed,,,
-FG_MicroMaxGapMs,FlashGold direction resolution (development),int,60000,replayed,,,
-UseFlashGoldDirectionFilter,Additional FlashGold entry filter,bool,True,replayed,,,
-FG_InpTf,Additional FlashGold entry filter,ENUM_TIMEFRAMES,16385,replayed,,,
+FG_MicroMaxGapMs,FlashGold direction resolution (development),int,60000,replayed,0.713,0.716,"5000, 60000, 300000"
+UseFlashGoldDirectionFilter,Additional FlashGold entry filter,bool,True,replayed,0.706,0.719,"0, 1"
+FG_InpTf,Additional FlashGold entry filter,ENUM_TIMEFRAMES,16385,replayed,0.695,0.728,"1, 5, 15, 16385"
 FG_InpLvMode,Additional FlashGold entry filter,ENUM_FGF_LEVEL,0,replayed,,,
-FG_InpLast,Additional FlashGold entry filter,ENUM_FGF_LASTS,0,replayed,,,
-FG_InpMinutes,Additional FlashGold entry filter,int,60,replayed,,,
-FG_InpSeconds,Additional FlashGold entry filter,int,5,replayed,,,
-FG_InpMilliseconds,Additional FlashGold entry filter,int,500,replayed,,,
-FG_InpBars,Additional FlashGold entry filter,int,1,replayed,,,
+FG_InpLast,Additional FlashGold entry filter,ENUM_FGF_LASTS,0,replayed,0.717,0.719,"0, 1"
+FG_InpMinutes,Additional FlashGold entry filter,int,60,replayed,0.719,0.719,"5, 15, 60"
+FG_InpSeconds,Additional FlashGold entry filter,int,5,replayed,0.719,0.719,"5, 30, 120"
+FG_InpMilliseconds,Additional FlashGold entry filter,int,500,replayed,0.713,0.713,"100, 250, 500, 2000"
+FG_InpBars,Additional FlashGold entry filter,int,1,replayed,0.713,0.713,"1, 5, 30"
 FG_InpCheck,Additional FlashGold entry filter,ENUM_FGF_CHECK,0,not replayed: Tick mode in every preset,,,
-FG_InpAllowBuy,Additional FlashGold entry filter,bool,True,replayed,,,
-FG_InpAllowSell,Additional FlashGold entry filter,bool,True,replayed,,,
-FG_InpSpreadPts,Additional FlashGold entry filter,double,25.0,replayed,,,
+FG_InpAllowBuy,Additional FlashGold entry filter,bool,True,replayed,0.695,0.713,"0, 1"
+FG_InpAllowSell,Additional FlashGold entry filter,bool,True,replayed,0.713,0.725,"0, 1"
+FG_InpSpreadPts,Additional FlashGold entry filter,double,25.0,replayed,0.708,0.722,"0, 12, 25, 50"
 FG_InpEntryDistPts,Additional FlashGold entry filter,double,50.0,replayed,,,
-FG_InpHoldBars,Additional FlashGold entry filter,int,0,replayed,,,
+FG_InpHoldBars,Additional FlashGold entry filter,int,0,replayed,0.713,0.731,"0, 1, 3"
 FG_InpHoldFavPts,Additional FlashGold entry filter,double,5.0,replayed,,,
 FG_InpOnePerBar,Additional FlashGold entry filter,bool,True,replayed,,,
-FG_InpDistUnit,Additional FlashGold entry filter,ENUM_FGF_UNIT,0,replayed,,,
-FG_InpBurstAtr,Additional FlashGold entry filter,double,0.5,replayed,,,
-FG_InpEntryDistAtr,Additional FlashGold entry filter,double,0.25,replayed,,,
+FG_InpDistUnit,Additional FlashGold entry filter,ENUM_FGF_UNIT,0,replayed,0.683,0.713,"0, 1"
+FG_InpBurstAtr,Additional FlashGold entry filter,double,0.5,replayed,0.702,0.73,"0.25, 0.5, 1, 1.5, 2.5"
+FG_InpEntryDistAtr,Additional FlashGold entry filter,double,0.25,replayed,0.701,0.728,"0, 0.25, 0.5, 1"
 FG_InpHoldFavAtr,Additional FlashGold entry filter,double,0.1,replayed,,,
 FG_InpBurstPts,Additional FlashGold entry filter,double,172.0,replayed,,,
 FG_InpUseBurst,Additional FlashGold entry filter,bool,True,replayed,,,
-FG_InpAnyCombo,Additional FlashGold entry filter,bool,False,replayed,,,
-FG_InpDriftBars,Additional FlashGold entry filter,int,60,replayed,,,
-FG_InpUseDrift,Additional FlashGold entry filter,bool,False,replayed,,,
-FG_InpUseZones,Additional FlashGold entry filter,bool,True,replayed,,,
-FG_InpParentTf,Additional FlashGold entry filter,ENUM_TIMEFRAMES,16385,replayed,,,
-FG_InpRsiLen,Additional FlashGold entry filter,int,14,replayed,,,
-FG_InpFastLen,Additional FlashGold entry filter,int,2,replayed,,,
-FG_InpMinAligned,Additional FlashGold entry filter,int,2,replayed,,,
-FG_InpFlatParent,Additional FlashGold entry filter,bool,False,replayed,,,
+FG_InpAnyCombo,Additional FlashGold entry filter,bool,False,replayed,0.694,0.713,"0, 1"
+FG_InpDriftBars,Additional FlashGold entry filter,int,60,replayed,0.713,0.713,"5, 20, 60, 300"
+FG_InpUseDrift,Additional FlashGold entry filter,bool,False,replayed,0.707,0.713,"0, 1"
+FG_InpUseZones,Additional FlashGold entry filter,bool,True,replayed,0.719,0.723,"0, 1"
+FG_InpParentTf,Additional FlashGold entry filter,ENUM_TIMEFRAMES,16385,replayed,0.719,0.737,"5, 15, 16385"
+FG_InpRsiLen,Additional FlashGold entry filter,int,14,replayed,0.708,0.713,"7, 14, 28"
+FG_InpFastLen,Additional FlashGold entry filter,int,2,replayed,0.708,0.713,"2, 5"
+FG_InpMinAligned,Additional FlashGold entry filter,int,2,replayed,0.719,0.721,"0, 1, 2, 3"
+FG_InpFlatParent,Additional FlashGold entry filter,bool,False,replayed,0.713,0.713,"0, 1"
 FG_InpIgnoreNa,Additional FlashGold entry filter,bool,True,replayed,,,
 FG_InpHtfClosed,Additional FlashGold entry filter,bool,True,replayed,,,
 FG_InpUseZ1,Additional FlashGold entry filter,bool,True,replayed,,,
@@ -66,22 +66,22 @@ FG_InpZTf6,Additional FlashGold entry filter,ENUM_TIMEFRAMES,2,replayed,,,
 FG_InpTickSize,Additional FlashGold entry filter,double,0.0,not replayed: compatibility check,,,
 FG_InpMaxBars,Additional FlashGold entry filter,int,20000,not replayed: legacy,,,
 FG_InpWarmup,Additional FlashGold entry filter,int,500,not replayed: legacy,,,
-FG_InpBandAtr,FlashGold v1.2 direction area,double,0.25,replayed,,,
-FG_InpAgainst,FlashGold v1.2 direction area,bool,True,replayed,,,
+FG_InpBandAtr,FlashGold v1.2 direction area,double,0.25,replayed,0.709,0.729,"0, 0.1, 0.25, 0.5, 1"
+FG_InpAgainst,FlashGold v1.2 direction area,bool,True,replayed,0.719,0.752,"0, 1"
 Inp01_General,General,string,=== General ===,"label, file name, comment or colour",,,
 TradingEnabled,General,bool,False,not replayed: must be true for the tester to trade,,,
 MagicNumber,General,long,26090568,not replayed: identifier,,,
 FixedLot,General,double,0.01,position sizing: does not change the profit factor at the fixed 0.01 lot,,,
 SlippagePoints,General,int,50,not replayed: deviation of market orders; the replay fills at the quote,,,
-EntryRouterMode,General,RouterMode,2,replayed,,,
+EntryRouterMode,General,RouterMode,2,replayed,0.719,0.777,"0, 1, 2"
 MaxOpenPositions,General,int,1,replayed,,,
 MaxPendingOrders,General,int,1,replayed,,,
-ScenarioIndependentPerformance,General,bool,True,replayed,,,
+ScenarioIndependentPerformance,General,bool,True,replayed,0.715,0.719,"0, 1"
 MaxOpenPositionsPerScenario,General,int,1,replayed,,,
 MaxPendingOrdersPerScenario,General,int,1,replayed,,,
 CancelOnlySameScenarioPendings,General,bool,True,replayed,,,
 CancelOldPendings,General,bool,True,replayed,,,
-PendingExpirySeconds,General,int,45,replayed,,,
+PendingExpirySeconds,General,int,45,replayed,0.706,0.733,"2, 3, 5, 8, 12, 20, 45, 120"
 ScenarioCapLogCooldownSeconds,General,int,10,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
 CsvLogFileV483Cost,General,string,SpeedAlertRouter_XAUUSD_scenario_v48_3.csv,"label, file name, comment or colour",,,
 InpUseSplitStopFloor,General,bool,False,position sizing: does not change the profit factor at the fixed 0.01 lot,,,
@@ -90,9 +90,9 @@ InpCalibrationRiskPercent,General,double,1.0,position sizing: does not change th
 InpUseSlippageInstrumentation,General,bool,False,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
 InpUseExitReasonAudit,General,bool,False,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
 InpExecutionAuditLogFile,General,string,SpeedAlertRouter_XAUUSD_execution_audit_v1.csv,"label, file name, comment or colour",,,
-UseDefensiveCloseLockout,General,bool,True,replayed,,,
-DefensiveLockoutCloseCount,General,int,3,replayed,,,
-DefensiveLockoutSeconds,General,int,90,replayed,,,
+UseDefensiveCloseLockout,General,bool,True,replayed,0.719,0.719,"0, 1"
+DefensiveLockoutCloseCount,General,int,3,replayed,0.717,0.719,"1, 2, 3, 5"
+DefensiveLockoutSeconds,General,int,90,replayed,0.717,0.719,"30, 90, 300, 900"
 DefensiveLockoutLogCooldownSeconds,General,int,10,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
 DefensiveLockoutCancelPendings,General,bool,True,replayed,,,
 CloseDuplicateMemoryMs,General,int,10000,not replayed: duplicate close guard,,,
@@ -100,19 +100,19 @@ Inp01A_AIShadow,Research-only AI Shadow,string,=== Research-only AI Shadow ===,"
 InpAIShadowLogFile,Research-only AI Shadow,string,SpeedAlertRouter_XAUUSD_ai_shadow_v1.csv,"label, file name, comment or colour",,,
 InpAIJourneyShadowEnabled,Research-only AI Shadow,bool,True,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
 InpAIJourneyShadowLogFile,Research-only AI Shadow,string,SpeedAlertRouter_XAUUSD_ai_journey_shadow_v2.csv,"label, file name, comment or colour",,,
-InpAIHardGateEnabled,Research-only AI Shadow,bool,False,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
-InpAIRiskAdjustEnabled,Research-only AI Shadow,bool,False,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
+InpAIHardGateEnabled,Research-only AI Shadow,bool,False,"not replayed: recorded only, the code says it has no execution authority",,,
+InpAIRiskAdjustEnabled,Research-only AI Shadow,bool,False,"not replayed: recorded only, the code says it has no execution authority",,,
 Inp02_SpeedAlert,MaxTrailingMultiplier Speed Alert,string,=== MaxTrailingMultiplier Speed Alert ===,"label, file name, comment or colour",,,
-MaxTrailingMultiplier,MaxTrailingMultiplier Speed Alert,double,7.5,replayed,,,
-SpeedLookbackSeconds,MaxTrailingMultiplier Speed Alert,int,10,replayed,,,
-MinSpeedAlertPoints,MaxTrailingMultiplier Speed Alert,double,37.0,replayed,,,
-SpeedAlertHoldSeconds,MaxTrailingMultiplier Speed Alert,int,20,replayed,,,
+MaxTrailingMultiplier,MaxTrailingMultiplier Speed Alert,double,7.5,replayed,0.699,0.778,"3, 4, 5, 6, 7.5, 9, 11, 13, 16, 20, 25"
+SpeedLookbackSeconds,MaxTrailingMultiplier Speed Alert,int,10,replayed,0.711,0.737,"2, 3, 5, 7, 10, 15"
+MinSpeedAlertPoints,MaxTrailingMultiplier Speed Alert,double,37.0,replayed,0.71,0.72,"20, 37, 60, 80, 100, 120, 150, 200, 250, 300"
+SpeedAlertHoldSeconds,MaxTrailingMultiplier Speed Alert,int,20,replayed,0.707,0.764,"11, 13, 15, 20, 30, 45, 60"
 InpSpeedThresholdMode,MaxTrailingMultiplier Speed Alert,SpeedThresholdMode,0,not replayed: PERCENTILE threshold mode (FIXED in every preset),,,
 InpSpeedPercentile,MaxTrailingMultiplier Speed Alert,double,99.0,not replayed: PERCENTILE mode only,,,
 InpSpeedWindowSamples,MaxTrailingMultiplier Speed Alert,int,2000,not replayed: PERCENTILE mode only,,,
-InpUseHighBurstGate,MaxTrailingMultiplier Speed Alert,bool,False,replayed,,,
+InpUseHighBurstGate,MaxTrailingMultiplier Speed Alert,bool,False,replayed,0.719,0.719,0
 InpBurstThresholdMode,MaxTrailingMultiplier Speed Alert,SpeedThresholdMode,0,not replayed: PERCENTILE mode only,,,
-InpBurstThresholdPts,MaxTrailingMultiplier Speed Alert,double,172.0,replayed,,,
+InpBurstThresholdPts,MaxTrailingMultiplier Speed Alert,double,172.0,replayed,0.719,0.719,"40, 80, 145, 172, 250"
 InpBurstPercentile,MaxTrailingMultiplier Speed Alert,double,99.0,not replayed: PERCENTILE mode only,,,
 InpBurstWindowSamples,MaxTrailingMultiplier Speed Alert,int,2000,not replayed: PERCENTILE mode only,,,
 SpeedDirectionScore,MaxTrailingMultiplier Speed Alert,double,1.0,replayed,,,
@@ -147,7 +147,7 @@ FLXQSellStopFastPreSpeedDefense,MaxTrailingMultiplier Speed Alert,bool,True,repl
 FLXQSellStopPreSpeedDefenseNoFollowSeconds,MaxTrailingMultiplier Speed Alert,int,4,replayed,,,
 FLXQSellStopFastPreSpeedDefenseLossPoints,MaxTrailingMultiplier Speed Alert,double,18.0,replayed,,,
 FLXQSellStopFastPreSpeedDefenseNeedsOppositePressure,MaxTrailingMultiplier Speed Alert,bool,False,replayed,,,
-FLXQSellStopPressureDangerClose,MaxTrailingMultiplier Speed Alert,bool,True,replayed,,,
+FLXQSellStopPressureDangerClose,MaxTrailingMultiplier Speed Alert,bool,True,replayed,0.719,0.722,"0, 1"
 FLXQSellStopPressureDangerLossPoints,MaxTrailingMultiplier Speed Alert,double,25.0,replayed,,,
 FLXQSellStopPressureDangerCloseComment,MaxTrailingMultiplier Speed Alert,string,SA_FLXQ_SS_PRESSURE,"label, file name, comment or colour",,,
 UseStopFlowDisagreeDangerClose,MaxTrailingMultiplier Speed Alert,bool,True,order-flow feed: no effect in the Strategy Tester (the feed's global variables do not exist there),,,
@@ -159,15 +159,15 @@ PreSpeedAgainstDefenseMaxSignalAgeMs,MaxTrailingMultiplier Speed Alert,int,8000,
 PreSpeedAgainstDefenseCloseComment,MaxTrailingMultiplier Speed Alert,string,SA_PRE_SPEED_DEFENSE,"label, file name, comment or colour",,,
 PreSpeedAgainstDefenseRetryLogCooldownMs,MaxTrailingMultiplier Speed Alert,int,1000,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
 Inp03_DirectionScore,Pre Entry Direction Score,string,=== Pre Entry Direction Score ===,"label, file name, comment or colour",,,
-MinDirectionScore,Pre Entry Direction Score,double,4.0,replayed,,,
-MinScoreEdge,Pre Entry Direction Score,double,1.5,replayed,,,
+MinDirectionScore,Pre Entry Direction Score,double,4.0,replayed,0.719,0.744,"2, 2.5, 3, 4, 4.5"
+MinScoreEdge,Pre Entry Direction Score,double,1.5,replayed,0.719,0.719,"0.5, 1, 1.5, 2.5, 4"
 CandleIndexToCheck,Pre Entry Direction Score,int,0,not replayed: 0 (forming candle) in every preset,,,
-MinCandleBodyPoints,Pre Entry Direction Score,double,21.0,replayed,,,
+MinCandleBodyPoints,Pre Entry Direction Score,double,21.0,replayed,0.704,0.72,"0, 10, 21, 40, 60, 80, 100, 150"
 CandleBodyScore,Pre Entry Direction Score,double,1.5,replayed,,,
-MicroBreakLookbackSeconds,Pre Entry Direction Score,int,10,replayed,,,
-MicroBreakBufferPoints,Pre Entry Direction Score,double,3.0,replayed,,,
+MicroBreakLookbackSeconds,Pre Entry Direction Score,int,10,replayed,0.719,0.728,"2, 5, 10, 20, 30, 60"
+MicroBreakBufferPoints,Pre Entry Direction Score,double,3.0,replayed,0.675,0.719,"0, 3, 6, 10, 20"
 MicroBreakScore,Pre Entry Direction Score,double,1.5,replayed,,,
-MaxSpreadPoints,Pre Entry Direction Score,double,31.0,replayed,,,
+MaxSpreadPoints,Pre Entry Direction Score,double,31.0,replayed,0.7,0.78,"12, 14, 16, 20, 31, 60"
 SpreadStableScore,Pre Entry Direction Score,double,0.5,replayed,,,
 Inp04_OrderFlow,Order Flow Global Variables,string,=== Order Flow Global Variables ===,"label, file name, comment or colour",,,
 UseOrderFlow,Order Flow Global Variables,bool,True,order-flow feed: no effect in the Strategy Tester (the feed's global variables do not exist there),,,
@@ -176,51 +176,51 @@ MaxFlowAgeMs,Order Flow Global Variables,int,4000,order-flow feed: no effect in 
 MinFlowImbalance,Order Flow Global Variables,double,5.0,order-flow feed: no effect in the Strategy Tester (the feed's global variables do not exist there),,,
 FlowComponentScore,Order Flow Global Variables,double,1.0,order-flow feed: no effect in the Strategy Tester (the feed's global variables do not exist there),,,
 BlockStrongFlowAgainst,Order Flow Global Variables,bool,False,order-flow feed: no effect in the Strategy Tester (the feed's global variables do not exist there),,,
-DowngradeNeutralSellMarketToStop,Order Flow Global Variables,bool,True,replayed,,,
+DowngradeNeutralSellMarketToStop,Order Flow Global Variables,bool,True,replayed,0.719,0.719,"0, 1"
 WeakFlowMarketNeedsBodyAndMicro,Order Flow Global Variables,bool,True,replayed,,,
-WeakFlowMarketMinScore,Order Flow Global Variables,double,5.0,replayed,,,
+WeakFlowMarketMinScore,Order Flow Global Variables,double,5.0,replayed,0.691,0.719,"4.5, 5"
 WeakFlowMarketMinScoreEdge,Order Flow Global Variables,double,2.0,replayed,,,
 Inp05_EntryRouting,Entry Routing,string,=== Entry Routing ===,"label, file name, comment or colour",,,
-StopEntryDistancePoints,Entry Routing,double,35.0,replayed,,,
-LimitRetestDistancePoints,Entry Routing,double,35.0,replayed,,,
-MarketFollow21Points,Entry Routing,double,21.0,replayed,,,
+StopEntryDistancePoints,Entry Routing,double,35.0,replayed,0.679,0.731,"5, 10, 20, 35, 50, 70, 100"
+LimitRetestDistancePoints,Entry Routing,double,35.0,replayed,0.718,0.744,"10, 20, 35, 50, 70, 100, 150"
+MarketFollow21Points,Entry Routing,double,21.0,replayed,0.718,0.719,"10, 21, 40, 70, 110"
 MarketFollow21Seconds,Entry Routing,int,10,replayed,,,
-MarketFollow37Points,Entry Routing,double,37.0,replayed,,,
+MarketFollow37Points,Entry Routing,double,37.0,replayed,0.719,0.72,"20, 37, 60, 100"
 MarketFollow37Seconds,Entry Routing,int,30,replayed,,,
-StopSLPoints,Entry Routing,double,90.0,replayed,,,
-StopTPPoints,Entry Routing,double,180.0,replayed,,,
+StopSLPoints,Entry Routing,double,90.0,replayed,0.663,0.764,"40, 60, 75, 90, 110, 130, 160, 200, 300"
+StopTPPoints,Entry Routing,double,180.0,replayed,0.68,0.724,"60, 80, 100, 130, 180, 250, 400, 1000"
 MarketSLPoints,Entry Routing,double,80.0,replayed,,,
 MarketTPPoints,Entry Routing,double,160.0,replayed,,,
-LimitSLPoints,Entry Routing,double,90.0,replayed,,,
-LimitTPPoints,Entry Routing,double,160.0,replayed,,,
+LimitSLPoints,Entry Routing,double,90.0,replayed,0.675,0.747,"40, 60, 90, 130, 200"
+LimitTPPoints,Entry Routing,double,160.0,replayed,0.712,0.721,"60, 100, 160, 250, 400"
 BodyOnlyLotFactor,Entry Routing,double,0.65,position sizing: does not change the profit factor at the fixed 0.01 lot,,,
 ContinuationStopLotFactor,Entry Routing,double,1.0,position sizing: does not change the profit factor at the fixed 0.01 lot,,,
 FollowThroughMarketLotFactor,Entry Routing,double,1.0,position sizing: does not change the profit factor at the fixed 0.01 lot,,,
 ExhaustionLimitLotFactor,Entry Routing,double,0.5,position sizing: does not change the profit factor at the fixed 0.01 lot,,,
-InpUseEntryHold,Entry Routing,bool,False,replayed,,,
-InpEntryHoldMs,Entry Routing,int,1000,replayed,,,
-InpEntryHoldMinFavPoints,Entry Routing,double,5.0,replayed,,,
-InpUsePrior60Filter,Entry Routing,bool,False,replayed,,,
-InpUse1000msHold,Entry Routing,bool,False,replayed,,,
+InpUseEntryHold,Entry Routing,bool,False,replayed,0.719,0.725,"0, 1"
+InpEntryHoldMs,Entry Routing,int,1000,replayed,0.71,0.734,"250, 500, 800, 1100, 1500, 2000, 3000"
+InpEntryHoldMinFavPoints,Entry Routing,double,5.0,replayed,0.657,0.736,"-20, 0, 5, 10, 20, 35"
+InpUsePrior60Filter,Entry Routing,bool,False,replayed,0.714,0.719,"0, 1"
+InpUse1000msHold,Entry Routing,bool,False,replayed,0.719,0.719,"0, 1"
 InpHoldMinFavPts,Entry Routing,double,5.0,replayed,,,
 Inp06_PostValidation,Post Entry Validation,string,=== Post Entry Validation ===,"label, file name, comment or colour",,,
-UsePostEntryValidation,Post Entry Validation,bool,True,replayed,,,
-OppositePressurePoints,Post Entry Validation,double,21.0,replayed,,,
+UsePostEntryValidation,Post Entry Validation,bool,True,replayed,0.719,0.732,"0, 1"
+OppositePressurePoints,Post Entry Validation,double,21.0,replayed,0.716,0.722,"10, 21, 35, 50"
 OppositePressureSeconds,Post Entry Validation,int,5,replayed,,,
 CloseIfNoFollowThrough,Post Entry Validation,bool,True,replayed,,,
 ValidationSeconds,Post Entry Validation,int,30,replayed,,,
-CloseOnRetestFailure,Post Entry Validation,bool,True,replayed,,,
-RetestFailPoints,Post Entry Validation,double,10.0,replayed,,,
+CloseOnRetestFailure,Post Entry Validation,bool,True,replayed,0.719,0.721,"0, 1"
+RetestFailPoints,Post Entry Validation,double,10.0,replayed,0.718,0.723,"5, 10, 20, 35"
 RetestFailCloseMinLossPoints,Post Entry Validation,double,37.0,replayed,,,
 RetestFailedEarlyClose,Post Entry Validation,bool,True,replayed,,,
-RetestFailedEarlyLossPoints,Post Entry Validation,double,25.0,replayed,,,
+RetestFailedEarlyLossPoints,Post Entry Validation,double,25.0,replayed,0.719,0.719,"10, 15, 25, 40"
 RetestFailedEarlyBypassHold,Post Entry Validation,bool,True,replayed,,,
 RetestFailedEarlyCloseComment,Post Entry Validation,string,SA_RETEST_EARLY,"label, file name, comment or colour",,,
 FOLMAfterFollowRetestDangerClose,Post Entry Validation,bool,True,replayed,,,
 FOLMAfterFollowRetestDangerLossPoints,Post Entry Validation,double,37.0,replayed,,,
 FOLMAfterFollowRetestBypassHold,Post Entry Validation,bool,True,replayed,,,
 FOLMAfterFollowRetestDangerCloseComment,Post Entry Validation,string,SA_FOLM_RETEST_DANGER,"label, file name, comment or colour",,,
-RetestFailConfirmSeconds,Post Entry Validation,int,2,replayed,,,
+RetestFailConfirmSeconds,Post Entry Validation,int,2,replayed,0.717,0.72,"0, 1, 2, 4"
 RetestFailedCloseComment,Post Entry Validation,string,SA_RETEST_FAILED,"label, file name, comment or colour",,,
 UseEmergencyRetestCollapseClose,Post Entry Validation,bool,True,replayed,,,
 RetestCollapseMinLossPoints,Post Entry Validation,double,37.0,replayed,,,
@@ -243,14 +243,14 @@ NoFollowEarlyNeedsOppositePressure,Post Entry Validation,bool,True,replayed,,,
 NoFollowEarlyCloseComment,Post Entry Validation,string,SA_NO_FOLLOW_EARLY,"label, file name, comment or colour",,,
 NoFollowCloseMinLossPoints,Post Entry Validation,double,37.0,replayed,,,
 NoFollowCloseComment,Post Entry Validation,string,SA_NO_FOLLOW,"label, file name, comment or colour",,,
-UseSpeedProfitExit,Post Entry Validation,bool,True,replayed,,,
-SpeedProfitExitPoints,Post Entry Validation,double,100.0,replayed,,,
-RequireProfitSideSpeed,Post Entry Validation,bool,True,replayed,,,
+UseSpeedProfitExit,Post Entry Validation,bool,True,replayed,0.719,0.726,"0, 1"
+SpeedProfitExitPoints,Post Entry Validation,double,100.0,replayed,0.719,0.731,"50, 70, 85, 100, 120, 140, 170"
+RequireProfitSideSpeed,Post Entry Validation,bool,True,replayed,0.717,0.719,"0, 1"
 SpeedProfitExitComment,Post Entry Validation,string,SA_PROFIT_EXIT,"label, file name, comment or colour",,,
 SpeedProfitExitRetrySeconds,Post Entry Validation,int,2,not replayed: close retry after a rejected close,,,
 SpeedProfitExitMaxRetries,Post Entry Validation,int,8,not replayed: close retry after a rejected close,,,
-UsePredictiveSpeedProfitExit,Post Entry Validation,bool,True,replayed,,,
-PredictiveExitMinProfitPoints,Post Entry Validation,double,70.0,replayed,,,
+UsePredictiveSpeedProfitExit,Post Entry Validation,bool,True,replayed,0.717,0.719,"0, 1"
+PredictiveExitMinProfitPoints,Post Entry Validation,double,70.0,replayed,0.719,0.724,"70, 100, 370"
 PredictiveExitMinProjectedNetPoints,Post Entry Validation,double,37.0,replayed,,,
 PredictiveExitLatencyMs,Post Entry Validation,int,250,replayed,,,
 PredictiveExitVelocityLookbackMs,Post Entry Validation,int,1000,replayed,,,
@@ -260,21 +260,21 @@ PredictiveExitMinRiskBufferPoints,Post Entry Validation,double,21.0,replayed,,,
 PredictiveExitMaxRiskBufferPoints,Post Entry Validation,double,180.0,replayed,,,
 BlockSpeedExitIfProjectedNegative,Post Entry Validation,bool,True,replayed,,,
 Inp07_Trailing,Simple Test Trailing,string,=== Simple Test Trailing ===,"label, file name, comment or colour",,,
-UseTrailing,Simple Test Trailing,bool,True,replayed,,,
-TrailStartPoints,Simple Test Trailing,double,70.0,replayed,,,
-TrailBehindPoints,Simple Test Trailing,double,60.0,replayed,,,
-TrailStepPoints,Simple Test Trailing,double,10.0,replayed,,,
-InpWaitForBurstSettle,Simple Test Trailing,bool,True,replayed,,,
+UseTrailing,Simple Test Trailing,bool,True,replayed,0.719,0.719,"0, 1"
+TrailStartPoints,Simple Test Trailing,double,70.0,replayed,0.719,0.719,"69, 80, 100, 130, 270"
+TrailBehindPoints,Simple Test Trailing,double,60.0,replayed,0.719,0.719,"20, 30, 40, 60, 80"
+TrailStepPoints,Simple Test Trailing,double,10.0,replayed,0.719,0.719,"1, 5, 10, 20"
+InpWaitForBurstSettle,Simple Test Trailing,bool,True,replayed,0.719,0.719,"0, 1"
 InpBurstSettleQuietMs,Simple Test Trailing,int,1500,replayed,,,
 InpBurstSettleSpeedFraction,Simple Test Trailing,double,0.35,replayed,,,
 InpBurstSettleMaxSpeedPipsSec,Simple Test Trailing,double,2.0,replayed,,,
 InpBurstSettlePullbackPips,Simple Test Trailing,double,2.0,replayed,,,
 Inp07A_TrailLayer,Spread-Scaled Broker Trail Layer,string,=== Spread-Scaled Broker Trail Layer ===,"label, file name, comment or colour",,,
-InpUseTrailLayer,Spread-Scaled Broker Trail Layer,bool,False,replayed,,,
+InpUseTrailLayer,Spread-Scaled Broker Trail Layer,bool,False,replayed,0.719,0.719,"0, 1"
 internalOrderDistance,Spread-Scaled Broker Trail Layer,double,3.0,replayed,,,
 internalMinTrailing,Spread-Scaled Broker Trail Layer,double,3.33333333,replayed,,,
 internalMaxTrailing,Spread-Scaled Broker Trail Layer,double,6.6666667,replayed,,,
-internalMultiplier,Spread-Scaled Broker Trail Layer,double,2.0,"telemetry, logging, visuals or shadow scorecards: no effect on orders",,,
+internalMultiplier,Spread-Scaled Broker Trail Layer,double,2.0,not replayed: consistency check only (internalMaxTrailing must equal internalMinTrailing x internalMultiplier),,,
 InpReferenceSpreadPts,Spread-Scaled Broker Trail Layer,double,30.0,replayed,,,
 InpTrailOuterCapPts,Spread-Scaled Broker Trail Layer,double,200.0,replayed,,,
 InpStopBufferPts,Spread-Scaled Broker Trail Layer,double,3.0,replayed,,,
@@ -317,7 +317,7 @@ UseFOLMPreHardWarnActiveClose,v36 FOLM Warning Active Close,bool,True,replayed,,
 FOLMPreHardWarnActiveClosePoints,v36 FOLM Warning Active Close,double,24.0,replayed,,,
 FOLMPreHardWarnActiveCloseComment,v36 FOLM Warning Active Close,string,SA_FOLM_WARN24,"label, file name, comment or colour",,,
 Inp12_V40ExecutionShield,v40 Emergency Execution Shield,string,=== v40 Emergency Execution Shield ===,"label, file name, comment or colour",,,
-UseV40ExecutionShield,v40 Emergency Execution Shield,bool,True,replayed,,,
+UseV40ExecutionShield,v40 Emergency Execution Shield,bool,True,replayed,0.717,0.719,"0, 1"
 V40PreSpeedExecutionShield,v40 Emergency Execution Shield,bool,True,replayed,,,
 V40PreSpeedExecutionShieldLossPoints,v40 Emergency Execution Shield,double,18.0,replayed,,,
 V40PreSpeedExecutionShieldNeedsPressureOrFlow,v40 Emergency Execution Shield,bool,True,replayed,,,
@@ -327,7 +327,7 @@ V40FLXQSellStopPressureShieldLossPoints,v40 Emergency Execution Shield,double,18
 V40FLXQSellStopPressureShieldNeedsPressure,v40 Emergency Execution Shield,bool,True,replayed,,,
 V40FLXQSellStopPressureShieldCloseComment,v40 Emergency Execution Shield,string,SA_V40_FLXQ_SS_SHIELD,"label, file name, comment or colour",,,
 V40RetestExecutionShield,v40 Emergency Execution Shield,bool,True,replayed,,,
-V40RetestExecutionShieldLossPoints,v40 Emergency Execution Shield,double,21.0,replayed,,,
+V40RetestExecutionShieldLossPoints,v40 Emergency Execution Shield,double,21.0,replayed,0.719,0.72,"10, 21, 35"
 V40RetestExecutionShieldMinWarningAgeMs,v40 Emergency Execution Shield,int,250,replayed,,,
 V40RetestExecutionShieldMinVelocityPointsPerSec,v40 Emergency Execution Shield,double,25.0,replayed,,,
 V40RetestExecutionShieldMinJumpPoints,v40 Emergency Execution Shield,double,10.0,replayed,,,

@@ -1,4 +1,4 @@
-; The calibrated preset with no trailing at all: highest average profit factor in the replay, about a third more drawdown (REPORT.md section 10).
+; The calibrated preset with no trailing at all: highest average profit factor in the replay, about a third more drawdown (REPORT.md section 10). MaxTrailingMultiplier 30 and MaxSpreadPoints 14 fit a median spread of 15 points: for another spread use 450 / median and 0.93 x median (REPORT.md section 11).
 ; base preset: FlashGold_NativeReference
 ; changed: EntryRouterMode=0, MaxTrailingMultiplier=30.0, MaxSpreadPoints=14.0, StopEntryDistancePoints=50.0, StopTPPoints=600.0, LimitTPPoints=600.0, MarketTPPoints=600.0, UseSpeedProfitExit=false, InpUseTrailLayer=false, InpWaitForBurstSettle=false, UseOrderFlow=false, UseTrailing=false
 InpCPMode=2

@@ -13,24 +13,27 @@ regenerated with the commands in section 13.
    36% winners, -8.5 points per trade, -21,951 points in total. The replay of the shipped
    reference preset over nine other calendar months gives **0.72** on 9,282 trades and is below 1 in
    every month (0.61 to 0.89). In October-November 2026, the months next to the real
-   trades, it gives 0.83.
+   trades, it gives 0.83. Given the account's own entries, the replay ends 5 points per
+   trade below the account, so it errs on the pessimistic side.
 2. **The reason is cost, not exits.** After a fill the price keeps moving in the trade's favour by at most
    about 11 points on average, while a round trip costs about 37 points in spread and
    slippage. Stops, targets and trailing cannot change that sign: across 105 stop/target/exit
-   combinations the result stays between -26 and -13 points per trade.
+   combinations the result stays between -28 and -17 points per trade.
 3. **No single input fixes it.** 74 inputs were varied one at a time (316 replays): the
-   profit factor stays between 0.67 and 0.81. 85 of the 400 inputs are
+   profit factor stays between 0.64 and 0.78. 82 of the 400 inputs are
    telemetry and cannot change an order at all.
 4. **Trailing does not fix it either.** As shipped, neither trailing mechanism can ever act: `TrailStartPoints`
    270 lies beyond the 180 target, and the burst-settle rule waits for a 100 pip pullback. Switched on, on the
-   shipped entries, simple trailing gives 0.76 to 0.79 and the best
-   "let it run" exit 0.82.
+   shipped entries, simple trailing gives 0.71 to 0.72 and the best
+   "let it run" exit 0.75.
 5. **A combination gets it to about break-even, slightly above.** Trade only bursts that are large against
    the spread (`MaxTrailingMultiplier` 7.5 to 30), cap the spread near its median (`MaxSpreadPoints` 31 to 14),
    drop the fade and market routes (`EntryRouterMode` StopOnly), move the target out (180 to 600), switch the
    fixed 100 point speed exit off and trail 150 points behind the best price. In the replay that preset makes
    **1.15** on 1,234 trades (calibration months 1.16, validation months 1.06,
-   October-November 2026 1.39), 10 points per trade.
+   October-November 2026 1.39), 10 points per trade. The two entry inputs count in spreads:
+   on a symbol with another median spread, keep multiplier x median spread near 450 points and the cap just
+   under the median (table in section 11).
 6. **That number is thin, and it should be read as "about 1.0 to 1.15".** The average of 384
    neighbouring input sets is 1.06. 4 of 9 months are positive. The profit comes from
    buys (1.49) and not from sells (0.97). A 7 point commission leaves 1.04,
@@ -61,9 +64,9 @@ check it there.
 | exits | stop 90 (market 80), target 180 (market/limit 160). EA-side exits are locked until the trade has first been more than 6.8 pips (68 points) in profit; that gate is a constant in the code, not an input. Then: close at 100+ points when a new alert on the trade's side is active (speed profit exit), close a trade that fell back to a loss (retest and pressure shields), trailing |
 
 Of the 400 inputs, 224 can change an order in a tester run and are replayed,
-85 are telemetry, logging, visuals or shadow scorecards, 53 are labels, comments and
+82 are telemetry, logging, visuals or shadow scorecards, 53 are labels, comments and
 file names, 11 belong to the order-flow feed, 8 are position sizing (irrelevant to the profit
-factor at the fixed 0.01 lot) and 19 are not replayed (percentile threshold modes, retry
+factor at the fixed 0.01 lot) and 22 are not replayed (percentile threshold modes, retry
 timers and the like). `results/inputs_classification.csv` lists every input with its class and the profit
 factor range found for it.
 
@@ -117,8 +120,9 @@ disagreed with:
 **Data.** XAUUSD ticks from Dukascopy: November 2025 to May 2026 (via the public Hugging Face copy
 `CarlosSilva1/xauusd-ticks`, CC-BY-4.0) and 6 October to 13 November 2026 (downloaded directly): nine calendar
 months, 38 trading weeks, about 62 million quotes after rebuilding. The direct download is throttled hard
-(roughly a hundred hourly files, then a long block), so June to September 2026 is missing; of the real-trade
-window only 6 to 8 October and 17 separate hours could be fetched. Dukascopy quotes 3 digits
+(roughly a hundred hourly files, then a long block), so June to September 2026 is missing as a continuous
+feed. For the real-trade window the hours with the most trades were fetched one by one: 1,621 of the
+2,584 real trades (63%) lie inside downloaded quotes. Dukascopy quotes 3 digits
 with a spread near 55 points, which the EA's own spread caps reject, so the replay keeps the Dukascopy mid
 price and tick times and rebuilds a 2-digit bid/ask around it with the spread scaled to a median of 12 points
 in October-November 2026 (15 over all months).
@@ -142,10 +146,12 @@ Dukascopy quote shows.
 | limit orders and take profits | filled at the market, with price improvement | same |
 
 The last factor matters. Without it the replay's stop losses slip 5.3 points on average against
-8.3 on the account (1,363 real stop-loss fills). On the 145 trades where both
-the account and the replay ended at the stop, the account slipped 8.1 points and the replay
-(with the factor) 9.2. The calibrated preset closes nearly every trade through a stop, so its
-result moves with this factor: section 10 shows it at 1.0, 1.5 and 2.0.
+8.3 on the account (1,363 real stop-loss fills). It was checked trade by trade: on the
+816 real trades that ended at the stop both on the account and in the replay, the account slipped
+7.7 points on average and the replay 7.9 (75% and
+75% of those fills were exact). That sample alone would give a factor of
+1.46. The calibrated preset closes nearly every trade through a stop, so its result moves with
+this factor: section 10 shows it at 1.0, 1.5 and 2.0.
 
 "Real fills" in every table means this model. "Strict fills" means no snapping to the level, no price
 improvement on limits and targets, and a 250 ms delay.
@@ -163,31 +169,39 @@ months (the earlier months were faster and cost more):
 
 ![exit mix, real against replay](results/charts/fidelity.png)
 
-For 283 real trades on 11 days whose ticks could be downloaded, the replay was given the real
-entries and only managed the exits: -14.0 points per trade against -9.3 real (profit
-factor 0.74 against 0.81), 90% of the trades ending on the same side, correlation
-0.85. On the same entries the replay is -4.7 points per trade away from the account, on the
-pessimistic side.
+For the 1,621 real trades on 20 days whose ticks could be downloaded, the replay was given the
+real entries and only managed the exits: -11.7 points per trade against -6.4 real (profit
+factor 0.78 against 0.87), 92% of the trades ending on the same side, correlation
+0.85. So on the same entries the replay is -5.2 points per trade away from the account, on the
+pessimistic side. The gap is in the winners: of the 558 trades the account closed at the speed
+profit exit or the target (average +121), 15% end as a loss in the replay (average
++100), because its quotes touch a stop or a defensive close that the broker's quotes did not.
+The stop-loss side agrees. Read the replay as somewhat conservative for the shipped exits.
 
-The same real entries with other exit inputs (small sample, direction only):
+The same real entries with other exit inputs. These are the account's own entries, mostly the market route
+that the replay cannot generate itself, so the table says what other exits would have done to the real
+trades, with the replay's pessimism included:
 
 | exit inputs applied to the real entries | profit factor | points per trade |
 | --- | ---: | ---: |
-| as traded: shipped reference preset exits | 0.74 | -14.0 |
-| calibrated exits (target 600, speed exit off, trail layer 100) | 0.82 | -9.3 |
-| simple trailing on (start 69, behind 20), speed exit kept | 0.79 | -10.4 |
-| simple trailing on (start 80, behind 40), speed exit kept | 0.77 | -11.4 |
-| trail layer on (reference spread 15, factor 1.0) | 0.78 | -10.7 |
-| speed profit exit off (stop/target only) | 0.76 | -13.3 |
-| speed profit exit at 170 instead of 100 | 0.76 | -13.3 |
-| runner: speed exit off, target 600, trail 160/60 | 0.82 | -9.8 |
-| runner + stop 200 | 1.03 | 2.3 |
-| runner + stop 300, no post-entry validation | 1.13 | 13.5 |
-| stop 60 (tighter), exits as traded | 0.71 | -13.5 |
-| stop 130, exits as traded | 0.81 | -12.2 |
-| stop 200, exits as traded | 0.91 | -6.5 |
-| post-entry validation off | 0.71 | -17.1 |
-| what-if: no 6.8 pip exit gate (not an input) | 0.41 | -13.6 |
+| as traded: shipped reference preset exits | 0.78 | -11.7 |
+| calibrated exits (target 600, speed exit off, trail layer 150) | 0.81 | -10.3 |
+| simple trailing on (start 69, behind 20), speed exit kept | 0.75 | -12.1 |
+| simple trailing on (start 80, behind 40), speed exit kept | 0.76 | -12.1 |
+| trail layer on (reference spread 15, factor 1.0) | 0.75 | -12.4 |
+| speed profit exit off (stop/target only) | 0.77 | -12.6 |
+| speed profit exit at 170 instead of 100 | 0.78 | -12.4 |
+| runner: speed exit off, target 600, trail 160/60 | 0.80 | -11.1 |
+| runner + stop 200 | 0.95 | -3.6 |
+| runner + stop 300, no post-entry validation | 0.96 | -4.9 |
+| stop 60 (tighter), exits as traded | 0.72 | -12.8 |
+| stop 130, exits as traded | 0.90 | -5.9 |
+| stop 200, exits as traded | 0.92 | -5.7 |
+| post-entry validation off | 0.78 | -12.6 |
+| what-if: no 6.8 pip exit gate (not an input) | 0.36 | -13.8 |
+
+No trailing variant helps here either. The one thing that does is a wider stop: 0.90 at 130 points
+and 0.92 at 200, against 0.78 as traded. It does not reach break-even.
 
 **Self-test.** `tools/selftest.py` runs the package's own quote-bucket cases (`tests/test_bucket_host.py`)
 against the port, checks the continuation filter and the TDI direction against plain numpy/pandas, and checks
@@ -270,30 +284,30 @@ Each input was varied alone around the shipped reference preset, over the whole 
 
 | input | shipped | values tested | lowest | highest | best value | best: Nov-Feb / Mar-May / Oct-Nov |
 | --- | --- | --- | ---: | ---: | --- | --- |
-| InpCPMaxMedianGapMs | 215 | 0, 100, 150, 215, 300 | 0.67 | 0.76 | 150 | 0.72 / 0.78 / 0.85 |
-| MaxTrailingMultiplier | 7.5 | 3, 4, 5, 6, 7.5, 9, 11, 13, 16, 20, 25 | 0.74 | 0.81 | 25 | 0.76 / 0.81 / 1.01 |
-| StopSLPoints | 90 | 40, 60, 75, 90, 110, 130, 160, 200, 300 | 0.71 | 0.78 | 200 | 0.76 / 0.80 / 0.85 |
-| MaxSpreadPoints | 31 | 12, 14, 16, 20, 31, 60 | 0.74 | 0.81 | 14 | 0.82 / 0.79 / 0.83 |
-| SpeedAlertHoldSeconds | 20 | 11, 13, 15, 20, 30, 45, 60 | 0.75 | 0.81 | 11 | 0.86 / 0.78 / 0.74 |
-| InpCPMinTickRate60 | 3.8 | 0, 2, 3, 3.8, 5, 6.5, 8 | 0.72 | 0.77 | 0 | 0.74 / 0.77 / 0.89 |
-| InpEntryHoldMinFavPoints | 5 | -20, 0, 5, 10, 20, 35 | 0.72 | 0.77 | -20 | 0.74 / 0.79 / 0.85 |
-| LimitSLPoints | 90 | 40, 60, 90, 130, 200 | 0.73 | 0.77 | 200 | 0.72 / 0.81 / 0.87 |
-| StopEntryDistancePoints | 35 | 5, 10, 20, 35, 50, 70, 100 | 0.72 | 0.77 | 10 | 0.72 / 0.79 / 0.85 |
-| InpEntryHoldMs | 1100 | 250, 500, 800, 1100, 1500, 2000, 3000 | 0.74 | 0.78 | 250 | 0.74 / 0.80 / 0.89 |
-| MicroBreakBufferPoints | 3 | 0, 3, 6, 10, 20 | 0.72 | 0.76 | 3 | 0.72 / 0.78 / 0.84 |
-| StopTPPoints | 180 | 60, 80, 100, 130, 180, 250, 400, 1000 | 0.73 | 0.76 | 180 | 0.72 / 0.78 / 0.84 |
-| EntryRouterMode | 2 | 0, 1, 2 | 0.76 | 0.80 | 0 | 0.79 / 0.80 / 0.82 |
-| FG_InpAgainst | 1 | 0, 1 | 0.76 | 0.80 | 0 | 0.80 / 0.78 / 0.83 |
+| StopSLPoints | 90 | 40, 60, 75, 90, 110, 130, 160, 200, 300 | 0.66 | 0.76 | 200 | 0.75 / 0.76 / 0.86 |
+| InpCPMaxMedianGapMs | 215 | 0, 100, 150, 215, 300 | 0.64 | 0.72 | 150 | 0.69 / 0.73 / 0.84 |
+| MaxSpreadPoints | 31 | 12, 14, 16, 20, 31, 60 | 0.70 | 0.78 | 14 | 0.80 / 0.75 / 0.81 |
+| InpEntryHoldMinFavPoints | 5 | -20, 0, 5, 10, 20, 35 | 0.66 | 0.74 | -20 | 0.70 / 0.74 / 0.85 |
+| MaxTrailingMultiplier | 7.5 | 3, 4, 5, 6, 7.5, 9, 11, 13, 16, 20, 25 | 0.70 | 0.78 | 25 | 0.71 / 0.79 / 0.97 |
+| LimitSLPoints | 90 | 40, 60, 90, 130, 200 | 0.67 | 0.75 | 200 | 0.70 / 0.77 / 0.86 |
+| EntryRouterMode | 2 | 0, 1, 2 | 0.72 | 0.78 | 0 | 0.77 / 0.77 / 0.83 |
+| SpeedAlertHoldSeconds | 20 | 11, 13, 15, 20, 30, 45, 60 | 0.71 | 0.76 | 11 | 0.80 / 0.74 / 0.72 |
+| InpCPMinTickRate60 | 3.8 | 0, 2, 3, 3.8, 5, 6.5, 8 | 0.68 | 0.73 | 0 | 0.71 / 0.72 / 0.88 |
+| StopEntryDistancePoints | 35 | 5, 10, 20, 35, 50, 70, 100 | 0.68 | 0.73 | 20 | 0.69 / 0.73 / 0.88 |
+| MicroBreakBufferPoints | 3 | 0, 3, 6, 10, 20 | 0.67 | 0.72 | 3 | 0.69 / 0.72 / 0.83 |
+| StopTPPoints | 180 | 60, 80, 100, 130, 180, 250, 400, 1000 | 0.68 | 0.72 | 1000 | 0.70 / 0.73 / 0.82 |
+| InpCPGrossFloor | 16 | 16, 40, 80, 150, 250, 400 | 0.69 | 0.72 | 16 | 0.69 / 0.72 / 0.83 |
+| InpCPMinRange60 | 0 | 0, 50, 100, 200, 400 | 0.69 | 0.72 | 0 | 0.69 / 0.72 / 0.83 |
 
 Settings with fewer than 2,000 trades are left out of the table. Full results: `results/oat_native_all.csv`
-(reference preset) and `results/oat_micro1s_fg.csv` (1 FlashGold inputs around the 1 s micro
-preset, profit factor 0.75 to 0.76).
+(reference preset) and `results/oat_micro1s_fg.csv` (28 FlashGold inputs around the 1 s micro
+preset, profit factor 0.67 to 0.75).
 
 Inputs that change nothing at the shipped values, because another setting makes them unreachable:
-`DowngradeNeutralSellMarketToStop`, `FG_InpMinutes`, `FG_InpSeconds`, `InpBurstThresholdPts`, `InpCPRequireCostCoverage`, `InpUse1000msHold`, `InpUseTrailLayer`, `InpWaitForBurstSettle`, `MarketFollow37Points`, `MinScoreEdge`, `PredictiveExitMinProfitPoints`, `RetestFailedEarlyLossPoints`, `TrailBehindPoints`, `TrailStartPoints`, `TrailStepPoints`, `UseDefensiveCloseLockout`, `UseTrailing`.
+`DowngradeNeutralSellMarketToStop`, `FG_InpMinutes`, `FG_InpSeconds`, `InpBurstThresholdPts`, `InpCPRequireCostCoverage`, `InpUse1000msHold`, `InpUseTrailLayer`, `InpWaitForBurstSettle`, `MarketFollow37Points`, `MinScoreEdge`, `RetestFailedEarlyLossPoints`, `TrailBehindPoints`, `TrailStartPoints`, `TrailStepPoints`, `UseDefensiveCloseLockout`, `UseTrailing`.
 
 One code constant matters more than any input: without the 6.8 pip exit gate (`minimumProfitPips` in
-`TrailingActivationProfitReached`) the replay falls to 0.52. The gate is doing useful work; it would
+`TrailingActivationProfitReached`) the replay falls to 0.51. The gate is doing useful work; it would
 be worth exposing as an input.
 
 ## 8. Trailing on the shipped entries
@@ -317,45 +331,45 @@ off, and the settle rule asks for a 100 pip ($10) pullback inside a trade whose 
 Changing `TrailStart`, `TrailBehind` or `TrailStep` alone therefore does nothing.
 
 **Simple trailing on the shipped entries** (settle rule off, speed exit kept; preset without trailing:
-0.77):
+0.72):
 
 | TrailStartPoints / TrailBehindPoints | behind 20 | behind 30 | behind 40 | behind 60 | behind 80 | behind 110 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| start 69 | 0.79 | 0.78 | 0.78 | 0.77 | 0.77 | 0.76 |
-| start 80 | 0.78 | 0.78 | 0.78 | 0.77 | 0.77 | 0.77 |
-| start 100 | 0.77 | 0.77 | 0.77 | 0.77 | 0.76 | 0.76 |
-| start 130 | 0.76 | 0.76 | 0.77 | 0.76 | 0.76 | 0.76 |
-| start 160 | 0.77 | 0.77 | 0.77 | 0.77 | 0.77 | 0.77 |
+| start 69 | 0.72 | 0.71 | 0.72 | 0.71 | 0.71 | 0.71 |
+| start 80 | 0.72 | 0.72 | 0.72 | 0.71 | 0.71 | 0.71 |
+| start 100 | 0.71 | 0.72 | 0.72 | 0.71 | 0.71 | 0.71 |
+| start 130 | 0.71 | 0.72 | 0.72 | 0.72 | 0.72 | 0.72 |
+| start 160 | 0.72 | 0.72 | 0.72 | 0.72 | 0.72 | 0.72 |
 
-With the settle rule on (source defaults and four variants) the range is 0.77 to
-0.77: the rule mostly prevents the trail from acting.
+With the settle rule on (source defaults and four variants) the range is 0.72 to
+0.72: the rule mostly prevents the trail from acting.
 
 **Trail layer on the shipped entries:**
 
 | reference spread | min / order distance factor | about points behind the peak | profit factor | win % | points per trade |
 | ---: | ---: | ---: | ---: | ---: | ---: |
-| 15 | 1.00 | 15 | 0.79 | 47 | -11.4 |
-| 15 | 2.00 | 30 | 0.78 | 46 | -12.3 |
-| 30 | 1.00 | 30 | 0.78 | 47 | -12.1 |
-| 15 | 3.33 | 50 | 0.77 | 44 | -12.6 |
-| 30 | 2.00 | 60 | 0.77 | 44 | -12.6 |
-| 15 | 5.00 | 75 | 0.77 | 40 | -13.0 |
-| 30 | 3.33 | 100 | 0.77 | 36 | -13.6 |
-| 30 | 5.00 | 150 | 0.77 | 36 | -14.0 |
+| 15 | 1.00 | 15 | 0.72 | 46 | -16.3 |
+| 15 | 2.00 | 30 | 0.71 | 45 | -17.1 |
+| 30 | 1.00 | 30 | 0.71 | 46 | -17.0 |
+| 15 | 3.33 | 50 | 0.71 | 43 | -17.2 |
+| 30 | 2.00 | 60 | 0.71 | 43 | -17.3 |
+| 15 | 5.00 | 75 | 0.71 | 39 | -17.6 |
+| 30 | 3.33 | 100 | 0.71 | 36 | -18.1 |
+| 30 | 5.00 | 150 | 0.72 | 36 | -18.2 |
 
 **Letting winners run** (speed profit exit off, far target, late trail) is the best exit structure for the
 shipped entries, and still below 1:
 
 | trail start | trail behind | target | profit factor | Nov-Feb | Mar-May | Oct-Nov 2026 | win % | points per trade |
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| 160 | 110 | 600 | 0.82 | 0.78 | 0.83 | 0.98 | 28 | -11.3 |
-| 160 | 30 | 600 | 0.82 | 0.81 | 0.81 | 0.93 | 28 | -11.3 |
-| 160 | 60 | 600 | 0.82 | 0.80 | 0.82 | 0.94 | 28 | -11.4 |
-| 69 | 30 | 600 | 0.82 | 0.79 | 0.82 | 0.95 | 47 | -9.9 |
-| 69 | 60 | 600 | 0.82 | 0.78 | 0.82 | 0.99 | 44 | -10.1 |
-| 100 | 110 | 600 | 0.81 | 0.76 | 0.83 | 0.98 | 32 | -11.2 |
-| 69 | 110 | 600 | 0.81 | 0.76 | 0.82 | 0.99 | 32 | -11.1 |
-| 100 | 60 | 600 | 0.81 | 0.78 | 0.82 | 0.93 | 38 | -11.2 |
+| 160 | 30 | 600 | 0.75 | 0.73 | 0.74 | 0.90 | 28 | -16.9 |
+| 160 | 110 | 600 | 0.75 | 0.70 | 0.75 | 0.95 | 28 | -17.0 |
+| 160 | 60 | 600 | 0.75 | 0.72 | 0.74 | 0.91 | 28 | -17.0 |
+| 160 | 30 | 180 | 0.73 | 0.71 | 0.74 | 0.84 | 29 | -17.9 |
+| 100 | 110 | 600 | 0.73 | 0.68 | 0.74 | 0.94 | 31 | -17.4 |
+| 160 | 60 | 180 | 0.73 | 0.70 | 0.73 | 0.83 | 29 | -18.2 |
+| 100 | 60 | 600 | 0.73 | 0.69 | 0.73 | 0.89 | 37 | -17.3 |
+| 69 | 110 | 600 | 0.73 | 0.67 | 0.73 | 0.95 | 31 | -17.7 |
 
 Trailing on the calibrated entries is in section 10.
 
@@ -367,28 +381,28 @@ Profit factor, speed profit exit off:
 
 | stop loss / take profit | target 120 | target 180 | target 300 | target 600 | target 1500 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| stop 40 | 0.66 | 0.69 | 0.70 | 0.73 | 0.68 |
-| stop 60 | 0.71 | 0.73 | 0.75 | 0.78 | 0.78 |
-| stop 90 | 0.75 | 0.77 | 0.79 | 0.79 | 0.79 |
-| stop 130 | 0.77 | 0.80 | 0.81 | 0.81 | 0.83 |
-| stop 200 | 0.79 | 0.81 | 0.82 | 0.82 | 0.79 |
-| stop 300 | 0.78 | 0.80 | 0.80 | 0.81 | 0.79 |
-| stop 450 | 0.78 | 0.79 | 0.80 | 0.81 | 0.79 |
+| stop 40 | 0.58 | 0.62 | 0.62 | 0.65 | 0.60 |
+| stop 60 | 0.65 | 0.67 | 0.69 | 0.72 | 0.72 |
+| stop 90 | 0.70 | 0.73 | 0.74 | 0.75 | 0.75 |
+| stop 130 | 0.73 | 0.76 | 0.77 | 0.78 | 0.80 |
+| stop 200 | 0.76 | 0.78 | 0.79 | 0.80 | 0.77 |
+| stop 300 | 0.77 | 0.78 | 0.78 | 0.80 | 0.78 |
+| stop 450 | 0.77 | 0.78 | 0.79 | 0.80 | 0.78 |
 
 Points per trade, same grid:
 
 | stop loss / take profit | target 120 | target 180 | target 300 | target 600 | target 1500 |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| stop 40 | -14.0 | -13.3 | -13.7 | -12.7 | -16.0 |
-| stop 60 | -14.2 | -14.1 | -14.1 | -13.2 | -13.6 |
-| stop 90 | -15.3 | -14.6 | -14.5 | -14.8 | -15.5 |
-| stop 130 | -16.3 | -15.0 | -15.4 | -15.5 | -14.7 |
-| stop 200 | -17.2 | -16.5 | -17.0 | -17.6 | -21.1 |
-| stop 300 | -19.6 | -19.4 | -21.3 | -20.7 | -23.6 |
-| stop 450 | -21.5 | -22.1 | -22.6 | -22.3 | -26.5 |
+| stop 40 | -19.2 | -18.6 | -19.2 | -18.4 | -21.9 |
+| stop 60 | -18.7 | -18.7 | -19.0 | -18.2 | -18.8 |
+| stop 90 | -19.1 | -18.6 | -18.7 | -19.2 | -20.1 |
+| stop 130 | -19.6 | -18.3 | -18.9 | -19.1 | -18.5 |
+| stop 200 | -19.7 | -19.0 | -19.6 | -20.2 | -23.8 |
+| stop 300 | -21.6 | -21.3 | -23.3 | -22.7 | -25.7 |
+| stop 450 | -22.9 | -23.5 | -24.1 | -23.7 | -28.0 |
 
 The profit factor moves because the size of wins and losses moves. The points lost per trade do not. The
-highest profit factor in the whole grid (with the speed exit off, at 100 or at 200) is 0.83.
+highest profit factor in the whole grid (with the speed exit off, at 100 or at 200) is 0.81.
 
 ## 10. What gets closest: large bursts at a tight spread
 
@@ -434,16 +448,17 @@ seconds". That is the EA's own idea, turned up.
 | spread cap 10 | 0.86 | 0.91 | 1.02 | 1.04 | 1.09 | 1.14 | 1.02 | 0.95 |
 
 (The calibrated preset with only these two inputs changed; trade counts are in the figure.) Below a
-multiplier of 20 nothing reaches break-even (best 0.91); the band of 25 to 40 does, at a spread cap
-of 12 to 20. The same grid without the entry hold and the post-entry validation, with a 200 point stop, stays
-between 0.90 and 1.15 (`results/grid_stops.csv`), so the other settings of the preset matter too.
+multiplier of 20 nothing reaches break-even (best 0.91). From 25 to 40 most cells are at or above
+1, with the best at 30 and 35 and a spread cap of 12 to 14. The same grid without the entry hold and the
+post-entry validation, with a 200 point stop, stays between 0.82 and 1.06
+(`results/grid_stops.csv`), so the other settings of the preset matter too.
 
 ### The calibrated preset
 
 | input | shipped | calibrated | what it does |
 | --- | ---: | ---: | --- |
 | `MaxTrailingMultiplier` | 7.5 | 30 | alert only on a move of 30 spreads within the lookback |
-| `MaxSpreadPoints` | 31 | 14 | no entry while the spread is above about its median (15 over the replayed months; use your symbol's median) |
+| `MaxSpreadPoints` | 31 | 14 | no entry while the spread is above about its median (15 over the replayed months; rescale both for another spread, section 11) |
 | `EntryRouterMode` | StopMarketLimit | StopOnly | no limit fades (they lose from the first second) and no market entries (they lose to the order delay) |
 | `StopEntryDistancePoints` | 35 | 50 | the burst has to continue a little further before the stop order fills (effect inside the noise, see below) |
 | `StopTPPoints` (and market/limit targets) | 180 (160) | 600 | let the winners run |
@@ -743,7 +758,19 @@ Values that beat the preset by at least 0.03 in all three samples (4):
 | InpCPMinTickRate60 | 2 | 1,284 | 1.18 | 1.19 | 1.08 | 1.49 | 4,666 |
 | InpCPMinTickRate60 | 0 | 1,288 | 1.18 | 1.19 | 1.07 | 1.49 | 4,666 |
 
-(pending)
+Two of them are FlashGold gate inputs: a wider band around the armed level (`FG_InpBandAtr`) and a larger entry distance (`FG_InpEntryDistAtr`). Both make the gate stricter and cut the number of trades. Because single replays are noisy, they were put through a grid of 96 sets (four bands, three entry distances, four multipliers, two spread caps), `results/grid_flashgold.csv`:
+
+| input | value | sets | average trades | average profit factor | Nov-May | Oct-Nov 2026 | sets at or above 1, % |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `FG_InpBandAtr` | 0.25 | 24 | 939 | 1.15 | 1.07 | 1.62 | 100 |
+| `FG_InpBandAtr` | 0.5 | 24 | 790 | 1.17 | 1.07 | 1.71 | 100 |
+| `FG_InpBandAtr` | 1 | 24 | 537 | 1.20 | 1.09 | 1.73 | 100 |
+| `FG_InpBandAtr` | 1.5 | 24 | 357 | 1.16 | 1.05 | 1.76 | 96 |
+| `FG_InpEntryDistAtr` | 0.25 | 32 | 720 | 1.16 | 1.08 | 1.63 | 97 |
+| `FG_InpEntryDistAtr` | 0.5 | 32 | 660 | 1.18 | 1.06 | 1.77 | 100 |
+| `FG_InpEntryDistAtr` | 1 | 32 | 587 | 1.17 | 1.07 | 1.72 | 100 |
+
+The band holds up on average: 1.15 at the shipped 0.25 against 1.20 at 1, higher in the months to May (1.07 to 1.09) and in October-November (1.62 to 1.73), on about 537 trades instead of 939. The entry distance does not (1.16 at the shipped 0.25, 1.18 at 0.5). Neither is in the calibrated preset: fewer trades make the result harder to verify, and a gain that appears after the preset was fixed is the kind that most often disappears. `FlashGold_NativeReference_Calibrated_flashgold_TESTER_OPT.set` is the range file to test them in MetaTrader.
 
 ## 11. FlashGold micro mode, spread, and what to do next
 
@@ -772,14 +799,46 @@ preset, 1.14 for the calibrated preset.
 | shipped reference preset | 11,682 | 10,912 | 9,282 | 7,380 | 3,669 |
 | calibrated preset | 6,694 | 3,109 | 1,234 | 567 | 230 |
 
+The calibrated preset is best at the spread it was calibrated on and falls off on both sides. That is not
+the spread itself: `MaxTrailingMultiplier` and `MaxSpreadPoints` both count in spreads, so on a tighter feed
+the same numbers let much smaller bursts through (five times as many trades at a 5 point median). The preset
+was replayed again with those two inputs rescaled to each feed, so that the alert needs the same move in
+points (450, which is 30 x 15) and the cap sits at the same place below the median, and once more with
+`MinSpeedAlertPoints` 450 as a fixed floor instead:
+
+| calibrated preset, feed rebuilt at four spreads | median 5 | median 10 | median 15 | median 20 |
+| --- | ---: | ---: | ---: | ---: |
+| calibrated preset as it is (multiplier 30, spread cap 14) | 1.03 | 1.01 | 1.15 | 0.92 |
+| multiplier and spread cap rescaled to the feed (450 points / median spread, 0.93 x median) | 1.20 | 1.21 | 1.15 | 1.02 |
+| as it is, with MinSpeedAlertPoints 450 and the spread cap rescaled | 1.00 | 0.99 | 1.02 | 0.82 |
+
+| trades | median 5 | median 10 | median 15 | median 20 |
+| --- | ---: | ---: | ---: | ---: |
+| calibrated preset as it is (multiplier 30, spread cap 14) | 6,694 | 3,109 | 1,234 | 567 |
+| multiplier and spread cap rescaled to the feed (450 points / median spread, 0.93 x median) | 1,338 | 1,164 | 1,233 | 1,244 |
+| as it is, with MinSpeedAlertPoints 450 and the spread cap rescaled | 552 | 434 | 462 | 412 |
+
+(Rescaled values: median 5: multiplier 90, cap 5; median 10: multiplier 45, cap 9; median 15: multiplier 30, cap 14; median 20: multiplier 23, cap 19.) Rescaled, the preset keeps about the same number of trades and
+makes 1.20 and 1.21 at the two tighter spreads, against 1.03 and
+1.01 unscaled. A fixed floor in points does not do the same job (1.00,
+0.99): what works is the size of the burst against the spread of that moment. At a 20 point
+median nothing does better than break-even. For another symbol:
+
+| median spread of the symbol | `MaxTrailingMultiplier` | `MaxSpreadPoints` |
+| ---: | ---: | ---: |
+| 8 | 56 | 7 |
+| 10 | 45 | 9 |
+| 12 | 38 | 11 |
+| 15 (the replayed feed) | 30 | 14 |
+
 **Checking this in MetaTrader.** Use `presets/FlashGold_NativeReference_Calibrated_DISABLED.set` with
 `TradingEnabled` switched on in the tester, "Every tick based on real ticks", an execution delay of about
 150 ms, and at least three months. Things to compare with section 10: trades per day (about
 8), share of trades that end at a stop (86%), average win and loss
 (+230 / -99). Then, if it holds:
 
-1. `FlashGold_NativeReference_Calibrated_entries_TESTER_OPT.set` optimises `MaxTrailingMultiplier` 20-45,
-   `MaxSpreadPoints` 9-16, `StopEntryDistancePoints` 20-80 and `PendingExpirySeconds` 3-15.
+1. `FlashGold_NativeReference_Calibrated_entries_TESTER_OPT.set` optimises `MaxTrailingMultiplier` 20-60,
+   `MaxSpreadPoints` 7-16, `StopEntryDistancePoints` 20-80 and `PendingExpirySeconds` 3-15.
 2. `FlashGold_NativeReference_Calibrated_exits_TESTER_OPT.set` optimises the stop, the target and the trail
    layer distance (through `InpReferenceSpreadPts`).
 3. `FlashGold_NativeReference_Calibrated_simple_trailing_TESTER_OPT.set` optimises the simple trailing in
@@ -789,9 +848,9 @@ preset, 1.14 for the calibrated preset.
 5. `FlashGold_NativeReference_shipped_trailing_TESTER_OPT.set` is the trailing question on the shipped
    entries (expect section 8: no gain).
 
-Use a forward period and keep the delay on. Set `MaxSpreadPoints` from your symbol's median spread, not from
-the number 14. Count the broker's commission: 3 points per round trip leaves 1.10 in the replay
-and 7 points 1.04.
+Use a forward period and keep the delay on. Take `MaxTrailingMultiplier` and `MaxSpreadPoints` from your
+symbol's median spread with the table above, not from the numbers 30 and 14. Count the broker's commission:
+3 points per round trip leaves 1.10 in the replay and 7 points 1.04.
 
 **Changes in the code that the data supports**, none of them made here: a rolling or restarting bucket
 series for the micro mode; the 6.8 pip exit gate as an input; a commission input that the continuation
@@ -800,7 +859,10 @@ filter can use; an hour filter is *not* supported by the data (no hour is reliab
 ## 12. Limits
 
 - This is a replay written from the source, not MetaTrader. It matches the real account's exit mix, win rates
-  and slippage, but it has been compared trade by trade on 283 trades only.
+  and slippage, and it was compared trade by trade on 1,621 of the 2,584 real trades, where it ends
+  5 points per trade below the account. None of those real trades used the calibrated settings.
+- Stop-order entries slip as much on average in the replay as on the account, but the account's worst tenth
+  is worse. The calibrated preset enters in larger bursts than any real trade in the sample.
 - The spread is a scaled Dukascopy spread. A broker whose spread behaves differently in fast markets changes
   the result; `MaxSpreadPoints` and `MaxTrailingMultiplier` both act through the spread.
 - The calibrated preset earns 10.0 points per trade before commission, with a stop slippage factor
@@ -830,11 +892,12 @@ tools/selftest.py              checks of the port
 pip install numpy pandas numba pyarrow matplotlib
 cd flashgold_micro_calibration/tools
 python -I fetch_hf_ticks.py ../data 2025-11 2026-05          # ticks, public copy of the Dukascopy feed
-python -I fetch_dukascopy.py fetch XAUUSD 2026-10-06 2026-11-13 ../data && python -I fetch_dukascopy.py build XAUUSD ../data
+python -I fetch_dukascopy.py fetch XAUUSD 2026-10-06 2026-11-13 ../data
+python -I fetch_dukascopy.py build XAUUSD ../data ../data 2026-10-06 2026-11-13     # main feed: only the continuous weeks
 python -I fetch_dukascopy.py hours XAUUSD ../data/real_trade_hours.txt ../data     # hours of the real-trade window, slow
 python -I fetch_dukascopy.py build XAUUSD ../data ../data/real_window 2026-09-01 2026-10-09
 python -I chart_trades.py <component>/basis/saved_chart.chr ../results/real/real_trades_sar.csv
-bash run_all.sh                                               # about 45 minutes on 4 cores, 16 GB
+bash run_all.sh                                               # about 50 minutes on 4 cores, 16 GB
 python -I classify_inputs.py ../results
 python -I make_presets.py ../presets/presets_spec.json ../presets
 python -I charts.py ../results && python -I make_report.py

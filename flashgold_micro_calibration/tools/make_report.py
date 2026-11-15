@@ -150,7 +150,7 @@ def build():
     V["T_fidelity_mix"] = md(fm[["kind", "real", "replay"]].rename(columns={"kind": "closed by", "real": "real trades %", "replay": "replay %"}))
     rr = read("real/real_replay_variants.csv")
     b0 = rr.iloc[0]
-    V["rr_n"] = f"{int(b0.sim_n)}"
+    V["rr_n"] = f"{int(b0.sim_n):,}"
     V["rr_sim_avg"] = f"{b0.sim_avg:.1f}"
     V["rr_real_avg"] = f"{b0.real_avg:.1f}"
     V["rr_sim_pf"] = f"{b0.sim_pf:.2f}"
@@ -161,6 +161,9 @@ def build():
     V["rr_corr"], V["rr_sign"], V["rr_close"] = f"{ag['corr']:.2f}", f"{100 * ag['same_sign']:.0f}%", f"{100 * ag['within_15']:.0f}%"
     V["rr_days"], V["rr_stretches"] = str(ag["days"]), str(ag["stretches"])
     V["rr_gap"] = f"{b0.sim_avg - b0.real_avg:+.1f}"
+    V["rr_gap_abs"] = f"{abs(b0.sim_avg - b0.real_avg):.0f}"
+    V["rr_stop130"] = f"{rr[rr.name.str.startswith('stop 130')].sim_pf.iloc[0]:.2f}"
+    V["rr_stop200"] = f"{rr[rr.name.str.startswith('stop 200')].sim_pf.iloc[0]:.2f}"
 
     # ------------------------------------------------------------------ fills: real account against the replay
     sl = real[(real.exit_kind == "SL") & real.exit_level.notna()].copy()
@@ -205,6 +208,14 @@ def build():
     V["sl_pair_n"] = str(len(pr))
     V["sl_pair_real"] = f"{(pr.side * (pr.exit_level - pr.exit) / 0.01).mean():.1f}"
     V["sl_pair_sim"] = f"{(pr.side * (pr.exit_level - pr.exit_sim) / 0.01).mean():.1f}"
+    V["sl_pair_factor"] = f"{(pr.side * (pr.exit_level - pr.exit) / 0.01).mean() / ((pr.side * (pr.exit_level - pr.exit_sim) / 0.01).mean() / 1.5):.2f}"
+    V["sl_pair_exact_real"] = f"{100 * exact(pr.side * (pr.exit_level - pr.exit) / 0.01):.0f}%"
+    V["sl_pair_exact_sim"] = f"{100 * exact(pr.side * (pr.exit_level - pr.exit_sim) / 0.01):.0f}%"
+    win_real = bt[bt.exit_kind.isin(["SA_PROFIT_EXIT", "TP"])]
+    V["rr_win_n"] = f"{len(win_real):,}"
+    V["rr_win_lost"] = f"{100 * (win_real.pts_sim < 0).mean():.0f}%"
+    V["rr_win_real"], V["rr_win_sim"] = f"{win_real.pts.mean():.0f}", f"{win_real.pts_sim.mean():.0f}"
+    V["rr_share"] = f"{100 * len(bt) / len(real):.0f}%"
 
     # ------------------------------------------------------------------ baseline
     bs = read("baseline_summary.csv")
@@ -599,6 +610,23 @@ def build():
     pn = sp.pivot_table(index="name", columns="spread_median", values="n").loc[list(dict.fromkeys(sp.name))]
     pn.columns = [f"{c:.0f} points" for c in pn.columns]
     V["T_spread_n"] = md(pn.reset_index().rename(columns={"name": "trades"}))
+
+    # ---- the calibrated preset carried to other spreads
+    with maybe():
+        st2 = read("study_spread_transfer.csv")
+        names2 = list(dict.fromkeys(st2.name))
+        for col, key, dec in (("pf", "T_transfer", 2), ("n", "T_transfer_n", 0)):
+            piv = st2.pivot_table(index="name", columns="spread_median", values=col).loc[names2]
+            piv.columns = [f"median {c:.0f}" for c in piv.columns]
+            V[key] = md(piv.reset_index().rename(columns={"name": "calibrated preset, feed rebuilt at four spreads" if col == "pf" else "trades"}),
+                        {c: dec for c in piv.columns})
+        sc = st2[st2.name == names2[1]].sort_values("spread_median")
+        V["transfer_settings"] = "; ".join(f"median {r.spread_median:.0f}: multiplier {r.MaxTrailingMultiplier:.0f}, cap {r.MaxSpreadPoints:.0f}" for r in sc.itertuples())
+        for k_, nm in (("asis", names2[0]), ("scaled", names2[1]), ("floor", names2[2])):
+            g_ = st2[st2.name == nm].set_index(st2[st2.name == nm].spread_median.round(0))
+            for med_ in (5, 10, 20):
+                if med_ in g_.index:
+                    V[f"tr_{k_}_{med_}"] = f"{g_.loc[med_].pf:.2f}"
 
     # ------------------------------------------------------------------ FlashGold inputs
     with maybe():

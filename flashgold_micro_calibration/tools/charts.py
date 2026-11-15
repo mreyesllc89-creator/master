@@ -1,7 +1,8 @@
 """Report figures (static PNG, light surface). usage: python -I charts.py <results_dir>
 
 Colour follows the entity in every figure: blue = the shipped reference preset, orange = the calibrated
-preset, aqua = the real account, yellow = the market-entry set found without an order delay. Reference
+preset, aqua = the real account, yellow = the market-entry set found without an order delay, magenta = the
+shipped preset with the market route opened. Reference
 levels (break-even, cost) are drawn in ink, not in a series colour. Thin marks, 2 px lines, hairline
 grid, text in ink colours, a legend only when there are two or more series, never two y scales.
 """
@@ -19,7 +20,7 @@ import pandas as pd
 from matplotlib.patches import Patch
 
 SURFACE, INK, INK2, MUTED, GRID, AXIS = "#fcfcfb", "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
-BLUE, ORANGE, AQUA, YELLOW = "#2a78d6", "#eb6834", "#1baf7a", "#eda100"
+BLUE, ORANGE, AQUA, YELLOW, MAGENTA = "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4"
 SEQ = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
 
 plt.rcParams.update({
@@ -286,7 +287,7 @@ def fig_latency(res, out):
     d = pd.read_csv(os.path.join(res, "latency.csv"))
     fig, ax = plt.subplots(figsize=(8.2, 4.3), dpi=160)
     frame(ax)
-    colors = {"shipped reference preset": BLUE, "calibrated preset": ORANGE, "shipped preset with the market route opened": AQUA,
+    colors = {"shipped reference preset": BLUE, "calibrated preset": ORANGE, "shipped preset with the market route opened": MAGENTA,
               "best set found with no order delay": YELLOW}
     for name in dict.fromkeys(d.name):
         short = name.split(" (")[0]
@@ -339,7 +340,7 @@ def fig_equity(res, out):
     ax.set_xlabel("trades in time order; ticks mark the first trade of a month (year-month), no quotes for June to September 2026")
     ax.set_ylabel("cumulative points per 0.01 lot")
     pos = int((t.groupby(month).pts.sum() > 0).sum())
-    title(ax, f"The calibrated preset earns in {pos} of {month.nunique()} months; the others are flat or negative",
+    title(ax, f"The calibrated preset's profit comes from {pos} of {month.nunique()} months",
           f"Cumulative result of the calibrated preset in the replay, {len(t):,} trades, fills calibrated to the real account")
     fig.tight_layout()
     fig.savefig(out)

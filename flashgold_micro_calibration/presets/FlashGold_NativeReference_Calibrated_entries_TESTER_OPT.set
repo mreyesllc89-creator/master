@@ -105,7 +105,7 @@ InpAIJourneyShadowLogFile=SpeedAlertRouter_XAUUSD_ai_journey_shadow_v2.csv
 InpAIHardGateEnabled=false
 InpAIRiskAdjustEnabled=false
 Inp02_SpeedAlert==== MaxTrailingMultiplier Speed Alert ===
-MaxTrailingMultiplier=30.0||20.0||5.0||45.0||Y
+MaxTrailingMultiplier=30.0||20.0||5.0||60.0||Y
 SpeedLookbackSeconds=10
 MinSpeedAlertPoints=37.0
 SpeedAlertHoldSeconds=20
@@ -169,7 +169,7 @@ CandleBodyScore=1.5
 MicroBreakLookbackSeconds=10
 MicroBreakBufferPoints=3.0
 MicroBreakScore=1.5
-MaxSpreadPoints=14.0||9.0||1.0||16.0||Y
+MaxSpreadPoints=14.0||7.0||1.0||16.0||Y
 SpreadStableScore=0.5
 Inp04_OrderFlow==== Order Flow Global Variables ===
 UseOrderFlow=false
