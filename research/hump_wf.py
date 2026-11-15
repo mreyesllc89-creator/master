@@ -40,6 +40,26 @@ holds except what is listed here; meta.json of the build says "protocol": 2, and
             and USA500IDXUSD for US500), through duk_to_m1 (DUK_INSTRUMENT; bi5 prices / 1e5 and / 1e3): mid prices,
             tick volume, UTC converted to server time once. The Dukascopy spread of every bar (ask close - bid close) is
             kept next to the series (duk_spread.npy) for the clock check and the shape of the spread.
+            duk_to_m1 drops every minute with volume 0 on both sides (Dukascopy's fill of a closed minute), as for gold.
+            Some of them are quotes without a volume figure, whose prices move (the build reports them, meta.json
+            "coverage"): US500 39367, all in 2013-2017, on 79 weekdays that are missing or almost (68 of 2013, most of
+            them in 25 Feb - 21 May 2013, when the series has no bar at all, and 11 whole days of 2014-2017); EURUSD 56
+            (10 Oct 2024, 02:05-03:09 server time). Gold's Dukascopy folders have none. They stay out: kept, they would
+            fail the pre-registered US500 2013 clock check (their quote droughts of 45-150 minutes read as daily breaks:
+            reopen at 01:00-01:15 on 88% of 125 days; the cash-only 2013Q1 would put the largest jump at 18:30) and bring
+            night hours onto a few days of 2016-2017, years that otherwise have none (09:00-23:00 server time only).
+  US500     what the data covers, found by the build (meta.json "coverage"; reported, nothing is decided on it): 2013 has
+            the US cash session only (16:00-23:59 server time, about 390 bars a day) on 45 weekdays, 2 Jan - 22 Feb (with a
+            zero Dukascopy spread) and 30 Sep - 21 Oct, nothing from 23 Feb to 21 May (the dropped quotes above), and holes
+            of 5-6 days in January, February and October; 23 Jan - 7 Feb 2014 is the cash session only too; in 2013-2014
+            the night (01:00-09:59 server time) is nearly flat (median one-minute range 0.16-0.21 bp of the price, against
+            0.9-2.4 bp from 2018 on); bars at 01:00-08:59 exist on 68 weekdays of 2015 (the last on 5 Nov), on none from
+            then to 12 Apr 2018 (09:00-23:00 server time only), and on every weekday after. So asia_break and asia_inside
+            (the 01:00-09:00 range), and hours_7_10 on H1, have no trades in 2016-2017; with MIN_N no setup qualifies for
+            them in the windows of 2016-2020 (trial run, N=300), so they are judged on 2021-2025 only; and in 2015-2017
+            the sessions, the base signals and the daily values (pdr, tdr, pdpos, dopen) run on a 09:00-23:00 day. Whether
+            US500 should be judged on these years at all is for the user to decide; the protocol as registered uses them.
+            EURUSD covers every hour of every year.
   clock     fatal on the whole series and on every year with more than 100000 bars.
             EURUSD, which has no daily break: (a) the FX week opens Sunday 17:00 New York = Monday 00:00 server time in
             summer and winter, so the first bar after a closure of 24 h or more is on Monday 00:00-00:05 after at least
@@ -50,12 +70,14 @@ holds except what is listed here; meta.json of the build says "protocol": 2, and
             US500: the daily reopen after the CME maintenance break at 01:00-01:15 server time on at least 90% of the days,
             and the US stock open jump at 16:30 the largest of the half-past marks in at least two thirds of the quarters
             (clock_check with top=1). "hump_wf.py clockshift" shows that copies shifted by +1 h and -1 h fail.
-            Found in the data (build, meta.json "schedule_by_year"): US500 has its daily break at 00:15-01:00 server time
-            in 2013-2014 (Friday close 00:00), only 09:00-23:00 server time from early 2015 to 2017 (no daily break: the
-            reopen test does not apply there, the 16:30 jump decides; Friday close 23:01), the break at 23:15-01:00 from 2018 on
-            (Friday close 23:15, the usual close). Two years fail one mark for a reason of the data provider and pass with
-            a lowered threshold (CLOCK_EXCEPTIONS, reported as deviations): EURUSD 2013, the rollover mark in 3 of 4
-            quarters; US500 2014, the reopen at 01:00-01:15 after 84.6% of the 45-150 minute gaps.
+            Found in the data (build, meta.json "schedule_by_year" and "friday_window"): US500 has its daily break at
+            00:15-01:00 server time in 2013-2014 (Friday close 24:00), mostly 09:00-23:00 server time from 13 Feb 2015 to
+            12 Apr 2018 (no daily break: the reopen test does not apply there, the 16:30 jump decides; Friday close 23:01,
+            the end of the 23:00 bar, and 23:00, the end of the 22:59 bar, on 4 Fridays of 2015 and on every regular Friday
+            from 8 Sep 2017 to 6 Apr 2018), and the break at 23:15-01:00 from April 2018 on (Friday close 23:15, the usual
+            close). Two years fail one mark for a reason of the data provider and pass with a lowered threshold
+            (CLOCK_EXCEPTIONS, reported as deviations): EURUSD 2013, the rollover mark in 3 of 4 quarters; US500 2014, the
+            reopen at 01:00-01:15 after 84.6% of the 195 gaps of 45-150 minutes.
   anchor    the mean close of the 180 days that end on 2025-12-31 (2026 plays no part in anything that is decided).
   space     buf, min_risk and the two larger minimum stops are gold's dollar values times k = the symbol's median
             one-minute high-low range / gold's (wf/gold2/m1.pkl), both over those 180 days, each rounded to two
@@ -69,15 +91,22 @@ holds except what is listed here; meta.json of the build says "protocol": 2, and
             The shape of the day is the symbol's median Dukascopy spread by server hour over 2013-2025 (not 2026),
             divided by its median over the hours (meta.json; gold keeps FTMO's hourly table). No spread filter (as BTC).
   rules     the EA's Friday close and its catch-up at the next open as for gold, from 23:00 server time for EURUSD and
-            from 15 minutes before US500's usual Friday close (23:15, so also from 23:00; build checks it); no entry on
-            the first bar after a break of 30 minutes or more. hump_search BASE: skip_big_pb=1, weekend_close=1, no
-            spread filter.
+            from 22:45 for US500: 15 minutes before its earliest regular Friday close (23:00; a close is regular when it
+            ends 10% or more of a year's Fridays, 2013-2025), so that the window opens before the last bar of every Friday
+            with a regular close (build checks it). A deviation: the pre-registered "15 minutes before its usual Friday
+            close" gives 23:00 (usual close 23:15), a window that never opens on the 33 Fridays whose last bar is 22:59
+            (4 in 2015, 29 from 8 Sep 2017 to 6 Apr 2018) and would hold their trades to Monday 09:00. Fridays that close
+            earlier still (holidays) are caught up at the next open, as for gold. No entry on the first bar after a break
+            of 30 minutes or more. hump_search BASE: skip_big_pb=1, weekend_close=1, no spread filter.
   features  the 59 conditions mean the same on every symbol: the round-number grid (0.5% of the previous day's close,
             rounded to the nearest step) extends below 1 (NICE2; gold and BTC prices choose the same step as before),
             and the random controls draw from a stream of their own per symbol.
   windows   the calibration sums leave out the trades that close in a later calendar year than they open (a late-
             December trade must not bring test-year prices into the calibration); the test year counts every trade by
-            its entry year, as before.
+            its entry year, as before, except the last test year before the final one (2025), which counts only the
+            trades that close in it: a trade open at New Year 2026 would bring final-year prices into the pass decision.
+            (A deviation that settles a conflict inside the pre-registration: "2026 plays no part in anything that is
+            decided" against "the test-year sums keep them by entry year". "detail" leaves those trades out too.)
   final     "wf" writes the final year (2026) only for the cells that pass, and computes nothing about it for the
             others. "detail" does the same, and adds the trades collapsed to distinct (entry time, side) signals (mean
             R over the picks that took each) with the pass rule applied to them and the counts.
@@ -147,7 +176,7 @@ GOLD_M1 = os.environ.get("HUMP_GOLD_M1", "/tmp/claude-0/-workspace-master/53e0ea
 # end of the 23:14 bar) from April 2018, its most frequent close; at 23:00 (the 22:59 bar) on 4 Fridays of 2015 and every
 # regular Friday from 2017-09-08 to 2018-04-06, at 23:01 (the 23:00 bar) on most Fridays of 2015-2017, and at 24:00 in
 # 2013-2014. A window from 23:00 (the usual close minus 15 minutes) would not open on the Fridays that close at 23:00 and
-# would hold their trades to Monday 09:00; 22:45 is the "usual close minus 15 minutes" of the 2015-2018 feed.
+# would hold their trades to Monday 09:00; 22:45 is 15 minutes before that 23:00 close (a deviation, see the docstring).
 WEEKEND_MIN = {"US500": 22 * 60 + 45}.get(SYM, 1380)
 REGULAR_CLOSE_SHARE = 0.10                      # a Friday close found on 10% of a year's Fridays is regular (holidays are not)
 # Protocol 2: a year in which one clock mark sits elsewhere for a reason of the data provider, found when the data was
@@ -301,7 +330,8 @@ def build2(work, folder):
     import duk_to_m1 as D
     assert D.DIVISOR == DUK_DIVISOR[SYM], (D.DIVISOR, SYM)
     t0 = time.time()
-    m1, half = D.load(folder, keep_moving=True)
+    dl = []                                                        # dropped minutes whose prices move (no volume figure)
+    m1, half = D.load(folder, dropped=dl)
     m1 = m1[["open", "high", "low", "close", "vol"]].astype(float)
     # Dukascopy spread (ask close - bid close) of each bar, in the feed's price steps (equal spreads, equal numbers)
     spread = np.round(2.0 * np.asarray(half, float) * DUK_DIVISOR[SYM]) / DUK_DIVISOR[SYM]
@@ -309,20 +339,24 @@ def build2(work, folder):
     assert np.isfinite(m1[["open", "high", "low", "close"]].values).all() and (m1["low"] <= m1["high"]).all()
     print(f"{SYM}: {len(m1)} bars {m1.index[0]} .. {m1.index[-1]} read in {time.time() - t0:.0f}s", flush=True)
     notes = [f"Dukascopy {DUK_NAME[SYM]} one-minute BID and ASK candles (prices = bi5 integers / {DUK_DIVISOR[SYM]:g}), "
-             f"mid prices, UTC converted once to server time (New York + 7 h); a minute with volume 0 on both sides is "
-             f"dropped when it is flat on both sides (Dukascopy's fill bar of a closed minute) and kept with unknown volume "
-             f"when its prices move (duk_to_m1.load keep_moving); source {os.path.abspath(folder)}"]
+             f"mid prices, minutes with volume 0 on both sides dropped (as for gold), UTC converted once to server time "
+             f"(New York + 7 h); source {os.path.abspath(folder)}"]
     yr = m1.index.year.values
     hist = yr <= 2025                                              # what is decided uses 2013-2025, never 2026
-    nv = np.asarray(m1["vol"].isna())
-    nv_days = pd.Series(nv).groupby(m1.index.normalize()).sum()
-    nv_days = nv_days[nv_days >= 100]
-    vol_unknown = dict(by_year={int(y): int(n) for y, n in pd.Series(nv).groupby(yr).sum().items() if n},
-                       days_with_100_or_more={str(d.date()): int(n) for d, n in nv_days.items()})
-    if nv.any():
-        notes.append(f"{int(nv.sum())} minutes whose BID or ASK prices move but whose Dukascopy volume is 0 on both sides are "
-                     f"kept with unknown volume (the volume conditions skip them): by year {vol_unknown['by_year']}; "
-                     f"{len(nv_days)} days with 100 or more of them: {list(vol_unknown['days_with_100_or_more'])}")
+    # Dukascopy minutes with volume 0 whose prices move: quotes without a volume figure, dropped like the fill bars
+    # (the converter's rule, as for gold, whose folders have none). Reported: on these days the series has a hole.
+    dl = pd.DatetimeIndex(dl)
+    dl_wd = dl[dl.dayofweek < 5]
+    dl_days = pd.Series(np.ones(len(dl_wd), int)).groupby(dl_wd.normalize()).sum()
+    bars_day = pd.Series(np.ones(len(m1), int)).groupby(m1.index.normalize()).sum()
+    dl_days = dl_days[dl_days >= 100]
+    dropped_quotes = dict(by_year={int(y): int(n) for y, n in pd.Series(np.ones(len(dl), int)).groupby(dl.year).sum().items()},
+                          weekdays_with_100_or_more={str(d.date()): [int(n), int(bars_day.get(d, 0))] for d, n in dl_days.items()})
+    if len(dl):
+        notes.append(f"{len(dl)} Dukascopy minutes whose BID or ASK prices move but whose volume is 0 on both sides (quotes "
+                     f"without a volume figure, not fill bars) are dropped like the fill bars, as for gold: by year "
+                     f"{dropped_quotes['by_year']}; {len(dl_days)} weekdays with 100 or more of them, [dropped, bars left]: "
+                     f"{dropped_quotes['weekdays_with_100_or_more']}" + ("; the others: " + ", ".join(sorted({str(x.date()) for x in dl})) if len(dl) < 500 else ""))
         print(notes[-1], flush=True)
     # where the closures fall (the first look at the schedule), whole series and by year
     sched = R.schedule(m1)
@@ -375,7 +409,7 @@ def build2(work, folder):
                     median_range_bp={"01:00-09:59": {int(y): round(float(v), 3) for y, v in pd.Series(bp[on]).groupby(yr[on]).median().items()},
                                      "16:30-22:59": {int(y): round(float(v), 3) for y, v in pd.Series(bp[day]).groupby(yr[day]).median().items()}},
                     zero_spread_bars={int(y): int(n) for y, n in pd.Series(spread == 0).groupby(yr).sum().items() if n},
-                    volume_unknown=vol_unknown)
+                    dropped_quotes_without_volume=dropped_quotes)
     print("server hours with fewer than a quarter of the bars of the year's median hour:", coverage["thin_hours"], flush=True)
     print("median one-minute range (bp of price):", coverage["median_range_bp"], "; bars with zero Dukascopy spread:",
           coverage["zero_spread_bars"], flush=True)
@@ -426,8 +460,6 @@ def build2(work, folder):
                            final_year="wf writes the final year only for cells that pass",
                            friday_window=f"from {hhmm(WEEKEND_MIN)} server time; trades still open at a Friday close before it "
                                          f"are closed at the next open",
-                           volume="minutes kept without a Dukascopy volume have unknown volume: a bar of any timeframe with "
-                                  "such a minute, and the 20 bars after it, meet none of the three volume conditions",
                            dukascopy="DUK_INSTRUMENT " + DUK_NAME[SYM], duk_spread="duk_spread.npy: ask close - bid close of every bar"))
     json.dump(meta, open(os.path.join(work, "meta.json"), "w"), indent=1)
     print(json.dumps({k_: v for k_, v in meta.items() if k_ not in ("schedule_by_year",)}, indent=1)[:6000])
@@ -844,13 +876,7 @@ class Feat:
             hb = B.resample(m1, htf)
             mac = B.ema(hb["close"], 12) - B.ema(hb["close"], 26); mac.iloc[:60] = np.nan
             setattr(self, f"hm{k + 1}", np.nan_to_num(asof(np.sign(mac), htf)).astype(np.int8))
-        if name == "M1":
-            vol = mk.vol
-        else:
-            rs = mk.vol.resample(f"{tfm}min", label="left", closed="left")
-            vol = rs.sum()
-            if NEW:          # protocol 2: a bar with a minute of unknown volume (NaN, see duk_to_m1 keep_moving) has unknown volume
-                vol = vol.where(rs.count() == rs.size())
+        vol = mk.vol if name == "M1" else mk.vol.resample(f"{tfm}min", label="left", closed="left").sum()
         vol = vol.reindex(idx)
         self.volr = (vol / vol.rolling(20).mean().shift(1)).values
         self.body_dir = np.sign(c - o).astype(np.int8)
