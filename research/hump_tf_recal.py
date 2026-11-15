@@ -87,7 +87,7 @@ def utc_to_server(index):
     return index.tz_localize("UTC").tz_convert("America/New_York").tz_localize(None) + pd.Timedelta(hours=7)
 
 
-def clock_check(m1, label, min_reopen=0.9, jump_fatal=True):
+def clock_check(m1, label, min_reopen=0.9, jump_fatal=True, top=None):
     """Stops when a price series is not on broker server time (New York + 7 h). Two physical marks are used.
 
     1. The US stock open (09:30 New York = 16:30 server time) lifts activity on gold and on BTC every weekday, at
@@ -99,8 +99,10 @@ def clock_check(m1, label, min_reopen=0.9, jump_fatal=True):
     quarters; a quarter full of 08:30 New York data releases can put 15:30 first. A series with a daily break must
     reopen between 01:00 and 01:15 on at least 90% of the days, and 16:30 must be one of its two largest jumps in
     at least two thirds of the quarters (gold reacts to the 08:30 releases as much as to the stock open).
+    top: how high the 16:30 jump must rank (default: 2 with a daily break, 1 without). US500 has the daily break
+    and must have its largest jump at 16:30 (top=1): the stock index follows the stock open first.
     A BTC file that was already in server time was once converted a second time, which put a calibration 2-3
-    hours off: such a series fails here."""
+    hours off: such a series fails here. Returns the line it prints."""
     rng = (m1["high"] - m1["low"]).values
     mod = (m1.index.hour * 60 + m1.index.minute).values
     q = m1.index.to_period("Q")
@@ -114,7 +116,28 @@ def clock_check(m1, label, min_reopen=0.9, jump_fatal=True):
         if share < min_reopen:
             raise SystemExit(f"{label}: the market reopens between 01:00 and 01:15 server time on only {share:.0%} of {len(reopen)} days: wrong clock")
         note = f"daily reopen at 01:00-01:15 server time on {share:.0%} of {len(reopen)} days; "
-    top = 2 if daily_break else 1
+    top = (2 if daily_break else 1) if top is None else int(top)
+    tested, bad = _open_jumps(rng, mod, q, wd, top)
+    if tested == 0 or len(bad) > 0.34 * tested:
+        msg = f"{label}: the US-open jump is not at 16:30 server time in {bad} ({len(bad)} of {tested} quarters)"
+        if jump_fatal or not daily_break:
+            raise SystemExit(msg + ": wrong clock")
+        # a market with a daily break whose reopen is already at 01:00 server time: the reopen decides the clock
+        # (a series one hour off has 0-1% of its reopens there); the weaker activity mark is only recorded
+        line = f"{label}: clock check passed on the daily reopen ({note.strip('; ')}); NOTE {msg}"
+        print(line, flush=True)
+        return line
+    line = (f"{label}: clock check passed ({note}US-open jump at 16:30 server time "
+            + ("among the two largest " if top == 2 else "") + f"in {tested - len(bad)} of {tested} quarters"
+            + (f"; elsewhere in {bad}" if bad else "") + ")")
+    print(line, flush=True)
+    return line
+
+
+def _open_jumps(rng, mod, q, wd, top):
+    """The US-open mark of clock_check: per quarter (20000 weekday bars or more) the jump of the median one-minute
+    range at each half-past mark from 13:30 to 19:30; returns (quarters tested, [(quarter, largest mark)] of the
+    quarters where 16:30 is not among the `top` largest)."""
     bad = []; tested = 0
     for quarter in sorted(set(q)):
         mask = np.asarray(q == quarter) & np.asarray(wd)
@@ -131,17 +154,91 @@ def clock_check(m1, label, min_reopen=0.9, jump_fatal=True):
         tested += 1
         if 16 * 60 + 30 not in [m for _, m in jumps[:top]]:
             bad.append((str(quarter), f"{jumps[0][1] // 60:02d}:{jumps[0][1] % 60:02d}" if jumps else "none"))
-    if tested == 0 or len(bad) > 0.34 * tested:
-        msg = f"{label}: the US-open jump is not at 16:30 server time in {bad} ({len(bad)} of {tested} quarters)"
-        if jump_fatal or not daily_break:
-            raise SystemExit(msg + ": wrong clock")
-        # a market with a daily break whose reopen is already at 01:00 server time: the reopen decides the clock
-        # (a series one hour off has 0-1% of its reopens there); the weaker activity mark is only recorded
-        print(f"{label}: clock check passed on the daily reopen ({note.strip('; ')}); NOTE {msg}", flush=True)
-        return
-    print(f"{label}: clock check passed ({note}US-open jump at 16:30 server time "
-          + ("among the two largest " if daily_break else "") + f"in {tested - len(bad)} of {tested} quarters"
-          + (f"; elsewhere in {bad}" if bad else "") + ")", flush=True)
+    return tested, bad
+
+
+def clock_check_fx(m1, spread, label, min_monday=0.9, min_rollover=0.8):
+    """Stops when a currency series without a daily break (EURUSD) is not on broker server time (New York + 7 h).
+    Two marks of the FX market itself are used.
+
+    1. The FX week opens on Sunday at 17:00 New York, which is Monday 00:00 server time in the US summer and in the
+       US winter. The first bar after every closure of 24 hours or more (the weekends, and the odd holiday) must be on
+       a Monday between 00:00 and 00:05 server time after at least 90% of those closures.
+    2. The daily rollover at 17:00 New York (00:00 server time) widens the spread every day. Quarter by quarter
+       (quarters with 20000 bars or more), the minute of the day with the largest median spread (ask close - bid
+       close, `spread`, one value per bar) must lie between 23:50 and 00:10 server time in at least 80% of them.
+
+    The US-open jump of clock_check (16:30 the largest of the half-past marks in two thirds of the quarters) is only
+    recorded: a currency reacts to the 08:30 New York releases (15:30 server time) more than to the stock open.
+    Returns (line, note): the line it prints and the US-open note."""
+    t = m1.index
+    spread = np.asarray(spread, float)
+    assert len(spread) == len(t)
+    mod = (t.hour * 60 + t.minute).values
+    tmin = t.values.astype("datetime64[m]").astype(np.int64)
+    first = np.where(np.diff(tmin) >= 24 * 60)[0] + 1                   # first bar after a closure of 24 h or more
+    if len(first) == 0:
+        raise SystemExit(f"{label}: no closure of 24 hours or more (no weekend) in the series: the weekly open cannot be checked")
+    monday = (t.dayofweek.values[first] == 0) & (mod[first] <= 5)
+    share = float(monday.mean())
+    if share < min_monday:
+        other = pd.Series([f"{t[i].day_name()[:3]} {mod[i] // 60:02d}:{mod[i] % 60:02d}" for i in first[~monday]]).value_counts()
+        raise SystemExit(f"{label}: the week opens on Monday 00:00-00:05 server time after only {share:.0%} of {len(first)} "
+                         f"closures of 24 h or more (others: {dict(other.head(5))}): wrong clock")
+    q = t.to_period("Q")
+    bad = []; tested = 0
+    for quarter in sorted(set(q)):
+        mask = np.asarray(q == quarter)
+        if mask.sum() < 20000:
+            continue
+        med = pd.Series(spread[mask]).groupby(mod[mask]).median()
+        widest = int(med.idxmax())
+        tested += 1
+        if not (widest >= 23 * 60 + 50 or widest <= 10):
+            bad.append((str(quarter), f"{widest // 60:02d}:{widest % 60:02d}"))
+    if tested == 0 or tested - len(bad) < min_rollover * tested:
+        raise SystemExit(f"{label}: the widest median spread (the daily rollover) is not at 23:50-00:10 server time in {bad} "
+                         f"({len(bad)} of {tested} quarters): wrong clock")
+    wd = (t.dayofweek < 5)
+    jt, jbad = _open_jumps((m1["high"] - m1["low"]).values, mod, q, wd, 1)
+    note = (f"{label}: US-open jump (recorded only) at 16:30 server time the largest of the half-past marks in "
+            f"{jt - len(jbad)} of {jt} quarters" + (f"; elsewhere in {jbad}" if jbad else ""))
+    line = (f"{label}: clock check passed (weekly open on Monday 00:00-00:05 server time after {int(monday.sum())} of {len(first)} "
+            f"closures of 24 h or more; widest median spread at 23:50-00:10 server time in {tested - len(bad)} of {tested} quarters"
+            + (f"; elsewhere in {bad}" if bad else "") + ")")
+    print(line, flush=True)
+    print("NOTE", note, flush=True)
+    return line, note
+
+
+def schedule(m1):
+    """Where a series' closures fall in server time (for the record, and for the weekend rule of a new symbol):
+    the reopen minute after breaks of 45-150 minutes (a daily break), the minute after the last bar of each Friday
+    (the Friday close; a Friday without bars is skipped) and the first bar after closures of 24 hours or more
+    (the weekly open). Each as {"HH:MM": share} of the five most frequent values, with the count."""
+    t = m1.index
+    mod = (t.hour * 60 + t.minute).values
+    tmin = t.values.astype("datetime64[m]").astype(np.int64)
+    gap = np.diff(tmin)
+
+    def top5(minutes, days=None):
+        if len(minutes) == 0:
+            return dict(n=0)
+        s = pd.Series([f"{m // 60:02d}:{m % 60:02d}" if days is None else f"{d} {m // 60:02d}:{m % 60:02d}"
+                       for m, d in zip(minutes, days if days is not None else [None] * len(minutes))])
+        vc = s.value_counts(normalize=True).head(5)
+        return dict(n=int(len(s)), top={k: round(float(v), 3) for k, v in vc.items()})
+
+    i = np.where((gap >= 45) & (gap <= 150))[0]
+    brk = top5(mod[i + 1])
+    brk_start = top5((mod[i] + 1) % 1440)
+    fri = (t.dayofweek.values == 4)
+    day = tmin // 1440
+    last_fri = np.where(fri & np.r_[day[1:] != day[:-1], True])[0]       # last bar of each Friday
+    close = top5((mod[last_fri] + 1) % 1440)
+    j = np.where(gap >= 24 * 60)[0] + 1
+    wopen = top5(mod[j], [x.day_name()[:3] for x in t[j]])
+    return dict(daily_break_reopen=brk, daily_break_start=brk_start, friday_close=close, weekly_open=wopen)
 
 
 def build(work, src=None):

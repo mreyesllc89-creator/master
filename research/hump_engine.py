@@ -313,6 +313,10 @@ class Market:
         broker server time (New York + 7h) and a per-bar half spread (e.g. Dukascopy bid/ask)."""
         os.environ.setdefault("XLZC_SYMBOL", "XAUUSD")
         hourly = None
+        if m1 is None and SYMBOL not in ("XAUUSD", "BTCUSD"):
+            # the default data below is FTMO gold (or Binance BTC): it must never stand in for another symbol
+            raise SystemExit(f"hump_engine.Market: no default data for {SYMBOL}; pass m1 and half_spread "
+                             f"(hump_wf builds them from Dukascopy)")
         if m1 is None and SYMBOL == "BTCUSD":
             m1, half_spread = load_btc()
         if m1 is None:

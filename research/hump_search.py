@@ -23,6 +23,15 @@ SPACE = dict(
 )
 if H.SYMBOL == "BTCUSD":          # price distances in BTC dollars; the market trades through the weekend
     SPACE.update(buf=[5, 10, 20, 35, 50], min_risk=[10, 20, 35, 70], tf=["M1", "M2", "M3", "M5", "M10", "M15"])
+# EURUSD and US500 (hump_wf protocol 2): the gold distances in dollars times k, the symbol's median one-minute range
+# over gold's (both over the 180 days that end on 2025-12-31), rounded to two significant digits. hump_wf build
+# measures k and stores it in meta.json; set_scale(k) puts the values in. Until then they are unset, so that nothing
+# can draw a setup with gold's dollar distances on these symbols.
+SCALED = ("EURUSD", "US500")
+GOLD_DIST = dict(buf=[0.1, 0.3, 0.6, 1.0, 1.5], min_risk=[0.3, 0.5, 1.0, 2.0])
+SPACE_K = None
+if H.SYMBOL in SCALED:
+    SPACE.update(buf=None, min_risk=None)
 BASE = dict(skip_big_pb=1, max_spread=1e9) if H.SYMBOL == "BTCUSD" else {}
 if os.environ.get("HUMP_SPACE") == "2":      # second gold pass: v1.31 rules on, plus what the first pass held fixed
     BASE = dict(skip_big_pb=1, max_spread=1e9) if H.SYMBOL == "BTCUSD" else dict(skip_big_pb=1, weekend_close=1)
@@ -30,7 +39,27 @@ if os.environ.get("HUMP_SPACE") == "2":      # second gold pass: v1.31 rules on,
                  htf_ema=[20, 50, 100, 200], macd=["12-26", "8-17", "10-22", "16-35"], stoch_k=[5, 7, 10, 14],
                  stoch_lv=["20-80", "25-75", "15-85"], max_hold=[0, 60, 120, 240, 480, 1440],
                  eod=[-1, 1260, 1320, 1380])
+if H.SYMBOL in SCALED:                       # like gold (Friday close, no signal on a big pullback), no spread filter
+    BASE = dict(skip_big_pb=1, weekend_close=1, max_spread=1e9)
 CATEGORICAL = ("tf", "sides", "session", "htf", "tp_mode", "stoch_req", "macd", "stoch_lv", "eod")
+assert H.SYMBOL != "XAUUSD" or all(SPACE[k] == v for k, v in GOLD_DIST.items())
+
+
+def two_sig(x):
+    """x rounded to two significant digits."""
+    return float(f"{float(x):.2g}")
+
+
+def scaled(values, k):
+    return [two_sig(v * k) for v in values]
+
+
+def set_scale(k):
+    """EURUSD and US500: the stop buffer and minimum stop of the space in the symbol's price units (gold's x k)."""
+    global SPACE_K
+    assert H.SYMBOL in SCALED and k > 0, (H.SYMBOL, k)
+    SPACE.update({key: scaled(vals, k) for key, vals in GOLD_DIST.items()})
+    SPACE_K = float(k)
 
 
 def engine_cfg(c):

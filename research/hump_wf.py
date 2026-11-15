@@ -49,7 +49,10 @@ import hump_trail2 as T2
 import hump_tf_recal as R
 
 SYM = H.SYMBOL
+if SYM not in ("XAUUSD", "BTCUSD", "EURUSD", "US500"):
+    raise SystemExit(f"hump_wf: unknown symbol {SYM}")
 BTC = SYM == "BTCUSD"
+NEW = SYM in X.SCALED                           # EURUSD and US500: protocol 2 (stored in meta.json by build)
 TFS = ["M1", "M2", "M3", "M5", "M10", "M15", "M30", "H1"]
 MIN_N, TOPK, PASS_PF, PASS_STRESS, PASS_N = 20, 10, 1.30, 1.10, 100
 YEAR_N = 50                                     # an unseen year counts for the "no losing year" rule from this many trades
@@ -59,10 +62,28 @@ if BTC:
     SPREAD0 = 10.0
     COSTS = (dict(slip=0.0, comm=0.0, delay=0, trail_worst=0), dict(slip=3.0, comm=2.0, delay=1, trail_worst=1))
     EXTRA_MIN_RISK = [100, 150]
+elif SYM == "EURUSD":                           # VT Markets RAW ECN: 0.3 pips, 6 USD per 100,000 EUR round trip
+    SPREAD0 = 0.00003
+    COSTS = (dict(slip=0.0, comm=0.00006, delay=0, trail_worst=0), dict(slip=0.00002, comm=0.000066, delay=1, trail_worst=1))
+    EXTRA_MIN_RISK = None                       # gold's [4.0, 6.0] x k: set by apply_scale() from meta.json
+elif SYM == "US500":                            # VT Markets RAW ECN: 0.5 index points, no commission
+    SPREAD0 = 0.5
+    COSTS = (dict(slip=0.0, comm=0.0, delay=0, trail_worst=0), dict(slip=0.3, comm=0.2, delay=1, trail_worst=1))
+    EXTRA_MIN_RISK = None
 else:
     SPREAD0 = 0.15                              # VT Markets: 1.5 pips
     COSTS = (dict(slip=0.0, comm=0.60, delay=0, trail_worst=0), dict(slip=0.10, comm=0.67, delay=1, trail_worst=1))
     EXTRA_MIN_RISK = [4.0, 6.0]
+GOLD_EXTRA_MIN_RISK = [4.0, 6.0]
+# protocol 2 (EURUSD, US500)
+DUK_NAME = {"EURUSD": "EURUSD", "US500": "USA500IDXUSD"}           # Dukascopy instrument
+DUK_DIVISOR = {"EURUSD": 1e5, "US500": 1e3}                         # price unit of its bi5 integers
+ANCHOR_END = pd.Timestamp("2026-01-01")         # the anchor and k are measured on the 180 days that end on 2025-12-31
+GOLD_M1 = os.environ.get("HUMP_GOLD_M1", "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/wf/gold2/m1.pkl")
+# The EA's Friday close (WeekendCloseTime, server time, minutes): gold and EURUSD 23:00; US500 15 minutes before its
+# usual Friday close (build reports the close it finds and stops if this window would not start before it).
+WEEKEND_MIN = {"US500": None}.get(SYM, 1380)
+SEED_OFFSET = {"BTCUSD": 1000, "EURUSD": 2000, "US500": 3000}.get(SYM, 0)    # random controls: one stream per symbol
 HTF_UP = {"M1": ("M5", "M15"), "M2": ("M10", "M30"), "M3": ("M15", "H1"), "M5": ("M15", "H1"), "M10": ("M30", "H1"),
           "M15": ("H1", "H4"), "M30": ("H1", "H4"), "H1": ("H4", "D1")}
 # Years in which Dukascopy's gold had its own daily break on some days. The clock is still right: the other days
@@ -70,6 +91,9 @@ HTF_UP = {"M1": ("M5", "M15"), "M2": ("M10", "M30"), "M3": ("M15", "H1"), "M5": 
 GOLD_BREAK_EXCEPTIONS = {2014: "Dukascopy's daily break ran from 00:15 to 02:00 server time on 25 days in March and April 2014 "
                                "(87% of the year's reopens at 01:00-01:15 instead of 90%); the activity marks are where they belong"}
 NICE = np.array([1, 2, 2.5, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 2500, 5000, 10000], float)
+# protocol 2: the same grid extended downward (EURUSD's 0.5% of a day's close is about 0.005). For a price above 200
+# the choice is the same as with NICE (the new steps are all below 1), so gold and BTC would not change either.
+NICE2 = np.r_[[0.0001, 0.0002, 0.00025, 0.0005, 0.001, 0.002, 0.0025, 0.005, 0.01, 0.02, 0.025, 0.05, 0.1, 0.2, 0.25, 0.5], NICE]
 
 
 # ----------------------------------------------------------------------------- data
@@ -90,6 +114,8 @@ def read_binance(dirs):
 
 
 def build(work, src):
+    if NEW:
+        return build2(work, src)
     os.makedirs(work, exist_ok=True)
     notes = []
 
