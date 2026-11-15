@@ -1,4 +1,4 @@
-; XAUUSD_Loma_TrendPullback v1.34 - Gold M5 buys, H1 trend filter, all day
+; XAUUSD_Loma_TrendPullback v1.35 - Gold M5 buys, H1 trend filter, all day
 ; Loma (MACD hump) method: big hump = trend, small pullback hump, entry on the first bar back across zero.
 ; v1.31: no signal when the pullback hump is itself a big opposite hump; positions closed Friday 23:00 server time.
 ; Backtest (FTMO XAUUSD M1 path, Jan 2025-May 2026, risk-% sizing): 135 trades, PF 2.17, net +47R, max drawdown 6.7R; 2025 PF 2.25 (105), 2026 PF 1.84 (30 trades).
@@ -43,9 +43,15 @@ TP_RR=6.0
 MinRewardRisk=0.6
 MinSL_Points=100
 MaxSL_Points=0
+ScaleWithPrice=false
+ReferencePrice=0.0
 UseHTFFilter=true
 HTF_Timeframe=16385
 HTF_EMA_Period=50
+UseStochTurnFilter=false
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
 RiskPercent=0.5
 MaxLotSize=0.0
 SkipIfBelowMinLot=true
@@ -56,6 +62,8 @@ MaxEntryDelaySeconds=0
 TrailStartR=0.5
 TrailDistanceR=1.0
 TrailStep_Points=10
+TrailMode=0
+TrailParam=0
 UseTradingHours=false
 TradingHoursStart=07:00
 TradingHoursEnd=20:00

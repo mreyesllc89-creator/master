@@ -2,7 +2,7 @@
 //|                                  XAUUSD_Loma_TrendPullback.mq5   |
 //|                                                                  |
 //|  Strategy : XAUUSD "Loma" (MACD hump) Trend Pullback, both sides |
-//|  Version  : 1.34                                                 |
+//|  Version  : 1.35                                                 |
 //+------------------------------------------------------------------+
 //
 //  "No signal = no trade."
@@ -55,11 +55,36 @@
 //        MT5 charts are BID charts: a long is stopped and paid on the bid, so the buy SL/TP
 //        need no spread term (the reference backtest works on mid quotes and applies half a
 //        spread to both sides, which is the same thing).
+//    R5b Optional price scaling (ScaleWithPrice, v1.35): SL_Buffer_Points, MinSL_Points and
+//        MaxSL_Points are multiplied by bid / ReferencePrice each time a trade plan is built, so
+//        that a preset calibrated at ReferencePrice keeps the same proportions at another price
+//        level (reference: the price scale in research/hump_wf.py outcomes()). The level-based
+//        trailing uses the buffer scaled by the position's open price / ReferencePrice. Spread
+//        and slippage limits are not scaled.
 //    R7  Optional higher-timeframe filter: sell only if the last closed HTF bar closed below
 //        its EMA(50), buy only if above.
+//    R7b Optional Stochastic turn filter (UseStochTurnFilter, v1.35), with its own
+//        Stochastic(7,1,7) on TriggerTimeframe: a sell is taken only when the main line was
+//        >= StochTurnHigh on one of the last StochTurnBars closed bars (signal bar included) and
+//        on the signal bar it is below its signal line or below StochTurnHigh; a buy is the
+//        mirror with StochTurnLow. Applied where the R7 filter is: the signal still counts
+//        against MaxSignalsPerBigHump, only the entry is skipped (research/hump_wf.py xlzc_stoch).
 //    R8  Risk: RiskPercent of equity per trade, lot from the SL distance, ONE position at a
 //        time (magic number), spread filter, trading hours (broker server time), news filter,
 //        optional trailing in R multiples (TrailStartR / TrailDistanceR).
+//    R8b Trailing systems (TrailMode, v1.35); the units of TrailStartR / TrailDistanceR and the
+//        meaning of TrailParam depend on the system (see ENUM_LOMA_TRAIL_MODE). TRAIL_RISK is the
+//        trailing of R8, on every tick. TRAIL_STEP also works on every tick: once the best profit
+//        has reached k x TrailStartR x 1R the stop is at entry + (k - 1) x TrailStartR x 1R. All
+//        other systems act once per closed one-minute bar, on the first tick of the next M1 bar:
+//        from the best price of the completed M1 bars since the entry (bid highs for a buy, bid
+//        lows + spread for a sell) and, for TRAIL_CHANDELIER and the level systems (candles, EMA,
+//        SMA, Parabolic SAR, Bollinger band, higher candle, swings, MACD hump), from the last
+//        closed TriggerTimeframe bar. A level stop is the level -/+ SL_Buffer_Points (+ the
+//        spread for a sell). The stop is only ever tightened and the take profit never changed;
+//        when the price is already through the new stop the position is closed at market, as
+//        the reference backtest fills at that minute's open (research/hump_trail.py and
+//        hump_trail2.py simulate_y with closed = 1).
 //    R9  Optional weekend flat (CloseBeforeWeekend): on Friday from WeekendCloseTime (broker
 //        server time) on, no new entries are taken and the open position is closed at market
 //        on the first tick. Any position opened on or before that Friday that is still open
@@ -116,9 +141,17 @@
 //  * Time exits: the reference backtest (max_hold / eod) closes at the close of the M1 bar that
 //    reaches the holding limit or crosses the end-of-day time; the EA closes on the first tick
 //    of that M1 bar, about one minute earlier.
+//  * Trailing systems (R8b): nothing is kept in memory only. The best price is read from the M1
+//    history on every evaluation, the initial risk and the ATR at entry are terminal global
+//    variables. The M1 bar in which the position was opened counts as a whole, as in the
+//    reference backtest (which enters at that bar's open). A new stop is rounded to the tick on
+//    the looser side (down for a buy, up for a sell): it is then hit exactly when the unrounded
+//    stop of the backtest is. A stop that is closer to the price than the broker's stops level is
+//    not placed in that minute. Levels of minutes in which the EA was not running are not
+//    applied afterwards.
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
-#property version     "1.34"
+#property version     "1.35"
 #property strict
 #property description "XAUUSD Loma (MACD hump) Trend Pullback, sells and buys."
 #property description "Big MACD hump defines the trend; trade the zero-cross after a small pullback hump."
@@ -150,6 +183,24 @@ enum ENUM_LOMA_TP_MODE
   {
    TP_PREV_HUMP = 0, // extreme of the previous hump on the trend side (anticipated)
    TP_FIXED_RR  = 1  // fixed reward:risk (TP_RR)
+  };
+
+enum ENUM_LOMA_TRAIL_MODE
+  {
+   TRAIL_RISK        = 0,  // RISK: start / distance in R, every tick (TrailStartR 0 = off)
+   TRAIL_ATR_ENTRY   = 1,  // ATR_ENTRY: start / distance in ATR(14) of the signal bar
+   TRAIL_PERCENT     = 2,  // PERCENT: start / distance in % of the entry price
+   TRAIL_PROFIT_LOCK = 3,  // PROFIT_LOCK: from TrailStartR (R) keep the share TrailDistanceR of the best profit
+   TRAIL_STEP        = 4,  // STEP: ratchet in steps of TrailStartR (R), every tick
+   TRAIL_CHANDELIER  = 5,  // CHANDELIER: best price -/+ TrailDistanceR x live ATR(14)
+   TRAIL_CANDLES     = 6,  // CANDLES: low / high of the last TrailParam closed candles
+   TRAIL_EMA         = 7,  // EMA: EMA(TrailParam) of the closes
+   TRAIL_SMA         = 8,  // SMA: SMA(TrailParam) of the closes
+   TRAIL_PSAR        = 9,  // PSAR: Parabolic SAR, TrailParam 0 = 0.02/0.2, 1 = 0.01/0.1, 2 = 0.04/0.2
+   TRAIL_BOLLINGER   = 10, // BOLLINGER: SMA(20) -/+ 1 sd (TrailParam 0) or 2 sd (TrailParam 1)
+   TRAIL_HTF_CANDLE  = 11, // HTF_CANDLE: low / high of the last closed candle of TrailParam minutes
+   TRAIL_PIVOTS      = 12, // PIVOTS: last confirmed swing with TrailParam bars on each side
+   TRAIL_HUMP        = 13  // HUMP: low / high of the last completed MACD hump
   };
 
 //====================================================================
@@ -202,11 +253,19 @@ input double  TP_RR                    = 1.5;   // TP_FIXED_RR: reward:risk
 input double  MinRewardRisk            = 0.8;   // Skip when reward < this x risk
 input int     MinSL_Points             = 50;    // Min SL distance (points)
 input int     MaxSL_Points             = 0;     // Max SL distance (points, 0 = off)
+input bool    ScaleWithPrice           = false; // Multiply the *_Points distances by price / ReferencePrice
+input double  ReferencePrice           = 0.0;   // Price at which the *_Points values were calibrated
 
 input group "=== R7: Higher-timeframe filter ==="
 input bool            UseHTFFilter     = false;      // Sell only below / buy only above the HTF EMA
 input ENUM_TIMEFRAMES HTF_Timeframe    = PERIOD_H4;  // Higher timeframe
 input int             HTF_EMA_Period   = 50;         // HTF EMA period
+
+input group "=== R7b: Stochastic turn filter ==="
+input bool    UseStochTurnFilter       = false; // Entry only when the Stochastic came from the extreme and turned
+input int     StochTurnBars            = 5;     // ... within this many closed bars, the signal bar included
+input double  StochTurnHigh            = 80.0;  // Sells: Stochastic was at or above this
+input double  StochTurnLow             = 20.0;  // Buys: Stochastic was at or below this
 
 input group "=== R8: Risk & Position ==="
 input double  RiskPercent              = 0.75;  // Risk per trade, % of equity
@@ -221,6 +280,8 @@ input group "=== R8: Trailing stop (R multiples) ==="
 input double  TrailStartR              = 0.0;   // Start trailing at this profit in R (0 = off)
 input double  TrailDistanceR           = 0.5;   // Trailing distance in R
 input int     TrailStep_Points         = 10;    // Min SL improvement per modification (points)
+input ENUM_LOMA_TRAIL_MODE TrailMode = TRAIL_RISK;  // Trailing system (units of TrailStartR / TrailDistanceR depend on it)
+input int     TrailParam               = 0;     // Period, bars or variant of the level-based systems
 
 input group "=== R8: Session / News ==="
 input bool    UseTradingHours          = false;    // Restrict to trading hours (broker server time)
@@ -246,6 +307,7 @@ CPositionInfo g_pos;
 int      g_hMacd     = INVALID_HANDLE;   // MACD on the trigger timeframe
 int      g_hStoch    = INVALID_HANDLE;   // Stochastic on the trigger timeframe
 int      g_hEmaHTF   = INVALID_HANDLE;   // EMA on the higher timeframe (optional)
+int      g_hStochTurn = INVALID_HANDLE;  // Stochastic(7,1,7) of the turn filter on the trigger timeframe (optional)
 
 double   g_ptScale        = 1.0;   // point scale factor (AutoScalePoints)
 int      g_sessStartMin   = 0;
@@ -263,6 +325,25 @@ datetime g_timeExitLastTry = 0;    // server time of the last failed time exit (
 datetime g_timeExitBar     = 0;    // trigger bar on which a time exit was last due (its signal is not traded)
 datetime g_trailLastFail   = 0;    // server time of the last failed trailing modification (retry throttle)
 uint     g_trailFailCode   = 0;    // retcode of the last reported trailing failure (one journal line per new retcode)
+//--- trailing systems of v1.35 (TrailMode other than TRAIL_RISK). Closed trigger bars used:
+//    Wilder ATR(TRAIL_ATR_PERIOD) smoothed over TRAIL_ATR_BARS bars, EMA level run over TRAIL_EMA_BARS
+//    bars (10 x its period if that is more), Parabolic SAR run over TRAIL_PSAR_BARS bars, last
+//    confirmed swing searched in TRAIL_PIVOT_BARS bars
+#define  TRAIL_ATR_PERIOD  14
+#define  TRAIL_ATR_BARS    300
+#define  TRAIL_EMA_BARS    500
+#define  TRAIL_PSAR_BARS   1000
+#define  TRAIL_PIVOT_BARS  1000
+datetime g_trailBar        = 0;    // M1 bar on whose first tick the once-a-minute trailing was last completed
+ulong    g_trailSkipLog    = 0;    // ticket whose 'stop inside the stops level' skip was reported (once per position)
+ulong    g_trailCloseLog   = 0;    // ticket whose trailing close at market was announced (once per position)
+ulong    g_trailCloseFail  = 0;    // ticket whose failed trailing close was reported (once per position)
+bool     g_trailCloseDue   = false;// a trailing close at market was due on this tick
+datetime g_trailExitBar    = 0;    // trigger bar on which a trailing close at market was last due (its signal is not traded)
+bool     g_trailBarsWarned = false;// 'not enough closed bars for the trailing level' printed
+ulong    g_stepTicket      = 0;    // TRAIL_STEP: position whose best price of the completed M1 bars is cached
+datetime g_stepBar         = 0;    // TRAIL_STEP: M1 bar on which that cache was read
+double   g_stepBest        = 0.0;  // TRAIL_STEP: the cached best price
 bool     g_nettingWarned   = false;// netting-account warning printed
 datetime g_notReadySince   = 0;    // first tick on which the signal data was not ready (0 = ready)
 datetime g_notReadyWarned  = 0;    // last 'data not ready' warning (at most one every 5 trigger bars)
@@ -351,6 +432,14 @@ void LogSkip(const string reason)
 double Pts(const double points)
   {
    return points * g_ptScale * _Point;
+  }
+
+//--- factor of the dollar distances with ScaleWithPrice: price / ReferencePrice (1 when off)
+double PriceScale(const double price)
+  {
+   if(!ScaleWithPrice || ReferencePrice <= 0.0 || price <= 0.0)
+      return 1.0;
+   return price / ReferencePrice;
   }
 
 double NormalizePrice(const double price)
@@ -462,9 +551,23 @@ int OnInit()
       Print("[LOMA] TP_RR must be > 0 in TP_FIXED_RR mode");
       return INIT_PARAMETERS_INCORRECT;
      }
-   if(TrailStartR > 0.0 && TrailDistanceR <= 0.0)
+   if(TrailMode == TRAIL_RISK && TrailStartR > 0.0 && TrailDistanceR <= 0.0)
      {
       Print("[LOMA] TrailDistanceR must be > 0 when TrailStartR > 0");
+      return INIT_PARAMETERS_INCORRECT;
+     }
+   if(!TrailInputsOK())
+      return INIT_PARAMETERS_INCORRECT;
+   if(UseStochTurnFilter && (StochTurnBars < 1 || StochTurnLow < 0.0 || StochTurnHigh > 100.0))
+     {
+      Print("[LOMA] Stochastic turn filter: StochTurnBars must be >= 1, StochTurnLow >= 0 and StochTurnHigh <= 100. Got ",
+            StochTurnBars, ", ", StochTurnLow, ", ", StochTurnHigh);
+      return INIT_PARAMETERS_INCORRECT;
+     }
+   if(ScaleWithPrice && ReferencePrice <= 0.0)
+     {
+      Print("[LOMA] ScaleWithPrice needs ReferencePrice > 0 (the price at which the *_Points values were calibrated). Got ",
+            ReferencePrice);
       return INIT_PARAMETERS_INCORRECT;
      }
    if(UseTradingHours)
@@ -530,6 +633,16 @@ int OnInit()
       Print("[LOMA] Failed to create indicator handles, error ", GetLastError());
       return INIT_FAILED;
      }
+   //--- R7b: the turn filter has its own Stochastic(7,1,7), whatever Stoch_K is
+   if(UseStochTurnFilter)
+     {
+      g_hStochTurn = iStochastic(_Symbol, TriggerTimeframe, 7, 7, 1, MODE_SMA, STO_LOWHIGH);
+      if(g_hStochTurn == INVALID_HANDLE)
+        {
+         Print("[LOMA] Failed to create the Stochastic handle of the turn filter, error ", GetLastError());
+         return INIT_FAILED;
+        }
+     }
 
    //--- trade object
    g_trade.SetExpertMagicNumber(MagicNumber);
@@ -543,6 +656,8 @@ int OnInit()
    g_lastBarTime   = 0;
    g_signalActive  = false;
    g_signalBarTime = 0;
+   g_trailBar        = 0;
+   g_trailBarsWarned = false;
    if(HandleReady(g_hMacd, TriggerTimeframe) && HandleReady(g_hStoch, TriggerTimeframe))
       AdvanceHumps();
 
@@ -554,6 +669,13 @@ int OnInit()
    UpdatePanel();
    Log(StringFormat("Init OK on %s | digits=%d pointScale=%.2f | direction=%s | risk=%.2f%%",
                     _Symbol, _Digits, g_ptScale, EnumToString(TradeDirection), RiskPercent));
+   if(TrailMode != TRAIL_RISK)
+      Log("Trailing system: " + TrailModeText());
+   if(UseStochTurnFilter)
+      Log(StringFormat("Stochastic turn filter on: Stochastic(7,1,7) of %s, last %d closed bars, levels %.1f / %.1f",
+                       TFName(TriggerTimeframe), StochTurnBars, StochTurnLow, StochTurnHigh));
+   if(ScaleWithPrice)
+      Log(StringFormat("Price scaling on: SL_Buffer_Points, MinSL_Points and MaxSL_Points x bid / %.2f", ReferencePrice));
    return INIT_SUCCEEDED;
   }
 
@@ -565,9 +687,11 @@ void OnDeinit(const int reason)
    if(g_hMacd   != INVALID_HANDLE) IndicatorRelease(g_hMacd);
    if(g_hStoch  != INVALID_HANDLE) IndicatorRelease(g_hStoch);
    if(g_hEmaHTF != INVALID_HANDLE) IndicatorRelease(g_hEmaHTF);
+   if(g_hStochTurn != INVALID_HANDLE) IndicatorRelease(g_hStochTurn);
    g_hMacd   = INVALID_HANDLE;
    g_hStoch  = INVALID_HANDLE;
    g_hEmaHTF = INVALID_HANDLE;
+   g_hStochTurn = INVALID_HANDLE;
    ObjectsDeleteAll(0, OBJ_PREFIX);
    Comment("");
   }
@@ -606,6 +730,11 @@ void OnTick()
    datetime barTime = iTime(_Symbol, TriggerTimeframe, 0);
    if(timeExitDue)
       g_timeExitBar = barTime;
+   if(g_trailCloseDue)                         // R8b: a trailing stop already crossed was closed at market on this tick
+     {
+      g_trailExitBar  = barTime;
+      g_trailCloseDue = false;
+     }
    if(barTime == 0)
       return;
 
@@ -682,6 +811,12 @@ void OnTick()
    if(g_timeExitBar == barTime)                // as in the backtest: no entry on the bar of a time exit
      {
       LogSkip("a position was open at the bar open (time exit on this bar)");
+      g_signalActive = false;
+      return;
+     }
+   if(g_trailExitBar == barTime)               // as in the backtest: no entry on the bar of a trailing close at market
+     {
+      LogSkip("a position was open at the bar open (trailing stop already crossed, closed at market on this bar)");
       g_signalActive = false;
       return;
      }
@@ -791,6 +926,8 @@ bool SignalDataReady(const datetime barTime)
       if(!HTFBarCurrent(HTF_Timeframe, barTime))
          return false;
      }
+   if(UseStochTurnFilter && !HandleReady(g_hStochTurn, TriggerTimeframe))
+      return false;
    return true;
   }
 
@@ -1090,6 +1227,16 @@ int EvaluateSignal(const datetime barTime)
       if(c <= 0.0)
          return SIG_NOTREADY;
      }
+   //--- R7b: optional Stochastic turn filter on the signal bar, read before the signal is logged
+   //    for the same reason
+   int    turn    = 1;
+   string turnWhy = "";
+   if(UseStochTurnFilter)
+     {
+      turn = StochTurnCheck(g_sigSide, turnWhy);
+      if(turn < 0)
+         return SIG_NOTREADY;                        // the pending signal is kept for the retry
+     }
 
    Log(StringFormat("%s signal on the %s bar of %s: MACD zero-cross after a %d-bar pullback hump "
                     "(peak %.2f x anchor) | SL ref %.2f | TP ref %.2f | signal %d/%d of this trend",
@@ -1107,7 +1254,60 @@ int EvaluateSignal(const datetime barTime)
          return SIG_NONE;
         }
      }
+   if(turn == 0)
+     {
+      LogSkip(turnWhy);
+      return SIG_NONE;
+     }
    return SIG_VALID;
+  }
+
+//--- R7b: Stochastic turn rule on the signal bar (the last closed trigger bar), with the filter's
+//    own Stochastic(7,1,7): the main line was at the extreme on one of the last StochTurnBars
+//    closed bars and, on the signal bar, is beyond its signal line or back inside the level
+//    (Feat.xs_dn / xs_up in research/hump_wf.py).
+//    Returns 1 entry allowed, 0 not allowed ('why' is the skip reason), -1 data not ready.
+int StochTurnCheck(const int side, string &why)
+  {
+   double mainBuf[], sigBuf[];
+   ArraySetAsSeries(mainBuf, false);                 // index 0 = oldest bar, the last one is the signal bar
+   ArraySetAsSeries(sigBuf, false);
+   if(CopyBuffer(g_hStochTurn, 0, 1, StochTurnBars, mainBuf) != StochTurnBars ||
+      CopyBuffer(g_hStochTurn, 1, 1, 1, sigBuf) != 1)
+      return -1;
+   if(iTime(_Symbol, TriggerTimeframe, 1) != g_sigClosedBar)
+      return -1;                                     // a new bar appeared while reading
+   double hi       = -DBL_MAX;
+   double lo       = DBL_MAX;
+   bool   allValid = true;
+   for(int k = 0; k < StochTurnBars; k++)
+     {
+      double v = mainBuf[k];
+      if(v == EMPTY_VALUE || !MathIsValidNumber(v))
+        {
+         allValid = false;                           // as in the backtest: a missing value in the window, no entry
+         break;
+        }
+      if(v > hi) hi = v;
+      if(v < lo) lo = v;
+     }
+   double m   = mainBuf[StochTurnBars - 1];
+   double s   = sigBuf[0];
+   bool   sOk = (s != EMPTY_VALUE && MathIsValidNumber(s));
+   if(!allValid)
+     {
+      why = StringFormat("Stochastic turn filter: no Stochastic value on the last %d closed bars -> %s not allowed",
+                         StochTurnBars, SideName(side));
+      return 0;
+     }
+   bool ok = (side < 0) ? (hi >= StochTurnHigh && ((sOk && m < s) || m < StochTurnHigh))
+                        : (lo <= StochTurnLow && ((sOk && m > s) || m > StochTurnLow));
+   if(ok)
+      return 1;
+   why = StringFormat("Stochastic turn filter: %s of the last %d bars %.1f, main %.1f, signal %.1f (level %.1f) -> %s not allowed",
+                      side < 0 ? "highest" : "lowest", StochTurnBars, side < 0 ? hi : lo, m, sOk ? s : 0.0,
+                      side < 0 ? StochTurnHigh : StochTurnLow, SideName(side));
+   return 0;
   }
 
 //====================================================================
@@ -1133,11 +1333,12 @@ bool BuildTradePlan(const int side, TradePlan &p, string &reason)
 
    double risk   = 0.0;
    double reward = 0.0;
+   double ps     = PriceScale(bid);                  // R5b: bid / ReferencePrice with ScaleWithPrice, else 1
    if(side < 0)
      {
       //--- SELL at the bid; stopped and paid on the ask -> + spread on SL and TP
       p.entry = bid;
-      p.sl    = NormalizePrice(g_sigSlRef + Pts(SL_Buffer_Points) + spread);
+      p.sl    = NormalizePrice(g_sigSlRef + Pts(SL_Buffer_Points) * ps + spread);
       risk    = p.sl - p.entry;
       if(risk <= 0.0)
         {
@@ -1159,7 +1360,7 @@ bool BuildTradePlan(const int side, TradePlan &p, string &reason)
      {
       //--- BUY at the ask; stopped and paid on the bid (chart prices are bid) -> no spread term
       p.entry = ask;
-      p.sl    = NormalizePrice(g_sigSlRef - Pts(SL_Buffer_Points));
+      p.sl    = NormalizePrice(g_sigSlRef - Pts(SL_Buffer_Points) * ps);
       risk    = p.entry - p.sl;
       if(risk <= 0.0)
         {
@@ -1179,15 +1380,16 @@ bool BuildTradePlan(const int side, TradePlan &p, string &reason)
      }
 
    //--- SL distance sanity (points are in 2-digit gold units)
+   //    R5b: the limits are multiplied by ps
    double riskPts = risk / (_Point * g_ptScale);
-   if(riskPts < MinSL_Points)
+   if(riskPts < MinSL_Points * ps)
      {
-      reason = StringFormat("SL too tight (%.0f < %d points)", riskPts, MinSL_Points);
+      reason = StringFormat("SL too tight (%.0f < %.0f points)", riskPts, MinSL_Points * ps);
       return false;
      }
-   if(MaxSL_Points > 0 && riskPts > MaxSL_Points)
+   if(MaxSL_Points > 0 && riskPts > MaxSL_Points * ps)
      {
-      reason = StringFormat("SL too wide (%.0f > %d points)", riskPts, MaxSL_Points);
+      reason = StringFormat("SL too wide (%.0f > %.0f points)", riskPts, MaxSL_Points * ps);
       return false;
      }
    if(reward <= 0.0 || reward < MinRewardRisk * risk)
@@ -1565,13 +1767,15 @@ double InitialRiskFromHistory(const long positionId)
 
 void ManageOpenPositions()
   {
-   if(TrailStartR <= 0.0)
+   if(TrailMode == TRAIL_RISK && TrailStartR <= 0.0)
       return;
    if(!TerminalInfoInteger(TERMINAL_TRADE_ALLOWED) || !MQLInfoInteger(MQL_TRADE_ALLOWED))
       return;                                  // algo trading off: a modification cannot be sent
    datetime nowT = TimeCurrent();
    if(g_trailLastFail > 0 && nowT >= g_trailLastFail && nowT - g_trailLastFail < WEEKEND_RETRY_SEC)
       return;                                  // throttle retries after a failed modification
+   datetime m1      = nowT - (nowT % 60);      // R8b: open time of the M1 bar this tick belongs to
+   bool     allDone = true;                    // R8b: every position was evaluated on this M1 bar
    for(int i = PositionsTotal() - 1; i >= 0; i--)
      {
       if(!g_pos.SelectByIndex(i))
@@ -1604,6 +1808,17 @@ void ManageOpenPositions()
       double initRisk = GlobalVariableCheck(rKey) ? GlobalVariableGet(rKey) : 0.0;
       if(initRisk <= 0.0)
          continue;
+
+      //--- R8b: the trailing systems other than TRAIL_RISK. TRAIL_STEP on every tick, the others
+      //    once per closed one-minute bar, on the first tick of the next M1 bar
+      if(TrailMode != TRAIL_RISK)
+        {
+         if(TrailMode != TRAIL_STEP && m1 == g_trailBar)
+            continue;
+         if(!TrailPosition(ticket, g_pos.Time(), open, sl, tp, isSell, initRisk, m1, nowT))
+            allDone = false;                   // data not ready or a request failed: again on the next tick
+         continue;
+        }
 
       if(isSell)
         {
@@ -1640,6 +1855,589 @@ void ManageOpenPositions()
            }
         }
      }
+   if(TrailMode != TRAIL_RISK && allDone)
+      g_trailBar = m1;
+  }
+
+//====================================================================
+// TRAILING SYSTEMS (R8b: TrailMode other than TRAIL_RISK)
+// Reference: research/hump_trail.py simulate_x(), hump_trail2.py simulate_y() with closed = 1
+//====================================================================
+//--- "EMA (start 0.50, distance 0.50, param 34)" for the journal and the panel
+string TrailModeText()
+  {
+   string n = EnumToString(TrailMode);
+   StringReplace(n, "TRAIL_", "");
+   return StringFormat("%s (start %.2f, distance %.2f, param %d)", n, TrailStartR, TrailDistanceR, TrailParam);
+  }
+
+//--- the level systems: the stop follows a level read from the closed trigger bars
+bool TrailIsLevelMode()
+  {
+   return (TrailMode == TRAIL_CANDLES || TrailMode == TRAIL_EMA || TrailMode == TRAIL_SMA ||
+           TrailMode == TRAIL_PSAR || TrailMode == TRAIL_BOLLINGER || TrailMode == TRAIL_HTF_CANDLE ||
+           TrailMode == TRAIL_PIVOTS || TrailMode == TRAIL_HUMP);
+  }
+
+//--- TRAIL_HTF_CANDLE: timeframe of the candle of TrailParam minutes (PERIOD_CURRENT = not supported)
+ENUM_TIMEFRAMES TrailHtfPeriod()
+  {
+   if(TrailParam == 15)
+      return PERIOD_M15;
+   if(TrailParam == 30)
+      return PERIOD_M30;
+   if(TrailParam == 60)
+      return PERIOD_H1;
+   if(TrailParam == 240)
+      return PERIOD_H4;
+   return PERIOD_CURRENT;
+  }
+
+//--- OnInit checks of TrailStartR, TrailDistanceR and TrailParam for the system chosen in TrailMode
+//    (TRAIL_RISK keeps its own check). Prints the reason and returns false on a wrong input.
+bool TrailInputsOK()
+  {
+   if(TrailMode == TRAIL_RISK)
+      return true;
+   int    mode = (int)TrailMode;
+   string name = EnumToString(TrailMode);
+   if(mode < 0 || mode > (int)TRAIL_HUMP)
+     {
+      Print("[LOMA] TrailMode ", mode, " is not a trailing system (0 .. ", (int)TRAIL_HUMP, ")");
+      return false;
+     }
+   if(TrailStartR < 0.0)
+     {
+      Print("[LOMA] TrailStartR must be >= 0 with TrailMode ", name, ". Got ", TrailStartR);
+      return false;
+     }
+   if((TrailMode == TRAIL_ATR_ENTRY || TrailMode == TRAIL_PERCENT || TrailMode == TRAIL_PROFIT_LOCK ||
+       TrailMode == TRAIL_STEP) && TrailStartR <= 0.0)
+     {
+      Print("[LOMA] TrailStartR must be > 0 with TrailMode ", name, ". Got ", TrailStartR);
+      return false;
+     }
+   if((TrailMode == TRAIL_ATR_ENTRY || TrailMode == TRAIL_PERCENT || TrailMode == TRAIL_CHANDELIER) &&
+      TrailDistanceR <= 0.0)
+     {
+      Print("[LOMA] TrailDistanceR must be > 0 with TrailMode ", name, ". Got ", TrailDistanceR);
+      return false;
+     }
+   if(TrailMode == TRAIL_PROFIT_LOCK && (TrailDistanceR < 0.0 || TrailDistanceR > 1.0))
+     {
+      Print("[LOMA] TrailDistanceR is the share of the best profit kept with TrailMode ", name,
+            ": must be in [0, 1]. Got ", TrailDistanceR);
+      return false;
+     }
+   if((TrailMode == TRAIL_CANDLES || TrailMode == TRAIL_EMA || TrailMode == TRAIL_SMA) &&
+      (TrailParam < 1 || TrailParam > 1000))
+     {
+      Print("[LOMA] TrailParam is the number of bars / the period with TrailMode ", name,
+            ": must be 1 .. 1000. Got ", TrailParam);
+      return false;
+     }
+   if(TrailMode == TRAIL_PIVOTS && (TrailParam < 1 || TrailParam > 100))
+     {
+      Print("[LOMA] TrailParam is the number of bars on each side of the swing with TrailMode ", name,
+            ": must be 1 .. 100. Got ", TrailParam);
+      return false;
+     }
+   if(TrailMode == TRAIL_PSAR && (TrailParam < 0 || TrailParam > 2))
+     {
+      Print("[LOMA] TrailParam must be 0 (0.02 / 0.2), 1 (0.01 / 0.1) or 2 (0.04 / 0.2) with TrailMode ", name,
+            ". Got ", TrailParam);
+      return false;
+     }
+   if(TrailMode == TRAIL_BOLLINGER && (TrailParam < 0 || TrailParam > 1))
+     {
+      Print("[LOMA] TrailParam must be 0 (1 standard deviation) or 1 (2 standard deviations) with TrailMode ", name,
+            ". Got ", TrailParam);
+      return false;
+     }
+   if(TrailMode == TRAIL_HTF_CANDLE)
+     {
+      int trigMin = PeriodSeconds(TriggerTimeframe) / 60;
+      if(TrailHtfPeriod() == PERIOD_CURRENT || trigMin < 1 || TrailParam <= trigMin || TrailParam % trigMin != 0)
+        {
+         Print("[LOMA] TrailParam is the minutes of the higher candle with TrailMode ", name,
+               ": must be 15, 30, 60 or 240, larger than and a multiple of the ", trigMin,
+               " minutes of TriggerTimeframe. Got ", TrailParam);
+         return false;
+        }
+     }
+   return true;
+  }
+
+//--- the history holds fewer closed trigger bars than the trailing needs: said once
+void TrailBarsMissing(const int need, const int have)
+  {
+   if(g_trailBarsWarned)
+      return;
+   g_trailBarsWarned = true;
+   Print(StringFormat("[LOMA] Trailing %s needs %d closed %s bars, the history has %d: no stop is moved until they are there",
+                      TrailModeText(), need, TFName(TriggerTimeframe), have));
+  }
+
+//--- 'count' closed TriggerTimeframe bars ending at the bar of 'shift', whose open time must be
+//    'barTime' (index 0 = oldest bar). Returns 1 read, 0 the history is shorter than that, -1 not
+//    readable yet or a new bar appeared while reading (again on the next tick).
+int TrailRates(const int shift, const int count, const datetime barTime, MqlRates &r[])
+  {
+   int have = Bars(_Symbol, TriggerTimeframe) - shift;
+   if(have < count)
+     {
+      TrailBarsMissing(count, have);
+      return 0;
+     }
+   ArraySetAsSeries(r, false);
+   if(CopyRates(_Symbol, TriggerTimeframe, shift, count, r) != count)
+      return -1;
+   if(r[count - 1].time != barTime)
+      return -1;
+   return 1;
+  }
+
+//--- Wilder ATR(14) at the last of 'count' bars: true range smoothed with alpha = 1/14 from the
+//    second bar on (wilder_atr() in research/hump_trail2.py; MetaTrader's iATR is a simple
+//    average and is not this). With TRAIL_ATR_BARS bars the first value no longer matters.
+double WilderATR(const MqlRates &r[], const int count)
+  {
+   double atr = 0.0;
+   for(int k = 1; k < count; k++)
+     {
+      double tr = MathMax(r[k].high - r[k].low,
+                          MathMax(MathAbs(r[k].high - r[k - 1].close), MathAbs(r[k].low - r[k - 1].close)));
+      atr = (k == 1) ? tr : atr + (tr - atr) / TRAIL_ATR_PERIOD;
+     }
+   return atr;
+  }
+
+//--- TRAIL_ATR_ENTRY: Wilder ATR(14) of the trigger timeframe at the signal bar of a position (the
+//    last trigger bar closed before it was opened). Computed from the history once and kept in
+//    a terminal global variable next to the initial risk, so it is the same after a restart.
+//    Returns 1 found, 0 the history is too short, -1 not readable yet.
+int EntryATR(const ulong ticket, const datetime opened, double &atr)
+  {
+   string aKey = GVKey("A", ticket);
+   if(GlobalVariableCheck(aKey))
+     {
+      atr = GlobalVariableGet(aKey);
+      return (atr > 0.0) ? 1 : 0;
+     }
+   int sh = iBarShift(_Symbol, TriggerTimeframe, opened, false);
+   if(sh < 0)
+      return -1;
+   datetime entryTrig = iTime(_Symbol, TriggerTimeframe, sh);       // trigger bar the position was opened in
+   datetime sigBar    = iTime(_Symbol, TriggerTimeframe, sh + 1);   // the bar before it: the signal bar
+   if(entryTrig == 0 || sigBar == 0 || opened < entryTrig || opened >= entryTrig + PeriodSeconds(TriggerTimeframe))
+      return -1;
+   MqlRates r[];
+   int got = TrailRates(sh + 1, TRAIL_ATR_BARS + 1, sigBar, r);
+   if(got <= 0)
+      return got;
+   if(iBarShift(_Symbol, TriggerTimeframe, opened, false) != sh)
+      return -1;                                     // a new bar appeared while reading
+   atr = WilderATR(r, TRAIL_ATR_BARS + 1);
+   if(atr <= 0.0)
+      return 0;
+   GlobalVariableSet(aKey, atr);
+   GlobalVariablesFlush();
+   return 1;
+  }
+
+//--- best price of the COMPLETED M1 bars of the symbol with open times fromBar .. m1 - 1 minute:
+//    the highest bid high for a buy; the lowest ask low for a sell, where ask low = bid low + that
+//    bar's spread (the current spread when the bar has none). Read from the history every time,
+//    nothing is remembered. False when the bars cannot be read (yet).
+bool BestSince(const datetime fromBar, const datetime m1, const bool isSell, double &best)
+  {
+   datetime lastBar = m1 - 60;                       // the newest completed M1 bar there can be
+   if(lastBar < fromBar || !SeriesInfoInteger(_Symbol, PERIOD_M1, SERIES_SYNCHRONIZED))
+      return false;
+   MqlRates r[];
+   ArraySetAsSeries(r, false);
+   int n = CopyRates(_Symbol, PERIOD_M1, fromBar, lastBar, r);
+   if(n <= 0)
+      return false;
+   double spreadNow = MathMax(0.0, Ask() - Bid());
+   bool   found     = false;
+   for(int k = 0; k < n; k++)
+     {
+      if(r[k].time < fromBar || r[k].time > lastBar)
+         continue;
+      double v = isSell ? r[k].low + ((r[k].spread > 0) ? r[k].spread * _Point : spreadNow) : r[k].high;
+      if(!found || (isSell ? v < best : v > best))
+         best = v;
+      found = true;
+     }
+   return found;
+  }
+
+//--- level of the level systems for the M1 bar opening at m1, from the closed trigger bars (the
+//    newest is 'lastClosed', shift 1): support for a buy, resistance for a sell, in chart (bid)
+//    prices. Ports of MarketX._levels() / psar_levels() / hump_levels() in research/hump_trail.py
+//    and MarketY._levels() / pivot_levels() in research/hump_trail2.py.
+//    Returns 1 level found, 0 no level this minute, -1 data not ready (again on the next tick).
+int TrailLevel(const bool isSell, const datetime lastClosed, const datetime m1, double &level)
+  {
+   MqlRates r[];
+   int      got = 0;
+   if(TrailMode == TRAIL_CANDLES)
+     {
+      //--- lowest low / highest high of the last TrailParam closed bars
+      got = TrailRates(1, TrailParam, lastClosed, r);
+      if(got <= 0)
+         return got;
+      level = isSell ? r[0].high : r[0].low;
+      for(int k = 1; k < TrailParam; k++)
+         level = isSell ? MathMax(level, r[k].high) : MathMin(level, r[k].low);
+      return 1;
+     }
+   if(TrailMode == TRAIL_EMA)
+     {
+      //--- EMA(TrailParam) of the closes, run over so many bars that its first value no longer matters
+      int n = MathMax(TRAIL_EMA_BARS, 10 * TrailParam);
+      got = TrailRates(1, n, lastClosed, r);
+      if(got <= 0)
+         return got;
+      double alpha = 2.0 / (TrailParam + 1.0);
+      level = r[0].close;
+      for(int k = 1; k < n; k++)
+         level += alpha * (r[k].close - level);
+      return 1;
+     }
+   if(TrailMode == TRAIL_SMA || TrailMode == TRAIL_BOLLINGER)
+     {
+      //--- SMA(TrailParam) of the closes; Bollinger band: SMA(20) -/+ 1 or 2 population standard
+      //    deviations of the same 20 closes
+      int n = (TrailMode == TRAIL_SMA) ? TrailParam : 20;
+      got = TrailRates(1, n, lastClosed, r);
+      if(got <= 0)
+         return got;
+      double mean = 0.0;
+      for(int k = 0; k < n; k++)
+         mean += r[k].close;
+      mean /= n;
+      level = mean;
+      if(TrailMode == TRAIL_BOLLINGER)
+        {
+         double var = 0.0;
+         for(int k = 0; k < n; k++)
+            var += (r[k].close - mean) * (r[k].close - mean);
+         double band = ((TrailParam == 0) ? 1.0 : 2.0) * MathSqrt(var / n);
+         level = isSell ? mean + band : mean - band;
+        }
+      return 1;
+     }
+   if(TrailMode == TRAIL_PSAR)
+     {
+      //--- Parabolic SAR for the next bar: support in up mode (buys only), resistance in down mode
+      //    (sells only). Run over TRAIL_PSAR_BARS bars: the same values as over the whole history
+      double sarStep = (TrailParam == 1) ? 0.01 : (TrailParam == 2) ? 0.04 : 0.02;
+      double sarMax  = (TrailParam == 1) ? 0.1 : 0.2;
+      int    n       = TRAIL_PSAR_BARS;
+      got = TrailRates(1, n, lastClosed, r);
+      if(got <= 0)
+         return got;
+      bool   up  = (r[1].high >= r[0].high);
+      double ep  = up ? r[1].high : r[1].low;
+      double sar = up ? MathMin(r[0].low, r[1].low) : MathMax(r[0].high, r[1].high);
+      double af  = sarStep;
+      for(int k = 2; k < n; k++)
+        {
+         if(up)
+           {
+            if(r[k].low < sar)                       // reversal to down mode
+              {
+               up  = false;
+               sar = ep;
+               ep  = r[k].low;
+               af  = sarStep;
+              }
+            else
+               if(r[k].high > ep)
+                 {
+                  ep = r[k].high;
+                  af = MathMin(af + sarStep, sarMax);
+                 }
+           }
+         else
+           {
+            if(r[k].high > sar)                      // reversal to up mode
+              {
+               up  = true;
+               sar = ep;
+               ep  = r[k].high;
+               af  = sarStep;
+              }
+            else
+               if(r[k].low < ep)
+                 {
+                  ep = r[k].low;
+                  af = MathMin(af + sarStep, sarMax);
+                 }
+           }
+         sar = sar + af * (ep - sar);
+         if(up)
+            sar = MathMin(sar, MathMin(r[k].low, r[k - 1].low));
+         else
+            sar = MathMax(sar, MathMax(r[k].high, r[k - 1].high));
+        }
+      if(up == isSell)
+         return 0;                                   // the SAR is on the other side: no level for this position
+      level = sar;
+      return 1;
+     }
+   if(TrailMode == TRAIL_PIVOTS)
+     {
+      //--- last confirmed swing: a bar strictly beyond the TrailParam bars on each side of it,
+      //    known TrailParam bars later
+      int w = TrailParam;
+      int n = MathMin(TRAIL_PIVOT_BARS, Bars(_Symbol, TriggerTimeframe) - 1);
+      if(n < 2 * w + 1)
+        {
+         TrailBarsMissing(2 * w + 1, n);
+         return 0;
+        }
+      got = TrailRates(1, n, lastClosed, r);
+      if(got <= 0)
+         return got;
+      for(int j = n - 1 - w; j >= w; j--)
+        {
+         bool swing = true;
+         for(int q = j - w; q <= j + w && swing; q++)
+            if(q != j && (isSell ? r[q].high >= r[j].high : r[q].low <= r[j].low))
+               swing = false;
+         if(swing)
+           {
+            level = isSell ? r[j].high : r[j].low;
+            return 1;
+           }
+        }
+      return 0;
+     }
+   if(TrailMode == TRAIL_HTF_CANDLE)
+     {
+      //--- low / high of the last candle of TrailParam minutes that had closed by the close of
+      //    the last closed trigger bar
+      ENUM_TIMEFRAMES htf = TrailHtfPeriod();
+      if(!SeriesInfoInteger(_Symbol, htf, SERIES_SYNCHRONIZED) || !HTFBarCurrent(htf, m1))
+         return -1;
+      datetime latest = lastClosed + PeriodSeconds(TriggerTimeframe) - PeriodSeconds(htf);   // latest open time it can have
+      MqlRates h[];
+      ArraySetAsSeries(h, false);
+      if(CopyRates(_Symbol, htf, latest, 1, h) != 1)
+         return -1;
+      if(h[0].time > latest)
+         return -1;
+      level = isSell ? h[0].high : h[0].low;
+      return 1;
+     }
+   //--- TRAIL_HUMP: the hump state machine holds the low of the last completed negative hump and
+   //    the high of the last completed positive hump (hump_levels()); it is brought up to the
+   //    last closed bar first (the trailing runs before the signal evaluation of the tick)
+   if(!HandleReady(g_hMacd, TriggerTimeframe) || !HandleReady(g_hStoch, TriggerTimeframe) || !AdvanceHumps())
+      return -1;
+   if(!g_stateReady || g_lastProcTime != lastClosed)
+      return -1;
+   if(isSell ? !g_hasPosHi : !g_hasNegLo)
+      return 0;
+   level = isSell ? g_lastPosHi : g_lastNegLo;
+   return 1;
+  }
+
+//--- a trailing stop on the tick grid, rounded to the looser side (down for a buy, up for a sell).
+//    Prices lie on the grid, so the stop is then hit exactly when the unrounded stop of the
+//    reference backtest is, and it tightens the current stop by a point exactly when the unrounded
+//    one does (rounded to the nearest tick, a buy stop can sit up to half a tick higher and close
+//    the trade a minute early)
+double TrailStopPrice(const double price, const bool isSell)
+  {
+   double tick = SymbolInfoDouble(_Symbol, SYMBOL_TRADE_TICK_SIZE);
+   if(tick <= 0.0)
+      tick = _Point;
+   double q = price / tick;
+   q = isSell ? MathCeil(q - 1e-7) : MathFloor(q + 1e-7);   // 1e-7 tick: floating-point noise of a price on the grid
+   return NormalizeDouble(q * tick, _Digits);
+  }
+
+//--- move the stop of a position to 'cand', if that tightens it by at least minStep (and by a
+//    point). Price already through the new stop: the position is closed at market (the reference
+//    backtest fills at that minute's open). New stop closer to the price than the broker's stops
+//    level: not placed now (one journal line per position).
+//    Returns false when a request failed: it is repeated on a later tick (throttle of TrailFailed).
+bool TrailApply(const ulong ticket, const bool isSell, const double sl, const double tp, const double cand,
+                const double minStep, const datetime nowT)
+  {
+   double newSL = TrailStopPrice(cand, isSell);
+   if(newSL <= 0.0)
+      return true;
+   if(sl != 0.0)
+     {
+      //--- the stop is only ever tightened
+      if(isSell && !(newSL <= sl - minStep && newSL < sl - 0.5 * _Point))
+         return true;
+      if(!isSell && !(newSL >= sl + minStep && newSL > sl + 0.5 * _Point))
+         return true;
+     }
+   double price = isSell ? Ask() : Bid();
+   if(price <= 0.0)
+      return false;
+   if(isSell ? (price >= newSL) : (price <= newSL))
+     {
+      g_trailCloseDue = true;
+      if(g_trailCloseLog != ticket)
+        {
+         g_trailCloseLog = ticket;
+         Log(StringFormat("Trailing stop %.2f of #%I64u is already crossed (%s %.2f): closing at market",
+                          newSL, ticket, isSell ? "ask" : "bid", price));
+        }
+      ResetLastError();
+      bool sent = g_trade.PositionClose(ticket);
+      uint rc   = g_trade.ResultRetcode();
+      if(sent && (rc == TRADE_RETCODE_DONE || rc == TRADE_RETCODE_DONE_PARTIAL || rc == TRADE_RETCODE_PLACED))
+        {
+         g_trailFailCode = 0;
+         return true;
+        }
+      g_trailLastFail = nowT;
+      if(g_trailCloseFail != ticket)
+        {
+         g_trailCloseFail = ticket;
+         Print(StringFormat("[LOMA] Trailing close of #%I64u failed: retcode=%u (%s) lastError=%d - retrying every few seconds",
+                            ticket, rc, g_trade.ResultRetcodeDescription(), GetLastError()));
+        }
+      return false;
+     }
+   if(MathAbs(newSL - price) <= StopsLevelDistance())
+     {
+      if(g_trailSkipLog != ticket)
+        {
+         g_trailSkipLog = ticket;
+         Log(StringFormat("Trailing SL %.2f of #%I64u is closer to the price than the broker's stops level: not moved now",
+                          newSL, ticket));
+        }
+      return true;
+     }
+   if(g_trade.PositionModify(ticket, newSL, tp))
+     {
+      g_trailFailCode = 0;
+      Log(StringFormat("Trailing SL #%I64u -> %.2f", ticket, newSL));
+      return true;
+     }
+   TrailFailed(nowT);
+   return false;
+  }
+
+//--- one trailing evaluation of a position for the systems other than TRAIL_RISK: on every tick
+//    for TRAIL_STEP, on the first tick of an M1 bar (open time m1) for the others.
+//    Returns false when it must be repeated on the next tick (data not ready, or a request failed).
+bool TrailPosition(const ulong ticket, const datetime opened, const double open, const double sl, const double tp,
+                   const bool isSell, const double initRisk, const datetime m1, const datetime nowT)
+  {
+   datetime entryBar = opened - (opened % 60);       // M1 bar in which the position was opened
+   double   bid      = Bid();
+   double   ask      = Ask();
+   if(bid <= 0.0 || ask <= 0.0)
+      return false;
+
+   //--- TRAIL_STEP, every tick: with the best profit seen so far fav and a = TrailStartR x 1R, the
+   //    stop is at entry + (floor(fav / a) - 1) x a once fav >= a. Seen so far = this tick and the
+   //    completed M1 bars after the entry bar (read from the history once per M1 bar: restart-safe)
+   if(TrailMode == TRAIL_STEP)
+     {
+      double   fav  = isSell ? open - ask : bid - open;
+      datetime from = entryBar + 60;
+      if(m1 > from)
+        {
+         if(g_stepTicket != ticket || g_stepBar != m1)
+           {
+            double b = 0.0;
+            if(BestSince(from, m1, isSell, b))
+              {
+               g_stepTicket = ticket;
+               g_stepBar    = m1;
+               g_stepBest   = b;
+              }
+           }
+         if(g_stepTicket == ticket && g_stepBar == m1)
+            fav = MathMax(fav, isSell ? open - g_stepBest : g_stepBest - open);
+        }
+      double a = TrailStartR * initRisk;
+      if(a <= 0.0 || fav < a)
+         return true;
+      double k = MathFloor(fav / a);
+      return TrailApply(ticket, isSell, sl, tp, isSell ? open - (k - 1.0) * a : open + (k - 1.0) * a,
+                        Pts(TrailStep_Points), nowT);
+     }
+
+   //--- the other systems act on the completed M1 bars from the entry bar on, never in the entry minute
+   if(m1 <= entryBar)
+      return true;
+   bool   isLevel = TrailIsLevelMode();
+   double best    = open;
+   if((!isLevel || TrailStartR > 0.0) && !BestSince(entryBar, m1, isSell, best))
+      return false;
+   double fav  = isSell ? open - best : best - open;  // best profit of the completed M1 bars, in price
+   double cand = 0.0;
+   if(TrailMode == TRAIL_ATR_ENTRY || TrailMode == TRAIL_PERCENT)
+     {
+      //--- best price -/+ TrailDistanceR units once the profit has reached TrailStartR units;
+      //    unit = ATR(14) at the signal bar, or 1% of the entry price
+      double unit = 0.01 * open;
+      if(TrailMode == TRAIL_ATR_ENTRY)
+        {
+         int got = EntryATR(ticket, opened, unit);
+         if(got <= 0)
+            return (got == 0);
+        }
+      if(fav < TrailStartR * unit)
+         return true;
+      cand = isSell ? best + TrailDistanceR * unit : best - TrailDistanceR * unit;
+     }
+   else
+      if(TrailMode == TRAIL_PROFIT_LOCK)
+        {
+         //--- once the profit has reached TrailStartR x 1R: keep the share TrailDistanceR of the best profit
+         if(fav < TrailStartR * initRisk)
+            return true;
+         cand = isSell ? open - TrailDistanceR * fav : open + TrailDistanceR * fav;
+        }
+      else
+        {
+         //--- TRAIL_CHANDELIER and the level systems: active from the minute after the entry
+         //    (TrailStartR <= 0) or once the profit has reached TrailStartR x 1R; they read the
+         //    last trigger bar that had closed when this M1 bar opened
+         if(TrailStartR > 0.0 && fav < TrailStartR * initRisk)
+            return true;
+         if(!SeriesInfoInteger(_Symbol, TriggerTimeframe, SERIES_SYNCHRONIZED) || !HTFBarCurrent(TriggerTimeframe, m1))
+            return false;
+         datetime lastClosed = iTime(_Symbol, TriggerTimeframe, 1);
+         if(lastClosed == 0)
+            return false;
+         if(TrailMode == TRAIL_CHANDELIER)
+           {
+            //--- best price -/+ TrailDistanceR x Wilder ATR(14) of that bar; as in the reference
+            //    backtest the best price starts at the entry price
+            MqlRates r[];
+            int got = TrailRates(1, TRAIL_ATR_BARS + 1, lastClosed, r);
+            if(got <= 0)
+               return (got == 0);
+            double atr = WilderATR(r, TRAIL_ATR_BARS + 1);
+            cand = isSell ? MathMin(best, open) + TrailDistanceR * atr : MathMax(best, open) - TrailDistanceR * atr;
+           }
+         else
+           {
+            //--- level -/+ the SL buffer of the entry (+ the spread for a sell, stopped on the ask)
+            double level = 0.0;
+            int got = TrailLevel(isSell, lastClosed, m1, level);
+            if(got <= 0)
+               return (got == 0);
+            double buf = Pts(SL_Buffer_Points) * PriceScale(open);
+            cand = isSell ? level + buf + MathMax(0.0, ask - bid) : level - buf;
+           }
+        }
+   return TrailApply(ticket, isSell, sl, tp, cand, 0.0, nowT);
   }
 
 //--- R9: close this EA's positions opened before the end of the Friday of the most recent
@@ -1971,7 +2769,7 @@ void UpdatePanel()
   {
    if(!ShowStatusPanel || VisualsOff())
       return;
-   string build = "Loma TrendPullback v1.34";
+   string build = "Loma TrendPullback v1.35";
 
    string anchorTxt = "none";
    if(g_trend != 0)
@@ -1999,6 +2797,8 @@ void UpdatePanel()
       sessTxt += StringFormat("  |  max hold %d min", MaxHoldMinutes);
    if(CloseAtEndOfDay)
       sessTxt += "  |  EOD close " + EndOfDayTimeText();
+   if(TrailMode != TRAIL_RISK)
+      sessTxt += "  |  trailing " + TrailModeText();
    string htfTxt  = UseHTFFilter ? TFName(HTF_Timeframe) + StringFormat(" EMA(%d)", HTF_EMA_Period) : "off";
    string sigTxt  = g_signalActive ? "ACTIVE " + SideName(g_sigSide) : "none";
    double spreadPts = (Ask() - Bid()) / (_Point * g_ptScale);

@@ -1,4 +1,4 @@
-; XAUUSD_Loma_TrendPullback v1.34 - ALL-ROUND TOP 10, rank 8: gold M5 buy, session AllDay server time, trend filter H4
+; XAUUSD_Loma_TrendPullback v1.35 - ALL-ROUND TOP 10, rank 8: gold M5 buy, session AllDay server time, trend filter H4
 ; Backtest Jan 2025-May 2026 (FTMO XAUUSD M1 path, risk-% sizing): 138 trades, PF 1.83, net +66R, max drawdown 5.9R. 2025 worse half-year PF 1.89; 2026 PF 1.19 (29 trades).
 ; Harsh stress (1 min late, pessimistic trailing, 0.10 slippage, commission): PF 1.77; 2025 worse half 1.86; 2026 PF 1.17.
 ; Chosen with ALL the data from Jan 2025 to May 15 2026: the figures above are in-sample.
@@ -41,9 +41,15 @@ TP_RR=3.0
 MinRewardRisk=0.3
 MinSL_Points=30
 MaxSL_Points=0
+ScaleWithPrice=false
+ReferencePrice=0.0
 UseHTFFilter=true
 HTF_Timeframe=16388
 HTF_EMA_Period=50
+UseStochTurnFilter=false
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
 RiskPercent=0.5
 MaxLotSize=0.0
 SkipIfBelowMinLot=true
@@ -54,6 +60,8 @@ MaxEntryDelaySeconds=0
 TrailStartR=0.0
 TrailDistanceR=0.5
 TrailStep_Points=10
+TrailMode=0
+TrailParam=0
 UseTradingHours=false
 TradingHoursStart=07:00
 TradingHoursEnd=20:00

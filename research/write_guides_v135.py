@@ -106,7 +106,7 @@ def btc(wf_presets="presets/btc_wf", t15="presets/trailing15/btc"):
     passed = [r for r in summ["rows"] if r["passes"]]
     assert {(r["tf"], r["condition"]) for r in passed} == {("M30", "xlzc_stoch"), ("M30", "xlzc_both")}, passed
     a = det["all_unseen_years"]; w = det["walk_forward"]; fy = det["final_year"]; fin = cell["final"]
-    assert abs(fy["pf"] - fin["pf"]) < 1e-9 and fy["n"] == fin["n"]
+    assert abs(fy["pf"] - fin["pf"]) < 1e-6 and fy["n"] == fin["n"]          # the summary sums in float32
     yrows = []
     for y in cell["by_year"]:
         if y["n"]:
@@ -158,7 +158,7 @@ def btc(wf_presets="presets/btc_wf", t15="presets/trailing15/btc"):
 |---|---|---|---|---|---|---|---|---|---|
 """ + "\n".join(prow) + f"""
 
-**How to run them.** All {len(s)} together on one **hedging** account: that is what was tested. They overlap: {ex['shared_minutes']} of their {ex['entry_minutes']} entry minutes in 2024 – 2026 were shared by two or more presets, and up to {ex['max_open']} positions were open at once. So set **`RiskPercent=0.1`** in each (up to about {ex['max_open'] * 0.1:.1f}% at risk at once) instead of the 0.5 written in the files. The stops are wide: median ${ex['stop_median']:,.0f}, 90% under ${ex['stop_p90']:,.0f}, widest ${ex['stop_max']:,.0f} in 2026. With a 1-BTC contract and a 0.01 minimum lot, a trade is taken only if the balance is at least 20 times its stop in dollars at `RiskPercent=0.1`: about ${round(ex['min_balance_p90_at_0_1'], -3):,.0f} covers 90% of trades. At 0.1% each, the {len(s)} together held up to about {ex['together_max'] / 5:.0f} times the balance in open positions: BTC leverage of 1:10 or more is needed.
+**How to run them.** All {len(s)} together on one **hedging** account: that is what was tested. They overlap: {ex['shared_minutes']} of their {ex['entry_minutes']} entry minutes in 2024 – 2026 were shared by two or more presets, and up to {ex['max_open']} positions were open at once. So each file sets **`RiskPercent=0.1`** (up to about {ex['max_open'] * 0.1:.1f}% at risk at once); do not raise it to the 0.5 of the other presets. The stops are wide: median ${ex['stop_median']:,.0f}, 90% under ${ex['stop_p90']:,.0f}, widest ${ex['stop_max']:,.0f}. With a 1-BTC contract and a 0.01 minimum lot, a trade is taken only if the balance is at least {ex['min_balance_p90_at_0_1'] / ex['stop_p90']:.0f} times its stop in dollars at `RiskPercent=0.1` (`SkipIfBelowMinLot=true`): about ${round(ex['min_balance_p90_at_0_1'], -3):,.0f} covers 90% of trades. At 0.1% each, the {len(s)} together held up to about {ex['together_max'] / 5:.0f} times the balance in open positions: the account needs BTC leverage of at least 1:{ex['together_max'] / 5 + 1:.0f}, and 1:10 leaves room.
 
 **Inputs these presets use (new in v1.35):** `UseStochTurnFilter=true` (the entry rule), `ScaleWithPrice=true` with `ReferencePrice={ref}` (the stop buffer and minimum stop were calibrated at that price and follow it), `TrailMode=0` (the EA's own trailing).
 
@@ -233,7 +233,7 @@ def gold(t15="presets/trailing15/gold"):
     bl = []
     for r in best:
         why = []
-        if r["pf"] < 1.3: why.append(f"PF {f2(r['pf'])}")
+        if r["pf"] < 1.3: why.append("under 1.3")
         if r["stress_pf"] < 1.1: why.append(f"stressed {f2(r['stress_pf'])}")
         if r["losing_years"]: why.append("losing " + ", ".join(map(str, r["losing_years"])))
         if r["years_with_50_trades"] < 2: why.append("fewer than two years with 50 trades")
@@ -273,6 +273,11 @@ The best cells with at least 100 unseen trades: {'; '.join(bl)}. The year-by-yea
 
 """
     install = old[i["## Install"]:i["## The six presets"]].replace("pick a preset.", "pick a preset (`Loma_T15` presets need this v1.35).")
+    v134_line = ("v1.34, the file in this zip, adds the changes listed below. It was checked line by line and run through a compile harness and a "
+                 "simulated terminal, but it has not been compiled in MetaEditor yet.")
+    assert v134_line in install, "the compile sentence of the v1.34 guide changed"
+    install = install.replace(v134_line, "v1.34 and v1.35 (the file in this zip) were checked line by line and run through a compile harness and a "
+                                         "simulated terminal, but have not been compiled in MetaEditor yet.")
     new_changes = changes.replace("**v1.34** (this zip)", "**v1.35** (this zip)\n- The trailing systems, the Stochastic turn filter and the price scaling of \"New in v1.35\" above.\n\n**v1.34**")
     head = old[:i["> **Do not trade these presets with real money.**"]].replace("v1.34", "v1.35").replace(
         "This zip holds the EA and the six gold presets with a backtest profit factor of 1.3 or more under stress, in both 2025 and 2026.",

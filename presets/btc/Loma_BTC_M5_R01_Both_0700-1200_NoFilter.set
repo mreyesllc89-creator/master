@@ -1,4 +1,4 @@
-; XAUUSD_Loma_TrendPullback v1.34 on BTCUSD - re-calibration pick 1 of 4 for M5: both, session 0700-1200 server time, trend filter none, trailing off. DO NOT LOAD ON GOLD.
+; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - re-calibration pick 1 of 4 for M5: both, session 0700-1200 server time, trend filter none, trailing off. DO NOT LOAD ON GOLD.
 ; Picked on Jan 2025 - May 15 2026 only (lowest of six profit factors, normal and stressed costs: 1.59): 77 trades, PF 1.99, stressed 2.11.
 ; UNSEEN May 16 - Nov 13 2026 (never used to pick it): 31 trades, PF 1.64, net +8.1R; stressed PF 1.74. All 4 M5 picks together: 133 trades, PF 1.42 (stressed 1.37).
 ; EARLIER DATA, before the calibration period: 2024 78 trades, PF 0.76; 2023 74 trades, PF 0.79. All 4 M5 picks together: 2024 PF 0.79, 2023 PF 0.83. The 2026 result did not repeat there: UNPROVEN.
@@ -41,9 +41,15 @@ TP_RR=1.5
 MinRewardRisk=0.6
 MinSL_Points=3500
 MaxSL_Points=0
+ScaleWithPrice=false
+ReferencePrice=0.0
 UseHTFFilter=false
 HTF_Timeframe=16388
 HTF_EMA_Period=50
+UseStochTurnFilter=false
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
 RiskPercent=0.5
 MaxLotSize=0.0
 SkipIfBelowMinLot=true
@@ -54,6 +60,8 @@ MaxEntryDelaySeconds=0
 TrailStartR=0.0
 TrailDistanceR=1.0
 TrailStep_Points=200
+TrailMode=0
+TrailParam=0
 UseTradingHours=true
 TradingHoursStart=07:00
 TradingHoursEnd=12:00

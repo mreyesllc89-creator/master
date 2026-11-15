@@ -1,0 +1,76 @@
+; XAUUSD_Loma_TrendPullback v1.35 on XAUUSD - trailing result M5 + Hump trailing, setup 2 of 4: sell, session 0700-1200 server time, trend filter none, target 3R. DO NOT LOAD ON BTC.
+; Trailing: stop beyond the last completed pullback hump, once the profit reaches 0.5R. Needs EA v1.35 or later (TrailMode 13, TrailParam 0).
+; Picked on Jan 2025 - May 15 2026 only (score 1.45): 71 trades, PF 1.78.
+; UNSEEN May 16 - Nov 13 2026: this setup 27 trades, PF 0.97, net -0.5R; the 4 setups of this combination together 141 trades, PF 1.41 (stressed 1.12).
+; EARLIER DATA, before the calibration period: Jul-Dec 2024: this setup 39 trades, PF 1.04. The combination together: Jul-Dec 2024 PF 0.75 (116 trades). The 2026 result did NOT hold on earlier data: UNPROVEN, demo and Strategy Tester only.
+; Data: FTMO XAUUSD M1 to May 15 2026, Dukascopy after; FTMO spread table; no commission in the test (VT: set CommissionPerLot).
+; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).
+; UseNewsFilter was not in the backtest.
+MagicNumber=26113502
+TradeComment=LOMA_TM5Hump2
+TradeDirection=1
+AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
+ShowStatusPanel=true
+MarkSignals=true
+ShowHumpLabels=true
+TriggerTimeframe=5
+MACD_Fast=12
+MACD_Slow=26
+MACD_Signal=9
+Stoch_K=14
+Stoch_Slowing=1
+Stoch_D=7
+HumpWarmupBars=3000
+BigHumpHistory=10
+BigHumpMultiplier=3.0
+BigHumpMinBars=12
+RequireStochLevel=true
+StochLow=25.0
+StochHigh=75.0
+TrendBreakRatio=0.6
+MaxSignalsPerBigHump=99
+TrendMaxBars=100000
+PullbackMinBars=2
+PullbackMaxRatio=1.0
+SkipBigPullback=true
+SL_Buffer_Points=100
+TP_Mode=1
+TP_Anticipation=0.1
+TP_RR=3.0
+MinRewardRisk=0.6
+MinSL_Points=100
+MaxSL_Points=0
+ScaleWithPrice=false
+ReferencePrice=0.0
+UseHTFFilter=false
+HTF_Timeframe=16388
+HTF_EMA_Period=100
+UseStochTurnFilter=false
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
+RiskPercent=0.5
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
+CommissionPerLot=0.0
+MaxSpread_Points=60
+MaxSlippage_Points=20
+MaxEntryDelaySeconds=0
+TrailStartR=0.5
+TrailDistanceR=0.5
+TrailStep_Points=10
+TrailMode=13
+TrailParam=0
+UseTradingHours=true
+TradingHoursStart=07:00
+TradingHoursEnd=12:00
+CloseBeforeWeekend=true
+WeekendCloseTime=23:00
+UseNewsFilter=true
+NewsCurrency=USD
+NewsWindowMinutes=30
+MaxHoldMinutes=240
+CloseAtEndOfDay=false
+EndOfDayTime=22:00

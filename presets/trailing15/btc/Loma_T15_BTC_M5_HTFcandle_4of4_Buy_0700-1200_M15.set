@@ -1,0 +1,76 @@
+; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - trailing result M5 + HTFcandle trailing, setup 4 of 4: buy, session 0700-1200 server time, trend filter M15 EMA 200, target 1R. DO NOT LOAD ON GOLD.
+; Trailing: stop beyond the low / high of the last closed 30-minute candle, from the minute after entry. Needs EA v1.35 or later (TrailMode 11, TrailParam 30).
+; Picked on Jan 2025 - May 15 2026 only (score 1.31): 97 trades, PF 1.62.
+; UNSEEN May 16 - Nov 13 2026: this setup 39 trades, PF 1.41, net +3.7R; the 4 setups of this combination together 166 trades, PF 1.71 (stressed 1.51).
+; EARLIER DATA, before the calibration period: 2024: this setup 75 trades, PF 1.01; 2023: this setup 63 trades, PF 0.89. The combination together: 2024 PF 1.14 (321 trades); 2023 PF 0.70 (337 trades). The 2026 result did NOT hold on earlier data: UNPROVEN, demo and Strategy Tester only.
+; Data: Binance BTCUSDT M1 in broker server time, assumed spread 10 USD. Points are 0.01 USD: 2000 points = 20 USD.
+; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).
+; UseNewsFilter was not in the backtest.
+MagicNumber=26113629
+TradeComment=LOMA_TM5HTFc4
+TradeDirection=2
+AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
+ShowStatusPanel=true
+MarkSignals=true
+ShowHumpLabels=true
+TriggerTimeframe=5
+MACD_Fast=12
+MACD_Slow=26
+MACD_Signal=9
+Stoch_K=10
+Stoch_Slowing=1
+Stoch_D=7
+HumpWarmupBars=3000
+BigHumpHistory=40
+BigHumpMultiplier=2.5
+BigHumpMinBars=8
+RequireStochLevel=true
+StochLow=25.0
+StochHigh=75.0
+TrendBreakRatio=1.0
+MaxSignalsPerBigHump=99
+TrendMaxBars=120
+PullbackMinBars=1
+PullbackMaxRatio=0.6
+SkipBigPullback=true
+SL_Buffer_Points=1000
+TP_Mode=1
+TP_Anticipation=0.2
+TP_RR=1.0
+MinRewardRisk=0.3
+MinSL_Points=7000
+MaxSL_Points=0
+ScaleWithPrice=false
+ReferencePrice=0.0
+UseHTFFilter=true
+HTF_Timeframe=15
+HTF_EMA_Period=200
+UseStochTurnFilter=false
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
+RiskPercent=0.5
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
+CommissionPerLot=0.0
+MaxSpread_Points=3000
+MaxSlippage_Points=1000
+MaxEntryDelaySeconds=0
+TrailStartR=0.0
+TrailDistanceR=0.5
+TrailStep_Points=200
+TrailMode=11
+TrailParam=30
+UseTradingHours=true
+TradingHoursStart=07:00
+TradingHoursEnd=12:00
+CloseBeforeWeekend=false
+WeekendCloseTime=23:00
+UseNewsFilter=true
+NewsCurrency=USD
+NewsWindowMinutes=30
+MaxHoldMinutes=120
+CloseAtEndOfDay=true
+EndOfDayTime=21:00

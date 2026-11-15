@@ -249,7 +249,8 @@ def wf(work, tf, key, out_dir, magic, detail_json=None):
         c = A[i, v, :, :, :]                                        # [cost, year, 4]
         yr = {years[y]: (int(c[0, y, 0]), float(W.pf_of(c[0, y, 1], c[0, y, 2]))) for y in cal}
         o = ea_inputs(dict(p, trail_kind="R"), btc, magic + k, f"LOMA_W{tf}{k:02d}")
-        o.update(ScaleWithPrice="true", ReferencePrice=round(meta["anchor_price"], 2))
+        o.update(ScaleWithPrice="true", ReferencePrice=round(meta["anchor_price"], 2),
+                 RiskPercent=0.1)                                   # the presets run together: up to 9 positions at once
         if key in ("xlzc_stoch", "xlzc_both"):
             o.update(UseStochTurnFilter="true")
         side = SIDE[p["sides"]]; sess = SESS_NAME[p["session"]]; filt = p["htf"] if p["htf"] != "none" else "NoFilter"
@@ -261,6 +262,7 @@ def wf(work, tf, key, out_dir, magic, detail_json=None):
                       + ", ".join(f"{y}: {n} trades PF {pf:.2f}" for y, (n, pf) in yr.items()) + ". These are calibration figures."),
                 *([plain(hist)] if hist else []),
                 plain(f"ScaleWithPrice: the *_Points distances were calibrated at {meta['anchor_price']:.2f} (ReferencePrice) and follow the price."),
+                f"RiskPercent 0.1: the {len(picks)} presets are meant to run together on one hedging account, and they overlap.",
                 "Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer). Demo and Strategy Tester first.",
                 "UseNewsFilter was not in the backtest."]
         write_set(os.path.join(out_dir, fname + ".set"), head, o)

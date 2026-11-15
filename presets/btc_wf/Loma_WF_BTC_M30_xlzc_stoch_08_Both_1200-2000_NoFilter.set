@@ -1,0 +1,75 @@
+; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - year-by-year result M30, setup 8 of 10: both, session 1200-2000 server time, trend filter none; entries only when the Stochastic (7,1,7) of the trigger timeframe came from 80 (sells) / 20 (buys) within 5 bars and turned (UseStochTurnFilter). DO NOT LOAD ON GOLD.
+; Picked for the year ahead on 2024 - 13 Nov 2026 by the year-by-year rule: lowest of six profit factors 1.40; 2024: 22 trades PF 1.95, 2025: 28 trades PF 1.85, 2026: 23 trades PF 2.26. These are calibration figures.
+; Year by year, setups picked by this rule on the three years before each year: 2023 PF 1.22 (65 trades), 2024 PF 1.39 (170 trades), 2025 PF 1.87 (251 trades), 2026 PF 1.26 (267 trades); all 4 unseen years together PF 1.46 (753 trades, stressed 1.41). The last year (2026) was kept back and checked once.
+; ScaleWithPrice: the *_Points distances were calibrated at 72408.79 (ReferencePrice) and follow the price.
+; RiskPercent 0.1: the 10 presets are meant to run together on one hedging account, and they overlap.
+; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer). Demo and Strategy Tester first.
+; UseNewsFilter was not in the backtest.
+MagicNumber=26113708
+TradeComment=LOMA_WM3008
+TradeDirection=0
+AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
+ShowStatusPanel=true
+MarkSignals=true
+ShowHumpLabels=true
+TriggerTimeframe=30
+MACD_Fast=10
+MACD_Slow=22
+MACD_Signal=9
+Stoch_K=7
+Stoch_Slowing=1
+Stoch_D=7
+HumpWarmupBars=3000
+BigHumpHistory=40
+BigHumpMultiplier=1.25
+BigHumpMinBars=12
+RequireStochLevel=false
+StochLow=25.0
+StochHigh=75.0
+TrendBreakRatio=99.0
+MaxSignalsPerBigHump=99
+TrendMaxBars=80
+PullbackMinBars=2
+PullbackMaxRatio=0.4
+SkipBigPullback=true
+SL_Buffer_Points=2000
+TP_Mode=1
+TP_Anticipation=0.35
+TP_RR=3.0
+MinRewardRisk=1.0
+MinSL_Points=2000
+MaxSL_Points=0
+ScaleWithPrice=true
+ReferencePrice=72408.79
+UseHTFFilter=false
+HTF_Timeframe=16388
+HTF_EMA_Period=20
+UseStochTurnFilter=true
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
+RiskPercent=0.1
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
+CommissionPerLot=0.0
+MaxSpread_Points=3000
+MaxSlippage_Points=1000
+MaxEntryDelaySeconds=0
+TrailStartR=0.0
+TrailDistanceR=0.3
+TrailStep_Points=200
+TrailMode=0
+TrailParam=0
+UseTradingHours=true
+TradingHoursStart=12:00
+TradingHoursEnd=20:00
+CloseBeforeWeekend=false
+WeekendCloseTime=23:00
+UseNewsFilter=true
+NewsCurrency=USD
+NewsWindowMinutes=30
+MaxHoldMinutes=240
+CloseAtEndOfDay=true
+EndOfDayTime=21:00

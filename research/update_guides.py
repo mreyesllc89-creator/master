@@ -10,7 +10,7 @@
    Each is one line, found by its opening words.
 2. Checks every other figure of the BTC guide against the data and stops on a mismatch.
 Run from the repository root, after make_recal_html.py."""
-import json, re, sys
+import json, os, re, sys
 import pandas as pd
 
 F = json.load(open("research/reports/recal_facts.json"))
@@ -105,6 +105,19 @@ if os.path.exists("research/results/wf/wf_facts.json"):
     set_line("LOMA_START_HERE.md", "> - **Trailing presets", f"> - **Trailing presets:** {t15_line}")
     set_line("README.md", "- **Year by year", f"- **Year by year (15 November 2026):** {wf_line} See `research/reports/loma_oos_review.html`, section 6.")
     set_line("README.md", "- **Trailing presets", f"- **Trailing presets:** {t15_line}")
+    # the two paragraphs under the BTC table of LOMA_START_HERE.md ("Shipped presets")
+    wfp = pd.read_csv("presets/btc_wf/BTC_WF_M30_xlzc_stoch_SUMMARY.csv")
+    n_t15 = {s: len([f for f in os.listdir(f"presets/trailing15/{s}") if f.endswith(".set")]) for s in ("gold", "btc")}
+    yrs_n = ", ".join(f"{y['year']} {f2_(y['pf'])} ({y['n']} trades)" for y in cellw["by_year"] if y["n"])
+    wf_extra = (f"\n**BTC year by year** (same zip, presets `Loma_WF_BTC_M30_01` to `{len(wfp):02d}`). Picked on 2024 – 13 November 2026 by the rule that "
+                f"passed the year-by-year test: M30 with the Stochastic turn rule (`UseStochTurnFilter=true`). The rule on its unseen years: {yrs_n}; "
+                f"the 2026 months, checked once at the end, {f2_(finw['pf'])} ({finw['n']} trades). Run all {len(wfp)} together on a hedging account at "
+                f"`RiskPercent=0.1` (set in the files). Account size, leverage and the preset table: `packages/loma_btcusd/START_HERE.md`.\n\n"
+                f"**Trailing presets** (`Loma_T15_Gold_*`: {n_t15['gold']} in the gold zip; `Loma_T15_BTC_*`: {n_t15['btc']} in the BTC zip): the 15 "
+                f"combinations of timeframe and trailing system that reached a profit factor of 1.3 on the 2026 months. None reached 1.3 on the earlier "
+                f"data: unproven, Strategy Tester and demo only. Their tables are in the two zip guides.\n")
+else:
+    wf_extra = ""
 
 set_line("LOMA_START_HERE.md", "> - **BTC:**", f"> - **BTC:** {btc_status}")
 set_line("LOMA_START_HERE.md", "> - **Re-calibration", f"> - **Re-calibration (15 November 2026):** {recal_status}")
@@ -136,7 +149,7 @@ a = open("LOMA_START_HERE.md", encoding="utf-8").read()
 i = a.index("**BTC** (`dist/Loma_BTCUSD"); j = a.index("\n## ", i)
 a = a[:i] + ("**BTC** (`dist/Loma_BTCUSD_v1_35.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. "
              "Picked on January 2025 – 15 May 2026; unseen: 16 May – 13 November 2026; 2024 and 2023 lie before the calibration data. "
-             "Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC.\n\n" + table_long + "\n") + a[j:]
+             "Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC.\n\n" + table_long + "\n" + wf_extra) + a[j:]
 open("LOMA_START_HERE.md", "w", encoding="utf-8").write(a)
 
 # ---- every other figure of the BTC guide, checked against the data

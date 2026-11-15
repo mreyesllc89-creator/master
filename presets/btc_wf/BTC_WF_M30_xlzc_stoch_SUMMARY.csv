@@ -1,0 +1,11 @@
+file,timeframe,condition,direction,session,trend_filter,htf_ema,macd,target,trailing,score,cal_2024_trades,cal_2025_trades,cal_2026_trades,cal_2024_pf,cal_2025_pf,cal_2026_pf,magic
+Loma_WF_BTC_M30_xlzc_stoch_01_Buy_AllDay_NoFilter,M30,xlzc_stoch,Buy,AllDay,none,100,12-26,3.0R,"from 1.0R, 0.5R behind",1.565,22,28,26,1.69,2.5,2.04,26113701
+Loma_WF_BTC_M30_xlzc_stoch_02_Sell_AllDay_H1,M30,xlzc_stoch,Sell,AllDay,H1,200,8-17,1.0R,"from 1.5R, 0.5R behind",1.532,27,27,22,2.45,1.67,1.53,26113702
+Loma_WF_BTC_M30_xlzc_stoch_03_Both_0700-2000_H4,M30,xlzc_stoch,Both,0700-2000,H4,50,10-22,2.0R,off,1.524,26,27,20,1.94,1.62,1.57,26113703
+Loma_WF_BTC_M30_xlzc_stoch_04_Both_0700-2000_H1,M30,xlzc_stoch,Both,0700-2000,H1,100,10-22,3.0R,"from 1.0R, 1.0R behind",1.513,29,31,22,2.9,1.72,1.51,26113704
+Loma_WF_BTC_M30_xlzc_stoch_05_Sell_AllDay_NoFilter,M30,xlzc_stoch,Sell,AllDay,none,50,8-17,3.0R,"from 1.0R, 1.0R behind",1.498,33,25,27,1.66,1.5,2.13,26113705
+Loma_WF_BTC_M30_xlzc_stoch_06_Both_0700-2000_NoFilter,M30,xlzc_stoch,Both,0700-2000,none,200,10-22,3.0R,off,1.481,43,45,44,1.61,1.66,2.08,26113706
+Loma_WF_BTC_M30_xlzc_stoch_07_Both_1200-2000_H4,M30,xlzc_stoch,Both,1200-2000,H4,20,10-22,3.0R,"from 1.0R, 1.0R behind",1.429,22,24,20,1.52,3.2,1.63,26113707
+Loma_WF_BTC_M30_xlzc_stoch_08_Both_1200-2000_NoFilter,M30,xlzc_stoch,Both,1200-2000,none,20,10-22,3.0R,off,1.395,22,28,23,1.95,1.85,2.26,26113708
+Loma_WF_BTC_M30_xlzc_stoch_09_Both_1200-2000_H1,M30,xlzc_stoch,Both,1200-2000,H1,20,10-22,3.0R,off,1.374,22,26,21,1.4,2.35,2.79,26113709
+Loma_WF_BTC_M30_xlzc_stoch_10_Both_AllDay_H1,M30,xlzc_stoch,Both,AllDay,H1,100,10-22,2.0R,off,1.358,29,25,23,1.36,1.66,1.6,26113710

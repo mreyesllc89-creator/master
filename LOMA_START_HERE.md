@@ -1,19 +1,21 @@
-# Loma EA v1.34: start here
+# Loma EA v1.35: start here
 
 `XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method in MetaTrader 5, buys and sells, on XAUUSD and (with its own presets) BTCUSD. It is separate from the XLZC Bearish EA.
 
-> **Status: not recommended for live trading.** The presets were fitted to January 2025 – 15 May 2026.
+> **Status: not recommended for live trading.** The gold, BTC M5 and trailing presets were fitted to January 2025 – 15 May 2026; the BTC year-by-year presets to 2024 – 13 November 2026.
 > - **Gold:** on the months after that, which they never saw, the six shipped gold presets together lost money even before commission on VT Markets real ticks: profit factor 0.74 on 247 trades, 1 June – 6 November 2026 (0.67 at VT's $0.60 commission per lot). Dukascopy prices agree.
 > - **BTC:** the four new M5 presets passed the unseen months of 2026 (profit factor 1.42 on 133 trades, 16 May – 13 November) and lost on the two years before the calibration data (0.79 in 2024, 0.83 in 2023): unproven, demo only. The earlier `Loma_BTC01`–`BTC04` presets are withdrawn; they were fitted on a price file with a wrong clock.
 > - **Re-calibration (15 November 2026):** every timeframe from M1 to H1 was re-calibrated on the same period with 23 trailing systems and tested on the months after it. Gold: no timeframe holds a profit factor of 1.3 on unseen data (0.67–1.08, or 0.61–1.01 at VT's costs). BTC: M5 passes the 2026 months, with the EA's own trailing (1.42 on 133 trades) and with all 23 systems (1.48 on 377 trades), but the same setups scored 0.79 and 1.00 in 2024 and 0.83 and 0.69 in 2023: it did not hold on earlier data. No other BTC timeframe passes.
+> - **Year by year (15 November 2026):** the method was set up on three years and traded on the next, rolling forward (gold 2016 – 2025, BTC 2021 – 2025), with 59 entry conditions tried one at a time. Gold: nothing passed. BTC: one result passed, M30 with the Stochastic turn rule: 1.22 in 2023, 1.39 in 2024, 1.87 in 2025; the 2026 months, kept back and checked once, 1.26 on 267 trades; all four unseen years 1.46 on 753 trades. Its setups for the year ahead are in the BTC zip (EA v1.35); demo first.
+> - **Trailing presets:** the 15 combinations of timeframe and trailing system that reached a profit factor of 1.3 on the 2026 months (4 gold, 11 BTC) are in the zips as presets (v1.35). None reached 1.3 on the earlier data: unproven, Strategy Tester and demo only.
 > - **The EA itself** reproduces the backtest's trades.
 
 ## Downloads
 
 | Zip | Contents |
 |---|---|
-| `dist/Loma_XAUUSD_v1_34.zip` | The EA, the six gold presets, `GOLD_PRESETS_SUMMARY.csv` and the out-of-sample report `Loma_OOS_Review.html`. Guide: `packages/loma_xauusd/START_HERE.md`. |
-| `dist/Loma_BTCUSD_v1_34.zip` | The same EA and the four BTC M5 presets with `BTC_PRESETS_SUMMARY.csv` and the report. Guide: `packages/loma_btcusd/START_HERE.md`. |
+| `dist/Loma_XAUUSD_v1_35.zip` | The EA, the six gold Top presets, the 16 gold trailing presets, `GOLD_PRESETS_SUMMARY.csv`, `GOLD_TRAILING15_SUMMARY.csv` and the report `Loma_OOS_Review.html`. Guide: `packages/loma_xauusd/START_HERE.md`. |
+| `dist/Loma_BTCUSD_v1_35.zip` | The same EA, the 10 presets of the BTC year-by-year result, the four BTC M5 presets, the 38 BTC trailing presets, their summary CSVs and the report. Guide: `packages/loma_btcusd/START_HERE.md`. |
 
 The out-of-sample report is also in the repository: `research/reports/loma_oos_review.html`.
 
@@ -38,7 +40,14 @@ A **hump** (loma) is a run of bars with the MACD on one side of zero.
 4. Attach the EA to an XAUUSD or BTCUSD chart (any timeframe: it reads its own). In **Inputs** click **Load** and pick a preset for that symbol.
 5. Enable **Algo Trading**.
 
-v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.34 was checked line by line by independent reviews but has not been compiled here (no MetaEditor available). If the compiler reports anything, send the log rather than editing the file.
+v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.34 and v1.35 were checked line by line by independent reviews, in a C++ compile harness and in a simulated terminal that replays real one-minute prices, but have not been compiled here (no MetaEditor available). If the compiler reports anything, send the log rather than editing the file.
+
+## What changed in v1.35
+
+- **`TrailMode`** chooses one of 14 trailing systems (0 = the EA's own, as before; 1 ATR at entry, 2 percent of price, 3 profit lock, 4 stepped, 5 chandelier, 6 candle lows / highs, 7 EMA, 8 SMA, 9 Parabolic SAR, 10 Bollinger band, 11 higher-timeframe candle, 12 swing pivots, 13 hump structure), with **`TrailParam`** for the period or variant. Except for 0 and 4 they move the stop once per closed one-minute bar, as the backtest does.
+- **`UseStochTurnFilter`** (`StochTurnBars`, `StochTurnHigh`, `StochTurnLow`): enter only when the Stochastic (7, 1, 7) came from 80 / 20 and turned.
+- **`ScaleWithPrice`** with **`ReferencePrice`**: the stop buffer, minimum and maximum stop follow the price.
+- With the new inputs at their defaults v1.35 trades exactly like v1.34.
 
 ## What changed in v1.34
 
@@ -60,7 +69,7 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 
 ## Shipped presets and their out-of-sample results
 
-**Gold** (`dist/Loma_XAUUSD_v1_34.zip`). Backtest: FTMO one-minute data, January 2025 – 15 May 2026. Out of sample: 1 June – 6 November 2026.
+**Gold** (`dist/Loma_XAUUSD_v1_35.zip`). Backtest: FTMO one-minute data, January 2025 – 15 May 2026. Out of sample: 1 June – 6 November 2026.
 
 | Preset | Chart | Direction | Session (server time) | Trend filter | Backtest trades / PF | VT trades, Jun – Nov 6 | VT PF before commission / at $0.60 per lot | Dukascopy PF |
 |---|---|---|---|---|---|---|---|---|
@@ -71,7 +80,7 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 | `Loma_Top05` | M10 | buy | all day | M30 EMA 20 | 141 / 1.96 | 49 | 0.87 / 0.81 | 0.84 |
 | `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 32 | 0.72 / 0.64 | 0.67 |
 
-**BTC** (`dist/Loma_BTCUSD_v1_34.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. Picked on January 2025 – 15 May 2026; unseen: 16 May – 13 November 2026; 2024 and 2023 lie before the calibration data. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC.
+**BTC** (`dist/Loma_BTCUSD_v1_35.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. Picked on January 2025 – 15 May 2026; unseen: 16 May – 13 November 2026; 2024 and 2023 lie before the calibration data. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC.
 
 | Preset | Direction | Session (server time) | Trend filter | Target | Trailing | Picked on: trades / PF | Unseen 2026: trades, PF, net | Stress PF | 2024: PF (trades) | 2023: PF (trades) |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -80,6 +89,10 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 | `Loma_BTC_M5_R03` | both | 12:00-16:30 | H1 EMA 200 | 1.5R | from 1.0R, 1.0R behind | 85 / 1.76 | 28, 0.74, −3.3R | 0.79 | 0.73 (80) | 0.67 (59) |
 | `Loma_BTC_M5_R04` | sell | 12:00-20:00 | none | 1.5R | from 1.0R, 1.0R behind | 103 / 1.63 | 36, 1.79, +9.7R | 1.60 | 0.52 (59) | 0.96 (75) |
 | **All four** | | | | | | | **133, 1.42, +23.3R** | **1.37** | **0.79 (276)** | **0.83 (291)** |
+
+**BTC year by year** (same zip, presets `Loma_WF_BTC_M30_01` to `10`). Picked on 2024 – 13 November 2026 by the rule that passed the year-by-year test: M30 with the Stochastic turn rule (`UseStochTurnFilter=true`). The rule on its unseen years: 2023 1.22 (65 trades), 2024 1.39 (170 trades), 2025 1.87 (251 trades); the 2026 months, checked once at the end, 1.26 (267 trades). Run all 10 together on a hedging account at `RiskPercent=0.1` (set in the files). Account size, leverage and the preset table: `packages/loma_btcusd/START_HERE.md`.
+
+**Trailing presets** (`Loma_T15_Gold_*`: 16 in the gold zip; `Loma_T15_BTC_*`: 38 in the BTC zip): the 15 combinations of timeframe and trailing system that reached a profit factor of 1.3 on the 2026 months. None reached 1.3 on the earlier data: unproven, Strategy Tester and demo only. Their tables are in the two zip guides.
 
 ## Read before trading
 

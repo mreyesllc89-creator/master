@@ -1,30 +1,78 @@
-# Loma EA v1.34 for XAUUSD: start here
+# Loma EA v1.35 for XAUUSD: start here
 
-`XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method on gold in MetaTrader 5, buys and sells. This zip holds the EA and the six gold presets with a backtest profit factor of 1.3 or more under stress, in both 2025 and 2026.
+`XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method on gold in MetaTrader 5, buys and sells. This zip holds the EA, the six gold presets of the first calibration and the trailing presets of the re-calibration.
 
-> **Do not trade these presets with real money.** They were fitted to January 2025 – May 2026. On the months after that, which they never saw, all six lost money. On VT Markets real ticks (MT5 Strategy Tester, 1 June – 6 November 2026), the six together had a profit factor of 0.74 before commission on 247 trades, and 0.67 at VT's $0.60 per lot. Five of the six lost and the sixth (Top02) broke even before commission. On Dukascopy prices all six lost. The EA itself works: it takes the same trades as the backtest. The edge did not last. Open `Loma_OOS_Review.html` for the full test.
+> **Do not trade these presets with real money.**
+> - **Year-by-year test: no gold result passed.** Set up on three years and traded on the next, 2016 to 2025, with 59 entry conditions tried one at a time: none of the 472 timeframe-and-condition cells held a profit factor of 1.3 at VT Markets' costs without a losing year.
+> - **The six `Loma_Top` presets** lost on the months after their calibration: on VT Markets real ticks (1 June – 6 November 2026) profit factor 0.74 before commission and 0.67 at VT's $0.60 per lot, on 247 trades. Dukascopy prices agree.
+> - **The `Loma_T15_Gold_*` trailing presets** reached a profit factor of 1.3 on the 2026 months and lost on July – December 2024. Unproven: Strategy Tester and demo only.
+> - The EA itself works: it takes the same trades as the backtest.
+
+## The year-by-year test on gold
+
+Dukascopy gold one-minute prices from 2013 to 2024, FTMO for 2025 to 15 May 2026 and Dukascopy after, all in broker server time (the daily reopen at 01:00 server time checked year by year). For every year from 2016 to 2025, 12,000 setups per timeframe (M1 to H1) were scored on the three years before it, with each of 59 entry conditions added one at a time (market regime, location, confirmation, timing, the XLZC rules, and three random halves of the signals as controls), and the 10 best were traded on that year unchanged. Costs are VT Markets' own: a 1.5-pip spread shaped by the hour and $0.60 commission per ounce, scaled with the price like every dollar distance of a setup. A cell passes with a profit factor of 1.3 or more over its unseen years together, 1.1 or more stressed, at least two years with 50 trades and no such year below 1.0.
+
+**Nothing passed.** The method without an extra condition, by timeframe:
+
+| Timeframe | Unseen 2016 – 2025: PF (trades) | Stressed | Unseen years with 50+ trades below 1.0 |
+|---|---|---|---|
+| M1 | no setup held PF 1.3 in three years running | – | – |
+| M2 | no setup held PF 1.3 in three years running | – | – |
+| M3 | no setup held PF 1.3 in three years running | – | – |
+| M5 | 0.92 (248) | 0.88 | 2016, 2017 |
+| M10 | 0.65 (286) | 0.55 | 2017, 2022, 2023 |
+| M15 | 0.71 (134) | 0.63 | 2017 |
+| M30 | 0.89 (703) | 0.83 | 2016, 2019, 2021, 2023, 2025 |
+| H1 | 1.08 (1146) | 1.00 | 2016, 2018, 2019, 2024, 2025 |
+
+The best cells with at least 100 unseen trades: H1 MACD of both higher timeframes on the trade's side: 1.53 on 165 trades (fewer than two years with 50 trades); H1 MACD two timeframes up on the trade's side: 1.47 on 271 trades (losing 2024); M3 signal candle range at least 1 ATR: 1.44 on 133 trades (fewer than two years with 50 trades); H1 beyond the 01:00-09:00 range in the trade's direction: 1.39 on 170 trades (losing 2024); H1 with the daily trend: 1.29 on 600 trades (under 1.3; losing 2018). The year-by-year tables are in `Loma_OOS_Review.html`, section 6.
+
+## The trailing presets `Loma_T15_Gold_*` (unproven)
+
+These are the 4 combinations of timeframe and trailing system that reached a profit factor of 1.3 on at least 100 unseen trades in 16 May – 13 November 2026, out of 23 trailing systems tested on every timeframe (16 presets: every setup behind each combination). The setups were chosen on January 2025 – 15 May 2026 only. Then each combination was run on July – December 2024, before the calibration data: **none reached 1.3 there**; all four lost. With so many combinations, some reach 1.3 on one period by chance.
+
+| Combination | Trailing (TrailMode) | Presets | Unseen 2026: PF (trades) | Stressed | Jul – Dec 2024: PF (trades) |
+|---|---|---|---|---|---|
+| M5 | hump structure (13) | 4 | 1.41 (141) | 1.12 | 0.75 (116) |
+| M5 | chandelier (5) | 4 | 1.31 (157) | 1.21 | 0.80 (110) |
+| M10 | percent of price (2) | 4 | 1.31 (181) | 1.25 | 0.74 (137) |
+| M10 | ATR at entry (1) | 4 | 1.57 (206) | 1.45 | 0.70 (154) |
+
+- Every preset's header gives its own figures for the calibration period, the 2026 months and July – December 2024; `GOLD_TRAILING15_SUMMARY.csv` lists them all.
+- The test is of each combination's setups together, not of the best of them by their 2026 result.
+- They need v1.35 (`TrailMode`, `TrailParam`). Strategy Tester and demo only.
 
 ## What is in the zip
 
 | File | What it is |
 |---|---|
-| `MQL5/Experts/XAUUSD_Loma_TrendPullback.mq5` | The EA, v1.34 (the same file runs on gold and on BTCUSD). |
+| `MQL5/Experts/XAUUSD_Loma_TrendPullback.mq5` | The EA, v1.35 (the same file runs on gold and on BTCUSD). |
 | `MQL5/Include/EVK/EVK.mqh` | Records trades in the Strategy Tester only (EA Validation Kit). The EA needs it to compile. |
-| `MQL5/Presets/Loma_Top01 … Top07 *.set` | The six gold presets (table below). Each has its own magic number. |
-| `GOLD_PRESETS_SUMMARY.csv` | Backtest and out-of-sample figures of the six presets. |
-| `Loma_OOS_Review.html` | The out-of-sample report: VT Markets run, Dukascopy cross-check, walk-forward test. Open it in a browser. |
+| `MQL5/Presets/Loma_Top01 … Top07 *.set` | The six gold presets of the first calibration (table below). |
+| `MQL5/Presets/Loma_T15_Gold_*.set` | The trailing presets (unproven). |
+| `GOLD_PRESETS_SUMMARY.csv` | Backtest and out-of-sample figures of the six Top presets. |
+| `GOLD_TRAILING15_SUMMARY.csv` | Every trailing preset with its figures. |
+| `Loma_OOS_Review.html` | The out-of-sample report: VT Markets run, Dukascopy cross-check, walk-forward, re-calibration (section 5) and the year-by-year test (section 6). Open it in a browser. |
 
 ## Install
 
 1. In MT5 choose **File > Open Data Folder**.
 2. Copy the zip's `MQL5` folder over the data folder's `MQL5` folder. This adds files and replaces nothing else.
 3. In MetaEditor open `MQL5/Experts/XAUUSD_Loma_TrendPullback.mq5` and press **F7** (compile).
-4. Attach the EA to an XAUUSD chart (any timeframe: it reads its own). In **Inputs** click **Load** and pick a preset.
+4. Attach the EA to an XAUUSD chart (any timeframe: it reads its own). In **Inputs** click **Load** and pick a preset (`Loma_T15` presets need this v1.35).
 5. Enable **Algo Trading**.
 
-v1.33 was compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.34, the file in this zip, adds the changes listed below. It was checked line by line and run through a compile harness and a simulated terminal, but it has not been compiled in MetaEditor yet. If the compiler reports anything, send me the log rather than editing the file.
+v1.33 was compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.34 and v1.35 (the file in this zip) were checked line by line and run through a compile harness and a simulated terminal, but have not been compiled in MetaEditor yet. If the compiler reports anything, send me the log rather than editing the file.
 
-## The six presets
+## New in v1.35
+
+- **`TrailMode`** chooses the trailing system; `TrailStartR`, `TrailDistanceR` and the new **`TrailParam`** are read in its units. 0 = the EA's own (multiples of the risk, as before), 1 = ATR at entry, 2 = percent of price, 3 = profit lock, 4 = stepped, 5 = chandelier, 6 = candle lows / highs, 7 = EMA, 8 = SMA, 9 = Parabolic SAR, 10 = Bollinger band, 11 = higher-timeframe candle, 12 = swing pivots, 13 = hump structure. Every system except 0 and 4 moves the stop once per closed one-minute bar, as the backtest does; the stop only ever moves closer.
+- **`UseStochTurnFilter`** (with `StochTurnBars`, `StochTurnHigh`, `StochTurnLow`): enter only when the Stochastic (7, 1, 7) of the trigger timeframe came from 80 (sells) or 20 (buys) within the last 5 bars and turned.
+- **`ScaleWithPrice`** with **`ReferencePrice`**: the stop buffer, minimum and maximum stop follow the price, relative to the price they were calibrated at.
+- With these inputs at their defaults v1.35 trades exactly like v1.34: the earlier presets work unchanged.
+- v1.35 was checked in a C++ compile harness (the same diagnostics as v1.34) and in a simulated terminal that replays real one-minute prices: it took the same trades as the Python backtest on the shipped setups. It has not been compiled in MetaEditor: if the compiler reports anything, send me the log rather than editing the file.
+
+## The six Top presets (lost out of sample)
 
 Backtest: FTMO one-minute data, January 2025 – 15 May 2026, the period the presets were chosen on. Out of sample: 1 June – 6 November 2026, never used for calibration. "PF" is the profit factor.
 
@@ -79,7 +127,10 @@ Steps:
 
 ## What changed
 
-**v1.34** (this zip)
+**v1.35** (this zip)
+- The trailing systems, the Stochastic turn filter and the price scaling of "New in v1.35" above.
+
+**v1.34**
 - **Trailing stop:** after a failed stop change (the MT5 test logged 295, all while the market was closed at the daily open) it pauses for 5 seconds instead of retrying on every tick, and it does not try while Algo Trading is off. Its original risk (1R) is read from the opening deal, so a crash or a move to another terminal no longer shrinks the trailing distance.
 - **Weekend close:** a Friday close that was missed (EA or Algo Trading off, market closed early) is made up on the next tick.
 - **Netting accounts:** a warning, and no entry while another position on the symbol is open.
