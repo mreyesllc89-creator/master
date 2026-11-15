@@ -29,5 +29,16 @@
   ],
   "failed": [],
   "no_final_picks": []
+ },
+ "EURUSD": {
+  "cells": 472,
+  "cells_100": 267,
+  "passed": 0,
+  "controls_passed": 0,
+  "controls": 24,
+  "confirmed": [],
+  "flat": [],
+  "failed": [],
+  "no_final_picks": []
  }
 }

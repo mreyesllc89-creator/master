@@ -5,8 +5,10 @@ between the <!-- wf:start --> and <!-- wf:end --> markers (inserted before "What
 Also writes research/results/wf/<sym>_wf_summary.json, the compact per-cell results the section is built from.
 
 Usage (repository root):
-  python3 research/make_wf_html.py <xauusd wf json> <btcusd wf json> [<detail json of a passing cell> ...]
-The wf jsons are written by "hump_wf.py wf"; the detail jsons by "hump_wf.py detail".
+  python3 research/make_wf_html.py <wf json> ... [<detail json of a passing cell> ...]
+The wf jsons (written by "hump_wf.py wf": XAUUSD, BTCUSD, and EURUSD and US500 of protocol 2) and the detail jsons
+("hump_wf.py detail") can come in any order; they are told apart by their contents. Protocol 2 writes the final
+year only for the cells that pass.
 """
 import json, os, re, sys
 
@@ -22,8 +24,8 @@ def compact(d):
                          net_r=r["net_r"], cost_r_per_trade=r["cost_r_per_trade"], passes=r["passes"], losing_years=r["losing_years"],
                          years_with_50_trades=r["years_with_50_trades"],
                          by_year=[dict(year=y["year"], picks=len(y["picks"]), n=y["n"], pf=y["pf"], stress_pf=y["stress_pf"]) for y in r["by_year"]],
-                         final=dict(year=r["final"]["year"], picks=len(r["final"]["picks"]), n=r["final"]["n"], pf=r["final"]["pf"],
-                                    stress_pf=r["final"]["stress_pf"], net_r=r["final"]["win"] - r["final"]["loss"])))
+                         final=(dict(year=r["final"]["year"], picks=len(r["final"]["picks"]), n=r["final"]["n"], pf=r["final"]["pf"],
+                                     stress_pf=r["final"]["stress_pf"], net_r=r["final"]["win"] - r["final"]["loss"]) if r.get("final") else None)))
     return dict({k: v for k, v in d.items() if k != "rows"}, rows=rows)
 
 
@@ -41,12 +43,15 @@ def ycell(y):
 def main():
     sums = {}
     os.makedirs(OUT, exist_ok=True)
-    for fn in sys.argv[1:3]:
-        d = compact(json.load(open(fn)))
+    loaded = [json.load(open(f)) for f in sys.argv[1:]]
+    order = {"XAUUSD": 0, "BTCUSD": 1, "EURUSD": 2, "US500": 3}
+    for raw in sorted((x for x in loaded if "rows" in x), key=lambda x: order.get(x["symbol"], 9)):
+        d = compact(raw)
         sym = d["symbol"].lower()
         json.dump(d, open(os.path.join(OUT, f"{sym}_wf_summary.json"), "w"), indent=1, default=float)
         sums[d["symbol"]] = d
-    details = [json.load(open(f)) for f in sys.argv[3:]]
+    details = [x for x in loaded if "walk_forward" in x]
+    NAME = {"XAUUSD": "Gold", "BTCUSD": "BTC", "EURUSD": "EURUSD", "US500": "US500"}
 
     def table(d, rows, title):
         years = [y["year"] for y in rows[0]["by_year"]] if rows else []
@@ -54,36 +59,60 @@ def main():
         body = []
         for r in rows:
             fin = r["final"]
-            fcls = ' class="loss"' if fin["n"] and fin["pf"] < 1 else (' class="gain"' if fin["n"] and fin["pf"] >= 1.3 else "")
+            if fin is None:
+                fcell = '<td class="mut">not run <span class="sub">did not pass</span></td>'
+            else:
+                fcls = ' class="loss"' if fin["n"] and fin["pf"] < 1 else (' class="gain"' if fin["n"] and fin["pf"] >= 1.3 else "")
+                fcell = f'<td{fcls}>{f2(fin["pf"]) if fin["n"] else "no picks"} <span class="sub">{fin["n"]}</span></td>'
             body.append(f'          <tr><td>{r["tf"]} · {r["text"]}</td>{"".join(ycell(y) for y in r["by_year"])}'
                         f'<td{" class=\"gain\"" if r["passes"] else ""}>{f2(r["pf"])} <span class="sub">{r["n"]} · stressed {f2(r["stress_pf"])}</span></td>'
-                        f'<td{fcls}>{f2(fin["pf"]) if fin["n"] else "no picks"} <span class="sub">{fin["n"]}</span></td></tr>')
+                        f'{fcell}</tr>')
+        fy = next((r["final"]["year"] for r in rows if r["final"]), 2026)
         return (f'    <h3>{title}</h3>\n    <div class="tablebox">\n      <table>\n        <thead><tr><th>Timeframe · condition</th>{head}'
-                f'<th>Unseen years together<span class="sub">PF · trades</span></th><th>Final check {rows[0]["final"]["year"] if rows else ""}<span class="sub">never used to decide</span></th></tr></thead>\n'
+                f'<th>Unseen years together<span class="sub">PF · trades</span></th><th>Final check {fy}<span class="sub">never used to decide</span></th></tr></thead>\n'
                 f'        <tbody>\n' + "\n".join(body) + '\n        </tbody>\n      </table>\n    </div>')
 
-    parts = []
+    parts, parts2 = [], []
     counts = {}
+    p2 = [d for d in sums.values() if d.get("protocol", 1) == 2]
+    P2_INTRO = ""
+    if p2:
+        cells2 = sum(len(d["rows"]) for d in p2)
+        P2_INTRO = (f'    <h3>EURUSD and US500: the same test, because gold and BTC did not hold up</h3>\n'
+                    f'    <p>The research brief said: if gold and BTC both fail, run the same test on EURUSD and US500. It was run with the same setups, '
+                    f'entry conditions, selection and pass rule ({cells2:,} cells), on Dukascopy one-minute prices from 2013 to 13 November 2026 in broker server '
+                    f'time (each year\'s clock checked), so the unseen years are 2016 to 2025. What counts as a result was written down before any of their '
+                    f'figures existed (<code>research/results/wf/protocol2_decision.md</code>): the pass rule, then the same rule counted once per signal, then a '
+                    f'chance check, then the 2026 months, which are run only for cells that get that far. Three details of the earlier runs were also tightened: '
+                    f'the anchor price comes from the last 180 days of 2025, calibration years leave out trades that close in the next year, and the 2025 test '
+                    f'year counts only trades that close in 2025.</p>\n'
+                    f'    <p class="note">Costs at VT Markets\' RAW ECN account (the account type of the gold costs above): EURUSD a 0.3-pip spread shaped by the '
+                    f'hour (wider at the daily rollover) and $6 commission per 100,000; US500 a 0.5-point spread shaped by the hour, no commission. Stressed: '
+                    f'one minute late, pessimistic trailing, and 0.2 pip slippage with 10% more commission (EURUSD) or 0.3 points slippage and 0.2 points '
+                    f'commission (US500). All scaled with the price as for gold. US500\'s early data is uneven: a three-month hole in 2013, the cash session only '
+                    f'on some 2013 days, and 09:00 – 23:00 server time only from 2015 to April 2018, so the night conditions have fewer years there.</p>')
     for sym, d in sums.items():
         rows = d["rows"]
         passed = [r for r in rows if r["passes"]]
         base = [r for r in rows if r["condition"] == "base"]
         ctrl = [r for r in rows if r["group"] == "control"]
         counts[sym] = dict(cells=len(rows), cells_100=sum(1 for r in rows if r["n"] >= 100), passed=len(passed),
-                           confirmed=[r for r in passed if r["final"]["n"] and r["final"]["pf"] >= 1.3],
-                           flat=[r for r in passed if r["final"]["n"] and 1.0 <= r["final"]["pf"] < 1.3],
-                           failed=[r for r in passed if r["final"]["n"] and r["final"]["pf"] < 1.0],
-                           nopick=[r for r in passed if not r["final"]["n"]], controls_passed=sum(1 for r in ctrl if r["passes"]), controls=len(ctrl))
-        name = "Gold" if sym == "XAUUSD" else "BTC"
+                           confirmed=[r for r in passed if r["final"] and r["final"]["n"] and r["final"]["pf"] >= 1.3],
+                           flat=[r for r in passed if r["final"] and r["final"]["n"] and 1.0 <= r["final"]["pf"] < 1.3],
+                           failed=[r for r in passed if r["final"] and r["final"]["n"] and r["final"]["pf"] < 1.0],
+                           nopick=[r for r in passed if not (r["final"] and r["final"]["n"])], controls_passed=sum(1 for r in ctrl if r["passes"]), controls=len(ctrl),
+                           protocol=d.get("protocol", 1))
+        name = NAME.get(sym, sym)
+        dst = parts2 if d.get("protocol", 1) == 2 else parts
         if passed:
-            parts.append(table(d, sorted(passed, key=lambda r: -r["pf"]), f"{name}: the timeframe-and-condition cells that passed"))
+            dst.append(table(d, sorted(passed, key=lambda r: -r["pf"]), f"{name}: the timeframe-and-condition cells that passed"))
         else:
-            parts.append(f"    <h3>{name}: no cell passed</h3>")
-        parts.append(table(d, base, f"{name}: the method without an extra condition"))
+            dst.append(f"    <h3>{name}: no cell passed</h3>")
+        dst.append(table(d, base, f"{name}: the method without an extra condition"))
     c_g, c_b = counts.get("XAUUSD"), counts.get("BTCUSD")
 
     def names(lst):
-        return ", ".join(f'{r["tf"]} {r["condition"]} ({f2(r["final"]["pf"]) if r["final"]["n"] else "no picks"})' for r in lst) or "none"
+        return ", ".join(f'{r["tf"]} {r["condition"]} ({f2(r["final"]["pf"]) if r["final"] and r["final"]["n"] else "no picks"})' for r in lst) or "none"
 
     det = ""
     for x in details:
@@ -124,15 +153,25 @@ def main():
     <span class="eyebrow">6 · Year by year on long history</span>
     <h2>{"One BTC result passes; gold has none" if c_b and c_b["confirmed"] and not (c_g and c_g["confirmed"]) else "Nothing holds up year by year"}</h2>
     <p>The method was then tested the way it would be traded: set up on three years, traded on the next year without changes, and rolled forward one year at a time. Gold: Dukascopy prices from 2013 (FTMO for 2025 to mid-May 2026), so ten unseen years, 2016 to 2025. BTC: Binance from 2018, so five unseen years, 2021 to 2025. The last months, 2026 to 13 November, were kept back: they were not used to decide what passes (the tables show them for every cell, as a check). Each year 12,000 setups per timeframe (M1 to H1) were scored on the three years before it with 58 entry conditions added one at a time (market regime, location, confirmation, timing, the XLZC rules, and three random halves of the signals as controls) and the method without one: 59 cells per timeframe. Picks: the best of them, up to 10, one per direction, session and trend-filter family, each holding PF 1.3 in all three years at normal and stressed costs, and with an average cost under 1/8 of the risk. A cell passes with PF 1.3 or more over all its unseen years together, 1.1 or more stressed, at least two unseen years with 50 trades, and no such year below 1.0.</p>
-    <p class="note">Costs: gold at VT Markets' own, a 1.5-pip spread (shaped by hour) and $0.60 commission per ounce; BTC a $10 spread. Both, and every dollar distance of a setup, are scaled with the price, so a setup means the same in 2016 as today. Swap is not charged. {total_cells:,} cells were tested; with that many, a few pass by chance. The random controls passed {sum(c["controls_passed"] for c in counts.values())} of {sum(c["controls"] for c in counts.values())} times.</p>
+    <p class="note">Costs: gold at VT Markets' own, a 1.5-pip spread (shaped by hour) and $0.60 commission per ounce; BTC a $10 spread. Both, and every dollar distance of a setup, are scaled with the price, so a setup means the same in 2016 as today. Swap is not charged. {sum(c["cells"] for k, c in counts.items() if c["protocol"] == 1):,} cells were tested on gold and BTC; with that many, a few pass by chance. The random controls passed {sum(c["controls_passed"] for k, c in counts.items() if c["protocol"] == 1)} of {sum(c["controls"] for k, c in counts.items() if c["protocol"] == 1)} times.</p>
 {chr(10).join(parts)}
-{det}{chance_html}    <p>The 2026 months of the cells that passed: gold {names(c_g["confirmed"] + c_g["flat"] + c_g["failed"] + c_g["nopick"]) if c_g else "–"}; BTC {names(c_b["confirmed"] + c_b["flat"] + c_b["failed"] + c_b["nopick"]) if c_b else "–"}.</p>
+{det}{chance_html}{P2_INTRO}
+{chr(10).join(parts2)}
+    <p>The 2026 months of the cells that passed: {"; ".join(f'{NAME.get(k, k)} {names(v["confirmed"] + v["flat"] + v["failed"] + v["nopick"])}' for k, v in counts.items())}.</p>
   </section>
 <!-- wf:end -->
 """
     s = open(PAGE, encoding="utf-8").read()
     # the verdict line and the "What this means" bullet
     b = counts["BTCUSD"]; gld = counts["XAUUSD"]
+    p2c = {k: v for k, v in counts.items() if v["protocol"] == 2}
+    p2_txt = ""
+    if p2c:
+        conf = [(k, r) for k, v in p2c.items() for r in v["confirmed"]]
+        p2_txt = (f' The same test on {" and ".join(NAME.get(k, k) for k in p2c)}, run because gold and BTC did not hold up: '
+                  + ("; ".join(f'{NAME.get(k, k)} {v["passed"]} of {v["cells"]} cells passed' for k, v in p2c.items())
+                     if any(v["passed"] for v in p2c.values()) else f'none of their {sum(v["cells"] for v in p2c.values()):,} cells passed')
+                  + (f', and {len(conf)} held in the 2026 months.' if conf else '.'))
     btc_pass = [r for r in sums["BTCUSD"]["rows"] if r["passes"]]
     best = max(btc_pass, key=lambda r: r["final"]["pf"] if r["final"]["n"] else 0) if btc_pass else None
     if best is not None:
@@ -144,11 +183,11 @@ def main():
                    f'(set up on three years and traded on the next: {yrs}), but the 2026 months that were kept back gave {f2(best["final"]["pf"])} on '
                    f'{best["final"]["n"]} trades, under 1.3, and an independent audit found that chance alone produces one or two such passes among the '
                    f'{b["cells"]} BTC cells (about {th["placebo"]["expected_passes"]:.1f} expected). Its setups for the year ahead are in the BTC zip as unproven '
-                   f'presets: demo only.</p>')
+                   f'presets: demo only.' + p2_txt + '</p>')
         bullet = (f'<li><strong>Nothing held year by year.</strong> With {total_cells:,} timeframe-and-condition cells tested on long history, '
                   f'{"no gold cell" if not gld["passed"] else str(gld["passed"]) + " gold cells"} and {b["passed"]} BTC cells (one result) met the pass rule. '
                   f'The BTC one, M30 with the Stochastic turn rule, made {f2(best["final"]["pf"])} in the 2026 months it had not seen, under 1.3, and chance '
-                  f'explains a pass like it: a candidate for a demo, not an edge.</li>')
+                  f'explains a pass like it: a candidate for a demo, not an edge.' + p2_txt + '</li>')
     else:
         verdict = "<p><strong>Year by year: nothing passed</strong> on gold or BTC (section 6).</p>"
         bullet = "<li><strong>Nothing held year by year</strong> on long history, on gold or BTC, with 58 entry conditions tried one at a time.</li>"
