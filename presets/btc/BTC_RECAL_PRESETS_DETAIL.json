@@ -2,6 +2,67 @@
  "M5": {
   "unseen_first_close": 79092.21,
   "unseen_last_close": 68314.0,
+  "unseen_low_close": 57881.98,
+  "unseen_low_date": "2026-07-01",
+  "unseen_high_close": 87348.89,
+  "unseen_high_date": "2026-09-21",
+  "falling_months": [
+   "2026-05",
+   "2026-06",
+   "2026-10",
+   "2026-11"
+  ],
+  "rising_months": [
+   "2026-07",
+   "2026-08",
+   "2026-09"
+  ],
+  "sells_in_falling_months": {
+   "trades": 65,
+   "net_r": 12.179196069478987
+  },
+  "sells_in_rising_months": {
+   "trades": 48,
+   "net_r": 3.7411762403456597
+  },
+  "buys_all": {
+   "trades": 20,
+   "net_r": 7.429134630501831
+  },
+  "pf_extra_costs_without_late_entry": 1.3041205573363128,
+  "pf_by_extra_cost_per_btc": {
+   "10": 1.318529258866074,
+   "20": 1.222673826304089,
+   "40": 1.0512956629316441,
+   "45": 1.0123775488120135
+  },
+  "earlier_years_no_spread": {
+   "2024": 0.833207883370883,
+   "2023": 0.9358364296048839
+  },
+  "shared_entry_minutes": {
+   "R02+R03": 7,
+   "R03+R04": 1,
+   "R01+R02": 3
+  },
+  "exposure_unseen": {
+   "per_trade_median": 1.3485768053748237,
+   "per_trade_p90": 2.1006032466663065,
+   "per_trade_max": 3.252783505154639,
+   "all_presets_max": 5.66150100805627,
+   "max_positions_open": 4,
+   "pairs_open_together": 39,
+   "pairs_same_direction": 38
+  },
+  "exposure_whole_series": {
+   "per_trade_median": 1.163187592007718,
+   "per_trade_p90": 2.1232129044563925,
+   "per_trade_max": 8.431035640084126,
+   "all_presets_max": 8.431035640084126,
+   "max_positions_open": 4,
+   "pairs_open_together": 131,
+   "pairs_same_direction": 127
+  },
   "picks": 4,
   "trades": 133,
   "pf": 1.4212469722215078,

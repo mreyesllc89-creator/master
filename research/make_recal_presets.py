@@ -52,7 +52,15 @@ def ea_inputs(p, magic, comment):
     return o
 
 
-def earlier_market():
+def trail_text(p):
+    if p["trail_start"] <= 0:
+        return "off"
+    if p["tp_mode"] == 1 and p["trail_start"] >= p["tp_rr"]:
+        return f"never active (would start at {p['trail_start']}R, the target)"
+    return f"from {p['trail_start']}R, {p['trail_dist']}R behind"
+
+
+def earlier_market(spread=None):
     """BTC 2023-2024 from raw Binance zips, converted to server time once (None when RECAL_PRE_DIR is not set)."""
     pre = os.environ.get("RECAL_PRE_DIR")
     if not (BTC and pre):
@@ -61,7 +69,7 @@ def earlier_market():
     m1 = raw.copy(); m1.index = R.utc_to_server(raw.index)
     m1 = m1[~m1.index.duplicated()].sort_index()
     R.clock_check(m1, "BTC 2023-2024")
-    return R.T2.MarketY(m1=m1, half_spread=np.full(len(m1), R.H.BTC_SPREAD / 2.0))
+    return R.T2.MarketY(m1=m1, half_spread=np.full(len(m1), (R.H.BTC_SPREAD if spread is None else spread) / 2.0))
 
 
 def picks_of(tf):
@@ -81,28 +89,78 @@ def picks_of(tf):
     return picked
 
 
+def exposure(frames, mk, risk_pct=0.5):
+    """Position size in multiples of the balance at RiskPercent, per trade and for all picks together, and how
+    often positions of two different presets are open at the same time."""
+    rows = []
+    for k, df in enumerate(frames):
+        for e, x, sd, rk in zip(df.entry_row.astype(int), df.exit_row.astype(int), df.side, df.risk):
+            rows.append((e, x, sd, 0.01 * risk_pct * mk.o[e] / rk, k))
+    if not rows:
+        return {}
+    a = np.array(rows, float); lev = a[:, 3]
+    together = [float(lev[(a[:, 0] <= e) & (a[:, 1] >= e)].sum()) for e in a[:, 0]]
+    n_open = [int(((a[:, 0] <= e) & (a[:, 1] >= e)).sum()) for e in a[:, 0]]
+    pairs = same = 0
+    for i in range(len(a)):
+        for j in range(i + 1, len(a)):
+            if a[i, 4] != a[j, 4] and a[i, 0] <= a[j, 1] and a[j, 0] <= a[i, 1]:
+                pairs += 1; same += a[i, 2] == a[j, 2]
+    return dict(per_trade_median=float(np.median(lev)), per_trade_p90=float(np.quantile(lev, 0.9)), per_trade_max=float(lev.max()),
+                all_presets_max=float(max(together)), max_positions_open=int(max(n_open)), pairs_open_together=int(pairs), pairs_same_direction=int(same))
+
+
 def detail(tfs):
     """Figures quoted in the guide, per timeframe: all picks of the timeframe together on the unseen months."""
     mk = R.market(WORK)
     wide = R.market(WORK, flat_spread=2 * R.H.BTC_SPREAD) if BTC else None
+    pre_free = earlier_market(spread=0.0)
+    costs_only = dict(R.STRESS, delay=0)
     out = {}
     for tf in tfs:
-        frames = []; wr = []; allrisk = []
+        frames = []; wr = []; allrisk = []; full = []; cost_r = []; extra = {10: [], 20: [], 40: [], 45: []}; free = {"2024": [], "2023": []}
         for p in picks_of(tf):
             c = dict(X.BASE); c.update(p)
-            df = mk.run(X.engine_cfg(c)); allrisk.append(df.risk.values.astype(float)); df = df[df.entry_time.values >= R.IS_END]
-            frames.append(df[["entry_time", "side", "r", "risk"]])
+            df = mk.run(X.engine_cfg(c)); allrisk.append(df.risk.values.astype(float)); full.append(df)
+            df = df[df.entry_time.values >= R.IS_END]
+            frames.append(df[["entry_time", "side", "r", "risk", "entry_row", "exit_row"]])
+            q = mk.run(X.engine_cfg(dict(c, **costs_only))); cost_r.append(q.r.values[q.entry_time.values >= R.IS_END])
+            if BTC:
+                for usd in extra:                                   # extra round-trip cost per BTC on top of the spread
+                    q = mk.run(X.engine_cfg(dict(c, comm=float(usd)))); extra[usd].append(q.r.values[q.entry_time.values >= R.IS_END])
             if wide is not None:
                 w = wide.run(X.engine_cfg(c)); wr.append(w.r.values[w.entry_time.values >= R.IS_END])
+            if pre_free is not None:
+                q = pre_free.run(X.engine_cfg(c)); t = q.entry_time.values.astype("datetime64[m]")
+                free["2024"].append(q.r.values[(t >= np.datetime64("2024-01-01")) & (t < np.datetime64("2025-01-01"))])
+                free["2023"].append(q.r.values[(t >= np.datetime64("2023-01-15")) & (t < np.datetime64("2024-01-01"))])
         if not frames:
             continue
-        a = pd.concat(frames).sort_values("entry_time")
+        a = pd.concat([f.assign(preset=k + 1) for k, f in enumerate(frames)]).sort_values("entry_time")
+        shared = {}
+        for minute, g in a.groupby("entry_time"):
+            if g.preset.nunique() > 1:
+                key = "+".join(f"R{int(x):02d}" for x in sorted(g.preset.unique())); shared[key] = shared.get(key, 0) + 1
         month = a.entry_time.dt.strftime("%Y-%m")
         r = a.r.values.astype(float); top3 = np.sort(r)[:-3] if len(r) > 3 else r
         eq = np.cumsum(r); dd = float((np.maximum.accumulate(np.maximum(eq, 0)) - eq).max()) if len(r) else 0.0
         unseen = mk.m1["close"][mk.m1.index >= pd.Timestamp(str(R.IS_END))]
+        mon = unseen.groupby(unseen.index.strftime("%Y-%m")).agg(["first", "last"])
+        falling = set(mon.index[mon["last"] < mon["first"]])
+        fall = month.isin(falling).values; sell = (a.side < 0).values; rr = a.r.values.astype(float)
         out[tf] = dict(
             unseen_first_close=float(unseen.iloc[0]), unseen_last_close=float(unseen.iloc[-1]),
+            unseen_low_close=float(unseen.min()), unseen_low_date=str(unseen.idxmin().date()),
+            unseen_high_close=float(unseen.max()), unseen_high_date=str(unseen.idxmax().date()),
+            falling_months=sorted(falling), rising_months=sorted(set(mon.index) - falling),
+            sells_in_falling_months=dict(trades=int((sell & fall).sum()), net_r=float(rr[sell & fall].sum())),
+            sells_in_rising_months=dict(trades=int((sell & ~fall).sum()), net_r=float(rr[sell & ~fall].sum())),
+            buys_all=dict(trades=int((~sell).sum()), net_r=float(rr[~sell].sum())),
+            pf_extra_costs_without_late_entry=R.pf(np.concatenate(cost_r)),
+            pf_by_extra_cost_per_btc=({str(k): R.pf(np.concatenate(v)) for k, v in extra.items()} if BTC else None),
+            earlier_years_no_spread=({y: R.pf(np.concatenate(v)) for y, v in free.items()} if pre_free is not None else None),
+            shared_entry_minutes=shared,
+            exposure_unseen=exposure(frames, mk), exposure_whole_series=exposure(full, mk),
             picks=len(frames), trades=int(len(a)), pf=R.pf(r), net_r=float(r.sum()), win_rate=float((r > 0).mean()),
             distinct_entry_minutes=int(a.entry_time.nunique()), buys=int((a.side > 0).sum()), sells=int((a.side < 0).sum()),
             pf_without_3_largest_wins=R.pf(top3), max_drawdown_r=dd,
@@ -155,7 +213,7 @@ def main():
             fname = f"Loma_{sym}_{tf}_R{rank:02d}_{side}_{sess}_{filt}"
             o = ea_inputs(p, MAGIC + k, f"LOMA_{sym[0]}{tf}_{rank:02d}")
             assert not (set(o) - names), set(o) - names
-            trail = "off" if p["trail_start"] <= 0 else f"from {p['trail_start']}R, {p['trail_dist']}R behind"
+            trail = trail_text(p)
             head = [f"; XAUUSD_Loma_TrendPullback v{M.EA_VERSION} on {'BTCUSD' if BTC else 'XAUUSD'} - re-calibration pick {rank} of {len(picked)} "
                     f"for {tf}: {side.lower()}, session {sess} server time, trend filter {p['htf']}, trailing {trail}."
                     + (" DO NOT LOAD ON GOLD." if BTC else " DO NOT LOAD ON BTC."),

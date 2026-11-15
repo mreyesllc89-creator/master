@@ -71,12 +71,12 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 | `Loma_Top05` | M10 | buy | all day | M30 EMA 20 | 141 / 1.96 | 49 | 0.87 / 0.81 | 0.84 |
 | `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 32 | 0.72 / 0.64 | 0.67 |
 
-**BTC** (`dist/Loma_BTCUSD_v1_34.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. Picked on January 2025 – 15 May 2026; unseen: 16 May – 13 November 2026; 2024 and 2023 lie before the calibration data. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission.
+**BTC** (`dist/Loma_BTCUSD_v1_34.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. Picked on January 2025 – 15 May 2026; unseen: 16 May – 13 November 2026; 2024 and 2023 lie before the calibration data. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC.
 
 | Preset | Direction | Session (server time) | Trend filter | Target | Trailing | Picked on: trades / PF | Unseen 2026: trades, PF, net | Stress PF | 2024: PF (trades) | 2023: PF (trades) |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `Loma_BTC_M5_R01` | both | 07:00-12:00 | none | previous hump | off | 77 / 1.99 | 31, 1.64, +8.1R | 1.74 | 0.76 (78) | 0.79 (74) |
-| `Loma_BTC_M5_R02` | sell | 07:00-20:00 | M15 EMA 200 | 1.5R | from 1.5R, 0.5R behind | 102 / 1.54 | 38, 1.50, +8.9R | 1.38 | 1.17 (59) | 0.85 (83) |
+| `Loma_BTC_M5_R02` | sell | 07:00-20:00 | M15 EMA 200 | 1.5R | never active (would start at 1.5R, the target) | 102 / 1.54 | 38, 1.50, +8.9R | 1.38 | 1.17 (59) | 0.85 (83) |
 | `Loma_BTC_M5_R03` | both | 12:00-16:30 | H1 EMA 200 | 1.5R | from 1.0R, 1.0R behind | 85 / 1.76 | 28, 0.74, −3.3R | 0.79 | 0.73 (80) | 0.67 (59) |
 | `Loma_BTC_M5_R04` | sell | 12:00-20:00 | none | 1.5R | from 1.0R, 1.0R behind | 103 / 1.63 | 36, 1.79, +9.7R | 1.60 | 0.52 (59) | 0.96 (75) |
 | **All four** | | | | | | | **133, 1.42, +23.3R** | **1.37** | **0.79 (276)** | **0.83 (291)** |

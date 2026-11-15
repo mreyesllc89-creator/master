@@ -112,7 +112,7 @@ a = open("LOMA_START_HERE.md", encoding="utf-8").read()
 i = a.index("**BTC** (`dist/Loma_BTCUSD"); j = a.index("\n## ", i)
 a = a[:i] + ("**BTC** (`dist/Loma_BTCUSD_v1_34.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. "
              "Picked on January 2025 – 15 May 2026; unseen: 16 May – 13 November 2026; 2024 and 2023 lie before the calibration data. "
-             "Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission.\n\n" + table_long + "\n") + a[j:]
+             "Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC.\n\n" + table_long + "\n") + a[j:]
 open("LOMA_START_HERE.md", "w", encoding="utf-8").write(a)
 
 # ---- every other figure of the BTC guide, checked against the data
@@ -123,12 +123,11 @@ words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "sev
 others = ", ".join((f"{tf} {RUN1[tf]['oos_pf']:.2f}" + (f" ({int(RUN1[tf]['oos_n'])} trades)" if RUN1[tf]["oos_n"] < 100 and tf == "M2" else ""))
                    for tf in TFS if tf != "M5" and RUN1[tf].get("picked"))
 rules = [f"{x['oos_pf']:.2f}" for x in RULES if not x["rule"].startswith("main rule")]
-ws = DET["stop_usd_whole_series"]
+ws = DET["stop_usd_whole_series"]; ex = DET["exposure_unseen"]
 expect = [
-    f"{m5['n']} trades, profit factor {m5['pf']:.2f} ({m5['stress']:.2f} with stressed costs)",
     f"profit factor {m5['y2024']:.2f} in 2024 ({m5['y2024_n']} trades) and {m5['y2023']:.2f} in 2023 ({m5['y2023_n']} trades)",
     f"{DET['sells']} of the {DET['trades']} unseen trades were sells",
-    f"from about ${round(DET['unseen_first_close'], -3) / 1000:.0f},000 to ${round(DET['unseen_last_close'], -3) / 1000:.0f},000",
+    f"(about ${round(DET['unseen_first_close'], -3) / 1000:.0f},000 to ${round(DET['unseen_last_close'], -3) / 1000:.0f},000)",
     f"{words[m5['positive_months']]} of the {words[m5['months']]} months were positive (September −{abs(sept['net_r']):.1f}R)",
     f"The largest drawdown was {DET['max_drawdown_r']:.1f}R",
     f"It falls to {m5['pf_no_top3']:.2f} without the three largest wins and to {m5['pf_double_spread']:.2f} at a $20 spread",
@@ -138,7 +137,19 @@ expect = [
     f"the {DET['trades']} trades start on {DET['distinct_entry_minutes']} different minutes",
     f"median ${round(ws['median'] / 5) * 5:.0f}, 90% under ${round(ws['p90'], -1):.0f}, widest ${round(ws['max'], -1):,.0f}",
     f"about ${round(2 * ws['p90'], -2):,.0f} covers 90% of trades",
+    f"{m5['n']} trades, profit factor {m5['pf']:.2f} ({m5['stress']:.2f} in the stress test)",
+    f"after falling to ${round(DET['unseen_low_close'], -3) / 1000:.0f},000 by July and rising to ${round(DET['unseen_high_close'], -3) / 1000:.0f},000 in September",
+    f"Sells in the {words[len(DET['falling_months'])]} falling months made +{DET['sells_in_falling_months']['net_r']:.1f}R of the +{DET['net_r']:.1f}R, "
+    f"sells in the {words[len(DET['rising_months'])]} rising months +{DET['sells_in_rising_months']['net_r']:.1f}R and the {DET['buys_all']['trades']} buys +{DET['buys_all']['net_r']:.1f}R",
+    f"with no spread at all they score {DET['earlier_years_no_spread']['2024']:.2f} in 2024 and {DET['earlier_years_no_spread']['2023']:.2f} in 2023",
+    f"Extra round-trip costs of $20 per BTC lower it to {DET['pf_by_extra_cost_per_btc']['20']:.2f}, and $45 per BTC removes the gain ({DET['pf_by_extra_cost_per_btc']['45']:.2f})",
+    f"with the extra costs alone it is {DET['pf_extra_costs_without_late_entry']:.2f}",
+    f"R02 shares entry minutes with R03 ({DET['shared_entry_minutes']['R02+R03']}) and R01 ({DET['shared_entry_minutes']['R01+R02']}), and R03 with R04 ({DET['shared_entry_minutes']['R03+R04']})",
+    f"open together {ex['pairs_open_together']} times, {ex['pairs_same_direction']} of them in the same direction, and up to {words[ex['max_positions_open']]} at once: {0.5 * ex['max_positions_open']:.0f}% at risk",
+    f"typically {ex['per_trade_median']:.1f} times the balance (up to {ex['per_trade_max']:.1f} times in the unseen months), and the four presets together held up to {ex['all_presets_max']:.1f} times",
 ]
+assert set(DET["shared_entry_minutes"]) == {"R02+R03", "R01+R02", "R03+R04"} and DET["unseen_low_date"][5:7] == "07" and DET["unseen_high_date"][5:7] == "09"
+assert ex["all_presets_max"] < 10 and DET["exposure_whole_series"]["all_presets_max"] < 10, "the leverage sentence says about 1:10"
 assert len(neg) == 1 and neg[0] is sept, neg
 bad = [x for x in expect if x not in g]
 for x in bad:

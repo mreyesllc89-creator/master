@@ -2,7 +2,7 @@
 
 `XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method in MetaTrader 5, buys and sells. The file name says XAUUSD, but the same EA runs on BTCUSD with these four presets. **Do not load them on gold, or the gold presets on BTC.**
 
-> **Unproven: demo only.** The four presets are the M5 setups of a re-calibration that held part of the data back. They were chosen on January 2025 – 15 May 2026 only and then run unchanged on 16 May – 13 November 2026: 133 trades, profit factor 1.42 (1.37 with stressed costs). With the EA's own trailing stop, M5 was the only one of eight BTC timeframes that passed. A second test on the two years before the calibration data failed: profit factor 0.79 in 2024 (276 trades) and 0.83 in 2023 (291 trades). One good period out of three is not an edge.
+> **Unproven: demo only.** The four presets are the M5 setups of a re-calibration that held part of the data back. They were chosen on January 2025 – 15 May 2026 only and then run unchanged on 16 May – 13 November 2026: 133 trades, profit factor 1.42 (1.37 in the stress test). With the EA's own trailing stop, M5 was the only one of eight BTC timeframes that passed. A second test on the two years before the calibration data failed: profit factor 0.79 in 2024 (276 trades) and 0.83 in 2023 (291 trades). One good period out of three is not an edge.
 
 ## Correction: the first BTC zip is withdrawn
 
@@ -32,23 +32,23 @@ v1.33 was compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. 
 
 ## The four presets
 
-All four trade the M5 chart. Data: Binance BTCUSDT one-minute prices in broker server time, with an assumed $10 spread. "Picked on" is January 2025 – 15 May 2026. "Unseen" is 16 May – 13 November 2026. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per trade. R = result in units of the trade's own risk.
+All four trade the M5 chart. Data: Binance BTCUSDT one-minute prices in broker server time, with an assumed $10 spread. "Picked on" is January 2025 – 15 May 2026. "Unseen" is 16 May – 13 November 2026. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC (per 1.0 lot). R = result in units of the trade's own risk.
 
 | Preset | Direction | Session (server time) | Trend filter | Target | Trailing | Picked on: trades / PF | Unseen 2026: trades, PF, net | Stress PF | 2024: PF (trades) | 2023: PF (trades) |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `R01` | both | 07:00-12:00 | none | previous hump | off | 77 / 1.99 | 31, 1.64, +8.1R | 1.74 | 0.76 (78) | 0.79 (74) |
-| `R02` | sell | 07:00-20:00 | M15 EMA 200 | 1.5R | from 1.5R, 0.5R behind | 102 / 1.54 | 38, 1.50, +8.9R | 1.38 | 1.17 (59) | 0.85 (83) |
+| `R02` | sell | 07:00-20:00 | M15 EMA 200 | 1.5R | never active (would start at 1.5R, the target) | 102 / 1.54 | 38, 1.50, +8.9R | 1.38 | 1.17 (59) | 0.85 (83) |
 | `R03` | both | 12:00-16:30 | H1 EMA 200 | 1.5R | from 1.0R, 1.0R behind | 85 / 1.76 | 28, 0.74, −3.3R | 0.79 | 0.73 (80) | 0.67 (59) |
 | `R04` | sell | 12:00-20:00 | none | 1.5R | from 1.0R, 1.0R behind | 103 / 1.63 | 36, 1.79, +9.7R | 1.60 | 0.52 (59) | 0.96 (75) |
 | **All four** | | | | | | | **133, 1.42, +23.3R** | **1.37** | **0.79 (276)** | **0.83 (291)** |
 
 - **The test is of the four together.** Picking the best of them by their 2026 result would be hindsight. R03 lost in all three periods.
-- **Mostly sells in a falling market.** 113 of the 133 unseen trades were sells, in months when BTC fell from about $79,000 to $68,000. In 2023 and 2024 BTC rose, and the same four presets lost.
+- **Mostly sells.** 113 of the 133 unseen trades were sells. BTC ended those months lower (about $79,000 to $68,000), after falling to $58,000 by July and rising to $87,000 in September. Sells in the four falling months made +12.2R of the +23.3R, sells in the three rising months +3.7R and the 20 buys +7.4R. In 2023 and 2024 BTC rose, and the same four presets lost. The spread is not the reason: with no spread at all they score 0.83 in 2024 and 0.94 in 2023.
 - **Month by month in 2026:** six of the seven months were positive (September −2.1R). The largest drawdown was 5.7R.
-- **How firm is 1.42?** It falls to 1.31 without the three largest wins and to 1.25 at a $20 spread. Resampling the weeks gives a range of 1.03 to 1.96. Under four other ways of choosing the M5 setups the result is 1.43, 1.33, 1.31 and 1.17.
+- **How firm is 1.42?** It falls to 1.31 without the three largest wins and to 1.25 at a $20 spread. Extra round-trip costs of $20 per BTC lower it to 1.22, and $45 per BTC removes the gain (1.01). The stress test's 1.37 includes the one-minute-late entry, which happened to help in these months; with the extra costs alone it is 1.30. Resampling the weeks gives a range of 1.03 to 1.96. Under four other ways of choosing the M5 setups the result is 1.43, 1.33, 1.31 and 1.17.
 - **The other timeframes failed** with the EA's own trailing: M1 0.55, M2 1.22 (35 trades), M3 1.02, M10 1.07, M15 0.82, M30 1.08; H1 had no setup that passed in the calibration period.
 - **With 23 trailing systems** instead of the EA's one, M5 again passes the 2026 months (1.48 on 377 trades), and the same setups scored 1.00 in 2024 and 0.69 in 2023. No other BTC timeframe passes. The EA cannot trade the other 22 systems, and nothing in these results is a reason to add them.
-- R02 and R04 are both sells with overlapping hours and share some entries (the 133 trades start on 122 different minutes).
+- **The presets overlap.** R02 shares entry minutes with R03 (7) and R01 (3), and R03 with R04 (1), so the 133 trades start on 122 different minutes. Positions of two presets were open together 39 times, 38 of them in the same direction, and up to four at once: 2% at risk at `RiskPercent=0.5`.
 - The data is Binance spot. Your broker's BTCUSD CFD has its own prices, spread, commission, swaps and weekend behaviour.
 
 ## Settings that are specific to BTC
@@ -60,6 +60,7 @@ All four trade the M5 chart. Data: Binance BTCUSDT one-minute prices in broker s
 - **One account, several presets:** only on a **hedging** account. On a netting account all presets on one symbol share one position. v1.34 warns on a netting account and sends no entry while another position on the symbol is open.
 - **Commission:** set `CommissionPerLot` to your round-trip commission per lot, in your account's currency (on a USC cent account, $0.60 is 60), so a stop-out costs `RiskPercent` including commission.
 - **Account size:** the stops are wide: median $375, 90% under $750, widest $1,850 over the whole data. With a 1-BTC contract and a 0.01 minimum lot at `RiskPercent=0.5`, a trade is taken only if the balance is at least twice its stop in dollars: about $1,500 covers 90% of trades. Smaller balances skip the wide-stop trades.
+- **Leverage:** the stops are small next to the price, so at `RiskPercent=0.5` a position is typically 1.3 times the balance (up to 3.3 times in the unseen months), and the four presets together held up to 5.7 times the balance. BTC leverage of about 1:10 or more is needed. With less, the EA cuts or skips trades for lack of free margin and says so in the journal, and the result will differ from the backtest.
 - **News filter** is on in the presets but was not in the backtest. It does nothing in the Strategy Tester, so tester results equal `UseNewsFilter=false`.
 
 ## If you want to test it
