@@ -36,7 +36,7 @@ regenerated with the commands in section 13.
    under the median (table in section 11).
 6. **That number is thin, and it should be read as "about 1.0 to 1.15".** The average of {{jg_n}}
    neighbouring input sets is {{jg_pf_mean}}. {{fin_months_pos}} months are positive. The profit comes from
-   buys ({{fin_buy_pf}}) and not from sells ({{fin_sell_pf}}); the best five of {{fin_days}} trading days make
+   buys ({{fin_buy_pf}}) and not from sells ({{fin_sell_pf}}); the best five of the {{fin_days}} days on which it traded make
    {{fin_top5_share}} of the net, and without them it averages {{fin_wo5_avg}} points per trade (profit factor
    {{fin_wo5_pf}}). A 7 point commission leaves {{fin_comm7_pf}},
    strict fills {{fin_strict_pf}}, both together {{fin_worst_pf}}. If stop losses slip twice as far as quoted
@@ -336,8 +336,8 @@ points. The t-statistic of the mean trade is {{fin_t}}; resampling the trades gi
 {{T_final_month}}
 
 {{fin_months_pos}} months are positive. The three best ({{fin_months_top}}) earn {{fin_top3_net}} points; the
-other {{fin_rest_n}} together make {{fin_rest_net}}. By day it is more concentrated still: the best five of {{fin_days}} trading
-days make {{fin_top5_share}} of the net, and without them the preset averages {{fin_wo5_avg}} points per trade (profit factor
+other {{fin_rest_n}} together make {{fin_rest_net}}. By day it is more concentrated still: the best five of the {{fin_days}} days on
+which it traded make {{fin_top5_share}} of the net, and without them the preset averages {{fin_wo5_avg}} points per trade (profit factor
 {{fin_wo5_pf}}).
 
 These are very short trades in the fastest part of the market: the average alert is {{fin_alert}} points,

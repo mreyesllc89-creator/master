@@ -36,7 +36,7 @@ regenerated with the commands in section 13.
    under the median (table in section 11).
 6. **That number is thin, and it should be read as "about 1.0 to 1.15".** The average of 384
    neighbouring input sets is 1.06. 4 of 9 months are positive. The profit comes from
-   buys (1.49) and not from sells (0.97); the best five of 158 trading days make
+   buys (1.49) and not from sells (0.97); the best five of the 158 days on which it traded make
    96% of the net, and without them it averages +0.4 points per trade (profit factor
    1.01). A 7 point commission leaves 1.04,
    strict fills 1.04, both together 0.95. If stop losses slip twice as far as quoted
@@ -496,8 +496,8 @@ points. The t-statistic of the mean trade is 1.7; resampling the trades gives a 
 | 2026-11 | 139 | 1.75 | 37.4 | 5,199 |
 
 4 of 9 months are positive. The three best (2026-11, 2026-01, 2026-03) earn 13,903 points; the
-other 6 together make -1,617. By day it is more concentrated still: the best five of 158 trading
-days make 96% of the net, and without them the preset averages +0.4 points per trade (profit factor
+other 6 together make -1,617. By day it is more concentrated still: the best five of the 158 days on
+which it traded make 96% of the net, and without them the preset averages +0.4 points per trade (profit factor
 1.01).
 
 These are very short trades in the fastest part of the market: the average alert is 360 points,
