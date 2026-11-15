@@ -1,0 +1,50 @@
+==============================================================================
+ XPW ShapeMap v0.9.2 + FlashGold PF preset -- Python emulation (BTCUSD)
+ *** SYNTHETIC RANDOM-WALK DATA: layout demo only, the numbers carry no information ***
+==============================================================================
+ Symbol: BTCUSD   Period: 15-minute chart   Bars: 34,560
+ Range: 2025.10.27 00:00 -> 2026.10.21 23:45   Deposit: 10,000 USD
+ Preset: Turn after-hold, candle close, close-only opposite, ATR exits SL 1.5 x ATR14, TP 4.0R,
+         no trail, no loss-rev, FlashGold H1 filter with-direction, Risk 1 %, spread 3000 pts
+------------------------------------------------------------------------------
+ Turn signals:   1417    blocked by filter:   1309    below min lot:    0    trades: 99
+------------------------------------------------------------------------------
+ Total Net Profit:           -319.09    Gross Profit:       5,863.85    Gross Loss:     -6,182.93
+ Profit Factor:                 0.95    Expected Payoff:       -3.22    Final equity:   9,680.91
+ Max Equity Drawdown:       1,691.74 (14.88 %)    Recovery Factor: -0.19
+ Total Trades:                    99    Short: 44 (29.5 % won)    Long: 55 (36.4 % won)
+ Profit Trades:             33 (33.3 %)    Loss Trades: 66 (66.7 %)
+ Largest profit trade:        421.58    Largest loss trade:      -113.72
+ Average profit trade:        177.69    Average loss trade:       -93.68
+ Max consecutive wins:             4    Max consecutive losses: 6
+ Exit reasons:          SL 57, TP 7, opp signal 35
+------------------------------------------------------------------------------
+ Month      Trades   Net P/L      PF    Win%
+ 2025-11        9      215.98    1.56    44.4
+ 2025-12       10     -116.56    0.80    30.0
+ 2026-01        8       77.75    1.16    37.5
+ 2026-02        7      139.93    1.35    42.9
+ 2026-03       13     -168.98    0.77    38.5
+ 2026-04        8      775.96    3.30    50.0
+ 2026-05        4       47.19    1.22    50.0
+ 2026-06        8     -140.77    0.74    37.5
+ 2026-07       14     -309.44    0.72    21.4
+ 2026-08       10     -273.17    0.60    20.0
+ 2026-09        4     -182.18    0.39    25.0
+ 2026-10        4     -384.80    0.00     0.0
+------------------------------------------------------------------------------
+ Equity curve (balance after closed trades, 60 columns)
+    11,189 |                                                         #  
+           |                                                     #  # # 
+           |                                                      #    #
+           |                                                    #  #    
+           |                                                            
+           |                              #     ###                     
+    10,440 |                               #       #         # #        
+           |                         #      # ##    #  ##     #         
+           | # #   # #        #       #  #   #       #   #              
+           |  # ##  # #        ### #   ##             #   ###           
+           |#     #    ## ##      # #                                   
+     9,815 |             #  ##                                          
+           +------------------------------------------------------------
+==============================================================================

@@ -1,0 +1,50 @@
+==============================================================================
+ XPW ShapeMap v0.9.2 + FlashGold PF preset -- Python emulation (XAUUSD)
+ *** SYNTHETIC RANDOM-WALK DATA: layout demo only, the numbers carry no information ***
+==============================================================================
+ Symbol: XAUUSD   Period: 5-minute chart   Bars: 74,304
+ Range: 2025.10.27 00:00 -> 2026.10.21 23:55   Deposit: 10,000 USD
+ Preset: Turn after-hold, candle close, close-only opposite, ATR exits SL 2.0 x ATR14, TP 3.0R,
+         no trail, no loss-rev, FlashGold H1 filter with-direction, Risk 1 %, spread 20 pts
+------------------------------------------------------------------------------
+ Turn signals:   3062    blocked by filter:   2826    below min lot:    0    trades: 212
+------------------------------------------------------------------------------
+ Total Net Profit:            644.65    Gross Profit:      10,134.36    Gross Loss:     -9,489.71
+ Profit Factor:                 1.07    Expected Payoff:        3.04    Final equity:  10,644.65
+ Max Equity Drawdown:       2,414.70 (20.94 %)    Recovery Factor: 0.27
+ Total Trades:                   212    Short: 89 (40.4 % won)    Long: 123 (40.7 % won)
+ Profit Trades:             86 (40.6 %)    Loss Trades: 126 (59.4 %)
+ Largest profit trade:        324.79    Largest loss trade:      -112.11
+ Average profit trade:        117.84    Average loss trade:       -75.32
+ Max consecutive wins:             6    Max consecutive losses: 15
+ Exit reasons:          SL 80, TP 20, opp signal 112
+------------------------------------------------------------------------------
+ Month      Trades   Net P/L      PF    Win%
+ 2025-11       22      443.12    1.66    45.5
+ 2025-12       20      735.75    1.87    55.0
+ 2026-01       20      165.16    1.20    35.0
+ 2026-02       18      -68.03    0.93    38.9
+ 2026-03       11     -277.00    0.62    27.3
+ 2026-04       15     -376.33    0.55    33.3
+ 2026-05       12     -331.55    0.51    33.3
+ 2026-06       17      313.46    1.36    35.3
+ 2026-07       26   -1,319.94    0.14    23.1
+ 2026-08       21      320.05    1.42    42.9
+ 2026-09       15      428.80    2.44    66.7
+ 2026-10       15      611.17    2.38    53.3
+------------------------------------------------------------------------------
+ Equity curve (balance after closed trades, 60 columns)
+    11,479 |                        #                                   
+           |             # # ######   #                                 
+           |            # # #      # # # ## ##                          
+           |          ##                #  #                            
+           |         #                        ##          #             
+           |      ###                           #   #    # ##           
+    10,199 |    ##                                   ##                 
+           |#                                    ###    #    #          
+           | # #                                       #      #         
+           |  #                                                ##       
+           |                                                     #  # ##
+     9,132 |                                                      ## #  
+           +------------------------------------------------------------
+==============================================================================
