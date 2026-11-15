@@ -134,8 +134,10 @@ DUK_DIVISOR = {"EURUSD": 1e5, "US500": 1e3}                         # price unit
 ANCHOR_END = pd.Timestamp("2026-01-01")         # the anchor and k are measured on the 180 days that end on 2025-12-31
 GOLD_M1 = os.environ.get("HUMP_GOLD_M1", "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/wf/gold2/m1.pkl")
 # The EA's Friday close (WeekendCloseTime, server time, minutes): gold and EURUSD 23:00; US500 15 minutes before its
-# usual Friday close (build reports the close it finds and stops if this window would not start before it).
-WEEKEND_MIN = {"US500": None}.get(SYM, 1380)
+# usual Friday close (build reports the close it finds and stops if this window would not start before it). US500's
+# Dukascopy series closes on Fridays at 23:15 server time (16:15 New York) in 2018-2026, the usual close of the whole
+# series; earlier it closed at 00:00 (2013-2014) and 23:01 (2015-2017), after the window's start in both cases.
+WEEKEND_MIN = {"US500": 23 * 60}.get(SYM, 1380)
 # Protocol 2: a year in which one clock mark sits elsewhere for a reason of the data provider, found when the data was
 # first checked and reported (as GOLD_BREAK_EXCEPTIONS for gold): that mark's threshold is lowered for that year only;
 # the shifted copies must still fail with it. (symbol, year) -> keyword arguments of the check, and the reason.
