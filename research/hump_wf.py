@@ -142,10 +142,14 @@ DUK_DIVISOR = {"EURUSD": 1e5, "US500": 1e3}                         # price unit
 ANCHOR_END = pd.Timestamp("2026-01-01")         # the anchor and k are measured on the 180 days that end on 2025-12-31
 GOLD_M1 = os.environ.get("HUMP_GOLD_M1", "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/wf/gold2/m1.pkl")
 # The EA's Friday close (WeekendCloseTime, server time, minutes): gold and EURUSD 23:00; US500 15 minutes before its
-# usual Friday close (build reports the close it finds and stops if this window would not start before it). US500's
-# Dukascopy series closes on Fridays at 23:15 server time (16:15 New York) in 2018-2026, the usual close of the whole
-# series; earlier it closed at 00:00 (2013-2014) and 23:01 (2015-2017), after the window's start in both cases.
-WEEKEND_MIN = {"US500": 23 * 60}.get(SYM, 1380)
+# earliest regular Friday close, 22:45 (build checks it and stops if the window would not start before the last bar of
+# every Friday with a regular close). US500's Dukascopy series closes on Fridays at 23:15 server time (16:15 New York, the
+# end of the 23:14 bar) from April 2018, its most frequent close; at 23:00 (the 22:59 bar) on 4 Fridays of 2015 and every
+# regular Friday from 2017-09-08 to 2018-04-06, at 23:01 (the 23:00 bar) on most Fridays of 2015-2017, and at 24:00 in
+# 2013-2014. A window from 23:00 (the usual close minus 15 minutes) would not open on the Fridays that close at 23:00 and
+# would hold their trades to Monday 09:00; 22:45 is the "usual close minus 15 minutes" of the 2015-2018 feed.
+WEEKEND_MIN = {"US500": 22 * 60 + 45}.get(SYM, 1380)
+REGULAR_CLOSE_SHARE = 0.10                      # a Friday close found on 10% of a year's Fridays is regular (holidays are not)
 # Protocol 2: a year in which one clock mark sits elsewhere for a reason of the data provider, found when the data was
 # first checked and reported (as GOLD_BREAK_EXCEPTIONS for gold): that mark's threshold is lowered for that year only;
 # the shifted copies must still fail with it. (symbol, year) -> keyword arguments of the check, and the reason.
@@ -297,7 +301,7 @@ def build2(work, folder):
     import duk_to_m1 as D
     assert D.DIVISOR == DUK_DIVISOR[SYM], (D.DIVISOR, SYM)
     t0 = time.time()
-    m1, half = D.load(folder)
+    m1, half = D.load(folder, keep_moving=True)
     m1 = m1[["open", "high", "low", "close", "vol"]].astype(float)
     # Dukascopy spread (ask close - bid close) of each bar, in the feed's price steps (equal spreads, equal numbers)
     spread = np.round(2.0 * np.asarray(half, float) * DUK_DIVISOR[SYM]) / DUK_DIVISOR[SYM]
@@ -305,8 +309,21 @@ def build2(work, folder):
     assert np.isfinite(m1[["open", "high", "low", "close"]].values).all() and (m1["low"] <= m1["high"]).all()
     print(f"{SYM}: {len(m1)} bars {m1.index[0]} .. {m1.index[-1]} read in {time.time() - t0:.0f}s", flush=True)
     notes = [f"Dukascopy {DUK_NAME[SYM]} one-minute BID and ASK candles (prices = bi5 integers / {DUK_DIVISOR[SYM]:g}), "
-             f"mid prices, minutes without ticks dropped, UTC converted once to server time (New York + 7 h); "
-             f"source {os.path.abspath(folder)}"]
+             f"mid prices, UTC converted once to server time (New York + 7 h); a minute with volume 0 on both sides is "
+             f"dropped when it is flat on both sides (Dukascopy's fill bar of a closed minute) and kept with unknown volume "
+             f"when its prices move (duk_to_m1.load keep_moving); source {os.path.abspath(folder)}"]
+    yr = m1.index.year.values
+    hist = yr <= 2025                                              # what is decided uses 2013-2025, never 2026
+    nv = np.asarray(m1["vol"].isna())
+    nv_days = pd.Series(nv).groupby(m1.index.normalize()).sum()
+    nv_days = nv_days[nv_days >= 100]
+    vol_unknown = dict(by_year={int(y): int(n) for y, n in pd.Series(nv).groupby(yr).sum().items() if n},
+                       days_with_100_or_more={str(d.date()): int(n) for d, n in nv_days.items()})
+    if nv.any():
+        notes.append(f"{int(nv.sum())} minutes whose BID or ASK prices move but whose Dukascopy volume is 0 on both sides are "
+                     f"kept with unknown volume (the volume conditions skip them): by year {vol_unknown['by_year']}; "
+                     f"{len(nv_days)} days with 100 or more of them: {list(vol_unknown['days_with_100_or_more'])}")
+        print(notes[-1], flush=True)
     # where the closures fall (the first look at the schedule), whole series and by year
     sched = R.schedule(m1)
     sched_y = {int(y): R.schedule(m1[m1.index.year == y]) for y in sorted(set(m1.index.year))}
@@ -314,20 +331,54 @@ def build2(work, folder):
     for y, s in sched_y.items():
         print(f"  {y}: daily break {s['daily_break_start'].get('top')} -> reopen {s['daily_break_reopen'].get('top')} | weekly close "
               f"{s['weekly_close'].get('top')} | weekly open {s['weekly_open'].get('top')} | Saturday bars {s['saturday_bars']}", flush=True)
-    # the usual Friday close: the most frequent end of the last bar before a closure of 24 h or more ("Sat 00:00" is
-    # Friday 24:00), in minutes after Friday 00:00 server time
-    close = [k for k in sched["weekly_close"]["top"]][0]
+    # The Friday window, decided on 2013-2025: the usual weekly close is the most frequent end of the last bar before a
+    # closure of 24 h or more ("Sat 00:00" is Friday 24:00). Each Friday's close is the end of its last bar (1440 = the
+    # end of the 23:59 bar); a close found on 10% or more of a year's Fridays is regular (holiday closes are not). The
+    # window must start before the last bar of every Friday with a regular close; US500's starts 15 minutes before the
+    # earliest regular close. A Friday that closes earlier (a holiday) is closed at the next open, as for gold.
+    hhmm = lambda x: f"{int(x) // 60:02d}:{int(x) % 60:02d}"
+    sched_dec = R.schedule(m1[hist])
+    close = [k for k in sched_dec["weekly_close"]["top"]][0]
     if close[:3] not in ("Fri", "Sat"):
         raise SystemExit(f"{SYM}: the usual weekly close is {close}, not on a Friday")
-    close_min = (1440 if close[:3] == "Sat" else 0) + int(close[4:6]) * 60 + int(close[7:9])
+    th = m1.index[hist]
+    fri = th[th.dayofweek == 4]
+    last = pd.Series(fri).groupby(fri.normalize()).max()
+    fclose = (last.dt.hour * 60 + last.dt.minute + 1).values
+    share = pd.crosstab(last.index.year, fclose, normalize="index")
+    regular = sorted(int(c) for c in share.columns if (share[c] >= REGULAR_CLOSE_SHARE).any())
+    by_year_close = {int(y): {hhmm(c): round(float(s), 3) for c, s in share.loc[y].items() if s > 0} for y in share.index}
     if SYM == "US500":
-        assert WEEKEND_MIN == close_min - 15, f"US500's usual weekly close is {close}: WEEKEND_MIN must be {close_min - 15}"
-    if not (WEEKEND_MIN < close_min - 1 and WEEKEND_MIN < 1440):
-        raise SystemExit(f"{SYM}: the Friday window from minute {WEEKEND_MIN} does not start before the market's usual last "
-                         f"Friday bar (weekly close {close})")
-    notes.append(f"usual weekly close {close} server time (the end of the last bar before a closure of 24 h or more, "
-                 f"{sched['weekly_close']['top'][close]:.0%} of {sched['weekly_close']['n']} closures; Saturday bars: "
-                 f"{sched['saturday_bars']}); the EA's Friday window starts at {WEEKEND_MIN // 60:02d}:{WEEKEND_MIN % 60:02d}")
+        assert WEEKEND_MIN == regular[0] - 15, f"US500's earliest regular Friday close is {hhmm(regular[0])}: WEEKEND_MIN must be {regular[0] - 15}"
+    if not (WEEKEND_MIN < regular[0] - 1 and WEEKEND_MIN < 1440):
+        raise SystemExit(f"{SYM}: the Friday window from {hhmm(WEEKEND_MIN)} does not start before the last bar of every Friday "
+                         f"with a regular close (earliest {hhmm(regular[0])})")
+    early = [(str(d.date()), hhmm(c)) for d, c in zip(last.index, fclose) if c - 1 < WEEKEND_MIN]
+    friday_window = dict(start=hhmm(WEEKEND_MIN), usual_weekly_close=close, regular_friday_closes=[hhmm(c) for c in regular],
+                         friday_close_by_year=by_year_close, fridays_closing_before_the_window=early)
+    notes.append(f"usual weekly close {close} server time (2013-2025: the end of the last bar before a closure of 24 h or more, "
+                 f"{sched_dec['weekly_close']['top'][close]:.0%} of {sched_dec['weekly_close']['n']} closures; Saturday bars: "
+                 f"{sched_dec['saturday_bars']}); regular Friday closes {[hhmm(c) for c in regular]}; the EA's Friday window "
+                 f"starts at {hhmm(WEEKEND_MIN)}, before the last bar of every Friday with a regular close; {len(early)} Fridays "
+                 f"of 2013-2025 close earlier (holidays and feed holes; their trades are closed at the next open): {early}")
+    print(notes[-1], flush=True)
+    # what the data covers, year by year (for reading the results; nothing is decided on it): bars by server hour, the
+    # median one-minute range in basis points of the price at 01:00-09:59 and 16:30-22:59 server time, bars with a zero
+    # Dukascopy spread, and the server hours with fewer than a quarter of the bars of the year's median hour
+    hr = m1.index.hour.values
+    mod = hr * 60 + m1.index.minute.values
+    byh = pd.crosstab(yr, hr).reindex(columns=range(24), fill_value=0)
+    bp = ((m1["high"] - m1["low"]) / m1["close"]).values * 1e4
+    on, day = (mod >= 60) & (mod < 600), (mod >= 990) & (mod < 1380)
+    coverage = dict(bars_by_year_hour={int(y): [int(v) for v in byh.loc[y].values] for y in byh.index},
+                    thin_hours={int(y): [h for h in range(24) if byh.loc[y, h] < 0.25 * np.median(byh.loc[y].values)] for y in byh.index},
+                    median_range_bp={"01:00-09:59": {int(y): round(float(v), 3) for y, v in pd.Series(bp[on]).groupby(yr[on]).median().items()},
+                                     "16:30-22:59": {int(y): round(float(v), 3) for y, v in pd.Series(bp[day]).groupby(yr[day]).median().items()}},
+                    zero_spread_bars={int(y): int(n) for y, n in pd.Series(spread == 0).groupby(yr).sum().items() if n},
+                    volume_unknown=vol_unknown)
+    print("server hours with fewer than a quarter of the bars of the year's median hour:", coverage["thin_hours"], flush=True)
+    print("median one-minute range (bp of price):", coverage["median_range_bp"], "; bars with zero Dukascopy spread:",
+          coverage["zero_spread_bars"], flush=True)
     # the clock: fatal on the whole series and on every year with enough bars
     lines = clock_suite(m1, spread, notes=notes)
     gaps = pd.Series(m1.index).diff().dt.total_seconds().div(60)
@@ -347,8 +398,6 @@ def build2(work, folder):
           f"median one-minute range {med:.6g} vs gold {gmed:.6g} ({gold_bars} bars of {GOLD_M1}): k = {k:.6g}", flush=True)
     print(f"space: buf {sp['buf']}; min_risk {sp['min_risk']} (the last two: gold's {GOLD_EXTRA_MIN_RISK} x k)", flush=True)
     # spread shape of the day: median Dukascopy spread by server hour, 2013-2025, over its median across the hours
-    hist = np.asarray(m1.index.year <= 2025)
-    hr = m1.index.hour.values
     by_h = pd.Series(spread[hist]).groupby(hr[hist]).median().reindex(range(24))
     n_h = pd.Series(np.ones(int(hist.sum()))).groupby(hr[hist]).sum().reindex(range(24)).fillna(0).astype(int)
     shape = (by_h / float(np.median(by_h.dropna().values))).values
@@ -365,13 +414,20 @@ def build2(work, folder):
                 anchor_window=[str(ANCHOR_END - pd.Timedelta(days=ANCHOR_DAYS)), str(ANCHOR_END)], anchor_bars=int(aw.sum()),
                 bars_per_year={int(y): int(n) for y, n in m1.groupby(m1.index.year).size().items()}, long_gaps=big, notes=notes,
                 clock_checks=lines, schedule=sched, schedule_by_year=sched_y, weekend_close_min=int(WEEKEND_MIN), usual_weekly_close=close,
+                friday_window=friday_window, coverage=coverage,
                 hourly_spread_shape=[float(v) for v in shape], hourly_spread_dukascopy_median=[float(v) for v in by_h.values],
                 hourly_spread_bars=[int(v) for v in n_h.values],
                 space_k=float(k), space_k_detail=dict(symbol_median_m1_range=med, gold_median_m1_range=gmed, gold_series=GOLD_M1,
                                                       gold_bars=gold_bars, symbol_bars=int(aw.sum())),
                 space=sp, spread_at_anchor=SPREAD0, costs=list(COSTS),
                 rules=dict(calibration="calibration sums leave out trades that close in a later calendar year than they open",
+                           last_walk_forward_year="the year before the final one counts, as a test year, only the trades that "
+                                                  "close in it (no final-year price enters what is decided)",
                            final_year="wf writes the final year only for cells that pass",
+                           friday_window=f"from {hhmm(WEEKEND_MIN)} server time; trades still open at a Friday close before it "
+                                         f"are closed at the next open",
+                           volume="minutes kept without a Dukascopy volume have unknown volume: a bar of any timeframe with "
+                                  "such a minute, and the 20 bars after it, meet none of the three volume conditions",
                            dukascopy="DUK_INSTRUMENT " + DUK_NAME[SYM], duk_spread="duk_spread.npy: ask close - bid close of every bar"))
     json.dump(meta, open(os.path.join(work, "meta.json"), "w"), indent=1)
     print(json.dumps({k_: v for k_, v in meta.items() if k_ not in ("schedule_by_year",)}, indent=1)[:6000])
@@ -482,7 +538,7 @@ class Mk(H.Market):
         # The EA closes from Friday 23:00 server time and, when that moment passed while the market was closed (an
         # early Friday close), on the first tick after it. It cannot know a mid-week holiday closure in advance, so a
         # trade stays open over it. (hump_engine uses the last bar before any closure of a day or more: look-ahead.)
-        # WEEKEND_MIN is 23:00 (1380) for gold and EURUSD; US500's is 15 minutes before its usual Friday close.
+        # WEEKEND_MIN is 23:00 (1380) for gold and EURUSD; US500's is 22:45, 15 minutes before its earliest regular Friday close.
         self.wk_gold = (self.dow == 4) & (self.tod >= WEEKEND_MIN)
         tmin = self.t.astype("datetime64[m]").astype(np.int64)
         day = tmin // 1440; dw = (day + 3) % 7                       # 1970-01-01 was a Thursday: Monday = 0
@@ -788,7 +844,13 @@ class Feat:
             hb = B.resample(m1, htf)
             mac = B.ema(hb["close"], 12) - B.ema(hb["close"], 26); mac.iloc[:60] = np.nan
             setattr(self, f"hm{k + 1}", np.nan_to_num(asof(np.sign(mac), htf)).astype(np.int8))
-        vol = mk.vol if name == "M1" else mk.vol.resample(f"{tfm}min", label="left", closed="left").sum()
+        if name == "M1":
+            vol = mk.vol
+        else:
+            rs = mk.vol.resample(f"{tfm}min", label="left", closed="left")
+            vol = rs.sum()
+            if NEW:          # protocol 2: a bar with a minute of unknown volume (NaN, see duk_to_m1 keep_moving) has unknown volume
+                vol = vol.where(rs.count() == rs.size())
         vol = vol.reindex(idx)
         self.volr = (vol / vol.rolling(20).mean().shift(1)).values
         self.body_dir = np.sign(c - o).astype(np.int8)
@@ -1007,9 +1069,11 @@ def run(work, tf, n, workers=3):
     cand = candidates(tf, n)
     one(cand[0])                                        # compile before the workers start
     print(f"{SYM} {tf}: market and features ready in {time.time() - t0:.0f}s; {len(MK.t)} bars, years {MK.years[0]}-{MK.years[-1]}", flush=True)
+    # one array filled in setup order (no list of per-setup results next to a stacked copy: half the memory at N = 12000)
+    A = np.zeros((len(cand), len(CONDS), 2, len(MK.years), 8 if MK.protocol == 2 else 4), np.float32)
     with Pool(workers) as pool:
-        res = pool.map(one, cand, chunksize=8)
-    A = np.stack(res)
+        for i, r in enumerate(pool.imap(one, cand, chunksize=8)):
+            A[i] = r
     np.save(os.path.join(work, f"wf_{tf}.npy.tmp.npy"), A)
     os.replace(os.path.join(work, f"wf_{tf}.npy.tmp.npy"), os.path.join(work, f"wf_{tf}.npy"))
     extra = dict(protocol=2, space_k=X.SPACE_K, space=dict(buf=space()["buf"], min_risk=space()["min_risk"])) if MK.protocol == 2 else {}
@@ -1065,7 +1129,8 @@ def wf_tf(work, tf):
     def year_of(v, ty):
         cal = [ty - 3, ty - 2, ty - 1]
         picks, score, cost, n_ok, n_cost = window_pick(A, P, v, cal, col)
-        s = A[picks][:, v][:, :, ty, :].sum(axis=0) if picks else np.zeros((2, 4))
+        tc = 4 if (proto == 2 and ty == final - 1) else 0     # protocol 2: the year before the final one, only the trades
+        s = A[picks][:, v][:, :, ty, tc:tc + 4].sum(axis=0) if picks else np.zeros((2, 4))   # that close in it
         return dict(year=years[ty], picks=picks, eligible=n_ok, eligible_after_cost_rule=n_cost,
                     n=int(s[0, 0]), win=float(s[0, 1]), loss=float(s[0, 2]), cost_r=float(s[0, 3]),
                     stress_n=int(s[1, 0]), stress_win=float(s[1, 1]), stress_loss=float(s[1, 2]),
@@ -1109,6 +1174,8 @@ def wf(work, out_json):
                      hourly_spread_shape=meta["hourly_spread_shape"], weekend_close_min=meta["weekend_close_min"],
                      rules=["calibration years: sums over the trades that close in the calendar year they open in "
                             "(the test year counts every trade by its entry year)",
+                            "the last test year before the final year: only the trades that close in it (a trade still open "
+                            "at New Year would bring final-year prices into the pass decision)",
                             "final year: written ('final') only for the cells that pass; nothing about it for the others"])
     json.dump(dict(symbol=SYM, anchor_price=meta["anchor_price"], spread_at_anchor=SPREAD0, costs=list(COSTS), min_n=MIN_N, topk=TOPK,
                    pass_pf=PASS_PF, pass_stress_pf=PASS_STRESS, pass_n=PASS_N, year_n=YEAR_N, max_cost_r=MAX_COST_R, **extra,
@@ -1145,12 +1212,15 @@ def unseen_trades(work, tf, key, flat_spread=None, final=True):
     out = [[], []]
     for ty in range(3, len(years) if final else len(years) - 1):
         picks, score, cost, _, _ = window_pick(A, P, v, [ty - 3, ty - 2, ty - 1], col)
+        tc = 4 if (col == 4 and ty == len(years) - 2) else 0   # protocol 2: the year before the final one, as in wf_tf
         for i in picks:
             for ci in (0, 1):
                 df = trades_of(P[i], key, COSTS[ci])
                 df = df[df.entry_time.dt.year == years[ty]]
+                if tc:                                   # only the trades that close in that year
+                    df = df[MK.year[df.exit_row.values.astype(np.int64)] + MK.y0 == years[ty]]
                 if flat_spread is None:                  # the stored sums must be these trades
-                    assert len(df) == A[i, v, ci, ty, 0] and abs(df.r[df.r > 0].sum() - A[i, v, ci, ty, 1]) < 1e-3 * max(1.0, A[i, v, ci, ty, 1]), (tf, key, i, years[ty])
+                    assert len(df) == A[i, v, ci, ty, tc] and abs(df.r[df.r > 0].sum() - A[i, v, ci, ty, tc + 1]) < 1e-3 * max(1.0, A[i, v, ci, ty, tc + 1]), (tf, key, i, years[ty])
                 out[ci].append(df.assign(year=years[ty], pick=i, score=float(score[i])))
     cols = ["year", "pick", "score", "entry_time", "side", "r", "risk", "cost_r", "entry_row", "exit_row"]
     return [pd.concat(x)[cols].sort_values("entry_time").reset_index(drop=True) if x else pd.DataFrame(columns=cols) for x in out], P
