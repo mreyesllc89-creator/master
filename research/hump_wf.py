@@ -44,11 +44,18 @@ holds except what is listed here; meta.json of the build says "protocol": 2, and
             EURUSD, which has no daily break: (a) the FX week opens Sunday 17:00 New York = Monday 00:00 server time in
             summer and winter, so the first bar after a closure of 24 h or more is on Monday 00:00-00:05 after at least
             90% of them; (b) the daily rollover (17:00 New York) widens the spread: the minute of the day with the largest
-            median Dukascopy spread lies in 23:50-00:10 server time in at least 80% of the quarters
-            (hump_tf_recal.clock_check_fx). The US-open jump of clock_check is only recorded as a note.
+            median Dukascopy spread lies in 23:50-00:10 server time in at least 80% of the quarters (spreads in the
+            feed's price steps; minutes with the same median told apart by their mean) (hump_tf_recal.clock_check_fx).
+            The US-open jump of clock_check is only recorded as a note.
             US500: the daily reopen after the CME maintenance break at 01:00-01:15 server time on at least 90% of the days,
             and the US stock open jump at 16:30 the largest of the half-past marks in at least two thirds of the quarters
             (clock_check with top=1). "hump_wf.py clockshift" shows that copies shifted by +1 h and -1 h fail.
+            Found in the data (build, meta.json "schedule_by_year"): US500 has its daily break at 00:15-01:00 server time
+            in 2013-2014 (Friday close 00:00), only 09:00-23:00 server time from early 2015 to 2017 (no daily break: the
+            reopen test does not apply there, the 16:30 jump decides; Friday close 23:01), the break at 23:15-01:00 from 2018 on
+            (Friday close 23:15, the usual close). Two years fail one mark for a reason of the data provider and pass with
+            a lowered threshold (CLOCK_EXCEPTIONS, reported as deviations): EURUSD 2013, the rollover mark in 3 of 4
+            quarters; US500 2014, the reopen at 01:00-01:15 after 84.6% of the 45-150 minute gaps.
   anchor    the mean close of the 180 days that end on 2025-12-31 (2026 plays no part in anything that is decided).
   space     buf, min_risk and the two larger minimum stops are gold's dollar values times k = the symbol's median
             one-minute high-low range / gold's (wf/gold2/m1.pkl), both over those 180 days, each rounded to two
@@ -62,8 +69,9 @@ holds except what is listed here; meta.json of the build says "protocol": 2, and
             The shape of the day is the symbol's median Dukascopy spread by server hour over 2013-2025 (not 2026),
             divided by its median over the hours (meta.json; gold keeps FTMO's hourly table). No spread filter (as BTC).
   rules     the EA's Friday close and its catch-up at the next open as for gold, from 23:00 server time for EURUSD and
-            from 15 minutes before US500's usual Friday close (build reports it); no entry on the first bar after a
-            break of 30 minutes or more. hump_search BASE: skip_big_pb=1, weekend_close=1, no spread filter.
+            from 15 minutes before US500's usual Friday close (23:15, so also from 23:00; build checks it); no entry on
+            the first bar after a break of 30 minutes or more. hump_search BASE: skip_big_pb=1, weekend_close=1, no
+            spread filter.
   features  the 59 conditions mean the same on every symbol: the round-number grid (0.5% of the previous day's close,
             rounded to the nearest step) extends below 1 (NICE2; gold and BTC prices choose the same step as before),
             and the random controls draw from a stream of their own per symbol.
@@ -91,7 +99,7 @@ Usage (from research/):
   [HUMP_SYMBOL=...] python3 hump_wf.py selftest <work_dir>      (writes <work_dir>/_selftest)
   HUMP_SYMBOL=EURUSD|US500 python3 hump_wf.py clockshift <work_dir> [out_json]
 """
-import gc, glob, io, json, os, pickle, random, sys, time, zipfile
+import contextlib, gc, glob, io, json, os, pickle, random, sys, time, zipfile
 from multiprocessing import Pool
 import numba as nb, numpy as np, pandas as pd
 
@@ -141,7 +149,18 @@ WEEKEND_MIN = {"US500": 23 * 60}.get(SYM, 1380)
 # Protocol 2: a year in which one clock mark sits elsewhere for a reason of the data provider, found when the data was
 # first checked and reported (as GOLD_BREAK_EXCEPTIONS for gold): that mark's threshold is lowered for that year only;
 # the shifted copies must still fail with it. (symbol, year) -> keyword arguments of the check, and the reason.
-CLOCK_EXCEPTIONS = {}
+# These are deviations from the pre-registered checks, reported with the build.
+CLOCK_EXCEPTIONS = {
+    ("EURUSD", 2013): dict(min_rollover=0.75, why="Dukascopy's EURUSD spread stayed widest for half an hour after the 17:00 New "
+                           "York rollover in 2013Q4 (widest median minute 00:19 server time; median 8 points at 00:13-00:27 "
+                           "against at most 7 at 23:50-00:10), so 3 of the 4 quarters of 2013 have the widest spread at "
+                           "23:50-00:10 instead of 80%; the week opens at Monday 00:00-00:05 server time as in every other year"),
+    ("US500", 2014): dict(min_reopen=0.80, why="Dukascopy's index feed had holes of 45-150 minutes that end elsewhere than at "
+                          "the daily reopen: 14:21-16:30 server time on 10 days of January-February 2014 and about 20 one-off "
+                          "gaps, so 84.6% of the 195 reopens after such gaps are at 01:00-01:15 instead of 90%; the daily break "
+                          "itself (00:15-01:00) reopens at 01:00 on every day it appears, and the US-open jump is at 16:30 in "
+                          "3 of 4 quarters"),
+}
 SEED_OFFSET = {"BTCUSD": 1000, "EURUSD": 2000, "US500": 3000}.get(SYM, 0)    # random controls: one stream per symbol
 HTF_UP = {"M1": ("M5", "M15"), "M2": ("M10", "M30"), "M3": ("M15", "H1"), "M5": ("M15", "H1"), "M10": ("M30", "H1"),
           "M15": ("H1", "H4"), "M30": ("H1", "H4"), "H1": ("H4", "D1")}
@@ -358,31 +377,77 @@ def build2(work, folder):
     print(json.dumps({k_: v for k_, v in meta.items() if k_ not in ("schedule_by_year",)}, indent=1)[:6000])
 
 
+def clock_marks(m1, spread, exc):
+    """Each clock mark of a protocol-2 symbol on its own (pass / fail / n/a), with the thresholds of clock2: EURUSD the
+    weekly open and the rollover spread; US500 the daily reopen (n/a without 20 breaks of 45-150 minutes) and the
+    16:30 jump."""
+    out = {}
+    quiet = io.StringIO()
+    tmin = m1.index.values.astype("datetime64[m]").astype(np.int64)
+    mod = (m1.index.hour * 60 + m1.index.minute).values
+    if SYM == "EURUSD":
+        first = np.where(np.diff(tmin) >= 24 * 60)[0] + 1
+        share = float(((m1.index.dayofweek.values[first] == 0) & (mod[first] <= 5)).mean()) if len(first) else 0.0
+        out["weekly_open"] = f"{'pass' if share >= exc.get('min_monday', 0.9) else 'FAIL'} ({share:.0%} of {len(first)} at Monday 00:00-00:05)"
+        try:
+            with contextlib.redirect_stdout(quiet):
+                R.clock_check_fx(m1, spread, "mark", min_monday=0.0, min_rollover=exc.get("min_rollover", 0.8))
+            out["rollover"] = "pass"
+        except SystemExit as err:
+            q = str(err).rsplit("(", 1)[-1].split(")")[0]                  # "N of M quarters" not at 23:50-00:10
+            out["rollover"] = f"FAIL (widest median spread elsewhere in {q})"
+    else:
+        gap = np.diff(tmin)
+        reopen = mod[np.where((gap >= 45) & (gap <= 150))[0] + 1]
+        if len(reopen) >= 20:
+            share = float(((reopen >= 60) & (reopen <= 75)).mean())
+            out["daily_reopen"] = f"{'pass' if share >= exc.get('min_reopen', 0.9) else 'FAIL'} ({share:.0%} of {len(reopen)} at 01:00-01:15)"
+        else:
+            out["daily_reopen"] = f"n/a ({len(reopen)} breaks of 45-150 minutes)"
+        try:
+            with contextlib.redirect_stdout(quiet):
+                R.clock_check(m1[["open", "high", "low", "close"]], "mark", min_reopen=0.0, jump_fatal=True, top=1)
+            out["jump_1630"] = "pass"
+        except SystemExit as err:
+            out["jump_1630"] = "FAIL (" + str(err).split("(")[-1].split(")")[0] + ")"
+    return out
+
+
 def clockshift(work, out_json=None):
     """The clock checks of a protocol-2 build on copies of its series shifted by +1 h and -1 h: every check of the
-    whole series and of every year must fail on them (the checks would catch a series that is one hour off)."""
+    whole series and of every year must fail on them (the checks would catch a series that is one hour off). Each
+    mark is also judged on its own (clock_marks), on the shifted copies and on the series itself."""
     m1 = pd.read_pickle(os.path.join(work, "m1.pkl"))
     spread = np.load(os.path.join(work, "duk_spread.npy"))
-    res = {}
-    for hours in (1, -1):
+    res, marks = {}, {}
+    for hours in (0, 1, -1):
         s = m1.copy(); s.index = s.index + pd.Timedelta(hours=hours)
         parts = [("whole series", np.ones(len(s), bool))] + [(str(y), np.asarray(s.index.year == y)) for y in sorted(set(s.index.year))]
-        out = {}
+        out, mk = {}, {}
         for label, sel in parts:
             if label != "whole series" and sel.sum() <= 100000:
                 continue
             exc = {k: v for k, v in CLOCK_EXCEPTIONS.get((SYM, int(label)) if label.isdigit() else None, {}).items() if k != "why"}
+            mk[label] = clock_marks(s[sel], spread[sel], exc)
+            if hours == 0:
+                continue
             try:
-                clock2(s[sel], spread[sel], f"{SYM} shifted {hours:+d} h {label}", **exc)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    clock2(s[sel], spread[sel], f"{SYM} shifted {hours:+d} h {label}", **exc)
                 out[label] = "PASSED"
             except SystemExit as err:
                 out[label] = f"failed: {err}"
-            print(f"{hours:+d} h {label}: {out[label][:200]}", flush=True)
-        res[f"{hours:+d}h"] = out
+            print(f"{hours:+d} h {label}: {out[label][:160]} | marks {mk[label]}", flush=True)
+        if hours:
+            res[f"{hours:+d}h"] = out
+        marks[f"{hours:+d}h" if hours else "unshifted"] = mk
     n_pass = sum(v == "PASSED" for o in res.values() for v in o.values())
-    print(f"{SYM}: shifted copies: {n_pass} of {sum(len(o) for o in res.values())} checks passed (0 expected)", flush=True)
+    n_mark = sum(v.startswith("pass") for k, o in marks.items() if k != "unshifted" for m in o.values() for v in m.values())
+    print(f"{SYM}: shifted copies: {n_pass} of {sum(len(o) for o in res.values())} checks passed (0 expected); single marks "
+          f"passed on the shifted copies: {n_mark}", flush=True)
+    print(f"{SYM}: the marks on the series itself: {marks['unshifted']}", flush=True)
     if out_json:
-        json.dump(res, open(out_json, "w"), indent=1)
+        json.dump(dict(checks=res, marks=marks), open(out_json, "w"), indent=1)
     return n_pass
 
 

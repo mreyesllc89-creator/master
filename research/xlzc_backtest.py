@@ -47,6 +47,12 @@ INSTRUMENTS = {
     "XAUUSD": dict(scale=1.0, spread_cap=60, spread_pts=None),
     # BTC M1 median range $41.0 vs gold $1.26 (Jan 2025-May 2026) -> 32.6; CFD spread assumed $20
     "BTCUSD": dict(scale=32.6, spread_cap=3000, spread_pts=2000),
+    # EURUSD and US500 (hump_wf protocol 2): median one-minute range of the Dukascopy mid bars over gold's (FTMO), both
+    # over the 180 days that end on 2025-12-31 (meta.json "space_k" of the hump_wf build): EURUSD 0.00011 / 1.15,
+    # US500 1.009 / 1.15. spread_pts: VT Markets RAW ECN spread in this module's points (0.01 of a price unit),
+    # 0.00003 and 0.5; no spread cap (hump_wf uses no spread filter for them).
+    "EURUSD": dict(scale=9.565e-05, spread_cap=1e9, spread_pts=0.003),
+    "US500": dict(scale=0.8774, spread_cap=1e9, spread_pts=50),
 }
 SYMBOL = os.environ.get("XLZC_SYMBOL", "XAUUSD")
 INST = dict(INSTRUMENTS[SYMBOL])
