@@ -1,0 +1,390 @@
+[
+ {
+  "symbol": "XAUUSD",
+  "tf": "M1",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 0
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M1",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 476,
+  "oos_pf": 1.0130449237588641,
+  "oos_stress_pf": 0.9180103409162328,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M1",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 3462,
+  "oos_pf": 0.9723982888275938,
+  "oos_stress_pf": 0.9123134159129446,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M1",
+  "rule": "top 10, base costs only",
+  "picked": 4,
+  "oos_n": 297,
+  "oos_pf": 0.8205841732074078,
+  "oos_stress_pf": 0.7598386696008561,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M1",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 390,
+  "oos_pf": 0.8851689119430375,
+  "oos_stress_pf": 0.7760122206824243,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 487,
+  "oos_pf": 0.6280345353115299,
+  "oos_stress_pf": 0.5907150544054072,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 487,
+  "oos_pf": 0.6280345353115299,
+  "oos_stress_pf": 0.5907150544054072,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 3513,
+  "oos_pf": 0.7309187066627494,
+  "oos_stress_pf": 0.6797857134595795,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 569,
+  "oos_pf": 0.6040566773224049,
+  "oos_stress_pf": 0.4252526063696447,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 642,
+  "oos_pf": 0.6204638470802496,
+  "oos_stress_pf": 0.3736292274949069,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 555,
+  "oos_pf": 0.8962131540303171,
+  "oos_stress_pf": 0.8138139900115436,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 555,
+  "oos_pf": 0.8962131540303171,
+  "oos_stress_pf": 0.8138139900115436,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 3004,
+  "oos_pf": 0.817288392023226,
+  "oos_stress_pf": 0.753652233067244,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 483,
+  "oos_pf": 0.8177580789499677,
+  "oos_stress_pf": 0.6808967244590068,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 454,
+  "oos_pf": 0.6664635441734661,
+  "oos_stress_pf": 0.5160763587190901,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M5",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 490,
+  "oos_pf": 0.9968081598549119,
+  "oos_stress_pf": 0.8082610931070339,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M5",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 490,
+  "oos_pf": 0.9968081598549119,
+  "oos_stress_pf": 0.8082610931070339,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M5",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 2462,
+  "oos_pf": 1.0465020637190263,
+  "oos_stress_pf": 0.9312951901124413,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M5",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 426,
+  "oos_pf": 1.06671099022713,
+  "oos_stress_pf": 0.8583143139484184,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M5",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 404,
+  "oos_pf": 1.007169939601928,
+  "oos_stress_pf": 0.8527388570102072,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M10",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 356,
+  "oos_pf": 0.8866294962852697,
+  "oos_stress_pf": 0.8973005654011046,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M10",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 356,
+  "oos_pf": 0.8866294962852697,
+  "oos_stress_pf": 0.8973005654011046,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M10",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 2093,
+  "oos_pf": 1.0010426350875847,
+  "oos_stress_pf": 0.9479978147186113,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M10",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 409,
+  "oos_pf": 1.122297080988122,
+  "oos_stress_pf": 1.0024830671586404,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M10",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 282,
+  "oos_pf": 0.9938631267859532,
+  "oos_stress_pf": 0.882532669183298,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M15",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 335,
+  "oos_pf": 0.9103136806472131,
+  "oos_stress_pf": 0.9574082844507776,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M15",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 335,
+  "oos_pf": 0.9103136806472131,
+  "oos_stress_pf": 0.9574082844507776,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M15",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 1876,
+  "oos_pf": 0.7591704473617887,
+  "oos_stress_pf": 0.7422082512371347,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M15",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 327,
+  "oos_pf": 0.8667216184654882,
+  "oos_stress_pf": 0.9108349438446506,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M15",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 257,
+  "oos_pf": 0.7640239585129429,
+  "oos_stress_pf": 0.7795117012464893,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M30",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 7,
+  "oos_n": 258,
+  "oos_pf": 0.8052141540330993,
+  "oos_stress_pf": 0.7829471957464552,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M30",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 331,
+  "oos_pf": 0.7915162105634538,
+  "oos_stress_pf": 0.7623070930749206,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M30",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 1878,
+  "oos_pf": 0.7898056080232141,
+  "oos_stress_pf": 0.7626428027593548,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M30",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 299,
+  "oos_pf": 0.7910048622787986,
+  "oos_stress_pf": 0.7462689567188127,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M30",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 183,
+  "oos_pf": 0.7131661338752031,
+  "oos_stress_pf": 0.6829297983325217,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "H1",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 0
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "H1",
+  "rule": "top 10 by score, no threshold",
+  "picked": 7,
+  "oos_n": 157,
+  "oos_pf": 1.1472199061466055,
+  "oos_stress_pf": 1.0713903046985487,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "H1",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 1591,
+  "oos_pf": 0.8572131447213985,
+  "oos_stress_pf": 0.8185358962652006,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "H1",
+  "rule": "top 10, base costs only",
+  "picked": 0
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "H1",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 175,
+  "oos_pf": 0.7890909188957134,
+  "oos_stress_pf": 0.8024704026804141,
+  "passes": false
+ }
+]

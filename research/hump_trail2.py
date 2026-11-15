@@ -8,7 +8,8 @@ New kinds (config key "trail_kind"):
   profitlock  once the profit reaches trail_start x risk, the stop locks trail_dist (0..1) of the best open profit
   timestop    the stop moves linearly from the initial stop to breakeven over trail_dist market minutes
   partial     half the position is closed at +trail_start x risk, the stop of the rest goes to breakeven and,
-              if trail_dist > 0, trails the best price at trail_dist x risk
+              if trail_dist > 0, trails the best price at trail_dist x risk (when the target is reached on the same
+              bar as the half-close level, half is booked at that level and half at the target)
   supertrend  level trailing at the SuperTrend line (trail_p: 0 = 10/3.0, 1 = 10/2.0, 2 = 7/1.5)
   keltner     level trailing at the Keltner band EMA(20) -/+ m x ATR(10) (trail_p: 0 = 1.0, 1 = 1.5, 2 = 2.0)
   bollinger   level trailing at the Bollinger band SMA(20) -/+ k x sd (trail_p: 0 = 1.0, 1 = 2.0)
@@ -116,7 +117,10 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                 if ah >= stop:
                     px = stop + slip; break
                 if al <= tp:
-                    px = min(tp, ao); break
+                    px = min(tp, ao)
+                    if trail_kind == 11 and (not part) and trail_start * risk <= entry - tp:
+                        part = True                        # the half-close level lies before the target: half is booked there
+                    break
                 fav = entry - al
                 if trail_kind >= 1 and trail_kind <= 4:
                     if trail_start > 0 and fav >= trail_start * unit:
@@ -225,7 +229,10 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                 if bl <= stop:
                     px = stop - slip; break
                 if bh >= tp:
-                    px = max(tp, bo); break
+                    px = max(tp, bo)
+                    if trail_kind == 11 and (not part) and trail_start * risk <= tp - entry:
+                        part = True
+                    break
                 fav = bh - entry
                 if trail_kind >= 1 and trail_kind <= 4:
                     if trail_start > 0 and fav >= trail_start * unit:
@@ -456,14 +463,14 @@ def _selftest():
     print("parity with hump_trail.simulate_x:", n_ok, "runs identical")
 
     # hand-made M1 path: one buy at bar 0, entry 100, stop 99 (risk 1), target 110; trigger bars = M1 bars
-    def path(lows, highs, closes, kind, ts, td, worst=0, lvl=None, aux=None, comm=0.0):
+    def path(lows, highs, closes, kind, ts, td, worst=0, lvl=None, aux=None, comm=0.0, rr=10.0):
         nb_ = len(lows); o = np.array([100.0] + list(closes[:-1])); h = np.array(highs, float); l = np.array(lows, float)
         cl = np.array(closes, float); hs = np.zeros(nb_); tod = np.arange(nb_) + 600
         sig = np.array([[0, 1, 99.0, 0.0, 0.0, 1.0]]); er = np.array([0]); wk = np.zeros(nb_, np.bool_)
         tbv = (np.arange(nb_) - 1).astype(np.int64)
         lv = np.full(nb_, np.nan) if lvl is None else np.array(lvl, float)
         ax = np.full(nb_, np.nan) if aux is None else np.array(aux, float)
-        tr = simulate_y(sig, er, o, h, l, cl, hs, tod, 0, 1440, 0.0, 0.0, 0.0, 1, 10.0, ts, td, 1e9, 0.0, 1e9, 0.0, comm, 0,
+        tr = simulate_y(sig, er, o, h, l, cl, hs, tod, 0, 1440, 0.0, 0.0, 0.0, 1, rr, ts, td, 1e9, 0.0, 1e9, 0.0, comm, 0,
                         worst, wk, 0, -1, ALLKIND[kind], tbv, lv, lv, ax)
         return round(float(tr[0, 3]), 6), int(tr[0, 1])
 
@@ -486,6 +493,10 @@ def _selftest():
     assert path([100, 99.5, 98.9], [100.5, 100.4, 99.6], [100.2, 99.6, 99.0], "partial", 1.0, 0.0) == (-1.0, 2)
     # commission is charged once on the whole size: 0.2 per unit -> 0.5*(1-0.2) + 0.5*(0-0.2) = 0.3R
     assert path([100, 100.6, 99.9], [100.5, 101.2, 100.8], [100.4, 100.9, 100.1], "partial", 1.0, 0.0, comm=0.2) == (0.3, 2)
+    # the half-close level (+1R) and the target (+2R) are reached on the same bar: half at +1R, half at +2R = 1.5R
+    assert path([100, 100.4, 101.5], [100.5, 102.5, 102.2], [100.4, 102.2, 101.9], "partial", 1.0, 0.0, rr=2.0) == (1.5, 1)
+    # a target that lies before the half-close level: the whole position goes out at the target
+    assert path([100, 100.4, 101.5], [100.5, 102.5, 102.2], [100.4, 102.2, 101.9], "partial", 3.0, 0.0, rr=2.0) == (2.0, 1)
     print("hand-made paths: ok")
 
     # level builders against straightforward references on real bars

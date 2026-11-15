@@ -18,7 +18,8 @@ trail_kind (config key "trail_kind"):
              negative hump low for buys), with the setup's own MACD
 For the four level-based kinds (candles, ema, psar, hump) the level comes from trigger bars that CLOSED at or
 before the open of each M1 bar (no look-ahead); the stop is level +/- the setup's SL buffer (+ spread for
-sells), only ever tightened, and it starts once the profit has reached trail_start x risk (0 = at once).
+sells), only ever tightened, and it starts once the profit has reached trail_start x risk (0 = from the
+one-minute bar after the entry bar).
 The first four kinds reproduce hump_engine.simulate exactly (see the self-test in __main__).
 """
 import os, sys

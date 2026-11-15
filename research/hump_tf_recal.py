@@ -7,7 +7,8 @@ calibration never saw?
 
 Protocol (fixed before any out-of-sample result was looked at):
   data     XAUUSD: FTMO M1 (Jan 2025 - May 15 2026) followed by Dukascopy M1 (May 18 - Nov 13 2026), FTMO hourly
-           spread table throughout. BTCUSD: Binance BTCUSDT M1 (Jan 2025 - Nov 13 2026), 10 USD spread.
+           spread table throughout. BTCUSD: Binance BTCUSDT M1 (Jan 2025 - Nov 13 2026) read from the raw UTC
+           files and converted to broker server time once, 10 USD spread. build() checks the clock of both.
   IS       in-sample: entries before 2026-05-16 03:00 server time, in three blocks
            (2025 H1, 2025 H2, 2026 Jan - May 15).
   OOS      out-of-sample: entries from 2026-05-16 03:00 server time to the end of the data.
@@ -20,7 +21,8 @@ Protocol (fixed before any out-of-sample result was looked at):
   pass     pooled OOS PF >= 1.3 on >= 100 trades.
 
 Usage:
-  python3 hump_tf_recal.py build  <work_dir> [dukascopy_dir]          # once per symbol: combined M1 series
+  python3 hump_tf_recal.py build  <work_dir> <source>                 # once per symbol: combined M1 series
+                                   (XAUUSD: Dukascopy bi5 directory; BTCUSD: Binance zip directories, comma-separated)
   python3 hump_tf_recal.py run    <work_dir> <TF> <N> [workers]       # candidates of one timeframe, base + stress
   python3 hump_tf_recal.py runx   <work_dir> <TF> <N> [workers]       # the same with every trailing family (hump_trail.py)
   python3 hump_tf_recal.py runy   <work_dir> <TF> <N> [workers]       # twelve more trailing systems (hump_trail2.py)
@@ -58,10 +60,60 @@ VT_SPREAD, VT_COMM = 0.15, 0.60
 
 
 # ----------------------------------------------------------------------------- data
-def build(work, duk_dir=None):
+def read_binance_zips(dirs):
+    """Binance spot kline zips (monthly or daily) -> M1 bars indexed by UTC. Timestamps are milliseconds
+    until 2024 and microseconds from 2025."""
+    import glob, io, zipfile
+    parts = []
+    for d in dirs:
+        for z in sorted(glob.glob(os.path.join(d, "BTCUSDT-1m-*.zip"))):
+            with zipfile.ZipFile(z) as f:
+                raw = pd.read_csv(io.BytesIO(f.read(f.namelist()[0])), header=None)
+            t = raw[0].astype("int64")
+            parts.append(pd.DataFrame(dict(open=raw[1].values, high=raw[2].values, low=raw[3].values, close=raw[4].values),
+                                      index=pd.to_datetime(t.values, unit="us" if t.iloc[0] > 1e14 else "ms")))
+    m = pd.concat(parts)
+    return m[~m.index.duplicated()].sort_index().astype(float)
+
+
+def utc_to_server(index):
+    """Broker server time = New York time + 7 hours (GMT+2 in the US winter, GMT+3 in the US summer)."""
+    return index.tz_localize("UTC").tz_convert("America/New_York").tz_localize(None) + pd.Timedelta(hours=7)
+
+
+def clock_check(m1, label):
+    """The US stock open (09:30 New York = 16:30 server time) is the busiest half hour of the day on gold and on
+    BTC. Stop when it is anywhere else in any quarter: the series is then not in server time (a BTC file that was
+    already in server time was once converted a second time, which put the calibration 2-3 hours off)."""
+    rng = (m1["high"] - m1["low"])
+    slot = m1.index.hour * 60 + (m1.index.minute // 30) * 30
+    q = m1.index.to_period("Q")
+    wd = m1.index.dayofweek < 5
+    bad = []
+    for quarter in sorted(set(q)):
+        mask = (q == quarter) & wd
+        if mask.sum() < 20000:
+            continue
+        top = rng[mask].groupby(slot[mask]).median().idxmax()        # median: a few news days must not decide
+        if top != 16 * 60 + 30:
+            bad.append((str(quarter), f"{top // 60:02d}:{top % 60:02d}"))
+    if bad:
+        raise SystemExit(f"{label}: the busiest half hour is not 16:30 server time in {bad}: wrong clock")
+    print(f"{label}: clock check passed (US open at 16:30 server time in every quarter)")
+
+
+def build(work, src=None):
+    """XAUUSD: src = Dukascopy bi5 directory for the months after the FTMO data.
+    BTCUSD: src = comma-separated directories of raw Binance kline zips (UTC), converted to server time once."""
     os.makedirs(work, exist_ok=True)
+    duk_dir = src
     if SYM == "BTCUSD":
-        m1, hs = H.load_btc()
+        raw = read_binance_zips(src.split(","))
+        m1 = raw.copy(); m1.index = utc_to_server(raw.index)
+        m1 = m1[~m1.index.duplicated()].sort_index()
+        gaps = pd.Series(m1.index).diff().dt.total_seconds().div(60)
+        print(f"Binance UTC {raw.index[0]} .. {raw.index[-1]}; largest gap {gaps.max():.0f} min; gaps over 10 min: {int((gaps > 10).sum())}")
+        hs = np.full(len(m1), H.BTC_SPREAD / 2.0)
         hs_real = hs
     else:
         import duk_to_m1 as D
@@ -76,6 +128,7 @@ def build(work, duk_dir=None):
         hs_real = np.r_[hourly[B.server_to_utc_hour(f.index)] / 2.0, dh]  # Dukascopy's own spread after the seam
         print(f"FTMO to {cut}, Dukascopy {d.index[0]} .. {d.index[-1]} ({len(d)} bars)")
     m1 = m1[["open", "high", "low", "close"]].astype(float)
+    clock_check(m1, SYM)
     m1.to_pickle(os.path.join(work, "m1.pkl"))
     np.save(os.path.join(work, "hs.npy"), np.asarray(hs, float)); np.save(os.path.join(work, "hs_real.npy"), np.asarray(hs_real, float))
     print(SYM, m1.index[0], m1.index[-1], len(m1), "bars; IS bars", int((m1.index.values < IS_END).sum()),
@@ -249,6 +302,26 @@ def run_y(work, tf, n, workers=3):
     with open(os.path.join(work, f"candy_{tf}.pkl"), "wb") as f:
         pickle.dump(dict(tf=tf, params=cand, base=[r[0] for r in res], stress=[r[1] for r in res]), f, protocol=4)
     print(f"{SYM} {tf}: {n} setups x 2 (twelve more trailing systems) in {time.time() - t0:.0f}s", flush=True)
+
+
+def rerun_kind(work, prefix, kind, workers=3):
+    """Recompute the stored trades of one trailing kind in <prefix>_<TF>.pkl (after a fix to that kind)."""
+    for tf in TFS:
+        fn = os.path.join(work, f"{prefix}_{tf}.pkl")
+        if not os.path.exists(fn):
+            continue
+        d = pickle.load(open(fn, "rb"))
+        idx = [i for i, p in enumerate(d["params"]) if p.get("trail_kind") == kind]
+        with Pool(workers, initializer=_init, initargs=(work,)) as pool:
+            res = pool.map(_one_y, [d["params"][i] for i in idx], chunksize=16)
+        changed = 0
+        for i, r in zip(idx, res):
+            if len(r[0][1]) != len(d["base"][i][1]) or not np.allclose(r[0][1], d["base"][i][1]):
+                changed += 1
+            d["base"][i], d["stress"][i] = r
+        with open(fn, "wb") as f:
+            pickle.dump(d, f, protocol=4)
+        print(f"{SYM} {tf}: {len(idx)} '{kind}' setups recomputed, {changed} changed", flush=True)
 
 
 def run_x(work, tf, n, workers=3):
@@ -546,6 +619,8 @@ if __name__ == "__main__":
         select(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "cand")
     elif cmd == "sens":
         sensitivity(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "cand")
+    elif cmd == "rerun":
+        rerun_kind(sys.argv[2], sys.argv[3], sys.argv[4])
     elif cmd == "runy":
         run_y(sys.argv[2], sys.argv[3], int(sys.argv[4]), int(sys.argv[5]) if len(sys.argv) > 5 else 3)
     elif cmd == "kinds":

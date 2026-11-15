@@ -45,7 +45,10 @@ BTC_SPREAD = float(os.environ.get("HUMP_BTC_SPREAD", "10"))       # assumed CFD 
 
 
 def load_btc():
-    """Binance BTCUSDT M1 (UTC) re-indexed to broker server time (New York + 7h), constant spread."""
+    """Binance BTCUSDT M1 re-indexed to broker server time (New York + 7h), constant spread.
+    The file MUST carry UTC times. A file that is already in server time (such as the one prepared for the XLZC
+    calibration) gets converted a second time here and ends up 2-3 hours ahead: that happened to the first Loma
+    BTC calibration (presets BTC01-04). hump_tf_recal.clock_check() detects it."""
     m1 = pd.read_csv(os.path.join(BTC_DATA, "BTCUSD_m1.csv"), parse_dates=["datetime"])
     utc = pd.DatetimeIndex(m1["datetime"]).tz_localize("UTC")
     server = (utc.tz_convert("America/New_York").tz_localize(None) + pd.Timedelta(hours=7))
