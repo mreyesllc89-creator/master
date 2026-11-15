@@ -63,7 +63,7 @@ compile-readiness review).
 - `BuildTradePlan`: SL buffer, minimum and maximum stop multiplied by `PriceScale(bid)`.
 - `ManageOpenPositions`: for `TrailMode` other than RISK, calls `TrailPosition` (STEP on every tick, the others on the first tick of each M1 bar; a failed request or unready data is repeated on the next tick after the `TrailFailed` throttle). The 1R fallback to the current SL (no `R` terminal variable and the opening deal not found) is used by these systems only while that SL is still on the loss side of the open price; otherwise the opening deal is looked up again on the next tick, and while 1R is not known the M1 bar is not marked as evaluated, so the once-a-minute systems evaluate it on the first tick on which the deal is found (fix 9). TRAIL_RISK code unchanged.
 - `SpreadOK` (v1.34 function): the spread is counted in whole points, `MathRound((ask - bid) / point) / scale`, so that a spread equal to `MaxSpread_Points` passes every time, as in the backtest (`2 x hs > max_spread` refuses only a wider one). v1.34 compared `(ask - bid) / point`, which is a hair above or below the whole number depending on the price, and refused such a spread in about half the cases.
-- `InitialRiskFromHistory` (v1.34 function): the position id is passed to `HistorySelectByPosition` as `(ulong)positionId`, the parameter type MetaEditor declares (fix 11); the same value, no change in behaviour.
+- `InitialRiskFromHistory` (v1.34 function): the position id is passed to `HistorySelectByPosition` as `(ulong)positionId`, the ulong parameter type reported by the compile-readiness review (fix 11; the MQL5 Reference may list long: the value is the same under either declaration); the same value, no change in behaviour.
 - `UpdatePanel`: "v1.35" and the trailing system when it is not RISK.
 - Also: `#property version "1.35"`, header comment (R5b, R7b, R8b, the NOTES paragraphs on the trailing systems, on the terminal variables and on charts that share a magic number, and the restart sentence of the entry-parity note), `ENUM_LOMA_TRAIL_MODE`, globals `g_hStochTurn`, `g_trail*`, `g_step*`, defines `TRAIL_ATR_PERIOD` (14), `TRAIL_ATR_BARS` (300), `TRAIL_EMA_BARS` (500), `TRAIL_PSAR_BARS` (1000), `TRAIL_PIVOT_BARS` (1000).
 
@@ -220,7 +220,7 @@ fix 10 as finally made (the deletion of item 15 saved to disk at once, the trigg
 header note on charts that share a magic number) and fix 11 (the explicit cast); outputs in `last/patcher/`, the
 comparison listings in `last/patcher/checks/`, every figure in `FIXES.md`, "Checks run on the last file"):
 - C++ shim compile (clang++ and g++, the flags of the v1.34 final check), the extended shim declaring
-  `HistorySelectByPosition(ulong)` as MetaEditor does: 0 errors and the 2 pre-existing warnings, diagnostics identical to
+  `HistorySelectByPosition(ulong)` as the compile-readiness review reported for MetaEditor (unconfirmed here: mql5.com was not reachable): 0 errors and the 2 pre-existing warnings, diagnostics identical to
   v1.34's; an error injected into each of the 28 code lines that differ from bd96c372 (7 of them changed since 156f018a)
   is caught by both compilers at that line (`last/patcher/cc/run_cc_out.txt`).
 - Plain runs of the 71 shipped setups: trade files and journals byte-identical to 156f018a (and so to bd96c372); EA

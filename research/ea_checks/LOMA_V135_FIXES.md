@@ -47,7 +47,7 @@ delivery.
 | 8 | `StochTurnBars` has no upper limit | real (code reading) | fixed: OnInit accepts 1 .. 1000 |
 | 9 | Fix 7 side effect (re-check): without 1R the M1 bar is marked done, a stop move after a restart waits a minute | real, reproduced | fixed: the bar stays open while 1R is not known |
 | 10 | After a restart inside a trigger bar its signal is decided again; without the deal history a traded signal is entered twice (CHANGES item 15, v1.34 code) | real, reproduced | fixed: the decided bar is kept in a terminal variable per magic number, symbol and trigger timeframe (not while the signal waits for algo trading, and that deletion is saved to disk at once; deleted when a Strategy Tester pass starts) |
-| 11 | `InitialRiskFromHistory` passes its `long` position id to `HistorySelectByPosition`, whose parameter MetaEditor declares `ulong` (compile-readiness review of the final file) | real (implicit sign conversion; no behaviour change) | fixed: explicit `(ulong)` cast; the C++ stand-in shims declare the parameter `ulong` |
+| 11 | `InitialRiskFromHistory` passes its `long` position id to `HistorySelectByPosition`, whose parameter the compile-readiness review reported as `ulong` in MetaEditor (unconfirmed here; the MQL5 Reference may list `long`) | real (implicit sign conversion; no behaviour change) | fixed: explicit `(ulong)` cast; the C++ stand-in shims declare the parameter `ulong` |
 
 Compile check (`fix/cc/run_cc.sh`, output `fix/cc/run_cc_out.txt`): clang++ and g++ with the flags of the v1.34 final
 check give exactly the diagnostics of v1.34 (0 errors, the same 2 warnings: EVK.mqh switch-enum, unused `reason` in
@@ -56,8 +56,8 @@ finisher and the reviewer used compares with `/workspace/master/XAUUSD_Loma_Tren
 pre-fix v1.35, so it was changed to take v1.34 from git. An injected error in the changed lines is caught (`fix/cc/neg`).
 Fixes 9 and 10 in their first form: `restart/patcher/cc/run_cc.sh`, same result. The final file:
 `final/finisher/cc/run_cc.sh`, same result, and an error injected into each of its 24 changed code lines is caught. The
-last file: `last/patcher/cc/run_cc.sh`, with the extended shim declaring `HistorySelectByPosition(ulong)` as MetaEditor
-does (fix 11): the diagnostics of v1.34, 0 errors and the same 2 warnings, and an error injected into each of its 28 code
+last file: `last/patcher/cc/run_cc.sh`, with the extended shim declaring `HistorySelectByPosition(ulong)` as the compile-readiness review reported for MetaEditor
+(unconfirmed here) (fix 11): the diagnostics of v1.34, 0 errors and the same 2 warnings, and an error injected into each of its 28 code
 lines that differ from bd96c372 (7 of them changed since 156f018a) is caught by both compilers at that line (last
 section).
 
@@ -466,12 +466,12 @@ reviewer's crash driver, `two` = two EA instances in one simulated terminal; the
 ## 11. HistorySelectByPosition is given a long position id (compile-readiness review)
 
 **Verdict: real** (compile readiness; no change in behaviour). `InitialRiskFromHistory(const long positionId)` (v1.34
-code) passed its `long` id to `HistorySelectByPosition`, whose parameter MetaEditor declares `ulong` (finding of a
+code) passed its `long` id to `HistorySelectByPosition`, whose parameter the compile-readiness review reported as `ulong` in MetaEditor (unconfirmed here; finding of a
 compile-readiness review of the final file): an implicit signed-to-unsigned conversion, which a compiler may report.
 The id is a position identifier (a positive number), so the value passed is the same either way.
 
 **Change** (line 1787): `if(!HistorySelectByPosition((ulong)positionId))`. The C++ stand-in shims declared the parameter
-`long`, so their compile check could not see the conversion; they now declare it `ulong` as MetaEditor does: the
+`long`, so their compile check could not see the conversion; they now declare it `ulong` as the compile-readiness review reported for MetaEditor (unconfirmed here: mql5.com was not reachable): the
 compile shim `last/patcher/cc/mql5_shim_ext.h` and the runtime shims of `last/patcher/{rt,rt_hooks,fr,parity/ea,two}`
 (`HistorySelectByPosition(ulong id)`, same behaviour). v1.34's own shim (`mql5_shim_v134.h`) is left as it was.
 
@@ -568,7 +568,7 @@ made (the flush after the deletion while a signal waits for algo trading; the tr
 `chain3.sh` ran everything; `checks/` holds the comparison listings; the large output files that are byte-identical to
 the final file's were deleted afterwards, their md5 are in `last/patcher/md5/`).
 - (a) Compile (`cc/run_cc.sh`, output `cc/run_cc_out.txt`; clang++ and g++ with the flags of the v1.34 final check; the
-  extended shim declares `HistorySelectByPosition(ulong)` as MetaEditor does): 0 errors and the 2 warnings of v1.34
+  extended shim declares `HistorySelectByPosition(ulong)` as the compile-readiness review reported for MetaEditor (unconfirmed here: mql5.com was not reachable)): 0 errors and the 2 warnings of v1.34
   (EVK.mqh switch-enum, unused `reason` in OnDeinit), diagnostics identical to v1.34 with its own shim and with the
   earlier extended shim, and to 156f018a with the earlier shim. With the `ulong` declaration v1.34, bd96c372 and
   156f018a get one more warning each (the conversion of fix 11); with the earlier `long` declaration the last file
