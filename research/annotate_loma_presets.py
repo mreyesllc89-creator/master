@@ -68,6 +68,8 @@ for k, g in gold.items():
     m = s["rank"] == int(k[3:])
     s.loc[m, OOS_COLS] = [g["oos_vt_n"], round(g["oos_vt_gross_pf"], 2), round(g["oos_vt_pf_real_comm"], 2),
                           round(g["oos_vt_net_pf"], 2), g["oos_duk_n"], round(g["oos_duk_pf"], 2)]
+for c in ("oos_vt_trades", "oos_dukascopy_trades"):
+    s[c] = pd.to_numeric(s[c]).astype("Int64")                      # whole numbers, blank where not tested
 s.to_csv("presets/top10/TOP10_SUMMARY.csv", index=False)
 s = pd.read_csv("presets/btc/BTC_PRESETS_SUMMARY.csv")
 s = s[[c for c in s.columns if not c.startswith("oos_")]]
@@ -77,5 +79,6 @@ for i, r in s.iterrows():
     key = f"BTC{int(r['rank']):02d}"; a, st, t = btc(b10, key, "base"), btc(b10, key, "stress"), btc(b20, key, "base")
     s.loc[i, ["oos_trades", "oos_pf", "oos_net_r", "oos_stress_pf", "oos_pf_spread20"]] = \
         [a["oos_n"], round(a["oos_pf"], 2), round(a["oos_netR"], 1), round(st["oos_pf"], 2), round(t["oos_pf"], 2)]
+s["oos_trades"] = pd.to_numeric(s["oos_trades"]).astype("Int64")
 s.to_csv("presets/btc/BTC_PRESETS_SUMMARY.csv", index=False)
 print("done")
