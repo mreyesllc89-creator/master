@@ -1,6 +1,6 @@
 #property strict
 #property version "7.32"
-#property description "7.32 r6 USD - COPIA DE LABORATORIO: lote y distancias por volatilidad. SOLO Probador de estrategias."
+#property description "7.32 r6 USD - COPIA DE LABORATORIO: lote y distancias por volatilidad. XAUUSD o BTCUSD. SOLO Probador de estrategias."
 #include <Trade/Trade.mqh>
 enum TREND_SOURCE { TENDENCIA_PRINCIPAL=0,MICROTENDENCIA=1,AMBAS_DEBEN_COINCIDIR=2,PRINCIPAL_CON_RESPALDO_MICRO=3 };
 input group "01 - Tendencia y microtendencia (barras cerradas)"
@@ -19,7 +19,7 @@ input double PairedSeedLots=0.0;
 input double LotMultiplier=1.0;
 input bool ScaleLotsWithBalance=true;
 input double ReferenceBalanceUSD=1000;
-input group "03 - Separaciones en USD de PRECIO del oro"
+input group "03 - Separaciones en USD de PRECIO del simbolo (oro o bitcoin)"
 input double CrossAboveCenter=220.0;
 input double CrossBelowCenter=110.0;
 input double MinMoveBetweenOrders=0.5;
@@ -69,7 +69,7 @@ input group "40 - LAB volatilidad: lote y distancias segun ATR"
 input bool VolLotEnabled=true;              // lote = lote normal / (ATR/ref)^gamma
 input double VolLotGamma=1.0;
 input bool VolDistEnabled=true;             // cruces, movimiento minimo, zona y trailing x (ATR/ref)
-input double VolATRRef=4.74;                 // ATR14 H1 del oro para el que se diseno el SET
+input double VolATRRef=4.74;                 // ATR14 H1 del simbolo para el que se diseno el SET (oro 4.74; bitcoin ver SET)
 input int VolATRPeriod=14;
 input ENUM_TIMEFRAMES VolATRTimeframe=PERIOD_H1;
 input double VolFactorMin=0.25;
@@ -984,7 +984,7 @@ bool CheckAccount732(){
  string c=AccountInfoString(ACCOUNT_CURRENCY);
  if(c=="")return WaitBootstrap732("ESPERA_CUENTA","La moneda de cuenta aun no esta disponible");
  if(c!=RELEASE_CURRENCY){Print("732: esta edicion requiere moneda ",RELEASE_CURRENCY,"; cuenta actual ",c);return BlockDiag732("ERROR_MONEDA","Edicion "+RELEASE_MODE+" requiere "+RELEASE_CURRENCY+"; cuenta="+c);}
- if(StringFind(_Symbol,"XAUUSD")!=0){Print("732: requiere XAUUSD del broker, incluido su sufijo.");return BlockDiag732("ERROR_SIMBOLO","Este experto requiere XAUUSD y el sufijo correcto del broker");}
+ if(StringFind(_Symbol,"XAUUSD")!=0 && StringFind(_Symbol,"BTCUSD")!=0){Print("732: requiere XAUUSD o BTCUSD del broker, incluido su sufijo.");return BlockDiag732("ERROR_SIMBOLO","Este experto requiere XAUUSD o BTCUSD y el sufijo correcto del broker");}
  if(!MQLInfoInteger(MQL_TESTER)){
   string company=AccountInfoString(ACCOUNT_COMPANY);StringToLower(company);
   string server=AccountInfoString(ACCOUNT_SERVER);StringToLower(server);
