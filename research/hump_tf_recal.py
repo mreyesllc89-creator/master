@@ -87,7 +87,7 @@ def utc_to_server(index):
     return index.tz_localize("UTC").tz_convert("America/New_York").tz_localize(None) + pd.Timedelta(hours=7)
 
 
-def clock_check(m1, label):
+def clock_check(m1, label, min_reopen=0.9, jump_fatal=True):
     """Stops when a price series is not on broker server time (New York + 7 h). Two physical marks are used.
 
     1. The US stock open (09:30 New York = 16:30 server time) lifts activity on gold and on BTC every weekday, at
@@ -111,7 +111,7 @@ def clock_check(m1, label):
     note = ""
     if daily_break:
         share = float(((reopen >= 60) & (reopen <= 75)).mean())
-        if share < 0.9:
+        if share < min_reopen:
             raise SystemExit(f"{label}: the market reopens between 01:00 and 01:15 server time on only {share:.0%} of {len(reopen)} days: wrong clock")
         note = f"daily reopen at 01:00-01:15 server time on {share:.0%} of {len(reopen)} days; "
     top = 2 if daily_break else 1
@@ -132,7 +132,13 @@ def clock_check(m1, label):
         if 16 * 60 + 30 not in [m for _, m in jumps[:top]]:
             bad.append((str(quarter), f"{jumps[0][1] // 60:02d}:{jumps[0][1] % 60:02d}" if jumps else "none"))
     if tested == 0 or len(bad) > 0.34 * tested:
-        raise SystemExit(f"{label}: the US-open jump is not at 16:30 server time in {bad} ({len(bad)} of {tested} quarters): wrong clock")
+        msg = f"{label}: the US-open jump is not at 16:30 server time in {bad} ({len(bad)} of {tested} quarters)"
+        if jump_fatal or not daily_break:
+            raise SystemExit(msg + ": wrong clock")
+        # a market with a daily break whose reopen is already at 01:00 server time: the reopen decides the clock
+        # (a series one hour off has 0-1% of its reopens there); the weaker activity mark is only recorded
+        print(f"{label}: clock check passed on the daily reopen ({note.strip('; ')}); NOTE {msg}", flush=True)
+        return
     print(f"{label}: clock check passed ({note}US-open jump at 16:30 server time "
           + ("among the two largest " if daily_break else "") + f"in {tested - len(bad)} of {tested} quarters"
           + (f"; elsewhere in {bad}" if bad else "") + ")", flush=True)

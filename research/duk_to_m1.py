@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Convert Dukascopy XAUUSD bi5 one-minute candles (BID and ASK, UTC) into the hump engine's input:
-mid-price M1 bars indexed by broker server time (New York + 7h) and a per-bar half spread."""
+mid-price M1 bars (with a tick-volume column) indexed by broker server time (New York + 7h) and a per-bar half spread."""
 import datetime as dt, glob, lzma, os, struct
 import numpy as np, pandas as pd
 
@@ -34,6 +34,7 @@ def load(folder):
     m = pd.DataFrame({k: (j[f"{k}_b"] + j[f"{k}_a"]) / 2 for k in ("open", "high", "low", "close")})
     m["high"] = np.maximum(m["high"], m[["open", "close"]].max(axis=1))
     m["low"] = np.minimum(m["low"], m[["open", "close"]].min(axis=1))
+    m["vol"] = (j["vol_b"] + j["vol_a"]).values                    # tick volume of the two sides (relative use only)
     half = ((j["close_a"] - j["close_b"]).clip(lower=0) / 2).values
     utc = m.index.tz_localize("UTC")
     m.index = utc.tz_convert("America/New_York").tz_localize(None) + pd.Timedelta(hours=7)
