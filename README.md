@@ -22,6 +22,8 @@ Download a zip, unpack it and read its `START_HERE.md`:
 | `packages/loma_xauusd/`, `packages/loma_btcusd/` | The guides that go into the zips. |
 | `LOMA_START_HERE.md` | Full guide: rules, every preset set, calibration and stress history. |
 | `research/reports/loma_oos_review.html` | Out-of-sample review: VT Markets MT5 run, Dukascopy cross-check, walk-forward test. |
+| `research/results/recal/*_successful_trailing.json` | Every trailing result that reached PF 1.3 on the unseen months, with the settings of each setup and its result on earlier data (`research/successful_trailing.py`). |
+| `LOMA_NEXT_PROMPT.md` | A ready prompt for the next round of research: more history, new entry conditions, the same honest test. |
 | `research/` | Python backtest engine (`hump_engine.py`), calibration, walk-forward and out-of-sample scripts and results. `hump_tf_recal.py` and `hump_trail.py` are the per-timeframe re-calibration with every trailing family (`results/recal/`). `package_loma.py` builds the zips. |
 
 ## XLZC Bearish EA (v1.21): XAUUSD
