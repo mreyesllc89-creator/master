@@ -1,8 +1,10 @@
 #property strict
 #property version "7.32"
-#property description "7.32 r6 USD - COPIA DE LABORATORIO: lote y distancias por volatilidad. XAUUSD o BTCUSD. SOLO Probador de estrategias."
+#property description "7.32 r6 USD - lote y distancias por volatilidad. XAUUSD o BTCUSD. En vivo solo con LiveTradingEnabled=true."
 #include <Trade/Trade.mqh>
 enum TREND_SOURCE { TENDENCIA_PRINCIPAL=0,MICROTENDENCIA=1,AMBAS_DEBEN_COINCIDIR=2,PRINCIPAL_CON_RESPALDO_MICRO=3 };
+input group "00 - Operativa real"
+input bool LiveTradingEnabled=false;         // false = solo Probador; true = envia ordenes reales en el grafico
 input group "01 - Tendencia y microtendencia (barras cerradas)"
 input TREND_SOURCE TrendSource=PRINCIPAL_CON_RESPALDO_MICRO;
 input ENUM_TIMEFRAMES MainTimeframe=PERIOD_M6;
@@ -75,22 +77,23 @@ input ENUM_TIMEFRAMES VolATRTimeframe=PERIOD_H1;
 input double VolFactorMin=0.25;
 input double VolFactorMax=8.0;
 double volFactorNow=1,volDist=1,volSum=0,volLo=0,volHi=0;
+bool volReady=false;
 datetime volBar=0;
 int volBaskets=0;
 double VolFactor732(){
  // ATR de Wilder sobre barras CERRADAS (sin mirar la barra en curso).
- if(!VolLotEnabled && !VolDistEnabled)return 1;
+ if(!VolLotEnabled && !VolDistEnabled){volReady=true;return 1;}
  datetime b=iTime(_Symbol,VolATRTimeframe,0);
  if(b==volBar && volBar>0)return volFactorNow;
  MqlRates r[];int n=CopyRates(_Symbol,VolATRTimeframe,1,VolATRPeriod*20+2,r);
- if(n<VolATRPeriod+2)return 1;
+ if(n<VolATRPeriod+2){volReady=false;return 1;}   // historial insuficiente: EntryWindow732 no abre cestas (antes usaba factor 1)
  double a=0;int k=0;
  for(int i=1;i<n;i++){
   double trv=MathMax(r[i].high-r[i].low,MathMax(MathAbs(r[i].high-r[i-1].close),MathAbs(r[i].low-r[i-1].close)));
   if(k<VolATRPeriod){a+=trv;k++;if(k==VolATRPeriod)a/=VolATRPeriod;}else a=(a*(VolATRPeriod-1)+trv)/VolATRPeriod;
  }
- if(a<=0 || VolATRRef<=0)return 1;
- volBar=b;volFactorNow=MathMin(VolFactorMax,MathMax(VolFactorMin,a/VolATRRef));return volFactorNow;
+ if(a<=0 || VolATRRef<=0){volReady=false;return 1;}
+ volBar=b;volReady=true;volFactorNow=MathMin(VolFactorMax,MathMax(VolFactorMin,a/VolATRRef));return volFactorNow;
 }
 input group "41 - LAB colchon, trailing por lote, pausa y horario"
 input bool CushionEnabled=true;             // lote fijo hasta Activate; por encima arriesga lo ganado sobre Base
@@ -123,7 +126,9 @@ double BaseScale732(){
 }
 bool EntryWindow732(){
  if(TimeCurrent()<cooldownUntil)return false;
- if(MinVolFactor>0 && VolFactor732()<MinVolFactor)return false;
+ double vfNow=VolFactor732();
+ if(!volReady)return BlockDiag732("ESPERA_HISTORIAL_ATR","Historial insuficiente para el factor de volatilidad; no abre cestas");
+ if(MinVolFactor>0 && vfNow<MinVolFactor)return false;
  if(MaxEntrySpreadPrice>0){MqlTick sq;if(SymbolInfoTick(_Symbol,sq) && sq.ask-sq.bid>MaxEntrySpreadPrice)return false;}
  if(EntryHourTo-EntryHourFrom>=24)return true;
  MqlDateTime d;TimeToStruct(TimeCurrent(),d);double hr=d.hour+d.min/60.0+d.sec/3600.0;
@@ -268,7 +273,7 @@ bool CanRequest(){MqlTick t;return SymbolInfoTick(_Symbol,t) && t.time_msc>=retr
 void Rejected(){diagRetcode=tr.ResultRetcode();SetDiag732("RECHAZO_BROKER",tr.ResultRetcodeDescription());Print("732 rechazo: ",diagRetcode," ",diagDetail);failedRequests++;MqlTick t;SymbolInfoTick(_Symbol,t);retryAfter=t.time_msc+1000*(long)MathMax(1,RetrySecondsAfterRejection);Log("RECHAZO",tr.ResultRetcode());}
 double Quantize(double v){double step=SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_STEP);return NormalizeDouble(MathFloor((v+1e-9)/step)*step,8);}
 bool Send(int side,double volume,string why){
- if(!MQLInfoInteger(MQL_TESTER))return false;
+ if(!MQLInfoInteger(MQL_TESTER) && !LiveTradingEnabled)return false;
  if(!CanRequest())return false;Book();double v=Quantize(volume);
  if(StringFind(why,"SEMILLA_")!=0 && RecycleNetEnabled && TryRecycle732(side,v))return true;
  if(StringFind(why,"SEMILLA_")!=0)v=BudgetLotCap(v);
@@ -977,6 +982,11 @@ bool hazardLatched;
 ulong cycleBoundary;
 ulong lastInventoryEntryID;
 long retryAfter;
+ double volDist;
+ double trailMult;
+ datetime cooldownUntil;
+ datetime flatSince;
+ bool cushionActive;
 };
 uint Hash732(string s){uint h=2166136261;for(int i=0;i<StringLen(s);i++){h^=(uint)StringGetCharacter(s,i);h*=16777619;}return h;}
 bool CheckAccount732(){
@@ -1020,7 +1030,7 @@ double CycleRealizedNative732(){
 bool SaveLive732(bool force=false){
  if(!liveReady)return false;
  if(!force && !liveStateDirty && GetTickCount64()-lastStateSave<1000)return true;
- LiveState732 s;ZeroMemory(s);s.signature=7321201;s.login=AccountInfoInteger(ACCOUNT_LOGIN);s.magic=MagicNumber;
+ LiveState732 s;ZeroMemory(s);s.signature=7321202;s.login=AccountInfoInteger(ACCOUNT_LOGIN);s.magic=MagicNumber;
  s.started=started;
 s.lastOrder=lastOrder;
 s.resStart=resStart;
@@ -1076,6 +1086,11 @@ s.hazardLatched=hazardLatched;
 s.cycleBoundary=cycleBoundary;
 s.lastInventoryEntryID=lastInventoryEntryID;
 s.retryAfter=retryAfter;
+s.volDist=volDist;
+s.trailMult=trailMult;
+s.cooldownUntil=cooldownUntil;
+s.flatSince=flatSince;
+s.cushionActive=cushionActive;
  string p=liveBase+".state.tmp";
  ResetLastError();int f=FileOpen(p,FILE_WRITE|FILE_BIN|FILE_COMMON);if(f==INVALID_HANDLE){Print("732 estado: FileOpen error=",GetLastError()," ruta=",TerminalInfoString(TERMINAL_COMMONDATA_PATH),"\\Files\\",p);return false;}
  uint bytes=FileWriteStruct(f,s);FileFlush(f);FileClose(f);
@@ -1086,7 +1101,7 @@ s.retryAfter=retryAfter;
 bool LoadLive732(){
  int f=FileOpen(liveBase+".state",FILE_READ|FILE_BIN|FILE_COMMON);if(f==INVALID_HANDLE)return false;
  LiveState732 s;uint bytes=FileReadStruct(f,s);FileClose(f);
- if(bytes!=sizeof(s) || s.signature!=7321201 || s.login!=AccountInfoInteger(ACCOUNT_LOGIN) || s.magic!=MagicNumber)return false;
+ if(bytes!=sizeof(s) || s.signature!=7321202 || s.login!=AccountInfoInteger(ACCOUNT_LOGIN) || s.magic!=MagicNumber)return false;
  started=s.started;
 lastOrder=s.lastOrder;
 resStart=s.resStart;
@@ -1142,6 +1157,11 @@ hazardLatched=s.hazardLatched;
 cycleBoundary=s.cycleBoundary;
 lastInventoryEntryID=s.lastInventoryEntryID;
 retryAfter=s.retryAfter;
+volDist=s.volDist>0?s.volDist:1;
+trailMult=s.trailMult>0?s.trailMult:1;
+cooldownUntil=s.cooldownUntil;
+flatSince=s.flatSince;
+cushionActive=s.cushionActive;
  if(pendingExit)exitReason="SALIDA_REANUDADA";
  trimCause="RECORTE_REANUDADO";liveLedgerDirty=true;
  return true;
@@ -1277,7 +1297,7 @@ void Dashboard732(){
  bool waiting=StringFind(diagState,"ESPERA")>=0 || StringFind(diagState,"ZONA")>=0 || StringFind(diagState,"CALENDARIO")>=0 || StringFind(diagState,"OTRA_CESTA")>=0;
  color status=StringFind(diagState,"RECHAZO")>=0 || StringFind(diagState,"ERROR")>=0 || StringFind(diagState,"DESACTIVADO")>=0?clrTomato:waiting?clrGold:positions>0?clrLimeGreen:clrGold;
  MqlTick q;SymbolInfoTick(_Symbol,q);Book();
- DashboardRow732(0,"TOKIO 7.32 - EXNESS "+RELEASE_MODE+" | r6 "+DisplayCurrency732()+" NATIVO",clrDeepSkyBlue);
+ DashboardRow732(0,"TOKIO 7.32 VolLab - EXNESS "+RELEASE_MODE+" | "+_Symbol+" | factor vol "+DoubleToString(active?volDist:VolFactor732(),2)+(volReady?"":" (sin historial)"),clrDeepSkyBlue);
  DashboardRow732(1,"ESTADO: "+diagState,status);
  DashboardRow732(2,StringSubstr(diagDetail,0,85),status);
  DashboardRow732(3,"Ticks: "+(string)tickCount+" | Senal: "+Dir732(cachedTrend)+" | Ciclo: "+(string)cycle);
@@ -1300,7 +1320,7 @@ void Dashboard732(){
  ChartRedraw();
 }
 int OnInit(){
- if(!MQLInfoInteger(MQL_TESTER)){Print("Tokio732_VolLab: copia de laboratorio, SOLO Probador de estrategias. No opera en graficos.");return INIT_FAILED;}
+ if(!MQLInfoInteger(MQL_TESTER) && !LiveTradingEnabled){Print("Tokio732_VolLab: LiveTradingEnabled=false, solo Probador de estrategias. No opera en graficos.");return INIT_FAILED;}
  if(CushionEnabled && (CushionBaseUSD<=0 || CushionActivateUSD<CushionDeactivateUSD || CushionGain<0))return INIT_PARAMETERS_INCORRECT;
  if(VolLotGamma<0 || VolATRRef<=0 || VolATRPeriod<2 || VolFactorMin<=0 || VolFactorMax<VolFactorMin)return INIT_PARAMETERS_INCORRECT;
  string unit=AccountInfoString(ACCOUNT_CURRENCY);MoneyFactor=unit=="USC" || (unit=="" && RELEASE_CURRENCY=="USC")?100.0:1.0;

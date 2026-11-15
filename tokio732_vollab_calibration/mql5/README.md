@@ -1,9 +1,25 @@
 # Tokio732_VolLab — XAUUSD and BTCUSD edition
 
-`Tokio732_VolLab.mq5` is the author's engine 3614 source with one change: the symbol check in
-`CheckAccount732` now accepts symbols that start with `XAUUSD` **or** `BTCUSD` (any broker suffix,
-e.g. `BTCUSDm`). The trading logic is untouched (`git log -p -- Tokio732_VolLab.mq5` shows the
-four changed lines: that check and three description strings).
+`Tokio732_VolLab.mq5` is the author's engine 3614 source with these changes
+(`git log -p -- Tokio732_VolLab.mq5` shows every line):
+
+1. The symbol check in `CheckAccount732` accepts symbols that start with `XAUUSD` **or** `BTCUSD`
+   (any broker suffix, e.g. `BTCUSDm`).
+2. New input `LiveTradingEnabled` (group 00, default `false`). With `false` the EA behaves as the
+   author shipped it: it refuses to start on a chart and sends no orders outside the Strategy
+   Tester. With `true` it starts on a chart and sends real orders.
+3. Live-only fixes needed for (2):
+   * The volatility state of an open basket (distance and trailing multiplier) and the cooldown,
+     flat-since and cushion state are saved with the rest of the live state, so a terminal
+     restart in the middle of a basket continues with the same distances. Before, a restart
+     reset them to 1, i.e. about one third of the intended distances and trailing levels.
+     State files from the old build are not read (new signature 7321202).
+   * If the H1 history needed for the ATR is missing, no basket is opened (dashboard state
+     `ESPERA_HISTORIAL_ATR`). Before, the factor silently fell back to 1, which with the gold H6
+     preset (volatility switch off, lot ∝ factor^-1.5) would open a basket about 5 times too large.
+   * The dashboard header shows the symbol and the current volatility factor.
+
+The order logic is unchanged.
 
 It has not been compiled here: MetaEditor does not run in this environment. Compile it in
 MetaEditor before use.
@@ -22,8 +38,21 @@ BTCUSD), and lot rounding uses the symbol's minimum and step.
 3. Strategy Tester: symbol `BTCUSDm` (or your broker's BTCUSD), M5 chart, every tick based on
    real ticks, USD account, hedging, 1,000 USD. Load the .set in the Inputs tab.
 
-Still applies: the EA refuses to start outside the Strategy Tester (`OnInit`), and live it would
-also require an Exness account.
+## Live (chart) use
+
+Set `LiveTradingEnabled=true` in the Inputs tab, allow algo trading, and attach the EA to an
+M5 chart of the symbol. Still enforced by the author's code and not changed: the account must be
+an **Exness** account (`CheckAccount732`), in **USD**, with **hedging**; one copy per
+account/symbol/magic (a lock file in `Common\Files`); no new baskets while positions with another
+Tokio magic are open on the symbol. The EA writes its state, panel and logs to `Common\Files`;
+do not delete the `.state` file while a basket is open.
+
+Before real money: run it on an Exness demo account for several weeks, and compare its basket log
+(`Common\Files\Tokio732_USD_<login>_..._baskets.csv`) with a Strategy Tester run over the same
+dates. The calibration behind the presets is a simulation (`../REPORT.md`,
+`../REPORT_TIMEFRAMES.md`); the gold and bitcoin H6 presets were flat and −19 % on the only recent
+data, July–August 2026. The EA has no hard stop per position; the basket stop is a percentage of
+balance checked on every tick, so a gap, a disconnection or a weekend can take the loss past it.
 
 ## Check before trusting a bitcoin run
 
