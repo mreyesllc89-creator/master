@@ -78,13 +78,14 @@ def load(symbol, year, spread_mult=1.0, rescale=True):
         for x in "ohlc":
             m = 0.5 * (d["b" + x] + d["a" + x]); h = 0.5 * (d["a" + x] - d["b" + x]) * spread_mult
             d["b" + x] = m - h; d["a" + x] = m + h
-    d["c"] = c
+    d["c"] = c; d["sym"] = symbol; d["year"] = year
     _cache[key] = d
     return d
 
 
 def _bars(d, minutes):
-    k = d["t"] // (minutes * 60)
+    off = 3 * 86400 if minutes == 10080 else 0       # weekly bars start on Monday
+    k = (d["t"] + off) // (minutes * 60)
     brk = np.flatnonzero(np.diff(k)) + 1
     st = np.concatenate([[0], brk]); en = np.concatenate([brk, [len(k)]]) - 1
     return k, st, en
@@ -117,6 +118,18 @@ def atr_closed(d, minutes, period):
     return out
 
 
+def _history(symbol, year):
+    """Raw bid closes of the run of consecutive years that contains `year`."""
+    ys = years(symbol)
+    run = [y for y in ys if all(z in ys for z in range(min(y, year), max(y, year) + 1))]
+    key = ("hist", symbol, run[0])
+    if key not in _cache:
+        parts = [np.load(os.path.join(DATA, f"{symbol.lower()}_m1_{y}.npz")) for y in run]
+        _cache[key] = dict(t=np.concatenate([z["t"].astype(np.int64) for z in parts]),
+                           bc=np.concatenate([z["bc"].astype(np.float64) for z in parts]))
+    return _cache[key]
+
+
 def trend_closed(d, p):
     """EMA direction on closed bars (GetTrend/Direction), per M1 bar."""
     key = ("tr", id(d), p["MainTimeframe"], p["MainFastEMA"], p["MainSlowEMA"], p["MicroTimeframe"],
@@ -125,14 +138,19 @@ def trend_closed(d, p):
         return _cache[key]
 
     def direction(minutes, fast, slow):
-        _, st, en = _bars(d, int(minutes))
-        c = pd.Series(d["bc"][en])
+        # EMAs run on the raw, continuous history of the symbol (all consecutive years), so slow
+        # timeframes are warmed up; a constant price rescale does not change the sign of a cross.
+        full = _history(d["sym"], d["year"])
+        _, st, en = _bars(full, int(minutes))
+        c = pd.Series(full["bc"][en])
         f = c.ewm(span=int(fast), adjust=False).mean().values
         s = c.ewm(span=int(slow), adjust=False).mean().values
         x = np.sign(f - s).astype(np.int8)
         x[:int(max(fast, slow))] = 0                 # warm-up
         prev = np.concatenate([[0], x[:-1]]).astype(np.int8)
-        return np.repeat(prev, en - st + 1)
+        m1 = np.repeat(prev, en - st + 1)
+        i = int(np.searchsorted(full["t"], d["t"][0]))
+        return m1[i:i + len(d["t"])]
 
     main = direction(p["MainTimeframe"], p["MainFastEMA"], p["MainSlowEMA"])
     micro = direction(p["MicroTimeframe"], p["MicroFastEMA"], p["MicroSlowEMA"])

@@ -1,7 +1,8 @@
 """Write an MT5 .set from the shipped 152-input preset with the calibrated inputs replaced."""
 import io
 
-TF = {60: 16385}
+TF = {60: 16385, 120: 16386, 180: 16387, 240: 16388, 360: 16390, 480: 16392, 720: 16396, 1440: 16408,
+      10080: 32769}
 
 
 def write(template, path, p, header):
