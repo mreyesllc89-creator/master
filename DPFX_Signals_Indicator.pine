@@ -1,6 +1,6 @@
 //@version=6
 //====================================================//
-// Danny Phantom FX V10.21.1 LiveSafe — INDICATOR EDITION
+// DPFX Signals & Alerts [Indicator] (from Danny Phantom FX V10.21.1 LiveSafe)
 //====================================================//
 // Markets: XAUUSD 5m, XAGUSD 5m, NAS100 5m
 //
@@ -32,7 +32,7 @@
 // (different fill price, missed webhook). Validate end-to-end at minimum lot.
 //====================================================//
 
-indicator("OF S/D Robust — Inverted FX Top 3 V10.21.1 LiveSafe (Indicator)", shorttitle="DPFX10.211-IND", overlay=true)
+indicator("DPFX Signals & Alerts [Indicator]", shorttitle="DPFX-SIGNALS", overlay=true)
 
 //====================================================//
 // PRESET MODE
@@ -823,8 +823,8 @@ if barstate.islast and showStatusPanel
     color goodBg = color.new(#089981, 65)
     color badBg = color.new(#f23645, 65)
     color warnBg = color.new(color.orange, 60)
-    table.cell(infoTable, 0, 0, "Danny Phantom FX", text_color=color.white, bgcolor=headerBg)
-    table.cell(infoTable, 1, 0, "V10.21.1 Indicator", text_color=color.white, bgcolor=goodBg)
+    table.cell(infoTable, 0, 0, "DPFX Signals", text_color=color.white, bgcolor=headerBg)
+    table.cell(infoTable, 1, 0, "INDICATOR (not strategy)", text_color=color.white, bgcolor=goodBg)
     table.cell(infoTable, 0, 1, "Preset", text_color=color.white, bgcolor=headerBg)
     table.cell(infoTable, 1, 1, presetXAUUSD ? "XAUUSD 5m" : presetXAGUSD ? "XAGUSD 5m" : presetNAS100 ? "NAS100 5m" : "Manual/Other", text_color=color.white, bgcolor=cellBg)
     table.cell(infoTable, 0, 2, "Direction", text_color=color.white, bgcolor=headerBg)
