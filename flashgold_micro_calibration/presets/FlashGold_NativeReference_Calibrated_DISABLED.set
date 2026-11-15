@@ -1,6 +1,6 @@
-; Calibrated on the tick replay (REPORT.md). Development build: TradingEnabled stays false. Verify in the Strategy Tester (real ticks, execution delay about 150 ms) before anything else.
+; Calibrated on the tick replay (REPORT.md): large bursts at a tight spread, stop orders only, far target, trail layer 150 points behind the best price. Development build: TradingEnabled stays false. Verify in the Strategy Tester (real ticks, execution delay about 150 ms) before anything else.
 ; base preset: FlashGold_NativeReference
-; changed: EntryRouterMode=0, MaxTrailingMultiplier=30.0, MaxSpreadPoints=14.0, StopEntryDistancePoints=50.0, StopTPPoints=600.0, LimitTPPoints=600.0, MarketTPPoints=600.0, UseSpeedProfitExit=false, InpUseTrailLayer=true, InpWaitForBurstSettle=false, UseOrderFlow=false, UseTrailing=false
+; changed: EntryRouterMode=0, MaxTrailingMultiplier=30.0, MaxSpreadPoints=14.0, StopEntryDistancePoints=50.0, StopTPPoints=600.0, LimitTPPoints=600.0, MarketTPPoints=600.0, UseSpeedProfitExit=false, InpUseTrailLayer=true, InpWaitForBurstSettle=false, UseOrderFlow=false, UseTrailing=false, InpReferenceSpreadPts=45.0
 InpCPMode=2
 InpCPPriceUnit=0.01
 InpCPMinTickRate60=3.8
@@ -277,7 +277,7 @@ internalOrderDistance=3.0
 internalMinTrailing=3.33333333
 internalMaxTrailing=6.6666667
 internalMultiplier=2.0
-InpReferenceSpreadPts=30.0
+InpReferenceSpreadPts=45.0
 InpTrailOuterCapPts=200.0
 InpStopBufferPts=3.0
 InpModifyMinIntervalMs=1000

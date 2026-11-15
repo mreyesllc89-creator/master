@@ -1,6 +1,6 @@
-; Strategy Tester optimisation of stops, target and both trailing mechanisms around the calibrated preset. InpReferenceSpreadPts sets the trail-layer distance (3.33 x the larger of the live spread and this value).
+; Strategy Tester optimisation of stop, target and trail-layer distance around the calibrated preset. InpReferenceSpreadPts sets the trail-layer distance: 3.33 x the larger of the live spread and this value, capped by InpTrailOuterCapPts (30 = 100 points, 45 = 150, 60 = 200).
 ; base preset: FlashGold_NativeReference
-; changed: EntryRouterMode=0, MaxTrailingMultiplier=30.0, MaxSpreadPoints=14.0, StopEntryDistancePoints=50.0, StopTPPoints=600.0, LimitTPPoints=600.0, MarketTPPoints=600.0, UseSpeedProfitExit=false, InpUseTrailLayer=true, InpWaitForBurstSettle=false, UseOrderFlow=false, UseTrailing=false
+; changed: EntryRouterMode=0, MaxTrailingMultiplier=30.0, MaxSpreadPoints=14.0, StopEntryDistancePoints=50.0, StopTPPoints=600.0, LimitTPPoints=600.0, MarketTPPoints=600.0, UseSpeedProfitExit=false, InpUseTrailLayer=true, InpWaitForBurstSettle=false, UseOrderFlow=false, UseTrailing=false, InpReferenceSpreadPts=45.0
 InpCPMode=2
 InpCPPriceUnit=0.01
 InpCPMinTickRate60=3.8
@@ -189,7 +189,7 @@ MarketFollow21Points=21.0
 MarketFollow21Seconds=10
 MarketFollow37Points=37.0
 MarketFollow37Seconds=30
-StopSLPoints=90.0||60.0||30.0||300.0||Y
+StopSLPoints=90.0||60.0||30.0||180.0||Y
 StopTPPoints=600.0||300.0||300.0||1500.0||Y
 MarketSLPoints=80.0
 MarketTPPoints=600.0
@@ -263,8 +263,8 @@ PredictiveExitMaxRiskBufferPoints=180.0
 BlockSpeedExitIfProjectedNegative=true
 Inp07_Trailing==== Simple Test Trailing ===
 UseTrailing=false
-TrailStartPoints=270.0||160.0||80.0||400.0||Y
-TrailBehindPoints=60.0||60.0||70.0||200.0||Y
+TrailStartPoints=270.0
+TrailBehindPoints=60.0
 TrailStepPoints=10.0
 InpWaitForBurstSettle=false
 InpBurstSettleQuietMs=7000
@@ -277,7 +277,7 @@ internalOrderDistance=3.0
 internalMinTrailing=3.33333333
 internalMaxTrailing=6.6666667
 internalMultiplier=2.0
-InpReferenceSpreadPts=30.0||15.0||15.0||60.0||Y
+InpReferenceSpreadPts=45.0||30.0||7.5||60.0||Y
 InpTrailOuterCapPts=200.0
 InpStopBufferPts=3.0
 InpModifyMinIntervalMs=1000

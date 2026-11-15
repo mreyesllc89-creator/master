@@ -1,6 +1,6 @@
-; Same changes on the 1 s micro preset. As shipped, the micro filter blocks all entries after 4096 occupied buckets (about 68 minutes) until the EA is restarted; see REPORT.md section 8.
+; Same changes on the 1 s micro preset. As shipped, the micro filter blocks all entries after 4096 occupied buckets (about 68 minutes) until the EA is restarted; see REPORT.md section 11.
 ; base preset: FlashGold_Micro1s
-; changed: EntryRouterMode=0, MaxTrailingMultiplier=30.0, MaxSpreadPoints=14.0, StopEntryDistancePoints=50.0, StopTPPoints=600.0, LimitTPPoints=600.0, MarketTPPoints=600.0, UseSpeedProfitExit=false, InpUseTrailLayer=true, InpWaitForBurstSettle=false, UseOrderFlow=false, UseTrailing=false
+; changed: EntryRouterMode=0, MaxTrailingMultiplier=30.0, MaxSpreadPoints=14.0, StopEntryDistancePoints=50.0, StopTPPoints=600.0, LimitTPPoints=600.0, MarketTPPoints=600.0, UseSpeedProfitExit=false, InpUseTrailLayer=true, InpWaitForBurstSettle=false, UseOrderFlow=false, UseTrailing=false, InpReferenceSpreadPts=45.0
 InpCPMode=2
 InpCPPriceUnit=0.01
 InpCPMinTickRate60=3.8
@@ -277,7 +277,7 @@ internalOrderDistance=3.0
 internalMinTrailing=3.33333333
 internalMaxTrailing=6.6666667
 internalMultiplier=2.0
-InpReferenceSpreadPts=30.0
+InpReferenceSpreadPts=45.0
 InpTrailOuterCapPts=200.0
 InpStopBufferPts=3.0
 InpModifyMinIntervalMs=1000

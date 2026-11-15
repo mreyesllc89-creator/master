@@ -5,6 +5,13 @@
    "set": {}
   },
   {
+   "name": "shipped preset with the market route opened (the live route, without the flow feed)",
+   "set": {
+    "WeakFlowMarketMinScore": 4.5,
+    "DowngradeNeutralSellMarketToStop": 0
+   }
+  },
+  {
    "name": "calibrated preset (stop orders, large bursts, tight spread)",
    "set": {
     "EntryRouterMode": 0,
@@ -17,7 +24,8 @@
     "UseSpeedProfitExit": 0,
     "InpUseTrailLayer": 1,
     "InpWaitForBurstSettle": 0,
-    "UseTrailing": 0
+    "UseTrailing": 0,
+    "InpReferenceSpreadPts": 45.0
    }
   },
   {

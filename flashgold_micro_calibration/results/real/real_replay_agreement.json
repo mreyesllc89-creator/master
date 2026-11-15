@@ -1,0 +1,10 @@
+{
+ "trades": 283,
+ "days": 11,
+ "stretches": 17,
+ "corr": 0.846255509724619,
+ "same_sign": 0.901060070671378,
+ "within_15": 0.5795053003533569,
+ "real_stop_exits": 149,
+ "both_stop_exits": 145
+}

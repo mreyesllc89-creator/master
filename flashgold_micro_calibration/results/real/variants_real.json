@@ -9,13 +9,14 @@
    "set": {}
   },
   {
-   "name": "calibrated exits (target 600, speed exit off, trail layer 100)",
+   "name": "calibrated exits (target 600, speed exit off, trail layer 150)",
    "tp_points": 600,
    "set": {
     "UseSpeedProfitExit": 0,
     "InpUseTrailLayer": 1,
     "InpWaitForBurstSettle": 0,
-    "UseTrailing": 0
+    "UseTrailing": 0,
+    "InpReferenceSpreadPts": 45.0
    }
   },
   {

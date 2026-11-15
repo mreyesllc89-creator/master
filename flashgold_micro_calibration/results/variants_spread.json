@@ -17,7 +17,8 @@
     "UseSpeedProfitExit": 0,
     "InpUseTrailLayer": 1,
     "InpWaitForBurstSettle": 0,
-    "UseTrailing": 0
+    "UseTrailing": 0,
+    "InpReferenceSpreadPts": 45.0
    }
   }
  ]

@@ -1,0 +1,6 @@
+{"axes": {
+  "FG_InpBandAtr": [0.25, 0.5, 1.0, 1.5],
+  "FG_InpEntryDistAtr": [0.25, 0.5, 1.0],
+  "MaxTrailingMultiplier": [28, 30, 32, 35],
+  "MaxSpreadPoints": [12, 14]
+}}

@@ -1,0 +1,12 @@
+{"axes": {
+  "MaxTrailingMultiplier": [25, 28, 30, 32, 35, 40],
+  "MaxSpreadPoints": [12, 14, 16, 20],
+  "trailing": {
+    "none": {"UseTrailing": 0, "InpUseTrailLayer": 0, "InpWaitForBurstSettle": 0},
+    "layer 100": {"UseTrailing": 0, "InpUseTrailLayer": 1, "InpReferenceSpreadPts": 30.0, "InpWaitForBurstSettle": 0},
+    "layer 150": {"UseTrailing": 0, "InpUseTrailLayer": 1, "InpReferenceSpreadPts": 45.0, "InpWaitForBurstSettle": 0},
+    "simple 100/110": {"UseTrailing": 1, "TrailStartPoints": 100, "TrailBehindPoints": 110, "TrailStepPoints": 10, "InpUseTrailLayer": 0, "InpWaitForBurstSettle": 0}
+  },
+  "InpEntryHoldMs": [1100, 2000],
+  "StopSLPoints": [90, 130]
+}}
