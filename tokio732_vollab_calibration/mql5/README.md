@@ -65,3 +65,39 @@ balance checked on every tick, so a gap, a disconnection or a weekend can take t
   distance and the lot size scale with it.
 * `DeviationPoints=1000` is 10 USD on a 2-digit BTCUSD quote. Raise it if you see requotes.
 * Bitcoin trades on weekends; the simulation included weekend data.
+
+## VT Markets and cent (USC) accounts
+
+Added inputs (group 00), all defaulting to the author's original behaviour:
+
+| Input | Default | Use |
+|---|---|---|
+| `RequireExnessBroker` | `false` | `true` restores the Exness-only check. With `false` any broker works. |
+| `EntryHourClock` | `0` server time | `1`: `EntryHourFrom/To` are UTC and the server runs on GMT+2 winter / GMT+3 summer (European DST), as VT Markets does. The calibrated hours are UTC (Exness servers are UTC), so on VT Markets use `1`. |
+| `ReferencePriceValueLotUSD` | `0` auto | The real-USD value of 1.0 lot per 1.0 price move that the preset lots were written for: 100 for gold (100 oz), 1 for bitcoin (1 BTC). At start-up the EA reads the broker's real value (`OrderCalcProfit`, converted from USC to USD) and multiplies every lot by reference / actual. On Exness USD accounts the factor is 1 (no change). |
+
+USC (cent) accounts are accepted. All money inputs (`ReferenceBalanceUSD`, `TrailArmUSD`, …)
+stay in **real USD**; the EA divides the USC balance by 100 internally, as the author's code
+already did. The lot conversion keeps the real-dollar exposure equal to the calibration: for
+example, a cent gold symbol with a 100 oz contract quoted in USC is worth 1 real USD per lot per
+1 USD of gold, so lots are multiplied by 100. The Journal prints this at start-up:
+
+```
+732_UNITS currency=USC factor=100 USD_price_value_per_lot=1 lot_conversion=100 ...
+```
+
+Check that line on your first run. If `lot_conversion` is not what your account's contract implies,
+set `ReferencePriceValueLotUSD` explicitly or stop.
+
+Presets for VT Markets: `../presets/TOKIO_VolLab_XAUUSD_H6_VTMARKETS.set` and
+`../presets/TOKIO_VolLab_BTCUSD_H6_VTMARKETS.set` (H6 presets with `EntryHourClock=1`).
+
+VT Markets' server clock also changes when H6 bars start (server midnight instead of UTC
+midnight). Re-simulated with EET-aligned H6 bars, the presets give the same picture
+(`../results/broker_clock.csv`; out-of-sample median of monthly 1,000 USD starts: gold 1,797 vs
+1,798, bitcoin 1,854 vs 1,674, no ruined starts).
+
+Not handled: the historical news files are GMT+0 and are compared with server time, so on a
+GMT+2/+3 server a news filter would be shifted by 2–3 hours. Both presets have the news options
+off. Cent account spreads, commissions and minimum lots differ by broker; set
+`ExtraCommissionRTperLot` (real USD per standard-equivalent lot) if your account charges one.

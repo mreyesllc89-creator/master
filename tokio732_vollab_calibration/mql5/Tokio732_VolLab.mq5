@@ -5,6 +5,10 @@
 enum TREND_SOURCE { TENDENCIA_PRINCIPAL=0,MICROTENDENCIA=1,AMBAS_DEBEN_COINCIDIR=2,PRINCIPAL_CON_RESPALDO_MICRO=3 };
 input group "00 - Operativa real"
 input bool LiveTradingEnabled=false;         // false = solo Probador; true = envia ordenes reales en el grafico
+input bool RequireExnessBroker=false;        // true = solo cuentas Exness (comportamiento original)
+enum ENTRY_CLOCK { HORA_SERVIDOR=0,UTC_DESDE_SERVIDOR_EET=1 };
+input ENTRY_CLOCK EntryHourClock=HORA_SERVIDOR; // EntryHourFrom/To: hora del servidor, o UTC con servidor GMT+2/+3 (VT Markets)
+input double ReferencePriceValueLotUSD=0;    // USD por 1.0 de precio y lote para el que se escribieron los lotes (0 = auto: oro 100, BTC 1)
 input group "01 - Tendencia y microtendencia (barras cerradas)"
 input TREND_SOURCE TrendSource=PRINCIPAL_CON_RESPALDO_MICRO;
 input ENUM_TIMEFRAMES MainTimeframe=PERIOD_M6;
@@ -124,6 +128,18 @@ double BaseScale732(){
  double f=CushionBaseUSD/ReferenceBalanceUSD;if(cushionActive)f+=CushionGain*(bal-CushionBaseUSD)/ReferenceBalanceUSD;
  return LotMultiplier*MathMax(0,f);
 }
+datetime LastSundayUTC732(int year,int mon){
+ // ultimo domingo del mes a las 01:00 UTC (cambio de horario europeo)
+ MqlDateTime x;ZeroMemory(x);x.year=mon==12?year+1:year;x.mon=mon==12?1:mon+1;x.day=1;
+ datetime t=StructToTime(x)-86400;MqlDateTime y;TimeToStruct(t,y);return t-y.day_of_week*86400+3600;
+}
+datetime EntryClockTime732(){
+ datetime s=TimeCurrent();
+ if(EntryHourClock==HORA_SERVIDOR)return s;
+ datetime u=s-2*3600;MqlDateTime y;TimeToStruct(u,y);       // servidor EET: GMT+2 invierno, GMT+3 verano
+ if(u>=LastSundayUTC732(y.year,3) && u<LastSundayUTC732(y.year,10))return s-3*3600;
+ return u;
+}
 bool EntryWindow732(){
  if(TimeCurrent()<cooldownUntil)return false;
  double vfNow=VolFactor732();
@@ -131,7 +147,7 @@ bool EntryWindow732(){
  if(MinVolFactor>0 && vfNow<MinVolFactor)return false;
  if(MaxEntrySpreadPrice>0){MqlTick sq;if(SymbolInfoTick(_Symbol,sq) && sq.ask-sq.bid>MaxEntrySpreadPrice)return false;}
  if(EntryHourTo-EntryHourFrom>=24)return true;
- MqlDateTime d;TimeToStruct(TimeCurrent(),d);double hr=d.hour+d.min/60.0+d.sec/3600.0;
+ MqlDateTime d;TimeToStruct(EntryClockTime732(),d);double hr=d.hour+d.min/60.0+d.sec/3600.0;
  if(EntryHourFrom<=EntryHourTo)return hr>=EntryHourFrom && hr<EntryHourTo;
  return hr>=EntryHourFrom || hr<EntryHourTo;
 }
@@ -471,7 +487,7 @@ bool CalibrateUnits732(MqlTick &q){
 }
 bool Init730(){
  bootstrapRetryable=false;diagInitError=0;
- if(!MQLInfoInteger(MQL_TESTER) && !TerminalInfoInteger(TERMINAL_CONNECTED))return WaitBootstrap732("ESPERA_CONEXION","Esperando conexion con Exness");
+ if(!MQLInfoInteger(MQL_TESTER) && !TerminalInfoInteger(TERMINAL_CONNECTED))return WaitBootstrap732("ESPERA_CONEXION","Esperando conexion con el broker");
  if(!SymbolSelect(_Symbol,true))return WaitBootstrap732("ESPERA_SIMBOLO","Esperando activacion del simbolo en Market Watch",GetLastError());
  ResetLastError();MqlTick q;if(!SymbolInfoTick(_Symbol,q))return WaitBootstrap732("ESPERA_COTIZACION","SymbolInfoTick aun no disponible",GetLastError());
  if(!CalibrateUnits732(q))return false;
@@ -485,7 +501,7 @@ bool Init730(){
    Print("732: calendario no disponible; NewsFailClosed=false fue elegido en Entradas.");bootstrapRetryable=false;
   }
  }
- Print("732_UNITS currency=",AccountInfoString(ACCOUNT_CURRENCY)," factor=",MoneyFactor," USD_price_value_per_lot=",PriceValueLot," news_ready=",newsReady);
+ Print("732_UNITS currency=",AccountInfoString(ACCOUNT_CURRENCY)," factor=",MoneyFactor," USD_price_value_per_lot=",PriceValueLot," lot_conversion=",LotConversion732()," news_ready=",newsReady);
  return true;
 }
 void CleanupPartialInit732(){
@@ -824,8 +840,8 @@ void NormalizeMoneyInputs732(){}
 // Core accounting stays in real USD. Public CENT money inputs/display are USC.
 input group "30 - Minimo de lotes escalados (regla explicita)"
 input bool UseMinimumForScaledLots=false;
-double DisplayFactor732(){return RELEASE_CURRENCY=="USC"?100.0:1.0;}
-string DisplayCurrency732(){return RELEASE_CURRENCY;}
+double DisplayFactor732(){return MoneyFactor;}
+string DisplayCurrency732(){return MoneyFactor==100.0?"USC":"USD";}
 double DisplayMoney732(double usd){return usd*DisplayFactor732();}
 double ScaleFactorMath732(double balance_native,double money_factor,double costs_usd,double reference_usd,double multiplier,bool enabled){
  if(!enabled)return multiplier;
@@ -838,8 +854,12 @@ double QuantizeScaledMath732(double raw,double minimum,double step,bool use_mini
  if(v<minimum-1e-8)return use_minimum?minimum:0;
  return v;
 }
+double LotConversion732(){
+ double ref=ReferencePriceValueLotUSD>0?ReferencePriceValueLotUSD:(StringFind(_Symbol,"BTCUSD")==0?1.0:100.0);
+ return PriceValueLot>0?ref/PriceValueLot:1.0;
+}
 double TargetLots732(double base,double factor){
- return QuantizeScaledMath732(base*factor,SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MIN),SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_STEP),ScaleLotsWithBalance && UseMinimumForScaledLots);
+ return QuantizeScaledMath732(base*factor*LotConversion732(),SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_MIN),SymbolInfoDouble(_Symbol,SYMBOL_VOLUME_STEP),ScaleLotsWithBalance && UseMinimumForScaledLots);
 }
 int MinimumLegs732(double factor){
  if(!ScaleLotsWithBalance || !UseMinimumForScaledLots)return 0;
@@ -990,12 +1010,12 @@ long retryAfter;
 };
 uint Hash732(string s){uint h=2166136261;for(int i=0;i<StringLen(s);i++){h^=(uint)StringGetCharacter(s,i);h*=16777619;}return h;}
 bool CheckAccount732(){
- if(!MQLInfoInteger(MQL_TESTER) && !TerminalInfoInteger(TERMINAL_CONNECTED))return WaitBootstrap732("ESPERA_CONEXION","Esperando conexion y datos de cuenta Exness");
+ if(!MQLInfoInteger(MQL_TESTER) && !TerminalInfoInteger(TERMINAL_CONNECTED))return WaitBootstrap732("ESPERA_CONEXION","Esperando conexion y datos de cuenta");
  string c=AccountInfoString(ACCOUNT_CURRENCY);
  if(c=="")return WaitBootstrap732("ESPERA_CUENTA","La moneda de cuenta aun no esta disponible");
- if(c!=RELEASE_CURRENCY){Print("732: esta edicion requiere moneda ",RELEASE_CURRENCY,"; cuenta actual ",c);return BlockDiag732("ERROR_MONEDA","Edicion "+RELEASE_MODE+" requiere "+RELEASE_CURRENCY+"; cuenta="+c);}
+ if(c!="USD" && c!="USC"){Print("732: requiere cuenta USD o USC (cent); cuenta actual ",c);return BlockDiag732("ERROR_MONEDA","Requiere cuenta USD o USC; cuenta="+c);}
  if(StringFind(_Symbol,"XAUUSD")!=0 && StringFind(_Symbol,"BTCUSD")!=0){Print("732: requiere XAUUSD o BTCUSD del broker, incluido su sufijo.");return BlockDiag732("ERROR_SIMBOLO","Este experto requiere XAUUSD o BTCUSD y el sufijo correcto del broker");}
- if(!MQLInfoInteger(MQL_TESTER)){
+ if(!MQLInfoInteger(MQL_TESTER) && RequireExnessBroker){
   string company=AccountInfoString(ACCOUNT_COMPANY);StringToLower(company);
   string server=AccountInfoString(ACCOUNT_SERVER);StringToLower(server);
   if(StringFind(company,"exness")<0 && StringFind(server,"exness")<0){Print("732: edicion Exness.");return BlockDiag732("ERROR_BROKER","Edicion exclusiva para cuentas Exness");}
@@ -1297,7 +1317,7 @@ void Dashboard732(){
  bool waiting=StringFind(diagState,"ESPERA")>=0 || StringFind(diagState,"ZONA")>=0 || StringFind(diagState,"CALENDARIO")>=0 || StringFind(diagState,"OTRA_CESTA")>=0;
  color status=StringFind(diagState,"RECHAZO")>=0 || StringFind(diagState,"ERROR")>=0 || StringFind(diagState,"DESACTIVADO")>=0?clrTomato:waiting?clrGold:positions>0?clrLimeGreen:clrGold;
  MqlTick q;SymbolInfoTick(_Symbol,q);Book();
- DashboardRow732(0,"TOKIO 7.32 VolLab - EXNESS "+RELEASE_MODE+" | "+_Symbol+" | factor vol "+DoubleToString(active?volDist:VolFactor732(),2)+(volReady?"":" (sin historial)"),clrDeepSkyBlue);
+ DashboardRow732(0,"TOKIO 7.32 VolLab - "+AccountInfoString(ACCOUNT_COMPANY)+" "+DisplayCurrency732()+" | "+_Symbol+" | factor vol "+DoubleToString(active?volDist:VolFactor732(),2)+(volReady?"":" (sin historial)"),clrDeepSkyBlue);
  DashboardRow732(1,"ESTADO: "+diagState,status);
  DashboardRow732(2,StringSubstr(diagDetail,0,85),status);
  DashboardRow732(3,"Ticks: "+(string)tickCount+" | Senal: "+Dir732(cachedTrend)+" | Ciclo: "+(string)cycle);

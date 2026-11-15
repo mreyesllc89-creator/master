@@ -83,8 +83,23 @@ def load(symbol, year, spread_mult=1.0, rescale=True):
     return d
 
 
+# Broker server clock for bar alignment: "UTC" (Exness) or "EET" (GMT+2 winter / GMT+3 summer,
+# VT Markets and most MT5 brokers). Bars of H1 and above start at server-time boundaries.
+SERVER_CLOCK = os.environ.get("TOKIO_SERVER_CLOCK", "UTC")
+
+
+def server_offset(t):
+    if SERVER_CLOCK == "UTC":
+        return 0
+    idx = pd.to_datetime(t, unit="s", utc=True).tz_convert("Europe/Athens")
+    naive = idx.tz_localize(None).values.astype("datetime64[s]").astype(np.int64)
+    return naive - np.asarray(t, dtype=np.int64)
+
+
 def _bars(d, minutes):
     off = 3 * 86400 if minutes == 10080 else 0       # weekly bars start on Monday
+    if minutes >= 60:
+        off = off + server_offset(d["t"])
     k = (d["t"] + off) // (minutes * 60)
     brk = np.flatnonzero(np.diff(k)) + 1
     st = np.concatenate([[0], brk]); en = np.concatenate([brk, [len(k)]]) - 1
@@ -132,7 +147,7 @@ def _history(symbol, year):
 
 def trend_closed(d, p):
     """EMA direction on closed bars (GetTrend/Direction), per M1 bar."""
-    key = ("tr", id(d), p["MainTimeframe"], p["MainFastEMA"], p["MainSlowEMA"], p["MicroTimeframe"],
+    key = ("tr", SERVER_CLOCK, id(d), p["MainTimeframe"], p["MainFastEMA"], p["MainSlowEMA"], p["MicroTimeframe"],
            p["MicroFastEMA"], p["MicroSlowEMA"], p["TrendSource"])
     if key in _cache:
         return _cache[key]
