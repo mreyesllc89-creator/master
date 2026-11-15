@@ -1,0 +1,307 @@
+{
+ "preset": "FlashGold_NativeReference",
+ "set": {
+  "EntryRouterMode": 0,
+  "MaxTrailingMultiplier": 30,
+  "MaxSpreadPoints": 14,
+  "StopEntryDistancePoints": 50,
+  "StopTPPoints": 600,
+  "LimitTPPoints": 600,
+  "MarketTPPoints": 600,
+  "UseSpeedProfitExit": 0
+ },
+ "stress": [
+  {
+   "name": "tester fills (no order delay)",
+   "set": {
+    "X_LatencyMs": 0
+   }
+  },
+  {
+   "name": "order delay 400 ms",
+   "set": {
+    "X_LatencyMs": 400
+   }
+  },
+  {
+   "name": "strict fills (no snap, limits at price, delay 250 ms)",
+   "set": {
+    "X_FillSnapPts": 0,
+    "X_LimitAtMarket": 0,
+    "X_LatencyMs": 250
+   }
+  },
+  {
+   "name": "extra slip 2 points on every stop/stop-loss fill",
+   "set": {
+    "X_SlipPts": 2
+   }
+  },
+  {
+   "name": "extra slip 5 points on every stop/stop-loss fill",
+   "set": {
+    "X_SlipPts": 5
+   }
+  },
+  {
+   "name": "commission 3 points per round trip",
+   "set": {
+    "X_CommissionPts": 3
+   }
+  },
+  {
+   "name": "commission 7 points per round trip",
+   "set": {
+    "X_CommissionPts": 7
+   }
+  },
+  {
+   "name": "strict fills + commission 7",
+   "set": {
+    "X_FillSnapPts": 0,
+    "X_LimitAtMarket": 0,
+    "X_LatencyMs": 250,
+    "X_CommissionPts": 7
+   }
+  },
+  {
+   "name": "trailing: trail layer on, distance 100 (burst settle off)",
+   "set": {
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0
+   }
+  },
+  {
+   "name": "trailing: trail layer on, distance 200 (reference spread 60)",
+   "set": {
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0,
+    "InpReferenceSpreadPts": 60
+   }
+  },
+  {
+   "name": "trailing: trail layer on, distance 50 (reference spread 15)",
+   "set": {
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0,
+    "InpReferenceSpreadPts": 15
+   }
+  },
+  {
+   "name": "trailing: simple, start 270 behind 60 as shipped (burst settle off)",
+   "set": {
+    "InpWaitForBurstSettle": 0
+   }
+  },
+  {
+   "name": "trailing: simple, start 100 behind 60",
+   "set": {
+    "InpWaitForBurstSettle": 0,
+    "TrailStartPoints": 100
+   }
+  },
+  {
+   "name": "trailing: simple, start 160 behind 110",
+   "set": {
+    "InpWaitForBurstSettle": 0,
+    "TrailStartPoints": 160,
+    "TrailBehindPoints": 110
+   }
+  },
+  {
+   "name": "trailing: simple, start 300 behind 200",
+   "set": {
+    "InpWaitForBurstSettle": 0,
+    "TrailStartPoints": 300,
+    "TrailBehindPoints": 200
+   }
+  },
+  {
+   "name": "trailing: simple, start 69 behind 30",
+   "set": {
+    "InpWaitForBurstSettle": 0,
+    "TrailStartPoints": 69,
+    "TrailBehindPoints": 30
+   }
+  },
+  {
+   "name": "trailing: layer 100 + simple 270/60 (burst settle off)",
+   "set": {
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0
+   }
+  },
+  {
+   "name": "trailing: simple 160/110 with the source-default burst settle",
+   "set": {
+    "TrailStartPoints": 160,
+    "TrailBehindPoints": 110,
+    "InpBurstSettleQuietMs": 1500,
+    "InpBurstSettleSpeedFraction": 0.35,
+    "InpBurstSettleMaxSpeedPipsSec": 2.0,
+    "InpBurstSettlePullbackPips": 2.0
+   }
+  },
+  {
+   "name": "FlashGold filter off",
+   "set": {
+    "UseFlashGoldDirectionFilter": 0
+   }
+  },
+  {
+   "name": "FlashGold micro 1 s (capacity restart)",
+   "set": {
+    "FG_Resolution": 1,
+    "FG_IntervalMs": 1000
+   }
+  },
+  {
+   "name": "FlashGold micro 250 ms (capacity restart)",
+   "set": {
+    "FG_Resolution": 1,
+    "FG_IntervalMs": 250
+   }
+  },
+  {
+   "name": "FlashGold micro 1 s as shipped (capacity block)",
+   "set": {
+    "FG_Resolution": 1,
+    "FG_IntervalMs": 1000,
+    "X_MicroRestart": 0
+   }
+  },
+  {
+   "name": "back to shipped: multiplier 7.5",
+   "set": {
+    "MaxTrailingMultiplier": 7.5
+   }
+  },
+  {
+   "name": "back to shipped: spread cap 31",
+   "set": {
+    "MaxSpreadPoints": 31
+   }
+  },
+  {
+   "name": "back to shipped: stop entry distance 35",
+   "set": {
+    "StopEntryDistancePoints": 35
+   }
+  },
+  {
+   "name": "back to shipped: fade route on (EntryRouterMode 2)",
+   "set": {
+    "EntryRouterMode": 2
+   }
+  },
+  {
+   "name": "back to shipped: speed profit exit on at 100",
+   "set": {
+    "UseSpeedProfitExit": 1
+   }
+  },
+  {
+   "name": "back to shipped: target 180",
+   "set": {
+    "StopTPPoints": 180,
+    "LimitTPPoints": 160,
+    "MarketTPPoints": 160
+   }
+  },
+  {
+   "name": "back to shipped: speed exit on and target 180",
+   "set": {
+    "UseSpeedProfitExit": 1,
+    "StopTPPoints": 180,
+    "LimitTPPoints": 160,
+    "MarketTPPoints": 160
+   }
+  },
+  {
+   "name": "entry hold off",
+   "set": {
+    "InpUseEntryHold": 0
+   }
+  },
+  {
+   "name": "60 minute drift filter off",
+   "set": {
+    "InpUsePrior60Filter": 0
+   }
+  },
+  {
+   "name": "post-entry validation off",
+   "set": {
+    "UsePostEntryValidation": 0
+   }
+  },
+  {
+   "name": "continuation filter off",
+   "set": {
+    "InpCPMode": 0
+   }
+  },
+  {
+   "name": "buys only",
+   "set": {
+    "X_TradeSells": 0
+   }
+  },
+  {
+   "name": "sells only",
+   "set": {
+    "X_TradeBuys": 0
+   }
+  }
+ ],
+ "neighbours": {
+  "MaxSpreadPoints": [
+   11,
+   12,
+   13,
+   16,
+   20
+  ],
+  "MaxTrailingMultiplier": [
+   20,
+   25,
+   35,
+   40
+  ],
+  "StopEntryDistancePoints": [
+   20,
+   35,
+   40,
+   60,
+   70
+  ],
+  "StopSLPoints": [
+   60,
+   130,
+   200,
+   300
+  ],
+  "StopTPPoints": [
+   300,
+   400,
+   1000,
+   1500
+  ],
+  "PendingExpirySeconds": [
+   3,
+   10,
+   20
+  ],
+  "SpeedLookbackSeconds": [
+   5,
+   15
+  ],
+  "InpEntryHoldMs": [
+   500,
+   2000
+  ]
+ }
+}

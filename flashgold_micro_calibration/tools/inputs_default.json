@@ -1,0 +1,3602 @@
+[
+ {
+  "name": "InpCPMode",
+  "type": "ENUM_CP_MODE",
+  "kind": "enum",
+  "default": 2,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Continuation mode (Filter or Off)"
+ },
+ {
+  "name": "InpCPPriceUnit",
+  "type": "double",
+  "kind": "double",
+  "default": 0.01,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Price per audit point (not broker _Point)"
+ },
+ {
+  "name": "InpCPMinTickRate60",
+  "type": "double",
+  "kind": "double",
+  "default": 3.8,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Minimum tick rate, last 60s (ticks/sec; 0=off)"
+ },
+ {
+  "name": "InpCPMaxMedianGapMs",
+  "type": "double",
+  "kind": "double",
+  "default": 215.0,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Maximum median quote gap, last 60s (ms; 0=off)"
+ },
+ {
+  "name": "InpCPMinRange60",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Minimum 1-minute range (audit points; 0=off)"
+ },
+ {
+  "name": "InpCPMinRange300",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Minimum 5-minute range (audit points; 0=off)"
+ },
+ {
+  "name": "InpCPRequireCostCoverage",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Prior-minute range must cover costs"
+ },
+ {
+  "name": "InpCPGrossFloor",
+  "type": "double",
+  "kind": "double",
+  "default": 16.0,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Minimum gross distance (audit points)"
+ },
+ {
+  "name": "InpCPSlipReserve",
+  "type": "double",
+  "kind": "double",
+  "default": 4.0,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Total slippage budget (audit points, not deviation)"
+ },
+ {
+  "name": "InpCPCommission",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Round-trip commission equivalent (audit points)"
+ },
+ {
+  "name": "InpCPMaxSilenceMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1500,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Block after no new quote for this long"
+ },
+ {
+  "name": "InpCPCancelBadPendings",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": "Cancel own pending orders on filter failure"
+ },
+ {
+  "name": "InpCPWriteCsv",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": ""
+ },
+ {
+  "name": "InpCPPrintDecisions",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Continuation - ALL enabled checks must agree",
+  "file": "SpeedAlertContinuationFilter.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_Resolution",
+  "type": "ENUM_FGF_RESOLUTION",
+  "kind": "enum",
+  "default": 0,
+  "section": "FlashGold direction resolution (development)",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_IntervalMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "FlashGold direction resolution (development)",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "1000=1 second, 250=quarter second, minimum 1ms"
+ },
+ {
+  "name": "FG_MicroWarmupBars",
+  "type": "int",
+  "kind": "int",
+  "default": 100,
+  "section": "FlashGold direction resolution (development)",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Completed occupied quote bars, not elapsed time"
+ },
+ {
+  "name": "FG_MicroMaxBars",
+  "type": "int",
+  "kind": "int",
+  "default": 4096,
+  "section": "FlashGold direction resolution (development)",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Session capacity; blocks instead of reseeding"
+ },
+ {
+  "name": "FG_MicroMaxGapMs",
+  "type": "int",
+  "kind": "int",
+  "default": 60000,
+  "section": "FlashGold direction resolution (development)",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Larger gaps restart warmup"
+ },
+ {
+  "name": "UseFlashGoldDirectionFilter",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpTf",
+  "type": "ENUM_TIMEFRAMES",
+  "kind": "enum",
+  "default": 16385,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpLvMode",
+  "type": "ENUM_FGF_LEVEL",
+  "kind": "enum",
+  "default": 0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpLast",
+  "type": "ENUM_FGF_LASTS",
+  "kind": "enum",
+  "default": 0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpMinutes",
+  "type": "int",
+  "kind": "int",
+  "default": 60,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 5,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Used only when Permission lasts = Seconds"
+ },
+ {
+  "name": "FG_InpMilliseconds",
+  "type": "int",
+  "kind": "int",
+  "default": 500,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Used only when Permission lasts = Milliseconds"
+ },
+ {
+  "name": "FG_InpBars",
+  "type": "int",
+  "kind": "int",
+  "default": 1,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpCheck",
+  "type": "ENUM_FGF_CHECK",
+  "kind": "enum",
+  "default": 0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpAllowBuy",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpAllowSell",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpSpreadPts",
+  "type": "double",
+  "kind": "double",
+  "default": 25.0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpEntryDistPts",
+  "type": "double",
+  "kind": "double",
+  "default": 50.0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpHoldBars",
+  "type": "int",
+  "kind": "int",
+  "default": 0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpHoldFavPts",
+  "type": "double",
+  "kind": "double",
+  "default": 5.0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpOnePerBar",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpDistUnit",
+  "type": "ENUM_FGF_UNIT",
+  "kind": "enum",
+  "default": 0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpBurstAtr",
+  "type": "double",
+  "kind": "double",
+  "default": 0.5,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpEntryDistAtr",
+  "type": "double",
+  "kind": "double",
+  "default": 0.25,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpHoldFavAtr",
+  "type": "double",
+  "kind": "double",
+  "default": 0.1,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpBurstPts",
+  "type": "double",
+  "kind": "double",
+  "default": 172.0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseBurst",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpAnyCombo",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpDriftBars",
+  "type": "int",
+  "kind": "int",
+  "default": 60,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseDrift",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseZones",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpParentTf",
+  "type": "ENUM_TIMEFRAMES",
+  "kind": "enum",
+  "default": 16385,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpRsiLen",
+  "type": "int",
+  "kind": "int",
+  "default": 14,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpFastLen",
+  "type": "int",
+  "kind": "int",
+  "default": 2,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpMinAligned",
+  "type": "int",
+  "kind": "int",
+  "default": 2,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpFlatParent",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpIgnoreNa",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpHtfClosed",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseZ1",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpZTf1",
+  "type": "ENUM_TIMEFRAMES",
+  "kind": "enum",
+  "default": 16385,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseZ2",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpZTf2",
+  "type": "ENUM_TIMEFRAMES",
+  "kind": "enum",
+  "default": 16386,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseZ3",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpZTf3",
+  "type": "ENUM_TIMEFRAMES",
+  "kind": "enum",
+  "default": 16388,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseZ4",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpZTf4",
+  "type": "ENUM_TIMEFRAMES",
+  "kind": "enum",
+  "default": 16392,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseZ5",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpZTf5",
+  "type": "ENUM_TIMEFRAMES",
+  "kind": "enum",
+  "default": 1,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpUseZ6",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpZTf6",
+  "type": "ENUM_TIMEFRAMES",
+  "kind": "enum",
+  "default": 2,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": ""
+ },
+ {
+  "name": "FG_InpTickSize",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Compatibility: 0 or actual broker trade tick size only"
+ },
+ {
+  "name": "FG_InpMaxBars",
+  "type": "int",
+  "kind": "int",
+  "default": 20000,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Legacy only: v1.2 uses all available history"
+ },
+ {
+  "name": "FG_InpWarmup",
+  "type": "int",
+  "kind": "int",
+  "default": 500,
+  "section": "Additional FlashGold entry filter",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Legacy only: v1.2 warms up from full available history"
+ },
+ {
+  "name": "FG_InpBandAtr",
+  "type": "double",
+  "kind": "double",
+  "default": 0.25,
+  "section": "FlashGold v1.2 direction area",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "No-trade band, ATR multiplier"
+ },
+ {
+  "name": "FG_InpAgainst",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "FlashGold v1.2 direction area",
+  "file": "SpeedAlertFlashGoldPermission.mqh",
+  "comment": "Allow area direction against the armed signal"
+ },
+ {
+  "name": "Inp01_General",
+  "type": "string",
+  "kind": "string",
+  "default": "=== General ===",
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "TradingEnabled",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MagicNumber",
+  "type": "long",
+  "kind": "int",
+  "default": 26090568,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FixedLot",
+  "type": "double",
+  "kind": "double",
+  "default": 0.01,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SlippagePoints",
+  "type": "int",
+  "kind": "int",
+  "default": 50,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "EntryRouterMode",
+  "type": "RouterMode",
+  "kind": "enum",
+  "default": 2,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MaxOpenPositions",
+  "type": "int",
+  "kind": "int",
+  "default": 1,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MaxPendingOrders",
+  "type": "int",
+  "kind": "int",
+  "default": 1,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "ScenarioIndependentPerformance",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MaxOpenPositionsPerScenario",
+  "type": "int",
+  "kind": "int",
+  "default": 1,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MaxPendingOrdersPerScenario",
+  "type": "int",
+  "kind": "int",
+  "default": 1,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "CancelOnlySameScenarioPendings",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "CancelOldPendings",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PendingExpirySeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 45,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "ScenarioCapLogCooldownSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 10,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "CsvLogFileV483Cost",
+  "type": "string",
+  "kind": "string",
+  "default": "SpeedAlertRouter_XAUUSD_scenario_v48_3.csv",
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUseSplitStopFloor",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUseTrueStopRiskSizing",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpCalibrationRiskPercent",
+  "type": "double",
+  "kind": "double",
+  "default": 1.0,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUseSlippageInstrumentation",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUseExitReasonAudit",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpExecutionAuditLogFile",
+  "type": "string",
+  "kind": "string",
+  "default": "SpeedAlertRouter_XAUUSD_execution_audit_v1.csv",
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseDefensiveCloseLockout",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "DefensiveLockoutCloseCount",
+  "type": "int",
+  "kind": "int",
+  "default": 3,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "DefensiveLockoutSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 90,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "DefensiveLockoutLogCooldownSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 10,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "DefensiveLockoutCancelPendings",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "CloseDuplicateMemoryMs",
+  "type": "int",
+  "kind": "int",
+  "default": 10000,
+  "section": "General",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp01A_AIShadow",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Research-only AI Shadow ===",
+  "section": "Research-only AI Shadow",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpAIShadowLogFile",
+  "type": "string",
+  "kind": "string",
+  "default": "SpeedAlertRouter_XAUUSD_ai_shadow_v1.csv",
+  "section": "Research-only AI Shadow",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpAIJourneyShadowEnabled",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Research-only AI Shadow",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpAIJourneyShadowLogFile",
+  "type": "string",
+  "kind": "string",
+  "default": "SpeedAlertRouter_XAUUSD_ai_journey_shadow_v2.csv",
+  "section": "Research-only AI Shadow",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpAIHardGateEnabled",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Research-only AI Shadow",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpAIRiskAdjustEnabled",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Research-only AI Shadow",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp02_SpeedAlert",
+  "type": "string",
+  "kind": "string",
+  "default": "=== MaxTrailingMultiplier Speed Alert ===",
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MaxTrailingMultiplier",
+  "type": "double",
+  "kind": "double",
+  "default": 7.5,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedLookbackSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 10,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MinSpeedAlertPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedAlertHoldSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 20,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpSpeedThresholdMode",
+  "type": "SpeedThresholdMode",
+  "kind": "enum",
+  "default": 0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpSpeedPercentile",
+  "type": "double",
+  "kind": "double",
+  "default": 99.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpSpeedWindowSamples",
+  "type": "int",
+  "kind": "int",
+  "default": 2000,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUseHighBurstGate",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpBurstThresholdMode",
+  "type": "SpeedThresholdMode",
+  "kind": "enum",
+  "default": 0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpBurstThresholdPts",
+  "type": "double",
+  "kind": "double",
+  "default": 172.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpBurstPercentile",
+  "type": "double",
+  "kind": "double",
+  "default": 99.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpBurstWindowSamples",
+  "type": "int",
+  "kind": "int",
+  "default": 2000,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedDirectionScore",
+  "type": "double",
+  "kind": "double",
+  "default": 1.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UsePreSpeedRadar",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedEarlyRatio",
+  "type": "double",
+  "kind": "double",
+  "default": 0.5,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedStrongRatio",
+  "type": "double",
+  "kind": "double",
+  "default": 0.7,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedLogCooldownSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 10,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UsePreSpeedAgainstDefense",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseMinLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 21.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseHardClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseHardMaxLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 25.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "EXHLPreSpeedDangerClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "EXHLPreSpeedDangerLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "EXHLPreSpeedDangerNeedsOppositePressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMMarketDangerClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMMarketDangerLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMMarketDangerNeedsOppositePressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMFlowDisagreeDangerLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMMarketHardClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMMarketHardMaxLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 25.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMMarketHardCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_FOLM_MARKET_HARD",
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMSellMarketEarlyDangerClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMSellMarketEarlyDangerLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 18.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMSellMarketEarlyDangerNeedsOppositePressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMSellMarketEarlyDangerCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_FOLM_SM_EARLY",
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseNoFollowSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 6,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseNeedsOppositePressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseCloseOnPreSpeed50",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseCloseOnPreSpeed70",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FlowDisagreeMakesDefenseImmediate",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FLXQSellStopFastPreSpeedDefense",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FLXQSellStopPreSpeedDefenseNoFollowSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 4,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FLXQSellStopFastPreSpeedDefenseLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 18.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FLXQSellStopFastPreSpeedDefenseNeedsOppositePressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FLXQSellStopPressureDangerClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FLXQSellStopPressureDangerLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 25.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FLXQSellStopPressureDangerCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_FLXQ_SS_PRESSURE",
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseStopFlowDisagreeDangerClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "StopFlowDisagreeDangerLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "StopFlowDisagreeDangerMinHoldMs",
+  "type": "int",
+  "kind": "int",
+  "default": 0,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "StopFlowDisagreeDangerNeedsOppositePressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "StopFlowDisagreeDangerCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_STOP_FLOW_DANGER",
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseMaxSignalAgeMs",
+  "type": "int",
+  "kind": "int",
+  "default": 8000,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_PRE_SPEED_DEFENSE",
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PreSpeedAgainstDefenseRetryLogCooldownMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "MaxTrailingMultiplier Speed Alert",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp03_DirectionScore",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Pre Entry Direction Score ===",
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MinDirectionScore",
+  "type": "double",
+  "kind": "double",
+  "default": 4.0,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MinScoreEdge",
+  "type": "double",
+  "kind": "double",
+  "default": 1.5,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "CandleIndexToCheck",
+  "type": "int",
+  "kind": "int",
+  "default": 0,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MinCandleBodyPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 21.0,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "CandleBodyScore",
+  "type": "double",
+  "kind": "double",
+  "default": 1.5,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MicroBreakLookbackSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 10,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MicroBreakBufferPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 3.0,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MicroBreakScore",
+  "type": "double",
+  "kind": "double",
+  "default": 1.5,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MaxSpreadPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 31.0,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpreadStableScore",
+  "type": "double",
+  "kind": "double",
+  "default": 0.5,
+  "section": "Pre Entry Direction Score",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp04_OrderFlow",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Order Flow Global Variables ===",
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseOrderFlow",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FlowGVPrefix",
+  "type": "string",
+  "kind": "string",
+  "default": "XPW_XAU_",
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MaxFlowAgeMs",
+  "type": "int",
+  "kind": "int",
+  "default": 4000,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MinFlowImbalance",
+  "type": "double",
+  "kind": "double",
+  "default": 5.0,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FlowComponentScore",
+  "type": "double",
+  "kind": "double",
+  "default": 1.0,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "BlockStrongFlowAgainst",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "DowngradeNeutralSellMarketToStop",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "WeakFlowMarketNeedsBodyAndMicro",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "WeakFlowMarketMinScore",
+  "type": "double",
+  "kind": "double",
+  "default": 5.0,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "WeakFlowMarketMinScoreEdge",
+  "type": "double",
+  "kind": "double",
+  "default": 2.0,
+  "section": "Order Flow Global Variables",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp05_EntryRouting",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Entry Routing ===",
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "StopEntryDistancePoints",
+  "type": "double",
+  "kind": "double",
+  "default": 35.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "LimitRetestDistancePoints",
+  "type": "double",
+  "kind": "double",
+  "default": 35.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MarketFollow21Points",
+  "type": "double",
+  "kind": "double",
+  "default": 21.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MarketFollow21Seconds",
+  "type": "int",
+  "kind": "int",
+  "default": 10,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MarketFollow37Points",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MarketFollow37Seconds",
+  "type": "int",
+  "kind": "int",
+  "default": 30,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "StopSLPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 90.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "StopTPPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 180.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MarketSLPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 80.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "MarketTPPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 160.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "LimitSLPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 90.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "LimitTPPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 160.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "BodyOnlyLotFactor",
+  "type": "double",
+  "kind": "double",
+  "default": 0.65,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "ContinuationStopLotFactor",
+  "type": "double",
+  "kind": "double",
+  "default": 1.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FollowThroughMarketLotFactor",
+  "type": "double",
+  "kind": "double",
+  "default": 1.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "ExhaustionLimitLotFactor",
+  "type": "double",
+  "kind": "double",
+  "default": 0.5,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUseEntryHold",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpEntryHoldMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpEntryHoldMinFavPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 5.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUsePrior60Filter",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUse1000msHold",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpHoldMinFavPts",
+  "type": "double",
+  "kind": "double",
+  "default": 5.0,
+  "section": "Entry Routing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp06_PostValidation",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Post Entry Validation ===",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UsePostEntryValidation",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "OppositePressurePoints",
+  "type": "double",
+  "kind": "double",
+  "default": 21.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "OppositePressureSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 5,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "CloseIfNoFollowThrough",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "ValidationSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 30,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "CloseOnRetestFailure",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestFailPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 10.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestFailCloseMinLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestFailedEarlyClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestFailedEarlyLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 25.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestFailedEarlyBypassHold",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestFailedEarlyCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_RETEST_EARLY",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMAfterFollowRetestDangerClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMAfterFollowRetestDangerLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMAfterFollowRetestBypassHold",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMAfterFollowRetestDangerCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_FOLM_RETEST_DANGER",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestFailConfirmSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 2,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestFailedCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_RETEST_FAILED",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseEmergencyRetestCollapseClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseMinLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseVelocityPointsPerSec",
+  "type": "double",
+  "kind": "double",
+  "default": 35.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseJumpPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 21.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseLookbackMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseConfirmTicks",
+  "type": "int",
+  "kind": "int",
+  "default": 2,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseConfirmMs",
+  "type": "int",
+  "kind": "int",
+  "default": 250,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseHoldNormalCloseMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseHardMaxLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 75.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseHardCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_RETEST_HARD_FLOOR",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestHardFloorRetryLogCooldownMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseRetryLogCooldownMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestPauseLogCooldownMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RetestCollapseCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_RETEST_COLLAPSE",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "NoFollowEarlyClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "NoFollowEarlySeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 12,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "NoFollowEarlyLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 25.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "NoFollowEarlyNeedsOppositePressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "NoFollowEarlyCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_NO_FOLLOW_EARLY",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "NoFollowCloseMinLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "NoFollowCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_NO_FOLLOW",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseSpeedProfitExit",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedProfitExitPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 100.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "RequireProfitSideSpeed",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedProfitExitComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_PROFIT_EXIT",
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedProfitExitRetrySeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 2,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedProfitExitMaxRetries",
+  "type": "int",
+  "kind": "int",
+  "default": 8,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UsePredictiveSpeedProfitExit",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PredictiveExitMinProfitPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 70.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PredictiveExitMinProjectedNetPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 37.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PredictiveExitLatencyMs",
+  "type": "int",
+  "kind": "int",
+  "default": 250,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PredictiveExitVelocityLookbackMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PredictiveExitVelocityMultiplier",
+  "type": "double",
+  "kind": "double",
+  "default": 1.5,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PredictiveExitExtraBufferPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 5.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PredictiveExitMinRiskBufferPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 21.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PredictiveExitMaxRiskBufferPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 180.0,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "BlockSpeedExitIfProjectedNegative",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Post Entry Validation",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp07_Trailing",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Simple Test Trailing ===",
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseTrailing",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "TrailStartPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 70.0,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "TrailBehindPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 60.0,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "TrailStepPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 10.0,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpWaitForBurstSettle",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpBurstSettleQuietMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1500,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpBurstSettleSpeedFraction",
+  "type": "double",
+  "kind": "double",
+  "default": 0.35,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpBurstSettleMaxSpeedPipsSec",
+  "type": "double",
+  "kind": "double",
+  "default": 2.0,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpBurstSettlePullbackPips",
+  "type": "double",
+  "kind": "double",
+  "default": 2.0,
+  "section": "Simple Test Trailing",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp07A_TrailLayer",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Spread-Scaled Broker Trail Layer ===",
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpUseTrailLayer",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "internalOrderDistance",
+  "type": "double",
+  "kind": "double",
+  "default": 3.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "internalMinTrailing",
+  "type": "double",
+  "kind": "double",
+  "default": 3.33333333,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "internalMaxTrailing",
+  "type": "double",
+  "kind": "double",
+  "default": 6.6666667,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "internalMultiplier",
+  "type": "double",
+  "kind": "double",
+  "default": 2.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpReferenceSpreadPts",
+  "type": "double",
+  "kind": "double",
+  "default": 30.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpTrailOuterCapPts",
+  "type": "double",
+  "kind": "double",
+  "default": 200.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpStopBufferPts",
+  "type": "double",
+  "kind": "double",
+  "default": 3.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpModifyMinIntervalMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpArmOnFavPts",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpTrailArmFavPts",
+  "type": "double",
+  "kind": "double",
+  "default": 35.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpArmOnCostDigested",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpArmOnTimeMs",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpTrailArmTimeMs",
+  "type": "int",
+  "kind": "int",
+  "default": 2900,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpCommissionPts",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpExitSlipReservePts",
+  "type": "double",
+  "kind": "double",
+  "default": 14.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "InpCostLockInPts",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "Spread-Scaled Broker Trail Layer",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp08_Visuals",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Speed Alert Chart Visuals ===",
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "ShowSpeedVisuals",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualDrawImpulseLine",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualDrawNextDistance",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualShowAlertText",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualShowDistanceText",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualKeepAlerts",
+  "type": "int",
+  "kind": "int",
+  "default": 30,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualMarkerCode",
+  "type": "int",
+  "kind": "int",
+  "default": 159,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualTextOffsetPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 15.0,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualBuyColor",
+  "type": "color",
+  "kind": "color",
+  "default": "clrDeepSkyBlue",
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualSellColor",
+  "type": "color",
+  "kind": "color",
+  "default": "clrTomato",
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualDistanceColor",
+  "type": "color",
+  "kind": "color",
+  "default": "clrGold",
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualPrefix",
+  "type": "string",
+  "kind": "string",
+  "default": "SAR_SPEED_",
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualCleanOldOnInit",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "SpeedVisualDeleteOnDeinit",
+  "type": "bool",
+  "kind": "bool",
+  "default": false,
+  "section": "Speed Alert Chart Visuals",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp09_SlippageLog",
+  "type": "string",
+  "kind": "string",
+  "default": "=== Passive Slippage Measurement ===",
+  "section": "Passive Slippage Measurement",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "LogSlippageMeasurement",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "Passive Slippage Measurement",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp10_PassiveTelemetry",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v35 Passive Warning Telemetry ===",
+  "section": "v35 Passive Warning Telemetry",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UsePassiveWarningTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v35 Passive Warning Telemetry",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "LogFOLMPreHardWarnings",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v35 Passive Warning Telemetry",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "LogRetestPreFailWarnings",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v35 Passive Warning Telemetry",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PassiveWarnLevel1Points",
+  "type": "double",
+  "kind": "double",
+  "default": 15.0,
+  "section": "v35 Passive Warning Telemetry",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PassiveWarnLevel2Points",
+  "type": "double",
+  "kind": "double",
+  "default": 18.0,
+  "section": "v35 Passive Warning Telemetry",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PassiveWarnLevel3Points",
+  "type": "double",
+  "kind": "double",
+  "default": 21.0,
+  "section": "v35 Passive Warning Telemetry",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "PassiveWarnLevel4Points",
+  "type": "double",
+  "kind": "double",
+  "default": 24.0,
+  "section": "v35 Passive Warning Telemetry",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp11_V36FOLMActiveClose",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v36 FOLM Warning Active Close ===",
+  "section": "v36 FOLM Warning Active Close",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseFOLMPreHardWarnActiveClose",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v36 FOLM Warning Active Close",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMPreHardWarnActiveClosePoints",
+  "type": "double",
+  "kind": "double",
+  "default": 24.0,
+  "section": "v36 FOLM Warning Active Close",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "FOLMPreHardWarnActiveCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_FOLM_WARN24",
+  "section": "v36 FOLM Warning Active Close",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp12_V40ExecutionShield",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v40 Emergency Execution Shield ===",
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV40ExecutionShield",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40PreSpeedExecutionShield",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40PreSpeedExecutionShieldLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 18.0,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40PreSpeedExecutionShieldNeedsPressureOrFlow",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40PreSpeedExecutionShieldCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_V40_PRE_SPEED_SHIELD",
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40FLXQSellStopPressureShield",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40FLXQSellStopPressureShieldLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 18.0,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40FLXQSellStopPressureShieldNeedsPressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40FLXQSellStopPressureShieldCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_V40_FLXQ_SS_SHIELD",
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40RetestExecutionShield",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40RetestExecutionShieldLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 21.0,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40RetestExecutionShieldMinWarningAgeMs",
+  "type": "int",
+  "kind": "int",
+  "default": 250,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40RetestExecutionShieldMinVelocityPointsPerSec",
+  "type": "double",
+  "kind": "double",
+  "default": 25.0,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40RetestExecutionShieldMinJumpPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 10.0,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40RetestExecutionShieldNeedsPressure",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V40RetestExecutionShieldCloseComment",
+  "type": "string",
+  "kind": "string",
+  "default": "SA_V40_RETEST_SHIELD",
+  "section": "v40 Emergency Execution Shield",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp13_V41TelemetryOnly",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v41 FOLM Tick-Gap Telemetry Only ===",
+  "section": "v41 FOLM Tick-Gap Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV41FOLMTickGapTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v41 FOLM Tick-Gap Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp14_V42JumpDirectionTelemetry",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v42 Tick-Jump Direction Telemetry Only ===",
+  "section": "v42 Tick-Jump Direction Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV42JumpDirectionTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v42 Tick-Jump Direction Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp15_V43EarlyJumpTelemetry",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v43 Entry/Early Jump Telemetry Only ===",
+  "section": "v43 Entry/Early Jump Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV43EarlyJumpTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v43 Entry/Early Jump Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp16_V44ShadowReplayTelemetry",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v44 Shadow Replay / FOLM:SM Ghost Only ===",
+  "section": "v44 Shadow Replay / FOLM:SM Ghost Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV44ShadowReplayTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v44 Shadow Replay / FOLM:SM Ghost Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V44ShadowFirst1sAdverseJumpPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 15.0,
+  "section": "v44 Shadow Replay / FOLM:SM Ghost Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V44ShadowFirst2sAdverseJumpPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 18.0,
+  "section": "v44 Shadow Replay / FOLM:SM Ghost Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV44FOLMSGhostTracker",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v44 Shadow Replay / FOLM:SM Ghost Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V44FOLMSGhostWinPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 100.0,
+  "section": "v44 Shadow Replay / FOLM:SM Ghost Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V44FOLMSGhostLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 24.0,
+  "section": "v44 Shadow Replay / FOLM:SM Ghost Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V44FOLMSGhostMaxSeconds",
+  "type": "int",
+  "kind": "int",
+  "default": 30,
+  "section": "v44 Shadow Replay / FOLM:SM Ghost Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp17_V45FOLMQualityTelemetry",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v45 FOLM Quality Telemetry Only ===",
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV45FOLMQualityTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V45FOLMLowQualityScore",
+  "type": "double",
+  "kind": "double",
+  "default": 45.0,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V45FOLMHighQualityScore",
+  "type": "double",
+  "kind": "double",
+  "default": 70.0,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V45FOLMFav2sTargetPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 20.0,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V45FOLMFav3sTargetPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 24.0,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V45FOLMFirst10sMfeTargetPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 75.0,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV45PreEntryHighShadowTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V45PreEntryHighShadowScore",
+  "type": "double",
+  "kind": "double",
+  "default": 70.0,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V45PreEntryMidShadowScore",
+  "type": "double",
+  "kind": "double",
+  "default": 45.0,
+  "section": "v45 FOLM Quality Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp18_V451ProofTelemetry",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v45.1 Candidate Proof Telemetry Only ===",
+  "section": "v45.1 Candidate Proof Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV451ProofTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v45.1 Candidate Proof Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V451LOWJFirst1sAdversePoints",
+  "type": "double",
+  "kind": "double",
+  "default": 10.0,
+  "section": "v45.1 Candidate Proof Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V451LOWJFirst2sAdversePoints",
+  "type": "double",
+  "kind": "double",
+  "default": 12.0,
+  "section": "v45.1 Candidate Proof Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp19_V452LowWinnerMicroscope",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v45.2 LOW Winner Microscope Telemetry Only ===",
+  "section": "v45.2 LOW Winner Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV452LowWinnerMicroscope",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v45.2 LOW Winner Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V452LowDeadMfeCeilingPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 20.0,
+  "section": "v45.2 LOW Winner Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V452LowEscapeMfeFloorPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 50.0,
+  "section": "v45.2 LOW Winner Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp20_V46LowDeadShadowReplay",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v46 LOW Dead Shadow Replay Only ===",
+  "section": "v46 LOW Dead Shadow Replay Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV46LowDeadShadowReplay",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v46 LOW Dead Shadow Replay Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V46LowDeadShadowMinAgeMs",
+  "type": "int",
+  "kind": "int",
+  "default": 3000,
+  "section": "v46 LOW Dead Shadow Replay Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V46LowDeadShadowMaxFav1To3Points",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "v46 LOW Dead Shadow Replay Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V46LowDeadShadowMfeCeilingPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 20.0,
+  "section": "v46 LOW Dead Shadow Replay Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V46LowDeadShadowRequireCurrentFavNonPositive",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v46 LOW Dead Shadow Replay Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp21_V461MicroTelemetry",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v46.1 LOW/HIGH-MID Microscope Telemetry Only ===",
+  "section": "v46.1 LOW/HIGH-MID Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV461MicroTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v46.1 LOW/HIGH-MID Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V461Mfe10LevelPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 10.0,
+  "section": "v46.1 LOW/HIGH-MID Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V461Mfe20LevelPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 20.0,
+  "section": "v46.1 LOW/HIGH-MID Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V461Mfe40LevelPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 40.0,
+  "section": "v46.1 LOW/HIGH-MID Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V461OppositeSpeedPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 100.0,
+  "section": "v46.1 LOW/HIGH-MID Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V461OppositeHardLossPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 24.0,
+  "section": "v46.1 LOW/HIGH-MID Microscope Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp22_V47DecisionFrontierTelemetry",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v47 Decision-Time Frontier Telemetry Only ===",
+  "section": "v47 Decision-Time Frontier Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV47DecisionFrontierTelemetry",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v47 Decision-Time Frontier Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V47LowNoTradeFavCeilingPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "v47 Decision-Time Frontier Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V47LowNoTradeMaxFav1To3Points",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "v47 Decision-Time Frontier Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V47EarlyAdverseJumpPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 12.0,
+  "section": "v47 Decision-Time Frontier Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V47DecisionFrontierMaxMs",
+  "type": "int",
+  "kind": "int",
+  "default": 3000,
+  "section": "v47 Decision-Time Frontier Telemetry Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp23_V471TelemetryRepair",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v47.1 Telemetry Repair / Tick Frontier Only ===",
+  "section": "v47.1 Telemetry Repair / Tick Frontier Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV471TelemetryRepair",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v47.1 Telemetry Repair / Tick Frontier Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V471TickCapsuleCount",
+  "type": "int",
+  "kind": "int",
+  "default": 8,
+  "section": "v47.1 Telemetry Repair / Tick Frontier Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V471EarlyFavCeilingPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 0.0,
+  "section": "v47.1 Telemetry Repair / Tick Frontier Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V471AdverseJumpPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 12.0,
+  "section": "v47.1 Telemetry Repair / Tick Frontier Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V471TapeDeadMaxTicks500ms",
+  "type": "int",
+  "kind": "int",
+  "default": 2,
+  "section": "v47.1 Telemetry Repair / Tick Frontier Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V471TapeDeadMaxTicks1000ms",
+  "type": "int",
+  "kind": "int",
+  "default": 4,
+  "section": "v47.1 Telemetry Repair / Tick Frontier Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "Inp24_V48Mode2ShadowScorecard",
+  "type": "string",
+  "kind": "string",
+  "default": "=== v48.2 Mode 2 BODY+Align Shadow Scorecard Only ===",
+  "section": "v48.2 Mode 2 BODY+Align Shadow Scorecard Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "UseV48Mode2ShadowScorecard",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v48.2 Mode 2 BODY+Align Shadow Scorecard Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V48Mode2BodyNeedsVelocityAlign",
+  "type": "bool",
+  "kind": "bool",
+  "default": true,
+  "section": "v48.2 Mode 2 BODY+Align Shadow Scorecard Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V48Mode2VelocityAlignLookbackMs",
+  "type": "int",
+  "kind": "int",
+  "default": 1000,
+  "section": "v48.2 Mode 2 BODY+Align Shadow Scorecard Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V48Mode2MaxOppositeFlags",
+  "type": "int",
+  "kind": "int",
+  "default": 2,
+  "section": "v48.2 Mode 2 BODY+Align Shadow Scorecard Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V48Mode2MaxSpreadPoints",
+  "type": "double",
+  "kind": "double",
+  "default": 15.0,
+  "section": "v48.2 Mode 2 BODY+Align Shadow Scorecard Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V48Mode2BlockedHoursCSV",
+  "type": "string",
+  "kind": "string",
+  "default": "12,22,23",
+  "section": "v48.2 Mode 2 BODY+Align Shadow Scorecard Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ },
+ {
+  "name": "V48Mode2BodyLotFactorForScorecard",
+  "type": "double",
+  "kind": "double",
+  "default": 0.65,
+  "section": "v48.2 Mode 2 BODY+Align Shadow Scorecard Only",
+  "file": "SpeedAlert_FlashGold_Micro.mq5",
+  "comment": ""
+ }
+]

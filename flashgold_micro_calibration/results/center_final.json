@@ -1,0 +1,99 @@
+{
+ "preset": "FlashGold_NativeReference",
+ "set": {
+  "EntryRouterMode": 0,
+  "MaxTrailingMultiplier": 30,
+  "MaxSpreadPoints": 14,
+  "StopEntryDistancePoints": 50,
+  "StopTPPoints": 600,
+  "LimitTPPoints": 600,
+  "MarketTPPoints": 600,
+  "UseSpeedProfitExit": 0,
+  "InpUseTrailLayer": 1,
+  "InpWaitForBurstSettle": 0,
+  "UseTrailing": 0
+ },
+ "stress": [
+  {
+   "name": "no trailing at all (trail layer off)",
+   "set": {
+    "InpUseTrailLayer": 0
+   }
+  },
+  {
+   "name": "tester fills (no order delay)",
+   "set": {
+    "X_LatencyMs": 0
+   }
+  },
+  {
+   "name": "order delay 400 ms",
+   "set": {
+    "X_LatencyMs": 400
+   }
+  },
+  {
+   "name": "strict fills (no snap, limits at price, delay 250 ms)",
+   "set": {
+    "X_FillSnapPts": 0,
+    "X_LimitAtMarket": 0,
+    "X_LatencyMs": 250
+   }
+  },
+  {
+   "name": "extra slip 2 points on every stop/stop-loss fill",
+   "set": {
+    "X_SlipPts": 2
+   }
+  },
+  {
+   "name": "extra slip 5 points on every stop/stop-loss fill",
+   "set": {
+    "X_SlipPts": 5
+   }
+  },
+  {
+   "name": "commission 3 points per round trip",
+   "set": {
+    "X_CommissionPts": 3
+   }
+  },
+  {
+   "name": "commission 7 points per round trip",
+   "set": {
+    "X_CommissionPts": 7
+   }
+  },
+  {
+   "name": "strict fills + commission 7",
+   "set": {
+    "X_FillSnapPts": 0,
+    "X_LimitAtMarket": 0,
+    "X_LatencyMs": 250,
+    "X_CommissionPts": 7
+   }
+  },
+  {
+   "name": "FlashGold micro 1 s (capacity restart)",
+   "set": {
+    "FG_Resolution": 1,
+    "FG_IntervalMs": 1000
+   }
+  },
+  {
+   "name": "FlashGold micro 1 s as shipped (capacity block)",
+   "set": {
+    "FG_Resolution": 1,
+    "FG_IntervalMs": 1000,
+    "X_MicroRestart": 0
+   }
+  },
+  {
+   "name": "FlashGold filter off",
+   "set": {
+    "UseFlashGoldDirectionFilter": 0
+   }
+  }
+ ],
+ "neighbours": {}
+}

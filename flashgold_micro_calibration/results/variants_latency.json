@@ -1,0 +1,51 @@
+{
+ "variants": [
+  {
+   "name": "shipped reference preset (stop and limit orders)",
+   "set": {}
+  },
+  {
+   "name": "calibrated preset (stop orders, large bursts, tight spread)",
+   "set": {
+    "EntryRouterMode": 0,
+    "MaxTrailingMultiplier": 30,
+    "MaxSpreadPoints": 14,
+    "StopEntryDistancePoints": 50,
+    "StopTPPoints": 600,
+    "LimitTPPoints": 600,
+    "MarketTPPoints": 600,
+    "UseSpeedProfitExit": 0,
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0
+   }
+  },
+  {
+   "name": "best set found with no order delay (market entries on the signal tick)",
+   "set": {
+    "EntryRouterMode": 1,
+    "WeakFlowMarketMinScore": 4.5,
+    "DowngradeNeutralSellMarketToStop": 0,
+    "InpUseEntryHold": 0,
+    "MaxSpreadPoints": 11,
+    "MaxTrailingMultiplier": 20,
+    "MinSpeedAlertPoints": 120,
+    "PendingExpirySeconds": 10,
+    "StopSLPoints": 200,
+    "LimitSLPoints": 200,
+    "MarketSLPoints": 200,
+    "StopTPPoints": 600,
+    "LimitTPPoints": 600,
+    "MarketTPPoints": 600,
+    "UseSpeedProfitExit": 0,
+    "UsePostEntryValidation": 0,
+    "InpUseTrailLayer": 1,
+    "internalMinTrailing": 3.3333333,
+    "internalMaxTrailing": 6.6666667,
+    "internalMultiplier": 2.0,
+    "internalOrderDistance": 3.3333333,
+    "InpWaitForBurstSettle": 0
+   }
+  }
+ ]
+}

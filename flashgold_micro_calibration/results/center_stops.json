@@ -1,0 +1,6 @@
+{"preset": "FlashGold_NativeReference",
+ "set": {"EntryRouterMode": 1, "InpUseEntryHold": 0, "PendingExpirySeconds": 10, "MinSpeedAlertPoints": 120,
+         "StopSLPoints": 200, "LimitSLPoints": 200, "MarketSLPoints": 200, "StopTPPoints": 600, "LimitTPPoints": 600, "MarketTPPoints": 600,
+         "UseSpeedProfitExit": 0, "UsePostEntryValidation": 0,
+         "InpUseTrailLayer": 1, "internalMinTrailing": 3.3333333, "internalMaxTrailing": 6.6666667, "internalMultiplier": 2.0, "internalOrderDistance": 3.3333333,
+         "InpWaitForBurstSettle": 0}}

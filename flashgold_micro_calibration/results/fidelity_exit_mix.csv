@@ -1,0 +1,6 @@
+kind,real,replay,note
+stop loss,54.12698412698413,53.82302835955507,"Stop and limit routes only (the replay has no order-flow feed): 630 real trades, Sep 7 - Oct 8 2026, against 9,979 replayed trades over eight months"
+speed profit exit,32.22222222222222,26.726124862210643,"Stop and limit routes only (the replay has no order-flow feed): 630 real trades, Sep 7 - Oct 8 2026, against 9,979 replayed trades over eight months"
+defensive close,9.841269841269842,10.381801783745866,"Stop and limit routes only (the replay has no order-flow feed): 630 real trades, Sep 7 - Oct 8 2026, against 9,979 replayed trades over eight months"
+take profit,2.6984126984126986,9.069044994488426,"Stop and limit routes only (the replay has no order-flow feed): 630 real trades, Sep 7 - Oct 8 2026, against 9,979 replayed trades over eight months"
+other,1.1111111111111112,0.0,"Stop and limit routes only (the replay has no order-flow feed): 630 real trades, Sep 7 - Oct 8 2026, against 9,979 replayed trades over eight months"

@@ -1,0 +1,147 @@
+{
+ "FlashGold_NativeReference_Calibrated": {
+  "base": "FlashGold_NativeReference",
+  "note": "Calibrated on the tick replay (REPORT.md). Development build: TradingEnabled stays false. Verify in the Strategy Tester (real ticks, execution delay about 150 ms) before anything else.",
+  "set": {
+   "EntryRouterMode": 0,
+   "MaxTrailingMultiplier": 30.0,
+   "MaxSpreadPoints": 14.0,
+   "StopEntryDistancePoints": 50.0,
+   "StopTPPoints": 600.0,
+   "LimitTPPoints": 600.0,
+   "MarketTPPoints": 600.0,
+   "UseSpeedProfitExit": false,
+   "InpUseTrailLayer": true,
+   "InpWaitForBurstSettle": false,
+   "UseOrderFlow": false,
+   "UseTrailing": false
+  }
+ },
+ "FlashGold_Micro1s_Calibrated": {
+  "base": "FlashGold_Micro1s",
+  "note": "Same changes on the 1 s micro preset. As shipped, the micro filter blocks all entries after 4096 occupied buckets (about 68 minutes) until the EA is restarted; see REPORT.md section 8.",
+  "set": {
+   "EntryRouterMode": 0,
+   "MaxTrailingMultiplier": 30.0,
+   "MaxSpreadPoints": 14.0,
+   "StopEntryDistancePoints": 50.0,
+   "StopTPPoints": 600.0,
+   "LimitTPPoints": 600.0,
+   "MarketTPPoints": 600.0,
+   "UseSpeedProfitExit": false,
+   "InpUseTrailLayer": true,
+   "InpWaitForBurstSettle": false,
+   "UseOrderFlow": false,
+   "UseTrailing": false
+  }
+ },
+ "FlashGold_NativeReference_Calibrated_entries": {
+  "base": "FlashGold_NativeReference",
+  "note": "Strategy Tester optimisation of the entry inputs around the calibrated preset. Real ticks, execution delay about 150 ms, forward period 1/3.",
+  "set": {
+   "EntryRouterMode": 0,
+   "MaxTrailingMultiplier": 30.0,
+   "MaxSpreadPoints": 14.0,
+   "StopEntryDistancePoints": 50.0,
+   "StopTPPoints": 600.0,
+   "LimitTPPoints": 600.0,
+   "MarketTPPoints": 600.0,
+   "UseSpeedProfitExit": false,
+   "InpUseTrailLayer": true,
+   "InpWaitForBurstSettle": false,
+   "UseOrderFlow": false,
+   "UseTrailing": false
+  },
+  "ranges": {
+   "MaxTrailingMultiplier": [
+    20.0,
+    5.0,
+    45.0
+   ],
+   "MaxSpreadPoints": [
+    9.0,
+    1.0,
+    16.0
+   ],
+   "StopEntryDistancePoints": [
+    20.0,
+    10.0,
+    80.0
+   ],
+   "PendingExpirySeconds": [
+    3,
+    3,
+    15
+   ]
+  }
+ },
+ "FlashGold_NativeReference_Calibrated_exits": {
+  "base": "FlashGold_NativeReference",
+  "note": "Strategy Tester optimisation of stops, target and both trailing mechanisms around the calibrated preset. InpReferenceSpreadPts sets the trail-layer distance (3.33 x the larger of the live spread and this value).",
+  "set": {
+   "EntryRouterMode": 0,
+   "MaxTrailingMultiplier": 30.0,
+   "MaxSpreadPoints": 14.0,
+   "StopEntryDistancePoints": 50.0,
+   "StopTPPoints": 600.0,
+   "LimitTPPoints": 600.0,
+   "MarketTPPoints": 600.0,
+   "UseSpeedProfitExit": false,
+   "InpUseTrailLayer": true,
+   "InpWaitForBurstSettle": false,
+   "UseOrderFlow": false,
+   "UseTrailing": false
+  },
+  "ranges": {
+   "StopSLPoints": [
+    60.0,
+    30.0,
+    300.0
+   ],
+   "StopTPPoints": [
+    300.0,
+    300.0,
+    1500.0
+   ],
+   "InpReferenceSpreadPts": [
+    15.0,
+    15.0,
+    60.0
+   ],
+   "TrailStartPoints": [
+    160.0,
+    80.0,
+    400.0
+   ],
+   "TrailBehindPoints": [
+    60.0,
+    70.0,
+    200.0
+   ]
+  }
+ },
+ "FlashGold_NativeReference_shipped_trailing": {
+  "base": "FlashGold_NativeReference",
+  "note": "Strategy Tester optimisation of the simple trailing on the SHIPPED entries, with the burst-settle wait off so that trailing can act at all (as shipped: start 270 is beyond the 180 target and the settle rule needs a 100 pip pullback).",
+  "set": {
+   "InpWaitForBurstSettle": false
+  },
+  "ranges": {
+   "TrailStartPoints": [
+    69.0,
+    20.0,
+    169.0
+   ],
+   "TrailBehindPoints": [
+    20.0,
+    20.0,
+    120.0
+   ],
+   "TrailStepPoints": [
+    5.0,
+    5.0,
+    20.0
+   ]
+  }
+ }
+}

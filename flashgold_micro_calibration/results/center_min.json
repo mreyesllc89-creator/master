@@ -1,0 +1,3 @@
+{"preset": "FlashGold_NativeReference",
+ "set": {"EntryRouterMode": 0, "StopTPPoints": 600, "LimitTPPoints": 600, "MarketTPPoints": 600, "UseSpeedProfitExit": 0,
+         "InpUseTrailLayer": 1, "InpWaitForBurstSettle": 0}}

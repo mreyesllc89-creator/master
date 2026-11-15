@@ -1,0 +1,2 @@
+{"WeakFlowMarketMinScore": [5.0, 4.5], "InpUseEntryHold": [0, 1], "MaxSpreadPoints": [10, 11, 13, 31], "MaxTrailingMultiplier": [7.5, 13, 20, 30],
+ "_set": {"DowngradeNeutralSellMarketToStop": 0, "MinSpeedAlertPoints": 120}}

@@ -1,0 +1,24 @@
+{
+ "variants": [
+  {
+   "name": "shipped reference preset",
+   "set": {}
+  },
+  {
+   "name": "calibrated preset",
+   "set": {
+    "EntryRouterMode": 0,
+    "MaxTrailingMultiplier": 30,
+    "MaxSpreadPoints": 14,
+    "StopEntryDistancePoints": 50,
+    "StopTPPoints": 600,
+    "LimitTPPoints": 600,
+    "MarketTPPoints": 600,
+    "UseSpeedProfitExit": 0,
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0
+   }
+  }
+ ]
+}

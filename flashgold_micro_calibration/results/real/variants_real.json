@@ -1,0 +1,132 @@
+{
+ "months": [
+  "2026-09",
+  "2026-10"
+ ],
+ "variants": [
+  {
+   "name": "as traded: shipped reference preset exits",
+   "set": {}
+  },
+  {
+   "name": "calibrated exits (target 600, speed exit off, trail layer 100)",
+   "tp_points": 600,
+   "set": {
+    "UseSpeedProfitExit": 0,
+    "InpUseTrailLayer": 1,
+    "InpWaitForBurstSettle": 0,
+    "UseTrailing": 0
+   }
+  },
+  {
+   "name": "simple trailing on (start 69, behind 20), speed exit kept",
+   "set": {
+    "UseTrailing": 1,
+    "TrailStartPoints": 69,
+    "TrailBehindPoints": 20,
+    "TrailStepPoints": 10,
+    "InpWaitForBurstSettle": 0
+   }
+  },
+  {
+   "name": "simple trailing on (start 80, behind 40), speed exit kept",
+   "set": {
+    "UseTrailing": 1,
+    "TrailStartPoints": 80,
+    "TrailBehindPoints": 40,
+    "TrailStepPoints": 10,
+    "InpWaitForBurstSettle": 0
+   }
+  },
+  {
+   "name": "trail layer on (reference spread 15, factor 1.0)",
+   "set": {
+    "InpUseTrailLayer": 1,
+    "InpReferenceSpreadPts": 15,
+    "internalMinTrailing": 1.0,
+    "internalMaxTrailing": 2.0,
+    "internalMultiplier": 2.0,
+    "internalOrderDistance": 1.0,
+    "InpWaitForBurstSettle": 0
+   }
+  },
+  {
+   "name": "speed profit exit off (stop/target only)",
+   "set": {
+    "UseSpeedProfitExit": 0
+   }
+  },
+  {
+   "name": "speed profit exit at 170 instead of 100",
+   "set": {
+    "SpeedProfitExitPoints": 170
+   }
+  },
+  {
+   "name": "runner: speed exit off, target 600, trail 160/60",
+   "tp_points": 600,
+   "set": {
+    "UseSpeedProfitExit": 0,
+    "UseTrailing": 1,
+    "TrailStartPoints": 160,
+    "TrailBehindPoints": 60,
+    "TrailStepPoints": 10,
+    "InpWaitForBurstSettle": 0
+   }
+  },
+  {
+   "name": "runner + stop 200",
+   "tp_points": 600,
+   "sl_points": 200,
+   "set": {
+    "UseSpeedProfitExit": 0,
+    "UseTrailing": 1,
+    "TrailStartPoints": 160,
+    "TrailBehindPoints": 60,
+    "TrailStepPoints": 10,
+    "InpWaitForBurstSettle": 0
+   }
+  },
+  {
+   "name": "runner + stop 300, no post-entry validation",
+   "tp_points": 600,
+   "sl_points": 300,
+   "set": {
+    "UseSpeedProfitExit": 0,
+    "UsePostEntryValidation": 0,
+    "UseTrailing": 1,
+    "TrailStartPoints": 160,
+    "TrailBehindPoints": 60,
+    "TrailStepPoints": 10,
+    "InpWaitForBurstSettle": 0
+   }
+  },
+  {
+   "name": "stop 60 (tighter), exits as traded",
+   "sl_points": 60,
+   "set": {}
+  },
+  {
+   "name": "stop 130, exits as traded",
+   "sl_points": 130,
+   "set": {}
+  },
+  {
+   "name": "stop 200, exits as traded",
+   "sl_points": 200,
+   "set": {}
+  },
+  {
+   "name": "post-entry validation off",
+   "set": {
+    "UsePostEntryValidation": 0
+   }
+  },
+  {
+   "name": "what-if: no 6.8 pip exit gate (not an input)",
+   "set": {
+    "X_ExitGatePips": 0
+   }
+  }
+ ]
+}

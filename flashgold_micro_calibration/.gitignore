@@ -1,0 +1,8 @@
+data/raw/
+data/ticks/
+data/hf/
+data/cache/
+data/fetch.log
+__pycache__/
+*.log
+results/.part*_done
