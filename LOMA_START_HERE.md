@@ -21,11 +21,11 @@ The out-of-sample report is also in the repository: `research/reports/loma_oos_r
 
 A **hump** (loma) is a run of bars with the MACD on one side of zero.
 
-1. **Trend first.** A big hump below zero means a bearish trend; a big hump above zero means a bullish trend. "Big" means its peak is at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and it lasts at least `BigHumpMinBars` bars. If `RequireStochLevel` is on, the Stochastic must also reach `StochLow` (bearish) or `StochHigh` (bullish) during it: 20/80 by default, 25/75 in Top04 and in the BTC preset R04. Top01, Top02, Top03 and Top05 do not require it. With no big hump in force the market is **lineal** and the EA does not trade.
+1. **Trend first.** A big hump below zero means a bearish trend; a big hump above zero means a bullish trend. "Big" means its peak is at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and it lasts at least `BigHumpMinBars` bars. If `RequireStochLevel` is on, the Stochastic must also reach `StochLow` (bearish) or `StochHigh` (bullish) during it: 20/80 by default, 25/75 in Top04 and in the BTC preset R04. Top01, Top02, Top03, Top05 and the BTC presets R01 and R02 do not require it. With no big hump in force the market is **lineal** and the EA does not trade.
 2. **Trend break.** An opposite hump as large as `TrendBreakRatio` times the big hump ends the trend.
-3. **Sell signal** (bearish trend): a pullback hump above zero that lasts at least `PullbackMinBars` bars and is no larger than `PullbackMaxRatio` times the big hump, then the first bar with the MACD back below zero. Top01, Top04 and Top07 use `PullbackMinBars=1`, so a single bar across zero counts as a pullback.
+3. **Sell signal** (bearish trend): a pullback hump above zero that lasts at least `PullbackMinBars` bars and is no larger than `PullbackMaxRatio` times the big hump, then the first bar with the MACD back below zero. Top01, Top04, Top07 and the BTC preset R01 use `PullbackMinBars=1`, so a single bar across zero counts as a pullback.
 4. **Stop loss:** above the highest high of the pullback hump (including the signal bar), plus `SL_Buffer_Points` and the spread. No hump, no stop, no trade.
-5. **Take profit:** every shipped preset uses a fixed multiple of the risk (`TP_Mode=TP_FIXED_RR`, `TP_RR`). The other mode, `TP_PREV_HUMP`, aims at the previous hump's extreme, taken a little early (`TP_Anticipation`).
+5. **Take profit:** the six gold presets and the BTC presets R02 to R04 use a fixed multiple of the risk (`TP_Mode=TP_FIXED_RR`, `TP_RR`). BTC R01 uses the other mode, `TP_PREV_HUMP`: the previous hump's extreme, taken a little early (`TP_Anticipation=0.1`).
 6. **Weak signals are skipped:** only the first `MaxSignalsPerBigHump` signals after a big hump are traded, and the trend lapses after `TrendMaxBars` bars without a new big hump.
 7. **Buys** are the exact mirror.
 8. **Trend filter** (`UseHTFFilter`): sell only if the last closed `HTF_Timeframe` bar closed below its EMA(`HTF_EMA_Period`), buy only if above. Each preset sets its own timeframe and period; Top02 and the BTC presets R01 and R04 use no filter.
@@ -129,7 +129,7 @@ These four were the first BTC presets. They were calibrated on a BTC price file 
 
 ### Original five presets
 
-Backtest: FTMO XAUUSD one-minute data, January 2025 to May 2026, real spreads, risk-% sizing. Settings were chosen with 2025 only; 2026 is out of sample. The two v1.31 rules were added after seeing all the data.
+Backtest: FTMO XAUUSD one-minute data, January 2025 to May 2026, real spreads, risk-% sizing. Settings were searched on 2025 only, but the five were kept after seeing 2026 and the two v1.31 rules were added with all the data in view, so the 2026 column is in-sample.
 
 | Preset | Chart / trend filter | Session (server time) | Trades | PF | 2025 PF | 2026 PF |
 |---|---|---|---|---|---|---|
@@ -172,5 +172,5 @@ The backtest engine was audited by three independent reviews: no look-ahead was 
 - **One-year risk at the harsher costs:** 95th-percentile drawdown 6.4R to 11.3R per preset; losing streaks up to 9 trades.
 - **Not tested here:** data before 2025 and swaps. Data after May 2026 was tested later; see the top of this guide.
 
-Use these presets for Strategy Tester (real ticks) and demo testing only until they are confirmed there.
+These presets were not confirmed: see the status at the top. Strategy Tester and demo only.
 

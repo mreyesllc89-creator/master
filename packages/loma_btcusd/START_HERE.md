@@ -53,7 +53,7 @@ All four trade the M5 chart. Data: Binance BTCUSDT one-minute prices in broker s
 
 ## Settings that are specific to BTC
 
-- **Points are 0.01 USD** with `AutoScalePoints=true`, whatever your broker's number of digits: `SL_Buffer_Points=3500` is $35, `MinSL_Points=7000` is $70, `MaxSpread_Points=3000` lets trades open up to a $30 spread.
+- **Points are 0.01 USD** with `AutoScalePoints=true`, whatever your broker's number of digits: for example R01's `SL_Buffer_Points=3500` is $35 and R03's `MinSL_Points=7000` is $70 (the other presets use $5 to $10 and $10 to $35). `MaxSpread_Points=3000`, in all four, lets trades open up to a $30 spread.
 - **`MaxSlippage_Points=1000` ($10)** and **`TrailStep_Points=200` ($2):** the trailing stop moves in steps of at least $2.
 - **Weekend close is off:** BTC trades through the weekend at most brokers.
 - **Server time:** sessions and the end-of-day close are broker server time on a GMT+2 (winter) / GMT+3 (summer) clock, the clock of VT Markets and FTMO. Shift them if your broker's clock differs.
@@ -65,8 +65,8 @@ All four trade the M5 chart. Data: Binance BTCUSDT one-minute prices in broker s
 
 ## If you want to test it
 
-- **Strategy Tester first:** "Every tick based on real ticks" on your broker's BTCUSD, deposit currency equal to your account's. Test January 2025 – 15 May 2026 and 16 May 2026 – today separately, and compare profit before commission, commission and swap. If your broker has BTC history for 2023 and 2024, test those years too: that is where the backtest lost.
-- **Then demo**, all four presets together on a hedging account, for a few months. Do not put real money on them before the tester and the demo agree with the 2026 figures above.
+- **Strategy Tester first:** "Every tick based on real ticks" on your broker's BTCUSD, deposit currency equal to your account's. In the tester, the Load dialog of the Inputs tab usually opens in `MQL5\Profiles\Tester`; browse to `MQL5\Presets` for these files. Test January 2025 – 15 May 2026 and 16 May 2026 – today separately, and compare profit before commission, commission and swap. If your broker has BTC history for 2023 and 2024, test those years too: that is where the backtest lost.
+- **Then demo only**, all four presets together on a hedging account. A tester run and a demo that match the 2026 figures show that the EA trades its backtest, not that the edge is real: the same presets lost on 2024 and 2023.
 
 ### Asking Codex to compile without changing anything
 
