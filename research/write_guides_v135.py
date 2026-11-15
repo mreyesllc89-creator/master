@@ -33,7 +33,7 @@ def sess(s):
 def v135_inputs():
     return """## New in v1.35
 
-- **`TrailMode`** chooses the trailing system; `TrailStartR`, `TrailDistanceR` and the new **`TrailParam`** are read in its units (R, ATR multiples, percent of the entry price or the share of profit kept, as the input comments say). 0 = the EA's own (multiples of the risk, as before), 1 = ATR at entry, 2 = percent of price, 3 = profit lock, 4 = stepped, 5 = chandelier, 6 = candle lows / highs, 7 = EMA, 8 = SMA, 9 = Parabolic SAR, 10 = Bollinger band, 11 = higher-timeframe candle, 12 = swing pivots, 13 = hump structure. Every system except 0 and 4 moves the stop once per closed one-minute bar, as the backtest does; the stop only ever moves closer.
+- **`TrailMode`** chooses the trailing system. `TrailStartR` and `TrailDistanceR` are read in its units (R, ATR multiples, percent of the entry price or the share of profit kept, as the comments of the `TrailMode` choices say; their own input labels still say R), and the new **`TrailParam`** is the period, number of bars, candle minutes or variant of the level systems. 0 = the EA's own (multiples of the risk, as before), 1 = ATR at entry, 2 = percent of price, 3 = profit lock, 4 = stepped, 5 = chandelier, 6 = candle lows / highs, 7 = EMA, 8 = SMA, 9 = Parabolic SAR, 10 = Bollinger band, 11 = higher-timeframe candle, 12 = swing pivots, 13 = hump structure. Every system except 0 and 4 moves the stop once per closed one-minute bar, as the backtest does; the stop only ever moves closer.
 - **`UseStochTurnFilter`** (with `StochTurnBars`, `StochTurnHigh`, `StochTurnLow`): enter only when the Stochastic (7, 1, 7) of the trigger timeframe came from 80 (sells) or 20 (buys) within the last 5 bars and turned.
 - **`ScaleWithPrice`** with **`ReferencePrice`**: the stop buffer, minimum and maximum stop follow the price, relative to the price they were calibrated at (the spread, slippage and trailing-step limits do not).
 - With these inputs at their defaults v1.35 trades like v1.34, with one difference: a spread exactly equal to `MaxSpread_Points` is now always accepted, as in the backtest (v1.34 refused it about half the time, by floating-point rounding). The earlier presets work unchanged.
@@ -95,9 +95,13 @@ def btc(wf_presets="presets/btc_wf", t15="presets/trailing15/btc"):
         "and then run unchanged on 16 May – 13 November 2026: 133 trades, profit factor 1.42 (1.37 in the stress test). On the two years before the calibration "
         "data they lost: profit factor 0.79 in 2024 (276 trades) and 0.83 in 2023 (291 trades).\n\nAll four trade the M5 chart.")
     settings = old[i["## Settings that are specific to BTC"]:i["## If you want to test it"]]
+    m5d = json.load(open("presets/btc/BTC_RECAL_PRESETS_DETAIL.json"))["M5"]; m5x, m5w = m5d["exposure_unseen"], m5d["exposure_whole_series"]
     settings = (settings.replace("v1.34 warns on a netting account", "The EA warns on a netting account")
                 .replace("- **Account size:** the stops are wide:", "- **Account size (M5 presets):** the stops are wide:")
                 .replace("- **Leverage:** the stops are small next to the price,", "- **Leverage (M5 presets):** the stops are small next to the price,")
+                .replace(f"typically {m5x['per_trade_median']:.1f} times the balance (up to {m5x['per_trade_max']:.1f} times in the unseen months), and the four presets together held up to {m5x['all_presets_max']:.1f} times the balance.",
+                         f"typically {m5x['per_trade_median']:.1f} times the balance; in the unseen months one position reached {m5x['per_trade_max']:.1f} times and the four together "
+                         f"{m5x['all_presets_max']:.1f} times, and over the whole data one position alone reached {m5w['per_trade_max']:.1f} times.")
                 .replace("`MaxSpread_Points=3000`, in all four, lets trades open", "`MaxSpread_Points=3000`, in every BTC preset, lets trades open")
                 .replace("(the other presets use $5 to $10 and $10 to $35)",
                          "(R02 and R04 use $5 to $10 and $10 to $35; the `Loma_WF` presets $5 to $50 and $10 to $150 at their `ReferencePrice`, scaled with the price; "
@@ -166,7 +170,7 @@ def btc(wf_presets="presets/btc_wf", t15="presets/trailing15/btc"):
 
 ## The year-by-year test: presets `Loma_WF_BTC_M30_*`
 
-**How it was tested.** Binance BTCUSDT one-minute prices from 2018 to 13 November 2026, in broker server time. For every year from 2021 to 2025, 12,000 setups per timeframe (M1 to H1) were scored on the three years before it, with each of 58 entry conditions added one at a time and the method without one (59 cells per timeframe). The best of them, up to 10 (one per direction, session and trend-filter family, each with a profit factor of at least 1.3 in all three years at normal and stressed costs, and costs under 1/8 of the risk), were then traded on that year unchanged. A timeframe-and-condition cell passes with a profit factor of 1.3 or more over its unseen years together, 1.1 or more with stressed costs, at least two years with 50 trades and no such year below 1.0. The 2026 months were not used to decide which cells passed; they were run at the end for the two cells that did, and the one with the better 2026 result is shipped. Costs: a $10 spread, scaled with the price like every dollar distance of a setup, so a setup means the same in 2021 as today; stressed = one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC, also scaled.
+**How it was tested.** Binance BTCUSDT one-minute prices from 2018 to 13 November 2026, in broker server time. For every year from 2021 to 2025, 12,000 setups per timeframe (M1 to H1) were scored on the three years before it, with each of 58 entry conditions added one at a time and the method without one (59 cells per timeframe). The best of them, up to 10 (one per direction, session and trend-filter family, each with a profit factor of at least 1.3 in all three years at normal and stressed costs, and costs under 1/8 of the risk), were then traded on that year unchanged. A timeframe-and-condition cell passes with a profit factor of 1.3 or more over its unseen years together, 1.1 or more with stressed costs, at least two years with 50 trades and no such year below 1.0. The 2026 months were not used to pick setups or to decide which cells passed (they were computed for every cell, as a check); of the two cells that passed, the one with the better 2026 result is shipped. Costs: a $10 spread, scaled with the price like every dollar distance of a setup, so a setup means the same in 2021 as today; stressed = one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC, also scaled.
 
 **What passed.** Of {fact['cells']} cells, {fact['passed']} passed, both on M30 with the Stochastic turn rule: the rule alone (these presets) and the rule with a liquidity sweep added. The sweep holds on about 95% of signals, so the two are one result; the second scored {f2(both['final']['pf'])} on the 2026 months and is not shipped. None of the {fact['controls']} random-half controls passed. The method without an extra condition passed on no timeframe (M30: {f2(base30['pf'])} on {base30['n']} trades).
 
@@ -179,7 +183,7 @@ def btc(wf_presets="presets/btc_wf", t15="presets/trailing15/btc"):
 
 **Why it is not a proven edge** (an independent audit of the test, `research/results/wf/chance_check.json`):
 - **Chance.** Cells built like the real ones but cut loose from the signals (a condition's mask moved in time, random masks) passed {plc['passed']} times in {plc['cells']:,}: about {plc['expected_passes']:.1f} passes expected by chance among {fact['cells']} cells (95% range {plc['ci95'][0]:.2f} to {plc['ci95'][1]:.1f}). When each year's results are swapped among setups, which removes any skill in choosing them, {nsk['mean']:.1f} cells pass per run on average and two or more in {nsk['at_least_2'] * 100:.0f}% of the runs; this cell itself still passes in {ch['real_passes_in_nulls']['M30 xlzc_stoch']['no_skill_share'] * 100:.0f}% of them. What passed is the rule's good years ({min(y['year'] for y in cell['by_year'] if y['n'])} – {cell['by_year'][-1]['year']}), not the choice of setups.
-- **The same signal counted several times.** The picks often take the same signal: the {thin['walk_forward']['trades']} trades of {cell['by_year'][0]['year']} – {cell['by_year'][-1]['year']} are {thin['walk_forward']['signals']} signals, and counted once each the profit factor is {f2(thin['walk_forward']['pf_signals'])} (weekly resampling {f2(thin['walk_forward']['bootstrap_signals']['p05'])} to {f2(thin['walk_forward']['bootstrap_signals']['p95'])}, under 1.3 in {thin['walk_forward']['bootstrap_signals']['below_1_3'] * 100:.0f}% of the resamples). In 2026 the {thin['final']['trades']} trades were {thin['final']['signals']} signals ({f2(thin['final']['pf_signals'])} per signal), and the 10 largest trades made {thin['final']['net_share_of_10_largest'] * 100:.0f}% of the profit.
+- **The same signal counted several times.** The picks often take the same signal: the {thin['walk_forward']['trades']} trades of {cell['by_year'][0]['year']} – {cell['by_year'][-1]['year']} are {thin['walk_forward']['signals']} signals, and counted once each the profit factor is {f2(thin['walk_forward']['pf_signals'])} (weekly resampling {f2(thin['walk_forward']['bootstrap_signals']['p05'])} to {f2(thin['walk_forward']['bootstrap_signals']['p95'])}, under 1.3 in {thin['walk_forward']['bootstrap_signals']['below_1_3'] * 100:.0f}% of the resamples). In 2026 the {thin['final']['trades']} trades were {thin['final']['signals']} signals (profit factor {f2(thin['final']['pf_signals'])} counted once per signal), and the 10 largest trades made {thin['final']['net_share_of_10_largest'] * 100:.0f}% of the profit.
 - **Thin years.** Only {sum(1 for y in cell['by_year'] if y['n'])} of the {len(cell['by_year'])} windows produced setups; read strictly (trades in every unseen year), no cell passes.
 - **The 2026 check** is profitable but under 1.3 ({f2(fin['pf'])}, {fin['net_r']:+.1f}R, {fy['positive_months']} of {fy['months']} months positive). Resampling its weeks gives {f2(fy['resampling']['p05'])} to {f2(fy['resampling']['p95'])} in nine cases out of ten, with a {fy['resampling']['below_1_0'] * 100:.0f}% chance of a result below 1.0.
 - **The same rule did not pass on the other timeframes** ({other_tf}).
@@ -221,9 +225,9 @@ def btc(wf_presets="presets/btc_wf", t15="presets/trailing15/btc"):
 5. Enable **Algo Trading**.
 
 """
-    test = """## If you want to test it
+    test = f"""## If you want to test it
 
-- **Strategy Tester first:** "Every tick based on real ticks" on your broker's BTCUSD, deposit currency equal to your account's. In the tester, the Load dialog of the Inputs tab usually opens in `MQL5\\Profiles\\Tester`; browse to `MQL5\\Presets` for these files. For the `Loma_WF` presets test 2024 to today, preset by preset and year by year, and compare each with its row in the table of the 10 presets (2024, 2025, 2026); also compare profit before commission, commission and swap. 2023 lies before the years they were picked on and has no figure here.
+- **Strategy Tester first:** "Every tick based on real ticks" on your broker's BTCUSD, deposit currency equal to your account's. In the tester, the Load dialog of the Inputs tab usually opens in `MQL5\\Profiles\\Tester`; browse to `MQL5\\Presets` for these files. For the `Loma_WF` presets use a deposit of at least ${-(-10 * ex['all_years']['stop_max'] // 5000) * 5000:,.0f} (at `RiskPercent=0.1` a trade is skipped unless the equity is at least 10 times its stop, and their stops reached ${ex['all_years']['stop_max']:,.0f}), and test 2024 to today, preset by preset and year by year, and compare each with its row in the table of the 10 presets (2024, 2025, 2026); also compare profit before commission, commission and swap. 2023 lies before the years they were picked on and has no figure here.
 - **Then demo**, the `Loma_WF` presets together on a hedging account at `RiskPercent=0.1`. A tester run and a demo that match the figures above show that the EA trades its backtest, not that the edge is real: the 2026 check was 1.26, and chance can explain the pass.
 
 """
@@ -259,7 +263,7 @@ def gold(t15="presets/trailing15/gold"):
     for tf in ("M1", "M2", "M3", "M5", "M10", "M15", "M30", "H1"):
         r = base[tf]
         if not r["n"]:
-            brows.append(f"| {tf} | no setup held PF 1.3 in three years running | – | – |"); continue
+            brows.append(f"| {tf} | no setup held PF 1.3 in three years running at normal and stressed costs | – | – |"); continue
         lose = [y["year"] for y in r["by_year"] if y["n"] >= 50 and y["pf"] < 1.0]
         brows.append(f"| {tf} | {f2(r['pf'])} ({r['n']}) | {f2(r['stress_pf'])} | {', '.join(map(str, lose)) or 'none'} |")
     best = sorted([r for r in rows if r["n"] >= 100], key=lambda r: -r["pf"])[:5]
@@ -279,8 +283,9 @@ def gold(t15="presets/trailing15/gold"):
     t15_n = sum(c["setups"] for c in sg); t15_alone = sum(1 for c in sg for q in c["picks"] if q["unseen_pf"] < 1.3)
     near = sorted([r for r in rows if r["n"] >= 100 and r["pf"] >= 1.3 and r["stress_pf"] >= 1.1 and not r["losing_years"]], key=lambda r: -r["pf"])
     n50 = {0: "none of its years", 1: "only one of its years"}
-    bl_first = (f"the closest, {near[0]['tf']} {near[0]['text'].split(' (')[0]}, made {f2(near[0]['pf'])} on {near[0]['n']} trades with no losing year, "
-                f"but {n50.get(near[0]['years_with_50_trades'], str(near[0]['years_with_50_trades']) + ' of its years')} had 50 trades" if near else "the best are listed below")
+    bl_first = (f"the best by profit factor, {near[0]['tf']} {near[0]['text'].split(' (')[0]}, made {f2(near[0]['pf'])} on {near[0]['n']} trades with no losing year in "
+                f"{years[0]} – {years[-1]}, but {n50.get(near[0]['years_with_50_trades'], str(near[0]['years_with_50_trades']) + ' of its years')} had 50 trades, "
+                f"and it made {f2(near[0]['final']['pf'])} on {near[0]['final']['n']} trades in the 2026 months kept back" if near else "the best are listed below")
     status = f"""> **Do not trade these presets with real money.**
 > - **Year-by-year test: no gold result passed.** Set up on three years and traded on the next, 2016 to 2025, with 58 entry conditions tried one at a time at VT Markets' costs: none of the {fact['cells']} timeframe-and-condition cells held a profit factor of 1.3 over at least two years with 50 trades without a losing year ({bl_first}).
 > - **The six `Loma_Top` presets** lost on the months after their calibration: on VT Markets real ticks (1 June – 6 November 2026) profit factor 0.74 before commission and 0.67 at VT's $0.60 per lot, on 247 trades. Dukascopy prices agree.
@@ -315,7 +320,21 @@ The best cells with at least 100 unseen trades: {'; '.join(bl)}. The year-by-yea
 
 """
     install = old[i["## Install"]:i["## The six presets"]].replace("pick a preset.", "pick a preset (`Loma_T15` presets need this v1.35).")
-    for a_, b_ in (("trailing in multiples of the risk, maximum holding time, end-of-day close and Friday close, as set in each preset.",
+    t15g = pd.read_csv(os.path.join(t15, "GOLD_TRAILING15_SUMMARY.csv"))
+    def setv(f, k):
+        return re.search(rf"^{k}=(.*)$", open(os.path.join(t15, f + ".set")).read(), re.M).group(1)
+    req = [(f, setv(f, "StochLow"), setv(f, "StochHigh")) for f in t15g.file if setv(f, "RequireStochLevel") == "true"]
+    pb1 = [f for f in t15g.file if setv(f, "PullbackMinBars") == "1"]
+    short = lambda f: f.split("_")[4] + " " + f.split("_")[5]
+    lv = {}
+    for f, lo, hi in req:
+        lv.setdefault(f"{float(lo):g}/{float(hi):g}", []).append(short(f))
+    for a_, b_ in (("With `RequireStochLevel` on (Top04: 25/75, Top07: 20/80) the Stochastic must also reach `StochLow` / `StochHigh`; Top01, Top02, Top03 and Top05 do not require it.",
+                    "With `RequireStochLevel` on (Top04 at 25/75 and Top07 at 20/80; among the `Loma_T15_Gold` presets " + "; ".join(f"{', '.join(v)} at {k}" for k, v in sorted(lv.items()))
+                    + ") the Stochastic must also reach `StochLow` / `StochHigh`; the other presets do not require it."),
+                   ("(1 in Top01, Top04 and Top07, so one bar across zero counts)",
+                    "(1 in Top01, Top04, Top07 and the `Loma_T15_Gold` presets " + ", ".join(short(f) for f in pb1) + ", so one bar across zero counts)"),
+                   ("trailing in multiples of the risk, maximum holding time, end-of-day close and Friday close, as set in each preset.",
                     "trailing in multiples of the risk (Top presets) or the system set in `TrailMode` (ATR at entry, percent, chandelier or hump structure in the "
                     "`Loma_T15_Gold` presets), maximum holding time, end-of-day close and Friday close, as set in each preset."),):
         assert a_ in rules, a_

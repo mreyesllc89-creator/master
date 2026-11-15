@@ -247,8 +247,8 @@ def wf(work, tf, key, out_dir, magic, detail_json=None):
         dj = json.load(open(detail_json)); a = dj["all_unseen_years"]
         hist = ("Year by year, setups picked by this rule on the three years before each year: "
                 + ", ".join(f"{y} PF {v['pf']:.2f} ({v['n']} trades)" for y, v in a["by_year"].items())
-                + f"; all {len(a['by_year'])} unseen years together PF {a['pf']:.2f} ({a['n']} trades, stressed {a['stress']['pf']:.2f}). "
-                f"The last year ({max(a['by_year'])}) was kept back and checked once.")
+                + f". The last year ({max(a['by_year'])}) was kept back: it was not used to pick the setups or to decide the pass "
+                f"({min(a['by_year'])} - {sorted(a['by_year'])[-2]} decided it).")
     os.makedirs(out_dir, exist_ok=True)
     tag = "BTC" if btc else "Gold"
     rows = []

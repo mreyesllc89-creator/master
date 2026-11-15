@@ -71,7 +71,7 @@ gold_recal = (f"every timeframe from M1 to H1 was re-calibrated on January 2025 
               f"23 trailing systems ({F['setups']['all23']:,} setups per timeframe), and the best 10 setups of each were run on 16 May – 13 November 2026. "
               f"No gold timeframe holds a profit factor of 1.3 there: the range is {F['gold_min']:.2f} to {F['gold_max']:.2f} "
               f"({F['vt_min']:.2f} to {F['vt_max']:.2f} at VT's costs), and {gold_best}.{gold_lead_txt}")
-btc_status = (f"the four new M5 presets passed the unseen months of 2026 (profit factor {m5['pf']:.2f} on {m5['n']} trades, 16 May – 13 November) and lost on the "
+btc_status = (f"the four M5 presets of the re-calibration passed the unseen months of 2026 (profit factor {m5['pf']:.2f} on {m5['n']} trades, 16 May – 13 November) and lost on the "
               f"two years before the calibration data ({m5['y2024']:.2f} in 2024, {m5['y2023']:.2f} in 2023): unproven, demo only. "
               f"The earlier `Loma_BTC01`–`BTC04` presets are withdrawn; they were fitted on a price file with a wrong clock.")
 if p23 == ["M5"]:
@@ -196,7 +196,8 @@ expect = [
     f"with the extra costs alone it is {DET['pf_extra_costs_without_late_entry']:.2f}",
     f"R02 shares entry minutes with R03 ({DET['shared_entry_minutes']['R02+R03']}) and R01 ({DET['shared_entry_minutes']['R01+R02']}), and R03 with R04 ({DET['shared_entry_minutes']['R03+R04']})",
     f"open together {ex['pairs_open_together']} times, {ex['pairs_same_direction']} of them in the same direction, and up to {words[ex['max_positions_open']]} at once: {0.5 * ex['max_positions_open']:.0f}% at risk",
-    f"typically {ex['per_trade_median']:.1f} times the balance (up to {ex['per_trade_max']:.1f} times in the unseen months), and the four presets together held up to {ex['all_presets_max']:.1f} times",
+    f"typically {ex['per_trade_median']:.1f} times the balance; in the unseen months one position reached {ex['per_trade_max']:.1f} times and the four together "
+    f"{ex['all_presets_max']:.1f} times, and over the whole data one position alone reached {DET['exposure_whole_series']['per_trade_max']:.1f} times",
 ]
 assert 0.30 <= DET["weekly_resampling"]["share_below_1_3"] <= 0.37, "the guide says about a third"
 assert set(DET["shared_entry_minutes"]) == {"R02+R03", "R01+R02", "R03+R04"} and DET["unseen_low_date"][5:7] == "07" and DET["unseen_high_date"][5:7] == "09"

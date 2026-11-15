@@ -136,6 +136,10 @@ GOLD_M1 = os.environ.get("HUMP_GOLD_M1", "/tmp/claude-0/-workspace-master/53e0ea
 # The EA's Friday close (WeekendCloseTime, server time, minutes): gold and EURUSD 23:00; US500 15 minutes before its
 # usual Friday close (build reports the close it finds and stops if this window would not start before it).
 WEEKEND_MIN = {"US500": None}.get(SYM, 1380)
+# Protocol 2: a year in which one clock mark sits elsewhere for a reason of the data provider, found when the data was
+# first checked and reported (as GOLD_BREAK_EXCEPTIONS for gold): that mark's threshold is lowered for that year only;
+# the shifted copies must still fail with it. (symbol, year) -> keyword arguments of the check, and the reason.
+CLOCK_EXCEPTIONS = {}
 SEED_OFFSET = {"BTCUSD": 1000, "EURUSD": 2000, "US500": 3000}.get(SYM, 0)    # random controls: one stream per symbol
 HTF_UP = {"M1": ("M5", "M15"), "M2": ("M10", "M30"), "M3": ("M15", "H1"), "M5": ("M15", "H1"), "M10": ("M30", "H1"),
           "M15": ("H1", "H4"), "M30": ("H1", "H4"), "H1": ("H4", "D1")}
@@ -233,24 +237,29 @@ def build(work, src):
 
 
 # ----------------------------------------------------------------------------- protocol 2: EURUSD and US500
-def clock2(m1, spread, label):
+def clock2(m1, spread, label, **kw):
     """The clock checks of a protocol-2 symbol; stops (SystemExit) when one fails. Returns the lines.
     EURUSD: the weekly open on Monday 00:00-00:05 server time and the daily rollover's spread at 23:50-00:10
     (hump_tf_recal.clock_check_fx; the US-open jump only recorded). US500: the daily reopen at 01:00-01:15 server
     time on 90% of the days and the US stock open at 16:30 the largest of the half-past jumps in two thirds of the
-    quarters (hump_tf_recal.clock_check with top=1)."""
+    quarters (hump_tf_recal.clock_check with top=1). kw: a lowered threshold of CLOCK_EXCEPTIONS."""
     if SYM == "EURUSD":
-        return list(R.clock_check_fx(m1, spread, label))
-    return [R.clock_check(m1[["open", "high", "low", "close"]], label, min_reopen=0.9, jump_fatal=True, top=1)]
+        return list(R.clock_check_fx(m1, spread, label, **kw))
+    return [R.clock_check(m1[["open", "high", "low", "close"]], label, **dict(dict(min_reopen=0.9), **kw), jump_fatal=True, top=1)]
 
 
-def clock_suite(m1, spread, tag=""):
-    """clock2 on the whole series and on every year with more than 100000 bars, all fatal."""
+def clock_suite(m1, spread, tag="", notes=None):
+    """clock2 on the whole series and on every year with more than 100000 bars, all fatal (a year of CLOCK_EXCEPTIONS
+    with its lowered threshold, recorded in notes)."""
     lines = clock2(m1, spread, f"{SYM}{tag} whole series")
     for y in sorted(set(m1.index.year)):
         sel = np.asarray(m1.index.year == y)
         if sel.sum() > 100000:
-            lines += clock2(m1[sel], spread[sel], f"{SYM}{tag} {y}")
+            exc = dict(CLOCK_EXCEPTIONS.get((SYM, int(y)), {}))
+            why = exc.pop("why", None)
+            if why and notes is not None:
+                notes.append(f"{y}: clock exception {exc}: {why}")
+            lines += clock2(m1[sel], spread[sel], f"{SYM}{tag} {y}", **exc)
     return lines
 
 
@@ -269,7 +278,8 @@ def build2(work, folder):
     t0 = time.time()
     m1, half = D.load(folder)
     m1 = m1[["open", "high", "low", "close", "vol"]].astype(float)
-    spread = 2.0 * np.asarray(half, float)                       # Dukascopy spread (ask close - bid close) of each bar
+    # Dukascopy spread (ask close - bid close) of each bar, in the feed's price steps (equal spreads, equal numbers)
+    spread = np.round(2.0 * np.asarray(half, float) * DUK_DIVISOR[SYM]) / DUK_DIVISOR[SYM]
     assert m1.index.is_monotonic_increasing and not m1.index.duplicated().any() and len(spread) == len(m1)
     assert np.isfinite(m1[["open", "high", "low", "close"]].values).all() and (m1["low"] <= m1["high"]).all()
     print(f"{SYM}: {len(m1)} bars {m1.index[0]} .. {m1.index[-1]} read in {time.time() - t0:.0f}s", flush=True)
@@ -298,7 +308,7 @@ def build2(work, folder):
                  f"{sched['weekly_close']['top'][close]:.0%} of {sched['weekly_close']['n']} closures; Saturday bars: "
                  f"{sched['saturday_bars']}); the EA's Friday window starts at {WEEKEND_MIN // 60:02d}:{WEEKEND_MIN % 60:02d}")
     # the clock: fatal on the whole series and on every year with enough bars
-    lines = clock_suite(m1, spread)
+    lines = clock_suite(m1, spread, notes=notes)
     gaps = pd.Series(m1.index).diff().dt.total_seconds().div(60)
     big = [(str(m1.index[i - 1]), str(m1.index[i]), int(g)) for i, g in gaps.items() if g > 60 * 24 * 4]
     # anchor and the scale of the setup space: the 180 days that end on 2025-12-31
@@ -359,8 +369,9 @@ def clockshift(work, out_json=None):
         for label, sel in parts:
             if label != "whole series" and sel.sum() <= 100000:
                 continue
+            exc = {k: v for k, v in CLOCK_EXCEPTIONS.get((SYM, int(label)) if label.isdigit() else None, {}).items() if k != "why"}
             try:
-                clock2(s[sel], spread[sel], f"{SYM} shifted {hours:+d} h {label}")
+                clock2(s[sel], spread[sel], f"{SYM} shifted {hours:+d} h {label}", **exc)
                 out[label] = "PASSED"
             except SystemExit as err:
                 out[label] = f"failed: {err}"

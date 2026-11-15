@@ -3,7 +3,7 @@
 `XAUUSD_Loma_TrendPullback.mq5` trades the "loma" (MACD hump) method on gold in MetaTrader 5, buys and sells. This zip holds the EA, the six gold presets of the first calibration and the trailing presets of the re-calibration.
 
 > **Do not trade these presets with real money.**
-> - **Year-by-year test: no gold result passed.** Set up on three years and traded on the next, 2016 to 2025, with 58 entry conditions tried one at a time at VT Markets' costs: none of the 472 timeframe-and-condition cells held a profit factor of 1.3 over at least two years with 50 trades without a losing year (the closest, H1 MACD of both higher timeframes on the trade's side, made 1.53 on 165 trades with no losing year, but only one of its years had 50 trades).
+> - **Year-by-year test: no gold result passed.** Set up on three years and traded on the next, 2016 to 2025, with 58 entry conditions tried one at a time at VT Markets' costs: none of the 472 timeframe-and-condition cells held a profit factor of 1.3 over at least two years with 50 trades without a losing year (the best by profit factor, H1 MACD of both higher timeframes on the trade's side, made 1.53 on 165 trades with no losing year in 2016 – 2025, but only one of its years had 50 trades, and it made 0.36 on 43 trades in the 2026 months kept back).
 > - **The six `Loma_Top` presets** lost on the months after their calibration: on VT Markets real ticks (1 June – 6 November 2026) profit factor 0.74 before commission and 0.67 at VT's $0.60 per lot, on 247 trades. Dukascopy prices agree.
 > - **The `Loma_T15_Gold_*` trailing presets** come from four combinations of timeframe and trailing system whose setups together reached a profit factor of 1.3 on the 2026 months at FTMO's spread without commission. At VT's costs 2 of the 4 stay at 1.3 or more (M5 hump structure 1.31 and M10 ATR at entry 1.61) and M5 chandelier (1.23) and M10 percent of price (1.24) fall under it; 7 of the 16 presets were under 1.3 on their own, and the four groups lost on July – December 2024. Unproven: Strategy Tester and demo only.
 > - The EA itself works: it takes the same trades as the backtest.
@@ -16,9 +16,9 @@ Dukascopy gold one-minute prices from 2013 to 2024, FTMO for 2025 to 15 May 2026
 
 | Timeframe | Unseen 2016 – 2025: PF (trades) | Stressed | Unseen years with 50+ trades below 1.0 |
 |---|---|---|---|
-| M1 | no setup held PF 1.3 in three years running | – | – |
-| M2 | no setup held PF 1.3 in three years running | – | – |
-| M3 | no setup held PF 1.3 in three years running | – | – |
+| M1 | no setup held PF 1.3 in three years running at normal and stressed costs | – | – |
+| M2 | no setup held PF 1.3 in three years running at normal and stressed costs | – | – |
+| M3 | no setup held PF 1.3 in three years running at normal and stressed costs | – | – |
 | M5 | 0.92 (248) | 0.88 | 2016, 2017 |
 | M10 | 0.65 (286) | 0.55 | 2017, 2022, 2023 |
 | M15 | 0.71 (134) | 0.63 | 2017 |
@@ -66,11 +66,11 @@ v1.33 was compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. 
 
 ## New in v1.35
 
-- **`TrailMode`** chooses the trailing system; `TrailStartR`, `TrailDistanceR` and the new **`TrailParam`** are read in its units (R, ATR multiples, percent of the entry price or the share of profit kept, as the input comments say). 0 = the EA's own (multiples of the risk, as before), 1 = ATR at entry, 2 = percent of price, 3 = profit lock, 4 = stepped, 5 = chandelier, 6 = candle lows / highs, 7 = EMA, 8 = SMA, 9 = Parabolic SAR, 10 = Bollinger band, 11 = higher-timeframe candle, 12 = swing pivots, 13 = hump structure. Every system except 0 and 4 moves the stop once per closed one-minute bar, as the backtest does; the stop only ever moves closer.
+- **`TrailMode`** chooses the trailing system. `TrailStartR` and `TrailDistanceR` are read in its units (R, ATR multiples, percent of the entry price or the share of profit kept, as the comments of the `TrailMode` choices say; their own input labels still say R), and the new **`TrailParam`** is the period, number of bars, candle minutes or variant of the level systems. 0 = the EA's own (multiples of the risk, as before), 1 = ATR at entry, 2 = percent of price, 3 = profit lock, 4 = stepped, 5 = chandelier, 6 = candle lows / highs, 7 = EMA, 8 = SMA, 9 = Parabolic SAR, 10 = Bollinger band, 11 = higher-timeframe candle, 12 = swing pivots, 13 = hump structure. Every system except 0 and 4 moves the stop once per closed one-minute bar, as the backtest does; the stop only ever moves closer.
 - **`UseStochTurnFilter`** (with `StochTurnBars`, `StochTurnHigh`, `StochTurnLow`): enter only when the Stochastic (7, 1, 7) of the trigger timeframe came from 80 (sells) or 20 (buys) within the last 5 bars and turned.
 - **`ScaleWithPrice`** with **`ReferencePrice`**: the stop buffer, minimum and maximum stop follow the price, relative to the price they were calibrated at (the spread, slippage and trailing-step limits do not).
 - With these inputs at their defaults v1.35 trades like v1.34, with one difference: a spread exactly equal to `MaxSpread_Points` is now always accepted, as in the backtest (v1.34 refused it about half the time, by floating-point rounding). The earlier presets work unchanged.
-- v1.35 was checked in a C++ compile harness (the same diagnostics as v1.34) and in a simulated terminal that replays real one-minute prices, where it took the same trades as the Python backtest on the shipped setups. Two independent reviews found eight defects (the spread test above, the order of a history check, the entry minute of the stepped trailing and others), which were fixed and checked again. It has not been compiled in MetaEditor: if the compiler reports anything, send me the log rather than editing the file.
+- v1.35 was checked in a C++ compile harness (the same diagnostics as v1.34) and in a simulated terminal that replays real one-minute prices, where it took the same trades as the Python backtest on the shipped setups. Independent reviews found ten defects (the spread test above, the order of a history check, the entry minute of the stepped trailing, two cases after a restart of the EA and others), which were fixed and checked again. It has not been compiled in MetaEditor: if the compiler reports anything, send me the log rather than editing the file.
 
 ## The six Top presets (lost out of sample)
 
@@ -119,9 +119,9 @@ Steps:
 
 ## The rules in short
 
-1. **Trend first:** a big MACD hump below zero (bearish) or above zero (bullish). "Big" = peak at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and at least `BigHumpMinBars` bars. With `RequireStochLevel` on (Top04: 25/75, Top07: 20/80) the Stochastic must also reach `StochLow` / `StochHigh`; Top01, Top02, Top03 and Top05 do not require it. No big hump in force = lineal market = no trades.
+1. **Trend first:** a big MACD hump below zero (bearish) or above zero (bullish). "Big" = peak at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and at least `BigHumpMinBars` bars. With `RequireStochLevel` on (Top04 at 25/75 and Top07 at 20/80; among the `Loma_T15_Gold` presets Chandelier 2of4, Percent 2of4 at 20/80; Hump 2of4, Hump 3of4, Chandelier 4of4, ATRentry 1of4, ATRentry 2of4 at 25/75) the Stochastic must also reach `StochLow` / `StochHigh`; the other presets do not require it. No big hump in force = lineal market = no trades.
 2. **Trend break:** an opposite hump as large as `TrendBreakRatio` times the big hump.
-3. **Signal:** a pullback hump of at least `PullbackMinBars` bars (1 in Top01, Top04 and Top07, so one bar across zero counts) and at most `PullbackMaxRatio` times the big hump, then the first bar with the MACD back across zero. Only `MaxSignalsPerBigHump` signals per big hump, and none after `TrendMaxBars` bars.
+3. **Signal:** a pullback hump of at least `PullbackMinBars` bars (1 in Top01, Top04, Top07 and the `Loma_T15_Gold` presets Hump 1of4, Percent 1of4, so one bar across zero counts) and at most `PullbackMaxRatio` times the big hump, then the first bar with the MACD back across zero. Only `MaxSignalsPerBigHump` signals per big hump, and none after `TrendMaxBars` bars.
 4. **Stop:** beyond the pullback hump's extreme, plus `SL_Buffer_Points` and (for sells) the spread. **Target:** `TP_RR` times the risk in every preset.
 5. **Filters and exits:** higher-timeframe EMA filter, trading hours, spread limit, trailing in multiples of the risk (Top presets) or the system set in `TrailMode` (ATR at entry, percent, chandelier or hump structure in the `Loma_T15_Gold` presets), maximum holding time, end-of-day close and Friday close, as set in each preset.
 

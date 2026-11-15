@@ -166,7 +166,9 @@ def clock_check_fx(m1, spread, label, min_monday=0.9, min_rollover=0.8):
        a Monday between 00:00 and 00:05 server time after at least 90% of those closures.
     2. The daily rollover at 17:00 New York (00:00 server time) widens the spread every day. Quarter by quarter
        (quarters with 20000 bars or more), the minute of the day with the largest median spread (ask close - bid
-       close, `spread`, one value per bar) must lie between 23:50 and 00:10 server time in at least 80% of them.
+       close, `spread`, one value per bar, in the feed's own price steps so that equal spreads are equal numbers)
+       must lie between 23:50 and 00:10 server time in at least 80% of them. Minutes with the same median are told
+       apart by their mean spread.
 
     The US-open jump of clock_check (16:30 the largest of the half-past marks in two thirds of the quarters) is only
     recorded: a currency reacts to the 08:30 New York releases (15:30 server time) more than to the stock open.
@@ -191,8 +193,9 @@ def clock_check_fx(m1, spread, label, min_monday=0.9, min_rollover=0.8):
         mask = np.asarray(q == quarter)
         if mask.sum() < 20000:
             continue
-        med = pd.Series(spread[mask]).groupby(mod[mask]).median()
-        widest = int(med.idxmax())
+        g = pd.Series(spread[mask]).groupby(mod[mask])
+        st = pd.DataFrame(dict(med=g.median(), mean=g.mean()))
+        widest = int(st.sort_values(["med", "mean"], ascending=False, kind="stable").index[0])
         tested += 1
         if not (widest >= 23 * 60 + 50 or widest <= 10):
             bad.append((str(quarter), f"{widest // 60:02d}:{widest % 60:02d}"))
