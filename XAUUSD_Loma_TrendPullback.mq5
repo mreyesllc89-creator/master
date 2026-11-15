@@ -129,8 +129,10 @@
 //    of the bar after the cross. If a position is open, the spread is too wide, the session
 //    is closed or news is blocking at that moment, the signal is dropped (no retry later in
 //    the bar). A signal whose bar is followed by a market gap (next bar more than one period
-//    late: daily break, weekend) is not traded. After a restart inside the entry bar the
-//    deal history is checked so the same signal is never entered twice.
+//    late: daily break, weekend) is not traded. After a restart or re-init inside the bar the
+//    signal is not decided again: the bar is kept in terminal variable
+//    LOMA_<magic>_D_0_<symbol>_<timeframe>, and an entry already made is also found in the deal
+//    history.
 //  * A signal counts against MaxSignalsPerBigHump when it is produced, even if the trade is
 //    then skipped (spread, session, reward/risk, HTF filter, position already open), exactly
 //    as in the reference backtest.
@@ -149,6 +151,12 @@
 //    stop of the backtest is. A stop that is closer to the price than the broker's stops level is
 //    not placed in that minute. Levels of minutes in which the EA was not running are not
 //    applied afterwards.
+//  * Terminal global variables: LOMA_<magic>_R_<ticket> (initial risk) and
+//    LOMA_<magic>_A_<ticket> (ATR at entry) of a position, and
+//    LOMA_<magic>_D_0_<symbol>_<timeframe> (the trigger bar whose signal was decided, e.g.
+//    LOMA_26113001_D_0_XAUUSD_M2; deleted when a Strategy Tester pass starts).
+//  * Charts with the same magic number on one symbol and trigger timeframe share the decided
+//    trigger bar; give each chart its own magic number (the presets do).
 //+------------------------------------------------------------------+
 #property copyright   "mreyesllc89"
 #property version     "1.35"
@@ -650,6 +658,10 @@ int OnInit()
    g_trade.SetTypeFillingBySymbol(_Symbol);
    g_trade.LogLevel(LOG_LEVEL_ERRORS);
 
+   //--- Strategy Tester: a pass calls OnInit once; a decided bar left by an earlier pass is stale
+   if(MQLInfoInteger(MQL_TESTER))
+      GlobalVariableDel(GVKey("D", 0) + "_" + _Symbol + "_" + TFName(TriggerTimeframe));
+
    //--- hump state: rebuilt from history as soon as the indicator data is calculated
    //    (usually on the first tick; tried here too so the panel is right at once)
    ResetHumpState();
@@ -771,8 +783,20 @@ void OnTick()
          g_signalActive = false;
          LogSkip("this bar's signal was already traded (found in the deal history)");
         }
+      //--- ... nor decide it twice: the trigger bar whose signal was decided is kept in a terminal variable
+      //    (one per magic number, symbol and trigger timeframe; ticket 0, so the OnTrade clean-up keeps it).
+      //    It holds while the deal history is not available yet and for a signal that was refused (filter,
+      //    reward test).
+      string dKey = GVKey("D", 0) + "_" + _Symbol + "_" + TFName(TriggerTimeframe);
+      if(g_signalActive && GlobalVariableCheck(dKey) && (datetime)GlobalVariableGet(dKey) == barTime)
+        {
+         g_signalActive = false;
+         LogSkip("this bar's signal was already decided before a restart");
+        }
       if(g_signalActive)
         {
+         GlobalVariableSet(dKey, (double)barTime);
+         GlobalVariablesFlush();
          if(MarkSignals)
             MarkSignal(g_sigClosedBar, g_sigSide);
          if(ShowLevels)
@@ -843,8 +867,22 @@ void OnTick()
       g_signalActive = false;
       return;
      }
+   string dKey = GVKey("D", 0) + "_" + _Symbol + "_" + TFName(TriggerTimeframe);
    if(!TradingAllowed(g_sigSide))
+     {
+      //--- still waiting for algo trading: not decided yet, so a re-init inside the bar decides it again
+      if(GlobalVariableCheck(dKey) && (datetime)GlobalVariableGet(dKey) == barTime)
+        {
+         GlobalVariableDel(dKey);
+         GlobalVariablesFlush();
+        }
       return;
+     }
+   if(!GlobalVariableCheck(dKey) || (datetime)GlobalVariableGet(dKey) != barTime)
+     {
+      GlobalVariableSet(dKey, (double)barTime);    // before the order: a restart after it never sends it again
+      GlobalVariablesFlush();
+     }
 
    if(TryOpen(g_sigSide))
      {
@@ -1746,7 +1784,7 @@ void TrailFailed(const datetime now)
 //--- 1R of a position from its opening deal: |fill price - SL sent with the order| (0 = unknown)
 double InitialRiskFromHistory(const long positionId)
   {
-   if(!HistorySelectByPosition(positionId))
+   if(!HistorySelectByPosition((ulong)positionId))
       return 0.0;
    for(int k = 0; k < HistoryDealsTotal(); k++)
      {
@@ -1811,7 +1849,11 @@ void ManageOpenPositions()
         }
       double initRisk = GlobalVariableCheck(rKey) ? GlobalVariableGet(rKey) : 0.0;
       if(initRisk <= 0.0)
+        {
+         if(TrailMode != TRAIL_RISK)
+            allDone = false;                   // R8b: 1R not known yet: this M1 bar is evaluated on a later tick
          continue;
+        }
 
       //--- R8b: the trailing systems other than TRAIL_RISK. TRAIL_STEP on every tick, the others
       //    once per closed one-minute bar, on the first tick of the next M1 bar
