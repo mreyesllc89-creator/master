@@ -45,10 +45,10 @@
    "tf": "M1",
    "kind": "percent",
    "setups": 2941,
-   "eligible": 1876,
+   "eligible": 1875,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8680650984258599
+   "all_eligible_oos_pf": 0.8544695779494073
   },
   {
    "symbol": "XAUUSD",
@@ -58,7 +58,7 @@
    "eligible": 1934,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8875637693035422
+   "all_eligible_oos_pf": 0.8329696164226923
   },
   {
    "symbol": "XAUUSD",
@@ -88,7 +88,7 @@
    "eligible": 1872,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8439742266560154
+   "all_eligible_oos_pf": 0.8167691968164207
   },
   {
    "symbol": "XAUUSD",
@@ -168,7 +168,7 @@
    "eligible": 1921,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8781850906389645
+   "all_eligible_oos_pf": 0.8679055413879628
   },
   {
    "symbol": "XAUUSD",
@@ -178,7 +178,7 @@
    "eligible": 1905,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8673224654720616
+   "all_eligible_oos_pf": 0.8660195483953187
   },
   {
    "symbol": "XAUUSD",
@@ -236,12 +236,12 @@
    "kind": "percent",
    "setups": 3078,
    "eligible": 1629,
-   "is_ge_1_3": 2,
+   "is_ge_1_3": 3,
    "picked": 2,
-   "all_eligible_oos_pf": 0.8517903121425391,
+   "all_eligible_oos_pf": 0.8389954706342271,
    "oos_n": 144,
    "oos_pf": 0.6769287099581102,
-   "oos_stress_pf": 0.6469589899181566,
+   "oos_stress_pf": 0.6506258208979524,
    "passes": false
   },
   {
@@ -330,12 +330,12 @@
    "kind": "points",
    "setups": 2934,
    "eligible": 1587,
-   "is_ge_1_3": 4,
-   "picked": 3,
-   "all_eligible_oos_pf": 0.8195886760940576,
-   "oos_n": 171,
-   "oos_pf": 0.4972283034033399,
-   "oos_stress_pf": 0.38000358011847324,
+   "is_ge_1_3": 2,
+   "picked": 2,
+   "all_eligible_oos_pf": 0.767128609935909,
+   "oos_n": 114,
+   "oos_pf": 0.47230354595102686,
+   "oos_stress_pf": 0.38146758570988387,
    "passes": false
   },
   {
@@ -343,13 +343,13 @@
    "tf": "M2",
    "kind": "atr",
    "setups": 3001,
-   "eligible": 1666,
-   "is_ge_1_3": 1,
-   "picked": 1,
-   "all_eligible_oos_pf": 0.8258096000416285,
-   "oos_n": 46,
-   "oos_pf": 1.1282734948655833,
-   "oos_stress_pf": 1.0006475653888398,
+   "eligible": 1665,
+   "is_ge_1_3": 3,
+   "picked": 3,
+   "all_eligible_oos_pf": 0.8094201511126344,
+   "oos_n": 165,
+   "oos_pf": 0.7489171180771513,
+   "oos_stress_pf": 0.7157483195712226,
    "passes": false
   },
   {
@@ -402,7 +402,7 @@
    "eligible": 1632,
    "is_ge_1_3": 2,
    "picked": 2,
-   "all_eligible_oos_pf": 0.8449906715122665,
+   "all_eligible_oos_pf": 0.8442093254707356,
    "oos_n": 139,
    "oos_pf": 0.7008421483757836,
    "oos_stress_pf": 0.6889404331754905,
@@ -498,9 +498,13 @@
    "kind": "profitlock",
    "setups": 3073,
    "eligible": 1673,
-   "is_ge_1_3": 0,
-   "picked": 0,
-   "all_eligible_oos_pf": 0.8489331372447309
+   "is_ge_1_3": 1,
+   "picked": 1,
+   "all_eligible_oos_pf": 0.8421844206185655,
+   "oos_n": 91,
+   "oos_pf": 0.5438182839435246,
+   "oos_stress_pf": 0.5006779847363969,
+   "passes": false
   },
   {
    "symbol": "XAUUSD",
@@ -621,11 +625,11 @@
    "setups": 2938,
    "eligible": 1508,
    "is_ge_1_3": 5,
-   "picked": 4,
-   "all_eligible_oos_pf": 0.7983598628853661,
-   "oos_n": 283,
-   "oos_pf": 0.6880536801621037,
-   "oos_stress_pf": 0.5895448336005861,
+   "picked": 3,
+   "all_eligible_oos_pf": 0.7388356611959288,
+   "oos_n": 214,
+   "oos_pf": 0.6097083139111005,
+   "oos_stress_pf": 0.613669550743191,
    "passes": false
   },
   {
@@ -664,10 +668,10 @@
    "eligible": 1432,
    "is_ge_1_3": 3,
    "picked": 3,
-   "all_eligible_oos_pf": 0.7956004943729231,
+   "all_eligible_oos_pf": 0.7777429057560975,
    "oos_n": 181,
-   "oos_pf": 0.6983794733368868,
-   "oos_stress_pf": 0.656619313950695,
+   "oos_pf": 0.677127274515909,
+   "oos_stress_pf": 0.6804715086278567,
    "passes": false
   },
   {
@@ -676,12 +680,12 @@
    "kind": "atr",
    "setups": 3058,
    "eligible": 1532,
-   "is_ge_1_3": 1,
-   "picked": 1,
-   "all_eligible_oos_pf": 0.7716807401049552,
-   "oos_n": 48,
-   "oos_pf": 0.395986020794004,
-   "oos_stress_pf": 0.5632714282786507,
+   "is_ge_1_3": 3,
+   "picked": 3,
+   "all_eligible_oos_pf": 0.7603711751604652,
+   "oos_n": 146,
+   "oos_pf": 0.5597369883927041,
+   "oos_stress_pf": 0.6305171321256776,
    "passes": false
   },
   {
@@ -718,12 +722,12 @@
    "kind": "partial",
    "setups": 3010,
    "eligible": 1546,
-   "is_ge_1_3": 2,
-   "picked": 2,
-   "all_eligible_oos_pf": 0.7872813269548773,
-   "oos_n": 104,
-   "oos_pf": 0.9485768110587679,
-   "oos_stress_pf": 0.8715440451761152,
+   "is_ge_1_3": 3,
+   "picked": 3,
+   "all_eligible_oos_pf": 0.7864153006380236,
+   "oos_n": 162,
+   "oos_pf": 0.776189273484987,
+   "oos_stress_pf": 0.6975558376802437,
    "passes": false
   },
   {
@@ -839,13 +843,13 @@
    "tf": "M3",
    "kind": "profitlock",
    "setups": 2949,
-   "eligible": 1435,
-   "is_ge_1_3": 2,
-   "picked": 2,
-   "all_eligible_oos_pf": 0.7976388780774877,
-   "oos_n": 87,
-   "oos_pf": 0.8598935190936006,
-   "oos_stress_pf": 0.7377287317041629,
+   "eligible": 1434,
+   "is_ge_1_3": 4,
+   "picked": 4,
+   "all_eligible_oos_pf": 0.7924186957120029,
+   "oos_n": 190,
+   "oos_pf": 0.8893166640205838,
+   "oos_stress_pf": 0.8198386856787571,
    "passes": false
   },
   {
@@ -923,13 +927,13 @@
    "tf": "M5",
    "kind": "points",
    "setups": 3115,
-   "eligible": 1262,
-   "is_ge_1_3": 3,
-   "picked": 3,
-   "all_eligible_oos_pf": 0.9135094643414529,
-   "oos_n": 136,
-   "oos_pf": 1.0206987237930298,
-   "oos_stress_pf": 0.8577086050393349,
+   "eligible": 1261,
+   "is_ge_1_3": 1,
+   "picked": 1,
+   "all_eligible_oos_pf": 0.8486244133113808,
+   "oos_n": 51,
+   "oos_pf": 0.9260333771817386,
+   "oos_stress_pf": 0.9454135777687047,
    "passes": false
   },
   {
@@ -952,12 +956,12 @@
    "kind": "percent",
    "setups": 3069,
    "eligible": 1244,
-   "is_ge_1_3": 2,
-   "picked": 2,
-   "all_eligible_oos_pf": 0.9184752584880764,
-   "oos_n": 125,
-   "oos_pf": 1.0979660710974755,
-   "oos_stress_pf": 0.8421168481088359,
+   "is_ge_1_3": 3,
+   "picked": 3,
+   "all_eligible_oos_pf": 0.8977023601348919,
+   "oos_n": 176,
+   "oos_pf": 0.971726520143039,
+   "oos_stress_pf": 0.8392589856955308,
    "passes": false
   },
   {
@@ -966,12 +970,12 @@
    "kind": "atr",
    "setups": 2968,
    "eligible": 1164,
-   "is_ge_1_3": 2,
-   "picked": 2,
-   "all_eligible_oos_pf": 0.9013647564706752,
-   "oos_n": 107,
-   "oos_pf": 0.7054106508399925,
-   "oos_stress_pf": 0.5029419393664244,
+   "is_ge_1_3": 3,
+   "picked": 3,
+   "all_eligible_oos_pf": 0.8913322577325735,
+   "oos_n": 175,
+   "oos_pf": 0.8181694951435347,
+   "oos_stress_pf": 0.6898554879493493,
    "passes": false
   },
   {
@@ -1038,7 +1042,7 @@
    "eligible": 1245,
    "is_ge_1_3": 1,
    "picked": 1,
-   "all_eligible_oos_pf": 0.9273594495663003,
+   "all_eligible_oos_pf": 0.9265974496814378,
    "oos_n": 37,
    "oos_pf": 2.0287605536241964,
    "oos_stress_pf": 1.4712879987837468,
@@ -1094,7 +1098,7 @@
    "eligible": 1221,
    "is_ge_1_3": 2,
    "picked": 2,
-   "all_eligible_oos_pf": 0.9370073024329513,
+   "all_eligible_oos_pf": 0.9318450641586458,
    "oos_n": 100,
    "oos_pf": 1.2067253199839478,
    "oos_stress_pf": 1.0496003484933722,
@@ -1214,13 +1218,13 @@
    "kind": "percent",
    "setups": 3021,
    "eligible": 645,
-   "is_ge_1_3": 1,
-   "picked": 1,
-   "all_eligible_oos_pf": 1.1413479476723174,
-   "oos_n": 20,
-   "oos_pf": 1.0584528608755632,
-   "oos_stress_pf": 1.108790110806829,
-   "passes": false
+   "is_ge_1_3": 4,
+   "picked": 4,
+   "all_eligible_oos_pf": 1.1067670833128562,
+   "oos_n": 181,
+   "oos_pf": 1.310593938421616,
+   "oos_stress_pf": 1.246539806407461,
+   "passes": true
   },
   {
    "symbol": "XAUUSD",
@@ -1270,13 +1274,9 @@
    "kind": "points",
    "setups": 3102,
    "eligible": 670,
-   "is_ge_1_3": 1,
-   "picked": 1,
-   "all_eligible_oos_pf": 1.2118947097894446,
-   "oos_n": 45,
-   "oos_pf": 1.8981946446322568,
-   "oos_stress_pf": 2.237122555148622,
-   "passes": false
+   "is_ge_1_3": 0,
+   "picked": 0,
+   "all_eligible_oos_pf": 1.099993845308343
   },
   {
    "symbol": "XAUUSD",
@@ -1298,13 +1298,13 @@
    "kind": "atr",
    "setups": 2971,
    "eligible": 673,
-   "is_ge_1_3": 2,
-   "picked": 2,
-   "all_eligible_oos_pf": 1.156164911651076,
-   "oos_n": 93,
-   "oos_pf": 1.744336250819055,
-   "oos_stress_pf": 1.6166829624687629,
-   "passes": false
+   "is_ge_1_3": 4,
+   "picked": 4,
+   "all_eligible_oos_pf": 1.1453754262864124,
+   "oos_n": 206,
+   "oos_pf": 1.565212670893138,
+   "oos_stress_pf": 1.4545609502858654,
+   "passes": true
   },
   {
    "symbol": "XAUUSD",
@@ -1424,9 +1424,13 @@
    "kind": "partial",
    "setups": 2975,
    "eligible": 648,
-   "is_ge_1_3": 0,
-   "picked": 0,
-   "all_eligible_oos_pf": 1.094545269722014
+   "is_ge_1_3": 1,
+   "picked": 1,
+   "all_eligible_oos_pf": 1.0940688934147467,
+   "oos_n": 51,
+   "oos_pf": 0.949427026363614,
+   "oos_stress_pf": 1.0810968719893197,
+   "passes": false
   },
   {
    "symbol": "XAUUSD",
@@ -1448,12 +1452,12 @@
    "kind": "profitlock",
    "setups": 3094,
    "eligible": 708,
-   "is_ge_1_3": 5,
-   "picked": 4,
-   "all_eligible_oos_pf": 1.1024027289484464,
-   "oos_n": 181,
-   "oos_pf": 1.0595636039534757,
-   "oos_stress_pf": 0.9616684171100623,
+   "is_ge_1_3": 6,
+   "picked": 5,
+   "all_eligible_oos_pf": 1.098684274830771,
+   "oos_n": 217,
+   "oos_pf": 1.0824184352038673,
+   "oos_stress_pf": 1.0266540966798323,
    "passes": false
   },
   {
@@ -1562,10 +1566,10 @@
    "eligible": 376,
    "is_ge_1_3": 1,
    "picked": 1,
-   "all_eligible_oos_pf": 1.0162169689779674,
+   "all_eligible_oos_pf": 0.9128964536695489,
    "oos_n": 22,
-   "oos_pf": 3.745160225778818,
-   "oos_stress_pf": 2.2945008072678728,
+   "oos_pf": 3.262993519532488,
+   "oos_stress_pf": 2.14220576471394,
    "passes": false
   },
   {
@@ -1590,10 +1594,10 @@
    "eligible": 390,
    "is_ge_1_3": 1,
    "picked": 1,
-   "all_eligible_oos_pf": 0.8447595440522884,
+   "all_eligible_oos_pf": 0.838050171159867,
    "oos_n": 44,
    "oos_pf": 0.6032602483787876,
-   "oos_stress_pf": 0.6083370510566501,
+   "oos_stress_pf": 0.6204912030911114,
    "passes": false
   },
   {
@@ -1643,10 +1647,14 @@
    "tf": "M15",
    "kind": "percent",
    "setups": 2974,
-   "eligible": 357,
-   "is_ge_1_3": 0,
-   "picked": 0,
-   "all_eligible_oos_pf": 0.9556842265521577
+   "eligible": 356,
+   "is_ge_1_3": 1,
+   "picked": 1,
+   "all_eligible_oos_pf": 0.9214521708160512,
+   "oos_n": 25,
+   "oos_pf": 1.466142607068882,
+   "oos_stress_pf": 1.1680324425120432,
+   "passes": false
   },
   {
    "symbol": "XAUUSD",
@@ -1752,12 +1760,12 @@
    "kind": "partial",
    "setups": 2872,
    "eligible": 330,
-   "is_ge_1_3": 2,
-   "picked": 2,
-   "all_eligible_oos_pf": 0.8068494483414415,
-   "oos_n": 74,
-   "oos_pf": 1.0023852211034587,
-   "oos_stress_pf": 0.911228215352694,
+   "is_ge_1_3": 4,
+   "picked": 4,
+   "all_eligible_oos_pf": 0.8064364176600594,
+   "oos_n": 146,
+   "oos_pf": 0.80927351648804,
+   "oos_stress_pf": 0.7883952230791935,
    "passes": false
   },
   {
@@ -1808,12 +1816,12 @@
    "kind": "profitlock",
    "setups": 3033,
    "eligible": 355,
-   "is_ge_1_3": 2,
-   "picked": 2,
-   "all_eligible_oos_pf": 0.8290185966167679,
-   "oos_n": 40,
-   "oos_pf": 0.7299283505568062,
-   "oos_stress_pf": 0.8705245795061199,
+   "is_ge_1_3": 3,
+   "picked": 3,
+   "all_eligible_oos_pf": 0.8255840806324207,
+   "oos_n": 86,
+   "oos_pf": 0.8244909350050589,
+   "oos_stress_pf": 0.8943808972184841,
    "passes": false
   },
   {
@@ -1824,7 +1832,7 @@
    "eligible": 99,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8802704534214276
+   "all_eligible_oos_pf": 0.8749426171809247
   },
   {
    "symbol": "XAUUSD",
@@ -1876,7 +1884,7 @@
    "eligible": 105,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8057950233237591
+   "all_eligible_oos_pf": 0.7201980986585873
   },
   {
    "symbol": "XAUUSD",
@@ -1948,7 +1956,7 @@
    "eligible": 85,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8534136457438269
+   "all_eligible_oos_pf": 0.8081229528096253
   },
   {
    "symbol": "XAUUSD",
@@ -2050,7 +2058,7 @@
    "eligible": 85,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8413688035336278
+   "all_eligible_oos_pf": 0.8412238754068961
   },
   {
    "symbol": "XAUUSD",
@@ -2060,7 +2068,7 @@
    "eligible": 99,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8838279574777578
+   "all_eligible_oos_pf": 0.8817100456998814
   },
   {
    "symbol": "XAUUSD",
@@ -2138,7 +2146,7 @@
    "eligible": 14,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.9103336729599212
+   "all_eligible_oos_pf": 0.901976225381271
   },
   {
    "symbol": "XAUUSD",
@@ -2148,7 +2156,7 @@
    "eligible": 19,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.6177759808157681
+   "all_eligible_oos_pf": 0.5779765863245651
   },
   {
    "symbol": "XAUUSD",
@@ -2178,7 +2186,7 @@
    "eligible": 17,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.570978127804517
+   "all_eligible_oos_pf": 0.49837340038540684
   },
   {
    "symbol": "XAUUSD",
@@ -2208,7 +2216,7 @@
    "eligible": 15,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.7714863628019708
+   "all_eligible_oos_pf": 0.7698518322229252
   },
   {
    "symbol": "XAUUSD",
@@ -2218,7 +2226,7 @@
    "eligible": 8,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.798867062988598
+   "all_eligible_oos_pf": 0.795483571144723
   },
   {
    "symbol": "XAUUSD",
@@ -2326,9 +2334,9 @@
    "symbol": "XAUUSD",
    "tf": "ALL",
    "kind": "percent",
-   "oos_n": 470,
-   "oos_pf": 0.7818223496295887,
-   "oos_stress_pf": 0.7123042621484433
+   "oos_n": 707,
+   "oos_pf": 0.8780064309849549,
+   "oos_stress_pf": 0.825947788871329
   },
   {
    "symbol": "XAUUSD",
@@ -2374,17 +2382,17 @@
    "symbol": "XAUUSD",
    "tf": "ALL",
    "kind": "points",
-   "oos_n": 657,
-   "oos_pf": 0.7191031099632444,
-   "oos_stress_pf": 0.6052879274302274
+   "oos_n": 401,
+   "oos_pf": 0.6042315443331918,
+   "oos_stress_pf": 0.5692236875427793
   },
   {
    "symbol": "XAUUSD",
    "tf": "ALL",
    "kind": "atr",
-   "oos_n": 338,
-   "oos_pf": 0.8312672442880056,
-   "oos_stress_pf": 0.7536556105931602
+   "oos_n": 736,
+   "oos_pf": 0.8521994033236235,
+   "oos_stress_pf": 0.8082248362801728
   },
   {
    "symbol": "XAUUSD",
@@ -2414,9 +2422,9 @@
    "symbol": "XAUUSD",
    "tf": "ALL",
    "kind": "partial",
-   "oos_n": 354,
-   "oos_pf": 0.9125140787343908,
-   "oos_stress_pf": 0.83574059843376
+   "oos_n": 535,
+   "oos_pf": 0.8271059222119838,
+   "oos_stress_pf": 0.7762480104802253
   },
   {
    "symbol": "XAUUSD",
@@ -2469,6 +2477,14 @@
   {
    "symbol": "XAUUSD",
    "tf": "ALL",
+   "kind": "profitlock",
+   "oos_n": 684,
+   "oos_pf": 0.9082364220200085,
+   "oos_stress_pf": 0.8543507429567668
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "ALL",
    "kind": "sma",
    "oos_n": 782,
    "oos_pf": 0.8201312407869848,
@@ -2497,14 +2513,6 @@
    "oos_n": 808,
    "oos_pf": 0.8535284975275315,
    "oos_stress_pf": 0.7702642515362151
-  },
-  {
-   "symbol": "XAUUSD",
-   "tf": "ALL",
-   "kind": "profitlock",
-   "oos_n": 408,
-   "oos_pf": 1.0086749322707749,
-   "oos_stress_pf": 0.9153694798811702
   }
  ]
 }

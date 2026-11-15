@@ -7,6 +7,9 @@ timeframes, each with its in-sample and unseen (May 16 - Nov 13 2026) figures in
 With RECAL_PRE_DIR=<directory of Binance zips for 2023-2024> (BTC only) each preset is also run on those two
 earlier years, which lie before the calibration data, and the result is written into the header and the CSV.
 
+<SYM>_RECAL_PRESETS_DETAIL.json holds what the guide quotes for each timeframe's picks: stop sizes in dollars, the
+unseen months one by one, the unseen result at twice the spread and without the three largest winners.
+
 Usage (repository root):
   [HUMP_SYMBOL=BTCUSD] [RECAL_PRE_DIR=<dir>] python3 research/make_recal_presets.py <recal_work_dir> <out_dir> <magic_base> <TF> [<TF> ...]
 """
@@ -59,6 +62,58 @@ def earlier_market():
     m1 = m1[~m1.index.duplicated()].sort_index()
     R.clock_check(m1, "BTC 2023-2024")
     return R.T2.MarketY(m1=m1, half_spread=np.full(len(m1), R.H.BTC_SPREAD / 2.0))
+
+
+def picks_of(tf):
+    d = pickle.load(open(os.path.join(WORK, f"cand_{tf}.pkl"), "rb"))
+    P, Bs, Ss = d["params"], d["base"], d["stress"]
+    sc = np.array([R.is_score(Bs[i], Ss[i]) for i in range(len(P))])
+    elig = np.where(sc > 0)[0]
+    order = elig[np.argsort(-sc[elig], kind="stable")]
+    picked, fams = [], set()
+    for i in order:
+        if sc[i] < R.PASS_PF or len(picked) >= R.TOPK:
+            break
+        fam = (P[i]["sides"], P[i]["session"], P[i]["htf"])
+        if fam in fams:
+            continue
+        fams.add(fam); picked.append(P[i])
+    return picked
+
+
+def detail(tfs):
+    """Figures quoted in the guide, per timeframe: all picks of the timeframe together on the unseen months."""
+    mk = R.market(WORK)
+    wide = R.market(WORK, flat_spread=2 * R.H.BTC_SPREAD) if BTC else None
+    out = {}
+    for tf in tfs:
+        frames = []; wr = []; allrisk = []
+        for p in picks_of(tf):
+            c = dict(X.BASE); c.update(p)
+            df = mk.run(X.engine_cfg(c)); allrisk.append(df.risk.values.astype(float)); df = df[df.entry_time.values >= R.IS_END]
+            frames.append(df[["entry_time", "side", "r", "risk"]])
+            if wide is not None:
+                w = wide.run(X.engine_cfg(c)); wr.append(w.r.values[w.entry_time.values >= R.IS_END])
+        if not frames:
+            continue
+        a = pd.concat(frames).sort_values("entry_time")
+        month = a.entry_time.dt.strftime("%Y-%m")
+        r = a.r.values.astype(float); top3 = np.sort(r)[:-3] if len(r) > 3 else r
+        eq = np.cumsum(r); dd = float((np.maximum.accumulate(np.maximum(eq, 0)) - eq).max()) if len(r) else 0.0
+        unseen = mk.m1["close"][mk.m1.index >= pd.Timestamp(str(R.IS_END))]
+        out[tf] = dict(
+            unseen_first_close=float(unseen.iloc[0]), unseen_last_close=float(unseen.iloc[-1]),
+            picks=len(frames), trades=int(len(a)), pf=R.pf(r), net_r=float(r.sum()), win_rate=float((r > 0).mean()),
+            distinct_entry_minutes=int(a.entry_time.nunique()), buys=int((a.side > 0).sum()), sells=int((a.side < 0).sum()),
+            pf_without_3_largest_wins=R.pf(top3), max_drawdown_r=dd,
+            pf_at_double_spread=(R.pf(np.concatenate(wr)) if wr else None), double_spread_trades=(int(sum(len(x) for x in wr)) if wr else None),
+            stop_usd=dict(median=float(a.risk.median()), p10=float(a.risk.quantile(0.10)), p90=float(a.risk.quantile(0.90)),
+                          max=float(a.risk.max())),
+            stop_usd_whole_series=dict(trades=int(len(np.concatenate(allrisk))), median=float(np.median(np.concatenate(allrisk))),
+                                       p90=float(np.quantile(np.concatenate(allrisk), 0.90)), max=float(np.concatenate(allrisk).max())),
+            months=[dict(month=m, trades=int(len(g)), net_r=float(g.r.sum()), pf=R.pf(g.r.values.astype(float)))
+                    for m, g in a.groupby(month.values)])
+    return out
 
 
 def main():
@@ -132,6 +187,7 @@ def main():
                              magic=MAGIC + k))
     s = pd.DataFrame(rows)
     s.to_csv(os.path.join(OUT, f"{sym.upper()}_RECAL_PRESETS_SUMMARY.csv"), index=False)
+    json.dump(detail(TFS), open(os.path.join(OUT, f"{sym.upper()}_RECAL_PRESETS_DETAIL.json"), "w"), indent=1, default=float)
     pd.set_option("display.width", 250)
     print(s.drop(columns=["file", "magic"]).to_string(index=False))
 

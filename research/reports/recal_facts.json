@@ -1,0 +1,269 @@
+{
+ "gold_pass": [],
+ "btc_pass_own_trailing": [
+  "M5"
+ ],
+ "btc_pass_23_systems": [
+  "M5"
+ ],
+ "passes_of_32": 2,
+ "gold_min": 0.67,
+ "gold_max": 1.08,
+ "vt_min": 0.61,
+ "vt_max": 1.01,
+ "gold": {
+  "own": {
+   "M1": null,
+   "M2": {
+    "pf": 0.87,
+    "n": 127,
+    "stress": 0.82
+   },
+   "M3": {
+    "pf": 0.7,
+    "n": 506,
+    "stress": 0.67
+   },
+   "M5": {
+    "pf": 1.08,
+    "n": 304,
+    "stress": 0.97
+   },
+   "M10": {
+    "pf": 0.93,
+    "n": 310,
+    "stress": 0.83
+   },
+   "M15": {
+    "pf": 0.72,
+    "n": 417,
+    "stress": 0.65
+   },
+   "M30": {
+    "pf": 0.81,
+    "n": 163,
+    "stress": 0.77
+   },
+   "H1": null
+  },
+  "all23": {
+   "M1": null,
+   "M2": {
+    "pf": 0.67,
+    "n": 489,
+    "stress": 0.64
+   },
+   "M3": {
+    "pf": 0.86,
+    "n": 502,
+    "stress": 0.81
+   },
+   "M5": {
+    "pf": 0.98,
+    "n": 477,
+    "stress": 0.77
+   },
+   "M10": {
+    "pf": 0.97,
+    "n": 365,
+    "stress": 0.97
+   },
+   "M15": {
+    "pf": 0.91,
+    "n": 335,
+    "stress": 0.96
+   },
+   "M30": {
+    "pf": 0.81,
+    "n": 258,
+    "stress": 0.78
+   },
+   "H1": null
+  }
+ },
+ "btc": {
+  "own": {
+   "M1": {
+    "pf": 0.55,
+    "n": 48,
+    "stress": 0.64
+   },
+   "M2": {
+    "pf": 1.22,
+    "n": 35,
+    "stress": 1.11
+   },
+   "M3": {
+    "pf": 1.02,
+    "n": 170,
+    "stress": 0.85
+   },
+   "M5": {
+    "pf": 1.42,
+    "n": 133,
+    "stress": 1.37
+   },
+   "M10": {
+    "pf": 1.07,
+    "n": 361,
+    "stress": 1.15
+   },
+   "M15": {
+    "pf": 0.82,
+    "n": 302,
+    "stress": 0.78
+   },
+   "M30": {
+    "pf": 1.08,
+    "n": 63,
+    "stress": 1.14
+   },
+   "H1": null
+  },
+  "all23": {
+   "M1": null,
+   "M2": {
+    "pf": 1.28,
+    "n": 438,
+    "stress": 1.15
+   },
+   "M3": {
+    "pf": 1.17,
+    "n": 286,
+    "stress": 1.04
+   },
+   "M5": {
+    "pf": 1.48,
+    "n": 377,
+    "stress": 1.42
+   },
+   "M10": {
+    "pf": 1.05,
+    "n": 358,
+    "stress": 1.06
+   },
+   "M15": {
+    "pf": 0.84,
+    "n": 377,
+    "stress": 0.85
+   },
+   "M30": {
+    "pf": 0.67,
+    "n": 330,
+    "stress": 0.68
+   },
+   "H1": {
+    "pf": 1.09,
+    "n": 30,
+    "stress": 1.18
+   }
+  }
+ },
+ "best_system": {
+  "gold": [
+   "bollinger",
+   0.99
+  ],
+  "btc": [
+   "ema",
+   1.66
+  ]
+ },
+ "cells_100": 118,
+ "cells_1_3": 15,
+ "leads": "gold M5 with hump-structure trailing, 1.41 on 141 trades (stressed 1.12); gold M5 with chandelier trailing, 1.31 on 157 trades (stressed 1.21); gold M10 with percent trailing, 1.31 on 181 trades (stressed 1.25); gold M10 with ATR-at-entry trailing, 1.57 on 206 trades (stressed 1.45); BTC M2 with Parabolic SAR trailing, 1.48 on 109 trades (stressed 1.27); BTC M2 with ATR-at-entry trailing, 2.14 on 121 trades (stressed 1.64); BTC M3 with candle trailing, 1.44 on 140 trades (stressed 1.12); BTC M5 with candle trailing, 1.89 on 156 trades (stressed 1.71); BTC M5 with SMA trailing, 1.51 on 205 trades (stressed 1.43); BTC M5 with profit-lock trailing, 1.35 on 214 trades (stressed 1.14); BTC M5 with Bollinger trailing, 1.37 on 112 trades (stressed 1.27); BTC M5 with higher-timeframe-candle trailing, 1.71 on 166 trades (stressed 1.51); BTC M10 with EMA trailing, 1.95 on 102 trades (stressed 2.09); BTC M10 with stepped trailing, 1.36 on 161 trades (stressed 1.26); BTC M10 with swing-pivot trailing, 1.56 on 129 trades (stressed 1.54)",
+ "held_on_every_period": [],
+ "mixed_on_earlier": [
+  "BTC M5",
+  "BTC M2 ATR-at-entry",
+  "BTC M5 candle",
+  "BTC M5 SMA",
+  "BTC M5 higher-timeframe-candle",
+  "BTC M10 EMA",
+  "BTC M10 stepped",
+  "BTC M10 swing-pivot"
+ ],
+ "earlier": {
+  "BTC M5": [
+   1.0,
+   0.69
+  ],
+  "gold M5 hump-structure": [
+   0.75
+  ],
+  "gold M5 chandelier": [
+   0.8
+  ],
+  "gold M10 percent": [
+   0.74
+  ],
+  "gold M10 ATR-at-entry": [
+   0.7
+  ],
+  "BTC M2 Parabolic SAR": [
+   0.8,
+   0.71
+  ],
+  "BTC M2 ATR-at-entry": [
+   1.1,
+   0.6
+  ],
+  "BTC M3 candle": [
+   0.85,
+   0.87
+  ],
+  "BTC M5 candle": [
+   1.02,
+   0.92
+  ],
+  "BTC M5 SMA": [
+   1.1,
+   0.71
+  ],
+  "BTC M5 profit-lock": [
+   0.77,
+   0.74
+  ],
+  "BTC M5 Bollinger": [
+   0.77,
+   0.65
+  ],
+  "BTC M5 higher-timeframe-candle": [
+   1.14,
+   0.7
+  ],
+  "BTC M10 EMA": [
+   1.04,
+   1.02
+  ],
+  "BTC M10 stepped": [
+   1.12,
+   0.79
+  ],
+  "BTC M10 swing-pivot": [
+   1.11,
+   0.72
+  ]
+ },
+ "btc_m5": {
+  "n": 133,
+  "pf": 1.42,
+  "stress": 1.37,
+  "p05": 1.03,
+  "p95": 1.96,
+  "random": 0.025,
+  "y2024": 0.79,
+  "y2024_n": 276,
+  "y2023": 0.83,
+  "y2023_n": 291,
+  "positive_months": 6,
+  "months": 7,
+  "sells": 113,
+  "pf_double_spread": 1.25,
+  "pf_no_top3": 1.31
+ },
+ "setups": {
+  "own": 12000,
+  "all23": 69000
+ }
+}

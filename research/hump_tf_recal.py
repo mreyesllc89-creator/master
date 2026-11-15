@@ -19,6 +19,10 @@ Protocol (fixed before any out-of-sample result was looked at):
   pick     per timeframe: the 10 best scores, one per (direction, session, trend filter) family, score >= 1.3.
   test     the picked setups on OOS: pooled profit factor (all their trades together), base and stress.
   pass     pooled OOS PF >= 1.3 on >= 100 trades.
+  trailing run 1 uses the EA's own trailing (multiples of the risk). Runs 2 and 3 add 22 more systems; those that
+           trail by a fixed dollar, percent or ATR distance, the profit lock and the trail after a partial close
+           move the stop once per closed one-minute bar, a rule that one-minute data resolves exactly
+           (hump_trail2.py; trailing from inside the running minute is not testable on one-minute bars).
 
 Usage:
   python3 hump_tf_recal.py build  <work_dir> <source>                 # once per symbol: combined M1 series
@@ -26,6 +30,8 @@ Usage:
   python3 hump_tf_recal.py run    <work_dir> <TF> <N> [workers]       # candidates of one timeframe, base + stress
   python3 hump_tf_recal.py runx   <work_dir> <TF> <N> [workers]       # the same with every trailing family (hump_trail.py)
   python3 hump_tf_recal.py runy   <work_dir> <TF> <N> [workers]       # twelve more trailing systems (hump_trail2.py)
+  python3 hump_tf_recal.py rerun  <work_dir> <prefix> <kind> [workers] # recompute one trailing kind in the stored files
+  python3 hump_tf_recal.py fresh  <work_dir> <prefix> [per_kind] [workers]  # stored trades must equal the current code
   python3 hump_tf_recal.py select <work_dir> <out_json> [cand|candx]  # in-sample pick and out-of-sample test
   python3 hump_tf_recal.py sens   <work_dir> <out_json> [cand|candx]  # other selection rules (robustness)
   python3 hump_tf_recal.py kinds  <work_dir> <out_json> [prefix]      # the same test per trailing family
@@ -82,38 +88,54 @@ def utc_to_server(index):
 
 
 def clock_check(m1, label):
-    """The US stock open (09:30 New York = 16:30 server time) lifts activity on gold and on BTC every weekday, at
-    that exact minute. For each half-past mark from 13:30 to 19:30 the median one-minute range of the five minutes
-    after it is compared with the five minutes before it; the largest jump must be at 16:30 in at least two
-    thirds of the quarters (a quarter full of 08:30 New York data releases can put 15:30 first). A
-    series on another clock (a BTC file already in server time was once converted a second time, which put the
-    calibration 2-3 hours off) has its jump elsewhere and stops the build."""
+    """Stops when a price series is not on broker server time (New York + 7 h). Two physical marks are used.
+
+    1. The US stock open (09:30 New York = 16:30 server time) lifts activity on gold and on BTC every weekday, at
+       that exact minute. For each half-past mark from 13:30 to 19:30 the median one-minute range of the five
+       minutes after it is compared with the five minutes before it, quarter by quarter.
+    2. A market with a daily break (gold) reopens at 18:00 New York = 01:00 server time (01:05 at FTMO).
+
+    A series without a daily break (BTC) must have its largest jump at 16:30 in at least two thirds of the
+    quarters; a quarter full of 08:30 New York data releases can put 15:30 first. A series with a daily break must
+    reopen between 01:00 and 01:15 on at least 90% of the days, and 16:30 must be one of its two largest jumps in
+    at least two thirds of the quarters (gold reacts to the 08:30 releases as much as to the stock open).
+    A BTC file that was already in server time was once converted a second time, which put a calibration 2-3
+    hours off: such a series fails here."""
     rng = (m1["high"] - m1["low"]).values
     mod = (m1.index.hour * 60 + m1.index.minute).values
     q = m1.index.to_period("Q")
     wd = (m1.index.dayofweek < 5)
+    gap = np.diff(m1.index.values).astype("timedelta64[m]").astype(np.int64)
+    reopen = mod[np.where((gap >= 45) & (gap <= 150))[0] + 1]            # first bar after a daily break
+    daily_break = len(reopen) >= 20
+    note = ""
+    if daily_break:
+        share = float(((reopen >= 60) & (reopen <= 75)).mean())
+        if share < 0.9:
+            raise SystemExit(f"{label}: the market reopens between 01:00 and 01:15 server time on only {share:.0%} of {len(reopen)} days: wrong clock")
+        note = f"daily reopen at 01:00-01:15 server time on {share:.0%} of {len(reopen)} days; "
+    top = 2 if daily_break else 1
     bad = []; tested = 0
     for quarter in sorted(set(q)):
         mask = np.asarray(q == quarter) & np.asarray(wd)
         if mask.sum() < 20000:
             continue
         r, t = rng[mask], mod[mask]
-        best, best_t = 0.0, None
+        jumps = []
         for mark in range(13 * 60 + 30, 19 * 60 + 31, 60):          # 13:30 ... 19:30: three hours either side
             after = r[(t >= mark) & (t < mark + 5)]; before = r[(t >= mark - 5) & (t < mark)]
             if len(after) < 50 or len(before) < 50 or np.median(before) <= 0:
                 continue
-            jump = np.median(after) / np.median(before)
-            if jump > best:
-                best, best_t = jump, mark
+            jumps.append((np.median(after) / np.median(before), mark))
+        jumps.sort(reverse=True)
         tested += 1
-        if best_t != 16 * 60 + 30:
-            bad.append((str(quarter), f"{best_t // 60:02d}:{best_t % 60:02d}"))
-    # a quarter with many 08:30 New York data releases can put 15:30 first; a wrong clock moves nearly all quarters
+        if 16 * 60 + 30 not in [m for _, m in jumps[:top]]:
+            bad.append((str(quarter), f"{jumps[0][1] // 60:02d}:{jumps[0][1] % 60:02d}" if jumps else "none"))
     if tested == 0 or len(bad) > 0.34 * tested:
         raise SystemExit(f"{label}: the US-open jump is not at 16:30 server time in {bad} ({len(bad)} of {tested} quarters): wrong clock")
-    print(f"{label}: clock check passed (US-open jump at 16:30 server time in {tested - len(bad)} of {tested} quarters"
-          + (f"; elsewhere in {bad}" if bad else "") + ")")
+    print(f"{label}: clock check passed ({note}US-open jump at 16:30 server time "
+          + ("among the two largest " if daily_break else "") + f"in {tested - len(bad)} of {tested} quarters"
+          + (f"; elsewhere in {bad}" if bad else "") + ")", flush=True)
 
 
 def build(work, src=None):
@@ -266,6 +288,14 @@ def load_cands(work, prefix, tf):
 MK = None
 
 
+def _dump(obj, fn):
+    """Write a candidate file in one step, so that a reader never meets a half-written pickle."""
+    tmp = fn + ".tmp"
+    with open(tmp, "wb") as f:
+        pickle.dump(obj, f, protocol=4)
+    os.replace(tmp, fn)
+
+
 def _init(work):
     global MK
     MK = market(work)
@@ -288,7 +318,7 @@ def _trades_x(p, extra=None):
     c = dict(X.BASE); c.update(p)
     if extra:
         c.update(extra)
-    df = MK.run_x(X.engine_cfg(c))
+    df = MK.run_y(X.engine_cfg(c))          # run_y: dollar, percent and ATR trailing move the stop per closed minute
     return (df.entry_time.values.astype("datetime64[m]").astype(np.int64).astype(np.int32), df.r.values.astype(np.float32))
 
 
@@ -313,8 +343,7 @@ def run_y(work, tf, n, workers=3):
     t0 = time.time()
     with Pool(workers, initializer=_init, initargs=(work,)) as pool:
         res = pool.map(_one_y, cand, chunksize=16)
-    with open(os.path.join(work, f"candy_{tf}.pkl"), "wb") as f:
-        pickle.dump(dict(tf=tf, params=cand, base=[r[0] for r in res], stress=[r[1] for r in res]), f, protocol=4)
+    _dump(dict(tf=tf, params=cand, base=[r[0] for r in res], stress=[r[1] for r in res]), os.path.join(work, f"candy_{tf}.pkl"))
     print(f"{SYM} {tf}: {n} setups x 2 (twelve more trailing systems) in {time.time() - t0:.0f}s", flush=True)
 
 
@@ -333,9 +362,39 @@ def rerun_kind(work, prefix, kind, workers=3):
             if len(r[0][1]) != len(d["base"][i][1]) or not np.allclose(r[0][1], d["base"][i][1]):
                 changed += 1
             d["base"][i], d["stress"][i] = r
-        with open(fn, "wb") as f:
-            pickle.dump(d, f, protocol=4)
+        _dump(d, fn)
         print(f"{SYM} {tf}: {len(idx)} '{kind}' setups recomputed, {changed} changed", flush=True)
+
+
+def fresh(work, prefix, per_kind=25, workers=3):
+    """Stored trades against the current code: per timeframe, a random sample of every trailing kind is recomputed
+    and must equal the stored arrays (entry minutes exactly, R to 1e-6). Stops on the first stale kind, so that a
+    result table is never built from trades that an older version of a simulator produced."""
+    rng = random.Random(20261115)
+    bad = {}; total = 0
+    for tf in TFS:
+        for pre in prefix.split("+"):
+            fn = os.path.join(work, f"{pre}_{tf}.pkl")
+            if not os.path.exists(fn):
+                continue
+            d = pickle.load(open(fn, "rb"))
+            groups = {}
+            for i, p in enumerate(d["params"]):
+                groups.setdefault(p.get("trail_kind", "R (run 1)"), []).append(i)
+            idx = [i for k in groups for i in rng.sample(groups[k], min(per_kind, len(groups[k])))]
+            one = _one if pre == "cand" else _one_y
+            with Pool(workers, initializer=_init, initargs=(work,)) as pool:
+                res = pool.map(one, [d["params"][i] for i in idx], chunksize=8)
+            for i, r in zip(idx, res):
+                for new, old in ((r[0], d["base"][i]), (r[1], d["stress"][i])):
+                    if len(new[1]) != len(old[1]) or not np.array_equal(new[0], old[0]) or not np.allclose(new[1], old[1], rtol=0, atol=1e-6):
+                        key = (pre, tf, d["params"][i].get("trail_kind", "R (run 1)"))
+                        bad[key] = bad.get(key, 0) + 1
+            total += len(idx)
+            print(f"{SYM} {pre} {tf}: {len(idx)} setups of {len(groups)} kinds recomputed", flush=True)
+    if bad:
+        raise SystemExit(f"{SYM}: STALE stored results (file, timeframe, kind: runs that differ): {bad}")
+    print(f"{SYM} {prefix}: {total} stored setups equal the current code, base and stress")
 
 
 def run_x(work, tf, n, workers=3):
@@ -343,8 +402,7 @@ def run_x(work, tf, n, workers=3):
     t0 = time.time()
     with Pool(workers, initializer=_init, initargs=(work,)) as pool:
         res = pool.map(_one_x, cand, chunksize=16)
-    with open(os.path.join(work, f"candx_{tf}.pkl"), "wb") as f:
-        pickle.dump(dict(tf=tf, params=cand, base=[r[0] for r in res], stress=[r[1] for r in res]), f, protocol=4)
+    _dump(dict(tf=tf, params=cand, base=[r[0] for r in res], stress=[r[1] for r in res]), os.path.join(work, f"candx_{tf}.pkl"))
     print(f"{SYM} {tf}: {n} setups x 2 (all trailing families) in {time.time() - t0:.0f}s", flush=True)
 
 
@@ -353,8 +411,7 @@ def run(work, tf, n, workers=3):
     t0 = time.time()
     with Pool(workers, initializer=_init, initargs=(work,)) as pool:
         res = pool.map(_one, cand, chunksize=16)
-    with open(os.path.join(work, f"cand_{tf}.pkl"), "wb") as f:
-        pickle.dump(dict(tf=tf, params=cand, base=[r[0] for r in res], stress=[r[1] for r in res]), f, protocol=4)
+    _dump(dict(tf=tf, params=cand, base=[r[0] for r in res], stress=[r[1] for r in res]), os.path.join(work, f"cand_{tf}.pkl"))
     print(f"{SYM} {tf}: {n} setups x 2 in {time.time() - t0:.0f}s", flush=True)
 
 
@@ -634,7 +691,9 @@ if __name__ == "__main__":
     elif cmd == "sens":
         sensitivity(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "cand")
     elif cmd == "rerun":
-        rerun_kind(sys.argv[2], sys.argv[3], sys.argv[4])
+        rerun_kind(sys.argv[2], sys.argv[3], sys.argv[4], int(sys.argv[5]) if len(sys.argv) > 5 else 3)
+    elif cmd == "fresh":
+        fresh(sys.argv[2], sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 25, int(sys.argv[5]) if len(sys.argv) > 5 else 3)
     elif cmd == "runy":
         run_y(sys.argv[2], sys.argv[3], int(sys.argv[4]), int(sys.argv[5]) if len(sys.argv) > 5 else 3)
     elif cmd == "kinds":

@@ -11,8 +11,8 @@ Download a zip, unpack it and read its `START_HERE.md`:
 
 **Status: not recommended for live trading.** The presets were fitted to January 2025 – May 2026.
 - **Gold:** on the months after that, the six presets together lost money on VT Markets real ticks (June – 6 November 2026, 247 trades): profit factor 0.74 before commission and 0.67 at VT's $0.60 per lot. Dukascopy prices agree.
-- **BTC:** the four together broke even on unseen data (profit factor 1.05 on 193 trades, 16 May – 13 November 2026).
-- **Re-calibration per timeframe** (M1 to H1, eleven kinds of trailing stop, tested on 16 May – 13 November 2026): no timeframe holds a profit factor of 1.3 on unseen data, on gold (0.72–1.04, or 0.71–0.98 at VT Markets' costs) or on BTC (0.77–1.20 where there are at least 100 unseen trades). See `research/reports/loma_oos_review.html`, section 5.
+- **BTC:** the four new M5 presets passed the unseen months of 2026 (profit factor 1.42 on 133 trades, 16 May – 13 November) and lost on the two years before the calibration data (0.79 in 2024, 0.83 in 2023): unproven, demo only. The earlier `Loma_BTC01`–`BTC04` presets are withdrawn; they were fitted on a price file with a wrong clock.
+- **Re-calibration per timeframe:** every timeframe from M1 to H1 was re-calibrated on the same period with 23 trailing systems and tested on the months after it. Gold: no timeframe holds a profit factor of 1.3 on unseen data (0.67–1.08, or 0.61–1.01 at VT's costs). BTC: M5 passes the 2026 months, with the EA's own trailing (1.42 on 133 trades) and with all 23 systems (1.48 on 377 trades), but the same setups scored 0.79 and 1.00 in 2024 and 0.83 and 0.69 in 2023: it did not hold on earlier data. No other BTC timeframe passes. See `research/reports/loma_oos_review.html`, section 5.
 - **The EA itself** reproduces the backtest's trades.
 
 | Where | What |

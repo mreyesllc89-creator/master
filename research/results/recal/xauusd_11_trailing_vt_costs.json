@@ -1,0 +1,100 @@
+{
+ "vt_spread": 0.15,
+ "vt_comm": 0.6,
+ "timeframes": [
+  {
+   "symbol": "XAUUSD",
+   "tf": "M1",
+   "picked": 0
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M2",
+   "picked": 8,
+   "vt_is_pf": 1.67762290705703,
+   "vt_oos_n": 408,
+   "vt_oos_pf": 0.7442899206708331,
+   "vt_oos_net_r": -51.68999584874884,
+   "vt_hard_is_pf": 1.6610683550057364,
+   "vt_hard_oos_n": 408,
+   "vt_hard_oos_pf": 0.687108453047035,
+   "vt_hard_oos_net_r": -65.8438960273566,
+   "base_oos_pf": 0.8058569802715965
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M3",
+   "picked": 10,
+   "vt_is_pf": 1.8136084354166386,
+   "vt_oos_n": 639,
+   "vt_oos_pf": 0.7486908337358288,
+   "vt_oos_net_r": -69.60670569681459,
+   "vt_hard_is_pf": 1.6425065409931365,
+   "vt_hard_oos_n": 651,
+   "vt_hard_oos_pf": 0.6770192184878642,
+   "vt_hard_oos_net_r": -93.70616875535524,
+   "base_oos_pf": 0.8030773444357358
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M5",
+   "picked": 10,
+   "vt_is_pf": 1.8088193060658857,
+   "vt_oos_n": 418,
+   "vt_oos_pf": 0.8805077576570566,
+   "vt_oos_net_r": -21.209396761076487,
+   "vt_hard_is_pf": 1.7754454180329686,
+   "vt_hard_oos_n": 418,
+   "vt_hard_oos_pf": 0.7783638392213177,
+   "vt_hard_oos_net_r": -40.723599098521305,
+   "base_oos_pf": 0.9667977805374248
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M10",
+   "picked": 10,
+   "vt_is_pf": 1.7152015546518131,
+   "vt_oos_n": 384,
+   "vt_oos_pf": 0.9829065998769948,
+   "vt_oos_net_r": -2.31092888158375,
+   "vt_hard_is_pf": 1.7221684992768036,
+   "vt_hard_oos_n": 383,
+   "vt_hard_oos_pf": 0.9377855313685359,
+   "vt_hard_oos_net_r": -8.669823390222374,
+   "base_oos_pf": 1.0374475464861344
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M15",
+   "picked": 10,
+   "vt_is_pf": 1.6121443898790704,
+   "vt_oos_n": 305,
+   "vt_oos_pf": 0.7982439040829449,
+   "vt_oos_net_r": -27.993295686672344,
+   "vt_hard_is_pf": 1.5679795576271383,
+   "vt_hard_oos_n": 305,
+   "vt_hard_oos_pf": 0.7773098342784197,
+   "vt_hard_oos_net_r": -30.306902649253537,
+   "base_oos_pf": 0.8061624421488499
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M30",
+   "picked": 4,
+   "vt_is_pf": 1.6836968948051902,
+   "vt_oos_n": 168,
+   "vt_oos_pf": 0.7052873032644613,
+   "vt_oos_net_r": -23.43224032626331,
+   "vt_hard_is_pf": 1.5632849942101807,
+   "vt_hard_oos_n": 168,
+   "vt_hard_oos_pf": 0.6749955231333999,
+   "vt_hard_oos_net_r": -25.85624547428389,
+   "base_oos_pf": 0.7248988654597496
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "H1",
+   "picked": 0
+  }
+ ]
+}

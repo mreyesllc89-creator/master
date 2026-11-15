@@ -12,9 +12,13 @@ Every pick set of hump_tf_recal.py is run unchanged on the earlier period, base 
                           unseen trades in 2026 (the leads)
 and the pooled profit factor is reported next to the 2026 out-of-sample figure.
 
-Usage: [HUMP_SYMBOL=BTCUSD] python3 pretest_picks.py <recal_work_dir> <pre_data_dir> <out_json> [prefix]
+Every distinct setup is run once (base and stress) in a pool of worker processes; the groups are put together
+from those runs.
+
+Usage: [HUMP_SYMBOL=BTCUSD] python3 pretest_picks.py <recal_work_dir> <pre_data_dir> <out_json> [prefix] [workers]
 """
 import glob, io, json, os, pickle, sys, zipfile
+from multiprocessing import Pool
 import numpy as np, pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +29,7 @@ import xlzc_backtest as B
 
 WORK, PRE, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
 PREFIX = sys.argv[4] if len(sys.argv) > 4 else "candx+candy"
+WORKERS = int(sys.argv[5]) if len(sys.argv) > 5 else 3
 
 if R.SYM == "BTCUSD":
     parts = []
@@ -35,8 +40,7 @@ if R.SYM == "BTCUSD":
         parts.append(pd.DataFrame(dict(datetime=pd.to_datetime(t, unit="us" if t.iloc[0] > 1e14 else "ms"),
                                        open=raw[1], high=raw[2], low=raw[3], close=raw[4])))
     m1 = pd.concat(parts).drop_duplicates("datetime").sort_values("datetime")
-    utc = pd.DatetimeIndex(m1["datetime"]).tz_localize("UTC")
-    m1.index = utc.tz_convert("America/New_York").tz_localize(None) + pd.Timedelta(hours=7)
+    m1.index = R.utc_to_server(pd.DatetimeIndex(m1["datetime"]))        # one conversion, raw UTC to broker server time
     m1 = m1[~m1.index.duplicated()].sort_index()[["open", "high", "low", "close"]].astype(float)
     hs = np.full(len(m1), R.H.BTC_SPREAD / 2.0)
     PERIODS = {"2023": (np.datetime64("2023-01-15"), np.datetime64("2024-01-01")),
@@ -49,8 +53,9 @@ else:
     hs = hourly[B.server_to_utc_hour(m1.index)] / 2.0
     first = m1.index[0] + pd.Timedelta(days=14)                    # two weeks of warm-up left out
     PERIODS = {"2024H2": (np.datetime64(first), np.datetime64("2025-01-01"))}
+R.clock_check(m1, f"{R.SYM} earlier period")
 mk = T2.MarketY(m1=m1, half_spread=hs)
-print("pre-period data", m1.index[0], "..", m1.index[-1], len(m1), "bars")
+print("pre-period data", m1.index[0], "..", m1.index[-1], len(m1), "bars", flush=True)
 
 
 def trades(p, extra=None):
@@ -96,11 +101,30 @@ for name, items in cells.items():                                   # the leads:
     if len(r) >= R.PASS_N and R.pf(r) >= R.PASS_PF:
         groups[name] = items
 
+
+
+def key(p):
+    return json.dumps(p, sort_keys=True, default=float)
+
+
+def both(p):
+    return trades(p), trades(p, R.STRESS)
+
+
+uniq = {}
+for items in groups.values():
+    for x in items:
+        uniq.setdefault(key(x[0]), x[0])
+print(len(groups), "groups,", sum(len(v) for v in groups.values()), "setups,", len(uniq), "distinct", flush=True)
+both(next(iter(uniq.values())))                                     # compile before the workers are forked
+with Pool(WORKERS) as pool:
+    done = dict(zip(uniq.keys(), pool.map(both, list(uniq.values()), chunksize=4)))
+
 rows = []
 for name, items in groups.items():
     row = dict(group=name, setups=len(items), oos2026_n=int(sum(len(x[1]) for x in items)),
                oos2026_pf=R.pf(np.concatenate([x[1] for x in items])), oos2026_stress_pf=R.pf(np.concatenate([x[2] for x in items])))
-    base = [trades(x[0]) for x in items]; stress = [trades(x[0], R.STRESS) for x in items]
+    base = [done[key(x[0])][0] for x in items]; stress = [done[key(x[0])][1] for x in items]
     for y, (a, b) in PERIODS.items():
         rb = np.concatenate([r[(t >= a) & (t < b)] for t, r in base]); rs = np.concatenate([r[(t >= a) & (t < b)] for t, r in stress])
         row[f"y{y}_n"] = int(len(rb)); row[f"y{y}_pf"] = R.pf(rb); row[f"y{y}_stress_pf"] = R.pf(rs); row[f"y{y}_net_r"] = float(rb.sum())

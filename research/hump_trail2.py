@@ -21,8 +21,16 @@ New kinds (config key "trail_kind"):
   htfcandle   level trailing at the low / high of the last closed higher-timeframe candle (trail_p = its minutes)
 Level kinds use only trigger (or higher-timeframe) bars closed at or before the open of each M1 bar; the stop
 is level -/+ the setup's SL buffer (+ spread for sells), is only ever tightened, and starts once the profit has
-reached trail_start x risk (0 = at once). simulate_y reproduces hump_trail.simulate_x for every earlier kind
-(self-test in __main__).
+reached trail_start x risk (0 = from the one-minute bar after the entry bar).
+
+One-minute resolution. hump_trail.simulate_x places a dollar, percent or ATR-at-entry trailing stop from the
+running bar's own extreme. When the distance is under about two one-minute ranges the pullbacks inside the bar
+are never tested, and the result is too good (measured against ticks: up to +0.05R per trade). run_y therefore
+uses a rule that one-minute data resolves exactly, for the kinds points, percent, atr, profitlock and the trailing
+part of partial: the stop is moved from the extreme of each COMPLETED one-minute bar and holds from the next
+bar's open (config key "trail_closed", default 1; 0 gives the old rule). Kind R, the EA's own trailing, keeps
+the engine's rule; chandelier and the level kinds always worked from completed bars. simulate_y with
+trail_closed 0 reproduces hump_trail.simulate_x for every earlier kind (self-test in __main__).
 """
 import os, sys
 import numba as nb, numpy as np, pandas as pd
@@ -42,9 +50,13 @@ BOLLINGER = {0: 1.0, 1: 2.0}
 @nb.njit(cache=True)
 def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, tp_mode, tp_rr,
                trail_start, trail_dist, max_spread, min_risk, max_risk, slip, comm, delay, trail_worst, wk,
-               max_hold, eod, trail_kind, tb, lvl_hi, lvl_lo, aux):
+               max_hold, eod, trail_kind, tb, lvl_hi, lvl_lo, aux, closed):
     """hump_trail.simulate_x plus trail_kind 8 chandelier (aux = ATR per trigger bar), 9 profit lock,
-    10 time stop, 11 partial close. Returns rows (entry_row, exit_row, side, R, risk)."""
+    10 time stop, 11 partial close. Returns rows (entry_row, exit_row, side, R, risk).
+    closed = 1: kinds 2, 3, 4 (dollars, percent, ATR at entry), 9 (profit lock) and the trailing part of 11 move the
+    stop from the extreme of each COMPLETED one-minute bar; the new stop holds from the next bar's open (filled at
+    that open when the price is already through it) and never closes the trade inside the bar that set it.
+    closed = 0: those kinds use the rule of hump_trail.simulate_x (stop from the running bar's own extreme)."""
     n = len(o)
     out = np.empty((len(sig), 5))
     m = 0
@@ -118,8 +130,8 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                     px = stop + slip; break
                 if al <= tp:
                     px = min(tp, ao)
-                    if trail_kind == 11 and (not part) and trail_start * risk <= entry - tp:
-                        part = True                        # the half-close level lies before the target: half is booked there
+                    if trail_kind == 11 and (not part) and trail_start * risk <= entry - tp + 1e-9 * risk:
+                        part = True                        # the half-close level lies at or before the target (rounding-tolerant): half is booked there
                     break
                 fav = entry - al
                 if trail_kind >= 1 and trail_kind <= 4:
@@ -127,7 +139,7 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                         cand = al + trail_dist * unit
                         if cand < stop:
                             stop = cand
-                            if c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop):
+                            if (closed == 0 or trail_kind == 1) and (c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop)):
                                 px = stop + slip; break
                 elif trail_kind == 5:
                     if trail_start > 0 and fav >= trail_start * risk:
@@ -152,7 +164,7 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                         cand = entry - trail_dist * fav
                         if cand < stop:
                             stop = cand
-                            if c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop):
+                            if closed == 0 and (c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop)):
                                 px = stop + slip; break
                 elif trail_kind == 11:
                     hit = False
@@ -160,12 +172,20 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                         part = True                        # half closed at entry - trail_start x risk
                         if entry < stop:
                             stop = entry; hit = True
-                    if part and trail_dist > 0:
-                        cand = al + trail_dist * risk
-                        if cand < stop:
-                            stop = cand; hit = True
-                    if hit and (c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop)):
-                        px = stop + slip; break
+                    if closed == 1:
+                        if hit and (c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop)):
+                            px = stop + slip; break            # the rest goes out at breakeven in the half-close bar
+                        if part and trail_dist > 0:
+                            cand = al + trail_dist * risk
+                            if cand < stop:
+                                stop = cand                    # holds from the next bar's open
+                    else:
+                        if part and trail_dist > 0:
+                            cand = al + trail_dist * risk
+                            if cand < stop:
+                                stop = cand; hit = True
+                        if hit and (c[j] + hs[j] >= stop or (trail_worst == 1 and ah >= stop)):
+                            px = stop + slip; break
                 if al < best:
                     best = al
                 if wk[j]:
@@ -230,7 +250,7 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                     px = stop - slip; break
                 if bh >= tp:
                     px = max(tp, bo)
-                    if trail_kind == 11 and (not part) and trail_start * risk <= tp - entry:
+                    if trail_kind == 11 and (not part) and trail_start * risk <= tp - entry + 1e-9 * risk:
                         part = True
                     break
                 fav = bh - entry
@@ -239,7 +259,7 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                         cand = bh - trail_dist * unit
                         if cand > stop:
                             stop = cand
-                            if c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop):
+                            if (closed == 0 or trail_kind == 1) and (c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop)):
                                 px = stop - slip; break
                 elif trail_kind == 5:
                     if trail_start > 0 and fav >= trail_start * risk:
@@ -264,7 +284,7 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                         cand = entry + trail_dist * fav
                         if cand > stop:
                             stop = cand
-                            if c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop):
+                            if closed == 0 and (c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop)):
                                 px = stop - slip; break
                 elif trail_kind == 11:
                     hit = False
@@ -272,12 +292,20 @@ def simulate_y(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr
                         part = True
                         if entry > stop:
                             stop = entry; hit = True
-                    if part and trail_dist > 0:
-                        cand = bh - trail_dist * risk
-                        if cand > stop:
-                            stop = cand; hit = True
-                    if hit and (c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop)):
-                        px = stop - slip; break
+                    if closed == 1:
+                        if hit and (c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop)):
+                            px = stop - slip; break
+                        if part and trail_dist > 0:
+                            cand = bh - trail_dist * risk
+                            if cand > stop:
+                                stop = cand
+                    else:
+                        if part and trail_dist > 0:
+                            cand = bh - trail_dist * risk
+                            if cand > stop:
+                                stop = cand; hit = True
+                        if hit and (c[j] - hs[j] <= stop or (trail_worst == 1 and bl <= stop)):
+                            px = stop - slip; break
                 if bh > best:
                     best = bh
                 if wk[j]:
@@ -315,10 +343,11 @@ def supertrend_levels(high, low, close, atr, mult):
             pfu = fu; pfl = fl
             fu = ub if (ub < pfu or close[i - 1] > pfu) else pfu
             fl = lb if (lb > pfl or close[i - 1] < pfl) else pfl
-            if close[i] > pfu:
+            if up:                                  # the flip is tied to the current state (classic SuperTrend):
+                if close[i] < pfl:                   # an up-trend ends on a close below its support line, even when a
+                    up = False                       # stale upper band lies below that close after a gap up
+            elif close[i] > pfu:
                 up = True
-            elif close[i] < pfl:
-                up = False
         if up:
             lo[i] = fl
         else:
@@ -430,7 +459,8 @@ class MarketY(T.MarketX):
         tr = simulate_y(sg, er, self.o, self.h, self.l, self.c, self.hs, self.tod, s0, s1, c["buf"], c["anticip"],
                         c["min_rr"], int(c["tp_mode"]), c["tp_rr"], ts, float(c["trail_dist"]),
                         c["max_spread"], c["min_risk"], c["max_risk"], c["slip"], c["comm"], int(c["delay"]),
-                        int(c["trail_worst"]), wk, int(c["max_hold"]), int(c["eod"]), tk, tb, lh, ll, aux)
+                        int(c["trail_worst"]), wk, int(c["max_hold"]), int(c["eod"]), tk, tb, lh, ll, aux,
+                        int(c.get("trail_closed", 1)))
         df = pd.DataFrame(tr, columns=["entry_row", "exit_row", "side", "r", "risk"])
         df["entry_time"] = self.t[df.entry_row.astype(int).values] if len(df) else pd.Series(dtype="datetime64[ns]")
         return df
@@ -456,14 +486,14 @@ def _selftest():
         elif c["trail_start"] <= 0:
             c["trail_start"] = 1.0
         for extra in ({}, stress):
-            a = mk.run_x(dict(c, **extra)); b = mk.run_y(dict(c, **extra))
+            a = mk.run_x(dict(c, **extra)); b = mk.run_y(dict(c, **extra, trail_closed=0))
             cols = ["entry_row", "exit_row", "side"]
             assert len(a) == len(b) and np.array_equal(a[cols].values, b[cols].values) and np.allclose(a.r.values, b.r.values, rtol=0, atol=1e-12), (kind, p)
             n_ok += 1
-    print("parity with hump_trail.simulate_x:", n_ok, "runs identical")
+    print("parity with hump_trail.simulate_x (trail_closed 0):", n_ok, "runs identical")
 
     # hand-made M1 path: one buy at bar 0, entry 100, stop 99 (risk 1), target 110; trigger bars = M1 bars
-    def path(lows, highs, closes, kind, ts, td, worst=0, lvl=None, aux=None, comm=0.0, rr=10.0):
+    def path(lows, highs, closes, kind, ts, td, worst=0, lvl=None, aux=None, comm=0.0, rr=10.0, closed=1):
         nb_ = len(lows); o = np.array([100.0] + list(closes[:-1])); h = np.array(highs, float); l = np.array(lows, float)
         cl = np.array(closes, float); hs = np.zeros(nb_); tod = np.arange(nb_) + 600
         sig = np.array([[0, 1, 99.0, 0.0, 0.0, 1.0]]); er = np.array([0]); wk = np.zeros(nb_, np.bool_)
@@ -471,7 +501,7 @@ def _selftest():
         lv = np.full(nb_, np.nan) if lvl is None else np.array(lvl, float)
         ax = np.full(nb_, np.nan) if aux is None else np.array(aux, float)
         tr = simulate_y(sig, er, o, h, l, cl, hs, tod, 0, 1440, 0.0, 0.0, 0.0, 1, rr, ts, td, 1e9, 0.0, 1e9, 0.0, comm, 0,
-                        worst, wk, 0, -1, ALLKIND[kind], tbv, lv, lv, ax)
+                        worst, wk, 0, -1, ALLKIND[kind], tbv, lv, lv, ax, closed)
         return round(float(tr[0, 3]), 6), int(tr[0, 1])
 
     # chandelier 2 x ATR(=0.4): high 102 on bar 1 -> from bar 2 the stop is 102 - 0.8 = 101.2; bar 2 low 101.0 -> +1.2R
@@ -497,7 +527,74 @@ def _selftest():
     assert path([100, 100.4, 101.5], [100.5, 102.5, 102.2], [100.4, 102.2, 101.9], "partial", 1.0, 0.0, rr=2.0) == (1.5, 1)
     # a target that lies before the half-close level: the whole position goes out at the target
     assert path([100, 100.4, 101.5], [100.5, 102.5, 102.2], [100.4, 102.2, 101.9], "partial", 3.0, 0.0, rr=2.0) == (2.0, 1)
+    # closed-bar rule, dollar trailing from +1 with a distance of 0.5: bar 1 runs to 102 and closes at 101.4. The old
+    # rule closes inside that bar at 102 - 0.5 = 101.5; the closed-bar rule sets 101.5 for bar 2, which opens at 101.4
+    # (already through the stop) and is filled there
+    bars = ([100, 100.3, 101.2], [100.5, 102.0, 101.6], [100.4, 101.4, 101.3])
+    assert path(*bars, "points", 1.0, 0.5, closed=0) == (1.5, 1) and path(*bars, "points", 1.0, 0.5, closed=0, worst=1) == (1.5, 1)
+    assert path(*bars, "points", 1.0, 0.5) == (1.4, 2) and path(*bars, "points", 1.0, 0.5, worst=1) == (1.4, 2)
+    # the same with a bar 2 that opens above the stop and then falls through it: filled at the stop, 101.5
+    bars = ([100, 100.3, 101.2], [100.5, 102.0, 101.9], [100.4, 101.7, 101.3])
+    assert path(*bars, "points", 1.0, 0.5) == (1.5, 2) and path(*bars, "percent", 1.0, 0.5) == (1.5, 2)
+    assert path(*bars, "atr", 1.0, 0.5) == (1.5, 2)                     # ATR at the signal = 1 in these paths
+    # profit lock 50% from +1R, closed-bar: bar 1 high 102 locks 101 for bar 2 even though bar 1 itself closes at 100.8
+    bars = ([100, 100.7, 100.6], [100.5, 102.0, 100.9], [100.4, 100.8, 100.7])
+    assert path(*bars, "profitlock", 1.0, 0.5, closed=0) == (1.0, 1) and path(*bars, "profitlock", 1.0, 0.5) == (0.8, 2)
+    # partial, closed-bar: the breakeven move still acts inside the half-close bar (close 99.9 under the entry -> rest
+    # out at breakeven), while the 0.5R trail on the rest only holds from the next bar
+    assert path([100, 99.8, 99.7], [100.5, 101.2, 100.1], [100.4, 99.9, 99.8], "partial", 1.0, 0.5) == (0.5, 1)
+    assert path([100, 100.8, 101.3], [100.5, 102.0, 101.9], [100.4, 101.2, 101.6], "partial", 1.0, 0.5, closed=0) == (1.25, 1)
+    assert path([100, 100.8, 101.1], [100.5, 102.0, 101.9], [100.4, 101.2, 101.6], "partial", 1.0, 0.5) == (1.1, 2)
     print("hand-made paths: ok")
+
+    # one-minute resolution: each minute is cut into 6 pieces; a reference that walks the pieces (stop and target
+    # tested piece by piece, stop moved only when a minute has closed) must give the same exit as simulate_y on the
+    # one-minute bars under the closed-bar rule. The old rule fails this on a large share of the paths.
+    def fine(side, entry, sl, kind, ts, td, unit, so, sh, slo, sc, per):
+        risk = abs(entry - sl); stop = sl; nmin = len(so) // per
+        for mnt in range(nmin):
+            for q in range(mnt * per, (mnt + 1) * per):
+                if side > 0:
+                    if so[q] <= stop: return (so[q] - entry) / risk, mnt
+                    if slo[q] <= stop: return (stop - entry) / risk, mnt
+                else:
+                    if so[q] >= stop: return (entry - so[q]) / risk, mnt
+                    if sh[q] >= stop: return (entry - stop) / risk, mnt
+            ext = sh[mnt * per:(mnt + 1) * per].max() if side > 0 else slo[mnt * per:(mnt + 1) * per].min()
+            fav = (ext - entry) * side
+            if kind == "profitlock":
+                if fav >= ts * risk:
+                    cand = entry + side * td * fav
+                    stop = max(stop, cand) if side > 0 else min(stop, cand)
+            elif fav >= ts * unit:
+                cand = ext - side * td * unit
+                stop = max(stop, cand) if side > 0 else min(stop, cand)
+        return (sc[-1] - entry) * side / risk, nmin - 1
+
+    rs2 = np.random.default_rng(11); per, nmin = 6, 45; same = {0: 0, 1: 0}; total = 0
+    for q in range(1600):
+        step = rs2.normal(0.02, 0.25, per * nmin)                       # a drifting walk in pieces of a minute
+        side = 1 if q % 2 == 0 else -1
+        sc = 100.0 + side * np.cumsum(step); so = np.concatenate([[100.0], sc[:-1]])
+        wig = np.abs(rs2.normal(0, 0.12, (2, per * nmin)))
+        sh = np.maximum(so, sc) + wig[0]; slo = np.minimum(so, sc) - wig[1]
+        o1 = so[::per]; c1 = sc[per - 1::per]; h1 = sh.reshape(nmin, per).max(axis=1); l1 = slo.reshape(nmin, per).min(axis=1)
+        kind = ("points", "percent", "atr", "profitlock")[q % 4]
+        ts = float(rs2.choice([0.5, 1.0, 2.0])); td = float(rs2.choice([0.25, 0.5, 1.0])) if kind != "profitlock" else float(rs2.choice([0.3, 0.5, 0.7]))
+        atr = 0.8; unit = {"points": 1.0, "percent": 1.0, "atr": atr, "profitlock": 1.0}[kind]      # 1% of 100 = 1.0
+        sig = np.array([[0, side, 100.0 - side * 1.5, 0.0, 0.0, atr]]); zero = np.zeros(nmin)
+        ref = fine(side, 100.0, 100.0 - side * 1.5, kind, ts, td, unit, so, sh, slo, sc, per)
+        total += 1
+        for closed in (0, 1):
+            tr = simulate_y(sig, np.array([0]), o1, h1, l1, c1, zero, np.arange(nmin) + 600, 0, 1440, 0.0, 0.0, 0.0, 1, 1e6,
+                            ts, td, 1e9, 0.0, 1e9, 0.0, 0.0, 0, 0, np.zeros(nmin, np.bool_), 0, -1, ALLKIND[kind],
+                            (np.arange(nmin) - 1).astype(np.int64), np.full(nmin, np.nan), np.full(nmin, np.nan), np.full(nmin, np.nan), closed)
+            ok = abs(tr[0, 3] - ref[0]) < 1e-9 and int(tr[0, 1]) == ref[1]
+            same[closed] += ok
+            assert ok or closed == 0, (q, kind, side, ts, td, tr[0, 3], tr[0, 1], ref)
+    assert same[1] == total and same[0] < 0.9 * total, same
+    print(f"one-minute resolution: closed-bar rule equals the walk in pieces of a minute on {same[1]} of {total} paths; "
+          f"the old rule on {same[0]}")
 
     # level builders against straightforward references on real bars
     d = mk._tf[list(mk._tf)[0]]; name = list(mk._tf)[0]; t = d["t"]; mk._tb(name)
@@ -506,12 +603,41 @@ def _selftest():
     for i in range(10, 400):
         j = max([q for q in range(2, i - 1) if hi[q] > max(hi[q - 2], hi[q - 1], hi[q + 1], hi[q + 2])], default=None)
         assert (j is None and np.isnan(a[i])) or a[i] == hi[j], i
+    # SuperTrend after a gap up: bar 2 closes at 105, under the support line at 108 -> the up-trend ends, resistance 109
+    h3, l3 = supertrend_levels(np.array([100.5, 111.0, 110.0]), np.array([99.5, 109.0, 104.0]), np.array([100.0, 110.5, 105.0]),
+                               np.ones(3), 2.0)
+    assert np.isnan(l3[2]) and h3[2] == 109.0 and l3[1] == 108.0, (h3, l3)
     sa, sb = mk._levels(name, "supertrend", 0, 12, 26)
     cl = t["close"].values
     below = np.nanmean((sb <= cl)[~np.isnan(sb)]); above = np.nanmean((sa >= cl)[~np.isnan(sa)])
     assert np.all(np.isnan(sa) | np.isnan(sb)) and below > 0.99 and above > 0.99, (below, above)
     print(f"level builders: pivots match a direct search; SuperTrend support below the close on {below:.1%} of up bars, "
           f"resistance above it on {above:.1%} of down bars")
+
+    # level timing: the level used on a one-minute row must come out the same when the series ends at that row.
+    # (The scramble test below has no power against a level read one trigger bar early; this one does.)
+    lv_kinds = [("supertrend", 1), ("keltner", 1), ("bollinger", 1), ("kijun", 26), ("pivots", 3), ("sma", 20), ("donchian", 20),
+                ("htfcandle", 60), ("candles", 3), ("ema", 21), ("psar", 0), ("hump", 0)]
+    rs3 = np.random.default_rng(21); n_cmp = 0; n_shift = 0
+    for tfn in ("M3", "M10"):
+        mk.tf(tfn, 12, 26, 7); full_tb = mk._tb(tfn)
+        full = {kd: mk._levels(tfn, kd[0], kd[1], 12, 26) for kd in lv_kinds}
+        for j in sorted(rs3.integers(60000, len(mk.m1) - 1, 6)):
+            part = MarketY(m1=mk.m1.iloc[:j + 1], half_spread=mk.hs[:j + 1])
+            part.tf(tfn, 12, 26, 7); ptb = part._tb(tfn)
+            i_full, i_part = full_tb[j], ptb[j]
+            assert i_full == i_part and i_full >= 1, (tfn, j)
+            for kd in lv_kinds:
+                a_, b_ = part._levels(tfn, kd[0], kd[1], 12, 26)
+                for cut_arr, full_arr in ((a_, full[kd][0]), (b_, full[kd][1])):
+                    x, y = cut_arr[i_part], full_arr[i_full]
+                    assert (x == y) or (x != x and y != y), (tfn, j, kd, x, y)
+                    n_cmp += 1
+                    z = full_arr[i_full + 1] if i_full + 1 < len(full_arr) else np.nan    # the level one bar early
+                    n_shift += not ((x == z) or (x != x and z != z))
+    assert n_shift > 0.25 * n_cmp, (n_shift, n_cmp)
+    print(f"level timing: {n_cmp} levels identical when the series is cut at the row that uses them; "
+          f"a level read one bar early would differ in {n_shift}")
 
     # look-ahead check: scramble everything after a cut, earlier-closed trades must not change
     m1 = mk.m1.copy(); cut = len(m1) * 2 // 3

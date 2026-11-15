@@ -4,8 +4,8 @@
 
 > **Status: not recommended for live trading.** The presets were fitted to January 2025 – 15 May 2026.
 > - **Gold:** on the months after that, which they never saw, the six shipped gold presets together lost money even before commission on VT Markets real ticks: profit factor 0.74 on 247 trades, 1 June – 6 November 2026 (0.67 at VT's $0.60 commission per lot). Dukascopy prices agree.
-> - **BTC:** the four presets together broke even: profit factor 1.05 on 193 trades, 16 May – 13 November 2026.
-> - **Re-calibration (15 November 2026):** every timeframe from M1 to H1, with eleven kinds of trailing stop, was re-calibrated on the same period and tested on the months after it. No timeframe holds a profit factor of 1.3 on unseen data, on gold (0.72–1.04, or 0.71–0.98 at VT's costs) or on BTC (0.77–1.20 where there are at least 100 unseen trades).
+> - **BTC:** the four new M5 presets passed the unseen months of 2026 (profit factor 1.42 on 133 trades, 16 May – 13 November) and lost on the two years before the calibration data (0.79 in 2024, 0.83 in 2023): unproven, demo only. The earlier `Loma_BTC01`–`BTC04` presets are withdrawn; they were fitted on a price file with a wrong clock.
+> - **Re-calibration (15 November 2026):** every timeframe from M1 to H1 was re-calibrated on the same period with 23 trailing systems and tested on the months after it. Gold: no timeframe holds a profit factor of 1.3 on unseen data (0.67–1.08, or 0.61–1.01 at VT's costs). BTC: M5 passes the 2026 months, with the EA's own trailing (1.42 on 133 trades) and with all 23 systems (1.48 on 377 trades), but the same setups scored 0.79 and 1.00 in 2024 and 0.83 and 0.69 in 2023: it did not hold on earlier data. No other BTC timeframe passes.
 > - **The EA itself** reproduces the backtest's trades.
 
 ## Downloads
@@ -13,7 +13,7 @@
 | Zip | Contents |
 |---|---|
 | `dist/Loma_XAUUSD_v1_34.zip` | The EA, the six gold presets, `GOLD_PRESETS_SUMMARY.csv` and the out-of-sample report `Loma_OOS_Review.html`. Guide: `packages/loma_xauusd/START_HERE.md`. |
-| `dist/Loma_BTCUSD_v1_34.zip` | The same EA and the four BTC presets with `BTC_PRESETS_SUMMARY.csv`. Guide: `packages/loma_btcusd/START_HERE.md`. |
+| `dist/Loma_BTCUSD_v1_34.zip` | The same EA and the four BTC M5 presets with `BTC_PRESETS_SUMMARY.csv` and the report. Guide: `packages/loma_btcusd/START_HERE.md`. |
 
 The out-of-sample report is also in the repository: `research/reports/loma_oos_review.html`.
 
@@ -21,14 +21,14 @@ The out-of-sample report is also in the repository: `research/reports/loma_oos_r
 
 A **hump** (loma) is a run of bars with the MACD on one side of zero.
 
-1. **Trend first.** A big hump below zero means a bearish trend; a big hump above zero means a bullish trend. "Big" means its peak is at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and it lasts at least `BigHumpMinBars` bars. If `RequireStochLevel` is on, the Stochastic must also reach `StochLow` (bearish) or `StochHigh` (bullish) during it: 20/80 by default, 25/75 in Top04, 15/85 in BTC04. Top01, Top02, Top03 and Top05 do not require it. With no big hump in force the market is **lineal** and the EA does not trade.
+1. **Trend first.** A big hump below zero means a bearish trend; a big hump above zero means a bullish trend. "Big" means its peak is at least `BigHumpMultiplier` times the median of the last `BigHumpHistory` humps and it lasts at least `BigHumpMinBars` bars. If `RequireStochLevel` is on, the Stochastic must also reach `StochLow` (bearish) or `StochHigh` (bullish) during it: 20/80 by default, 25/75 in Top04 and in the BTC preset R04. Top01, Top02, Top03 and Top05 do not require it. With no big hump in force the market is **lineal** and the EA does not trade.
 2. **Trend break.** An opposite hump as large as `TrendBreakRatio` times the big hump ends the trend.
 3. **Sell signal** (bearish trend): a pullback hump above zero that lasts at least `PullbackMinBars` bars and is no larger than `PullbackMaxRatio` times the big hump, then the first bar with the MACD back below zero. Top01, Top04 and Top07 use `PullbackMinBars=1`, so a single bar across zero counts as a pullback.
 4. **Stop loss:** above the highest high of the pullback hump (including the signal bar), plus `SL_Buffer_Points` and the spread. No hump, no stop, no trade.
 5. **Take profit:** every shipped preset uses a fixed multiple of the risk (`TP_Mode=TP_FIXED_RR`, `TP_RR`). The other mode, `TP_PREV_HUMP`, aims at the previous hump's extreme, taken a little early (`TP_Anticipation`).
 6. **Weak signals are skipped:** only the first `MaxSignalsPerBigHump` signals after a big hump are traded, and the trend lapses after `TrendMaxBars` bars without a new big hump.
 7. **Buys** are the exact mirror.
-8. **Trend filter** (`UseHTFFilter`): sell only if the last closed `HTF_Timeframe` bar closed below its EMA(`HTF_EMA_Period`), buy only if above. Each preset sets its own timeframe and period; Top02 and BTC03 use no filter.
+8. **Trend filter** (`UseHTFFilter`): sell only if the last closed `HTF_Timeframe` bar closed below its EMA(`HTF_EMA_Period`), buy only if above. Each preset sets its own timeframe and period; Top02 and the BTC presets R01 and R04 use no filter.
 
 ## Install
 
@@ -71,14 +71,15 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 | `Loma_Top05` | M10 | buy | all day | M30 EMA 20 | 141 / 1.96 | 49 | 0.87 / 0.81 | 0.84 |
 | `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 32 | 0.72 / 0.64 | 0.67 |
 
-**BTC** (`dist/Loma_BTCUSD_v1_34.zip`). Binance BTCUSDT one-minute data with an assumed $10 spread. Backtest: January 2025 – 15 May 2026. Out of sample: 16 May – 13 November 2026. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission.
+**BTC** (`dist/Loma_BTCUSD_v1_34.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. Picked on January 2025 – 15 May 2026; unseen: 16 May – 13 November 2026; 2024 and 2023 lie before the calibration data. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission.
 
-| Preset | Chart | Direction | Session (server time) | Trend filter | Backtest trades / PF | Out of sample: trades, PF, net | Stress PF | PF at $20 spread |
-|---|---|---|---|---|---|---|---|---|
-| `Loma_BTC01` | M3 | both | 07:00-12:00 | M15 EMA 20 | 136 / 2.22 | 56, 0.86, −4.9R | 0.79 | 0.78 |
-| `Loma_BTC02` | M5 | both | 12:00-16:30 | H4 EMA 50 | 129 / 2.22 | 41, 1.79, +7.9R | 1.04 | 1.61 |
-| `Loma_BTC03` | M10 | sell | 07:00-20:00 | none | 124 / 2.21 | 51, 1.24, +4.9R | 1.19 | 1.22 |
-| `Loma_BTC04` | M10 | sell | 07:00-20:00 | M30 EMA 50 | 132 / 1.72 | 45, 0.90, −3.0R | 0.82 | 0.90 |
+| Preset | Direction | Session (server time) | Trend filter | Target | Trailing | Picked on: trades / PF | Unseen 2026: trades, PF, net | Stress PF | 2024: PF (trades) | 2023: PF (trades) |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `Loma_BTC_M5_R01` | both | 07:00-12:00 | none | previous hump | off | 77 / 1.99 | 31, 1.64, +8.1R | 1.74 | 0.76 (78) | 0.79 (74) |
+| `Loma_BTC_M5_R02` | sell | 07:00-20:00 | M15 EMA 200 | 1.5R | from 1.5R, 0.5R behind | 102 / 1.54 | 38, 1.50, +8.9R | 1.38 | 1.17 (59) | 0.85 (83) |
+| `Loma_BTC_M5_R03` | both | 12:00-16:30 | H1 EMA 200 | 1.5R | from 1.0R, 1.0R behind | 85 / 1.76 | 28, 0.74, −3.3R | 0.79 | 0.73 (80) | 0.67 (59) |
+| `Loma_BTC_M5_R04` | sell | 12:00-20:00 | none | 1.5R | from 1.0R, 1.0R behind | 103 / 1.63 | 36, 1.79, +9.7R | 1.60 | 0.52 (59) | 0.96 (75) |
+| **All four** | | | | | | | **133, 1.42, +23.3R** | **1.37** | **0.79 (276)** | **0.83 (291)** |
 
 ## Read before trading
 
@@ -122,23 +123,9 @@ These are the ten best all-round setups from both gold calibrations (about 54,00
 - Several use MACD periods other than 12/26: set your chart's MACD to the preset's values if you want the chart to match what the EA sees.
 - Superseded: out of sample (June – 6 November 2026) the six tested presets lost. See the table at the top.
 
-### BTCUSD presets (`Loma_BTC01` to `Loma_BTC04`)
+### BTCUSD presets `Loma_BTC01` to `Loma_BTC04` (withdrawn)
 
-The same EA runs on BTCUSD with these four presets. **Do not load them on gold, or the gold presets on BTC:** the distances are BTC-sized (points are 0.01 USD, so 2000 points = 20 USD), `MaxSpread_Points` is 3000 (30 USD) and the weekend close is off.
-
-Backtest: Binance BTCUSDT one-minute data, January 2025 to May 2026, an assumed 10 USD spread. Stress = entry one minute late, pessimistic trailing, 3 USD slippage and 2 USD commission. Figures in brackets are with a 20 USD spread.
-
-| # | Chart | Direction | Session (server time) | Trend filter | Trades | PF | 2026 PF | Stress PF | Stress 2026 |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | M3 | both | 07:00-12:00 | M15 EMA 20 | 136 | 2.22 (2.11) | 2.14 (2.12) | 1.85 (1.83) | 1.80 (1.80) |
-| 2 | M5 | both | 12:00-16:30 | H4 EMA 50 | 129 | 2.22 (2.20) | 2.80 (3.15) | 1.64 (1.42) | 1.98 (1.49) |
-| 3 | M10 | sell | 07:00-20:00 | none | 124 | 2.21 (2.06) | 1.86 (1.64) | 2.08 (1.96) | 1.51 (1.57) |
-| 4 | M10 | sell | 07:00-20:00 | M30 EMA 50 | 132 | 1.72 (1.53) | 1.50 (1.36) | 1.49 (1.42) | 1.48 (1.34) |
-
-- **BTC is much weaker evidence than gold.** Across 54,000 random BTC setups, a good 2025 did not predict 2026 (median 2026 PF about 1.0), and only 56% of the 48 refined setups were profitable in 2026. These four are the ones that stay at PF 1.3 or better on every measure, chosen with all the data: four survivors out of 48 is not far from what luck gives.
-- #3 and #4 are both M10 sells in the same session and share many trades: run one of them.
-- The data is Binance spot; your broker's BTC CFD has its own prices, spread, commission, swaps and weekend behaviour.
-- Demo and Strategy Tester (real ticks) only until confirmed there.
+These four were the first BTC presets. They were calibrated on a BTC price file whose clock ran 2 hours (US winter) or 3 hours (US summer) ahead of broker time, because a file that was already in server time was converted a second time. Their trading hours, end-of-day times and H4 trend filters were fitted to the wrong hours, and every figure published for them came from the same file. They are kept in `presets/btc_withdrawn/` as a record only. Their replacement is the four `Loma_BTC_M5` presets in the table near the top, picked on a rebuilt series whose clock is checked.
 
 ### Original five presets
 

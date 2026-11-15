@@ -1,0 +1,398 @@
+[
+ {
+  "symbol": "BTCUSD",
+  "tf": "M1",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 0
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M1",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 564,
+  "oos_pf": 1.1270566120950163,
+  "oos_stress_pf": 1.0167770043528856,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M1",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 3731,
+  "oos_pf": 1.1863133524995215,
+  "oos_stress_pf": 1.0224505043427603,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M1",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 397,
+  "oos_pf": 1.0297285523912239,
+  "oos_stress_pf": 0.7978345861545645,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M1",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 285,
+  "oos_pf": 1.0650050707343701,
+  "oos_stress_pf": 0.8703753958085826,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M2",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 438,
+  "oos_pf": 1.283431747729634,
+  "oos_stress_pf": 1.1511365343055062,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M2",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 438,
+  "oos_pf": 1.283431747729634,
+  "oos_stress_pf": 1.1511365343055062,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M2",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 2414,
+  "oos_pf": 1.0806191662281832,
+  "oos_stress_pf": 0.9554710562880961,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M2",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 479,
+  "oos_pf": 1.1453232916556775,
+  "oos_stress_pf": 0.8915578730017283,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M2",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 308,
+  "oos_pf": 0.8560140848200392,
+  "oos_stress_pf": 0.7091023069542063,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M3",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 286,
+  "oos_pf": 1.1700681040818588,
+  "oos_stress_pf": 1.0447581577821108,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M3",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 286,
+  "oos_pf": 1.1700681040818588,
+  "oos_stress_pf": 1.0447581577821108,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M3",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 1835,
+  "oos_pf": 1.381728328234018,
+  "oos_stress_pf": 1.214075238290865,
+  "passes": true
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M3",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 356,
+  "oos_pf": 1.0849466057115358,
+  "oos_stress_pf": 0.9619422522904273,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M3",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 336,
+  "oos_pf": 1.4740515038317623,
+  "oos_stress_pf": 1.2155527719871284,
+  "passes": true
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M5",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 377,
+  "oos_pf": 1.482630701486309,
+  "oos_stress_pf": 1.418851314412547,
+  "passes": true
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M5",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 377,
+  "oos_pf": 1.482630701486309,
+  "oos_stress_pf": 1.418851314412547,
+  "passes": true
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M5",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 1901,
+  "oos_pf": 1.3387991548318718,
+  "oos_stress_pf": 1.2310699488629084,
+  "passes": true
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M5",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 413,
+  "oos_pf": 1.3696041784149209,
+  "oos_stress_pf": 1.2300808529302407,
+  "passes": true
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M5",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 300,
+  "oos_pf": 1.0704566742500712,
+  "oos_stress_pf": 1.0543381540376608,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M10",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 358,
+  "oos_pf": 1.0454803198239786,
+  "oos_stress_pf": 1.0626938607180154,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M10",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 358,
+  "oos_pf": 1.0454803198239786,
+  "oos_stress_pf": 1.0626938607180154,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M10",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 2084,
+  "oos_pf": 1.0885583449768417,
+  "oos_stress_pf": 1.0535492647218108,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M10",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 338,
+  "oos_pf": 1.1713003777787137,
+  "oos_stress_pf": 1.124955645775922,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M10",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 238,
+  "oos_pf": 0.8836735289351257,
+  "oos_stress_pf": 0.8594209538698147,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M15",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 377,
+  "oos_pf": 0.8412424620379295,
+  "oos_stress_pf": 0.8469679798840724,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M15",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 377,
+  "oos_pf": 0.8412424620379295,
+  "oos_stress_pf": 0.8469679798840724,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M15",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 2056,
+  "oos_pf": 0.7569782917473686,
+  "oos_stress_pf": 0.7278171140151134,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M15",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 336,
+  "oos_pf": 0.778261275153292,
+  "oos_stress_pf": 0.7805604477610685,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M15",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 267,
+  "oos_pf": 0.5851022149234488,
+  "oos_stress_pf": 0.5914495438626601,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M30",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 330,
+  "oos_pf": 0.670469484872068,
+  "oos_stress_pf": 0.6783515973827535,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M30",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 330,
+  "oos_pf": 0.670469484872068,
+  "oos_stress_pf": 0.6783515973827535,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M30",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 1524,
+  "oos_pf": 0.7199990485460104,
+  "oos_stress_pf": 0.7394534179456771,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M30",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 298,
+  "oos_pf": 0.6068225519128614,
+  "oos_stress_pf": 0.5533171986375875,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "M30",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 262,
+  "oos_pf": 0.8970655624897983,
+  "oos_stress_pf": 0.9298432624935727,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "H1",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 1,
+  "oos_n": 30,
+  "oos_pf": 1.0890871485664704,
+  "oos_stress_pf": 1.1751451905490542,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "H1",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 311,
+  "oos_pf": 0.9303309532705174,
+  "oos_stress_pf": 0.9425934317448508,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "H1",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 1883,
+  "oos_pf": 0.7714960628743671,
+  "oos_stress_pf": 0.777915901800879,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "H1",
+  "rule": "top 10, base costs only",
+  "picked": 4,
+  "oos_n": 122,
+  "oos_pf": 0.8274625063782197,
+  "oos_stress_pf": 0.8100990364107904,
+  "passes": false
+ },
+ {
+  "symbol": "BTCUSD",
+  "tf": "H1",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 294,
+  "oos_pf": 0.9560754829413406,
+  "oos_stress_pf": 0.8801362429264246,
+  "passes": false
+ }
+]

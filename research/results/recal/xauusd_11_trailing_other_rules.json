@@ -10,9 +10,9 @@
   "tf": "M1",
   "rule": "top 10 by score, no threshold",
   "picked": 10,
-  "oos_n": 567,
-  "oos_pf": 0.9583080804048802,
-  "oos_stress_pf": 0.9379064767707855,
+  "oos_n": 556,
+  "oos_pf": 0.9633758444695549,
+  "oos_stress_pf": 0.9672018827407725,
   "passes": false
  },
  {
@@ -20,9 +20,9 @@
   "tf": "M1",
   "rule": "top 50 by score",
   "picked": 50,
-  "oos_n": 3450,
-  "oos_pf": 0.9862990569294982,
-  "oos_stress_pf": 0.9491546889299268,
+  "oos_n": 3238,
+  "oos_pf": 0.9861879763653617,
+  "oos_stress_pf": 0.9506158342838953,
   "passes": false
  },
  {
@@ -40,9 +40,9 @@
   "tf": "M1",
   "rule": "top 10 by whole in-sample PF",
   "picked": 10,
-  "oos_n": 376,
-  "oos_pf": 0.8430538896953452,
-  "oos_stress_pf": 0.7929719740897442,
+  "oos_n": 365,
+  "oos_pf": 0.9221093981882643,
+  "oos_stress_pf": 0.8591746393656379,
   "passes": false
  },
  {
@@ -50,99 +50,99 @@
   "tf": "M2",
   "rule": "main rule (top 10, score >= 1.3)",
   "picked": 8,
+  "oos_n": 407,
+  "oos_pf": 0.8058569802715965,
+  "oos_stress_pf": 0.727302795673724,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 515,
+  "oos_pf": 0.8272473402930043,
+  "oos_stress_pf": 0.720887026489582,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 3576,
+  "oos_pf": 0.7360998701868054,
+  "oos_stress_pf": 0.6742192997494896,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 469,
+  "oos_pf": 0.5803710652750952,
+  "oos_stress_pf": 0.5568304301682986,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M2",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
+  "oos_n": 440,
+  "oos_pf": 0.6400478711460705,
+  "oos_stress_pf": 0.5411108746772942,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "main rule (top 10, score >= 1.3)",
+  "picked": 10,
+  "oos_n": 633,
+  "oos_pf": 0.8030773444357358,
+  "oos_stress_pf": 0.7373184856926828,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "top 10 by score, no threshold",
+  "picked": 10,
+  "oos_n": 633,
+  "oos_pf": 0.8030773444357358,
+  "oos_stress_pf": 0.7373184856926828,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "top 50 by score",
+  "picked": 50,
+  "oos_n": 3287,
+  "oos_pf": 0.799055697064138,
+  "oos_stress_pf": 0.7557512262512672,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "top 10, base costs only",
+  "picked": 10,
+  "oos_n": 453,
+  "oos_pf": 0.8060482082736644,
+  "oos_stress_pf": 0.7830643304964934,
+  "passes": false
+ },
+ {
+  "symbol": "XAUUSD",
+  "tf": "M3",
+  "rule": "top 10 by whole in-sample PF",
+  "picked": 10,
   "oos_n": 408,
-  "oos_pf": 0.8022521186881484,
-  "oos_stress_pf": 0.7051213398763115,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M2",
-  "rule": "top 10 by score, no threshold",
-  "picked": 10,
-  "oos_n": 492,
-  "oos_pf": 0.7862254617871528,
-  "oos_stress_pf": 0.6839062589127676,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M2",
-  "rule": "top 50 by score",
-  "picked": 50,
-  "oos_n": 3669,
-  "oos_pf": 0.7455531742503754,
-  "oos_stress_pf": 0.669807552122814,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M2",
-  "rule": "top 10, base costs only",
-  "picked": 10,
-  "oos_n": 564,
-  "oos_pf": 0.6533649955149503,
-  "oos_stress_pf": 0.4713139142782792,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M2",
-  "rule": "top 10 by whole in-sample PF",
-  "picked": 10,
-  "oos_n": 603,
-  "oos_pf": 0.5980465957966182,
-  "oos_stress_pf": 0.3428013153641523,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M3",
-  "rule": "main rule (top 10, score >= 1.3)",
-  "picked": 10,
-  "oos_n": 670,
-  "oos_pf": 0.8347732986231905,
-  "oos_stress_pf": 0.7376775699998945,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M3",
-  "rule": "top 10 by score, no threshold",
-  "picked": 10,
-  "oos_n": 670,
-  "oos_pf": 0.8347732986231905,
-  "oos_stress_pf": 0.7376775699998945,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M3",
-  "rule": "top 50 by score",
-  "picked": 50,
-  "oos_n": 3439,
-  "oos_pf": 0.8186950988886667,
-  "oos_stress_pf": 0.7609019034575734,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M3",
-  "rule": "top 10, base costs only",
-  "picked": 10,
-  "oos_n": 499,
-  "oos_pf": 0.8223674557328802,
-  "oos_stress_pf": 0.711468143106797,
-  "passes": false
- },
- {
-  "symbol": "XAUUSD",
-  "tf": "M3",
-  "rule": "top 10 by whole in-sample PF",
-  "picked": 10,
-  "oos_n": 426,
-  "oos_pf": 0.7955373949151442,
-  "oos_stress_pf": 0.6511663184022312,
+  "oos_pf": 0.7052214615251657,
+  "oos_stress_pf": 0.7176909870908067,
   "passes": false
  },
  {
@@ -150,9 +150,9 @@
   "tf": "M5",
   "rule": "main rule (top 10, score >= 1.3)",
   "picked": 10,
-  "oos_n": 454,
-  "oos_pf": 0.958878943566619,
-  "oos_stress_pf": 0.8149985152784552,
+  "oos_n": 415,
+  "oos_pf": 0.9667977805374248,
+  "oos_stress_pf": 0.7863191979959653,
   "passes": false
  },
  {
@@ -160,9 +160,9 @@
   "tf": "M5",
   "rule": "top 10 by score, no threshold",
   "picked": 10,
-  "oos_n": 454,
-  "oos_pf": 0.958878943566619,
-  "oos_stress_pf": 0.8149985152784552,
+  "oos_n": 415,
+  "oos_pf": 0.9667977805374248,
+  "oos_stress_pf": 0.7863191979959653,
   "passes": false
  },
  {
@@ -170,9 +170,9 @@
   "tf": "M5",
   "rule": "top 50 by score",
   "picked": 50,
-  "oos_n": 2518,
-  "oos_pf": 0.9633139747367064,
-  "oos_stress_pf": 0.8561256619356207,
+  "oos_n": 2547,
+  "oos_pf": 0.9558923545107663,
+  "oos_stress_pf": 0.8649385592919423,
   "passes": false
  },
  {
@@ -180,9 +180,9 @@
   "tf": "M5",
   "rule": "top 10, base costs only",
   "picked": 10,
-  "oos_n": 385,
-  "oos_pf": 1.043016052091355,
-  "oos_stress_pf": 0.7033983395436106,
+  "oos_n": 401,
+  "oos_pf": 0.9511216160991889,
+  "oos_stress_pf": 0.7429180871280995,
   "passes": false
  },
  {
@@ -190,9 +190,9 @@
   "tf": "M5",
   "rule": "top 10 by whole in-sample PF",
   "picked": 10,
-  "oos_n": 378,
-  "oos_pf": 1.0930059661815277,
-  "oos_stress_pf": 0.9154354961919057,
+  "oos_n": 390,
+  "oos_pf": 1.0404256533088938,
+  "oos_stress_pf": 0.9202603289676746,
   "passes": false
  },
  {
@@ -202,7 +202,7 @@
   "picked": 10,
   "oos_n": 381,
   "oos_pf": 1.0374475464861344,
-  "oos_stress_pf": 0.9522677342098177,
+  "oos_stress_pf": 0.959619992937981,
   "passes": false
  },
  {
@@ -212,7 +212,7 @@
   "picked": 10,
   "oos_n": 381,
   "oos_pf": 1.0374475464861344,
-  "oos_stress_pf": 0.9522677342098177,
+  "oos_stress_pf": 0.959619992937981,
   "passes": false
  },
  {
@@ -220,9 +220,9 @@
   "tf": "M10",
   "rule": "top 50 by score",
   "picked": 50,
-  "oos_n": 2249,
-  "oos_pf": 0.9484223723284951,
-  "oos_stress_pf": 0.8906294596583101,
+  "oos_n": 2327,
+  "oos_pf": 0.9614999329519,
+  "oos_stress_pf": 0.8921930792210384,
   "passes": false
  },
  {
@@ -230,9 +230,9 @@
   "tf": "M10",
   "rule": "top 10, base costs only",
   "picked": 10,
-  "oos_n": 451,
-  "oos_pf": 0.9463571997370083,
-  "oos_stress_pf": 0.838150648152223,
+  "oos_n": 395,
+  "oos_pf": 0.901884930053348,
+  "oos_stress_pf": 0.8603009627829117,
   "passes": false
  },
  {
@@ -241,8 +241,8 @@
   "rule": "top 10 by whole in-sample PF",
   "picked": 10,
   "oos_n": 288,
-  "oos_pf": 1.158271282095381,
-  "oos_stress_pf": 1.0412649040478603,
+  "oos_pf": 1.0990279678690775,
+  "oos_stress_pf": 1.1616183230958383,
   "passes": false
  },
  {
@@ -251,8 +251,8 @@
   "rule": "main rule (top 10, score >= 1.3)",
   "picked": 10,
   "oos_n": 305,
-  "oos_pf": 0.8094896461379613,
-  "oos_stress_pf": 0.8199028183015723,
+  "oos_pf": 0.8061624421488499,
+  "oos_stress_pf": 0.820246335496054,
   "passes": false
  },
  {
@@ -261,8 +261,8 @@
   "rule": "top 10 by score, no threshold",
   "picked": 10,
   "oos_n": 305,
-  "oos_pf": 0.8094896461379613,
-  "oos_stress_pf": 0.8199028183015723,
+  "oos_pf": 0.8061624421488499,
+  "oos_stress_pf": 0.820246335496054,
   "passes": false
  },
  {
@@ -270,9 +270,9 @@
   "tf": "M15",
   "rule": "top 50 by score",
   "picked": 50,
-  "oos_n": 1742,
-  "oos_pf": 0.7519148705905666,
-  "oos_stress_pf": 0.7303261399239452,
+  "oos_n": 1865,
+  "oos_pf": 0.7566876711431118,
+  "oos_stress_pf": 0.7310363109558234,
   "passes": false
  },
  {
@@ -281,8 +281,8 @@
   "rule": "top 10, base costs only",
   "picked": 10,
   "oos_n": 291,
-  "oos_pf": 0.6951623973810983,
-  "oos_stress_pf": 0.7319763851546948,
+  "oos_pf": 0.6879920417394622,
+  "oos_stress_pf": 0.7493540338225498,
   "passes": false
  },
  {
@@ -290,9 +290,9 @@
   "tf": "M15",
   "rule": "top 10 by whole in-sample PF",
   "picked": 10,
-  "oos_n": 218,
-  "oos_pf": 0.6902939429510058,
-  "oos_stress_pf": 0.6858649751834334,
+  "oos_n": 197,
+  "oos_pf": 0.678094190078979,
+  "oos_stress_pf": 0.6578374405638702,
   "passes": false
  },
  {
@@ -310,9 +310,9 @@
   "tf": "M30",
   "rule": "top 10 by score, no threshold",
   "picked": 10,
-  "oos_n": 348,
-  "oos_pf": 0.67906428458677,
-  "oos_stress_pf": 0.6331603483435424,
+  "oos_n": 320,
+  "oos_pf": 0.685734107467125,
+  "oos_stress_pf": 0.6471494623924243,
   "passes": false
  },
  {
@@ -320,9 +320,9 @@
   "tf": "M30",
   "rule": "top 50 by score",
   "picked": 50,
-  "oos_n": 1875,
-  "oos_pf": 0.8013319639112345,
-  "oos_stress_pf": 0.753509739324833,
+  "oos_n": 1893,
+  "oos_pf": 0.7949389488212738,
+  "oos_stress_pf": 0.7593679258460456,
   "passes": false
  },
  {
@@ -330,9 +330,9 @@
   "tf": "M30",
   "rule": "top 10, base costs only",
   "picked": 10,
-  "oos_n": 345,
-  "oos_pf": 0.8005752978390546,
-  "oos_stress_pf": 0.6934470836231426,
+  "oos_n": 362,
+  "oos_pf": 0.7483559508988664,
+  "oos_stress_pf": 0.6974101859481937,
   "passes": false
  },
  {
@@ -340,9 +340,9 @@
   "tf": "M30",
   "rule": "top 10 by whole in-sample PF",
   "picked": 10,
-  "oos_n": 186,
-  "oos_pf": 0.9224720668147119,
-  "oos_stress_pf": 0.7964417934500613,
+  "oos_n": 177,
+  "oos_pf": 0.7816099874489434,
+  "oos_stress_pf": 0.7286115495013158,
   "passes": false
  },
  {
@@ -366,9 +366,9 @@
   "tf": "H1",
   "rule": "top 50 by score",
   "picked": 50,
-  "oos_n": 1548,
-  "oos_pf": 0.7937699399881954,
-  "oos_stress_pf": 0.7475247970344798,
+  "oos_n": 1551,
+  "oos_pf": 0.7802628474748293,
+  "oos_stress_pf": 0.7438426806706562,
   "passes": false
  },
  {
@@ -382,9 +382,9 @@
   "tf": "H1",
   "rule": "top 10 by whole in-sample PF",
   "picked": 10,
-  "oos_n": 172,
-  "oos_pf": 0.8626798593975722,
-  "oos_stress_pf": 0.8489954256781994,
+  "oos_n": 180,
+  "oos_pf": 0.9259497675165811,
+  "oos_stress_pf": 0.919020068809988,
   "passes": false
  }
 ]
