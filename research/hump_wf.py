@@ -4,8 +4,9 @@ Year-by-year test of the Loma (hump) method on long history, with one extra entr
 
 Question: does any version of the method keep a profit factor of 1.3 on years it was not fitted to?
 
-Protocol (fixed before any result was looked at):
-  data      XAUUSD: Dukascopy M1 2019-2024, FTMO M1 2025 - 15 May 2026, Dukascopy after (to 13 Nov 2026).
+Protocol 1, XAUUSD and BTCUSD (fixed before any result was looked at):
+  data      XAUUSD: Dukascopy M1 2013-2024 (run gold2; the first run began in 2019), FTMO M1 2025 - 15 May 2026,
+            Dukascopy after (to 13 Nov 2026).
             BTCUSD: Binance BTCUSDT M1 2018 - 13 Nov 2026, read in UTC and converted to server time once.
             The clock of every series is checked (hump_tf_recal.clock_check).
   scale     Prices rose several-fold over these years, so every dollar distance of a setup (stop buffer, minimum
@@ -32,13 +33,65 @@ Protocol (fixed before any result was looked at):
             year with 50+ trades below 1.0, and at least two unseen years with 50+ trades.
   final     the last year (2026, to 13 Nov) is not used to decide what passes. It is run once, for what passed.
 
+Protocol 2, EURUSD and US500. Pre-registered on 15 Nov 2026, before any EURUSD or US500 data was looked at, after gold
+and BTC had both failed in an honest reading ("run the same test on EURUSD and US500"). Everything of protocol 1
+holds except what is listed here; meta.json of the build says "protocol": 2, and XAUUSD and BTCUSD run unchanged.
+  data      Dukascopy one-minute BID and ASK candles, 1 Jan 2013 - 13 Nov 2026, one folder per symbol (instrument EURUSD,
+            and USA500IDXUSD for US500), through duk_to_m1 (DUK_INSTRUMENT; bi5 prices / 1e5 and / 1e3): mid prices,
+            tick volume, UTC converted to server time once. The Dukascopy spread of every bar (ask close - bid close) is
+            kept next to the series (duk_spread.npy) for the clock check and the shape of the spread.
+  clock     fatal on the whole series and on every year with more than 100000 bars.
+            EURUSD, which has no daily break: (a) the FX week opens Sunday 17:00 New York = Monday 00:00 server time in
+            summer and winter, so the first bar after a closure of 24 h or more is on Monday 00:00-00:05 after at least
+            90% of them; (b) the daily rollover (17:00 New York) widens the spread: the minute of the day with the largest
+            median Dukascopy spread lies in 23:50-00:10 server time in at least 80% of the quarters
+            (hump_tf_recal.clock_check_fx). The US-open jump of clock_check is only recorded as a note.
+            US500: the daily reopen after the CME maintenance break at 01:00-01:15 server time on at least 90% of the days,
+            and the US stock open jump at 16:30 the largest of the half-past marks in at least two thirds of the quarters
+            (clock_check with top=1). "hump_wf.py clockshift" shows that copies shifted by +1 h and -1 h fail.
+  anchor    the mean close of the 180 days that end on 2025-12-31 (2026 plays no part in anything that is decided).
+  space     buf, min_risk and the two larger minimum stops are gold's dollar values times k = the symbol's median
+            one-minute high-low range / gold's (wf/gold2/m1.pkl), both over those 180 days, each rounded to two
+            significant digits (hump_search.set_scale; k and the lists are printed and stored in meta.json). Everything
+            else of the space as for gold; max_risk unbounded as for gold.
+  costs     VT Markets RAW ECN (the user's gold account type), times price / anchor like gold's:
+            EURUSD: 0.00003 spread (0.3 pips) shaped by server hour + 0.00006 commission per unit round trip (6 USD per
+                    100,000); stress: slippage 0.00002, commission 0.000066, entry one minute late, pessimistic trailing.
+            US500:  0.5 points spread shaped by server hour, no commission; stress: slippage 0.3, commission 0.2, entry
+                    one minute late, pessimistic trailing.
+            The shape of the day is the symbol's median Dukascopy spread by server hour over 2013-2025 (not 2026),
+            divided by its median over the hours (meta.json; gold keeps FTMO's hourly table). No spread filter (as BTC).
+  rules     the EA's Friday close and its catch-up at the next open as for gold, from 23:00 server time for EURUSD and
+            from 15 minutes before US500's usual Friday close (build reports it); no entry on the first bar after a
+            break of 30 minutes or more. hump_search BASE: skip_big_pb=1, weekend_close=1, no spread filter.
+  features  the 59 conditions mean the same on every symbol: the round-number grid (0.5% of the previous day's close,
+            rounded to the nearest step) extends below 1 (NICE2; gold and BTC prices choose the same step as before),
+            and the random controls draw from a stream of their own per symbol.
+  windows   the calibration sums leave out the trades that close in a later calendar year than they open (a late-
+            December trade must not bring test-year prices into the calibration); the test year counts every trade by
+            its entry year, as before.
+  final     "wf" writes the final year (2026) only for the cells that pass, and computes nothing about it for the
+            others. "detail" does the same, and adds the trades collapsed to distinct (entry time, side) signals (mean
+            R over the picks that took each) with the pass rule applied to them and the counts.
+
+Earlier looks (results seen before protocol 2 was written; listed so that nothing is counted twice):
+  XAUUSD    run on 2019 - Nov 2026 (unseen years 2022-2025): 13 H1 cells passed, and the final year was computed for
+            every cell; run gold2 on 2013 - Nov 2026 (unseen 2016-2025): no cell passes, final year again computed (and
+            written) for every cell.
+  BTCUSD    run before the engine fixes: 3 cells passed (M15 atrp_ge70, M30 xlzc_stoch, M30 xlzc_both); run btc2: 2 cells
+            pass (M30 xlzc_stoch and xlzc_both), which the independent audit finds indistinguishable from chance; the
+            final year computed for every cell.
+
 Usage (from research/):
   [HUMP_SYMBOL=BTCUSD] python3 hump_wf.py build <work_dir> <source dirs, comma separated>
-  [HUMP_SYMBOL=BTCUSD] python3 hump_wf.py run   <work_dir> <TF> <N> [workers]
-  [HUMP_SYMBOL=BTCUSD] python3 hump_wf.py wf    <work_dir> <out_json>
-  python3 hump_wf.py selftest
+  HUMP_SYMBOL=EURUSD|US500 python3 hump_wf.py build <work_dir> <Dukascopy folder>
+  [HUMP_SYMBOL=...] python3 hump_wf.py run    <work_dir> <TF> <N> [workers]
+  [HUMP_SYMBOL=...] python3 hump_wf.py wf     <work_dir> <out_json>
+  [HUMP_SYMBOL=...] python3 hump_wf.py detail <work_dir> <TF> <condition> <out_json>
+  [HUMP_SYMBOL=...] python3 hump_wf.py selftest <work_dir>      (writes <work_dir>/_selftest)
+  HUMP_SYMBOL=EURUSD|US500 python3 hump_wf.py clockshift <work_dir> [out_json]
 """
-import glob, io, json, os, pickle, random, sys, time, zipfile
+import gc, glob, io, json, os, pickle, random, sys, time, zipfile
 from multiprocessing import Pool
 import numba as nb, numpy as np, pandas as pd
 
@@ -179,15 +232,165 @@ def build(work, src):
     print(json.dumps(meta, indent=1)[:3000])
 
 
+# ----------------------------------------------------------------------------- protocol 2: EURUSD and US500
+def clock2(m1, spread, label):
+    """The clock checks of a protocol-2 symbol; stops (SystemExit) when one fails. Returns the lines.
+    EURUSD: the weekly open on Monday 00:00-00:05 server time and the daily rollover's spread at 23:50-00:10
+    (hump_tf_recal.clock_check_fx; the US-open jump only recorded). US500: the daily reopen at 01:00-01:15 server
+    time on 90% of the days and the US stock open at 16:30 the largest of the half-past jumps in two thirds of the
+    quarters (hump_tf_recal.clock_check with top=1)."""
+    if SYM == "EURUSD":
+        return list(R.clock_check_fx(m1, spread, label))
+    return [R.clock_check(m1[["open", "high", "low", "close"]], label, min_reopen=0.9, jump_fatal=True, top=1)]
+
+
+def clock_suite(m1, spread, tag=""):
+    """clock2 on the whole series and on every year with more than 100000 bars, all fatal."""
+    lines = clock2(m1, spread, f"{SYM}{tag} whole series")
+    for y in sorted(set(m1.index.year)):
+        sel = np.asarray(m1.index.year == y)
+        if sel.sum() > 100000:
+            lines += clock2(m1[sel], spread[sel], f"{SYM}{tag} {y}")
+    return lines
+
+
+def anchor_window(index):
+    return np.asarray((index >= ANCHOR_END - pd.Timedelta(days=ANCHOR_DAYS)) & (index < ANCHOR_END))
+
+
+def build2(work, folder):
+    """EURUSD and US500: one Dukascopy folder (BID and ASK one-minute candles), the whole range, through duk_to_m1.
+    Stores m1.pkl (open, high, low, close, vol; server time), the Dukascopy spread of every bar (duk_spread.npy)
+    and meta.json with protocol 2."""
+    os.makedirs(work, exist_ok=True)
+    os.environ["DUK_INSTRUMENT"] = DUK_NAME[SYM]
+    import duk_to_m1 as D
+    assert D.DIVISOR == DUK_DIVISOR[SYM], (D.DIVISOR, SYM)
+    t0 = time.time()
+    m1, half = D.load(folder)
+    m1 = m1[["open", "high", "low", "close", "vol"]].astype(float)
+    spread = 2.0 * np.asarray(half, float)                       # Dukascopy spread (ask close - bid close) of each bar
+    assert m1.index.is_monotonic_increasing and not m1.index.duplicated().any() and len(spread) == len(m1)
+    assert np.isfinite(m1[["open", "high", "low", "close"]].values).all() and (m1["low"] <= m1["high"]).all()
+    print(f"{SYM}: {len(m1)} bars {m1.index[0]} .. {m1.index[-1]} read in {time.time() - t0:.0f}s", flush=True)
+    notes = [f"Dukascopy {DUK_NAME[SYM]} one-minute BID and ASK candles (prices = bi5 integers / {DUK_DIVISOR[SYM]:g}), "
+             f"mid prices, minutes without ticks dropped, UTC converted once to server time (New York + 7 h); "
+             f"source {os.path.abspath(folder)}"]
+    # where the closures fall (the first look at the schedule), whole series and by year
+    sched = R.schedule(m1)
+    sched_y = {int(y): R.schedule(m1[m1.index.year == y]) for y in sorted(set(m1.index.year))}
+    print("schedule (server time):", json.dumps(sched), flush=True)
+    for y, s in sched_y.items():
+        print(f"  {y}: daily break {s['daily_break_start'].get('top')} -> reopen {s['daily_break_reopen'].get('top')} | weekly close "
+              f"{s['weekly_close'].get('top')} | weekly open {s['weekly_open'].get('top')} | Saturday bars {s['saturday_bars']}", flush=True)
+    # the usual Friday close: the most frequent end of the last bar before a closure of 24 h or more ("Sat 00:00" is
+    # Friday 24:00), in minutes after Friday 00:00 server time
+    close = [k for k in sched["weekly_close"]["top"]][0]
+    if close[:3] not in ("Fri", "Sat"):
+        raise SystemExit(f"{SYM}: the usual weekly close is {close}, not on a Friday")
+    close_min = (1440 if close[:3] == "Sat" else 0) + int(close[4:6]) * 60 + int(close[7:9])
+    if SYM == "US500":
+        assert WEEKEND_MIN == close_min - 15, f"US500's usual weekly close is {close}: WEEKEND_MIN must be {close_min - 15}"
+    if not (WEEKEND_MIN < close_min - 1 and WEEKEND_MIN < 1440):
+        raise SystemExit(f"{SYM}: the Friday window from minute {WEEKEND_MIN} does not start before the market's usual last "
+                         f"Friday bar (weekly close {close})")
+    notes.append(f"usual weekly close {close} server time (the end of the last bar before a closure of 24 h or more, "
+                 f"{sched['weekly_close']['top'][close]:.0%} of {sched['weekly_close']['n']} closures; Saturday bars: "
+                 f"{sched['saturday_bars']}); the EA's Friday window starts at {WEEKEND_MIN // 60:02d}:{WEEKEND_MIN % 60:02d}")
+    # the clock: fatal on the whole series and on every year with enough bars
+    lines = clock_suite(m1, spread)
+    gaps = pd.Series(m1.index).diff().dt.total_seconds().div(60)
+    big = [(str(m1.index[i - 1]), str(m1.index[i]), int(g)) for i, g in gaps.items() if g > 60 * 24 * 4]
+    # anchor and the scale of the setup space: the 180 days that end on 2025-12-31
+    aw = anchor_window(m1.index)
+    anchor = float(m1["close"][aw].mean())
+    med = float(np.median((m1["high"] - m1["low"]).values[aw]))
+    g = pd.read_pickle(GOLD_M1)
+    gw = anchor_window(g.index)
+    gmed = float(np.median((g["high"] - g["low"]).values[gw]))
+    k = med / gmed
+    gold_bars = int(gw.sum()); del g
+    X.set_scale(k)
+    sp = dict(buf=list(X.SPACE["buf"]), min_risk=list(X.SPACE["min_risk"]) + X.scaled(GOLD_EXTRA_MIN_RISK, k))
+    print(f"anchor {anchor:.6g} (mean close of {int(aw.sum())} bars, {ANCHOR_END - pd.Timedelta(days=ANCHOR_DAYS)} .. {ANCHOR_END}); "
+          f"median one-minute range {med:.6g} vs gold {gmed:.6g} ({gold_bars} bars of {GOLD_M1}): k = {k:.6g}", flush=True)
+    print(f"space: buf {sp['buf']}; min_risk {sp['min_risk']} (the last two: gold's {GOLD_EXTRA_MIN_RISK} x k)", flush=True)
+    # spread shape of the day: median Dukascopy spread by server hour, 2013-2025, over its median across the hours
+    hist = np.asarray(m1.index.year <= 2025)
+    hr = m1.index.hour.values
+    by_h = pd.Series(spread[hist]).groupby(hr[hist]).median().reindex(range(24))
+    n_h = pd.Series(np.ones(int(hist.sum()))).groupby(hr[hist]).sum().reindex(range(24)).fillna(0).astype(int)
+    shape = (by_h / float(np.median(by_h.dropna().values))).values
+    if (n_h < 1000).any():
+        notes.append(f"spread shape: hours with fewer than 1000 bars in 2013-2025 {n_h[n_h < 1000].to_dict()}"
+                     + ("; an hour without any bar takes the widest hour's value" if (n_h == 0).any() else ""))
+    shape = np.where(n_h.values > 0, shape, np.nanmax(shape))
+    assert np.isfinite(shape).all() and (shape > 0).all(), shape
+    print("hourly spread shape (server hour: Dukascopy median spread / median over the hours):",
+          {h: round(float(v), 3) for h, v in enumerate(shape)}, flush=True)
+    m1.to_pickle(os.path.join(work, "m1.pkl"))
+    np.save(os.path.join(work, "duk_spread.npy"), spread)
+    meta = dict(symbol=SYM, protocol=2, first=str(m1.index[0]), last=str(m1.index[-1]), bars=int(len(m1)), anchor_price=anchor,
+                anchor_window=[str(ANCHOR_END - pd.Timedelta(days=ANCHOR_DAYS)), str(ANCHOR_END)], anchor_bars=int(aw.sum()),
+                bars_per_year={int(y): int(n) for y, n in m1.groupby(m1.index.year).size().items()}, long_gaps=big, notes=notes,
+                clock_checks=lines, schedule=sched, schedule_by_year=sched_y, weekend_close_min=int(WEEKEND_MIN), usual_weekly_close=close,
+                hourly_spread_shape=[float(v) for v in shape], hourly_spread_dukascopy_median=[float(v) for v in by_h.values],
+                hourly_spread_bars=[int(v) for v in n_h.values],
+                space_k=float(k), space_k_detail=dict(symbol_median_m1_range=med, gold_median_m1_range=gmed, gold_series=GOLD_M1,
+                                                      gold_bars=gold_bars, symbol_bars=int(aw.sum())),
+                space=sp, spread_at_anchor=SPREAD0, costs=list(COSTS),
+                rules=dict(calibration="calibration sums leave out trades that close in a later calendar year than they open",
+                           final_year="wf writes the final year only for cells that pass",
+                           dukascopy="DUK_INSTRUMENT " + DUK_NAME[SYM], duk_spread="duk_spread.npy: ask close - bid close of every bar"))
+    json.dump(meta, open(os.path.join(work, "meta.json"), "w"), indent=1)
+    print(json.dumps({k_: v for k_, v in meta.items() if k_ not in ("schedule_by_year",)}, indent=1)[:6000])
+
+
+def clockshift(work, out_json=None):
+    """The clock checks of a protocol-2 build on copies of its series shifted by +1 h and -1 h: every check of the
+    whole series and of every year must fail on them (the checks would catch a series that is one hour off)."""
+    m1 = pd.read_pickle(os.path.join(work, "m1.pkl"))
+    spread = np.load(os.path.join(work, "duk_spread.npy"))
+    res = {}
+    for hours in (1, -1):
+        s = m1.copy(); s.index = s.index + pd.Timedelta(hours=hours)
+        parts = [("whole series", np.ones(len(s), bool))] + [(str(y), np.asarray(s.index.year == y)) for y in sorted(set(s.index.year))]
+        out = {}
+        for label, sel in parts:
+            if label != "whole series" and sel.sum() <= 100000:
+                continue
+            try:
+                clock2(s[sel], spread[sel], f"{SYM} shifted {hours:+d} h {label}")
+                out[label] = "PASSED"
+            except SystemExit as err:
+                out[label] = f"failed: {err}"
+            print(f"{hours:+d} h {label}: {out[label][:200]}", flush=True)
+        res[f"{hours:+d}h"] = out
+    n_pass = sum(v == "PASSED" for o in res.values() for v in o.values())
+    print(f"{SYM}: shifted copies: {n_pass} of {sum(len(o) for o in res.values())} checks passed (0 expected)", flush=True)
+    if out_json:
+        json.dump(res, open(out_json, "w"), indent=1)
+    return n_pass
+
+
 class Mk(H.Market):
     """hump_engine.Market on the long series, with the price scale and the scaled spread."""
 
     def __init__(self, work):
         m1 = pd.read_pickle(os.path.join(work, "m1.pkl"))
         self.meta = json.load(open(os.path.join(work, "meta.json")))
+        self.protocol = int(self.meta.get("protocol", 1))
+        if self.meta["symbol"] != SYM or (self.protocol == 2) != NEW:
+            raise SystemExit(f"{work} holds {self.meta['symbol']} (protocol {self.protocol}); HUMP_SYMBOL is {SYM}")
         self.p0 = self.meta["anchor_price"]
         ps = m1["open"].values.astype(float) / self.p0                 # known at each bar's open
-        if BTC:
+        if self.protocol == 2:                                         # Dukascopy's own spread by server hour (2013-2025) as the shape
+            apply_scale(self.meta)
+            assert int(self.meta["weekend_close_min"]) == WEEKEND_MIN, (self.meta["weekend_close_min"], WEEKEND_MIN)
+            shape = np.asarray(self.meta["hourly_spread_shape"], float)
+            assert shape.shape == (24,) and np.isfinite(shape).all()
+            spread = SPREAD0 * shape[m1.index.hour.values]
+        elif BTC:
             spread = np.full(len(m1), SPREAD0)
         else:
             _, hourly = B.load(H.DATA)                                 # FTMO spread by UTC hour: used as the shape of the day
@@ -201,10 +404,11 @@ class Mk(H.Market):
         # The EA closes from Friday 23:00 server time and, when that moment passed while the market was closed (an
         # early Friday close), on the first tick after it. It cannot know a mid-week holiday closure in advance, so a
         # trade stays open over it. (hump_engine uses the last bar before any closure of a day or more: look-ahead.)
-        self.wk_gold = (self.dow == 4) & (self.tod >= 1380)
+        # WEEKEND_MIN is 23:00 (1380) for gold and EURUSD; US500's is 15 minutes before its usual Friday close.
+        self.wk_gold = (self.dow == 4) & (self.tod >= WEEKEND_MIN)
         tmin = self.t.astype("datetime64[m]").astype(np.int64)
         day = tmin // 1440; dw = (day + 3) % 7                       # 1970-01-01 was a Thursday: Monday = 0
-        fri = (day - ((dw - 4) % 7)) * 1440 + 1380                    # the latest Friday 23:00 at or before each bar
+        fri = (day - ((dw - 4) % 7)) * 1440 + WEEKEND_MIN             # the latest Friday 23:00 at or before each bar
         fri = np.where(tmin >= fri, fri, fri - 7 * 1440)
         prev = np.r_[-10 ** 12, tmin[:-1]]
         self.wko_gold = (prev < fri) & (tmin > fri) & ~self.wk_gold    # first bar after a Friday 23:00 that had no bar
@@ -371,6 +575,36 @@ def aggregate(masks, kidx, e, j, r, costr, yr, ny):
     return out
 
 
+@nb.njit(cache=True)
+def aggregate2(masks, kidx, e, j, r, costr, yr, ny):
+    """Protocol 2: aggregate() in columns 0-3 (every trade, by entry year: the test year uses these) and in columns
+    4-7 the same sums over the trades that also close in the calendar year they open in (the calibration years use
+    these, so that a trade open over New Year brings no prices of the following year into the calibration)."""
+    nv = masks.shape[0]
+    out = np.zeros((nv, ny, 8))
+    for v in range(nv):
+        busy = -1
+        for i in range(len(e)):
+            if not masks[v, kidx[i]] or e[i] <= busy:
+                continue
+            busy = j[i]
+            y = yr[e[i]]
+            out[v, y, 0] += 1.0
+            if r[i] > 0:
+                out[v, y, 1] += r[i]
+            else:
+                out[v, y, 2] -= r[i]
+            out[v, y, 3] += costr[i]
+            if yr[j[i]] == y:
+                out[v, y, 4] += 1.0
+                if r[i] > 0:
+                    out[v, y, 5] += r[i]
+                else:
+                    out[v, y, 6] -= r[i]
+                out[v, y, 7] += costr[i]
+    return out
+
+
 # ----------------------------------------------------------------------------- features of the signal bar
 def adx(df, n=14):
     up = df["high"].diff(); dn = -df["low"].diff()
@@ -461,7 +695,12 @@ class Feat:
             ok = (open_tod >= a) & (open_tod + tfm >= b)              # the bar closes at or after the end of the range
             with np.errstate(divide="ignore", invalid="ignore"):
                 setattr(self, key + "_pos", np.where(ok, (c - rl) / (rh - rl), np.nan))
-        grid = NICE[np.abs(np.log(NICE)[None, :] - np.log(np.where(pdc > 0, 0.005 * pdc, 1.0))[:, None]).argmin(axis=1)]
+        if NEW:       # protocol 2: the grid extended downward, chosen once per distinct previous close (same argmin)
+            x = np.where(pdc > 0, 0.005 * pdc, 1.0)
+            ux, inv = np.unique(x, return_inverse=True)
+            grid = NICE2[np.abs(np.log(NICE2)[None, :] - np.log(ux)[:, None]).argmin(axis=1)][inv.ravel()]
+        else:
+            grid = NICE[np.abs(np.log(NICE)[None, :] - np.log(np.where(pdc > 0, 0.005 * pdc, 1.0))[:, None]).argmin(axis=1)]
         self.rn = np.where(pdc > 0, np.abs(c - np.round(c / grid) * grid) / (grid / 2.0), np.nan)
         ph, pl = T2.pivot_levels(h, l, 3)                  # last confirmed swing high / low, known 3 bars after it
         self.bos_up = c > ph; self.bos_dn = c < pl
@@ -488,7 +727,7 @@ class Feat:
         sh, sl = B.swing_flags(h, l, 2)
         self.sw_dn, self.sw_up = sweep_flags(h, l, c, sh, sl, 30, 2)
 
-        self.rnd = np.random.default_rng(B.TF_MIN[name] + (1000 if BTC else 0)).random((3, len(idx)))   # controls
+        self.rnd = np.random.default_rng(B.TF_MIN[name] + SEED_OFFSET).random((3, len(idx)))   # controls (gold 0, BTC 1000, EURUSD 2000, US500 3000)
 
 
 def conditions():
@@ -578,7 +817,21 @@ def space():
     return sp
 
 
+def apply_scale(meta):
+    """Protocol 2: the stop buffer and minimum stops of the space in the symbol's price units, from the k that build
+    measured (hump_search.set_scale; the two larger minimum stops are gold's 4 and 6 x k). They must be the lists
+    that build stored in meta.json."""
+    global EXTRA_MIN_RISK
+    k = float(meta["space_k"])
+    X.set_scale(k)
+    EXTRA_MIN_RISK = X.scaled(GOLD_EXTRA_MIN_RISK, k)
+    sp = space()
+    assert sp["buf"] == meta["space"]["buf"] and sp["min_risk"] == meta["space"]["min_risk"], (sp["buf"], sp["min_risk"], meta["space"])
+
+
 def candidates(tf, n):
+    if NEW:
+        assert X.SPACE_K is not None and EXTRA_MIN_RISK is not None, "protocol 2: the space is not scaled yet (Mk(work) does it)"
     rng = random.Random(f"{SYM}-{tf}-wf-2026-11")
     sp = space()
     keys = [k for k in sp if k not in ("tf", "htf")]
@@ -643,15 +896,15 @@ def one(p):
     """Per condition, cost level and entry year: trades, gross profit, gross loss, cost (all in R)."""
     c, sg, ix, er = prepare(p)
     ny = len(MK.years)
-    res = np.zeros((len(CONDS), 2, ny, 4), np.float32)
+    res = np.zeros((len(CONDS), 2, ny, 8 if MK.protocol == 2 else 4), np.float32)
     if not len(sg):
         return res
     M = masks_of(c["tf"], ix, sg[:, 1].astype(np.int8), er)
     for ci, cost in enumerate(COSTS):
         out = run_outcomes(c, sg, er, cost)
         if len(out):
-            res[:, ci] = aggregate(M, out[:, 0].astype(np.int64), out[:, 1].astype(np.int64), out[:, 2].astype(np.int64),
-                                   out[:, 4], out[:, 6], MK.year, ny)
+            res[:, ci] = (aggregate2 if MK.protocol == 2 else aggregate)(
+                M, out[:, 0].astype(np.int64), out[:, 1].astype(np.int64), out[:, 2].astype(np.int64), out[:, 4], out[:, 6], MK.year, ny)
     return res
 
 
@@ -681,8 +934,9 @@ def run(work, tf, n, workers=3):
     A = np.stack(res)
     np.save(os.path.join(work, f"wf_{tf}.npy.tmp.npy"), A)
     os.replace(os.path.join(work, f"wf_{tf}.npy.tmp.npy"), os.path.join(work, f"wf_{tf}.npy"))
+    extra = dict(protocol=2, space_k=X.SPACE_K, space=dict(buf=space()["buf"], min_risk=space()["min_risk"])) if MK.protocol == 2 else {}
     with open(os.path.join(work, f"wf_{tf}_params.pkl"), "wb") as f:
-        pickle.dump(dict(tf=tf, params=cand, keys=KEYS, years=MK.years, costs=COSTS, anchor=MK.p0), f, protocol=4)
+        pickle.dump(dict(tf=tf, params=cand, keys=KEYS, years=MK.years, costs=COSTS, anchor=MK.p0, **extra), f, protocol=4)
     print(f"{SYM} {tf}: {n} setups x {len(CONDS)} conditions x 2 cost levels in {time.time() - t0:.0f}s", flush=True)
 
 
@@ -693,14 +947,15 @@ def pf_of(win, loss):
         return np.where(loss > 0, win / loss, np.where(win > 0, np.inf, np.nan))
 
 
-def window_pick(A, P, v, cal):
-    """Picks of condition v on the calibration years cal (indices): the protocol's rule. A: [setups, conditions, cost, year, 4]."""
-    n = A[:, v][:, :, cal, 0]; win = A[:, v][:, :, cal, 1]; loss = A[:, v][:, :, cal, 2]       # [N, 2, 3]
+def window_pick(A, P, v, cal, col=0):
+    """Picks of condition v on the calibration years cal (indices): the protocol's rule. A: [setups, conditions, cost, year, 4]
+    (protocol 2: 8 columns, and col=4 scores the calibration years on the trades that close in the year they open in)."""
+    n = A[:, v][:, :, cal, col]; win = A[:, v][:, :, cal, col + 1]; loss = A[:, v][:, :, cal, col + 2]       # [N, 2, 3]
     ok = (n >= MIN_N).all(axis=(1, 2))
     score = np.where(ok, pf_of(win, loss).min(axis=(1, 2)), 0.0)
-    nb_ = A[:, v][:, 0][:, cal, 0].sum(axis=1)
+    nb_ = A[:, v][:, 0][:, cal, col].sum(axis=1)
     with np.errstate(divide="ignore", invalid="ignore"):
-        cost = np.where(nb_ > 0, A[:, v][:, 0][:, cal, 3].sum(axis=1) / nb_, np.inf)
+        cost = np.where(nb_ > 0, A[:, v][:, 0][:, cal, col + 3].sum(axis=1) / nb_, np.inf)
     score = np.where(cost <= MAX_COST_R, score, 0.0)
     order = np.argsort(-score, kind="stable")
     out, fams = [], set()
@@ -722,31 +977,44 @@ def wf_tf(work, tf):
     A = np.load(fn).astype(np.float64)
     d = pickle.load(open(os.path.join(work, f"wf_{tf}_params.pkl"), "rb"))
     P, years = d["params"], d["years"]
+    proto = int(d.get("protocol", 1))
+    assert A.shape[-1] == (8 if proto == 2 else 4) and (proto == 2) == NEW, (A.shape, proto, SYM)
+    col = 4 if proto == 2 else 0                         # protocol 2: calibration sums without trades open over New Year
     final = len(years) - 1
     tests = list(range(3, len(years)))                   # index of every year that has three years before it
     rows = []
+
+    def year_of(v, ty):
+        cal = [ty - 3, ty - 2, ty - 1]
+        picks, score, cost, n_ok, n_cost = window_pick(A, P, v, cal, col)
+        s = A[picks][:, v][:, :, ty, :].sum(axis=0) if picks else np.zeros((2, 4))
+        return dict(year=years[ty], picks=picks, eligible=n_ok, eligible_after_cost_rule=n_cost,
+                    n=int(s[0, 0]), win=float(s[0, 1]), loss=float(s[0, 2]), cost_r=float(s[0, 3]),
+                    stress_n=int(s[1, 0]), stress_win=float(s[1, 1]), stress_loss=float(s[1, 2]),
+                    pf=float(pf_of(s[0, 1], s[0, 2])), stress_pf=float(pf_of(s[1, 1], s[1, 2])),
+                    scores=[round(float(score[i]), 3) for i in picks])
+
     for v, key in enumerate(d["keys"]):
-        yrs = []
-        for ty in tests:
-            cal = [ty - 3, ty - 2, ty - 1]
-            picks, score, cost, n_ok, n_cost = window_pick(A, P, v, cal)
-            s = A[picks][:, v][:, :, ty, :].sum(axis=0) if picks else np.zeros((2, 4))
-            yrs.append(dict(year=years[ty], picks=picks, eligible=n_ok, eligible_after_cost_rule=n_cost,
-                            n=int(s[0, 0]), win=float(s[0, 1]), loss=float(s[0, 2]), cost_r=float(s[0, 3]),
-                            stress_n=int(s[1, 0]), stress_win=float(s[1, 1]), stress_loss=float(s[1, 2]),
-                            pf=float(pf_of(s[0, 1], s[0, 2])), stress_pf=float(pf_of(s[1, 1], s[1, 2])),
-                            scores=[round(float(score[i]), 3) for i in picks]))
-        wfy = [y for y in yrs if y["year"] != years[final]]
+        if proto == 2:                                   # the final year is not even computed before the cell passes
+            wfy = [year_of(v, ty) for ty in tests if ty != final]
+        else:
+            yrs = [year_of(v, ty) for ty in tests]
+            wfy = [y for y in yrs if y["year"] != years[final]]
         n = sum(y["n"] for y in wfy); win = sum(y["win"] for y in wfy); loss = sum(y["loss"] for y in wfy)
         sw = sum(y["stress_win"] for y in wfy); sl = sum(y["stress_loss"] for y in wfy)
         pf = float(pf_of(win, loss)); spf = float(pf_of(sw, sl))
         full = [y for y in wfy if y["n"] >= YEAR_N]
         passes = bool(n >= PASS_N and pf >= PASS_PF and spf >= PASS_STRESS and len(full) >= 2 and all(y["pf"] >= 1.0 for y in full))
-        rows.append(dict(symbol=SYM, tf=tf, condition=key, group=CONDS[v][1], text=CONDS[v][2],
-                         unseen_years=[y["year"] for y in wfy], n=int(n), pf=pf, stress_pf=spf, net_r=float(win - loss),
-                         cost_r_per_trade=(sum(y["cost_r"] for y in wfy) / n if n else None),
-                         years_with_50_trades=len(full), losing_years=[y["year"] for y in full if y["pf"] < 1.0],
-                         passes=passes, by_year=wfy, final=yrs[-1]))
+        row = dict(symbol=SYM, tf=tf, condition=key, group=CONDS[v][1], text=CONDS[v][2],
+                   unseen_years=[y["year"] for y in wfy], n=int(n), pf=pf, stress_pf=spf, net_r=float(win - loss),
+                   cost_r_per_trade=(sum(y["cost_r"] for y in wfy) / n if n else None),
+                   years_with_50_trades=len(full), losing_years=[y["year"] for y in full if y["pf"] < 1.0],
+                   passes=passes, by_year=wfy)
+        if proto != 2:
+            row["final"] = yrs[-1]
+        elif passes:                                     # protocol 2: the final year only for a cell that passed
+            row["final"] = year_of(v, final)
+        rows.append(row)
     return rows
 
 
@@ -757,8 +1025,15 @@ def wf(work, out_json):
         if r:
             rows += r
     meta = json.load(open(os.path.join(work, "meta.json")))
+    extra = {}
+    if int(meta.get("protocol", 1)) == 2:
+        extra = dict(protocol=2, anchor_window=meta["anchor_window"], space_k=meta["space_k"], space=meta["space"],
+                     hourly_spread_shape=meta["hourly_spread_shape"], weekend_close_min=meta["weekend_close_min"],
+                     rules=["calibration years: sums over the trades that close in the calendar year they open in "
+                            "(the test year counts every trade by its entry year)",
+                            "final year: written ('final') only for the cells that pass; nothing about it for the others"])
     json.dump(dict(symbol=SYM, anchor_price=meta["anchor_price"], spread_at_anchor=SPREAD0, costs=list(COSTS), min_n=MIN_N, topk=TOPK,
-                   pass_pf=PASS_PF, pass_stress_pf=PASS_STRESS, pass_n=PASS_N, year_n=YEAR_N, max_cost_r=MAX_COST_R,
+                   pass_pf=PASS_PF, pass_stress_pf=PASS_STRESS, pass_n=PASS_N, year_n=YEAR_N, max_cost_r=MAX_COST_R, **extra,
                    conditions=[dict(key=c[0], group=c[1], text=c[2]) for c in CONDS], rows=rows), open(out_json, "w"), indent=1)
     t = pd.DataFrame([{k: v for k, v in r.items() if k not in ("by_year", "final", "text")} for r in rows])
     pd.set_option("display.width", 250); pd.set_option("display.max_rows", 500)
@@ -774,11 +1049,12 @@ def wf(work, out_json):
     print(t[t.group == "control"][["tf", "condition", "n", "pf", "stress_pf", "passes", "by_year"]].round(2).to_string(index=False))
 
 
-def unseen_trades(work, tf, key, flat_spread=None):
+def unseen_trades(work, tf, key, flat_spread=None, final=True):
     """Trade lists behind one cell: for every window the picks of condition `key`, run on their test year.
     Returns a DataFrame (year, pick, entry_time, side, r, risk, cost_r) for base costs and the same for stress.
     flat_spread: the same spread in dollars in every year instead of the price-scaled one (no slippage or commission
-    scaling is changed; meant for BTC, whose base cost is the spread alone)."""
+    scaling is changed; meant for BTC, whose base cost is the spread alone).
+    final=False: the windows before the final year only (protocol 2, a cell that did not pass)."""
     global MK
     if MK is None or getattr(MK, "_work", None) != (work, flat_spread):
         MK = Mk(work); MK._work = (work, flat_spread)
@@ -787,9 +1063,10 @@ def unseen_trades(work, tf, key, flat_spread=None):
     A = np.load(os.path.join(work, f"wf_{tf}.npy")).astype(np.float64)
     d = pickle.load(open(os.path.join(work, f"wf_{tf}_params.pkl"), "rb"))
     P, years = d["params"], d["years"]; v = d["keys"].index(key)
+    col = 4 if int(d.get("protocol", 1)) == 2 else 0
     out = [[], []]
-    for ty in range(3, len(years)):
-        picks, score, cost, _, _ = window_pick(A, P, v, [ty - 3, ty - 2, ty - 1])
+    for ty in range(3, len(years) if final else len(years) - 1):
+        picks, score, cost, _, _ = window_pick(A, P, v, [ty - 3, ty - 2, ty - 1], col)
         for i in picks:
             for ci in (0, 1):
                 df = trades_of(P[i], key, COSTS[ci])
@@ -823,9 +1100,83 @@ def describe(r):
                 pf_without_3_largest_wins=float(pf_of(np.sort(r[r > 0])[:-3].sum(), -r[r <= 0].sum())) if (r > 0).sum() > 3 else None)
 
 
+def distinct_signals(base, stress):
+    """Protocol 2: the trades collapsed to distinct signals (entry time, side), each with the mean R of the picks that
+    took it (several picks of a window often take the same signal), and the pass rule applied to them: PF >= 1.3 on
+    >= 100 distinct signals pooled, >= 1.1 with stress costs, >= 2 years with 50+ distinct signals, none of those under
+    1.0. base and stress: the trade lists of the years to judge."""
+    def collapse(df):
+        g = df.groupby(["entry_time", "side"], sort=True)
+        return pd.DataFrame(dict(year=g["year"].first(), r=g["r"].mean(), picks=g.size())).reset_index()
+
+    def pf(r):
+        r = np.asarray(r, float)
+        return float(pf_of(r[r > 0].sum(), -r[r <= 0].sum())) if len(r) else float("nan")
+
+    b, s = collapse(base), collapse(stress)
+    by_year = {int(y): dict(trades=int((base.year == y).sum()), signals=int(len(g)), pf=pf(g.r.values), net_r=float(g.r.sum()))
+               for y, g in b.groupby("year")}
+    full = [y for y, x in by_year.items() if x["signals"] >= YEAR_N]
+    p, sp = pf(b.r.values), pf(s.r.values)
+    passes = bool(len(b) >= PASS_N and p >= PASS_PF and sp >= PASS_STRESS and len(full) >= 2 and all(by_year[y]["pf"] >= 1.0 for y in full))
+    return dict(trades=int(len(base)), signals=int(len(b)), stress_trades=int(len(stress)), stress_signals=int(len(s)),
+                pf=p, stress_pf=sp, net_r=float(b.r.sum()), picks_per_signal_mean=float(b.picks.mean()) if len(b) else None,
+                picks_per_signal_max=int(b.picks.max()) if len(b) else None, years_with_50_signals=len(full),
+                losing_years=[y for y in full if by_year[y]["pf"] < 1.0], passes=passes, by_year=by_year)
+
+
+def detail2(work, tf, key, out_json):
+    """Protocol 2 (EURUSD, US500): detail() plus the trades collapsed to distinct signals (distinct_signals) with the
+    pass rule applied to them. The final year is reported only when the cell passes (as in wf); otherwise the trade
+    lists stop before it and nothing about it is computed."""
+    d = pickle.load(open(os.path.join(work, f"wf_{tf}_params.pkl"), "rb"))
+    final_year = int(d["years"][-1])
+    row = [r for r in wf_tf(work, tf) if r["condition"] == key][0]
+    show = bool(row["passes"])
+    (base, stress), P = unseen_trades(work, tf, key, final=show)
+    res = dict(symbol=SYM, tf=tf, condition=key, text=CONDS[KEYS.index(key)][2], protocol=2, passes=show, final_year_number=final_year)
+    parts = [("walk_forward", base[base.year < final_year], stress[stress.year < final_year])]
+    if show:
+        parts += [("final_year", base[base.year == final_year], stress[stress.year == final_year]), ("all_unseen_years", base, stress)]
+    else:
+        res["final_year_withheld"] = "the cell does not pass: nothing about the final year is computed or shown"
+    for name, df, sdf in parts:
+        r = df.r.values.astype(float)
+        res[name] = dict(describe(r), stress=describe(sdf.r.values),
+                         buys=describe(df.r[df.side > 0].values), sells=describe(df.r[df.side < 0].values),
+                         cost_r_per_trade=float(df.cost_r.mean()) if len(df) else None,
+                         resampling=boot(df.entry_time.values, r) if len(df) > 30 else None,
+                         by_year={int(y): describe(g.r.values) for y, g in df.groupby("year")},
+                         positive_months=int((df.groupby(df.entry_time.dt.strftime("%Y-%m")).r.sum() > 0).sum()) if len(df) else 0,
+                         months=int(df.entry_time.dt.strftime("%Y-%m").nunique()) if len(df) else 0)
+    res["distinct_signals"] = dict(walk_forward=distinct_signals(base[base.year < final_year], stress[stress.year < final_year]))
+    if show:
+        res["distinct_signals"]["final_year"] = distinct_signals(base[base.year == final_year], stress[stress.year == final_year])
+    res["picks"] = [dict(year=int(y), pick=int(i), score=round(float(g.score.iloc[0]), 3), **describe(g.r.values),
+                         setup={k: P[i][k] for k in ("sides", "session", "htf", "htf_ema", "macd", "tp_mode", "tp_rr", "trail_start", "trail_dist", "max_hold", "eod", "buf", "min_risk")})
+                    for (y, i), g in base.groupby(["year", "pick"])]
+    json.dump(res, open(out_json, "w"), indent=1, default=float)
+    for name, _, _ in parts:
+        v = res[name]
+        if not v["n"]:
+            print(f"{SYM} {tf} {key} | {name}: no trades"); continue
+        print(f"{SYM} {tf} {key} | {name}: n {v['n']}, PF {v['pf']:.3f}, stress {v['stress'].get('pf', float('nan')):.3f}, net {v['net_r']:+.1f}R, "
+              f"win {v['win_rate']:.0%}, maxDD {v['max_drawdown_r']:.1f}R, buys {v['buys'].get('pf')} ({v['buys']['n']}), sells {v['sells'].get('pf')} "
+              f"({v['sells']['n']}), months {v['positive_months']}/{v['months']}, cost/trade {v['cost_r_per_trade']:.3f}R")
+    for name, x in res["distinct_signals"].items():
+        yrs = ", ".join("%d: %.2f (%d)" % (y, v_["pf"], v_["signals"]) for y, v_ in x["by_year"].items())
+        print(f"distinct signals, {name}: {x['signals']} signals from {x['trades']} trades (picks per signal {x['picks_per_signal_mean']}), "
+              f"PF {x['pf']:.3f}, stress {x['stress_pf']:.3f}, years with 50+ signals {x['years_with_50_signals']}, losing {x['losing_years']}: "
+              f"{'PASSES' if x['passes'] else 'does not pass'}; by year {yrs}")
+    if not show:
+        print(res["final_year_withheld"])
+
+
 def detail(work, tf, key, out_json):
     """Everything behind one cell, from its trade lists: per year, per side, per pick, months, resampling, and for
     BTC the same picks at a flat spread in dollars."""
+    if NEW:
+        return detail2(work, tf, key, out_json)
     (base, stress), P = unseen_trades(work, tf, key)
     last = int(base.year.max())
     res = dict(symbol=SYM, tf=tf, condition=key, text=CONDS[KEYS.index(key)][2], final_year_number=last)
@@ -867,6 +1218,7 @@ def selftest(work):
     MK = Mk(work)
     rng = random.Random(5)
     ps = MK.ps; hs = MK.hs
+    kx = X.SPACE_K if NEW else 1.0                      # protocol 2: the extra test cost in the symbol's price units
     try:
         MK.ps = np.ones(len(ps))
         n_tr = 0
@@ -874,7 +1226,7 @@ def selftest(work):
             tf = rng.choice(["M3", "M5", "M10", "M15", "M30", "H1"])
             p = candidates(tf, 400)[rng.randrange(400)]
             c, sg, ix, er = prepare(p)
-            for cost in COSTS + (dict(slip=0.05, comm=0.03, delay=2, trail_worst=1),):
+            for cost in COSTS + (dict(slip=0.05 * kx, comm=0.03 * kx, delay=2, trail_worst=1),):
                 out = run_outcomes(c, sg, er, cost, parity=True)
                 idx = take(out[:, 1].astype(np.int64), out[:, 2].astype(np.int64), np.ones(len(out), np.bool_))
                 mine = out[idx][:, 1:6]
@@ -891,11 +1243,11 @@ def selftest(work):
     # the production rules: the weekend arrays are what the EA can know
     if not BTC:
         fri = MK.wk_gold; wko = MK.wko_gold
-        assert not (fri & ~((MK.dow == 4) & (MK.tod >= 1380))).any()
+        assert not (fri & ~((MK.dow == 4) & (MK.tod >= WEEKEND_MIN))).any()
         t = pd.DatetimeIndex(MK.t)
         for j in np.where(wko)[0][:400]:
             prev = t[j - 1]; cur = t[j]
-            last_fri = cur.normalize() - pd.Timedelta(days=(cur.dayofweek - 4) % 7) + pd.Timedelta(hours=23)
+            last_fri = cur.normalize() - pd.Timedelta(days=(cur.dayofweek - 4) % 7) + pd.Timedelta(minutes=WEEKEND_MIN)
             if cur < last_fri:
                 last_fri -= pd.Timedelta(days=7)
             assert prev < last_fri < cur, (prev, cur, last_fri)
@@ -903,7 +1255,7 @@ def selftest(work):
     gaps = np.diff(MK.t.astype("datetime64[m]").astype(np.int64))
     assert int(MK.after_break[1:].sum()) == int((gaps >= 30).sum())
     print(f"break rule: no entry on {int(MK.after_break.sum())} bars that follow a break of 30 minutes or more")
-    n_cmp = 0
+    n_cmp = 0; n_cross = 0
     for q in range(40):
         tf = rng.choice(["M5", "M15", "H1"])
         p = candidates(tf, 400)[rng.randrange(400)]
@@ -914,13 +1266,23 @@ def selftest(work):
         out = run_outcomes(c, sg, er, COSTS[0])
         k = out[:, 0].astype(np.int64); e = out[:, 1].astype(np.int64); j = out[:, 2].astype(np.int64)
         A = aggregate(M, k, e, j, out[:, 4], out[:, 6], MK.year, len(MK.years))
+        if NEW:                                          # protocol 2: columns 0-3 are aggregate(), 4-7 the same-year trades
+            A2 = aggregate2(M, k, e, j, out[:, 4], out[:, 6], MK.year, len(MK.years))
+            assert np.array_equal(A2[:, :, :4], A)
         for v in rng.sample(range(len(CONDS)), 8):
-            idx = take(e, j, M[v][k]); r = out[idx, 4]; y = MK.year[e[idx]]
+            idx = take(e, j, M[v][k]); r = out[idx, 4]; y = MK.year[e[idx]]; c_ = out[idx, 6]
             for yy in range(len(MK.years)):
                 rr = r[y == yy]
                 assert A[v, yy, 0] == len(rr) and abs(A[v, yy, 1] - rr[rr > 0].sum()) < 1e-9 and abs(A[v, yy, 2] + rr[rr <= 0].sum()) < 1e-9
+                if NEW:
+                    same = (y == yy) & (MK.year[j[idx]] == yy)
+                    n_cross += int(((y == yy) & ~same).sum())
+                    rs_ = r[same]
+                    assert A2[v, yy, 4] == len(rs_) and abs(A2[v, yy, 5] - rs_[rs_ > 0].sum()) < 1e-9 and \
+                        abs(A2[v, yy, 6] + rs_[rs_ <= 0].sum()) < 1e-9 and abs(A2[v, yy, 7] - c_[same].sum()) < 1e-9
                 n_cmp += 1
-    print(f"aggregate: {n_cmp} condition-year sums equal the trade lists")
+    print(f"aggregate: {n_cmp} condition-year sums equal the trade lists"
+          + (f" (protocol 2: also the same-year sums of the calibration; {n_cross} trades open over New Year left out of them)" if NEW else ""))
     # look-ahead: features on a cut series
     names = ["tr_h4", "tr_d1", "sl_h4", "sl_d1", "adx_h1", "adx_h4", "atrp", "pdr", "tdr", "pdpos", "dopen", "asia_pos", "nyor_pos", "rn",
              "bos_up", "bos_dn", "hm1", "hm2", "volr", "body_dir", "body_frac", "rng_atr", "xs_dn", "xs_up", "sw_dn", "sw_up"]
@@ -943,6 +1305,8 @@ def selftest(work):
                 assert (a == b) or (a != a and b != b) or (isinstance(a, float) and abs(a - b) < 1e-9 * max(1.0, abs(a))), (tf, cut, nm, a, b)
                 z = getattr(F, nm)[i1 + 1]
                 n_feat += 1; n_diff_next += not ((z == b) or (z != z and b != b))
+            del mk2, F2, part, closed                    # one cut series at a time in memory (no effect on the test)
+            gc.collect()
     assert n_diff_next > 0.2 * n_feat
     print(f"features: {n_feat} values identical when the series is cut after the bar; the next bar's value would differ in {n_diff_next}")
 
@@ -959,3 +1323,7 @@ if __name__ == "__main__":
         detail(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
     elif cmd == "selftest":
         selftest(sys.argv[2])
+    elif cmd == "clockshift":
+        clockshift(sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
+    else:
+        raise SystemExit(f"unknown command {cmd}")

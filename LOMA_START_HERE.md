@@ -48,7 +48,7 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 - **`UseStochTurnFilter`** (`StochTurnBars`, `StochTurnHigh`, `StochTurnLow`): enter only when the Stochastic (7, 1, 7) came from 80 / 20 and turned.
 - **`ScaleWithPrice`** with **`ReferencePrice`**: the stop buffer, minimum and maximum stop follow the price.
 - With the new inputs at their defaults v1.35 trades like v1.34, with one difference: a spread exactly equal to `MaxSpread_Points` is now always accepted, as in the backtest (v1.34 refused it about half the time, by floating-point rounding).
-- Two independent reviews of v1.35 found eight defects (that spread test, the order of a history check, the entry minute of the stepped trailing and others); they were fixed and checked again.
+- Independent reviews of v1.35 found ten defects (that spread test, the order of a history check, the entry minute of the stepped trailing, two cases after a restart of the EA and others); they were fixed and checked again.
 
 ## What changed in v1.34
 

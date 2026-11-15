@@ -238,7 +238,10 @@ def schedule(m1):
     close = top5((mod[last_fri] + 1) % 1440)
     j = np.where(gap >= 24 * 60)[0] + 1
     wopen = top5(mod[j], [x.day_name()[:3] for x in t[j]])
-    return dict(daily_break_reopen=brk, daily_break_start=brk_start, friday_close=close, weekly_open=wopen)
+    end = t[j - 1] + pd.Timedelta(minutes=1)                             # the end of the last bar before each such closure
+    wclose = top5((end.hour * 60 + end.minute).values, [x.day_name()[:3] for x in end])
+    return dict(daily_break_reopen=brk, daily_break_start=brk_start, friday_close=close, weekly_open=wopen,
+                weekly_close=wclose, saturday_bars=int((t.dayofweek.values == 5).sum()))
 
 
 def build(work, src=None):
