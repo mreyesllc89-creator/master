@@ -1,0 +1,323 @@
+{
+ "symbol": "EURUSD",
+ "tf": "M15",
+ "condition": "pd_break",
+ "text": "sell below the previous day's low, buy above its high",
+ "protocol": 2,
+ "passes": false,
+ "final_year_number": 2026,
+ "final_year_withheld": "the cell does not pass: nothing about the final year is computed or shown",
+ "walk_forward": {
+  "n": 217,
+  "pf": 1.394391071178519,
+  "net_r": 20.71066098597032,
+  "win_rate": 0.5207373271889401,
+  "max_drawdown_r": 15.46330044856714,
+  "pf_without_3_largest_wins": 1.286442344946257,
+  "stress": {
+   "n": 217,
+   "pf": 1.26280000038168,
+   "net_r": 14.401844126760736,
+   "win_rate": 0.5161290322580645,
+   "max_drawdown_r": 15.490225261588149,
+   "pf_without_3_largest_wins": 1.1524467105035705
+  },
+  "buys": {
+   "n": 102,
+   "pf": 2.1918785235031333,
+   "net_r": 20.529563234233635,
+   "win_rate": 0.5588235294117647,
+   "max_drawdown_r": 4.395917169081116,
+   "pf_without_3_largest_wins": 1.8882240758458972
+  },
+  "sells": {
+   "n": 115,
+   "pf": 1.0051319251104374,
+   "net_r": 0.18109775173668888,
+   "win_rate": 0.48695652173913045,
+   "max_drawdown_r": 15.435312185369813,
+   "pf_without_3_largest_wins": 0.8543165821311469
+  },
+  "cost_r_per_trade": 0.040086272976858996,
+  "resampling": {
+   "p05": 0.8670065376617279,
+   "p95": 2.2138728891777526,
+   "below_1_0": 0.126,
+   "below_1_3": 0.4105
+  },
+  "by_year": {
+   "2019": {
+    "n": 26,
+    "pf": 0.5649269325550614,
+    "net_r": -5.409396556109489,
+    "win_rate": 0.46153846153846156,
+    "max_drawdown_r": 6.159985939149435,
+    "pf_without_3_largest_wins": 0.33230497493903804
+   },
+   "2023": {
+    "n": 21,
+    "pf": 0.9045976656994419,
+    "net_r": -0.4243054073145974,
+    "win_rate": 0.47619047619047616,
+    "max_drawdown_r": 2.304559863706493,
+    "pf_without_3_largest_wins": 0.30124286343181084
+   },
+   "2025": {
+    "n": 170,
+    "pf": 1.744955121306002,
+    "net_r": 26.54436294939441,
+    "win_rate": 0.5352941176470588,
+    "max_drawdown_r": 8.879009102103112,
+    "pf_without_3_largest_wins": 1.5858653670975609
+   }
+  },
+  "positive_months": 15,
+  "months": 35
+ },
+ "distinct_signals": {
+  "walk_forward": {
+   "trades": 217,
+   "signals": 127,
+   "stress_trades": 217,
+   "stress_signals": 127,
+   "pf": 1.3104653931655257,
+   "stress_pf": 1.2074706931083927,
+   "net_r": 9.733467089668293,
+   "picks_per_signal_mean": 1.7086614173228347,
+   "picks_per_signal_max": 6,
+   "years_with_50_signals": 1,
+   "losing_years": [],
+   "passes": false,
+   "by_year": {
+    "2019": {
+     "trades": 26,
+     "signals": 26,
+     "pf": 0.5649269325550614,
+     "net_r": -5.409396556109489
+    },
+    "2023": {
+     "trades": 21,
+     "signals": 21,
+     "pf": 0.9045976656994419,
+     "net_r": -0.4243054073145974
+    },
+    "2025": {
+     "trades": 170,
+     "signals": 80,
+     "pf": 2.075796091713877,
+     "net_r": 15.56716905309238
+    }
+   }
+  }
+ },
+ "picks": [
+  {
+   "year": 2019,
+   "pick": 629,
+   "score": 1.392,
+   "n": 26,
+   "pf": 0.5649269325550614,
+   "net_r": -5.409396556109489,
+   "win_rate": 0.46153846153846156,
+   "max_drawdown_r": 6.159985939149435,
+   "pf_without_3_largest_wins": 0.33230497493903804,
+   "setup": {
+    "sides": 0,
+    "session": "all",
+    "htf": "H1",
+    "htf_ema": 20,
+    "macd": "8-17",
+    "tp_mode": 1,
+    "tp_rr": 1.0,
+    "trail_start": 0.0,
+    "trail_dist": 0.5,
+    "max_hold": 480,
+    "eod": 1260,
+    "buf": 0.00014,
+    "min_risk": 0.00057
+   }
+  },
+  {
+   "year": 2023,
+   "pick": 6149,
+   "score": 1.367,
+   "n": 21,
+   "pf": 0.9045976656994419,
+   "net_r": -0.4243054073145974,
+   "win_rate": 0.47619047619047616,
+   "max_drawdown_r": 2.304559863706493,
+   "pf_without_3_largest_wins": 0.30124286343181084,
+   "setup": {
+    "sides": 0,
+    "session": "ny_12-20",
+    "htf": "H1",
+    "htf_ema": 20,
+    "macd": "10-22",
+    "tp_mode": 1,
+    "tp_rr": 2.0,
+    "trail_start": 1.0,
+    "trail_dist": 0.3,
+    "max_hold": 60,
+    "eod": 1260,
+    "buf": 2.9e-05,
+    "min_risk": 0.00057
+   }
+  },
+  {
+   "year": 2025,
+   "pick": 428,
+   "score": 1.305,
+   "n": 17,
+   "pf": 1.1777628852059605,
+   "net_r": 1.1866847253459447,
+   "win_rate": 0.47058823529411764,
+   "max_drawdown_r": 3.453233556164217,
+   "pf_without_3_largest_wins": 0.51466675665631,
+   "setup": {
+    "sides": -1,
+    "session": "ldn_ny_07-20",
+    "htf": "M30",
+    "htf_ema": 20,
+    "macd": "10-22",
+    "tp_mode": 1,
+    "tp_rr": 1.5,
+    "trail_start": 1.0,
+    "trail_dist": 1.0,
+    "max_hold": 480,
+    "eod": 1380,
+    "buf": 0.00014,
+    "min_risk": 0.00019
+   }
+  },
+  {
+   "year": 2025,
+   "pick": 1438,
+   "score": 1.525,
+   "n": 27,
+   "pf": 1.7352446650826978,
+   "net_r": 4.610469628085102,
+   "win_rate": 0.5925925925925926,
+   "max_drawdown_r": 1.8341334766106836,
+   "pf_without_3_largest_wins": 1.1612651419611593,
+   "setup": {
+    "sides": 0,
+    "session": "ldn_ny_07-20",
+    "htf": "M30",
+    "htf_ema": 20,
+    "macd": "12-26",
+    "tp_mode": 1,
+    "tp_rr": 1.5,
+    "trail_start": 1.0,
+    "trail_dist": 0.3,
+    "max_hold": 1440,
+    "eod": 1320,
+    "buf": 9.6e-06,
+    "min_risk": 2.9e-05
+   }
+  },
+  {
+   "year": 2025,
+   "pick": 1995,
+   "score": 1.502,
+   "n": 42,
+   "pf": 2.3105622006239677,
+   "net_r": 8.676210109685833,
+   "win_rate": 0.5476190476190477,
+   "max_drawdown_r": 1.9720056071539096,
+   "pf_without_3_largest_wins": 1.6790318123964283,
+   "setup": {
+    "sides": 0,
+    "session": "all",
+    "htf": "M30",
+    "htf_ema": 20,
+    "macd": "10-22",
+    "tp_mode": 1,
+    "tp_rr": 3.0,
+    "trail_start": 1.0,
+    "trail_dist": 0.3,
+    "max_hold": 120,
+    "eod": -1,
+    "buf": 9.6e-05,
+    "min_risk": 0.00019
+   }
+  },
+  {
+   "year": 2025,
+   "pick": 4458,
+   "score": 1.432,
+   "n": 42,
+   "pf": 1.8807305292171106,
+   "net_r": 6.542239876496458,
+   "win_rate": 0.5,
+   "max_drawdown_r": 2.212344903230962,
+   "pf_without_3_largest_wins": 1.2115684781742866,
+   "setup": {
+    "sides": 0,
+    "session": "ldn_ny_07-20",
+    "htf": "none",
+    "htf_ema": 100,
+    "macd": "12-26",
+    "tp_mode": 1,
+    "tp_rr": 3.0,
+    "trail_start": 1.5,
+    "trail_dist": 0.3,
+    "max_hold": 120,
+    "eod": 1260,
+    "buf": 9.6e-06,
+    "min_risk": 4.8e-05
+   }
+  },
+  {
+   "year": 2025,
+   "pick": 5679,
+   "score": 1.376,
+   "n": 20,
+   "pf": 1.596212488557629,
+   "net_r": 2.649172583173287,
+   "win_rate": 0.55,
+   "max_drawdown_r": 3.11049450607282,
+   "pf_without_3_largest_wins": 0.608688848077036,
+   "setup": {
+    "sides": -1,
+    "session": "all",
+    "htf": "H1",
+    "htf_ema": 50,
+    "macd": "10-22",
+    "tp_mode": 1,
+    "tp_rr": 2.0,
+    "trail_start": 0.0,
+    "trail_dist": 0.3,
+    "max_hold": 120,
+    "eod": 1380,
+    "buf": 0.00014,
+    "min_risk": 2.9e-05
+   }
+  },
+  {
+   "year": 2025,
+   "pick": 8094,
+   "score": 1.971,
+   "n": 22,
+   "pf": 1.6865819500663835,
+   "net_r": 2.8795860266077833,
+   "win_rate": 0.5454545454545454,
+   "max_drawdown_r": 3.0532814932735786,
+   "pf_without_3_largest_wins": 0.6732549132118523,
+   "setup": {
+    "sides": 0,
+    "session": "ldn_ny_07-20",
+    "htf": "H1",
+    "htf_ema": 200,
+    "macd": "12-26",
+    "tp_mode": 1,
+    "tp_rr": 3.0,
+    "trail_start": 0.5,
+    "trail_dist": 1.0,
+    "max_hold": 120,
+    "eod": 1380,
+    "buf": 5.7e-05,
+    "min_risk": 4.8e-05
+   }
+  }
+ ]
+}

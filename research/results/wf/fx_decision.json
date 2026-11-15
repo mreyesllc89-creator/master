@@ -1,0 +1,113 @@
+{
+ "EURUSD": {
+  "cells": 472,
+  "passes": 0,
+  "no_skill": {
+   "runs": 100,
+   "mean_passes_per_run": 0.23,
+   "p05": 0.0,
+   "p95": 1.0,
+   "share_runs_at_least_real": 1.0,
+   "share_ci95": [
+    0.9638,
+    1.0
+   ],
+   "real_cells_pass_share": {}
+  },
+  "order": {
+   "runs": 100,
+   "mean_passes_per_run": 0.4,
+   "p05": 0.0,
+   "p95": 2.0,
+   "share_runs_at_least_real": 1.0,
+   "share_ci95": [
+    0.9638,
+    1.0
+   ],
+   "real_cells_pass_share": {}
+  },
+  "passing_cells": [],
+  "results": []
+ },
+ "US500": {
+  "cells": 472,
+  "passes": 1,
+  "no_skill": {
+   "runs": 200,
+   "mean_passes_per_run": 0.55,
+   "p05": 0.0,
+   "p95": 2.0,
+   "share_runs_at_least_real": 0.42,
+   "share_ci95": [
+    0.3507,
+    0.4917
+   ],
+   "real_cells_pass_share": {
+    "M2 trend_h4": 0.0
+   }
+  },
+  "order": {
+   "runs": 200,
+   "mean_passes_per_run": 0.81,
+   "p05": 0.0,
+   "p95": 3.0,
+   "share_runs_at_least_real": 0.52,
+   "share_ci95": [
+    0.4484,
+    0.591
+   ],
+   "real_cells_pass_share": {
+    "M2 trend_h4": 0.0
+   }
+  },
+  "passing_cells": [
+   {
+    "tf": "M2",
+    "condition": "trend_h4",
+    "text": "with the H4 trend (H4 close on the trade's side of its EMA 50)",
+    "rule1": {
+     "trades": 151,
+     "pf": 1.3023107505960316,
+     "stress_pf": 1.2242901009306668,
+     "years_with_50": 2,
+     "by_year": {
+      "2022": {
+       "trades": 58,
+       "pf": 1.5789473684210527
+      },
+      "2023": {
+       "trades": 93,
+       "pf": 1.133580361374794
+      }
+     },
+     "met": true
+    },
+    "rule2": {
+     "signals": 149,
+     "pf": 1.3288069272692715,
+     "stress_pf": 1.2494090274549237,
+     "years_with_50": 2,
+     "losing_years": [],
+     "met": true
+    },
+    "rule3": {
+     "cell_share_of_no_skill_runs": 0.0,
+     "symbol_passes": 1,
+     "no_skill_p95": 2.0,
+     "no_skill_mean": 0.55,
+     "share_runs_with_as_many": 0.42,
+     "runs": 200,
+     "met": false
+    },
+    "rule4": {
+     "trades": 0,
+     "pf": null,
+     "signals": 0,
+     "outcome": "no setups qualified for 2026"
+    },
+    "result": false
+   }
+  ],
+  "results": []
+ }
+}

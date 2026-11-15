@@ -102,6 +102,23 @@ if os.path.exists("research/results/wf/wf_facts.json"):
     aw = DETW["all_unseen_years"]; finw = cellw["final"]
     yrs = ", ".join(f"{f2_(y['pf'])} in {y['year']}" for y in cellw["by_year"] if y["n"])
     CH = json.load(open("research/results/wf/chance_check.json"))["BTCUSD"]
+    fx_line = ""
+    if os.path.exists("research/results/wf/fx_decision.json"):
+        FX = json.load(open("research/results/wf/fx_decision.json"))
+        parts = []
+        for sym, v in FX.items():
+            if not v["passes"]:
+                parts.append(f"{sym}: nothing passed")
+            else:
+                c = v["passing_cells"][0]
+                yl = list(map(str, c['rule1']['by_year']))
+                parts.append(f"{sym}: {v['passes']} cell met the pass rule ({c['tf']} {c['text'].split(' (')[0]}, "
+                             f"{f2_(c['rule1']['pf'])} on {c['rule1']['trades']} trades, all in {' and '.join(yl) if len(yl) < 3 else ', '.join(yl)}) but failed "
+                             f"the chance check fixed in advance, and no setup qualified for 2026" if len(v["passing_cells"]) == 1 and not c["result"] else
+                             f"{sym}: results {', '.join(v['results']) or 'none'}")
+        res = [r for v in FX.values() for r in v["results"]]
+        fx_line = (" Then EURUSD and US500 were tested the same way, because gold and BTC did not hold up, with the decision written down before "
+                   "their results: " + "; ".join(parts) + (". No result on any of the four markets." if not res else "."))
     TH = CH["thin_M30_xlzc_stoch"]["walk_forward"]
     SUCC_G = json.load(open("research/results/recal/xauusd_successful_trailing.json"))["combinations"]
     vt_under = [c for c in SUCC_G if c["vt_unseen_pf"] < 1.3]
@@ -109,7 +126,8 @@ if os.path.exists("research/results/wf/wf_facts.json"):
                f"conditions tried one at a time. Gold: nothing passed. BTC: M30 with the Stochastic turn rule met the pass rule ({yrs}), but it does not hold up: "
                f"the 2026 months, kept back, gave {f2_(finw['pf'])} on {finw['n']} trades, under 1.3; with {WF['BTCUSD']['cells']} cells tested, chance alone "
                f"produces one or two such passes (about {CH['placebo']['expected_passes']:.1f} expected); counted once per signal its profit factor is "
-               f"{f2_(TH['pf_signals'])}, not {f2_(TH['pf'])}. Its picks for the year ahead are in the BTC zip as unproven presets (EA v1.35), demo only.")
+               f"{f2_(TH['pf_signals'])}, not {f2_(TH['pf'])}. Its picks for the year ahead are in the BTC zip as unproven presets (EA v1.35), demo only."
+               + fx_line)
     t15_line = ("the 15 combinations of timeframe and trailing system whose setups together reached a profit factor of 1.3 on the 2026 months (4 gold, 11 BTC) "
                 "are in the zips as presets (v1.35). None reached 1.3 on the earlier data. The gold figures are at FTMO's spread without commission: at VT's "
                 f"costs {len(vt_under)} of the 4 fall under 1.3 ("

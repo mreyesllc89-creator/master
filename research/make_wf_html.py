@@ -76,6 +76,28 @@ def main():
     counts = {}
     p2 = [d for d in sums.values() if d.get("protocol", 1) == 2]
     P2_INTRO = ""
+    P2_DECISION = ""
+    fxd_path = os.path.join(OUT, "fx_decision.json")
+    if p2 and os.path.exists(fxd_path):
+        fxd = json.load(open(fxd_path))
+        lines = []
+        for sym, v in fxd.items():
+            ns = v["no_skill"]
+            head = (f'<strong>{sym}:</strong> {v["passes"]} of {v["cells"]} cells met the pass rule; in the no-skill reshuffle '
+                    f'({ns["runs"]} runs per timeframe) {ns["mean_passes_per_run"]:.2f} cells pass per run, 95th percentile {ns["p95"]:.0f}.')
+            for c in v["passing_cells"]:
+                r1, r2, r3, r4 = c["rule1"], c["rule2"], c["rule3"], c["rule4"]
+                yrs = ", ".join(f'{y} {f2(x["pf"])} on {x["trades"]}' for y, x in r1["by_year"].items())
+                head += (f' {c["tf"]} {c["text"]}: rule 1 met, PF {r1["pf"]:.2f} on {r1["trades"]} trades ({yrs}), stressed {r1["stress_pf"]:.2f}, '
+                         f'and only one setup chosen in 2023 just above the 1.30 cut keeps it there; rule 2 {"met" if r2["met"] else "not met"}, '
+                         f'{r2["pf"]:.2f} on {r2["signals"]} signals; rule 3 not met: the cell itself passes in {r3["cell_share_of_no_skill_runs"] * 100:.0f}% of the reshuffles, '
+                         f'but one pass is what they give: {r3["share_runs_with_as_many"] * 100:.0f}% of the runs have one or more; rule 4: {r4["outcome"]} '
+                         f'(and none for the year ahead), so there is nothing to test or to trade.') if not r3["met"] else ''
+            lines.append(head)
+        verdict_all = "No result." if not any(v["results"] for v in fxd.values()) else "Results: " + "; ".join(f"{k} {', '.join(v['results'])}" for k, v in fxd.items() if v["results"])
+        P2_DECISION = (f'    <p><strong>The decision fixed in advance, applied.</strong> {" ".join(lines)} {verdict_all} '
+                       f'Sources: <code>research/results/wf/fx_decision.json</code>, <code>research/results/wf/fx_eval/</code>, '
+                       f'<code>research/audit_wf/protocol2/</code> (an independent recomputation reproduced all 944 cells exactly).</p>\n')
     if p2:
         cells2 = sum(len(d["rows"]) for d in p2)
         P2_INTRO = (f'    <h3>EURUSD and US500: the same test, because gold and BTC did not hold up</h3>\n'
@@ -157,6 +179,7 @@ def main():
 {chr(10).join(parts)}
 {det}{chance_html}{P2_INTRO}
 {chr(10).join(parts2)}
+{P2_DECISION}
     <p>The 2026 months of the cells that passed: {"; ".join(f'{NAME.get(k, k)} {names(v["confirmed"] + v["flat"] + v["failed"] + v["nopick"])}' for k, v in counts.items())}.</p>
   </section>
 <!-- wf:end -->
@@ -168,10 +191,13 @@ def main():
     p2_txt = ""
     if p2c:
         conf = [(k, r) for k, v in p2c.items() for r in v["confirmed"]]
+        fxd = json.load(open(os.path.join(OUT, "fx_decision.json"))) if os.path.exists(os.path.join(OUT, "fx_decision.json")) else {}
+        res2 = [f"{k} {c}" for k, v in fxd.items() for c in v.get("results", [])]
         p2_txt = (f' The same test on {" and ".join(NAME.get(k, k) for k in p2c)}, run because gold and BTC did not hold up: '
-                  + ("; ".join(f'{NAME.get(k, k)} {v["passed"]} of {v["cells"]} cells passed' for k, v in p2c.items())
+                  + ("; ".join(f'{NAME.get(k, k)} {v["passed"]} of {v["cells"]} cells met the pass rule' for k, v in p2c.items())
                      if any(v["passed"] for v in p2c.values()) else f'none of their {sum(v["cells"] for v in p2c.values()):,} cells passed')
-                  + (f', and {len(conf)} held in the 2026 months.' if conf else '.'))
+                  + (f'; under the decision fixed in advance (once per signal, a chance check, the 2026 months) ' + (f'the results are {", ".join(res2)}.' if res2 else 'nothing is a result.')
+                     if fxd and any(v["passed"] for v in p2c.values()) else '.'))
     btc_pass = [r for r in sums["BTCUSD"]["rows"] if r["passes"]]
     best = max(btc_pass, key=lambda r: r["final"]["pf"] if r["final"]["n"] else 0) if btc_pass else None
     if best is not None:

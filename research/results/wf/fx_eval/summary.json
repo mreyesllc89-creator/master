@@ -1,0 +1,638 @@
+{
+ "agent": "recompute",
+ "method": "Independent re-implementation of the protocol-2 selection and pass rule from the hump_wf.py docstring (no import of hump_wf; structure adapted from research/audit_wf/wfcore.py, extended to 8 columns): calibration Y-3..Y-1 from same-year columns 4-7 (counts, six PFs, base cost per trade), >= 20 trades in each of the six, cost <= 1/8 R, the 10 best scores >= 1.3 one per (sides, session, htf) family, ties to the lower index; test years 2016-2024 from entry-year columns 0-3, 2025 from same-year columns 4-7; pass over 2016-2025; 2026 computed only for passing cells. Arrays read with mmap, one TF at a time (peak RSS 1.4 GB); only small JSON written.",
+ "code": [
+  "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/wf2.py",
+  "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/compare2.py",
+  "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/variants.py",
+  "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/deepdive.py",
+  "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/make_summary.py"
+ ],
+ "verdict": "Reference reproduced exactly: every pick list (order included), every window sum, every score (3 dp), every eligible count, every cell figure and every pass flag of both symbols agree bit for bit (max relative difference 0.0). EURUSD 0 of 472 pass; US500 1 of 472 (M2 trend_h4); the final 2026 window is written only for that cell.",
+ "comparison": {
+  "EURUSD": {
+   "source_ref": "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/wf/eurusd_wf.json",
+   "source_mine": "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/cmp_eurusd.json",
+   "cells": 472,
+   "windows_compared": 4720,
+   "of_which_final_2026": 0,
+   "windows_with_picks_in_ref": 1597,
+   "picks_in_ref": 4654,
+   "pick_lists_differ": 0,
+   "pick_sets_differ": 0,
+   "window_field_diffs": 0,
+   "score_diffs_3dp": 0,
+   "cell_field_diffs": 0,
+   "pass_flag_diffs": 0,
+   "final_presence_diffs": 0,
+   "max_relative_difference_any_field": 0.0,
+   "passes_mine": [],
+   "passes_ref": [],
+   "windows_where_tie_rule_decides": 0,
+   "setups_moved_across_1.3_by_float32_division": 0,
+   "windows_with_an_eligible_score_within_1e-6_of_1.3": 0,
+   "layout_same_year_above_entry_year_entries": 0,
+   "cross_year_trade_share_max_over_tfs": 0.00012966552458237857
+  },
+  "US500": {
+   "source_ref": "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/wf/us500_wf.json",
+   "source_mine": "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/cmp_us500.json",
+   "cells": 472,
+   "windows_compared": 4721,
+   "of_which_final_2026": 1,
+   "windows_with_picks_in_ref": 1135,
+   "picks_in_ref": 2794,
+   "pick_lists_differ": 0,
+   "pick_sets_differ": 0,
+   "window_field_diffs": 0,
+   "score_diffs_3dp": 0,
+   "cell_field_diffs": 0,
+   "pass_flag_diffs": 0,
+   "final_presence_diffs": 0,
+   "max_relative_difference_any_field": 0.0,
+   "passes_mine": [
+    [
+     "M2",
+     "trend_h4"
+    ]
+   ],
+   "passes_ref": [
+    [
+     "M2",
+     "trend_h4"
+    ]
+   ],
+   "windows_where_tie_rule_decides": 0,
+   "setups_moved_across_1.3_by_float32_division": 0,
+   "windows_with_an_eligible_score_within_1e-6_of_1.3": 0,
+   "layout_same_year_above_entry_year_entries": 0,
+   "cross_year_trade_share_max_over_tfs": 0.00045116679393686354
+  }
+ },
+ "power_check": {
+  "note": "Alternative readings re-run against the reference: only the docstring reading reproduces it. The pass flips listed under alternatives are NOT protocol results (forking paths); they show that the comparison can tell readings apart and how sensitive the pass set is. The cost-rule columns and the tie rule never change anything, and the 2025 column choice changes nothing on US500, so those three choices are untestable here but also irrelevant.",
+  "source": [
+   "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/variants_eurusd.json",
+   "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/variants_us500.json"
+  ],
+  "variants": {
+   "EURUSD": {
+    "as_docstring": {
+     "pick_diffs": 0,
+     "sum_diffs": 0,
+     "pass_flips": []
+    },
+    "calibration_entry_year_cols": {
+     "pick_diffs": 15,
+     "sum_diffs": 11,
+     "pass_flips": []
+    },
+    "cost_rule_entry_year_cols": {
+     "pick_diffs": 0,
+     "sum_diffs": 0,
+     "pass_flips": []
+    },
+    "test_2025_entry_year_cols": {
+     "pick_diffs": 0,
+     "sum_diffs": 2,
+     "pass_flips": []
+    },
+    "all_test_years_same_year_cols": {
+     "pick_diffs": 0,
+     "sum_diffs": 13,
+     "pass_flips": []
+    },
+    "family_with_htf_ema": {
+     "pick_diffs": 284,
+     "sum_diffs": 284,
+     "pass_flips": []
+    },
+    "family_sides_session_only": {
+     "pick_diffs": 631,
+     "sum_diffs": 631,
+     "pass_flips": []
+    },
+    "min20_base_cost_only": {
+     "pick_diffs": 93,
+     "sum_diffs": 93,
+     "pass_flips": []
+    },
+    "ties_to_higher_index": {
+     "pick_diffs": 0,
+     "sum_diffs": 0,
+     "pass_flips": []
+    }
+   },
+   "US500": {
+    "as_docstring": {
+     "pick_diffs": 0,
+     "sum_diffs": 0,
+     "pass_flips": []
+    },
+    "calibration_entry_year_cols": {
+     "pick_diffs": 3,
+     "sum_diffs": 2,
+     "pass_flips": []
+    },
+    "cost_rule_entry_year_cols": {
+     "pick_diffs": 0,
+     "sum_diffs": 0,
+     "pass_flips": []
+    },
+    "test_2025_entry_year_cols": {
+     "pick_diffs": 0,
+     "sum_diffs": 0,
+     "pass_flips": []
+    },
+    "all_test_years_same_year_cols": {
+     "pick_diffs": 0,
+     "sum_diffs": 7,
+     "pass_flips": []
+    },
+    "family_with_htf_ema": {
+     "pick_diffs": 129,
+     "sum_diffs": 129,
+     "pass_flips": [
+      [
+       "M3",
+       "hours_10_13",
+       true
+      ]
+     ]
+    },
+    "family_sides_session_only": {
+     "pick_diffs": 321,
+     "sum_diffs": 321,
+     "pass_flips": [
+      [
+       "M5",
+       "adx_h1_20",
+       true
+      ],
+      [
+       "M30",
+       "tdr_ge40",
+       true
+      ]
+     ]
+    },
+    "min20_base_cost_only": {
+     "pick_diffs": 64,
+     "sum_diffs": 64,
+     "pass_flips": [
+      [
+       "M2",
+       "trend_h4",
+       false
+      ]
+     ]
+    },
+    "ties_to_higher_index": {
+     "pick_diffs": 0,
+     "sum_diffs": 0,
+     "pass_flips": []
+    }
+   }
+  }
+ },
+ "us500_M2_trend_h4": {
+  "source": "/tmp/claude-0/-workspace-master/53e0ea5b-b347-50b9-8f48-3f5cae086c17/scratchpad/fxeval/recompute/us500_M2_trend_h4.json",
+  "cell": {
+   "n": 151,
+   "pf_exact": "1.3023107505960316",
+   "stress_pf_exact": "1.2242901009306668",
+   "win_R": 130.62399291992188,
+   "loss_R": 100.30170822143555,
+   "stress_win_R": 126.97240257263184,
+   "stress_loss_R": 103.7110424041748,
+   "net_R": 30.322284698486328,
+   "pf_float32_accumulation": 1.3023107051849365,
+   "pf_ge_1.30": true,
+   "years_with_50_trades": 2,
+   "losing_years": [],
+   "answer": "PF = 130.62399291992188 / 100.30170822143555 = 1.3023107505960316 >= 1.30 (float32 accumulation 1.3023107); not a rounding of 1.2996. Margin: removing 0.2318 R of wins, or adding 0.1783 R of losses, would put it under 1.30."
+  },
+  "max_score_by_test_window": {
+   "2016": 1.0372,
+   "2017": 1.1308,
+   "2018": 1.1563,
+   "2019": 1.0252,
+   "2020": 0.99,
+   "2021": 1.1996,
+   "2022": 1.4809,
+   "2023": 1.5789,
+   "2024": 1.0557,
+   "2025": 1.0337
+  },
+  "test_years_with_picks": {
+   "2022": {
+    "picks": [
+     10738
+    ],
+    "scores_exact": [
+     "1.4808897900885107"
+    ],
+    "n": 58,
+    "pf": 1.5789473684210527,
+    "stress_n": 58,
+    "stress_pf": 1.6075421678449893,
+    "columns": "entry"
+   },
+   "2023": {
+    "picks": [
+     10738,
+     7536
+    ],
+    "scores_exact": [
+     "1.5789473684210527",
+     "1.30083869306594"
+    ],
+    "n": 93,
+    "pf": 1.133580361374794,
+    "stress_n": 91,
+    "stress_pf": 0.9943923854887932,
+    "columns": "entry"
+   }
+  },
+  "picks_detail": {
+   "2022:10738": {
+    "family": "sides=-1 session=ny_12-1630 htf=none",
+    "score": "1.4808897900885107",
+    "calibration": {
+     "2019": {
+      "base": {
+       "n": 24,
+       "pf": 1.7914595912595486
+      },
+      "stress": {
+       "n": 23,
+       "pf": 1.4808897900885107
+      }
+     },
+     "2020": {
+      "base": {
+       "n": 35,
+       "pf": 1.7727272727272727
+      },
+      "stress": {
+       "n": 35,
+       "pf": 1.690285574670972
+      }
+     },
+     "2021": {
+      "base": {
+       "n": 28,
+       "pf": 1.9387830364283594
+      },
+      "stress": {
+       "n": 29,
+       "pf": 1.6165418888226222
+      }
+     },
+     "cost_r_per_trade_base": 0.054455200831095375
+    },
+    "test": {
+     "n": 58,
+     "win": 60.0,
+     "loss": 38.0,
+     "pf": 1.5789473684210527,
+     "stress_n": 58,
+     "stress_win": 62.51085662841797,
+     "stress_loss": 38.885982513427734,
+     "stress_pf": 1.6075421678449893,
+     "cost_r": 2.910161018371582
+    }
+   },
+   "2023:10738": {
+    "family": "sides=-1 session=ny_12-1630 htf=none",
+    "score": "1.5789473684210527",
+    "calibration": {
+     "2020": {
+      "base": {
+       "n": 35,
+       "pf": 1.7727272727272727
+      },
+      "stress": {
+       "n": 35,
+       "pf": 1.690285574670972
+      }
+     },
+     "2021": {
+      "base": {
+       "n": 28,
+       "pf": 1.9387830364283594
+      },
+      "stress": {
+       "n": 29,
+       "pf": 1.6165418888226222
+      }
+     },
+     "2022": {
+      "base": {
+       "n": 58,
+       "pf": 1.5789473684210527
+      },
+      "stress": {
+       "n": 58,
+       "pf": 1.6075421678449893
+      }
+     },
+     "cost_r_per_trade_base": 0.049422295625544774
+    },
+    "test": {
+     "n": 33,
+     "win": 30.0,
+     "loss": 23.0,
+     "pf": 1.3043478260869565,
+     "stress_n": 33,
+     "stress_win": 23.793832778930664,
+     "stress_loss": 26.506040573120117,
+     "stress_pf": 0.8976758604625424,
+     "cost_r": 2.0103840827941895
+    }
+   },
+   "2023:7536": {
+    "family": "sides=-1 session=all htf=H4",
+    "score": "1.30083869306594",
+    "calibration": {
+     "2020": {
+      "base": {
+       "n": 69,
+       "pf": 1.5275227823959148
+      },
+      "stress": {
+       "n": 69,
+       "pf": 1.315638564707015
+      }
+     },
+     "2021": {
+      "base": {
+       "n": 61,
+       "pf": 1.3268648496535564
+      },
+      "stress": {
+       "n": 59,
+       "pf": 1.30083869306594
+      }
+     },
+     "2022": {
+      "base": {
+       "n": 114,
+       "pf": 1.4865844986371808
+      },
+      "stress": {
+       "n": 114,
+       "pf": 1.3508367420822094
+      }
+     },
+     "cost_r_per_trade_base": 0.038111808847208495
+    },
+    "test": {
+     "n": 60,
+     "win": 40.623992919921875,
+     "loss": 39.30170822143555,
+     "pf": 1.033644458684499,
+     "stress_n": 58,
+     "stress_win": 40.6677131652832,
+     "stress_loss": 38.31901931762695,
+     "stress_pf": 1.0612931617113657,
+     "cost_r": 3.565617561340332
+    }
+   }
+  },
+  "fragility": {
+   "marginal_pick_2023": {
+    "setup": 7536,
+    "family": "sides=-1 session=all htf=H4",
+    "score_exact": "1.30083869306594",
+    "margin_over_1.3": 0.0008386930659398661,
+    "binding": "2021 stressed PF 1.30084 on 59 trades",
+    "test_2023": {
+     "n": 60,
+     "pf": 1.033644458684499,
+     "stress_pf": 1.0612931617113657
+    },
+    "cell_without_it": {
+     "n": 91,
+     "pf": 1.4754098360655739,
+     "stress_pf": 1.3198045470029638,
+     "years_with_50_trades": 1,
+     "passes": false,
+     "fails": [
+      "n < 100",
+      "only one year with 50+ trades"
+     ]
+    }
+   },
+   "excluded_by_one_stressed_trade": {
+    "setup": 8254,
+    "family": "sides=-1 session=ny_12-1630 htf=M30",
+    "score": 1.3090732356654877,
+    "stressed_counts_2020_2022": [
+     20,
+     19,
+     35
+    ],
+    "base_counts_2020_2022": [
+     20,
+     20,
+     36
+    ],
+    "if_20_trades_were_counted_on_base_costs_only": {
+     "test_2023": {
+      "picks": [
+       10738,
+       8254,
+       7536
+      ],
+      "n": 119,
+      "pf": 1.0277252989458128,
+      "stress_pf": 0.8767634816009602
+     },
+     "cell": {
+      "n": 177,
+      "pf": 1.200388173490841,
+      "stress_pf": 1.0989335277225216,
+      "passes": false
+     }
+    }
+   },
+   "stressed_2023": {
+    "stress_n": 91,
+    "stress_pf": 0.9943923854887932,
+    "note": "the yearly floor (no 50+ trade year below 1.0) is applied to base costs, as the docstring and the decision rule read and as the module and this recompute do; base 2023 PF 1.1336 on 93 trades"
+   },
+   "evidence_base": "2 of 10 unseen years have picks; 2 setups, both short-only (sides=-1); 10738 gives 91 of the 151 trades (2022 and 2023)"
+  },
+  "window_2026": {
+   "calibration": [
+    2023,
+    2024,
+    2025
+   ],
+   "eligible": 6861,
+   "eligible_after_cost_rule": 6456,
+   "setups_with_score": {
+    ">=1.0": 5,
+    ">=1.1": 2,
+    ">=1.2": 0,
+    ">=1.25": 0,
+    ">=1.3": 0
+   },
+   "max_score": 1.165959083767449,
+   "picks": [],
+   "best_per_family": [
+    {
+     "setup": 6537,
+     "score": 1.166,
+     "family": "sides=1 session=all htf=H1",
+     "binding": "2025 stress PF 1.1660 on 29 trades"
+    },
+    {
+     "setup": 7901,
+     "score": 1.1653,
+     "family": "sides=-1 session=london_07-12 htf=none",
+     "binding": "2024 stress PF 1.1653 on 35 trades"
+    },
+    {
+     "setup": 6305,
+     "score": 1.0376,
+     "family": "sides=-1 session=london_07-12 htf=H4",
+     "binding": "2023 stress PF 1.0376 on 30 trades"
+    },
+    {
+     "setup": 1305,
+     "score": 1.0372,
+     "family": "sides=0 session=ldn_ny_07-20 htf=D1",
+     "binding": "2024 stress PF 1.0372 on 29 trades"
+    },
+    {
+     "setup": 5271,
+     "score": 1.0305,
+     "family": "sides=-1 session=ldn_ny_07-20 htf=D1",
+     "binding": "2023 stress PF 1.0305 on 60 trades"
+    }
+   ],
+   "scores_of_the_setups_that_made_the_pass": {
+    "10738": 0.30443529308452766,
+    "7536": 0.7774247491828075
+   },
+   "answer": "No picks because no setup reaches 1.3: the best lowest-of-six PF on 2023-2025 is 1.1660 (setup 6537, bound by its 2025 stressed PF), the next 1.1653; 5 of 6456 scored setups reach 1.0, 2 reach 1.1, none reach 1.2. The two setups that made the pass score 0.304 (10738) and 0.777 (7536). The final check therefore has 0 trades."
+  },
+  "window_year_ahead_2024_2026": {
+   "calibration": [
+    2024,
+    2025,
+    2026
+   ],
+   "eligible": 6695,
+   "eligible_after_cost_rule": 6410,
+   "setups_with_score": {
+    ">=1.0": 6,
+    ">=1.1": 3,
+    ">=1.2": 1,
+    ">=1.25": 0,
+    ">=1.3": 0
+   },
+   "max_score": 1.2267082481557348,
+   "picks": [],
+   "best_per_family": [
+    {
+     "setup": 6237,
+     "score": 1.2267,
+     "family": "sides=0 session=london_07-12 htf=H1",
+     "binding": "2026 stress PF 1.2267 on 29 trades"
+    },
+    {
+     "setup": 2501,
+     "score": 1.1072,
+     "family": "sides=-1 session=london_07-12 htf=H1",
+     "binding": "2024 stress PF 1.1072 on 40 trades"
+    },
+    {
+     "setup": 8748,
+     "score": 1.1029,
+     "family": "sides=-1 session=ny_12-20 htf=M30",
+     "binding": "2026 stress PF 1.1029 on 34 trades"
+    },
+    {
+     "setup": 9180,
+     "score": 1.0329,
+     "family": "sides=-1 session=ny_12-20 htf=H4",
+     "binding": "2026 stress PF 1.0329 on 53 trades"
+    },
+    {
+     "setup": 9786,
+     "score": 1.0155,
+     "family": "sides=0 session=ny_12-20 htf=H4",
+     "binding": "2026 stress PF 1.0155 on 169 trades"
+    }
+   ],
+   "same_with_2026_by_entry_year": {
+    "picks": [],
+    "pick_scores": [],
+    "max_score": 1.2267082929611206,
+    "setups_with_score": {
+     ">=1.0": 6,
+     ">=1.1": 3,
+     ">=1.2": 1,
+     ">=1.25": 0,
+     ">=1.3": 0
+    }
+   },
+   "year_2026_trades_entry_minus_same": {
+    "base": 0.0,
+    "stress": 0.0
+   },
+   "answer": "No picks for the year ahead: the best score on 2024-2026 (2026 to 13 Nov, same-year columns) is 1.2267 (setup 6237, sides=0 london_07-12 htf=H1), the next 1.1072; none reaches 1.25. The 2026 entry-year and same-year columns hold the same trades for this cell, so the column choice does not matter."
+  }
+ },
+ "near_misses_recomputed": [
+  {
+   "symbol": "EURUSD",
+   "tf": "M15",
+   "condition": "pd_break",
+   "n": 217,
+   "pf": 1.3944,
+   "stress_pf": 1.2628,
+   "fails": "one year with 50+ trades"
+  },
+  {
+   "symbol": "EURUSD",
+   "tf": "M15",
+   "condition": "round_near",
+   "n": 104,
+   "pf": 1.3297,
+   "stress_pf": 1.1619,
+   "fails": "one year with 50+ trades"
+  },
+  {
+   "symbol": "US500",
+   "tf": "M5",
+   "condition": "adx_h4_20",
+   "n": 420,
+   "pf": 1.3393,
+   "stress_pf": 1.195,
+   "fails": "2025 below 1.0"
+  },
+  {
+   "symbol": "US500",
+   "tf": "M30",
+   "condition": "tdr_ge40",
+   "n": 412,
+   "pf": 1.335,
+   "stress_pf": 1.1791,
+   "fails": "2021 below 1.0"
+  },
+  {
+   "symbol": "US500",
+   "tf": "M30",
+   "condition": "pd_inside",
+   "n": 102,
+   "pf": 1.3193,
+   "stress_pf": 1.0863,
+   "fails": "stress < 1.1 and one year with 50+ trades"
+  }
+ ],
+ "decision_implication": "Item 4 of research/results/wf/protocol2_decision.md: the 2026 window of the only passing cell has no picks, so the 2026 months have 0 trades and the cell cannot reach \"confirmed\" (the rule does not name the zero-trade case; it can only be read as not confirmed, so no presets). There are no picks for the year ahead either. Items 2 (once per signal) and 3 (not chance) were not checked here."
+}

@@ -1,0 +1,259 @@
+{
+ "symbol": "US500",
+ "tf": "M2",
+ "condition": "trend_h4",
+ "text": "with the H4 trend (H4 close on the trade's side of its EMA 50)",
+ "protocol": 2,
+ "passes": true,
+ "final_year_number": 2026,
+ "walk_forward": {
+  "n": 151,
+  "pf": 1.3023107299872132,
+  "net_r": 30.32228269728796,
+  "win_rate": 0.33112582781456956,
+  "max_drawdown_r": 17.233592369854186,
+  "pf_without_3_largest_wins": 1.212518640656014,
+  "stress": {
+   "n": 149,
+   "pf": 1.224290108410203,
+   "net_r": 23.261361308808745,
+   "win_rate": 0.33557046979865773,
+   "max_drawdown_r": 15.761056980807997,
+   "pf_without_3_largest_wins": 1.1376043340035484
+  },
+  "buys": {
+   "n": 0
+  },
+  "sells": {
+   "n": 151,
+   "pf": 1.3023107299872132,
+   "net_r": 30.32228269728796,
+   "win_rate": 0.33112582781456956,
+   "max_drawdown_r": 17.233592369854186,
+   "pf_without_3_largest_wins": 1.212518640656014
+  },
+  "cost_r_per_trade": 0.056199754305220596,
+  "resampling": {
+   "p05": 0.9397423365730708,
+   "p95": 1.72383202215637,
+   "below_1_0": 0.086,
+   "below_1_3": 0.4985
+  },
+  "by_year": {
+   "2022": {
+    "n": 58,
+    "pf": 1.5789473684210527,
+    "net_r": 22.0,
+    "win_rate": 0.3448275862068966,
+    "max_drawdown_r": 9.0,
+    "pf_without_3_largest_wins": 1.3421052631578947
+   },
+   "2023": {
+    "n": 93,
+    "pf": 1.1335803287863166,
+    "net_r": 8.322282697287962,
+    "win_rate": 0.3225806451612903,
+    "max_drawdown_r": 17.233592369854186,
+    "pf_without_3_largest_wins": 0.9890208906928767
+   }
+  },
+  "positive_months": 13,
+  "months": 22
+ },
+ "final_year": {
+  "n": 0,
+  "stress": {
+   "n": 0
+  },
+  "buys": {
+   "n": 0
+  },
+  "sells": {
+   "n": 0
+  },
+  "cost_r_per_trade": null,
+  "resampling": null,
+  "by_year": {},
+  "positive_months": 0,
+  "months": 0
+ },
+ "all_unseen_years": {
+  "n": 151,
+  "pf": 1.3023107299872132,
+  "net_r": 30.32228269728796,
+  "win_rate": 0.33112582781456956,
+  "max_drawdown_r": 17.233592369854186,
+  "pf_without_3_largest_wins": 1.212518640656014,
+  "stress": {
+   "n": 149,
+   "pf": 1.224290108410203,
+   "net_r": 23.261361308808745,
+   "win_rate": 0.33557046979865773,
+   "max_drawdown_r": 15.761056980807997,
+   "pf_without_3_largest_wins": 1.1376043340035484
+  },
+  "buys": {
+   "n": 0
+  },
+  "sells": {
+   "n": 151,
+   "pf": 1.3023107299872132,
+   "net_r": 30.32228269728796,
+   "win_rate": 0.33112582781456956,
+   "max_drawdown_r": 17.233592369854186,
+   "pf_without_3_largest_wins": 1.212518640656014
+  },
+  "cost_r_per_trade": 0.056199754305220596,
+  "resampling": {
+   "p05": 0.9397423365730708,
+   "p95": 1.72383202215637,
+   "below_1_0": 0.086,
+   "below_1_3": 0.4985
+  },
+  "by_year": {
+   "2022": {
+    "n": 58,
+    "pf": 1.5789473684210527,
+    "net_r": 22.0,
+    "win_rate": 0.3448275862068966,
+    "max_drawdown_r": 9.0,
+    "pf_without_3_largest_wins": 1.3421052631578947
+   },
+   "2023": {
+    "n": 93,
+    "pf": 1.1335803287863166,
+    "net_r": 8.322282697287962,
+    "win_rate": 0.3225806451612903,
+    "max_drawdown_r": 17.233592369854186,
+    "pf_without_3_largest_wins": 0.9890208906928767
+   }
+  },
+  "positive_months": 13,
+  "months": 22
+ },
+ "distinct_signals": {
+  "walk_forward": {
+   "trades": 151,
+   "signals": 149,
+   "stress_trades": 149,
+   "stress_signals": 147,
+   "pf": 1.3288069272692715,
+   "stress_pf": 1.2494090274549237,
+   "net_r": 32.32228269728796,
+   "picks_per_signal_mean": 1.0134228187919463,
+   "picks_per_signal_max": 2,
+   "years_with_50_signals": 2,
+   "losing_years": [],
+   "passes": true,
+   "by_year": {
+    "2022": {
+     "trades": 58,
+     "signals": 58,
+     "pf": 1.5789473684210527,
+     "net_r": 22.0
+    },
+    "2023": {
+     "trades": 93,
+     "signals": 91,
+     "pf": 1.1711772844322743,
+     "net_r": 10.322282697287964
+    }
+   }
+  },
+  "final_year": {
+   "trades": 0,
+   "signals": 0,
+   "stress_trades": 0,
+   "stress_signals": 0,
+   "pf": NaN,
+   "stress_pf": NaN,
+   "net_r": 0.0,
+   "picks_per_signal_mean": null,
+   "picks_per_signal_max": null,
+   "years_with_50_signals": 0,
+   "losing_years": [],
+   "passes": false,
+   "by_year": {}
+  }
+ },
+ "picks": [
+  {
+   "year": 2022,
+   "pick": 10738,
+   "score": 1.481,
+   "n": 58,
+   "pf": 1.5789473684210527,
+   "net_r": 22.0,
+   "win_rate": 0.3448275862068966,
+   "max_drawdown_r": 9.0,
+   "pf_without_3_largest_wins": 1.3421052631578947,
+   "setup": {
+    "sides": -1,
+    "session": "ny_12-1630",
+    "htf": "none",
+    "htf_ema": 20,
+    "macd": "8-17",
+    "tp_mode": 1,
+    "tp_rr": 3.0,
+    "trail_start": 0.0,
+    "trail_dist": 0.5,
+    "max_hold": 1440,
+    "eod": 1380,
+    "buf": 0.88,
+    "min_risk": 0.88
+   }
+  },
+  {
+   "year": 2023,
+   "pick": 7536,
+   "score": 1.301,
+   "n": 60,
+   "pf": 1.0336444075790212,
+   "net_r": 1.3222826972879638,
+   "win_rate": 0.3333333333333333,
+   "max_drawdown_r": 9.473723339498774,
+   "pf_without_3_largest_wins": 0.8044864314532345,
+   "setup": {
+    "sides": -1,
+    "session": "all",
+    "htf": "H4",
+    "htf_ema": 20,
+    "macd": "12-26",
+    "tp_mode": 1,
+    "tp_rr": 3.0,
+    "trail_start": 0.0,
+    "trail_dist": 0.5,
+    "max_hold": 480,
+    "eod": 1380,
+    "buf": 1.3,
+    "min_risk": 5.3
+   }
+  },
+  {
+   "year": 2023,
+   "pick": 10738,
+   "score": 1.579,
+   "n": 33,
+   "pf": 1.3043478260869565,
+   "net_r": 7.0,
+   "win_rate": 0.30303030303030304,
+   "max_drawdown_r": 11.0,
+   "pf_without_3_largest_wins": 0.9130434782608695,
+   "setup": {
+    "sides": -1,
+    "session": "ny_12-1630",
+    "htf": "none",
+    "htf_ema": 20,
+    "macd": "8-17",
+    "tp_mode": 1,
+    "tp_rr": 3.0,
+    "trail_start": 0.0,
+    "trail_dist": 0.5,
+    "max_hold": 1440,
+    "eod": 1380,
+    "buf": 0.88,
+    "min_risk": 0.88
+   }
+  }
+ ]
+}
