@@ -1,11 +1,11 @@
 rank,file,timeframe,direction,session,trend_filter,macd,stoch_k,max_hold_min,eod_close,target,trailing,trades,pf,dd,worse_half_2025,pf_2026,trades_2026,stress_pf,stress_2025,stress_2026,oos_vt_trades,oos_vt_pf_before_comm,oos_vt_pf_comm_0_60_per_lot,oos_vt_pf_comm_6_per_lot_tester,oos_dukascopy_trades,oos_dukascopy_pf
-1,Loma_Top01_Gold_M10_Both_0700-2000_H1,M10,Both,0700-2000,H1 EMA20,16-35,10,0,23:00,3.0R,off,129,2.09,8.6,2.21,1.72,35,2.08,2.05,1.97,32,0.46,0.43,0.28,34,0.69
-2,Loma_Top02_Gold_M3_Sell_AllDay_NoFilter,M3,Sell,AllDay,none,16-35,10,120,22:00,3.0R,off,143,1.98,4.7,1.89,2.07,46,1.81,1.5,2.03,48,1.04,0.91,0.31,51,0.77
+1,Loma_Top01_Gold_M10_Both_0700-2000_H1,M10,Both,0700-2000,H1 EMA20,16-35,10,0,23:00,3.0R,off,129,2.09,8.6,2.21,1.72,35,2.08,2.05,1.97,32,0.46,0.43,0.28,33,0.7
+2,Loma_Top02_Gold_M3_Sell_AllDay_NoFilter,M3,Sell,AllDay,none,16-35,10,120,22:00,3.0R,off,143,1.98,4.7,1.89,2.07,46,1.81,1.5,2.03,48,1.04,0.91,0.31,50,0.81
 3,Loma_Top03_Gold_M2_Sell_1200-2000_H1,M2,Sell,1200-2000,H1 EMA20,12-26,10,240,22:00,2.0R,off,117,2.03,4.1,2.28,1.46,32,1.9,1.91,1.63,44,0.77,0.69,0.27,44,0.83
-4,Loma_Top04_Gold_M5_Both_0700-1200_H1,M5,Both,0700-1200,H1 EMA50,8-17,7,240,23:00,3.0R,1.0/1.0R,124,1.82,7.9,2.07,1.4,37,1.76,1.52,1.66,42,0.58,0.51,0.19,43,0.45
+4,Loma_Top04_Gold_M5_Both_0700-1200_H1,M5,Both,0700-1200,H1 EMA50,8-17,7,240,23:00,3.0R,1.0/1.0R,124,1.82,7.9,2.07,1.4,37,1.76,1.52,1.66,42,0.58,0.51,0.19,42,0.46
 5,Loma_Top05_Gold_M10_Buy_AllDay_M30,M10,Buy,AllDay,M30 EMA20,16-35,10,240,23:00,1.5R,off,141,1.96,2.9,2.14,1.47,37,1.8,1.88,1.38,49,0.87,0.81,0.42,49,0.84
 6,Loma_Top06_Gold_M2_Sell_1200-2000_H4,M2,Sell,1200-2000,H4 EMA50,12-26,7,0,off,1.0R,1.0/0.3R,104,1.56,5.0,1.6,1.31,37,1.49,1.28,1.6,,,,,,
-7,Loma_Top07_Gold_M5_Buy_AllDay_H1,M5,Buy,AllDay,H1 EMA50,12-26,7,0,off,6.0R,0.5/1.0R,135,2.17,6.7,1.94,1.84,30,1.92,1.43,1.73,32,0.72,0.64,0.26,32,0.62
+7,Loma_Top07_Gold_M5_Buy_AllDay_H1,M5,Buy,AllDay,H1 EMA50,12-26,7,0,off,6.0R,0.5/1.0R,135,2.17,6.7,1.94,1.84,30,1.92,1.43,1.73,32,0.72,0.64,0.26,31,0.67
 8,Loma_Top08_Gold_M5_Buy_AllDay_H4,M5,Buy,AllDay,H4 EMA50,12-26,7,0,off,3.0R,off,138,1.83,5.9,1.89,1.19,29,1.77,1.86,1.17,,,,,,
 9,Loma_Top09_Gold_M5_Both_0700-2000_NoFilter,M5,Both,0700-2000,none,10-22,7,480,22:00,3.0R,1.0/1.0R,191,1.92,5.7,2.3,1.17,50,1.67,1.87,1.12,,,,,,
 10,Loma_Top10_Gold_M3_Both_0700-1200_NoFilter,M3,Both,0700-1200,none,8-17,7,0,21:00,3.0R,off,140,1.65,10.0,1.87,1.11,37,1.5,1.64,1.09,,,,,,

@@ -1,4 +1,6 @@
-# XLZC Bearish EA v1.20: start here
+# XLZC Bearish EA v1.21: start here
+
+*v1.21 is v1.20 with one fix: in the non-visual Strategy Tester the EA now requests an indicator value before checking that the indicator is ready, so it trades there. The rules and presets are unchanged.*
 
 A short-only Expert Advisor for XAUUSD (gold) in MetaTrader 5. It sells when MACD crosses below zero on a short timeframe while the higher-timeframe trend is down. It places the stop above the latest liquidity high and the target at the next liquidity low. *No signal = no trade.*
 

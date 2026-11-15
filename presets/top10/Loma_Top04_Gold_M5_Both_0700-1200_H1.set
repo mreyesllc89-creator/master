@@ -2,7 +2,7 @@
 ; Backtest Jan 2025-May 2026 (FTMO XAUUSD M1 path, risk-% sizing): 124 trades, PF 1.82, net +35R, max drawdown 7.9R. 2025 worse half-year PF 2.07; 2026 PF 1.40 (37 trades).
 ; Harsh stress (1 min late, pessimistic trailing, 0.10 slippage, commission): PF 1.76; 2025 worse half 1.52; 2026 PF 1.66.
 ; Chosen with ALL the data from Jan 2025 to May 15 2026: the figures above are in-sample.
-; OUT OF SAMPLE Jun 1 - Nov 6 2026 (never used for calibration): VT Markets MT5 real ticks 42 trades, PF 0.58 before commission, 0.51 at VT's 0.60 USD per lot; Dukascopy prices 43 trades, PF 0.45. The edge did not hold: NOT RECOMMENDED FOR LIVE TRADING.
+; OUT OF SAMPLE Jun 1 - Nov 6 2026 (never used for calibration): VT Markets MT5 real ticks 42 trades, PF 0.58 before commission, 0.51 at VT's 0.60 USD per lot; Dukascopy prices 42 trades, PF 0.46. The edge did not hold: NOT RECOMMENDED FOR LIVE TRADING.
 ; Strategy Tester and demo only. Session, weekend and end-of-day times are BROKER SERVER TIME (FTMO clock).
 ; UseNewsFilter was not in the backtest.
 MagicNumber=26113204

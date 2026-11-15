@@ -57,6 +57,16 @@ for path in sorted(glob.glob("presets/btc/Loma_BTC*.set")):
     head = [h.replace("UNPROVEN: Strategy Tester (real ticks) and demo only.", "Strategy Tester and demo only.") for h in head]
     rewrite(path, head)
 
+# the five original presets (repository only): no promise of live results, and no claim of an out-of-sample 2026
+for path in sorted(glob.glob("presets/Loma_Gold_*.set")):
+    head = [l for l in open(path).read().splitlines() if l.startswith(";")]
+    head[0] = re.sub(r"v1\.\d\d", f"v{VER}", head[0])
+    head = [h.replace("2026 (out of sample) PF", "2026 PF")
+             .replace("were added after seeing all the data: expect roughly PF 1.1-1.5 live. Stress verdicts are in LOMA_START_HERE.md.",
+                      "were added after seeing all the data. Not tested on data after May 2026; the six top-10 presets that were tested "
+                      "all lost from June 2026: NOT RECOMMENDED FOR LIVE TRADING.") for h in head]
+    rewrite(path, head)
+
 # summary CSVs: add out-of-sample columns
 s = pd.read_csv("presets/top10/TOP10_SUMMARY.csv")
 OOS_COLS = ["oos_vt_trades", "oos_vt_pf_before_comm", "oos_vt_pf_comm_0_60_per_lot", "oos_vt_pf_comm_6_per_lot_tester",

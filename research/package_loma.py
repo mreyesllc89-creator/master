@@ -61,13 +61,16 @@ gold_sets = sorted(p for p in (os.path.join("presets/top10", f) for f in os.list
                    if p.endswith(".set") and re.search(r"Loma_(Top\d\d)_", p).group(1) in GOLD)
 assert len(gold_sets) == 6
 s = pd.read_csv("presets/top10/TOP10_SUMMARY.csv")
-s = s[s["rank"].isin([int(g[3:]) for g in GOLD])]
+s = s[s["rank"].isin([int(g[3:]) for g in GOLD])].copy()
+for c in ("oos_vt_trades", "oos_dukascopy_trades"):
+    s[c] = s[c].astype("Int64")                                   # whole numbers (blank rows made them float)
 z1 = build(f"Loma_XAUUSD_v{TAG}", gold_sets, "packages/loma_xauusd/START_HERE.md",
            {"GOLD_PRESETS_SUMMARY.csv": s, "Loma_OOS_Review.html": "research/reports/loma_oos_review.html"})
 btc_sets = sorted(os.path.join("presets/btc", f) for f in os.listdir("presets/btc") if f.endswith(".set"))
 assert len(btc_sets) == 4
 z2 = build(f"Loma_BTCUSD_v{TAG}", btc_sets, "packages/loma_btcusd/START_HERE.md",
-           {"BTC_PRESETS_SUMMARY.csv": "presets/btc/BTC_PRESETS_SUMMARY.csv"})
+           {"BTC_PRESETS_SUMMARY.csv": "presets/btc/BTC_PRESETS_SUMMARY.csv",
+            "Loma_OOS_Review.html": "research/reports/loma_oos_review.html"})
 shutil.rmtree(BUILD)
 for z in (z1, z2):
     print(z)

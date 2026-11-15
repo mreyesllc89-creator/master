@@ -13,6 +13,7 @@ RANKS = [1, 2, 3, 4, 5, 7]
 # commission, as the account owner reported it, is 0.60 USD per lot round trip: one tenth.
 TESTER_COMM_PER_LOT, REAL_COMM_PER_LOT = 6.0, 0.60
 REAL_COMM_SCALE = REAL_COMM_PER_LOT / TESTER_COMM_PER_LOT
+VT_END = "2026-11-06"          # end of the tester run (exclusive): the last trading day is 5 Nov
 
 
 def pf(x):
@@ -50,18 +51,22 @@ for rank in RANKS:
                         filter=s.trend_filter, target=s.target, trailing=s.trailing,
                         bt_trades=int(s.trades), bt_pf=float(s.pf), bt_pf_2026=float(s.pf_2026), bt_stress_pf=float(s.stress_pf),
                         vt_trades=len(vt), vt_gross=round(vt.gross.sum(), 2), vt_comm=round(vt.comm.sum(), 2),
-                        vt_net=round(vt.gross.sum() + vt.comm.sum(), 2), vt_gross_pf=pf(vt.gross), vt_net_pf=pf(vt.gross + vt.comm)))
+                        vt_net=round(vt.gross.sum() + vt.comm.sum(), 2), vt_gross_pf=pf(vt.gross), vt_net_pf=pf(vt.gross + vt.comm),
+                        vt_real_comm=round(float(REAL_COMM_SCALE * vt.comm.sum()), 2),
+                        vt_real_net=round(float((vt.gross + REAL_COMM_SCALE * vt.comm).sum()), 2),
+                        vt_real_pf=pf(vt.gross + REAL_COMM_SCALE * vt.comm)))
     r = pool.iloc[rank - 1]; p = {k: X.cast(r[k], X.SPACE[k]) for k in X.SPACE}
     p.update(T.OVERRIDE.get((p["tf"], p["sides"], p["session"], p["htf"]), {}))
     c = X.engine_cfg(dict(p, skip_big_pb=1, weekend_close=1, max_spread=5))
     df = mk.run(c); tol = pd.Timedelta(minutes=H.B.TF_MIN[p["tf"]])
-    for name, a, b in [("Jun-Aug", "2026-06-01", "2026-08-31"), ("Sep-Nov 6", "2026-08-31", "2026-11-07")]:
+    # The VT tester run ends at 00:00 on 6 Nov 2026 (its last tick is 5 Nov 23:57): compare like for like.
+    for name, a, b in [("Jun-Aug", "2026-06-01", "2026-08-31"), ("Sep-Nov 6", "2026-08-31", VT_END)]:
         d = df[(df.entry_time >= a) & (df.entry_time < b)]; v = vt[(vt.entry >= a) & (vt.entry < b)]; pt = d.entry_time.values
         match = sum(1 for e in v.itertuples() if len(pt) and abs(pd.Timestamp(pt[np.argmin(np.abs(pt - np.datetime64(e.entry)))]) - e.entry) <= tol)
         duk_rows.append(dict(preset=f"Top{rank:02d}", tf=p["tf"], period=name, duk_n=len(d), duk_pf=pf(d.r), duk_netR=round(float(d.r.sum()), 1),
                              vt_n=len(v), vt_gross_pf=pf(v.gross), matched=match, _r=d.r.tolist(), _g=v.gross.tolist()))
     # whole untouched period per preset (Jun 1 - Nov 6 2026), for the preset headers and summary CSV
-    d = df[(df.entry_time >= "2026-06-01") & (df.entry_time < "2026-11-07")]; v = vt[(vt.entry >= "2026-06-01") & (vt.entry < "2026-11-07")]
+    d = df[(df.entry_time >= "2026-06-01") & (df.entry_time < VT_END)]; v = vt[(vt.entry >= "2026-06-01") & (vt.entry < VT_END)]
     presets[-1].update(oos_vt_n=len(v), oos_vt_gross=round(float(v.gross.sum()), 2), oos_vt_gross_pf=pf(v.gross),
                        oos_vt_net=round(float((v.gross + v.comm).sum()), 2), oos_vt_net_pf=pf(v.gross + v.comm),
                        oos_vt_pf_real_comm=pf(v.gross + REAL_COMM_SCALE * v.comm),

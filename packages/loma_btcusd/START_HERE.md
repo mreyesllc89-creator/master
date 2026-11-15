@@ -11,7 +11,8 @@
 | `MQL5/Experts/XAUUSD_Loma_TrendPullback.mq5` | The EA, v1.34 (the same file as in the gold zip). |
 | `MQL5/Include/EVK/EVK.mqh` | Records trades in the Strategy Tester only (EA Validation Kit). The EA needs it to compile. |
 | `MQL5/Presets/Loma_BTC01 … BTC04 *.set` | The four BTC presets (table below). Each has its own magic number. |
-| `BTC_PRESETS_SUMMARY.csv` | Backtest and out-of-sample figures of the four presets. |
+| `BTC_PRESETS_SUMMARY.csv` | Backtest and out-of-sample figures of the four presets. Columns up to `stress_2026` are the backtest (January 2025 – 15 May 2026; the `_2026` columns are its 2026 part, in sample). The `oos_` columns are 16 May – 13 November 2026. |
+| `Loma_OOS_Review.html` | The full report, the same file as in the gold zip. Section 5 has the re-calibration tables for BTC. Open it in a browser. |
 
 ## Install
 
@@ -21,7 +22,7 @@
 4. Attach the EA to a BTCUSD chart (any timeframe). In **Inputs** click **Load** and pick a `Loma_BTC` preset. The EA's built-in defaults are for gold; if they are left in place on BTC, the journal prints a warning.
 5. Enable **Algo Trading**.
 
-v1.33 was compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.34 adds the small changes listed below.
+v1.33 was compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.34, the file in this zip, adds the changes listed below. It was checked line by line and run through a compile harness and a simulated terminal, but it has not been compiled in MetaEditor yet. If the compiler reports anything, send me the log rather than editing the file.
 
 ## The four presets
 
@@ -48,13 +49,13 @@ Backtest: Binance BTCUSDT one-minute data with an assumed $10 spread, January 20
 - **Weekend close is off:** BTC trades through the weekend at most brokers.
 - **Server time:** sessions and the end-of-day close are broker server time on a GMT+2 (winter) / GMT+3 (summer) clock. Shift them if your broker's clock differs.
 - **One account, several presets:** only on a **hedging** account. On a netting account all presets on one symbol share one position. v1.34 warns on a netting account and sends no entry while another position on the symbol is open.
-- **Commission:** set `CommissionPerLot` to your round-trip commission per lot so a stop-out costs `RiskPercent` including commission.
+- **Commission:** set `CommissionPerLot` to your round-trip commission per lot, in your account's currency (on a USC cent account, $0.60 is 60), so a stop-out costs `RiskPercent` including commission.
 - **Account size:** the stops are wide (median $300–460, 90% under $580–810, widest about $2,230). With a 1-BTC contract and a 0.01 minimum lot at `RiskPercent=0.5`, a trade is taken only if the balance is at least twice its stop in dollars: about $2,000 covers 90% of trades. Smaller balances skip the wide-stop trades.
 - **News filter** is on in the presets but was not in the backtest. It does nothing in the Strategy Tester, so tester results equal `UseNewsFilter=false`.
 
 ## If you still want to test it
 
-- **Strategy Tester:** "Every tick based on real ticks" on your broker's BTCUSD, deposit currency equal to your account's. Test January 2025 – May 2026 and June 2026 – today separately, and compare profit before commission, commission and swap.
+- **Strategy Tester:** "Every tick based on real ticks" on your broker's BTCUSD, deposit currency equal to your account's. Test January 2025 – 15 May 2026 and 16 May 2026 – today separately, and compare profit before commission, commission and swap.
 - **Demo only** until a real-tick test and a few months of demo agree. BTC03 is the one to try first.
 
 ### Asking Codex to compile without changing anything

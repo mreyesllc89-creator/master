@@ -2,7 +2,7 @@
 //|                     XAUUSD_M1_LiquidityZeroCross_Bearish.mq5     |
 //|                                                                  |
 //|  Strategy : XAUUSD M1 Liquidity Zero-Cross (BEARISH / SHORT ONLY)|
-//|  Version  : 1.20                                                 |
+//|  Version  : 1.21                                                 |
 //+------------------------------------------------------------------+
 //
 //  "No señal = no operación"  ->  no signal = no trade.

@@ -10,7 +10,7 @@ import numpy as np, pandas as pd
 sys.path.insert(0, "research")
 import hump_engine as H, hump_search as X
 
-EA = "XAUUSD_Loma_TrendPullback.mq5"
+EA = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "XAUUSD_Loma_TrendPullback.mq5")   # repository root
 EA_VERSION = re.search(r'#property version\s+"([\d.]+)"', open(EA).read()).group(1)   # written into the preset headers
 TF = {"M1": 1, "M2": 2, "M3": 3, "M5": 5, "H1": 16385, "H4": 16388}
 ENUMS = {"PERIOD_M1": 1, "PERIOD_M2": 2, "PERIOD_M3": 3, "PERIOD_M5": 5, "PERIOD_H1": 16385, "PERIOD_H4": 16388,

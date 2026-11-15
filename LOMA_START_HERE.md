@@ -64,12 +64,12 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 
 | Preset | Chart | Direction | Session (server time) | Trend filter | Backtest trades / PF | VT trades, Jun – Nov 6 | VT PF before commission / at $0.60 per lot | Dukascopy PF |
 |---|---|---|---|---|---|---|---|---|
-| `Loma_Top01` | M10 | both | 07:00-20:00 | H1 EMA 20 | 129 / 2.09 | 32 | 0.46 / 0.43 | 0.69 |
-| `Loma_Top02` | M3 | sell | all day | none | 143 / 1.98 | 48 | 1.04 / 0.91 | 0.77 |
+| `Loma_Top01` | M10 | both | 07:00-20:00 | H1 EMA 20 | 129 / 2.09 | 32 | 0.46 / 0.43 | 0.70 |
+| `Loma_Top02` | M3 | sell | all day | none | 143 / 1.98 | 48 | 1.04 / 0.91 | 0.81 |
 | `Loma_Top03` | M2 | sell | 12:00-20:00 | H1 EMA 20 | 117 / 2.03 | 44 | 0.77 / 0.69 | 0.83 |
-| `Loma_Top04` | M5 | both | 07:00-12:00 | H1 EMA 50 | 124 / 1.82 | 42 | 0.58 / 0.51 | 0.45 |
+| `Loma_Top04` | M5 | both | 07:00-12:00 | H1 EMA 50 | 124 / 1.82 | 42 | 0.58 / 0.51 | 0.46 |
 | `Loma_Top05` | M10 | buy | all day | M30 EMA 20 | 141 / 1.96 | 49 | 0.87 / 0.81 | 0.84 |
-| `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 32 | 0.72 / 0.64 | 0.62 |
+| `Loma_Top07` | M5 | buy | all day | H1 EMA 50 | 135 / 2.17 | 32 | 0.72 / 0.64 | 0.67 |
 
 **BTC** (`dist/Loma_BTCUSD_v1_34.zip`). Binance BTCUSDT one-minute data with an assumed $10 spread. Backtest: January 2025 – 15 May 2026. Out of sample: 16 May – 13 November 2026. Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission.
 
@@ -83,7 +83,7 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 ## Read before trading
 
 - **Broker server time:** sessions, `WeekendCloseTime` and `EndOfDayTime` are calibrated on a GMT+2 (winter) / GMT+3 (summer) clock. VT Markets matches. Shift all three if your broker's clock differs.
-- **VT Markets costs:** a 1.5-pip spread ($0.15 per ounce) and $0.60 commission per lot (1 lot = 1 ounce), as reported by the account owner: about $0.75 per ounce for a round trip. The VT Strategy Tester run used VT's real spread but charged $6 per lot, ten times the real commission. At $0.60 the run's loss shrinks from $8,914 to $1,664, but the unseen months still lose (PF 0.67). On the calibration data the presets score PF 1.60–1.92 at $0.60 and 0.53–0.97 at $6. On VT set `CommissionPerLot=0.6` (1.2 if the $0.60 is per side).
+- **VT Markets costs:** a 1.5-pip spread ($0.15 per ounce) and $0.60 commission per lot (1 lot = 1 ounce), as reported by the account owner: about $0.75 per ounce for a round trip. The VT Strategy Tester run used VT's real spread but charged $6 per lot, ten times the real commission. At $0.60 the run's loss shrinks from $8,914 to $1,664, but the unseen months still lose (PF 0.67). On the calibration data the presets score PF 1.60–1.92 at $0.60 and 0.53–0.97 at $6. On VT set `CommissionPerLot` in the account's currency: 0.6 on a USD account, 60 on a USC cent account (double it if the $0.60 is per side).
 - **Account size:** lots are rounded down to the broker's step, and with `SkipIfBelowMinLot=true` a trade whose lot would be below the minimum is skipped. With a 100-ounce gold contract (minimum 0.01 lot) and `RiskPercent=0.5`, use about $10,000 or more; on smaller balances the wide-stop trades are skipped.
 - **Several presets on one account** only on a **hedging** account. On a netting account every EA and manual trade on a symbol shares one position.
 - **News filter** (`UseNewsFilter`, on in the presets) was not in the backtest. It does nothing in the Strategy Tester, so tester results equal `UseNewsFilter=false`. Live, the presets skip entries within 30 minutes of high-impact USD news.
@@ -146,7 +146,7 @@ Backtest: FTMO XAUUSD one-minute data, January 2025 to May 2026, real spreads, r
 
 | Preset | Chart / trend filter | Session (server time) | Trades | PF | 2025 PF | 2026 PF |
 |---|---|---|---|---|---|---|
-| `Loma_Gold_M5_Buy_H1.set` | M5 buys / H1 | all day | 135 | 2.17 | 2.27 | 1.84 |
+| `Loma_Gold_M5_Buy_H1.set` | M5 buys / H1 | all day | 135 | 2.17 | 2.25 | 1.84 |
 | `Loma_Gold_M5_Buy_H4.set` | M5 buys / H4 | all day | 126 | 2.05 | 2.03 | 2.14 |
 | `Loma_Gold_M2_Sell_London_H1.set` | M2 sells / H1 | 07:00-12:00 | 116 | 2.22 | 2.30 | 2.00 |
 | `Loma_Gold_M3_Sell_H4.set` | M3 sells / H4 | 07:00-20:00 | 124 | 2.05 | 2.14 | 1.89 |
