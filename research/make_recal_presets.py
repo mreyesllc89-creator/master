@@ -4,8 +4,11 @@ Write EA presets (.set) for the picks of the per-timeframe re-calibration (hump_
 EA's own trailing stop (run 1, files cand_<TF>.pkl): the setups picked on Jan 2025 - May 15 2026 for the given
 timeframes, each with its in-sample and unseen (May 16 - Nov 13 2026) figures in the header.
 
+With RECAL_PRE_DIR=<directory of Binance zips for 2023-2024> (BTC only) each preset is also run on those two
+earlier years, which lie before the calibration data, and the result is written into the header and the CSV.
+
 Usage (repository root):
-  [HUMP_SYMBOL=BTCUSD] python3 research/make_recal_presets.py <recal_work_dir> <out_dir> <magic_base> <TF> [<TF> ...]
+  [HUMP_SYMBOL=BTCUSD] [RECAL_PRE_DIR=<dir>] python3 research/make_recal_presets.py <recal_work_dir> <out_dir> <magic_base> <TF> [<TF> ...]
 """
 import json, os, pickle, sys
 import numpy as np, pandas as pd
@@ -46,8 +49,23 @@ def ea_inputs(p, magic, comment):
     return o
 
 
+def earlier_market():
+    """BTC 2023-2024 from raw Binance zips, converted to server time once (None when RECAL_PRE_DIR is not set)."""
+    pre = os.environ.get("RECAL_PRE_DIR")
+    if not (BTC and pre):
+        return None
+    raw = R.read_binance_zips([pre])
+    m1 = raw.copy(); m1.index = R.utc_to_server(raw.index)
+    m1 = m1[~m1.index.duplicated()].sort_index()
+    R.clock_check(m1, "BTC 2023-2024")
+    return R.T2.MarketY(m1=m1, half_spread=np.full(len(m1), R.H.BTC_SPREAD / 2.0))
+
+
 def main():
     base = M.defaults(); names = {n for n, _ in base}
+    pre_mk = earlier_market()
+    years = {"2024": (np.datetime64("2024-01-01"), np.datetime64("2025-01-01")),
+             "2023": (np.datetime64("2023-01-15"), np.datetime64("2024-01-01"))}
     os.makedirs(OUT, exist_ok=True)
     rows = []; k = 0
     sym = "BTC" if BTC else "Gold"
@@ -67,6 +85,12 @@ def main():
             fams.add(fam); picked.append(int(i))
         pooled = np.concatenate([R.split(*Bs[i])[2] for i in picked]) if picked else np.zeros(0)
         pooled_s = np.concatenate([R.split(*Ss[i])[2] for i in picked]) if picked else np.zeros(0)
+        early = {}
+        if pre_mk is not None:
+            for i in picked:
+                c = dict(X.BASE); c.update(P[i])
+                df = pre_mk.run(X.engine_cfg(c)); t = df.entry_time.values.astype("datetime64[m]"); r = df.r.values.astype(float)
+                early[i] = {y: r[(t >= a) & (t < b)] for y, (a, b) in years.items()}
         for rank, i in enumerate(picked, 1):
             k += 1
             p = P[i]
@@ -85,6 +109,10 @@ def main():
                     f"; UNSEEN May 16 - Nov 13 2026 (never used to pick it): {len(oor)} trades, PF {R.pf(oor):.2f}, net {oor.sum():+.1f}R; "
                     f"stressed PF {R.pf(oos):.2f}. All {len(picked)} {tf} picks together: {len(pooled)} trades, PF {R.pf(pooled):.2f} "
                     f"(stressed {R.pf(pooled_s):.2f}).",
+                    *([f"; EARLIER DATA, before the calibration period: 2024 {len(early[i]['2024'])} trades, PF {R.pf(early[i]['2024']):.2f}; "
+                       f"2023 {len(early[i]['2023'])} trades, PF {R.pf(early[i]['2023']):.2f}. All {len(picked)} {tf} picks together: 2024 PF "
+                       f"{R.pf(np.concatenate([early[q]['2024'] for q in picked])):.2f}, 2023 PF {R.pf(np.concatenate([early[q]['2023'] for q in picked])):.2f}. "
+                       "The 2026 result did not repeat there: UNPROVEN."] if early else []),
                     ("; Data: Binance BTCUSDT M1 in broker server time, assumed spread 10 USD. Points are 0.01 USD: 2000 points = 20 USD."
                      if BTC else "; Data: FTMO XAUUSD M1 to May 15 2026, Dukascopy after; FTMO spread table."),
                     "; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer). Demo and Strategy Tester first.",
@@ -98,7 +126,10 @@ def main():
                              trailing=trail, max_hold_min=int(p["max_hold"]), eod_close=T.hhmm(p["eod"]) if p["eod"] >= 0 else "off",
                              in_sample_score=round(float(sc[i]), 2), in_sample_trades=len(isr), in_sample_pf=round(R.pf(isr), 2),
                              unseen_trades=len(oor), unseen_pf=round(R.pf(oor), 2), unseen_net_r=round(float(oor.sum()), 1),
-                             unseen_stress_pf=round(R.pf(oos), 2), magic=MAGIC + k))
+                             unseen_stress_pf=round(R.pf(oos), 2),
+                             **({"y2024_trades": len(early[i]["2024"]), "y2024_pf": round(R.pf(early[i]["2024"]), 2),
+                                 "y2023_trades": len(early[i]["2023"]), "y2023_pf": round(R.pf(early[i]["2023"]), 2)} if early else {}),
+                             magic=MAGIC + k))
     s = pd.DataFrame(rows)
     s.to_csv(os.path.join(OUT, f"{sym.upper()}_RECAL_PRESETS_SUMMARY.csv"), index=False)
     pd.set_option("display.width", 250)

@@ -2,7 +2,8 @@
 """Update the comment header of the Loma presets (version, out-of-sample results) without touching any input line,
 and add the out-of-sample columns to the two summary CSVs.
 Gold: results/loma_report_data.json (VT Markets MT5 + Dukascopy, Jun 1 - Nov 6 2026, six tested presets).
-BTC:  results/btc_oos/btc_oos_2026.json and btc_oos_2026_spread20.json (Binance, May 16 - Nov 13 2026).
+BTC:  nothing to do here. The BTC presets in presets/btc are written complete by make_recal_presets.py; the four
+      earlier ones (presets/btc_withdrawn) were calibrated on a wrong clock and are withdrawn.
 Usage (repository root): python3 research/annotate_loma_presets.py 1.34"""
 import glob, json, os, re, sys
 import pandas as pd
@@ -10,12 +11,6 @@ import pandas as pd
 VER = sys.argv[1]
 R = "research/results"
 gold = {p["preset"]: p for p in json.load(open(f"{R}/loma_report_data.json"))["presets"]}
-b10 = json.load(open(f"{R}/btc_oos/btc_oos_2026.json")); b20 = json.load(open(f"{R}/btc_oos/btc_oos_2026_spread20.json"))
-
-
-def btc(d, preset, variant):
-    return next(x for x in d["presets"] if x["preset"] == preset and x["variant"] == variant)
-
 
 def rewrite(path, new_head):
     lines = open(path).read().splitlines()
@@ -43,20 +38,6 @@ for path in sorted(glob.glob("presets/top10/Loma_Top*.set")):
     head = [h.replace("UNPROVEN: Strategy Tester (real ticks) and demo only.", "Strategy Tester and demo only.") for h in head]
     rewrite(path, head)
 
-for path in sorted(glob.glob("presets/btc/Loma_BTC*.set")):
-    key = re.search(r"(BTC\d\d)", path).group(1)
-    head = [l for l in open(path).read().splitlines() if l.startswith(";")]
-    head[0] = re.sub(r"v1\.\d\d", f"v{VER}", head[0])
-    head = [h for h in head if not h.startswith("; OUT OF SAMPLE")]
-    i = next(k for k, h in enumerate(head) if h.startswith("; Chosen with ALL the data"))
-    a, s, t = btc(b10, key, "base"), btc(b10, key, "stress"), btc(b20, key, "base")
-    head[i] = "; Chosen with ALL the data from Jan 2025 to May 15 2026: the figures above are in-sample."
-    head.insert(i + 1, f"; OUT OF SAMPLE May 16 - Nov 13 2026 (Binance BTCUSDT M1, never used for calibration): {a['oos_n']} trades, "
-                       f"PF {a['oos_pf']:.2f} ({a['oos_netR']:+.1f}R); harsh stress PF {s['oos_pf']:.2f}; 20 USD spread PF {t['oos_pf']:.2f}. "
-                       f"All four together PF {b10['all_four_base']['pf']:.2f}: no reliable edge, demo only.")
-    head = [h.replace("UNPROVEN: Strategy Tester (real ticks) and demo only.", "Strategy Tester and demo only.") for h in head]
-    rewrite(path, head)
-
 # the five original presets (repository only): no promise of live results, and no claim of an out-of-sample 2026
 for path in sorted(glob.glob("presets/Loma_Gold_*.set")):
     head = [l for l in open(path).read().splitlines() if l.startswith(";")]
@@ -81,14 +62,4 @@ for k, g in gold.items():
 for c in ("oos_vt_trades", "oos_dukascopy_trades"):
     s[c] = pd.to_numeric(s[c]).astype("Int64")                      # whole numbers, blank where not tested
 s.to_csv("presets/top10/TOP10_SUMMARY.csv", index=False)
-s = pd.read_csv("presets/btc/BTC_PRESETS_SUMMARY.csv")
-s = s[[c for c in s.columns if not c.startswith("oos_")]]
-for c in ["oos_trades", "oos_pf", "oos_net_r", "oos_stress_pf", "oos_pf_spread20"]:
-    s[c] = pd.NA
-for i, r in s.iterrows():
-    key = f"BTC{int(r['rank']):02d}"; a, st, t = btc(b10, key, "base"), btc(b10, key, "stress"), btc(b20, key, "base")
-    s.loc[i, ["oos_trades", "oos_pf", "oos_net_r", "oos_stress_pf", "oos_pf_spread20"]] = \
-        [a["oos_n"], round(a["oos_pf"], 2), round(a["oos_netR"], 1), round(st["oos_pf"], 2), round(t["oos_pf"], 2)]
-s["oos_trades"] = pd.to_numeric(s["oos_trades"]).astype("Int64")
-s.to_csv("presets/btc/BTC_PRESETS_SUMMARY.csv", index=False)
 print("done")

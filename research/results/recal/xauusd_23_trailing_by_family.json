@@ -178,7 +178,7 @@
    "eligible": 1905,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8750672636558712
+   "all_eligible_oos_pf": 0.8673224654720616
   },
   {
    "symbol": "XAUUSD",
@@ -402,10 +402,10 @@
    "eligible": 1632,
    "is_ge_1_3": 2,
    "picked": 2,
-   "all_eligible_oos_pf": 0.8514796918482341,
+   "all_eligible_oos_pf": 0.8449906715122665,
    "oos_n": 139,
-   "oos_pf": 0.7144101705393432,
-   "oos_stress_pf": 0.7022781543195762,
+   "oos_pf": 0.7008421483757836,
+   "oos_stress_pf": 0.6889404331754905,
    "passes": false
   },
   {
@@ -720,10 +720,10 @@
    "eligible": 1546,
    "is_ge_1_3": 2,
    "picked": 2,
-   "all_eligible_oos_pf": 0.7945546623776627,
+   "all_eligible_oos_pf": 0.7872813269548773,
    "oos_n": 104,
-   "oos_pf": 0.970128535196699,
-   "oos_stress_pf": 0.8803738060974351,
+   "oos_pf": 0.9485768110587679,
+   "oos_stress_pf": 0.8715440451761152,
    "passes": false
   },
   {
@@ -1036,13 +1036,13 @@
    "kind": "partial",
    "setups": 3033,
    "eligible": 1245,
-   "is_ge_1_3": 2,
-   "picked": 2,
-   "all_eligible_oos_pf": 0.9338643267424639,
-   "oos_n": 156,
-   "oos_pf": 1.600201861263024,
-   "oos_stress_pf": 1.40708192732002,
-   "passes": true
+   "is_ge_1_3": 1,
+   "picked": 1,
+   "all_eligible_oos_pf": 0.9273594495663003,
+   "oos_n": 37,
+   "oos_pf": 2.0287605536241964,
+   "oos_stress_pf": 1.4712879987837468,
+   "passes": false
   },
   {
    "symbol": "XAUUSD",
@@ -1426,7 +1426,7 @@
    "eligible": 648,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 1.1052793778211663
+   "all_eligible_oos_pf": 1.094545269722014
   },
   {
    "symbol": "XAUUSD",
@@ -1754,7 +1754,7 @@
    "eligible": 330,
    "is_ge_1_3": 2,
    "picked": 2,
-   "all_eligible_oos_pf": 0.8099694487545553,
+   "all_eligible_oos_pf": 0.8068494483414415,
    "oos_n": 74,
    "oos_pf": 1.0023852211034587,
    "oos_stress_pf": 0.911228215352694,
@@ -2050,7 +2050,7 @@
    "eligible": 85,
    "is_ge_1_3": 0,
    "picked": 0,
-   "all_eligible_oos_pf": 0.8421952697532948
+   "all_eligible_oos_pf": 0.8413688035336278
   },
   {
    "symbol": "XAUUSD",
@@ -2414,9 +2414,9 @@
    "symbol": "XAUUSD",
    "tf": "ALL",
    "kind": "partial",
-   "oos_n": 473,
-   "oos_pf": 1.077420587405111,
-   "oos_stress_pf": 0.9861860924062325
+   "oos_n": 354,
+   "oos_pf": 0.9125140787343908,
+   "oos_stress_pf": 0.83574059843376
   },
   {
    "symbol": "XAUUSD",

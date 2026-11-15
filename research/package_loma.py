@@ -67,9 +67,9 @@ for c in ("oos_vt_trades", "oos_dukascopy_trades"):
 z1 = build(f"Loma_XAUUSD_v{TAG}", gold_sets, "packages/loma_xauusd/START_HERE.md",
            {"GOLD_PRESETS_SUMMARY.csv": s, "Loma_OOS_Review.html": "research/reports/loma_oos_review.html"})
 btc_sets = sorted(os.path.join("presets/btc", f) for f in os.listdir("presets/btc") if f.endswith(".set"))
-assert len(btc_sets) == 4
+assert btc_sets, "no BTC presets"
 z2 = build(f"Loma_BTCUSD_v{TAG}", btc_sets, "packages/loma_btcusd/START_HERE.md",
-           {"BTC_PRESETS_SUMMARY.csv": "presets/btc/BTC_PRESETS_SUMMARY.csv",
+           {"BTC_PRESETS_SUMMARY.csv": "presets/btc/BTC_RECAL_PRESETS_SUMMARY.csv",
             "Loma_OOS_Review.html": "research/reports/loma_oos_review.html"})
 shutil.rmtree(BUILD)
 for z in (z1, z2):

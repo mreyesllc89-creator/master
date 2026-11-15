@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 """
+SUPERSEDED. The BTC data this script ran on was already in broker server time and hump_engine.load_btc converted
+it again, so the calibration behind BTC01-04 ran 2-3 hours off the broker clock. Those presets are withdrawn
+(presets/btc_withdrawn); the BTC presets now come from hump_tf_recal.py + make_recal_presets.py on a corrected
+series. Kept for the record only.
+
 Write presets/btc/*.set for XAUUSD_Loma_TrendPullback.mq5 on BTCUSD: the setups of
 research/results/hump_btc_pool_ranked.csv that stay at PF >= 1.3 on all six measures (whole period, worse
 half-year of 2025, 2026, and the same three under harsh stress), one per family. Run from the repository

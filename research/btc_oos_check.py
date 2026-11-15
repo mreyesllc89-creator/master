@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
-"""Out-of-sample check of the four Loma BTCUSD presets on Binance BTCUSDT M1 after the calibration data
+"""SUPERSEDED AND WRONG. This script appended raw Binance (UTC) bars to a calibration file that was already in
+server time; hump_engine.load_btc then converted everything once more, so the calibration part ran 2-3 hours
+ahead of the out-of-sample part and 3 hours of prices were missing at the seam. Its results
+(results/btc_oos/) compare setups on two different clocks and are invalid. Use hump_tf_recal.py, which builds
+the BTC series from the raw UTC files and checks its clock. Kept for the record only.
+
+Out-of-sample check of the four Loma BTCUSD presets on Binance BTCUSDT M1 after the calibration data
 (which ended 2026-05-15 23:59 UTC). Appends the new monthly/daily Binance zips to the calibration CSV so the
 warm-up is identical, then reports in-sample (to compare with presets/btc/BTC_PRESETS_SUMMARY.csv) and
 out-of-sample results, base and harsh stress, plus a monthly breakdown.

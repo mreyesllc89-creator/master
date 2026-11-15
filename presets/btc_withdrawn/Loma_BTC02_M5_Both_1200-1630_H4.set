@@ -1,3 +1,4 @@
+; WITHDRAWN - DO NOT USE: calibrated on a BTC price file whose clock was 2-3 hours off the broker's server time (see WITHDRAWN.md). The figures below are invalid.
 ; XAUUSD_Loma_TrendPullback v1.34 on BTCUSD - rank 2: M5 both, session 1200-1630 server time, trend filter H4. DO NOT LOAD ON GOLD.
 ; Backtest Jan 2025-May 2026 (Binance BTCUSDT M1, assumed spread 10 USD, risk-% sizing): 129 trades, PF 2.22, net +29R, max drawdown 2.0R. 2025 worse half-year PF 2.05; 2026 PF 2.80 (34 trades).
 ; Harsh stress (1 min late, pessimistic trailing, 3 USD slippage, 2 USD commission): PF 1.64; 2025 worse half 1.54; 2026 PF 1.98.

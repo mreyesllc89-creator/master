@@ -71,8 +71,8 @@
   "rule": "top 50 by score",
   "picked": 50,
   "oos_n": 3513,
-  "oos_pf": 0.7309187066627494,
-  "oos_stress_pf": 0.6797857134595795,
+  "oos_pf": 0.730347704034691,
+  "oos_stress_pf": 0.6792322736783789,
   "passes": false
  },
  {

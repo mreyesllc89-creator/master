@@ -82,24 +82,38 @@ def utc_to_server(index):
 
 
 def clock_check(m1, label):
-    """The US stock open (09:30 New York = 16:30 server time) is the busiest half hour of the day on gold and on
-    BTC. Stop when it is anywhere else in any quarter: the series is then not in server time (a BTC file that was
-    already in server time was once converted a second time, which put the calibration 2-3 hours off)."""
-    rng = (m1["high"] - m1["low"])
-    slot = m1.index.hour * 60 + (m1.index.minute // 30) * 30
+    """The US stock open (09:30 New York = 16:30 server time) lifts activity on gold and on BTC every weekday, at
+    that exact minute. For each half-past mark from 13:30 to 19:30 the median one-minute range of the five minutes
+    after it is compared with the five minutes before it; the largest jump must be at 16:30 in at least two
+    thirds of the quarters (a quarter full of 08:30 New York data releases can put 15:30 first). A
+    series on another clock (a BTC file already in server time was once converted a second time, which put the
+    calibration 2-3 hours off) has its jump elsewhere and stops the build."""
+    rng = (m1["high"] - m1["low"]).values
+    mod = (m1.index.hour * 60 + m1.index.minute).values
     q = m1.index.to_period("Q")
-    wd = m1.index.dayofweek < 5
-    bad = []
+    wd = (m1.index.dayofweek < 5)
+    bad = []; tested = 0
     for quarter in sorted(set(q)):
-        mask = (q == quarter) & wd
+        mask = np.asarray(q == quarter) & np.asarray(wd)
         if mask.sum() < 20000:
             continue
-        top = rng[mask].groupby(slot[mask]).median().idxmax()        # median: a few news days must not decide
-        if top != 16 * 60 + 30:
-            bad.append((str(quarter), f"{top // 60:02d}:{top % 60:02d}"))
-    if bad:
-        raise SystemExit(f"{label}: the busiest half hour is not 16:30 server time in {bad}: wrong clock")
-    print(f"{label}: clock check passed (US open at 16:30 server time in every quarter)")
+        r, t = rng[mask], mod[mask]
+        best, best_t = 0.0, None
+        for mark in range(13 * 60 + 30, 19 * 60 + 31, 60):          # 13:30 ... 19:30: three hours either side
+            after = r[(t >= mark) & (t < mark + 5)]; before = r[(t >= mark - 5) & (t < mark)]
+            if len(after) < 50 or len(before) < 50 or np.median(before) <= 0:
+                continue
+            jump = np.median(after) / np.median(before)
+            if jump > best:
+                best, best_t = jump, mark
+        tested += 1
+        if best_t != 16 * 60 + 30:
+            bad.append((str(quarter), f"{best_t // 60:02d}:{best_t % 60:02d}"))
+    # a quarter with many 08:30 New York data releases can put 15:30 first; a wrong clock moves nearly all quarters
+    if tested == 0 or len(bad) > 0.34 * tested:
+        raise SystemExit(f"{label}: the US-open jump is not at 16:30 server time in {bad} ({len(bad)} of {tested} quarters): wrong clock")
+    print(f"{label}: clock check passed (US-open jump at 16:30 server time in {tested - len(bad)} of {tested} quarters"
+          + (f"; elsewhere in {bad}" if bad else "") + ")")
 
 
 def build(work, src=None):

@@ -1,0 +1,67 @@
+; XAUUSD_Loma_TrendPullback v1.34 on BTCUSD - re-calibration pick 2 of 4 for M5: sell, session 0700-2000 server time, trend filter M15, trailing from 1.5R, 0.5R behind. DO NOT LOAD ON GOLD.
+; Picked on Jan 2025 - May 15 2026 only (lowest of six profit factors, normal and stressed costs: 1.39): 102 trades, PF 1.54, stressed 1.44.
+; UNSEEN May 16 - Nov 13 2026 (never used to pick it): 38 trades, PF 1.50, net +8.9R; stressed PF 1.38. All 4 M5 picks together: 133 trades, PF 1.42 (stressed 1.37).
+; EARLIER DATA, before the calibration period: 2024 59 trades, PF 1.17; 2023 83 trades, PF 0.85. All 4 M5 picks together: 2024 PF 0.79, 2023 PF 0.83. The 2026 result did not repeat there: UNPROVEN.
+; Data: Binance BTCUSDT M1 in broker server time, assumed spread 10 USD. Points are 0.01 USD: 2000 points = 20 USD.
+; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer). Demo and Strategy Tester first.
+; UseNewsFilter was not in the backtest.
+MagicNumber=26113402
+TradeComment=LOMA_BM5_02
+TradeDirection=1
+AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
+ShowStatusPanel=true
+MarkSignals=true
+ShowHumpLabels=true
+TriggerTimeframe=5
+MACD_Fast=16
+MACD_Slow=35
+MACD_Signal=9
+Stoch_K=5
+Stoch_Slowing=1
+Stoch_D=7
+HumpWarmupBars=3000
+BigHumpHistory=40
+BigHumpMultiplier=1.25
+BigHumpMinBars=5
+RequireStochLevel=false
+StochLow=20.0
+StochHigh=80.0
+TrendBreakRatio=0.6
+MaxSignalsPerBigHump=99
+TrendMaxBars=80
+PullbackMinBars=2
+PullbackMaxRatio=0.25
+SkipBigPullback=true
+SL_Buffer_Points=1000
+TP_Mode=1
+TP_Anticipation=0.1
+TP_RR=1.5
+MinRewardRisk=1.0
+MinSL_Points=3500
+MaxSL_Points=0
+UseHTFFilter=true
+HTF_Timeframe=15
+HTF_EMA_Period=200
+RiskPercent=0.5
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
+CommissionPerLot=0.0
+MaxSpread_Points=3000
+MaxSlippage_Points=1000
+MaxEntryDelaySeconds=0
+TrailStartR=1.5
+TrailDistanceR=0.5
+TrailStep_Points=200
+UseTradingHours=true
+TradingHoursStart=07:00
+TradingHoursEnd=20:00
+CloseBeforeWeekend=false
+WeekendCloseTime=23:00
+UseNewsFilter=true
+NewsCurrency=USD
+NewsWindowMinutes=30
+MaxHoldMinutes=1440
+CloseAtEndOfDay=true
+EndOfDayTime=21:00

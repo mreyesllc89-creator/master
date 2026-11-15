@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 """
+SUPERSEDED by pretest_picks.py. The picks this script tested came from a BTC series with a clock error (see
+hump_tf_recal.clock_check), so results/recal/btcusd_picks_on_2023_2024.json is invalid.
+
 Second independent test of the BTC re-calibration picks: Binance BTCUSDT M1 of 2023 and 2024, which
 come BEFORE the calibration data (Jan 2025 - May 15 2026) and were never used for anything.
 

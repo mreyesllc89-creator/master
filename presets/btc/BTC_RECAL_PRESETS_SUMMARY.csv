@@ -1,0 +1,5 @@
+file,timeframe,rank,direction,session,trend_filter,htf_ema,macd,target,trailing,max_hold_min,eod_close,in_sample_score,in_sample_trades,in_sample_pf,unseen_trades,unseen_pf,unseen_net_r,unseen_stress_pf,y2024_trades,y2024_pf,y2023_trades,y2023_pf,magic
+Loma_BTC_M5_R01_Both_0700-1200_NoFilter,M5,1,Both,0700-1200,none,50,12-26,previous hump,off,480,21:00,1.59,77,1.99,31,1.64,8.1,1.74,78,0.76,74,0.79,26113401
+Loma_BTC_M5_R02_Sell_0700-2000_M15,M5,2,Sell,0700-2000,M15,200,16-35,1.5R,"from 1.5R, 0.5R behind",1440,21:00,1.39,102,1.54,38,1.5,8.9,1.38,59,1.17,83,0.85,26113402
+Loma_BTC_M5_R03_Both_1200-1630_H1,M5,3,Both,1200-1630,H1,200,16-35,1.5R,"from 1.0R, 1.0R behind",120,22:00,1.37,85,1.76,28,0.74,-3.3,0.79,80,0.73,59,0.67,26113403
+Loma_BTC_M5_R04_Sell_1200-2000_NoFilter,M5,4,Sell,1200-2000,none,100,10-22,1.5R,"from 1.0R, 1.0R behind",480,21:00,1.34,103,1.63,36,1.79,9.7,1.6,59,0.52,75,0.96,26113404
