@@ -22,6 +22,10 @@ TFS = ["M1", "M2", "M3", "M5", "M10", "M15", "M30", "H1"]
 m5 = F["btc_m5"]
 
 
+def f2_(x):
+    return f"{x:.2f}"
+
+
 def join(items):
     items = list(items)
     return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
@@ -82,6 +86,26 @@ set_line("packages/loma_xauusd/START_HERE.md", "- **Re-calibration per timeframe
          f"- **Re-calibration per timeframe (15 November 2026):** {gold_recal} The tables are in `Loma_OOS_Review.html`, section 5.")
 set_line("packages/loma_btcusd/START_HERE.md", "<!--BTC23-->" if "<!--BTC23-->" in open("packages/loma_btcusd/START_HERE.md").read() else "- **With 23 trailing systems",
          btc_bullet)
+# ---- the year-by-year test and the trailing presets (status lines of the full guide and the README)
+if os.path.exists("research/results/wf/wf_facts.json"):
+    WF = json.load(open("research/results/wf/wf_facts.json"))
+    DETW = json.load(open("research/results/wf/btcusd_M30_xlzc_stoch_detail.json"))
+    SUMW = json.load(open("research/results/wf/btcusd_wf_summary.json"))
+    cellw = next(r for r in SUMW["rows"] if r["tf"] == "M30" and r["condition"] == "xlzc_stoch")
+    assert WF["XAUUSD"]["passed"] == 0 and cellw["passes"]
+    aw = DETW["all_unseen_years"]; finw = cellw["final"]
+    yrs = ", ".join(f"{f2_(y['pf'])} in {y['year']}" for y in cellw["by_year"] if y["n"])
+    wf_line = (f"the method was set up on three years and traded on the next, rolling forward (gold 2016 – 2025, BTC 2021 – 2025), with 59 entry "
+               f"conditions tried one at a time. Gold: nothing passed. BTC: one result passed, M30 with the Stochastic turn rule: {yrs}; the 2026 months, "
+               f"kept back and checked once, {f2_(finw['pf'])} on {finw['n']} trades; all four unseen years {f2_(aw['pf'])} on {aw['n']} trades. Its setups for "
+               f"the year ahead are in the BTC zip (EA v1.35); demo first.")
+    t15_line = ("the 15 combinations of timeframe and trailing system that reached a profit factor of 1.3 on the 2026 months (4 gold, 11 BTC) are in the "
+                "zips as presets (v1.35). None reached 1.3 on the earlier data: unproven, Strategy Tester and demo only.")
+    set_line("LOMA_START_HERE.md", "> - **Year by year", f"> - **Year by year (15 November 2026):** {wf_line}")
+    set_line("LOMA_START_HERE.md", "> - **Trailing presets", f"> - **Trailing presets:** {t15_line}")
+    set_line("README.md", "- **Year by year", f"- **Year by year (15 November 2026):** {wf_line} See `research/reports/loma_oos_review.html`, section 6.")
+    set_line("README.md", "- **Trailing presets", f"- **Trailing presets:** {t15_line}")
+
 set_line("LOMA_START_HERE.md", "> - **BTC:**", f"> - **BTC:** {btc_status}")
 set_line("LOMA_START_HERE.md", "> - **Re-calibration", f"> - **Re-calibration (15 November 2026):** {recal_status}")
 set_line("README.md", "- **BTC:**", f"- **BTC:** {btc_status}")
@@ -110,7 +134,7 @@ open("packages/loma_btcusd/START_HERE.md", "w", encoding="utf-8").write(g)
 
 a = open("LOMA_START_HERE.md", encoding="utf-8").read()
 i = a.index("**BTC** (`dist/Loma_BTCUSD"); j = a.index("\n## ", i)
-a = a[:i] + ("**BTC** (`dist/Loma_BTCUSD_v1_34.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. "
+a = a[:i] + ("**BTC** (`dist/Loma_BTCUSD_v1_35.zip`). Four M5 presets from the re-calibration. Binance BTCUSDT one-minute data in broker server time with an assumed $10 spread. "
              "Picked on January 2025 – 15 May 2026; unseen: 16 May – 13 November 2026; 2024 and 2023 lie before the calibration data. "
              "Stress = entry one minute late, pessimistic trailing, $3 slippage and $2 commission per BTC.\n\n" + table_long + "\n") + a[j:]
 open("LOMA_START_HERE.md", "w", encoding="utf-8").write(a)

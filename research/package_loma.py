@@ -64,13 +64,25 @@ s = pd.read_csv("presets/top10/TOP10_SUMMARY.csv")
 s = s[s["rank"].isin([int(g[3:]) for g in GOLD])].copy()
 for c in ("oos_vt_trades", "oos_dukascopy_trades"):
     s[c] = s[c].astype("Int64")                                   # whole numbers (blank rows made them float)
-z1 = build(f"Loma_XAUUSD_v{TAG}", gold_sets, "packages/loma_xauusd/START_HERE.md",
-           {"GOLD_PRESETS_SUMMARY.csv": s, "Loma_OOS_Review.html": "research/reports/loma_oos_review.html"})
-btc_sets = sorted(os.path.join("presets/btc", f) for f in os.listdir("presets/btc") if f.endswith(".set"))
+def sets_in(folder):
+    return sorted(os.path.join(folder, f) for f in os.listdir(folder) if f.endswith(".set")) if os.path.isdir(folder) else []
+
+
+gold_t15 = sets_in("presets/trailing15/gold")
+extra_gold = {"GOLD_TRAILING15_SUMMARY.csv": "presets/trailing15/gold/GOLD_TRAILING15_SUMMARY.csv"} if gold_t15 else {}
+z1 = build(f"Loma_XAUUSD_v{TAG}", gold_sets + gold_t15, "packages/loma_xauusd/START_HERE.md",
+           dict({"GOLD_PRESETS_SUMMARY.csv": s, "Loma_OOS_Review.html": "research/reports/loma_oos_review.html"}, **extra_gold))
+btc_sets = sets_in("presets/btc")
 assert btc_sets, "no BTC presets"
-z2 = build(f"Loma_BTCUSD_v{TAG}", btc_sets, "packages/loma_btcusd/START_HERE.md",
-           {"BTC_PRESETS_SUMMARY.csv": "presets/btc/BTC_RECAL_PRESETS_SUMMARY.csv",
-            "Loma_OOS_Review.html": "research/reports/loma_oos_review.html"})
+btc_wf, btc_t15 = sets_in("presets/btc_wf"), sets_in("presets/trailing15/btc")
+extra_btc = {}
+if btc_wf:
+    extra_btc["BTC_WF_M30_SUMMARY.csv"] = "presets/btc_wf/BTC_WF_M30_xlzc_stoch_SUMMARY.csv"
+if btc_t15:
+    extra_btc["BTC_TRAILING15_SUMMARY.csv"] = "presets/trailing15/btc/BTC_TRAILING15_SUMMARY.csv"
+z2 = build(f"Loma_BTCUSD_v{TAG}", btc_wf + btc_sets + btc_t15, "packages/loma_btcusd/START_HERE.md",
+           dict({"BTC_PRESETS_SUMMARY.csv": "presets/btc/BTC_RECAL_PRESETS_SUMMARY.csv",
+                 "Loma_OOS_Review.html": "research/reports/loma_oos_review.html"}, **extra_btc))
 shutil.rmtree(BUILD)
 for z in (z1, z2):
     print(z)

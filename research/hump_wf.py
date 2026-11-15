@@ -15,6 +15,11 @@ Protocol (fixed before any result was looked at):
   costs     base   XAUUSD: VT Markets, 0.15 spread (with the usual widening by hour) + 0.60 commission per ounce.
                    BTCUSD: 10 USD spread, no commission.
             stress entry one minute late, pessimistic trailing, slippage 0.10 / 3 USD, extra commission 0.07 / 2 USD.
+  rules     as hump_engine.simulate, with three corrections found by the audit of this module: the gold weekend
+            close is the EA's (Friday from 23:00 server time, and at the next open when that moment fell in a closure;
+            a mid-week holiday closure is not known in advance, so a trade stays open over it); no entry on the first
+            bar after a break of 30 minutes or more (its spread is several times the normal one); a reward exactly
+            equal to the minimum reward is accepted (it was decided by floating-point rounding).
   setups    N random setups per timeframe from the calibration space of hump_search (EA's own trailing), with
             two larger minimum-stop values added so that setups can avoid stops that are small next to the cost.
   condition each setup is simulated once for all its signals; every entry condition is then applied as a mask
@@ -167,7 +172,18 @@ class Mk(H.Market):
         y = m1.index.year.values
         self.y0 = int(y.min()); self.years = list(range(self.y0, int(y.max()) + 1))
         self.year = (y - self.y0).astype(np.int64)
-        self.wk_gold = ((self.dow == 4) & (self.tod >= 1380)) | self.pre_gap
+        # The EA closes from Friday 23:00 server time and, when that moment passed while the market was closed (an
+        # early Friday close), on the first tick after it. It cannot know a mid-week holiday closure in advance, so a
+        # trade stays open over it. (hump_engine uses the last bar before any closure of a day or more: look-ahead.)
+        self.wk_gold = (self.dow == 4) & (self.tod >= 1380)
+        tmin = self.t.astype("datetime64[m]").astype(np.int64)
+        day = tmin // 1440; dw = (day + 3) % 7                       # 1970-01-01 was a Thursday: Monday = 0
+        fri = (day - ((dw - 4) % 7)) * 1440 + 1380                    # the latest Friday 23:00 at or before each bar
+        fri = np.where(tmin >= fri, fri, fri - 7 * 1440)
+        prev = np.r_[-10 ** 12, tmin[:-1]]
+        self.wko_gold = (prev < fri) & (tmin > fri) & ~self.wk_gold    # first bar after a Friday 23:00 that had no bar
+        self.wko_gold[0] = False                                       # (the first bar of the data has no bar before it)
+        self.after_break = (tmin - prev) >= 30
         self.wk_none = np.zeros(len(self.t), np.bool_)
         self._feat = {}
 
@@ -181,11 +197,16 @@ class Mk(H.Market):
 # ----------------------------------------------------------------------------- engine without the one-position rule
 @nb.njit(cache=True)
 def outcomes(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, tp_mode, tp_rr,
-             trail_start, trail_dist, min_risk, max_risk, slip, comm, delay, trail_worst, wk, max_hold, eod, ps):
+             trail_start, trail_dist, min_risk, max_risk, slip, comm, delay, trail_worst, wk, max_hold, eod, ps,
+             wko, after_break, rr_tol):
     """hump_engine.simulate (hump stop, target at the previous hump or a multiple of the risk, the EA's own
     trailing) for EVERY signal on its own: no one-position rule and no spread limit. buf, min_risk, max_risk, slip
     and comm are multiplied by ps at the entry bar. Rows: signal index, entry row, exit row, side, R, risk,
-    round-trip cost (spread + commission) in R."""
+    round-trip cost (spread + commission) in R.
+    wk: no entry on these bars, and an open trade is closed at their close (the EA's Friday window).
+    wko: an open trade is closed at the open of these bars (the EA's catch-up when the Friday close was missed).
+    after_break: no entry on these bars (the first bar after a break of 30 minutes or more).
+    rr_tol: relative tolerance of the reward test (a reward equal to min_rr x risk is accepted)."""
     n = len(o)
     out = np.empty((len(sig), 7))
     m = 0
@@ -197,7 +218,7 @@ def outcomes(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
             continue
         if not (s0 <= tod[e] < s1) if s0 < s1 else not (tod[e] >= s0 or tod[e] < s1):
             continue
-        if wk[e]:
+        if wk[e] or after_break[e]:
             continue
         sc = ps[e]
         bufk = buf * sc; slipk = slip * sc; commk = comm * sc
@@ -215,11 +236,13 @@ def outcomes(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
                 tp = ref + anticip * (entry - ref) + hs[e]
             else:
                 tp = entry - tp_rr * risk
-            if entry - tp < min_rr * risk:
+            if entry - tp < min_rr * risk * (1.0 - rr_tol):
                 continue
             stop = sl; px = np.nan; j = e
             while j < n:
                 ah = h[j] + hs[j]; al = l[j] + hs[j]; ao = o[j] + hs[j]
+                if wko[j] and j > e:
+                    px = ao + slipk; break
                 if ao >= stop:
                     px = ao + slipk; break
                 if ah >= stop:
@@ -254,11 +277,13 @@ def outcomes(sig, entry_row, o, h, l, c, hs, tod, s0, s1, buf, anticip, min_rr, 
                 tp = ref - anticip * (ref - entry) - hs[e]
             else:
                 tp = entry + tp_rr * risk
-            if tp - entry < min_rr * risk:
+            if tp - entry < min_rr * risk * (1.0 - rr_tol):
                 continue
             stop = sl; px = np.nan; j = e
             while j < n:
                 bh = h[j] - hs[j]; bl = l[j] - hs[j]; bo = o[j] - hs[j]
+                if wko[j] and j > e:
+                    px = bo - slipk; break
                 if bo <= stop:
                     px = bo - slipk; break
                 if bl <= stop:
@@ -561,13 +586,21 @@ def prepare(p):
     return c, sg, ix, row[ix]
 
 
-def run_outcomes(c, sg, er, cost):
+def run_outcomes(c, sg, er, cost, parity=False):
+    """parity=True: the rules of hump_engine.simulate (weekend array with closures known in advance, no break rule,
+    strict reward test), for the parity self-test only."""
     s0, s1 = H.SESSIONS[c["session"]]
-    wk = MK.wk_gold if c["weekend_close"] else MK.wk_none
+    if parity:
+        wk = (((MK.dow == 4) & (MK.tod >= 1380)) | MK.pre_gap) if c["weekend_close"] else MK.wk_none
+        wko = MK.wk_none; brk = MK.wk_none; tol = 0.0
+    else:
+        wk = MK.wk_gold if c["weekend_close"] else MK.wk_none
+        wko = MK.wko_gold if c["weekend_close"] else MK.wk_none
+        brk = MK.after_break; tol = 1e-9
     return outcomes(sg, er, MK.o, MK.h, MK.l, MK.c, MK.hs, MK.tod, s0, s1, float(c["buf"]), float(c["anticip"]), float(c["min_rr"]),
                     int(c["tp_mode"]), float(c["tp_rr"]), float(c["trail_start"]), float(c["trail_dist"]), float(c["min_risk"]),
                     float(c["max_risk"]), float(cost["slip"]), float(cost["comm"]), int(cost["delay"]), int(cost["trail_worst"]),
-                    wk, int(c["max_hold"]), int(c["eod"]), MK.ps)
+                    wk, int(c["max_hold"]), int(c["eod"]), MK.ps, wko, brk, tol)
 
 
 def masks_of(tf, ix, s, er):
@@ -769,7 +802,7 @@ def detail(work, tf, key, out_json):
     BTC the same picks at a flat spread in dollars."""
     (base, stress), P = unseen_trades(work, tf, key)
     last = int(base.year.max())
-    res = dict(symbol=SYM, tf=tf, condition=key, text=CONDS[KEYS.index(key)][2], final_year=last)
+    res = dict(symbol=SYM, tf=tf, condition=key, text=CONDS[KEYS.index(key)][2], final_year_number=last)
     for name, df in (("walk_forward", base[base.year < last]), ("final_year", base[base.year == last]), ("all_unseen_years", base)):
         r = df.r.values.astype(float)
         res[name] = dict(describe(r), stress=describe(stress[stress.year.isin(df.year.unique())].r.values),
@@ -816,11 +849,11 @@ def selftest(work):
             p = candidates(tf, 400)[rng.randrange(400)]
             c, sg, ix, er = prepare(p)
             for cost in COSTS + (dict(slip=0.05, comm=0.03, delay=2, trail_worst=1),):
-                out = run_outcomes(c, sg, er, cost)
+                out = run_outcomes(c, sg, er, cost, parity=True)
                 idx = take(out[:, 1].astype(np.int64), out[:, 2].astype(np.int64), np.ones(len(out), np.bool_))
                 mine = out[idx][:, 1:6]
                 s0, s1 = H.SESSIONS[c["session"]]
-                wk = MK.wk_gold if c["weekend_close"] else MK.wk_none
+                wk = (((MK.dow == 4) & (MK.tod >= 1380)) | MK.pre_gap) if c["weekend_close"] else MK.wk_none
                 ref = H.simulate(sg, er, MK.o, MK.h, MK.l, MK.c, MK.hs, MK.tod, s0, s1, c["buf"], c["anticip"], c["min_rr"], int(c["tp_mode"]),
                                  c["tp_rr"], c["trail_start"], c["trail_dist"], 1e18, c["min_risk"], c["max_risk"], cost["slip"], cost["comm"],
                                  int(cost["delay"]), int(cost["trail_worst"]), wk, 0, 0.0, 0.0, 0, int(c["max_hold"]), int(c["eod"]))
@@ -829,6 +862,21 @@ def selftest(work):
         print(f"engine parity: 360 runs, {n_tr} trades identical to hump_engine.simulate")
     finally:
         MK.ps = ps
+    # the production rules: the weekend arrays are what the EA can know
+    if not BTC:
+        fri = MK.wk_gold; wko = MK.wko_gold
+        assert not (fri & ~((MK.dow == 4) & (MK.tod >= 1380))).any()
+        t = pd.DatetimeIndex(MK.t)
+        for j in np.where(wko)[0][:400]:
+            prev = t[j - 1]; cur = t[j]
+            last_fri = cur.normalize() - pd.Timedelta(days=(cur.dayofweek - 4) % 7) + pd.Timedelta(hours=23)
+            if cur < last_fri:
+                last_fri -= pd.Timedelta(days=7)
+            assert prev < last_fri < cur, (prev, cur, last_fri)
+        print(f"weekend rule: {int(fri.sum())} Friday-window bars; {int(wko.sum())} catch-up closes after a missed Friday close, all checked")
+    gaps = np.diff(MK.t.astype("datetime64[m]").astype(np.int64))
+    assert int(MK.after_break[1:].sum()) == int((gaps >= 30).sum())
+    print(f"break rule: no entry on {int(MK.after_break.sum())} bars that follow a break of 30 minutes or more")
     n_cmp = 0
     for q in range(40):
         tf = rng.choice(["M5", "M15", "H1"])

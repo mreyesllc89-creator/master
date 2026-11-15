@@ -23,9 +23,14 @@ ea_src = open(EA, "rb").read()
 inputs = re.findall(r"^input\s+\w+\s+(\w+)\s*=", ea_src.decode("utf-8"), re.M)
 need(len(inputs) == len(set(inputs)) and len(inputs) >= 50, f"EA inputs: {len(inputs)} found, {len(set(inputs))} distinct")
 
+def count_sets(*folders):
+    return sum(len([f for f in os.listdir(d) if f.endswith(".set")]) for d in folders if os.path.isdir(d))
+
+
 for sym, n_sets, guide, name_pat, other in (
-        ("XAUUSD", 6, "packages/loma_xauusd/START_HERE.md", r"Loma_Top\d\d_Gold_", "BTC"),
-        ("BTCUSD", 4, "packages/loma_btcusd/START_HERE.md", r"Loma_BTC_M5_R\d\d_", "Gold")):
+        ("XAUUSD", 6 + count_sets("presets/trailing15/gold"), "packages/loma_xauusd/START_HERE.md", r"Loma_(Top\d\d_Gold_|T15_Gold_)", "BTC"),
+        ("BTCUSD", count_sets("presets/btc", "presets/btc_wf", "presets/trailing15/btc"), "packages/loma_btcusd/START_HERE.md",
+         r"Loma_(BTC_M5_R\d\d_|WF_BTC_M30_|T15_BTC_)", "Gold")):
     zname = os.path.join(DIST, f"Loma_{sym}_v{TAG}.zip")
     z = zipfile.ZipFile(zname)
     names = z.namelist(); root = f"Loma_{sym}_v{TAG}/"
@@ -50,8 +55,10 @@ for sym, n_sets, guide, name_pat, other in (
         vals = dict(x.split("=", 1) for x in text.splitlines() if x and not x.startswith(";"))
         magics.append(vals["MagicNumber"])
         if sym == "BTCUSD":
-            need(vals["CloseBeforeWeekend"] == "false" and int(vals["MaxSpread_Points"]) >= 1000 and vals["TriggerTimeframe"] == "5",
-                 f"{base}: BTC settings (weekend close, spread limit, M5)")
+            need(vals["CloseBeforeWeekend"] == "false" and int(vals["MaxSpread_Points"]) >= 1000, f"{base}: BTC settings (weekend close, spread limit)")
+            if base.startswith("Loma_WF_"):
+                need(vals["UseStochTurnFilter"] == "true" and vals["ScaleWithPrice"] == "true" and float(vals["ReferencePrice"]) > 0
+                     and vals["TriggerTimeframe"] == "30", f"{base}: year-by-year preset settings (M30, turn filter, price scaling)")
         else:
             need(vals["CloseBeforeWeekend"] == "true" and int(vals["MaxSpread_Points"]) <= 200, f"{base}: gold settings (weekend close, spread limit)")
     need(len(set(magics)) == len(magics), f"{zname}: magic numbers repeat")
@@ -67,11 +74,14 @@ for sym, n_sets, guide, name_pat, other in (
     need(body in page, f"{zname}: the report differs from research/reports/loma_oos_review.html")
     need("being recomputed" not in page and "recal-tiles:start -->\n<!-- recal-tiles:end" not in page, f"{zname}: the report has an unfilled part")
     csvs = [n for n in rel if n.endswith(".csv")]
-    need(len(csvs) == 1, f"{zname}: {len(csvs)} csv files")
-    table = pd.read_csv(io.BytesIO(z.read(rel[csvs[0]])))
-    need(len(table) == n_sets, f"{zname}: {csvs[0]} has {len(table)} rows")
     stems = {os.path.basename(s)[:-4] for s in sets}
-    need(set(table["file"].astype(str).str.replace(".set", "", regex=False)) == stems, f"{zname}: the csv's file column does not match the presets")
+    listed = []
+    for c in csvs:
+        table = pd.read_csv(io.BytesIO(z.read(rel[c])))
+        files = list(table["file"].astype(str).str.replace(".set", "", regex=False))
+        need(set(files) <= stems, f"{zname}: {c} names presets that are not in the zip: {sorted(set(files) - stems)[:3]}")
+        listed += files
+    need(sorted(listed) == sorted(stems), f"{zname}: the csv files do not list every preset exactly once")
     extra = set(rel) - set(sets) - set(csvs) - {"START_HERE.md", "Loma_OOS_Review.html", "MQL5/Experts/" + EA, "MQL5/Include/EVK/EVK.mqh"}
     need(not extra, f"{zname}: unexpected files {sorted(extra)}")
     print(f"{zname}: {len(names)} files, {len(sets)} presets, guide and report as in the repository")
