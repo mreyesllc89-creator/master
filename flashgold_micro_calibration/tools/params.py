@@ -12,7 +12,8 @@ BY_NAME = {r["name"]: r for r in SPEC}
 
 # replay-only switches (prefix X_), not EA inputs
 EXTRA = {"X_ExitGatePips": 6.8, "X_SlipPts": 0.0, "X_CommissionPts": 0.0, "X_StopsLevelPts": 0.0,
-         "X_MicroRestart": 1.0, "X_TradeBuys": 1.0, "X_TradeSells": 1.0, "X_FillSnapPts": 0.0, "X_LimitAtMarket": 1.0, "X_LatencyMs": 0.0}
+         "X_MicroRestart": 1.0, "X_TradeBuys": 1.0, "X_TradeSells": 1.0, "X_FillSnapPts": 0.0, "X_LimitAtMarket": 1.0, "X_LatencyMs": 0.0,
+         "X_StopLossSlipMult": 1.0}
 
 
 def defaults():

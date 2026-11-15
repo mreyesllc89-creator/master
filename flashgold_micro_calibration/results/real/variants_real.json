@@ -128,5 +128,7 @@
     "X_ExitGatePips": 0
    }
   }
- ]
+ ],
+ "data_dir": "../data/real_window",
+ "gap_minutes": 10
 }

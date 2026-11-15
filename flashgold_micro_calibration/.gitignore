@@ -1,8 +1,9 @@
 data/raw/
 data/ticks/
+data/real_window/
 data/hf/
 data/cache/
 data/fetch.log
 __pycache__/
 *.log
-results/.part*_done
+results/.done_*

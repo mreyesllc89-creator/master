@@ -36,8 +36,8 @@ regenerated with the commands in section 13.
    - The four micro presets place **{{micro_literal_n}} trades in eight months** as shipped: the quote-bucket
      series blocks for good after 4,096 occupied buckets (about 68 minutes at 1 s) until the EA is restarted.
    - The tester fills orders on the tick that sends them. With that, a search finds "profit factors" up to
-     {{z_grid_max}} from market entries; with the 150 ms delay that the real fills show, the same sets fall
-     to {{mk_grid_lo}}-{{mk_grid_hi}}. Set an execution delay in the tester.
+     {{z_grid_max}} from market entries; with the 150 ms delay that the real fills show, the best of those
+     sets falls from {{mk_pf0}} to {{mk_pf150}}. Set an execution delay in the tester.
    - The order-flow feed (terminal global variables) does not exist in the tester, so a tester run never
      takes the market route that produced 74% of the real trades. Live and tester are different programs
      unless `UseOrderFlow` is false.
@@ -253,11 +253,9 @@ average). With a 150 ms delay they fill {{mk_slip150}} points worse on average, 
 The Strategy Tester has the same blind spot unless an execution delay is set. Results of the no-delay
 searches are kept in `results/zero_latency/` for comparison.
 
-**With the 150 ms delay**, stop orders are what remains (they rest at the server, so the delay does not
-touch them). A search of {{jw_n}} random sets under the delay: profit factor 10th percentile {{jw_q10}},
-median {{jw_med}}, 90th percentile {{jw_q90}}, best {{jw_max}}; {{jw_share}} of the sets are at or above 1 in
-both the calibration and the validation months. What separates the good sets is how big the burst is against
-the spread:
+**With the 150 ms delay**, stop orders are what remains: they rest at the server, so the delay only matters
+while they are being placed (an order whose price the market has passed by then is refused). What separates
+the good sets from the bad is how big the burst is against the spread:
 
 ![spread cap against alert multiplier](results/charts/spread_multiplier_grid.png)
 

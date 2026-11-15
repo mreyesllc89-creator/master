@@ -1,7 +1,11 @@
 """One input at a time: how does the profit factor respond to each trade-affecting input?
 
-usage: python -I oat.py <preset name> <out csv> [spread_pts] [main|micro]
+usage: python -I oat.py <preset name> <out csv> [spread_pts] [main|micro] [center.json]
+
+With a centre file ({"set": {...}}) the inputs are varied around that set instead of the preset; the
+centre's own value of every input is added to its list, plus a few values beyond the shipped ranges.
 """
+import json
 import os
 import sys
 
@@ -135,6 +139,15 @@ GRID_MICRO = {
     "X_MicroRestart": [0, 1],
 }
 
+# extra values tried when the sweep runs around a calibrated centre
+CENTER_EXTRA = {
+    "MaxTrailingMultiplier": [30, 35, 40, 50, 60],
+    "MaxSpreadPoints": [10, 11, 13],
+    "StopTPPoints": [600, 1500],
+    "StopEntryDistancePoints": [60],
+    "InpEntryHoldMinFavPoints": [50],
+}
+
 SPLITS = {"is": ("2025-11-01", "2026-03-01"), "val": ("2026-03-01", "2026-06-01"), "test": ("2026-06-01", "2027-01-01")}
 
 
@@ -159,6 +172,10 @@ def main():
     feed = ticks.Feed("../data", spread)
     S = sim.Sim(feed)
     p0 = sweep.base(preset)
+    if len(sys.argv) > 5:
+        p0.update(json.load(open(sys.argv[5]))["set"])
+        grid = {k: sorted(set(float(x) for x in v) | set(float(x) for x in CENTER_EXTRA.get(k, [])) | {float(p0[k])})
+                for k, v in grid.items()}
     df = S.run(p0)
     b = sim.metrics(df)
     print("base", {k: round(v, 3) for k, v in b.items()}, {k: round(v, 3) for k, v in split_row(df).items()}, flush=True)

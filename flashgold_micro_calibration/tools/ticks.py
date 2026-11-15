@@ -70,11 +70,12 @@ def chunks(t, gap_ms=6 * 3600 * 1000):
 class Feed:
     """A rebuilt feed plus its weekly chunks. Arrays are shared by every run."""
 
-    def __init__(self, data_dir, target_spread_pts=12.0, fixed=False, extra_pts=0.0, months=None, symbol="XAUUSD"):
+    def __init__(self, data_dir, target_spread_pts=12.0, fixed=False, extra_pts=0.0, months=None, symbol="XAUUSD",
+                 gap_ms=6 * 3600 * 1000):
         rt, rb, ra = load_raw(data_dir, symbol, months)
         self.t, self.bid, self.ask = broker_feed(rt, rb, ra, target_spread_pts, fixed, extra_pts)
         self.mid = (self.bid + self.ask) * 0.5
-        self.chunks = chunks(self.t)
+        self.chunks = chunks(self.t, gap_ms)
         self.target_spread_pts = target_spread_pts
 
     def describe(self):

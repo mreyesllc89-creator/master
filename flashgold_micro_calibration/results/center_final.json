@@ -33,6 +33,18 @@
    }
   },
   {
+   "name": "stop-loss slip as quoted (factor 1.0 instead of 1.5)",
+   "set": {
+    "X_StopLossSlipMult": 1.0
+   }
+  },
+  {
+   "name": "stop-loss slip factor 2.0",
+   "set": {
+    "X_StopLossSlipMult": 2.0
+   }
+  },
+  {
    "name": "strict fills (no snap, limits at price, delay 250 ms)",
    "set": {
     "X_FillSnapPts": 0,

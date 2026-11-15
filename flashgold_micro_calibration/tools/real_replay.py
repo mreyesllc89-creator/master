@@ -55,11 +55,20 @@ def externals(d, feed, sl_points=None, tp_points=None):
                              tp=np.round(tp, 2), id=d.id.to_numpy()))
 
 
-def covered(d, feed):
-    """Real trades whose entry second and the following 10 minutes are inside the tick data."""
-    i = np.searchsorted(feed.t, d.ms.to_numpy())
+def covered(d, feed, lead_ms=60000, tail_ms=5000):
+    """Real trades that lie inside one stretch of tick data: a quote within 3 s of the entry, a minute
+    of quotes before it (the speed alert needs history) and quotes until after the real close."""
+    ms = d.ms.to_numpy()
+    i = np.searchsorted(feed.t, ms)
     i = np.minimum(i, len(feed.t) - 1)
-    near = np.abs(feed.t[i] - d.ms.to_numpy()) < 3000
+    near = np.abs(feed.t[i] - ms) < 3000
+    lo = np.full(len(d), np.iinfo(np.int64).max)
+    hi = np.full(len(d), np.iinfo(np.int64).min)
+    for a, b in feed.chunks:
+        inside = (i >= a) & (i < b)
+        lo[inside] = feed.t[a]
+        hi[inside] = feed.t[b - 1]
+    near &= (ms - lo >= lead_ms) & (d.close_ms.to_numpy() + tail_ms <= hi)
     px = np.where(d.side > 0, feed.ask[i], feed.bid[i])
     return near, (d.entry.to_numpy() - px) * d.side.to_numpy() / 0.01
 
@@ -75,13 +84,15 @@ def main():
     offset = float(sys.argv[4]) if len(sys.argv) > 4 else 3.0
     spread = float(sys.argv[5]) if len(sys.argv) > 5 else 12.0
     spec = json.load(open(spec_path))
-    feed = ticks.Feed("../data", spread, months=spec.get("months"))
+    feed = ticks.Feed(spec.get("data_dir", "../data"), spread, months=spec.get("months"),
+                      gap_ms=int(float(spec.get("gap_minutes", 360)) * 60000))
     S = sim.Sim(feed)
     d = load_real(real_path, offset)
     near, gap = covered(d, feed)
     d = d[near].reset_index(drop=True)
     d["id"] = np.arange(len(d))
-    print(f"{len(d)} real trades inside the tick data ({d.open_time.min()} .. {d.open_time.max()} server time)")
+    print(f"{len(d)} real trades inside the tick data ({d.open_time.min()} .. {d.open_time.max()} server time), "
+          f"{d.open_time.dt.date.nunique()} days, {len(feed.chunks)} stretches of ticks")
     print("real entry vs feed quote at that second, points (trade side +): median %.1f, p10 %.1f, p90 %.1f"
           % (np.median(gap[near]), np.percentile(gap[near], 10), np.percentile(gap[near], 90)))
     rows = []
@@ -102,8 +113,14 @@ def main():
         if k == 0:
             m["sim_kind"] = m.reason.map(engine.REASON)
             m.to_csv(out + "_baseline_trades.csv", index=False)
+            agree = dict(trades=int(len(m)), days=int(d.open_time.dt.date.nunique()), stretches=int(len(feed.chunks)),
+                         corr=float(np.corrcoef(m.pts, m.pts_sim)[0, 1]), same_sign=float((np.sign(m.pts) == np.sign(m.pts_sim)).mean()),
+                         within_15=float(((m.pts - m.pts_sim).abs() <= 15).mean()),
+                         real_stop_exits=int((m.exit_kind == "SL").sum()),
+                         both_stop_exits=int(((m.exit_kind == "SL") & (m.sim_kind == "SL")).sum()))
+            json.dump(agree, open(out + "_agreement.json", "w"), indent=1)
             print("  per-trade agreement with the real outcome: points correlation %.3f, same sign %.3f, |difference| <= 15 points %.3f"
-                  % (np.corrcoef(m.pts, m.pts_sim)[0, 1], (np.sign(m.pts) == np.sign(m.pts_sim)).mean(), ((m.pts - m.pts_sim).abs() <= 15).mean()))
+                  % (agree["corr"], agree["same_sign"], agree["within_15"]))
             print(pd.crosstab(m.exit_kind, m.sim_kind).to_string())
         pd.DataFrame(rows).to_csv(out + "_variants.csv", index=False)
 

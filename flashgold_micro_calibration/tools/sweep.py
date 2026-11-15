@@ -8,12 +8,13 @@ import params
 import sim
 
 # calibrated to the author's real fills (see REPORT.md, "Execution model"): 74% of real stop fills are
-# exact, limits and targets fill at the market, market orders reach the server after about 150 ms
-REAL_FILLS = {"X_FillSnapPts": 10.0, "X_LimitAtMarket": 1.0, "X_LatencyMs": 150.0}
-# what the Strategy Tester does without an execution delay: orders fill on the tick that sent them
-TESTER_FILLS = {"X_FillSnapPts": 10.0, "X_LimitAtMarket": 1.0, "X_LatencyMs": 0.0}
+# exact, limits and targets fill at the market, market orders reach the server after about 150 ms, and a
+# stop loss that is not exact slips 1.5 times as far as the Dukascopy quote shows
+REAL_FILLS = {"X_FillSnapPts": 10.0, "X_LimitAtMarket": 1.0, "X_LatencyMs": 150.0, "X_StopLossSlipMult": 1.5}
+# the same fills without the order delay: orders fill on the tick that sent them (Strategy Tester without a delay)
+TESTER_FILLS = {"X_FillSnapPts": 10.0, "X_LimitAtMarket": 1.0, "X_LatencyMs": 0.0, "X_StopLossSlipMult": 1.5}
 # strict: every stop fills at the next quote, limits and targets get no price improvement, slow orders
-STRICT_FILLS = {"X_FillSnapPts": 0.0, "X_LimitAtMarket": 0.0, "X_LatencyMs": 250.0}
+STRICT_FILLS = {"X_FillSnapPts": 0.0, "X_LimitAtMarket": 0.0, "X_LatencyMs": 250.0, "X_StopLossSlipMult": 1.5}
 
 
 def base(preset="FlashGold_NativeReference", fills=REAL_FILLS, **over):

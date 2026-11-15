@@ -247,9 +247,6 @@ def build():
     V["mk_pf150"] = f"{mk[mk.latency_ms == 150].pf.iloc[0]:.2f}"
     V["mk_slip150"] = f"{mk[mk.latency_ms == 150].entry_slip.iloc[0]:.0f}"
     V["mk_avg0"] = f"{mk[mk.latency_ms == 0].avg.iloc[0]:.0f}"
-    gl = read("grid_latency.csv")
-    mkt = gl[gl.WeakFlowMarketMinScore == 4.5]
-    V["mk_grid_lo"], V["mk_grid_hi"] = f"{mkt.pf.min():.2f}", f"{mkt.pf.max():.2f}"
     z1 = pd.read_csv(os.path.join(RES, "zero_latency", "joint_native_seed1.csv"))
     z2 = pd.read_csv(os.path.join(RES, "zero_latency", "joint_native_focus.csv"))
     V["z_wide_n"], V["z_wide_max"], V["z_wide_med"] = str(len(z1)), f"{z1.pf.max():.2f}", f"{z1.pf.median():.2f}"
@@ -257,11 +254,6 @@ def build():
     V["z_focus_share"] = f"{100 * ((z2.pf_is >= 1) & (z2.pf_val >= 1)).mean():.1f}%"
     zg = pd.read_csv(os.path.join(RES, "zero_latency", "grid_spread_mult.csv"))
     V["z_grid_max"] = f"{zg.pf.max():.2f}"
-    jw = read("joint_native_wide.csv")
-    V["jw_n"] = str(len(jw))
-    V["jw_q10"], V["jw_med"], V["jw_q90"], V["jw_max"] = (f"{jw.pf.quantile(0.1):.2f}", f"{jw.pf.median():.2f}", f"{jw.pf.quantile(0.9):.2f}", f"{jw.pf.max():.2f}")
-    V["jw_share"] = f"{100 * ((jw.pf_is >= 1) & (jw.pf_val >= 1)).mean():.1f}%"
-    V["jw_share_any"] = f"{100 * (jw.pf >= 1).mean():.1f}%"
 
     # ------------------------------------------------------------------ calibrated preset
     cf = read("center_final.csv")

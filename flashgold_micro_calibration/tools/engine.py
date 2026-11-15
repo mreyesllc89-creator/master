@@ -17,7 +17,10 @@ losses fill at the market when touched (gaps slip), except that a touch within X
 level fills at the level (the Dukascopy top of book flickers by several points between ticks; the
 author's real fills are exact 74% of the time). With X_LimitAtMarket = 1 limit orders and take
 profits fill at the market price when touched (price improvement, as on the author's "market
-execution" ECN symbol); with 0 they fill at their own price. X_SlipPts adds a fixed adverse slip to
+execution" ECN symbol); with 0 they fill at their own price. A stop loss that is not filled at its
+level slips X_StopLossSlipMult times as far as the quote shows (the author's 1,363 real stop-loss
+fills slip about 1.5 times as far as the Dukascopy quotes do; stop entries need no such factor).
+X_SlipPts adds a fixed adverse slip to
 every market, stop and stop-loss fill; X_CommissionPts is charged per round trip. X_LatencyMs is the
 round trip of an order the EA sends: a market entry or a market close fills at the first quote at
 least that much later, a pending order starts resting that much later and is refused if the market
@@ -117,6 +120,7 @@ NAMES = [
     "X_FillSnapPts",           # stop / stop-loss fills within this many points of their level fill at the level
     "X_LimitAtMarket",         # 1 = limit orders and take profits fill at the market (price improvement), 0 = at their price
     "X_LatencyMs",             # round trip of an order sent by the EA (market entry, market close, pending placement)
+    "X_StopLossSlipMult",      # a stop loss filled beyond its level slips this many times the quoted distance
 ]
 I = {n: k for k, n in enumerate(NAMES)}
 for _n, _k in I.items():
@@ -234,6 +238,7 @@ def run_chunk(T, B, A, P, idxL, cand, ep_start,
     commission = P[I_X_CommissionPts]
     stops_level = P[I_X_StopsLevelPts]
     snap = P[I_X_FillSnapPts] * PT + PT * 1e-6
+    slmult = P[I_X_StopLossSlipMult]
     latency = int(P[I_X_LatencyMs])
     lim_mkt = P[I_X_LimitAtMarket] > 0.5
     min_dist = max(stops_level * PT, PT)
@@ -404,14 +409,16 @@ def run_chunk(T, B, A, P, idxL, cand, ep_start,
                 px = 0.0
                 if p_side[s] > 0:
                     if bid <= p_sl[s]:
-                        px = (p_sl[s] if p_sl[s] - bid <= snap else bid) - slip
+                        gap = p_sl[s] - bid
+                        px = (p_sl[s] if gap <= snap else p_sl[s] - np.floor(gap / PT * slmult + 0.5) * PT) - slip
                         reason = R_SL if p_slmod[s] == 0 else (R_TRAIL_SL if p_slmod[s] == 1 else R_LAYER_SL)
                     elif bid >= p_tp[s]:
                         px = bid if lim_mkt else p_tp[s]
                         reason = R_TP
                 else:
                     if ask >= p_sl[s]:
-                        px = (p_sl[s] if ask - p_sl[s] <= snap else ask) + slip
+                        gap = ask - p_sl[s]
+                        px = (p_sl[s] if gap <= snap else p_sl[s] + np.floor(gap / PT * slmult + 0.5) * PT) + slip
                         reason = R_SL if p_slmod[s] == 0 else (R_TRAIL_SL if p_slmod[s] == 1 else R_LAYER_SL)
                     elif ask <= p_tp[s]:
                         px = ask if lim_mkt else p_tp[s]

@@ -3,7 +3,7 @@
 usage:
   python -I fetch_dukascopy.py fetch XAUUSD 2025-11-01 2026-11-14 <data_dir> [workers=1] [pause_s=9]
   python -I fetch_dukascopy.py hours XAUUSD <hours.txt> <data_dir> [pause_s=9]     (lines "YYYY-MM-DD HH", UTC, fetched in that order)
-  python -I fetch_dukascopy.py build XAUUSD <data_dir>
+  python -I fetch_dukascopy.py build XAUUSD <data_dir> [out_dir] [first_day] [last_day]
 
 fetch: one request per UTC hour, raw files kept in <data_dir>/raw/<SYM>/<YYYY-MM-DD>/<HH>.bi5
        (zero-length file = hour without ticks). Already present files are skipped, so the
@@ -12,7 +12,8 @@ fetch: one request per UTC hour, raw files kept in <data_dir>/raw/<SYM>/<YYYY-MM
        so the default is one keep-alive connection with a 9 s pause (about 400 hours of ticks per
        hour of downloading). Lower the pause if your address is not throttled.
 build: <data_dir>/ticks/<SYM>_<YYYY-MM>.npz with t (UTC milliseconds, int64), bid and ask
-       (int32, price * 1000).  Each record of a .bi5 file is 20 bytes big endian:
+       (int32, price * 1000). With out_dir and a day range the files go to <out_dir>/ticks instead
+       and only those days are used (a separate store for isolated hours, kept out of the main feed).  Each record of a .bi5 file is 20 bytes big endian:
        ms since the hour start, ask, bid (integers, price * 1000 for XAUUSD), ask volume, bid volume.
 """
 import datetime as dt
@@ -126,12 +127,14 @@ def fetch(sym, start, end, root, workers, pace, listed=None):
     print(f"done {stats['done']} hours, {stats['bytes'] / 1e6:.0f} MB new, {stats['fail']} failed", flush=True)
 
 
-def build(sym, root):
+def build(sym, root, out_root=None, first=None, last=None):
     raw = os.path.join(root, "raw", sym)
-    out = os.path.join(root, "ticks")
+    out = os.path.join(out_root or root, "ticks")
     os.makedirs(out, exist_ok=True)
     months = {}
     for day in sorted(os.listdir(raw)):
+        if (first and day < first) or (last and day > last):
+            continue
         months.setdefault(day[:7], []).append(day)
     for month, days in months.items():
         ts, bids, asks = [], [], []
@@ -164,4 +167,4 @@ if __name__ == "__main__":
         fetch(sys.argv[2], dt.date.fromisoformat(sys.argv[3]), dt.date.fromisoformat(sys.argv[4]), sys.argv[5],
               int(sys.argv[6]) if len(sys.argv) > 6 else 1, float(sys.argv[7]) if len(sys.argv) > 7 else 9.0)
     else:
-        build(sys.argv[2], sys.argv[3])
+        build(sys.argv[2], sys.argv[3], *sys.argv[4:7])
