@@ -29,8 +29,10 @@ also require an Exness account.
 
 * `732_UNITS ... USD_price_value_per_lot=` in the Journal should print `1` for a 1 BTC contract.
   If your broker's contract differs, scale `LotsWithTrend` / `LotsAgainstTrend` by 1 / contract.
-* `VolATRRef=81.22` assumes bitcoin's H1 ATR is 17.1 times gold's, as on the July–August 2026
-  Octa data. If your bitcoin H1 ATR(14) is far from about 1,370 USD in a typical 2026 week, the
-  volatility factor and every distance scale with it.
+* `VolATRRef=81.22` is gold's 4.74 times 17.1, the bitcoin/gold ratio of median H1 true range on
+  the July–August 2026 Octa data (257 USD vs 15 USD). With a bitcoin H1 ATR(14) near 257 USD the
+  volatility factor is about 3.2, and the preset opens baskets only when it is at least 3
+  (`MinVolFactor`). If your broker's bitcoin H1 ATR is far from that level, the factor, every
+  distance and the lot size scale with it.
 * `DeviationPoints=1000` is 10 USD on a 2-digit BTCUSD quote. Raise it if you see requotes.
 * Bitcoin trades on weekends; the simulation included weekend data.
