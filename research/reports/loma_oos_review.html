@@ -213,17 +213,17 @@ code { font-family: var(--mono); font-size: 13px; }
           <th>BTC, run 1<span class="sub">unseen PF (trades)</span></th><th>BTC, run 2: every trailing<span class="sub">unseen PF (trades)</span></th></tr></thead>
         <tbody>
           <tr><td>M1</td><td class="mut">none passed in-sample</td><td class="mut">none passed in-sample</td><td class="mut">none passed in-sample</td><td>1.49 (77) <span class="sub">stressed 1.60</span></td></tr>
-          <tr><td>M2</td><td>0.87 (127)</td><td>0.80 (408) <span class="sub">stressed 0.71</span></td><td>0.48 (33)</td><td>1.12 (146) <span class="sub">stressed 1.03</span></td></tr>
-          <tr><td>M3</td><td>0.70 (506)</td><td>0.83 (670) <span class="sub">stressed 0.74</span></td><td>0.79 (148)</td><td>0.91 (351) <span class="sub">stressed 0.77</span></td></tr>
-          <tr><td>M5</td><td>1.08 (304)</td><td>0.96 (454) <span class="sub">stressed 0.81</span></td><td>1.16 (280)</td><td>1.20 (358) <span class="sub">stressed 1.10</span></td></tr>
-          <tr><td>M10</td><td>0.93 (310)</td><td>1.04 (381) <span class="sub">stressed 0.95</span></td><td>0.93 (310)</td><td>1.09 (339) <span class="sub">stressed 1.11</span></td></tr>
-          <tr><td>M15</td><td>0.72 (417)</td><td>0.81 (305) <span class="sub">stressed 0.82</span></td><td>0.89 (195)</td><td>0.77 (419) <span class="sub">stressed 0.75</span></td></tr>
-          <tr><td>M30</td><td>0.81 (163)</td><td>0.72 (168) <span class="sub">stressed 0.68</span></td><td>0.92 (20)</td><td>0.85 (193) <span class="sub">stressed 0.83</span></td></tr>
+          <tr><td>M2</td><td>0.87 (127) <span class="sub">VT costs 0.83</span></td><td>0.80 (408) <span class="sub">stressed 0.71 · VT costs 0.74</span></td><td>0.48 (33)</td><td>1.12 (146) <span class="sub">stressed 1.03</span></td></tr>
+          <tr><td>M3</td><td>0.70 (506) <span class="sub">VT costs 0.66</span></td><td>0.83 (670) <span class="sub">stressed 0.74 · VT costs 0.76</span></td><td>0.79 (148)</td><td>0.91 (351) <span class="sub">stressed 0.77</span></td></tr>
+          <tr><td>M5</td><td>1.08 (304) <span class="sub">VT costs 1.01</span></td><td>0.96 (454) <span class="sub">stressed 0.81 · VT costs 0.86</span></td><td>1.16 (280)</td><td>1.20 (358) <span class="sub">stressed 1.10</span></td></tr>
+          <tr><td>M10</td><td>0.93 (310) <span class="sub">VT costs 0.89</span></td><td>1.04 (381) <span class="sub">stressed 0.95 · VT costs 0.98</span></td><td>0.93 (310)</td><td>1.09 (339) <span class="sub">stressed 1.11</span></td></tr>
+          <tr><td>M15</td><td>0.72 (417) <span class="sub">VT costs 0.70</span></td><td>0.81 (305) <span class="sub">stressed 0.82 · VT costs 0.80</span></td><td>0.89 (195)</td><td>0.77 (419) <span class="sub">stressed 0.75</span></td></tr>
+          <tr><td>M30</td><td>0.81 (163) <span class="sub">VT costs 0.79</span></td><td>0.72 (168) <span class="sub">stressed 0.68 · VT costs 0.71</span></td><td>0.92 (20)</td><td>0.85 (193) <span class="sub">stressed 0.83</span></td></tr>
           <tr><td>H1</td><td class="mut">none passed in-sample</td><td class="mut">none passed in-sample</td><td class="mut">none passed in-sample</td><td>0.56 (32) <span class="sub">stressed 0.55</span></td></tr>
         </tbody>
       </table>
     </div>
-    <p class="note">0 of 32 pass. Stressed = entry one minute late, pessimistic trailing, slippage and commission; with VT's $0.60 commission per ounce on top of its spread, real costs on gold are close to the stressed figures. BTC M1 in run 2 rests on one setup with 77 trades, under the 100-trade minimum. Gold: FTMO prices to 15 May 2026, Dukascopy after; BTC: Binance.</p>
+    <p class="note">0 of 32 pass. Stressed = entry one minute late, pessimistic trailing, slippage and commission. VT costs = the same gold setups at VT Markets' own costs as the account owner reported them, a 1.5-pip spread ($0.15) and $0.60 commission per lot, $0.75 per ounce in all: 0.66 to 1.01. BTC M1 in run 2 rests on one setup with 77 trades, under the 100-trade minimum. Gold: FTMO prices to 15 May 2026, Dukascopy after; BTC: Binance.</p>
     <h3>By trailing family, all timeframes together (run 2)</h3>
     <div class="tablebox">
       <table>

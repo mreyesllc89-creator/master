@@ -26,6 +26,7 @@ Usage:
   python3 hump_tf_recal.py select <work_dir> <out_json> [cand|candx]  # in-sample pick and out-of-sample test
   python3 hump_tf_recal.py sens   <work_dir> <out_json> [cand|candx]  # other selection rules (robustness)
   python3 hump_tf_recal.py kinds  <work_dir> <out_json>               # candx only: the same test per trailing family
+  python3 hump_tf_recal.py vt     <work_dir> <out_json> [cand|candx]  # gold: the picks at VT Markets' own costs
 Environment: HUMP_SYMBOL=XAUUSD|BTCUSD, HUMP_BTC_DATA=<dir with BTCUSD_m1.csv> for BTC.
 """
 import json, os, pickle, random, sys, time
@@ -48,6 +49,9 @@ TOPK = 10
 PASS_PF, PASS_N = 1.30, 100
 STRESS = (dict(trail_worst=1, delay=1, slip=3.0, comm=2.0, max_spread=1e9) if SYM == "BTCUSD"
           else dict(trail_worst=1, delay=1, slip=0.10, comm=0.07, max_spread=5.0))
+# VT Markets XAUUSD-ECNc as the account owner reported it: spread 1.5 pips (0.15 USD per ounce) and a
+# commission of 0.60 USD per lot round trip, 1 lot = 1 ounce. About 0.75 USD per ounce in total.
+VT_SPREAD, VT_COMM = 0.15, 0.60
 
 
 # ----------------------------------------------------------------------------- data
@@ -75,9 +79,11 @@ def build(work, duk_dir=None):
           "OOS bars", int((m1.index.values >= IS_END).sum()))
 
 
-def market(work, real_spread=False):
+def market(work, real_spread=False, flat_spread=None):
     m1 = pd.read_pickle(os.path.join(work, "m1.pkl"))
     hs = np.load(os.path.join(work, "hs_real.npy" if real_spread else "hs.npy"))
+    if flat_spread is not None:
+        hs = np.full(len(m1), flat_spread / 2.0)
     return T.MarketX(m1=m1, half_spread=hs)
 
 
@@ -302,6 +308,51 @@ def select(work, out_json, prefix="cand"):
     print(df[[c for c in cols if c in df]].round(2).to_string(index=False))
 
 
+def vt_costs(work, out_json, prefix="candx"):
+    """Gold only: the protocol's picks of every timeframe, re-run at VT Markets' own costs (VT_SPREAD, VT_COMM),
+    and the same with a one-minute delay, pessimistic trailing and 0.10 slippage on top."""
+    assert SYM == "XAUUSD"
+    mk = market(work, flat_spread=VT_SPREAD)
+    vt = dict(comm=VT_COMM, max_spread=5.0)
+    vt_hard = dict(vt, trail_worst=1, delay=1, slip=0.10)
+    runner = mk.run_x if prefix == "candx" else mk.run
+    rows = []
+    for tf in TFS:
+        fn = os.path.join(work, f"{prefix}_{tf}.pkl")
+        if not os.path.exists(fn):
+            continue
+        d = pickle.load(open(fn, "rb"))
+        P, Bs, Ss = d["params"], d["base"], d["stress"]
+        sc = np.array([is_score(Bs[i], Ss[i]) for i in range(len(P))])
+        elig = np.where(sc > 0)[0]
+        order = elig[np.argsort(-sc[elig], kind="stable")]
+        picked, fams = [], set()
+        for i in order:
+            if sc[i] < PASS_PF or len(picked) >= TOPK:
+                break
+            fam = (P[i]["sides"], P[i]["session"], P[i]["htf"])
+            if fam in fams:
+                continue
+            fams.add(fam); picked.append(int(i))
+        row = dict(symbol=SYM, tf=tf, picked=len(picked))
+        if picked:
+            for name, extra in (("vt", vt), ("vt_hard", vt_hard)):
+                isr, oor = [], []
+                for i in picked:
+                    c = dict(X.BASE); c.update(P[i]); c.update(extra)
+                    df = runner(X.engine_cfg(c))
+                    tt = df.entry_time.values.astype("datetime64[m]"); r = df.r.values.astype(float)
+                    isr.append(r[tt < IS_END]); oor.append(r[tt >= IS_END])
+                isr, oor = np.concatenate(isr), np.concatenate(oor)
+                row.update({f"{name}_is_pf": pf(isr), f"{name}_oos_n": int(len(oor)), f"{name}_oos_pf": pf(oor),
+                            f"{name}_oos_net_r": float(oor.sum())})
+            row["base_oos_pf"] = pf(np.concatenate([split(*Bs[i])[2] for i in picked]))
+        rows.append(row)
+    json.dump(dict(vt_spread=VT_SPREAD, vt_comm=VT_COMM, timeframes=rows), open(out_json, "w"), indent=1, default=float)
+    pd.set_option("display.width", 250)
+    print(pd.DataFrame(rows).round(2).to_string(index=False))
+
+
 def block_pfs(t, r):
     tt = t.astype("int64").astype("datetime64[m]")
     out = []
@@ -425,3 +476,5 @@ if __name__ == "__main__":
         sensitivity(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "cand")
     elif cmd == "kinds":
         by_kind(sys.argv[2], sys.argv[3])
+    elif cmd == "vt":
+        vt_costs(sys.argv[2], sys.argv[3], sys.argv[4] if len(sys.argv) > 4 else "candx")

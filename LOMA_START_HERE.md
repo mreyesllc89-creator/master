@@ -5,7 +5,7 @@
 > **Status: not recommended for live trading.** The presets were fitted to January 2025 – 15 May 2026.
 > - **Gold:** on the months after that, which they never saw, the six shipped gold presets together lost money even before commission on VT Markets real ticks: profit factor 0.74 on 247 trades, 1 June – 6 November 2026 (0.67 at VT's $0.60 commission per lot). Dukascopy prices agree.
 > - **BTC:** the four presets together broke even: profit factor 1.05 on 193 trades, 16 May – 13 November 2026.
-> - **Re-calibration (15 November 2026):** every timeframe from M1 to H1, with eleven kinds of trailing stop, was re-calibrated on the same period and tested on the months after it. No timeframe holds a profit factor of 1.3 on unseen data, on gold (0.72–1.04) or on BTC (0.56–1.20 with at least 100 trades).
+> - **Re-calibration (15 November 2026):** every timeframe from M1 to H1, with eleven kinds of trailing stop, was re-calibrated on the same period and tested on the months after it. No timeframe holds a profit factor of 1.3 on unseen data, on gold (0.72–1.04, or 0.71–0.98 at VT's costs) or on BTC (0.77–1.20 where there are at least 100 unseen trades).
 > - **The EA itself** reproduces the backtest's trades.
 
 ## Downloads
@@ -83,7 +83,7 @@ v1.33 compiled in MetaEditor (MT5 build 6302) with 0 errors and 0 warnings. v1.3
 ## Read before trading
 
 - **Broker server time:** sessions, `WeekendCloseTime` and `EndOfDayTime` are calibrated on a GMT+2 (winter) / GMT+3 (summer) clock. VT Markets matches. Shift all three if your broker's clock differs.
-- **Commission:** the VT Strategy Tester run charged $6 per lot round trip (1 lot = 1 ounce), ten times VT's real $0.60 per lot (as reported by the account owner). At $0.60 the run's loss shrinks from $8,914 to $1,664, but the unseen months still lose (PF 0.67). On the calibration data the presets score PF 1.60–1.92 at $0.60 and 0.53–0.97 at $6. On VT set `CommissionPerLot=0.6` (1.2 if the $0.60 is per side).
+- **VT Markets costs:** a 1.5-pip spread ($0.15 per ounce) and $0.60 commission per lot (1 lot = 1 ounce), as reported by the account owner: about $0.75 per ounce for a round trip. The VT Strategy Tester run used VT's real spread but charged $6 per lot, ten times the real commission. At $0.60 the run's loss shrinks from $8,914 to $1,664, but the unseen months still lose (PF 0.67). On the calibration data the presets score PF 1.60–1.92 at $0.60 and 0.53–0.97 at $6. On VT set `CommissionPerLot=0.6` (1.2 if the $0.60 is per side).
 - **Account size:** lots are rounded down to the broker's step, and with `SkipIfBelowMinLot=true` a trade whose lot would be below the minimum is skipped. With a 100-ounce gold contract (minimum 0.01 lot) and `RiskPercent=0.5`, use about $10,000 or more; on smaller balances the wide-stop trades are skipped.
 - **Several presets on one account** only on a **hedging** account. On a netting account every EA and manual trade on a symbol shares one position.
 - **News filter** (`UseNewsFilter`, on in the presets) was not in the backtest. It does nothing in the Strategy Tester, so tester results equal `UseNewsFilter=false`. Live, the presets skip entries within 30 minutes of high-impact USD news.
