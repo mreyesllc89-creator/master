@@ -157,8 +157,9 @@ Only what this work can support:
 * **Q1/Q2 (stop and lot sizing).** Consistent with your hypothesis. With the shipped lot the 8 %
   stop at 1,000 USD is a few dollars of gold; the gold pick keeps a fixed lot but one third the
   size, and the bitcoin pick uses `CushionEnabled=false`, which makes stop distance independent
-  of balance. No setting with the shipped lot size survived one-minute evaluation near the top
-  of the search. I did not isolate the stop alone.
+  of balance. In the gold search, 7 % of settings with a lot near the shipped size or larger
+  (0.25+ at factor 1) were profitable in-sample under one-minute evaluation, against 32 % of
+  settings with less than half that lot. I did not isolate the stop alone.
 * **Q3 (give-back).** The tight give-back is the part that depends on execution speed. The search
   allowed give-back up to 60 % of the arm level; the picks use 7 % (gold) and 17 % (bitcoin) with
   a higher floor.
