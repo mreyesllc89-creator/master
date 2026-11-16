@@ -89,7 +89,7 @@ def main():
                 r1, r2, r3, r4 = c["rule1"], c["rule2"], c["rule3"], c["rule4"]
                 yrs = ", ".join(f'{y} {f2(x["pf"])} on {x["trades"]}' for y, x in r1["by_year"].items())
                 head += (f' {c["tf"]} {c["text"]}: rule 1 met, PF {r1["pf"]:.2f} on {r1["trades"]} trades ({yrs}), stressed {r1["stress_pf"]:.2f}, '
-                         f'and only one setup chosen in 2023 just above the 1.30 cut keeps it there; rule 2 {"met" if r2["met"] else "not met"}, '
+                         f'and the pass rests on one setup chosen in 2023 with a score of 1.30, just above the selection cut: without it the cell has 91 trades, under the 100 the rule needs; rule 2 {"met" if r2["met"] else "not met"}, '
                          f'{r2["pf"]:.2f} on {r2["signals"]} signals; rule 3 not met: the cell itself passes in {r3["cell_share_of_no_skill_runs"] * 100:.0f}% of the reshuffles, '
                          f'but one pass is what they give: {r3["share_runs_with_as_many"] * 100:.0f}% of the runs have one or more; rule 4: {r4["outcome"]} '
                          f'(and none for the year ahead), so there is nothing to test or to trade.') if not r3["met"] else ''
@@ -105,7 +105,7 @@ def main():
                     f'entry conditions, selection and pass rule ({cells2:,} cells), on Dukascopy one-minute prices from 2013 to 13 November 2026 in broker server '
                     f'time (each year\'s clock checked), so the unseen years are 2016 to 2025. What counts as a result was written down before any of their '
                     f'figures existed (<code>research/results/wf/protocol2_decision.md</code>): the pass rule, then the same rule counted once per signal, then a '
-                    f'chance check, then the 2026 months, which are run only for cells that get that far. Three details of the earlier runs were also tightened: '
+                    f'chance check, then the 2026 months, which are run only for cells that get that far. For EURUSD and US500, three details of the gold and BTC runs were tightened (gold and BTC were not re-run): '
                     f'the anchor price comes from the last 180 days of 2025, calibration years leave out trades that close in the next year, and the 2025 test '
                     f'year counts only trades that close in 2025.</p>\n'
                     f'    <p class="note">Costs at VT Markets\' RAW ECN account (the account type of the gold costs above): EURUSD a 0.3-pip spread shaped by the '
@@ -210,7 +210,7 @@ def main():
                    f'{best["final"]["n"]} trades, under 1.3, and an independent audit found that chance alone produces one or two such passes among the '
                    f'{b["cells"]} BTC cells (about {th["placebo"]["expected_passes"]:.1f} expected). Its setups for the year ahead are in the BTC zip as unproven '
                    f'presets: demo only.' + p2_txt + '</p>')
-        bullet = (f'<li><strong>Nothing held year by year.</strong> With {total_cells:,} timeframe-and-condition cells tested on long history, '
+        bullet = (f'<li><strong>Nothing held year by year.</strong> With {sum(c["cells"] for c in counts.values() if c["protocol"] == 1):,} timeframe-and-condition cells tested on gold and BTC, '
                   f'{"no gold cell" if not gld["passed"] else str(gld["passed"]) + " gold cells"} and {b["passed"]} BTC cells (one result) met the pass rule. '
                   f'The BTC one, M30 with the Stochastic turn rule, made {f2(best["final"]["pf"])} in the 2026 months it had not seen, under 1.3, and chance '
                   f'explains a pass like it: a candidate for a demo, not an edge.' + p2_txt + '</li>')

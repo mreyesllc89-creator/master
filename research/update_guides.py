@@ -67,9 +67,12 @@ else:
     btc23 = f"with all 23 systems no BTC timeframe passes the 2026 months (the best is {best} at {F['btc']['all23'][best]['pf']:.2f})"
 assert not F["held_on_every_period"]
 
+nopick = [tf for tf in TFS if not F["gold"]["own"][tf] and not F["gold"]["all23"][tf]]
+withp = len(TFS) - len(nopick)
 gold_recal = (f"every timeframe from M1 to H1 was re-calibrated on January 2025 – 15 May 2026, once with the EA's own trailing stop and once with "
-              f"23 trailing systems ({F['setups']['all23']:,} setups per timeframe), and the best 10 setups of each were run on 16 May – 13 November 2026. "
-              f"No gold timeframe holds a profit factor of 1.3 there: the range is {F['gold_min']:.2f} to {F['gold_max']:.2f} "
+              f"23 trailing systems ({F['setups']['all23']:,} setups per timeframe), and the best setups of each, up to 10 and only with an in-sample score "
+              f"of 1.3 or more" + (f" (none qualified on {' and '.join(nopick)})" if nopick else "") + ", were run on 16 May – 13 November 2026. "
+              f"No gold timeframe holds a profit factor of 1.3 there: on the {WORD.get(withp, str(withp)).lower()} timeframes with setups the range is {F['gold_min']:.2f} to {F['gold_max']:.2f} "
               f"({F['vt_min']:.2f} to {F['vt_max']:.2f} at VT's costs), and {gold_best}.{gold_lead_txt}")
 btc_status = (f"the four M5 presets of the re-calibration passed the unseen months of 2026 (profit factor {m5['pf']:.2f} on {m5['n']} trades, 16 May – 13 November) and lost on the "
               f"two years before the calibration data ({m5['y2024']:.2f} in 2024, {m5['y2023']:.2f} in 2023): unproven, demo only. "

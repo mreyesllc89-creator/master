@@ -283,14 +283,14 @@ def gold(t15="presets/trailing15/gold"):
     t15_n = sum(c["setups"] for c in sg); t15_alone = sum(1 for c in sg for q in c["picks"] if q["unseen_pf"] < 1.3)
     near = sorted([r for r in rows if r["n"] >= 100 and r["pf"] >= 1.3 and r["stress_pf"] >= 1.1 and not r["losing_years"]], key=lambda r: -r["pf"])
     n50 = {0: "none of its years", 1: "only one of its years"}
-    bl_first = (f"the best by profit factor, {near[0]['tf']} {near[0]['text'].split(' (')[0]}, made {f2(near[0]['pf'])} on {near[0]['n']} trades with no losing year in "
+    bl_first = (f"the best by profit factor of the cells with at least 100 unseen trades, {near[0]['tf']} {near[0]['text'].split(' (')[0]}, made {f2(near[0]['pf'])} on {near[0]['n']} trades with no losing year in "
                 f"{years[0]} – {years[-1]}, but {n50.get(near[0]['years_with_50_trades'], str(near[0]['years_with_50_trades']) + ' of its years')} had 50 trades, "
                 f"and it made {f2(near[0]['final']['pf'])} on {near[0]['final']['n']} trades in the 2026 months kept back" if near else "the best are listed below")
     status = f"""> **Do not trade these presets with real money.**
 > - **Year-by-year test: no gold result passed.** Set up on three years and traded on the next, 2016 to 2025, with 58 entry conditions tried one at a time at VT Markets' costs: none of the {fact['cells']} timeframe-and-condition cells held a profit factor of 1.3 over at least two years with 50 trades without a losing year ({bl_first}).
 > - **The six `Loma_Top` presets** lost on the months after their calibration: on VT Markets real ticks (1 June – 6 November 2026) profit factor 0.74 before commission and 0.67 at VT's $0.60 per lot, on 247 trades. Dukascopy prices agree.
 > - **The `Loma_T15_Gold_*` trailing presets** come from four combinations of timeframe and trailing system whose setups together reached a profit factor of 1.3 on the 2026 months at FTMO's spread without commission. At VT's costs {t15_vt}; {t15_alone} of the {t15_n} presets were under 1.3 on their own, and the four groups lost on July – December 2024. Unproven: Strategy Tester and demo only.
-> - The EA itself works: it takes the same trades as the backtest.
+> - The EA follows the backtest: in the VT run in MT5 (v1.33) the Dukascopy backtest found 240 of its 247 trades, and v1.35 took the backtest's trades in a simulated terminal (about 97% of them when the spread changes by the hour). v1.35 has not been compiled or run in MetaTrader yet.
 
 """
     wf = f"""## The year-by-year test on gold
