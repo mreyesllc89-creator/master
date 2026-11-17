@@ -1,3 +1,7 @@
 danny_phantom_calibration/results/sweep_*.csv
 __pycache__/
 crypto_lab/data/raw/*_metrics_daily/
+flashgold_calibration/data/
+flashgold_calibration/results/sweep_*.csv
+flashgold_calibration/results/*.log
+*.ex5
