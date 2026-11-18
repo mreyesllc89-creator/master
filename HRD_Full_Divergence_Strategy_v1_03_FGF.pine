@@ -17,8 +17,12 @@
 //    SHORT entry only while it allows sells (SELL ZONE). In NO TRADE, before
 //    the first FlashGold signal and after a Minutes / Candles permission
 //    ends, neither. The script runs on every tick live
-//    (calc_on_every_tick), so live the gate is checked on the same tick as
-//    the signal; in the backtest both are judged at the candle close.
+//    (calc_on_every_tick). With "Check price on" = Tick (default) the gate
+//    is checked against the price of the same tick as the signal live, and
+//    at the candle close in the backtest. With Candle open it is fixed at
+//    each candle's open (live and backtest). With Candle close a forming
+//    candle is judged at its open with the last closed candle's close, and
+//    a closed candle at its close.
 //
 //  WHAT IT NEVER GATES
 //    Exits: the SL / TP bracket, "Close after X Candles" and the hybrid
@@ -29,14 +33,23 @@
 //    short, opens a long), and a SHORT signal while long does the opposite.
 //    If the filter blocks that signal, "Blocked opposite signal still closes
 //    the trade" (on by default, group "Direction filter - trading") still
-//    closes the open trade, like the reversal would, but opens nothing. Off:
+//    closes the open trade, like the reversal would, but opens nothing at
+//    that moment. Live in Tick mode the signal is checked again on every
+//    tick: if price reaches its zone later in the same candle while the
+//    signal still holds, the entry is taken then (the time and hybrid exits
+//    treat that like a reversal). Off: the blocked signal does nothing and
 //    the trade runs on to its own exits.
 //
 //  CHART AND DATA WINDOW
 //    A blocked entry gets a small gray "x" (L below the candle, S above).
 //    The filter draws its shading, level, zone names and status box. Data
-//    Window: the filter outputs (FGF ...) and the counts of entries the
-//    original would take and of those the filter blocked (FGD ...).
+//    Window: the filter outputs (FGF ...); per side, the candles on which
+//    this script's own rules called for an entry before the filter (FGD
+//    raw), the candles on which none of those calls could enter because
+//    the filter blocked them (FGD blocked), and running counts. Live, a
+//    call on any tick of the candle counts. Once the filter has blocked or
+//    closed a trade this script's position differs from your file's, so
+//    FGD raw equals your file's entries only with the filter off.
 //
 //  FILTER OFF
 //    With "Enable filter" off every signal trades: the same orders as your
@@ -44,14 +57,22 @@
 //
 //  NOTES ON THE ORIGINAL (unchanged here)
 //    - "Enable Alerts" has no effect: the script defines no alerts.
-//    - Live, with calc_on_every_tick, a breakout entry or the hybrid exit
-//      can fire in the middle of a candle; the backtest only sees closes.
-//      The divergence signals come from confirmed pivots (pivotStrength
-//      candles late) and the horizons from closed D / W / M candles, so
-//      they do not repaint.
-//    - "Close after X Candles" starts counting only when a trade opens from
-//      flat. A trade opened by a reversal keeps the previous trade's count,
-//      so it can be closed early.
+//    - Live, with calc_on_every_tick, every signal is judged on each tick:
+//      breakouts, divergences, the time exit (sent on the first tick of the
+//      X-th candle) and the hybrid exit. The backtest judges them only at
+//      candle closes, so live trades can differ from it. A divergence pivot
+//      is confirmed pivotStrength candles late, but the last of those
+//      candles is the live one: a pivot found on an early tick can be gone
+//      by the close after its order was sent, so a live divergence entry
+//      can come a candle earlier than in the backtest, or not be in it at
+//      all. Only the horizons (closed D / W / M candles, [1] with
+//      lookahead_on) never repaint.
+//    - "Close after X Candles" starts counting only when the position was
+//      flat at the previous candle's close. A trade opened by a reversal
+//      (or, live, on the same candle the previous trade closed) keeps the
+//      previous trade's count, so it can be closed early. If the reversal
+//      signal comes on the candle on which the time exit fires, the count
+//      is cleared and the new trade gets no time exit at all.
 //    - The strategy() declaration sets no commission or slippage, so
 //      TradingView reports the results without costs.
 // ============================================================================
@@ -939,13 +960,31 @@ if useHybridExit and inTrade
 // =====================================================================
 // --- DIRECTION FILTER: BLOCKED ENTRIES AND DIAGNOSTICS (FGF build) ---
 // =====================================================================
-plotshape(hrdBlkLong,  "LONG blocked by the filter",  shape.xcross, location.belowbar, color.gray, size=size.tiny, text="L", textcolor=color.gray)
-plotshape(hrdBlkShort, "SHORT blocked by the filter", shape.xcross, location.abovebar, color.gray, size=size.tiny, text="S", textcolor=color.gray)
-plot(hrdWantLong  ? 1 : 0, "FGD raw long",      display = display.data_window)
-plot(hrdWantShort ? 1 : 0, "FGD raw short",     display = display.data_window)
-plot(hrdBlkLong   ? 1 : 0, "FGD blocked long",  display = display.data_window)
-plot(hrdBlkShort  ? 1 : 0, "FGD blocked short", display = display.data_window)
-plot(ta.cum(hrdWantLong  ? 1 : 0), "FGD raw long count",      display = display.data_window)
-plot(ta.cum(hrdWantShort ? 1 : 0), "FGD raw short count",     display = display.data_window)
-plot(ta.cum(hrdBlkLong   ? 1 : 0), "FGD blocked long count",  display = display.data_window)
-plot(ta.cum(hrdBlkShort  ? 1 : 0), "FGD blocked short count", display = display.data_window)
+// Live (calc_on_every_tick) only a candle's last tick is kept, so latch each side once per
+// candle with varip: a call on any tick counts; "blocked" = called but never entered this candle.
+varip int hrdRawLBar = -1
+varip int hrdRawSBar = -1
+varip int hrdGoLBar  = -1
+varip int hrdGoSBar  = -1
+if hrdWantLong
+    hrdRawLBar := bar_index
+if hrdWantShort
+    hrdRawSBar := bar_index
+if hrdWantLong and fgfBuyOk
+    hrdGoLBar := bar_index
+if hrdWantShort and fgfSellOk
+    hrdGoSBar := bar_index
+bool fgdRawL = hrdRawLBar == bar_index
+bool fgdRawS = hrdRawSBar == bar_index
+bool fgdBlkL = fgdRawL and hrdGoLBar != bar_index
+bool fgdBlkS = fgdRawS and hrdGoSBar != bar_index
+plotshape(fgdBlkL, "LONG blocked by the filter",  shape.xcross, location.belowbar, color.gray, size=size.tiny, text="L", textcolor=color.gray)
+plotshape(fgdBlkS, "SHORT blocked by the filter", shape.xcross, location.abovebar, color.gray, size=size.tiny, text="S", textcolor=color.gray)
+plot(fgdRawL ? 1 : 0, "FGD raw long",      display = display.data_window)
+plot(fgdRawS ? 1 : 0, "FGD raw short",     display = display.data_window)
+plot(fgdBlkL ? 1 : 0, "FGD blocked long",  display = display.data_window)
+plot(fgdBlkS ? 1 : 0, "FGD blocked short", display = display.data_window)
+plot(ta.cum(fgdRawL ? 1 : 0), "FGD raw long count",      display = display.data_window)
+plot(ta.cum(fgdRawS ? 1 : 0), "FGD raw short count",     display = display.data_window)
+plot(ta.cum(fgdBlkL ? 1 : 0), "FGD blocked long count",  display = display.data_window)
+plot(ta.cum(fgdBlkS ? 1 : 0), "FGD blocked short count", display = display.data_window)
