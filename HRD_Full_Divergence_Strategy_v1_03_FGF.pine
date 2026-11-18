@@ -9,7 +9,8 @@
 //  exit and hybrid decay-slip exit are unchanged. Added: the FlashGold
 //  Direction Filter v1.2, between BEGIN and END FLASHGOLD DIRECTION FILTER,
 //  byte-identical to FlashGold_Direction_Filter_v1_2.pine (this script draws
-//  on the price chart, so FGF_FORCE_OVERLAY stays false).
+//  on the price chart, so FGF_FORCE_OVERLAY stays false). Also added: an
+//  optional trailing take profit, off by default (TRAILING TAKE PROFIT).
 //
 //  WHAT THE FILTER GATES
 //    The side that would actually trade, after "Reverse Trading" and "Trade
@@ -64,8 +65,7 @@
 //
 //  FILTER OFF
 //    With "Enable filter" off (and the trailing take profit off, the
-//    default) every signal trades: the same orders as your
-//    file.
+//    default) every signal trades: the same orders as your file.
 //
 //  NOTES ON THE ORIGINAL (unchanged here)
 //    - "Enable Alerts" has no effect: the script defines no alerts.
