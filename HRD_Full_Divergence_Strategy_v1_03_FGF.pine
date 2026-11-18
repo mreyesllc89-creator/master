@@ -37,8 +37,10 @@
 //    that moment. Live in Tick mode the signal is checked again on every
 //    tick: if price reaches its zone later in the same candle while the
 //    signal still holds, the entry is taken then (the time and hybrid exits
-//    treat that like a reversal). Off: the blocked signal does nothing and
-//    the trade runs on to its own exits.
+//    treat that like a reversal). Off: the blocked signal does nothing; the
+//    trade runs on to its own exits unless the filter allows the signal
+//    later (live, on a later tick of the same candle) or allows a later
+//    opposite signal, which then reverses it.
 //
 //  CHART AND DATA WINDOW
 //    A blocked entry gets a small gray "x" (L below the candle, S above).
@@ -70,9 +72,11 @@
 //    - "Close after X Candles" starts counting only when the position was
 //      flat at the previous candle's close. A trade opened by a reversal
 //      (or, live, on the same candle the previous trade closed) keeps the
-//      previous trade's count, so it can be closed early. If the reversal
-//      signal comes on the candle on which the time exit fires, the count
-//      is cleared and the new trade gets no time exit at all.
+//      previous trade's count, so it can be closed early. In the backtest,
+//      if the reversal signal comes on the candle on which the time exit
+//      fires, the count is cleared and the new trade gets no time exit at
+//      all. Live, the cleared count comes back on the next tick (it is a
+//      var), so the time exit closes the new trade at once.
 //    - The strategy() declaration sets no commission or slippage, so
 //      TradingView reports the results without costs.
 // ============================================================================
@@ -132,7 +136,7 @@ minActivationPts   = input.int(40,     title="Min Activation Points (Ticks)", gr
 // =====================================================================
 // --- DIRECTION FILTER (FGF build) ---
 // =====================================================================
-hrdBlkClose = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a LONG signal the filter blocks still closes an open short (and a blocked SHORT an open long), as the original reversal would, without opening the other side. Off: the open trade runs on to its own exits. Exits are never gated by the filter.")
+hrdBlkClose = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a LONG signal the filter blocks still closes an open short (and a blocked SHORT an open long), as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs on to its own exits unless the filter allows the signal later (live, a later tick of the same candle) or allows a later opposite signal, which reverses it. Exits are never gated by the filter.")
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane

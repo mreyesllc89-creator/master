@@ -9,7 +9,8 @@
 //  forge levels, order blocks, flow / volume detection, resonance signals
 //  and the stop / target rules are unchanged. Entries, the BUY / SELL
 //  labels, the highlights and the alerts now follow the filter (below); with
-//  the filter off they are as in your file. Added: the FlashGold
+//  the filter off the entries, labels and highlights are as in your file,
+//  and the new alert() calls fire on every signal. Added: the FlashGold
 //  Direction Filter v1.2, between BEGIN and END FLASHGOLD DIRECTION FILTER,
 //  byte-identical to FlashGold_Direction_Filter_v1_2.pine (this script draws
 //  on the price chart, so FGF_FORCE_OVERLAY stays false).
