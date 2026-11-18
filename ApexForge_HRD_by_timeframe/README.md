@@ -1,4 +1,4 @@
-# ApexForge Flow Resonance and HRD Full Divergence v1.03: results by timeframe, filter off vs on
+# ApexForge Flow Resonance and HRD Full Divergence v1.03: results by timeframe, filter off vs on, and every trailing setting
 
 Files tested:
 - [`ApexForge_Flow_Resonance_Strategy_FGF.pine`](../ApexForge_Flow_Resonance_Strategy_FGF.pine)
@@ -104,3 +104,154 @@ With "Enable filter" off, each one trades exactly like your original file. Every
 - **Live vs backtest.** HRD runs on every tick live, so live divergence and breakout entries can differ from this backtest (see the file's header). ApexForge's 15m levels differ live on charts below 15m.
 - **A trade open at the end.** It is closed at the last candle here; TradingView leaves it as open P/L. That moves each figure by at most about 0.14 points.
 - **Data.** The gold data is from 2017-2018; percentages carry over to today's prices, dollar distances do not. Two years of BTC is a short window.
+
+## Every trailing setting on every timeframe
+
+Neither strategy had a trailing stop. Both fused files now have an optional **trailing take profit**, group "Trailing take profit", off by default so nothing changes unless you turn it on.
+
+- **Settings:** activation and offset in % of the signal candle's close.
+- **ApexForge** can also drop its Reward:Risk target, but only while the trail is on.
+- **HRD:** set Take Profit (%) to 0 to remove its target.
+
+**What was swept.** For each pair, timeframe (1m to 4h) and filter setting:
+
+- **Trail:** activation 0, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3 and 5%; offset 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3 and 5%; plus no trail.
+- **ApexForge:** also target kept or dropped (394 settings).
+- **HRD:** also TP 4% (its default) or none, and a time exit after 5 (its default), 20 or 100 candles (1,182 settings). Its 5-candle time exit ends most trades before a trail could act, so longer time exits were included.
+
+Each setting was run with TradingView's standard fills and with 1-minute fills inside each candle (Bar Magnifier), with each script's own costs and with our costs, and with real and reversed labels. That is 640,000 backtests in total.
+
+Unless stated otherwise, everything below uses **1-minute fills with our costs**. The extended replicas were checked against two independent references, trade by trade, on about 360,000 trades. The grid, for both fill models, is in [`trailing_sweep_all.csv.gz`](trailing_sweep_all.csv.gz).
+
+### What it shows
+
+1. **No trailing setting is worth adopting on either strategy, on any timeframe.** The selection rule (the same as for XPW; see below) passes one setting out of 56 pair / timeframe / filter cells. A review refuted it.
+2. **The best trailing setting often beats the strategy's own exits, but it is the best of hundreds of tries.** It is positive on:
+   - ApexForge BTC 15m to 4h: +0.04% to +0.85% at its 1% size;
+   - HRD BTC 30m to 4h: up to +36% on 2h with the filter off;
+   - HRD gold 4h, and 30m / 1h with the filter on, by small amounts.
+
+   From 1m to 5m on ApexForge, and 1m to 15m on HRD, almost every setting loses. None of these best settings passes the rule: the best of a grid this size finds something positive by chance.
+3. **TradingView's standard backtest is misleading here too.**
+   - **HRD BTC 1m:** TradingView's own top trailing setting shows **+1,347%** (filter off), and on 1-minute fills with costs it loses 90%. Every HRD BTC timeframe shows the same gap.
+   - **ApexForge:** it is small because each trade is only 1% of equity.
+
+   Use Bar Magnifier, and trails well above the 1-minute candle size.
+4. **The one pick, HRD BTC 2h with the filter off, was refuted.** Activation 2%, offset 0.15%, TP 4%, time exit 100: +30.0% over 2 years with our costs, PF 1.27, drawdown 6.5%, reversed labels -28.6%, stressed costs +23.7%. It reproduces exactly, but:
+   - **It is really a take profit near 2%.** A plain 1.85-1.9% target makes +26% to +28%. Activation 2.25% halves the result.
+   - **It looks selected, not real.** If every signal's direction is randomised, the rule still finds a pass in at least one of 16 cells about 70% of the time. The 20 best trades are 93% of the gain. It is led by shorts in a window where BTC fell 28%, and it makes +2% in ranging markets.
+   - **Live it would trade differently.** HRD recalculates on every tick, and an emulation of that on 1-minute data gives +9.6% with a losing first half, or -2.3% with stressed costs. A ~$20 difference in prices (another exchange) already drops it to about +25%.
+
+### By timeframe
+
+"Trailing settings that make money" is the share of trailing settings with a positive result. For HRD, "No trailing" is the best of its own exits over the TP / time-exit choices; "Your default" is TP 4% and a 5-candle time exit. ApexForge figures are small because each trade is 1% of equity.
+
+#### ApexForge, BTCUSD
+
+| TF | Filter | Trailing settings that make money | Best trailing setting | No trailing (best of the strategy's own exits) | Your default | TradingView's top trailing setting: TradingView shows / 1-minute fills with costs | Rule verdict |
+|---|---|---|---|---|---|---|---|
+| 1m | off | 0% | 0% / 0.2%: -12.27% | own exits: -12.79% | -12.79% | -23.29% / -11.33% | no pick |
+| 1m | on | 0% | 0% / 0.3%: -6.28% | own exits: -6.80% | -6.80% | -12.26% / -5.76% | no pick |
+| 5m | off | 0% | 0% / 0.5%: -1.47% | own exits: -1.79% | -1.79% | -1.71% / -1.37% | no pick |
+| 5m | on | 0% | 0% / 0.5%: -1.06% | own exits: -1.77% | -1.77% | -0.86% / -0.83% | no pick |
+| 15m | off | 6% | 0.3% / 0.1%: +0.14% | own exits: -0.00% | -0.00% | +1.00% / +0.47% | no pick |
+| 15m | on | 12% | 0.1% / 1%: +0.16% | own exits: -0.22% | -0.22% | +0.78% / +0.23% | no pick |
+| 30m | off | 93% | 3% / 2%: +0.85% | own exits: +0.73% | +0.73% | +0.88% / +0.70% | pick fails: reverse hold-out failed |
+| 30m | on | 83% | 3% / 2%, no target: +0.33% | own exits: +0.16% | +0.16% | +0.62% / +0.06% | pick fails: stressed costs -0.04%; forward hold-out failed; reverse hold-out failed |
+| 1h | off | 24% | 5% / 5%, no target: +0.24% | own exits: -0.16% | -0.16% | +0.57% / +0.06% | no pick |
+| 1h | on | 21% | 0% / 1.5%, no target: +0.12% | own exits: -0.24% | -0.24% | +0.27% / +0.03% | no pick |
+| 2h | off | 36% | 2% / 0.1%: +0.27% | own exits: -0.31% | -0.31% | +0.39% / +0.28% | no pick |
+| 2h | on | 10% | 0.75% / 0.5%: +0.04% | own exits: -0.29% | -0.29% | +0.09% / -0.01% | no pick |
+| 4h | off | 81% | 0% / 5%, no target: +0.26% | own exits: +0.02% | +0.02% | +0.33% / +0.07% | no pick |
+| 4h | on | 48% | 0.75% / 0.3%: +0.06% | own exits: -0.11% | -0.11% | +0.11% / +0.05% | no pick |
+
+#### ApexForge, XAUUSD
+
+| TF | Filter | Trailing settings that make money | Best trailing setting | No trailing (best of the strategy's own exits) | Your default | TradingView's top trailing setting: TradingView shows / 1-minute fills with costs | Rule verdict |
+|---|---|---|---|---|---|---|---|
+| 1m | off | 0% | 0.5% / 0.05%: -1.10% | own exits: -1.18% | -1.18% | -3.14% / -1.11% | no pick |
+| 1m | on | 0% | 0.2% / 0.05%: -0.66% | own exits: -0.79% | -0.79% | -1.90% / -0.66% | no pick |
+| 5m | off | 0% | 0.02% / 0.3%: -0.09% | own exits: -0.27% | -0.27% | -0.63% / -0.08% | no pick |
+| 5m | on | 6% | 0.3% / 0.05%: +0.02% | own exits: -0.07% | -0.07% | -0.31% / +0.06% | no pick |
+| 15m | off | 1% | 0% / 0.3%: +0.01% | own exits: -0.17% | -0.17% | -0.19% / -0.04% | no pick |
+| 15m | on | 0% | 0% / 0.3%: -0.00% | own exits: -0.17% | -0.17% | -0.14% / -0.04% | no pick |
+| 30m | off | 2% | 0% / 0.3%: +0.02% | own exits: -0.16% | -0.16% | -0.05% / -0.00% | no pick |
+| 30m | on | 7% | 0% / 0.3%: +0.04% | own exits: -0.08% | -0.08% | -0.01% / -0.03% | no pick |
+| 1h | off | 73% | 0.15% / 1.5%: +0.10% | own exits: +0.00% | +0.00% | +0.11% / +0.05% | pick fails: forward hold-out failed; reverse hold-out failed |
+| 1h | on | 10% | 0% / 0.75%: +0.01% | own exits: -0.08% | -0.08% | +0.03% / +0.01% | no pick |
+| 2h | off | 14% | 0% / 0.5%: +0.03% | own exits: -0.13% | -0.13% | +0.06% / +0.01% | no pick |
+| 2h | on | 46% | 5% / 0.15%: +0.04% | own exits: -0.03% | -0.03% | +0.03% / +0.04% | no pick |
+| 4h | off | 8% | 0.1% / 0.05%: +0.01% | own exits: -0.10% | -0.10% | +0.02% / +0.01% | no pick |
+| 4h | on | 18% | 0.15% / 0.05%: +0.00% | own exits: -0.04% | -0.04% | +0.00% / +0.00% | no pick |
+
+#### HRD, BTCUSD
+
+| TF | Filter | Trailing settings that make money | Best trailing setting | No trailing (best of the strategy's own exits) | Your default | TradingView's top trailing setting: TradingView shows / 1-minute fills with costs | Rule verdict |
+|---|---|---|---|---|---|---|---|
+| 1m | off | 0% | 0.02% / 0.1%, TP 4%, time exit 100: -97.3% | TP 4%, time exit 100: -99.1% | -99.5% | +1346.9% / -89.6% | no pick |
+| 1m | on | 0% | 0.02% / 0.1%, TP 4%, time exit 100: -78.6% | TP 4%, time exit 100: -86.9% | -88.6% | +188.4% / -60.7% | no pick |
+| 5m | off | 0% | 0.15% / 0.1%, TP 4%, time exit 100: -51.2% | TP 4%, time exit 100: -60.6% | -69.8% | +450.9% / -42.1% | no pick |
+| 5m | on | 0% | 0.02% / 0.2%, TP 4%, time exit 20: -21.3% | TP 4%, time exit 100: -31.1% | -40.0% | +140.4% / -11.3% | no pick |
+| 15m | off | 0% | 0.15% / 0.3%, TP 4%, time exit 100: -4.2% | TP 4%, time exit 20: -22.2% | -25.6% | +367.9% / -5.9% | no pick |
+| 15m | on | 0% | 0.1% / 0.1%, TP 4%, time exit 100: -6.6% | TP 4%, time exit 100: -14.6% | -18.9% | +96.7% / -5.0% | no pick |
+| 30m | off | 21% | 0.1% / 1%, no TP, time exit 100: +16.8% | TP 4%, time exit 100: -4.7% | -25.8% | +277.0% / -5.6% | pick fails: stressed costs -8.55%; forward hold-out failed |
+| 30m | on | 11% | 0.1% / 1%, no TP, time exit 100: +9.8% | TP 4%, time exit 100: -10.8% | -17.0% | +86.8% / -5.3% | pick fails: stressed costs -2.23% |
+| 1h | off | 30% | 3% / 1%, no TP, time exit 20: +15.3% | no TP, time exit 20: +4.7% | -9.3% | +208.9% / +0.3% | pick fails: forward hold-out failed; reverse hold-out failed |
+| 1h | on | 48% | 1% / 0.75%, no TP, time exit 20: +8.9% | no TP, time exit 5: +0.8% | -0.4% | +48.6% / -1.2% | pick fails: forward hold-out failed; reverse hold-out failed |
+| 2h | off | 70% | 0.75% / 2%, TP 4%, time exit 20: +36.0% | TP 4%, time exit 20: +21.6% | +6.0% | +150.4% / +1.2% | **passes** (review below) |
+| 2h | on | 0% | 0.05% / 0.1%, TP 4%, time exit 5: -0.4% | TP 4%, time exit 20: -7.8% | -8.5% | +23.9% / -0.2% | no pick |
+| 4h | off | 13% | 5% / 5%, no TP, time exit 100: +11.0% | no TP, time exit 100: +4.7% | -12.1% | +105.7% / -1.7% | no pick |
+| 4h | on | 13% | 3% / 1%, no TP, time exit 100: +2.6% | no TP, time exit 100: +3.1% | -7.0% | +16.0% / +1.4% | no pick |
+
+#### HRD, XAUUSD
+
+| TF | Filter | Trailing settings that make money | Best trailing setting | No trailing (best of the strategy's own exits) | Your default | TradingView's top trailing setting: TradingView shows / 1-minute fills with costs | Rule verdict |
+|---|---|---|---|---|---|---|---|
+| 1m | off | 0% | 0.05% / 0.05%, TP 4%, time exit 100: -80.6% | TP 4%, time exit 100: -82.2% | -87.9% | +43.0% / -77.3% | no pick |
+| 1m | on | 0% | 0.05% / 0.05%, TP 4%, time exit 100: -49.3% | TP 4%, time exit 100: -52.5% | -58.8% | +18.0% / -44.8% | no pick |
+| 5m | off | 0% | 0.15% / 0.05%, TP 4%, time exit 100: -28.0% | TP 4%, time exit 100: -31.9% | -39.6% | +37.8% / -27.7% | no pick |
+| 5m | on | 0% | 0.15% / 0.05%, TP 4%, time exit 100: -13.9% | TP 4%, time exit 100: -16.2% | -20.4% | +16.3% / -9.5% | no pick |
+| 15m | off | 0% | 0.5% / 0.05%, TP 4%, time exit 20: -15.7% | TP 4%, time exit 20: -18.6% | -21.4% | +21.7% / -15.1% | no pick |
+| 15m | on | 0% | 0% / 0.1%, TP 4%, time exit 5: -7.3% | TP 4%, time exit 5: -9.4% | -9.4% | +8.5% / -8.4% | no pick |
+| 30m | off | 0% | 0.2% / 0.05%, TP 4%, time exit 5: -3.5% | TP 4%, time exit 5: -6.1% | -6.1% | +21.1% / -6.8% | no pick |
+| 30m | on | 2% | 0.2% / 0.05%, TP 4%, time exit 20: +0.4% | TP 4%, time exit 20: -1.8% | -3.5% | +10.3% / +1.5% | no pick |
+| 1h | off | 0% | 0.02% / 0.3%, TP 4%, time exit 100: -0.0% | TP 4%, time exit 5: -1.7% | -1.7% | +18.3% / -2.2% | no pick |
+| 1h | on | 4% | 0.02% / 0.3%, TP 4%, time exit 20: +0.3% | TP 4%, time exit 5: -1.3% | -1.3% | +8.5% / +0.4% | no pick |
+| 2h | off | 0% | 0% / 0.15%, TP 4%, time exit 20: -2.4% | TP 4%, time exit 100: -3.5% | -7.6% | +13.8% / -2.8% | no pick |
+| 2h | on | 0% | 0% / 0.2%, TP 4%, time exit 5: -0.4% | TP 4%, time exit 5: -2.9% | -2.9% | +3.3% / -1.0% | no pick |
+| 4h | off | 10% | 0.3% / 1%, TP 4%, time exit 20: +2.5% | TP 4%, time exit 20: -0.5% | -4.7% | +17.8% / -1.4% | no pick |
+| 4h | on | 8% | 0.02% / 0.5%, TP 4%, time exit 20: +1.2% | TP 4%, time exit 5: -0.5% | -0.5% | +3.9% / +0.0% | no pick |
+
+### Heatmaps
+
+Each panel shows activation (up) against offset (across), coloured by net % with our costs on 1-minute fills, for the other inputs of that panel's best setting (named in its title). Hatched cells have an offset under the 1-minute noise; the box marks the rule's pick.
+
+![ApexForge BTCUSD](img/trail_apex_BTC.png)
+
+![ApexForge XAUUSD](img/trail_apex_XAU.png)
+
+![HRD BTCUSD](img/trail_hrd_BTC.png)
+
+![HRD XAUUSD](img/trail_hrd_XAU.png)
+
+### The rule
+
+The same rule as the XPW trailing sweep.
+
+- **Pool.**
+  - Trail offsets of at least twice the median 1-minute candle range (BTC 0.1%, gold 0.05%), plus the no-trail settings.
+  - Settings with identical results count once.
+- **Pick.**
+  - Candidates: trailing settings positive in both halves, with 30+ trades in each half; each half is scored from a fresh start.
+  - Take the 40 best by their worse half. Score each as 0.5 x its worse half + 0.5 x the mean worse half of its grid neighbours (at least 5).
+- **A pick passes only if all of these hold:**
+  1. **Forward.** Settings chosen on the first half beat 95% of random draws on the second half, with 60%+ positive.
+  2. **Reverse.** The same, chosen on the second half and scored on the first.
+  3. **Signal control.** It beats the same setting with reversed labels in both halves.
+  4. **Stressed costs.** It stays positive.
+
+An auditor re-implemented the rule and matched all 56 verdicts and every pick. The auditor also found the random baseline lenient when the best settings cluster in the grid; with a stricter baseline, no cell passes.
+
+### A practical note on HRD
+
+HRD runs with calc_on_every_tick, so live it behaves differently from every backtest above. Divergence entries fire a candle early, on pivots that can still vanish. After an intrabar exit, a still-true signal re-enters, and the hybrid exit closes the new trade at once. Setting calc_on_every_tick to false in the strategy() line would make live trading match the backtest.
