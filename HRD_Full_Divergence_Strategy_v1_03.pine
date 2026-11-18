@@ -1,0 +1,272 @@
+//@version=6
+// HRD MultiTF Full Divergence — Horizon Resonance Divergence System
+// Converted to Strategy with Full Risk Engine & Hybrid Decay-Slip Exit
+strategy("HRD Full Divergence Strategy v1.03", overlay=true, calc_on_every_tick=true, max_lines_count=500, max_labels_count=500)
+
+// ============================ INDICATOR INPUTS ============================
+grpColors    = "Horizon Colors"
+dailyColor   = input.color(color.aqua,    "Daily Color",   group=grpColors)
+weeklyColor  = input.color(color.yellow,  "Weekly Color",  group=grpColors)
+monthlyColor = input.color(color.fuchsia, "Monthly Color", group=grpColors)
+
+grpDiv       = "Divergence Engine"
+pivotStrength  = input.int(5,   "Pivot Strength (L/R)",  minval=1,             group=grpDiv)
+maxDivLookback = input.int(60,  "Max Divergence Lookback (bars)", minval=10,   group=grpDiv)
+showDivLines   = input.bool(true,  "Show Divergence Lines", group=grpDiv)
+showLabels     = input.bool(true,  "Show Score Labels",     group=grpDiv)
+alertsOn       = input.bool(true,  "Enable Alerts",         group=grpDiv)
+scoreThreshold = input.int(75,  "Master Score Threshold", minval=0, maxval=100, group=grpDiv)
+
+grpReg = "Regular Divergences"
+showBullReg  = input.bool(true,  "Show Bullish Regular",  group=grpReg)
+scoreBullReg = input.int(85,     "Bullish Regular Score", minval=0, maxval=100, group=grpReg)
+showBearReg  = input.bool(true,  "Show Bearish Regular",  group=grpReg)
+scoreBearReg = input.int(88,     "Bearish Regular Score", minval=0, maxval=100, group=grpReg)
+
+grpHid = "Hidden Divergences"
+showBullHid  = input.bool(true,  "Show Hidden Bullish",   group=grpHid)
+scoreBullHid = input.int(78,     "Hidden Bullish Score",  minval=0, maxval=100, group=grpHid)
+showBearHid  = input.bool(true,  "Show Hidden Bearish",   group=grpHid)
+scoreBearHid = input.int(82,     "Hidden Bearish Score",  minval=0, maxval=100, group=grpHid)
+
+grpBrk = "Breakouts"
+showBreaks   = input.bool(true,  "Show Breakout Arrows",  group=grpBrk)
+
+// =====================================================================
+// --- STRATEGY RULES & RISK INPUTS ---
+// =====================================================================
+string groupRisk = "Strategy Rules & Risk"
+InpReverseTrading = input.bool(false, title = "Reverse Trading", group = groupRisk, tooltip = "When enabled, all long signals become short and vice versa")
+InpTradeDirection = input.string("Both", title = "Trade Direction", options = ["Both", "Buy Only", "Sell Only"], group = groupRisk)
+InpRiskPct        = input.float(1.0, title = "Risk % per Trade (If SL > 0)", minval = 0.0, step = 0.1, group = groupRisk)
+InpFixedQty       = input.float(0.01, title = "Fixed Quantity (If SL = 0)", minval = 0.0, step = 0.01, group = groupRisk)
+InpSlPct          = input.float(2.0, title = "Stop Loss (%) [0 = No SL]", minval = 0.0, step = 0.1, group = groupRisk)
+InpTpPct          = input.float(4.0, title = "Take Profit (%) [0 = Disabled]", minval = 0.0, step = 0.1, group = groupRisk)
+InpExitCandles    = input.int(5, title = "Close after X Candles", minval = 1, group = groupRisk)
+
+// =====================================================================
+// --- HYBRID DECAY-SLIP EXIT INPUTS ---
+// =====================================================================
+grp_hybrid = "--- HYBRID DECAY-SLIP EXIT ---"
+useHybridExit      = input.bool(true,  title="Use Hybrid Exit", group=grp_hybrid)
+hybridSensitivity  = input.float(1.0,  title="Hybrid Sensitivity", step=0.1, group=grp_hybrid)
+minDecayUpdates    = input.int(10,     title="Min Updates/Bars before exit allowed", group=grp_hybrid)
+trailStepMult      = input.float(1.0,  title="Trail Step Multiplier", step=0.1, group=grp_hybrid)
+minActivationPts   = input.int(40,     title="Min Activation Points (Ticks)", group=grp_hybrid)
+
+// =====================================================================
+// --- GLOBALS ---
+// =====================================================================
+var float g_PeakProfit = 0.0
+var int   g_UpdateCounter = 0
+
+// =====================================================================
+// --- RISK MATH ENGINE ---
+// =====================================================================
+calculatePositionSize(float slDistancePrice) =>
+    float positionSize = 0.0
+
+    // Case 1: No SL or no distance → use fixed quantity
+    if InpSlPct <= 0.0 or slDistancePrice <= 0.0
+        positionSize := InpFixedQty
+    else
+        // Calculate exact risk amount in account currency
+        float riskAmount = strategy.equity * (InpRiskPct / 100.0)
+
+        // Loss formula: slDistancePrice * positionSize * syminfo.pointvalue
+        if syminfo.pointvalue > 0.0
+            positionSize := riskAmount / (slDistancePrice * syminfo.pointvalue)
+        else
+            positionSize := InpFixedQty
+
+        // Never go below the fixed quantity floor
+        if positionSize < InpFixedQty
+            positionSize := InpFixedQty
+
+    positionSize
+
+// ============================ HORIZONS ============================
+pdh = request.security(syminfo.tickerid, "D", high[1], lookahead=barmerge.lookahead_on)
+pdl = request.security(syminfo.tickerid, "D", low[1],  lookahead=barmerge.lookahead_on)
+pwh = request.security(syminfo.tickerid, "W", high[1], lookahead=barmerge.lookahead_on)
+pwl = request.security(syminfo.tickerid, "W", low[1],  lookahead=barmerge.lookahead_on)
+pmh = request.security(syminfo.tickerid, "M", high[1], lookahead=barmerge.lookahead_on)
+pml = request.security(syminfo.tickerid, "M", low[1],  lookahead=barmerge.lookahead_on)
+
+plot(pdh, "Prev Day High",   color=dailyColor,   linewidth=2)
+plot(pdl, "Prev Day Low",    color=dailyColor,   linewidth=2)
+plot(pwh, "Prev Week High",  color=weeklyColor,  linewidth=2)
+plot(pwl, "Prev Week Low",   color=weeklyColor,  linewidth=2)
+plot(pmh, "Prev Month High", color=monthlyColor, linewidth=2)
+plot(pml, "Prev Month Low",  color=monthlyColor, linewidth=2)
+
+// ============================ SIGNALS & BREAKOUTS ============================
+bool longCondition = false
+bool shortCondition = false
+
+maxLevel = math.max(pdh, math.max(pwh, pmh))
+minLevel = math.min(pdl, math.min(pwl, pml))
+
+bullBreak = close > maxLevel and close[1] <= maxLevel
+bearBreak = close < minLevel and close[1] >= minLevel
+
+if bullBreak
+    longCondition := true
+if bearBreak
+    shortCondition := true
+
+plotshape(showBreaks and bullBreak, "Bull Break", shape.triangleup,   location.belowbar, color.lime, size=size.small)
+plotshape(showBreaks and bearBreak, "Bear Break", shape.triangledown, location.abovebar, color.red,  size=size.small)
+
+// ============================ OSCILLATORS ============================
+rsiVal             = ta.rsi(close, 14)
+[macdLine, _, _]   = ta.macd(close, 12, 26, 9)
+stochVal           = ta.sma(ta.stoch(close, high, low, 5), 3)
+
+osc = rsiVal * 0.4 + macdLine * 0.3 + stochVal * 0.3
+
+// ============================ PIVOTS & DIVERGENCE ============================
+ph = ta.pivothigh(high, pivotStrength, pivotStrength)
+pl = ta.pivotlow(low,   pivotStrength, pivotStrength)
+
+var float prevPlPrice = na
+var float prevPlOsc   = na
+var int   prevPlBar   = na
+var float prevPhPrice = na
+var float prevPhOsc   = na
+var int   prevPhBar   = na
+
+drawDiv(int b1, float p1, int b2, float p2, color col) =>
+    if showDivLines
+        line.new(b1, p1, b2, p2, color=col, width=2, style=line.style_dotted)
+
+drawLabel(int b, float p, string txt, int score, bool isLow) =>
+    if showLabels and score >= scoreThreshold
+        col   = score >= 85 ? color.lime : color.yellow
+        style = isLow ? label.style_label_up : label.style_label_down
+        loc   = isLow ? p - syminfo.mintick * 30 : p + syminfo.mintick * 30
+        label.new(b, loc, txt + " | Score " + str.tostring(score), style=style, color=color.new(col, 80), textcolor=col, size=size.small)
+
+// Bullish Divergence
+if not na(pl)
+    currPlBar   = bar_index - pivotStrength
+    currPlPrice = pl
+    currPlOsc   = osc[pivotStrength]
+
+    if not na(prevPlBar) and (currPlBar - prevPlBar) <= maxDivLookback
+        if showBullReg and currPlPrice < prevPlPrice and currPlOsc > prevPlOsc
+            drawDiv(prevPlBar, prevPlPrice, currPlBar, currPlPrice, color.lime)
+            drawLabel(currPlBar, currPlPrice, "Bullish Regular", scoreBullReg, true)
+            longCondition := true
+        else if showBullHid and currPlPrice > prevPlPrice and currPlOsc < prevPlOsc
+            drawDiv(prevPlBar, prevPlPrice, currPlBar, currPlPrice, color.lime)
+            drawLabel(currPlBar, currPlPrice, "Hidden Bullish", scoreBullHid, true)
+            longCondition := true
+
+    prevPlPrice := currPlPrice
+    prevPlOsc   := currPlOsc
+    prevPlBar   := currPlBar
+
+// Bearish Divergence
+if not na(ph)
+    currPhBar   = bar_index - pivotStrength
+    currPhPrice = ph
+    currPhOsc   = osc[pivotStrength]
+
+    if not na(prevPhBar) and (currPhBar - prevPhBar) <= maxDivLookback
+        if showBearReg and currPhPrice > prevPhPrice and currPhOsc < prevPhOsc
+            drawDiv(prevPhBar, prevPhPrice, currPhBar, currPhPrice, color.red)
+            drawLabel(currPhBar, currPhPrice, "Bearish Regular", scoreBearReg, false)
+            shortCondition := true
+        else if showBearHid and currPhPrice < prevPhPrice and currPhOsc > prevPhOsc
+            drawDiv(prevPhBar, prevPhPrice, currPhBar, currPhPrice, color.red)
+            drawLabel(currPhBar, currPhPrice, "Hidden Bearish", scoreBearHid, false)
+            shortCondition := true
+
+    prevPhPrice := currPhPrice
+    prevPhOsc   := currPhOsc
+    prevPhBar   := currPhBar
+
+// =====================================================================
+// --- RISK ENGINE EXECUTION LOGIC ---
+// =====================================================================
+bool userLongSignal  = longCondition
+bool userShortSignal = shortCondition
+
+// 1. Apply Reverse Trading Logic
+bool longSignal  = InpReverseTrading ? userShortSignal : userLongSignal
+bool shortSignal = InpReverseTrading ? userLongSignal  : userShortSignal
+
+// 2. Apply Trade Direction Filter
+bool longDirectionAllowed  = (InpTradeDirection == "Both") or (InpTradeDirection == "Buy Only")
+bool shortDirectionAllowed = (InpTradeDirection == "Both") or (InpTradeDirection == "Sell Only")
+
+// 3. Time-based exit
+var int entryBarIndex = na
+if strategy.position_size != 0 and strategy.position_size[1] == 0
+    entryBarIndex := bar_index
+
+if strategy.position_size != 0 and not na(entryBarIndex) and (bar_index - entryBarIndex >= InpExitCandles)
+    strategy.close_all(comment = "Time-based Exit")
+    entryBarIndex := na
+
+// 4. LONG EXECUTION
+if longSignal and longDirectionAllowed and strategy.position_size <= 0
+    float estimatedEntryPrice = close
+    float stopLossDistanceLong = InpSlPct > 0.0 ? estimatedEntryPrice * (InpSlPct / 100.0) : 0.0
+    float stopLossPriceLong    = InpSlPct > 0.0 ? estimatedEntryPrice * (1.0 - InpSlPct / 100.0) : na
+    float takeProfitPriceLong  = InpTpPct > 0.0 ? estimatedEntryPrice * (1.0 + InpTpPct / 100.0) : na
+
+    float longQuantity = calculatePositionSize(stopLossDistanceLong)
+
+    strategy.entry(id = "Long", direction = strategy.long, qty = longQuantity, comment = "Entry Long")
+    strategy.exit(id = "Long Exit", from_entry = "Long", stop = stopLossPriceLong, limit = takeProfitPriceLong, comment = "SL/TP Long")
+
+// 5. SHORT EXECUTION
+if shortSignal and shortDirectionAllowed and strategy.position_size >= 0
+    float estimatedEntryPrice = close
+    float stopLossDistanceShort = InpSlPct > 0.0 ? estimatedEntryPrice * (InpSlPct / 100.0) : 0.0
+    float stopLossPriceShort    = InpSlPct > 0.0 ? estimatedEntryPrice * (1.0 + InpSlPct / 100.0) : na
+    float takeProfitPriceShort  = InpTpPct > 0.0 ? estimatedEntryPrice * (1.0 - InpTpPct / 100.0) : na
+
+    float shortQuantity = calculatePositionSize(stopLossDistanceShort)
+
+    strategy.entry(id = "Short", direction = strategy.short, qty = shortQuantity, comment = "Entry Short")
+    strategy.exit(id = "Short Exit", from_entry = "Short", stop = stopLossPriceShort, limit = takeProfitPriceShort, comment = "SL/TP Short")
+
+// =====================================================================
+// --- HYBRID DECAY-SLIP EXIT ENGINE ---
+// =====================================================================
+inTrade = strategy.position_size != 0
+isLong  = strategy.position_size > 0
+isShort = strategy.position_size < 0
+
+float currentProfit = 0.0
+if inTrade
+    if isLong
+        currentProfit := close - strategy.position_avg_price
+    else
+        currentProfit := strategy.position_avg_price - close
+
+if not inTrade
+    g_PeakProfit := 0.0
+    g_UpdateCounter := 0
+
+if useHybridExit and inTrade
+    float activationLevel = minActivationPts * syminfo.mintick
+
+    if (currentProfit >= activationLevel) or (g_PeakProfit >= activationLevel)
+        g_UpdateCounter += 1
+
+        if currentProfit > g_PeakProfit
+            g_PeakProfit := currentProfit
+
+        float speedDrop = g_PeakProfit - currentProfit
+        bool decayTriggered = speedDrop > (trailStepMult * 8 * syminfo.mintick * hybridSensitivity)
+        bool slipTriggered = currentProfit < (g_PeakProfit * 0.85)
+
+        if decayTriggered and slipTriggered and g_UpdateCounter >= minDecayUpdates and g_PeakProfit > 0
+            strategy.close_all(comment="💥 Hybrid Exit")
+
+            g_PeakProfit := 0.0
+            g_UpdateCounter := 0
