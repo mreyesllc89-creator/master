@@ -68,6 +68,122 @@ The filter removes 53-65% of the entries on both pairs.
 - **FIFO pairing.** TradingView's default FIFO rule can pair a trail exit with an older open entry in its List of Trades. Totals are unaffected; per-trade win rate and PF can differ.
 - **Gold data age.** The gold data is from 2017-2018. Gold now trades at several times that price, so fixed dollar distances behave differently today. Distances in percent carry over.
 
-## Next: every trailing setting on every timeframe
+## Every trailing setting on every timeframe
 
-The trailing sweep (activation x offset x stop loss, filter off and on, with and without Bar Magnifier) is running. Its results will be added here.
+**What was swept.** For each pair, timeframe (1m to 4h) and filter setting (off / on):
+
+- trail activation 0, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3 and 5% of the entry price;
+- trail offset 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.75, 1, 1.5, 2, 3 and 5%;
+- stop loss off, or 0.1, 0.25, 0.5, 1, 2 and 4%;
+- plus trailing TP off, and your default ($2 / $1).
+
+That is 1,380 settings per cell. Each one was run four ways:
+
+- **Fills:** TradingView's standard backtest, and with exits checked on the 1-minute candles inside each chart candle. The second is what TradingView's Bar Magnifier does and is much closer to live trading.
+- **Labels:** as the script gives them, and with every label reversed (the control).
+
+In total 154,560 backtests. Everything below uses 1-minute fills and costs unless it says otherwise. The full grid is in [`trailing_sweep_all.csv.gz`](trailing_sweep_all.csv.gz).
+
+### What it shows
+
+1. **TradingView's standard backtest ranks the tiniest trail first on every timeframe** (activation 0.02%, offset 0.01%) and shows it making +30% to +300%. On 1-minute data with costs, every one of those settings loses. The reason is the same as for your $2 / $1 default above. Don't trust a TradingView result whose trail offset is smaller than a few 1-minute candles. Turn on Bar Magnifier, or use a wider trail.
+2. **1m to 1h: no trailing setting makes money after costs** on either pair. The few exceptions (BTC 30m and gold 30m with the filter on) make at most +4.4%, and only with an offset under the 1-minute noise or with positions stacked above 1x equity.
+3. **2h and 4h are the only timeframes with a profitable area.**
+   - On BTC it is wide trails: activation 3-5% and offset 1-3%. Those hardly ever trigger, so the signals and the filter do the exiting.
+   - On gold it is offsets of 0.75% or more.
+   - Most of these settings stack open entries above 1x equity, up to 2x. TradingView's default margin of 100% would liquidate part of those positions.
+4. **Two settings pass the hold-out test** (rule below). Both are weak:
+   - **BTCUSD 2h, filter on, activation 3%, offset 1%, no stop loss.** +15.7% over 2 years with costs, PF 1.20, drawdown 10.6%. Reversed labels: -4.1%. It is fragile: without its 10 best entry days it makes +0.7%, and most of the profit comes from shorts.
+   - **XAUUSD 4h, filter off, activation 0.75%, offset 0.05%, stop loss 0.5%.** +1.65% over 18 months, PF 1.12. That is too small to matter, and without its 10 best entry days it loses.
+5. **The filter.** On 2h it raises the best BTC result, and it is the version that passes there. On gold 4h the version without it passes. Elsewhere it changes how much you lose, not whether you lose.
+
+### By timeframe
+
+"Settings that make money" is the share of the 1,380 settings with a positive result. "Needs over 1x margin" means open entries go above 1x equity at some point.
+
+#### BTCUSD
+
+| TF | Filter | Settings that make money | Best setting (activation / offset) | Needs over 1x margin | TradingView's top setting: TradingView shows / 1-minute data | Your default ($2/$1): TradingView / 1-minute data | Hold-out verdict |
+|---|---|---|---|---|---|---|---|
+| 1m | off | 0% | 0.02% / 0.01%, SL 0.1%: -71.5% | no | +264.8% / -71.5% | +249.0% / -72.7% | no file |
+| 1m | on | 0% | 0.02% / 0.01%, SL 0.1%: -37.2% | no | +53.2% / -37.2% | +49.9% / -38.6% | no file |
+| 5m | off | 0% | 0.15% / 0.01%: -29.0% | yes (1.7x) | +299.8% / -29.5% | +288.0% / -33.5% | no file |
+| 5m | on | 0% | 0.02% / 0.01%, SL 0.5%: -15.2% | no | +60.7% / -15.6% | +59.5% / -17.3% | no file |
+| 15m | off | 0% | 0.3% / 0.01%: -5.0% | yes (2.0x) | +293.5% / -11.8% | +261.7% / -14.6% | no file |
+| 15m | on | 0% | 0.1% / 0.01%, SL 0.5%: -6.0% | no | +71.7% / -6.5% | +66.0% / -7.8% | no file |
+| 30m | off | 0% | 0.1% / 0.01%, SL 1%: -5.5% | yes (1.1x) | +231.2% / -9.4% | +196.9% / -10.4% | no file |
+| 30m | on | 18% | 0.5% / 0.01%: +4.4% | yes (1.6x) | +70.3% / -2.8% | +58.7% / -5.6% | no file |
+| 1h | off | 0% | 0.02% / 0.01%, SL 2%: -4.2% | no | +181.9% / -4.2% | +143.7% / -6.6% | no file |
+| 1h | on | 0% | 0.3% / 0.01%, SL 2%: -1.6% | no | +61.1% / -4.3% | +50.6% / -5.5% | no file |
+| 2h | off | 7% | 5% / 3%: +23.3% | yes (2.0x) | +105.0% / -3.6% | +87.0% / -4.0% | no file (every profitable setting needs over 1x margin) |
+| 2h | on | 18% | 5% / 3%: +24.4% | yes (1.2x) | +39.9% / -1.4% | +33.5% / -3.0% | **[file](XPW_TrailTP_BTCUSD_120m.pine): 3% / 1%, no SL, +15.7%** |
+| 4h | off | 3% | 5% / 1.5%: +12.9% | yes (2.0x) | +85.2% / -2.1% | +69.1% / -2.5% | no file (every profitable setting needs over 1x margin) |
+| 4h | on | 11% | 5% / 3%: +12.9% | yes (1.2x) | +31.8% / -0.9% | +25.7% / -1.2% | no file (pick 2% / 2%, +3.8%: reversed labels do as well; forward hold-out fails) |
+
+#### XAUUSD
+
+| TF | Filter | Settings that make money | Best setting (activation / offset) | Needs over 1x margin | TradingView's top setting: TradingView shows / 1-minute data | Your default ($2/$1): TradingView / 1-minute data | Hold-out verdict |
+|---|---|---|---|---|---|---|---|
+| 1m | off | 0% | 0.02% / 0.01%: -43.9% | no | +13.0% / -43.9% | +2.6% / -49.1% | no file |
+| 1m | on | 0% | 0% / 0.01%: -19.3% | no | +4.0% / -19.3% | +0.4% / -22.1% | no file |
+| 5m | off | 0% | 0.05% / 0.01%: -18.0% | yes (1.1x) | +15.8% / -18.6% | +0.9% / -23.4% | no file |
+| 5m | on | 0% | 0.1% / 0.01%, SL 0.25%: -6.6% | no | +6.4% / -7.2% | +1.0% / -9.2% | no file |
+| 15m | off | 0% | 0.3% / 0.01%, SL 1%: -6.8% | yes (2.0x) | +17.7% / -9.2% | +2.0% / -12.9% | no file |
+| 15m | on | 0% | 1% / 0.01%, SL 1%: -0.3% | yes (1.3x) | +7.9% / -3.0% | +2.4% / -4.4% | no file |
+| 30m | off | 0% | 0.3% / 0.01%, SL 1%: -1.3% | yes (1.6x) | +15.7% / -4.9% | +4.3% / -6.9% | no file |
+| 30m | on | 37% | 1% / 0.01%, SL 1%: +1.2% | yes (1.4x) | +6.7% / -1.9% | +1.7% / -2.9% | no file |
+| 1h | off | 0% | 0.05% / 0.01%, SL 1%: -2.1% | no | +13.9% / -2.9% | -0.1% / -8.8% | no file |
+| 1h | on | 0% | 0.05% / 0.01%, SL 1%: -0.5% | no | +7.1% / -0.8% | -1.5% / -5.5% | no file |
+| 2h | off | 55% | 0.75% / 1.5%: +8.7% | yes (2.0x) | +14.6% / +6.7% | +7.1% / +0.2% | no file (within 1x margin, only isolated settings are positive in both halves: no plateau) |
+| 2h | on | 64% | 0.75% / 1.5%: +3.1% | yes (1.3x) | +6.0% / +2.4% | +2.5% / -0.3% | no file (pick 0.5% / 0.75%, SL 0.5%, +2.2%: both hold-outs fail) |
+| 4h | off | 60% | 0.02% / 1.5%, SL 2%: +5.5% | yes (1.2x) | +10.8% / +0.0% | +4.0% / -1.9% | **[file](XPW_TrailTP_XAUUSD_240m.pine): 0.75% / 0.05%, SL 0.5%, +1.65%** |
+| 4h | on | 48% | 0.75% / 1.5%, SL 2%: +1.7% | no | +4.8% / +0.1% | +1.6% / -1.1% | no file (pick 0.75% / 0.05%, SL 0.5%, +1.1%: both hold-outs fail) |
+
+The gold percentages carry over to today's prices; dollar distances do not. At gold near $4,000, for example, 0.75% is $30.
+
+### Heatmaps
+
+Each panel shows activation (up) against offset (across), coloured by net % with costs on 1-minute data. Hatched cells have an offset under the 1-minute noise; a dot means open entries went above 1x equity; the box is the pick.
+
+![BTCUSD heatmaps](img/trail_heatmaps_BTC.png)
+
+![XAUUSD heatmaps](img/trail_heatmaps_XAU.png)
+
+What TradingView shows against 1-minute data, and the signal edge (normal minus reversed labels), on the 1h chart with the filter off:
+
+![BTCUSD 1h: TradingView vs 1-minute data](img/tv_vs_1m_BTC_60.png)
+
+![XAUUSD 1h: TradingView vs 1-minute data](img/tv_vs_1m_XAU_60.png)
+
+On 1h, reversing every label does better than the labels themselves, for almost every trailing setting on both pairs.
+
+### The rule (rule T)
+
+The same rule was applied to every pair, timeframe and filter setting.
+
+- **Pool.**
+  - Offsets of at least twice the median 1-minute candle range (BTC 0.1%, gold 0.05%). Below that, even 1-minute data decides the exit.
+  - Open entries never above 1x equity.
+  - Settings with identical results count once.
+- **Pick.**
+  - Candidates: settings positive in both halves of the window, with 30+ trades in each half. Each half is scored from a fresh $10,000.
+  - Take the 40 best by their worse half. Score each as 0.5 x its worse half + 0.5 x the mean worse half of its grid neighbours (at least 5 neighbours, positive mean).
+  - The best score is the pick.
+- **A file is published only if all of these pass:**
+  1. **Forward.** The 40 best settings chosen on the first half beat 95% of random 40-setting draws on the second half, and are 60%+ positive there with a positive mean.
+  2. **Reverse.** The 40 best chosen on the second half beat 95% of random draws on the first half.
+  3. **Signal control.** The pick beats the same setting with every label reversed, in both halves.
+  4. **Stressed costs.** It stays positive (BTC 0.035% per side + $0.20 + 1 tick per side; gold $0.50 + 1 tick per side).
+
+### Files
+
+Each file is the same code as `xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine`, with the tested trailing / stop / filter defaults and a record at the top:
+
+- [`XPW_TrailTP_BTCUSD_120m.pine`](XPW_TrailTP_BTCUSD_120m.pine)
+- [`XPW_TrailTP_XAUUSD_240m.pine`](XPW_TrailTP_XAUUSD_240m.pine)
+
+### Limits
+
+- The windows are short: 2 years of BTC in a strong market, 18 months of gold in 2017-2018.
+- One test was not run: lowering "Max open entries" to 10, which keeps positions under 1x equity. That could open up the wide-trail areas on 2h and 4h that the margin limit removed here.
+- 1-minute fills still assume a path inside each 1-minute candle, so offsets near the noise floor remain slightly optimistic.
