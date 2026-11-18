@@ -92,10 +92,10 @@ In total 154,560 backtests. Everything below uses 1-minute fills and costs unles
    - On BTC it is wide trails: activation 3-5% and offset 1-3%. Those hardly ever trigger, so the signals and the filter do the exiting.
    - On gold it is offsets of 0.75% or more.
    - Most of these settings stack open entries above 1x equity, up to 2x. TradingView's default margin of 100% would liquidate part of those positions.
-4. **Two settings pass the hold-out test** (rule below). Both are weak:
-   - **BTCUSD 2h, filter on, activation 3%, offset 1%, no stop loss.** +15.7% over 2 years with costs, PF 1.20, drawdown 10.6%. Reversed labels: -4.1%. It is fragile: without its 10 best entry days it makes +0.7%, and most of the profit comes from shorts.
-   - **XAUUSD 4h, filter off, activation 0.75%, offset 0.05%, stop loss 0.5%.** +1.65% over 18 months, PF 1.12. That is too small to matter, and without its 10 best entry days it loses.
-5. **The filter.** On 2h it raises the best BTC result, and it is the version that passes there. On gold 4h the version without it passes. Elsewhere it changes how much you lose, not whether you lose.
+4. **No trailing setting is worth adopting on any timeframe.** Two settings passed the hold-out test (rule below), but a review then refuted both, so neither gets a file (see "Review of the two picks").
+   - **BTCUSD 2h, filter on.** The best setting is effectively no trailing take profit at all. With the trail off it makes +18.6% instead of +15.7% for the pick (3% / 1%), and the whole edge is fragile.
+   - **XAUUSD 4h.** Nothing usable.
+5. **The filter.** On BTC 2h, the filter's closes on blocked opposite signals carry the result: without them +10.2%, and with the filter off +8.6% with a 30% drawdown. Elsewhere it changes how much you lose, not whether you lose.
 
 ### By timeframe
 
@@ -116,7 +116,7 @@ In total 154,560 backtests. Everything below uses 1-minute fills and costs unles
 | 1h | off | 0% | 0.02% / 0.01%, SL 2%: -4.2% | no | +181.9% / -4.2% | +143.7% / -6.6% | no file |
 | 1h | on | 0% | 0.3% / 0.01%, SL 2%: -1.6% | no | +61.1% / -4.3% | +50.6% / -5.5% | no file |
 | 2h | off | 7% | 5% / 3%: +23.3% | yes (2.0x) | +105.0% / -3.6% | +87.0% / -4.0% | no file (every profitable setting needs over 1x margin) |
-| 2h | on | 18% | 5% / 3%: +24.4% | yes (1.2x) | +39.9% / -1.4% | +33.5% / -3.0% | **[file](XPW_TrailTP_BTCUSD_120m.pine): 3% / 1%, no SL, +15.7%** |
+| 2h | on | 18% | 5% / 3%: +24.4% | yes (1.2x) | +39.9% / -1.4% | +33.5% / -3.0% | passed (3% / 1%, no SL, +15.7%), **withdrawn after review**: the trail costs money here (trail off +18.6%), and the edge is fragile |
 | 4h | off | 3% | 5% / 1.5%: +12.9% | yes (2.0x) | +85.2% / -2.1% | +69.1% / -2.5% | no file (every profitable setting needs over 1x margin) |
 | 4h | on | 11% | 5% / 3%: +12.9% | yes (1.2x) | +31.8% / -0.9% | +25.7% / -1.2% | no file (pick 2% / 2%, +3.8%: reversed labels do as well; forward hold-out fails) |
 
@@ -136,7 +136,7 @@ In total 154,560 backtests. Everything below uses 1-minute fills and costs unles
 | 1h | on | 0% | 0.05% / 0.01%, SL 1%: -0.5% | no | +7.1% / -0.8% | -1.5% / -5.5% | no file |
 | 2h | off | 55% | 0.75% / 1.5%: +8.7% | yes (2.0x) | +14.6% / +6.7% | +7.1% / +0.2% | no file (within 1x margin, only isolated settings are positive in both halves: no plateau) |
 | 2h | on | 64% | 0.75% / 1.5%: +3.1% | yes (1.3x) | +6.0% / +2.4% | +2.5% / -0.3% | no file (pick 0.5% / 0.75%, SL 0.5%, +2.2%: both hold-outs fail) |
-| 4h | off | 60% | 0.02% / 1.5%, SL 2%: +5.5% | yes (1.2x) | +10.8% / +0.0% | +4.0% / -1.9% | **[file](XPW_TrailTP_XAUUSD_240m.pine): 0.75% / 0.05%, SL 0.5%, +1.65%** |
+| 4h | off | 60% | 0.02% / 1.5%, SL 2%: +5.5% | yes (1.2x) | +10.8% / +0.0% | +4.0% / -1.9% | passed (0.75% / 0.05%, SL 0.5%, +1.65%), **withdrawn after review**: not significant, carried by 2018 |
 | 4h | on | 48% | 0.75% / 1.5%, SL 2%: +1.7% | no | +4.8% / +0.1% | +1.6% / -1.1% | no file (pick 0.75% / 0.05%, SL 0.5%, +1.1%: both hold-outs fail) |
 
 The gold percentages carry over to today's prices; dollar distances do not. At gold near $4,000, for example, 0.75% is $30.
@@ -175,15 +175,36 @@ The same rule was applied to every pair, timeframe and filter setting.
   3. **Signal control.** The pick beats the same setting with every label reversed, in both halves.
   4. **Stressed costs.** It stays positive (BTC 0.035% per side + $0.20 + 1 tick per side; gold $0.50 + 1 tick per side).
 
-### Files
+### Review of the two picks
 
-Each file is the same code as `xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine`, with the tested trailing / stop / filter defaults and a record at the top:
+Two independent sceptics re-ran each pick with a separate 1-minute reference and reproduced every trade exactly. An auditor re-implemented the rule and got the same verdicts in all 28 cells. Both picks were refuted.
 
-- [`XPW_TrailTP_BTCUSD_120m.pine`](XPW_TrailTP_BTCUSD_120m.pine)
-- [`XPW_TrailTP_XAUUSD_240m.pine`](XPW_TrailTP_XAUUSD_240m.pine)
+**BTCUSD 2h, filter on, activation 3%, offset 1%, no stop loss (+15.7%, PF 1.20)**
+
+- **The trail does not help.** Trail off makes +18.6%, and is better in both halves. Capped at 10 open entries (the same exposure as the pick), trail off makes +20.6%.
+  - The 144 trades the trail closed would each have made 0.24% more if held.
+  - The grid is a ramp toward "never trail": activation 2% about +7%, 3% about +15%, 5% about +22%. The pick won only because it is the least-trailing setting that stays within 1x margin.
+- **Where the profit does come from.** The signals and the filter's closes on blocked opposite signals. Without those closes: +10.2%. Filter off: +8.6% with a 30% drawdown.
+- **That edge is fragile.**
+  - Starting 1, 2 or 3 months later gives +13.8%, +6.9% and +2.8%.
+  - Without the 10 best entry days: +0.7%.
+  - Shorts make +13.6%; longs make +1.9%.
+  - Trades entered from March 2025 to August 2026 lose money.
+  - Statistically it is not distinguishable from zero (t = 1.24; 11% chance the true total is at or below 0).
+- **What TradingView would show.** +24.2% without Bar Magnifier and costs. Its own top settings show +38-40% and all lose on 1-minute data.
+
+**XAUUSD 4h, filter off, activation 0.75%, offset 0.05%, stop loss 0.5% (+1.65%, PF 1.12)**
+
+- **Not significant.** t = 1.0-1.3; 16% chance the true total is at or below 0.
+- **Concentrated.** 2018 carries +1.50 of the +1.65, and 2017 makes +0.14 in 12 months. Without the 10 best entry days it loses.
+- **Thin against costs.** Break-even is 1.28x the cost; at 2x the cost it makes +0.36%.
+- **It doesn't hold up.** Starting 2 or 3 months later, the first half turns negative. The trail adds only 0.48 points over trail off and acts like a fixed take profit near +0.75%.
+- **It is borderline under the rule too.** It fails under several equally reasonable readings: a stricter random baseline, the reverse hold-out's own mean (-0.29%), or stressed costs required positive in each half.
+
+**About the rule.** The hold-out tests measure whether a ranking of exits persists from one half to the other. They also pass on reversed labels in several cells, so only the label-reversal control tests the signals. The pick itself uses both halves, so its figures are in-sample: picking on the second half and scoring on the first loses money in both cells.
 
 ### Limits
 
 - The windows are short: 2 years of BTC in a strong market, 18 months of gold in 2017-2018.
-- One test was not run: lowering "Max open entries" to 10, which keeps positions under 1x equity. That could open up the wide-trail areas on 2h and 4h that the margin limit removed here.
+- On BTC 2h and 4h the best results come from wide or no trailing with fewer open entries: trail off capped at 10 open entries made +20.6% on BTC 2h. That variant was not put through the hold-out rule. It inherits the same fragility (dates, shorts, a few days).
 - 1-minute fills still assume a path inside each 1-minute candle, so offsets near the noise floor remain slightly optimistic.
