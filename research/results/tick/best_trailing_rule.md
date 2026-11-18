@@ -27,3 +27,11 @@ timeframe (M1 to H1) and each of the EA's 14 trailing systems (TrailMode 0 to 13
    MinRewardRisk with a fixed target), the preset sets MinRewardRisk = TP_RR - 0.05 so the EA takes every such signal,
    as the earlier presets do; the tick figures must come from a replay with that same setting.
 8. Nothing here is proven. The presets are for the Strategy Tester and demo accounts.
+
+**Note added after the independent audit (18 November 2026).** For BTC the timing above does not protect the
+choice: a test run of the replay with every BTC setup on January 2025 – November 2026, the 2026 months included, had
+already been computed with a per-cell summary before this rule was committed (only its M10 and M15 rows had been
+looked at), and its 2026 figures give the same six BTC choices. For gold no 2026 replay result existed before the
+rule; a test run of July – October 2024, part of the check period, did. The rule is the study's own (100 trades,
+highest profit factor), so there was little room to tune it, but for BTC it should be read as chosen with the
+results available.

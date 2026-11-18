@@ -1,12 +1,12 @@
-; XAUUSD_Loma_TrendPullback v1.35 on XAUUSD - best trailing of M30 (tick replay): Pivots trailing (TrailMode 12), setup 1 of 2: buy, session 0700-2000 server time, trend filter none, target 3R. DO NOT LOAD ON BTC.
+; XAUUSD_Loma_TrendPullback v1.35 on XAUUSD - best trailing of M30: Pivots trailing (TrailMode 12), setup 1 of 2: buy, session 0700-2000 server time, trend filter none, target 3R. DO NOT LOAD ON BTC.
 ; Trailing: stop beyond the last confirmed M30 swing with 3 bars on each side, from the minute after entry. Needs EA v1.35 or later (TrailMode 12, TrailParam 3).
-; Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest at the study's costs (FTMO spread, no commission; score 1.56): 92 trades, PF 1.88. Tick replay of the same months: 87 trades, PF 1.56.
-; TICK REPLAY (every tick, the EA's rules; VT costs: Dukascopy ticks with VT's 0.15 spread (scaled by Dukascopy's own spread), 0.60 USD commission per ounce). Unseen May 16 - Nov 13 2026: this setup 23 trades, PF 1.06, net +0.3R (stressed PF 1.07); the 2 setups of M30 + Pivots together 68 trades, PF 1.06, net +1.8R (stressed 1.05).
-; Pivots was chosen as the best of the EA's trailing systems on M30 by that 2026 result (fewer than 100 trades: thin): the 2026 figure is the score it was chosen by, not a test.
-; EARLIER DATA, not used for any choice (tick replay, same costs): this setup: Jul 15 - Dec 31 2024, 33 trades, PF 1.26. The 2 setups together: Jul 15 - Dec 31 2024, 81 trades, PF 0.97. They did not hold (under 1.3): UNPROVEN, Strategy Tester and demo only.
+; Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest at the study's costs (FTMO spread, no commission; score 1.56): 92 trades, PF 1.88. Replay of the same months: 87 trades, PF 1.56.
+; TICK REPLAY (every Dukascopy tick, the EA's rules; VT costs: VT's 0.15 spread scaled by Dukascopy's own spread, 0.60 USD commission per ounce). May 16 - Nov 13 2026 (the trailing was chosen on these months): this setup 23 trades, PF 1.06, net +0.3R (stressed PF 1.07); the 2 setups of M30 + Pivots together 68 trades, PF 1.06, net +1.8R (stressed 1.05).
+; Pivots was chosen as the best of the EA's trailing systems on M30 (highest PF of those with 30+ trades in those months: thin), so the 2026 figure is the score it was chosen by, not a test.
+; EARLIER DATA, not used for any choice (same replay and costs): this setup: Jul 15 - Dec 31 2024, 33 trades, PF 1.26. The 2 setups together: Jul 15 - Dec 31 2024, 81 trades, PF 0.97. They did not hold (under 1.3): UNPROVEN, Strategy Tester and demo only.
 ; Data: Dukascopy XAUUSD ticks, broker server time. Commission is in the figures: set CommissionPerLot to your round-trip commission per lot.
 ; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).
-; UseNewsFilter was not in the backtest.
+; UseNewsFilter is on: on demo or live the EA skips entries within 30 minutes of high-impact USD news, which the replay did not do (no effect in the Strategy Tester). Set it to false to trade exactly what was replayed.
 MagicNumber=26118119
 TradeComment=LOMA_BM30Pivo1
 TradeDirection=2

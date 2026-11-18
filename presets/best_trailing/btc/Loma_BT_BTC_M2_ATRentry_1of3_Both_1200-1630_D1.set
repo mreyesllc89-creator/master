@@ -1,12 +1,13 @@
-; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - best trailing of M2 (tick replay): ATRentry trailing (TrailMode 1), setup 1 of 3: both, session 1200-1630 server time, trend filter D1 EMA 200, target 1.5R. DO NOT LOAD ON GOLD.
+; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - best trailing of M2: ATRentry trailing (TrailMode 1), setup 1 of 3: both, session 1200-1630 server time, trend filter D1 EMA 200, target 1.5R. DO NOT LOAD ON GOLD.
 ; Trailing: 1.5 x ATR(14) of M2 at entry behind the best price once the profit reaches 3 x ATR, stop moved once per closed minute. Needs EA v1.35 or later (TrailMode 1, TrailParam 0).
-; Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest at the study's costs (10 USD spread; score 1.40): 87 trades, PF 1.93. Tick replay of the same months: 87 trades, PF 1.78.
-; TICK REPLAY (every tick, the EA's rules; Binance BTCUSDT one-second prices with a 10 USD spread, no commission). Unseen May 16 - Nov 13 2026: this setup 47 trades, PF 2.11, net +10.7R (stressed PF 1.52); the 3 setups of M2 + ATRentry together 121 trades, PF 1.97, net +19.5R (stressed 1.53).
-; ATRentry was chosen as the best of the EA's trailing systems on M2 by that 2026 result: the 2026 figure is the score it was chosen by, not a test.
-; EARLIER DATA, not used for any choice (tick replay, same costs): this setup: 2024, 85 trades, PF 1.38; 2023 (from Jan 15), 65 trades, PF 0.48. The 3 setups together: 2024, 214 trades, PF 1.05; 2023 (from Jan 15), 187 trades, PF 0.56. They did not hold (under 1.3): UNPROVEN, Strategy Tester and demo only.
+; Same setup as Loma_T15_BTC_M2_ATRentry_1of3_Both_1200-1630_D1 in Loma_BTCUSD_v1_35.zip (only the magic number differs): run one or the other, not both.
+; Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest at the study's costs (10 USD spread; score 1.40): 87 trades, PF 1.93. Replay of the same months: 87 trades, PF 1.78.
+; REPLAY ON BINANCE BTCUSDT ONE-SECOND PRICES (four price points per second; the EA's rules; 10 USD spread, no commission). May 16 - Nov 13 2026 (the trailing was chosen on these months): this setup 47 trades, PF 2.11, net +10.7R (stressed PF 1.52); the 3 setups of M2 + ATRentry together 121 trades, PF 1.97, net +19.5R (stressed 1.53).
+; ATRentry was chosen as the best of the EA's trailing systems on M2 (highest PF of those with 100+ trades in those months), so the 2026 figure is the score it was chosen by, not a test.
+; EARLIER DATA, not used for any choice (same replay and costs): this setup: 2024, 85 trades, PF 1.38; 2023 (from Jan 15), 65 trades, PF 0.48. The 3 setups together: 2024, 214 trades, PF 1.05; 2023 (from Jan 15), 187 trades, PF 0.56. They did not hold (under 1.3): UNPROVEN, Strategy Tester and demo only.
 ; Data: Binance BTCUSDT, broker server time. Points are 0.01 USD: 2000 points = 20 USD.
 ; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).
-; UseNewsFilter was not in the backtest.
+; UseNewsFilter is on: on demo or live the EA skips entries within 30 minutes of high-impact USD news, which the replay did not do (no effect in the Strategy Tester). Set it to false to trade exactly what was replayed.
 MagicNumber=26118201
 TradeComment=LOMA_BM2ATRe1
 TradeDirection=0
