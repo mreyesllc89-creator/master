@@ -58,8 +58,19 @@
 //    create one alert on this strategy with "alert() function calls only"
 //    (or "Order fills and alert() function calls").
 //
+//  TRAILING TAKE PROFIT (optional, group "Trailing take profit", off by default)
+//    On: each trade also gets a trailing stop. Once price has moved "Trail
+//    activation" in the trade's favour from the entry price, the stop follows
+//    "Trail offset" behind the best price since then, and only moves in the
+//    trade's favour. Both distances are in % of the signal candle's close and
+//    are fixed when the trade opens. The zone stop always stays; "Keep the
+//    target" off removes the Reward:Risk target. A later same-side signal
+//    still re-sets the stop and target (as in your file) and keeps the
+//    trailing settings. Off (default): exits exactly as in your file.
+//
 //  FILTER OFF
-//    With "Enable filter" off every signal trades: the same orders as your
+//    With "Enable filter" off (and the trailing take profit off, the
+//    default) every signal trades: the same orders as your
 //    file. Only the duplicate version-5 annotation line is removed (a script
 //    has one version line; the filter needs v6).
 //
@@ -90,6 +101,10 @@ rrRatio        = input.float(3.0, "Reward:Risk Ratio", minval=1.5)
 showZones      = input.bool(true, "Show Demand/Supply Zones")
 showRangeNote  = input.bool(true, "Show Range-Bar Recommendation")
 apxBlkClose    = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a BUY the filter blocks still closes an open short (and a blocked SELL an open long) at the next open, as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs to its stop or target unless a later opposite signal the filter allows reverses it. Exits are never gated by the filter.")
+apxTrailOn     = input.bool(false, "Use trailing take profit", group="Trailing take profit", tooltip="Off (default): exits as in your file. On: once price has moved Trail activation in the trade's favour from the entry price, a stop follows Trail offset behind the best price. Both in % of the signal candle's close, fixed when the trade opens. The zone stop always stays.")
+apxTrailAct    = input.float(1.0, "Trail activation (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Move in the trade's favour, in % of the price, before the trail arms. 0 = armed from the entry.")
+apxTrailOff    = input.float(0.5, "Trail offset (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Distance the trailing stop keeps behind the best price, in % of the price (at least one tick).")
+apxUseTarget   = input.bool(true, "Keep the target (Reward:Risk)", group="Trailing take profit", tooltip="Off: no target; the trade ends on its zone stop, the trailing stop, a reversal or a blocked-opposite close.")
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane
@@ -731,20 +746,32 @@ if apxBlkClose and apxBlkLong and strategy.position_size < 0
     strategy.close("Apex Short", comment="filter blocked BUY, close")
 
 // ── STRATEGY EXECUTION ─────────────────────────────
+// Trailing take profit (off by default): ticks fixed when a trade opens, kept when a later
+// same-side signal re-sets the stop / target. na = no trailing (the original's exits).
+var float apxTrPtsL = na
+var float apxTrOfsL = na
+var float apxTrPtsS = na
+var float apxTrOfsS = na
 if apxGoLong
     strategy.entry("Apex Long", strategy.long)
+    if strategy.position_size <= 0
+        apxTrPtsL := apxTrailOn ? math.max(close * apxTrailAct / 100.0 / syminfo.mintick, 0.0) : na
+        apxTrOfsL := apxTrailOn ? math.max(close * apxTrailOff / 100.0 / syminfo.mintick, 1.0) : na
 // the stop / target update of an open long on a new BUY is exit management: not gated
 if apxGoLong or (bullResonance and strategy.position_size > 0)
     stopPrice = box.get_bottom(demandBox) * 0.995
     targetPrice = close + (close - stopPrice) * rrRatio
-    strategy.exit("Exit Long", "Apex Long", stop=stopPrice, limit=targetPrice)
+    strategy.exit("Exit Long", "Apex Long", stop=stopPrice, limit=apxUseTarget ? targetPrice : na, trail_points=apxTrPtsL, trail_offset=apxTrOfsL)
 
 if apxGoShort
     strategy.entry("Apex Short", strategy.short)
+    if strategy.position_size >= 0
+        apxTrPtsS := apxTrailOn ? math.max(close * apxTrailAct / 100.0 / syminfo.mintick, 0.0) : na
+        apxTrOfsS := apxTrailOn ? math.max(close * apxTrailOff / 100.0 / syminfo.mintick, 1.0) : na
 if apxGoShort or (bearResonance and strategy.position_size < 0)
     stopPrice = box.get_top(supplyBox) * 1.005
     targetPrice = close - (stopPrice - close) * rrRatio
-    strategy.exit("Exit Short", "Apex Short", stop=stopPrice, limit=targetPrice)
+    strategy.exit("Exit Short", "Apex Short", stop=stopPrice, limit=apxUseTarget ? targetPrice : na, trail_points=apxTrPtsS, trail_offset=apxTrOfsS)
 
 // ── VISUALS (exactly like your screenshots) ───────
 plot(htfHigh, "HTF High", color=color.new(color.red, 70), style=plot.style_linebr)

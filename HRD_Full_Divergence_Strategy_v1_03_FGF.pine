@@ -53,8 +53,18 @@
 //    closed a trade this script's position differs from your file's, so
 //    FGD raw equals your file's entries only with the filter off.
 //
+//  TRAILING TAKE PROFIT (optional, group "Trailing take profit", off by default)
+//    On: each trade also gets a trailing stop. Once price has moved "Trail
+//    activation" in the trade's favour from the entry price, the stop follows
+//    "Trail offset" behind the best price since then, and only moves in the
+//    trade's favour. Both distances are in % of the signal candle's close
+//    (the same price the SL / TP use). The SL / TP, time exit and hybrid
+//    exit stay as set; "Take Profit (%) = 0" removes the target. Off
+//    (default): exits exactly as in your file.
+//
 //  FILTER OFF
-//    With "Enable filter" off every signal trades: the same orders as your
+//    With "Enable filter" off (and the trailing take profit off, the
+//    default) every signal trades: the same orders as your
 //    file.
 //
 //  NOTES ON THE ORIGINAL (unchanged here)
@@ -137,6 +147,9 @@ minActivationPts   = input.int(40,     title="Min Activation Points (Ticks)", gr
 // --- DIRECTION FILTER (FGF build) ---
 // =====================================================================
 hrdBlkClose = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a LONG signal the filter blocks still closes an open short (and a blocked SHORT an open long), as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs on to its own exits unless the filter allows the signal later (live, a later tick of the same candle) or allows a later opposite signal, which reverses it. Exits are never gated by the filter.")
+hrdTrailOn  = input.bool(false, "Use trailing take profit", group="Trailing take profit", tooltip="Off (default): exits as in your file. On: once price has moved Trail activation in the trade's favour from the entry price, a stop follows Trail offset behind the best price. Both in % of the signal candle's close. SL / TP, time exit and hybrid exit stay as set.")
+hrdTrailAct = input.float(1.0, "Trail activation (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Move in the trade's favour, in % of the price, before the trail arms. 0 = armed from the entry.")
+hrdTrailOff = input.float(0.5, "Trail offset (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Distance the trailing stop keeps behind the best price, in % of the price (at least one tick).")
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane
@@ -910,7 +923,9 @@ if hrdWantLong and fgfBuyOk
     float longQuantity = calculatePositionSize(stopLossDistanceLong)
 
     strategy.entry(id = "Long", direction = strategy.long, qty = longQuantity, comment = "Entry Long")
-    strategy.exit(id = "Long Exit", from_entry = "Long", stop = stopLossPriceLong, limit = takeProfitPriceLong, comment = "SL/TP Long")
+    float hrdTrPts = hrdTrailOn ? math.max(estimatedEntryPrice * hrdTrailAct / 100.0 / syminfo.mintick, 0.0) : na
+    float hrdTrOfs = hrdTrailOn ? math.max(estimatedEntryPrice * hrdTrailOff / 100.0 / syminfo.mintick, 1.0) : na
+    strategy.exit(id = "Long Exit", from_entry = "Long", stop = stopLossPriceLong, limit = takeProfitPriceLong, trail_points = hrdTrPts, trail_offset = hrdTrOfs, comment = "SL/TP Long")
 
 // 5. SHORT EXECUTION
 if hrdWantShort and fgfSellOk
@@ -922,7 +937,9 @@ if hrdWantShort and fgfSellOk
     float shortQuantity = calculatePositionSize(stopLossDistanceShort)
 
     strategy.entry(id = "Short", direction = strategy.short, qty = shortQuantity, comment = "Entry Short")
-    strategy.exit(id = "Short Exit", from_entry = "Short", stop = stopLossPriceShort, limit = takeProfitPriceShort, comment = "SL/TP Short")
+    float hrdTrPts = hrdTrailOn ? math.max(estimatedEntryPrice * hrdTrailAct / 100.0 / syminfo.mintick, 0.0) : na
+    float hrdTrOfs = hrdTrailOn ? math.max(estimatedEntryPrice * hrdTrailOff / 100.0 / syminfo.mintick, 1.0) : na
+    strategy.exit(id = "Short Exit", from_entry = "Short", stop = stopLossPriceShort, limit = takeProfitPriceShort, trail_points = hrdTrPts, trail_offset = hrdTrOfs, comment = "SL/TP Short")
 
 // =====================================================================
 // --- HYBRID DECAY-SLIP EXIT ENGINE ---
