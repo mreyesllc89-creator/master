@@ -6,8 +6,10 @@
 //  APEXFORGE FLOW RESONANCE STRATEGY  +  FLASHGOLD DIRECTION FILTER (FGF build)
 // ----------------------------------------------------------------------------
 //  Same strategy as ApexForge_Flow_Resonance_Strategy.pine (your file): the
-//  forge levels, order blocks, flow / volume detection, resonance signals,
-//  entries, stop / target and visuals are unchanged. Added: the FlashGold
+//  forge levels, order blocks, flow / volume detection, resonance signals
+//  and the stop / target rules are unchanged. Entries, the BUY / SELL
+//  labels, the highlights and the alerts now follow the filter (below); with
+//  the filter off they are as in your file. Added: the FlashGold
 //  Direction Filter v1.2, between BEGIN and END FLASHGOLD DIRECTION FILTER,
 //  byte-identical to FlashGold_Direction_Filter_v1_2.pine (this script draws
 //  on the price chart, so FGF_FORCE_OVERLAY stays false).
@@ -17,8 +19,11 @@
 //    buys (BUY ZONE); a SELL (bearish resonance) opens "Apex Short" only while
 //    it allows sells (SELL ZONE). In NO TRADE, before the first FlashGold
 //    signal and after a Minutes / Candles permission ends, neither opens.
-//    The filter is judged at the signal candle's close, like the signal
-//    itself (calc_on_every_tick is off); the order fills at the next open.
+//    With "Check price on" = Tick (default) or Candle close the filter is
+//    judged at the signal candle's close, like the signal itself
+//    (calc_on_every_tick is off); with Candle open, at that candle's open
+//    (its open price and the FlashGold signal in force then). Either way the
+//    order fills at the next open.
 //
 //  WHAT IT NEVER GATES
 //    Exits. The stop and target of an open trade are the original's. When a
@@ -32,7 +37,8 @@
 //    blocked, "Blocked opposite signal still closes the trade" (on by
 //    default, group "Direction filter - trading") still closes the trade at
 //    the next open, like the reversal would, but opens nothing. Off: the
-//    trade stays open until its own stop or target.
+//    blocked signal does nothing; the trade runs to its stop or target,
+//    unless a later opposite signal the filter allows reverses it.
 //
 //  CHART
 //    BUY / SELL labels and the resonance highlights mark the signals that
@@ -42,14 +48,19 @@
 //    (FGD ...).
 //
 //  ALERTS
-//    "ApexForge LONG" / "ApexForge SHORT" fire on the signals the filter
-//    allows (the ones the strategy trades). "ApexForge LONG blocked" /
-//    "ApexForge SHORT blocked" fire on the blocked ones.
+//    A strategy cannot create alerts from alertcondition() (TradingView only
+//    offers order fills and alert() calls for strategies), so the original's
+//    two alertconditions never fired; they are kept but do nothing. This
+//    build adds alert() calls, once per candle close: on the signals the
+//    filter allows (the ones the strategy trades), and on the blocked ones
+//    (saying when the blocked signal closes the open trade). To use them,
+//    create one alert on this strategy with "alert() function calls only"
+//    (or "Order fills and alert() function calls").
 //
 //  FILTER OFF
 //    With "Enable filter" off every signal trades: the same orders as your
-//    file. Only the duplicate "//@version=5" line is removed (a script has
-//    one version line; the filter needs v6).
+//    file. Only the duplicate version-5 annotation line is removed (a script
+//    has one version line; the filter needs v6).
 //
 //  NOTES ON THE ORIGINAL (unchanged here)
 //    - HTF high / low come from request.security without lookahead: in the
@@ -64,6 +75,8 @@
 //      per side, no slippage.
 //    - TradingView warns that strategies on Range bars backtest unrealistic
 //      fills. On a Range chart the filter also reads Range bars.
+//    - Its alertcondition() alerts cannot be created on a strategy (see
+//      ALERTS).
 // ============================================================================
 strategy("ApexForge Flow Resonance Strategy [Grok Team]", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0.04, max_bars_back=500, max_lines_count=500, max_labels_count=500)
 
@@ -75,7 +88,7 @@ volMultiplier  = input.float(1.7, "Volume Spike Multiplier for IFT Pressure")
 rrRatio        = input.float(3.0, "Reward:Risk Ratio", minval=1.5)
 showZones      = input.bool(true, "Show Demand/Supply Zones")
 showRangeNote  = input.bool(true, "Show Range-Bar Recommendation")
-apxBlkClose    = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a BUY the filter blocks still closes an open short (and a blocked SELL an open long) at the next open, as the original reversal would, without opening the other side. Off: the open trade runs to its own stop or target. Exits are never gated by the filter.")
+apxBlkClose    = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a BUY the filter blocks still closes an open short (and a blocked SELL an open long) at the next open, as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs to its stop or target unless a later opposite signal the filter allows reverses it. Exits are never gated by the filter.")
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane
@@ -753,6 +766,16 @@ alertcondition(apxGoLong,  title="ApexForge LONG",  message="🚀 ApexForge Bull
 alertcondition(apxGoShort, title="ApexForge SHORT", message="🔻 ApexForge Bearish Resonance → SELL (Bloodbath continuation)")
 alertcondition(apxBlkLong,  title="ApexForge LONG blocked",  message="ApexForge Bullish Resonance blocked by the direction filter (not in the BUY ZONE)")
 alertcondition(apxBlkShort, title="ApexForge SHORT blocked", message="ApexForge Bearish Resonance blocked by the direction filter (not in the SELL ZONE)")
+
+// alert() calls: the alerts a strategy can actually create ("alert() function calls only")
+if apxGoLong
+    alert("🚀 ApexForge Bullish Resonance → BUY (Strong demand bounce)", alert.freq_once_per_bar_close)
+if apxGoShort
+    alert("🔻 ApexForge Bearish Resonance → SELL (Bloodbath continuation)", alert.freq_once_per_bar_close)
+if apxBlkLong
+    alert(apxBlkClose and strategy.position_size < 0 ? "ApexForge BUY blocked by the direction filter: closing the short" : "ApexForge BUY blocked by the direction filter (not in the BUY ZONE)", alert.freq_once_per_bar_close)
+if apxBlkShort
+    alert(apxBlkClose and strategy.position_size > 0 ? "ApexForge SELL blocked by the direction filter: closing the long" : "ApexForge SELL blocked by the direction filter (not in the SELL ZONE)", alert.freq_once_per_bar_close)
 
 // ── DIRECTION FILTER DIAGNOSTICS (Data Window) ─────
 plot(bullResonance ? 1 : 0, "FGD raw long",      display = display.data_window)
