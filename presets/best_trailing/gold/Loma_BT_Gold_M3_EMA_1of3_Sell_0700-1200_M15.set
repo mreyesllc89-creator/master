@@ -1,0 +1,77 @@
+; XAUUSD_Loma_TrendPullback v1.35 on XAUUSD - best trailing of M3 (tick replay): EMA trailing (TrailMode 7), setup 1 of 3: sell, session 0700-1200 server time, trend filter M15 EMA 50, target 2R. DO NOT LOAD ON BTC.
+; Trailing: stop beyond the EMA(8) of M3 closes, once the profit reaches 0.5R. Needs EA v1.35 or later (TrailMode 7, TrailParam 8).
+; Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest at the study's costs (FTMO spread, no commission; score 1.67): 75 trades, PF 1.88. Tick replay of the same months: 81 trades, PF 1.13.
+; TICK REPLAY (every tick, the EA's rules; VT costs: Dukascopy ticks with VT's 0.15 spread (scaled by Dukascopy's own spread), 0.60 USD commission per ounce). Unseen May 16 - Nov 13 2026: this setup 42 trades, PF 0.72, net -4.5R (stressed PF 0.69); the 3 setups of M3 + EMA together 125 trades, PF 0.98, net -1.2R (stressed 0.78).
+; EMA was chosen as the best of the EA's trailing systems on M3 by that 2026 result: the 2026 figure is the score it was chosen by, not a test. Even so the set lost money in those months (PF 0.98): it is here only because the zip has the best system of every timeframe.
+; EARLIER DATA, not used for any choice (tick replay, same costs): this setup: Jul 15 - Dec 31 2024, 26 trades, PF 0.43. The 3 setups together: Jul 15 - Dec 31 2024, 86 trades, PF 0.62. They did not hold (under 1.3): UNPROVEN, Strategy Tester and demo only.
+; Data: Dukascopy XAUUSD ticks, broker server time. Commission is in the figures: set CommissionPerLot to your round-trip commission per lot.
+; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).
+; UseNewsFilter was not in the backtest.
+MagicNumber=26118103
+TradeComment=LOMA_BM3EMA1
+TradeDirection=1
+AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
+ShowStatusPanel=true
+MarkSignals=true
+ShowHumpLabels=true
+TriggerTimeframe=3
+MACD_Fast=12
+MACD_Slow=26
+MACD_Signal=9
+Stoch_K=10
+Stoch_Slowing=1
+Stoch_D=7
+HumpWarmupBars=3000
+BigHumpHistory=40
+BigHumpMultiplier=3.0
+BigHumpMinBars=5
+RequireStochLevel=false
+StochLow=20.0
+StochHigh=80.0
+TrendBreakRatio=1.5
+MaxSignalsPerBigHump=99
+TrendMaxBars=80
+PullbackMinBars=1
+PullbackMaxRatio=1.5
+SkipBigPullback=true
+SL_Buffer_Points=150
+TP_Mode=1
+TP_Anticipation=0.0
+TP_RR=2.0
+MinRewardRisk=1.0
+MinSL_Points=200
+MaxSL_Points=0
+ScaleWithPrice=false
+ReferencePrice=0.0
+UseHTFFilter=true
+HTF_Timeframe=15
+HTF_EMA_Period=50
+UseStochTurnFilter=false
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
+RiskPercent=0.5
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
+CommissionPerLot=0.0
+MaxSpread_Points=60
+MaxSlippage_Points=20
+MaxEntryDelaySeconds=0
+TrailStartR=0.5
+TrailDistanceR=0.5
+TrailStep_Points=10
+TrailMode=7
+TrailParam=8
+UseTradingHours=true
+TradingHoursStart=07:00
+TradingHoursEnd=12:00
+CloseBeforeWeekend=true
+WeekendCloseTime=23:00
+UseNewsFilter=true
+NewsCurrency=USD
+NewsWindowMinutes=30
+MaxHoldMinutes=0
+CloseAtEndOfDay=false
+EndOfDayTime=22:00

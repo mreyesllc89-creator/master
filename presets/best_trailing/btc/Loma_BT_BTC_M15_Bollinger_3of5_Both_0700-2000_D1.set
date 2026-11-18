@@ -1,0 +1,77 @@
+; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - best trailing of M15 (tick replay): Bollinger trailing (TrailMode 10), setup 3 of 5: both, session 0700-2000 server time, trend filter D1 EMA 20, target 3R. DO NOT LOAD ON GOLD.
+; Trailing: stop beyond the Bollinger band SMA(20) -/+ 1 sd of M15, once the profit reaches 0.5R. Needs EA v1.35 or later (TrailMode 10, TrailParam 0).
+; Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest at the study's costs (10 USD spread; score 1.42): 83 trades, PF 1.62. Tick replay of the same months: 83 trades, PF 1.59.
+; TICK REPLAY (every tick, the EA's rules; Binance BTCUSDT one-second prices with a 10 USD spread, no commission). Unseen May 16 - Nov 13 2026: this setup 31 trades, PF 0.82, net -3.2R (stressed PF 0.76); the 5 setups of M15 + Bollinger together 169 trades, PF 0.96, net -2.4R (stressed 0.91).
+; Bollinger was chosen as the best of the EA's trailing systems on M15 by that 2026 result: the 2026 figure is the score it was chosen by, not a test. Even so the set lost money in those months (PF 0.96): it is here only because the zip has the best system of every timeframe.
+; EARLIER DATA, not used for any choice (tick replay, same costs): this setup: 2024, 55 trades, PF 1.44; 2023 (from Jan 15), 42 trades, PF 0.51. The 5 setups together: 2024, 360 trades, PF 1.06; 2023 (from Jan 15), 359 trades, PF 0.84. They did not hold (under 1.3): UNPROVEN, Strategy Tester and demo only.
+; Data: Binance BTCUSDT, broker server time. Points are 0.01 USD: 2000 points = 20 USD.
+; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).
+; UseNewsFilter was not in the backtest.
+MagicNumber=26118214
+TradeComment=LOMA_BM15Boll3
+TradeDirection=0
+AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
+ShowStatusPanel=true
+MarkSignals=true
+ShowHumpLabels=true
+TriggerTimeframe=15
+MACD_Fast=16
+MACD_Slow=35
+MACD_Signal=9
+Stoch_K=14
+Stoch_Slowing=1
+Stoch_D=7
+HumpWarmupBars=3000
+BigHumpHistory=10
+BigHumpMultiplier=1.0
+BigHumpMinBars=12
+RequireStochLevel=false
+StochLow=25.0
+StochHigh=75.0
+TrendBreakRatio=0.8
+MaxSignalsPerBigHump=1
+TrendMaxBars=120
+PullbackMinBars=6
+PullbackMaxRatio=0.8
+SkipBigPullback=true
+SL_Buffer_Points=2000
+TP_Mode=1
+TP_Anticipation=0.35
+TP_RR=3.0
+MinRewardRisk=0.6
+MinSL_Points=2000
+MaxSL_Points=0
+ScaleWithPrice=false
+ReferencePrice=0.0
+UseHTFFilter=true
+HTF_Timeframe=16408
+HTF_EMA_Period=20
+UseStochTurnFilter=false
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
+RiskPercent=0.5
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
+CommissionPerLot=0.0
+MaxSpread_Points=3000
+MaxSlippage_Points=1000
+MaxEntryDelaySeconds=0
+TrailStartR=0.5
+TrailDistanceR=0.5
+TrailStep_Points=200
+TrailMode=10
+TrailParam=0
+UseTradingHours=true
+TradingHoursStart=07:00
+TradingHoursEnd=20:00
+CloseBeforeWeekend=false
+WeekendCloseTime=23:00
+UseNewsFilter=true
+NewsCurrency=USD
+NewsWindowMinutes=30
+MaxHoldMinutes=480
+CloseAtEndOfDay=true
+EndOfDayTime=23:00

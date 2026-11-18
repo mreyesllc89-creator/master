@@ -1,0 +1,77 @@
+; XAUUSD_Loma_TrendPullback v1.35 on BTCUSD - best trailing of M3 (tick replay): Candles trailing (TrailMode 6), setup 3 of 3: buy, session 0700-1200 server time, trend filter none, target 2R. DO NOT LOAD ON GOLD.
+; Trailing: stop beyond the low / high of the last 5 closed M3 candles, from the minute after entry. Needs EA v1.35 or later (TrailMode 6, TrailParam 5).
+; Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest at the study's costs (10 USD spread; score 1.31): 191 trades, PF 1.57. Tick replay of the same months: 191 trades, PF 1.44.
+; TICK REPLAY (every tick, the EA's rules; Binance BTCUSDT one-second prices with a 10 USD spread, no commission). Unseen May 16 - Nov 13 2026: this setup 63 trades, PF 1.67, net +10.3R (stressed PF 1.25); the 3 setups of M3 + Candles together 140 trades, PF 1.41, net +16.2R (stressed 1.08).
+; Candles was chosen as the best of the EA's trailing systems on M3 by that 2026 result: the 2026 figure is the score it was chosen by, not a test.
+; EARLIER DATA, not used for any choice (tick replay, same costs): this setup: 2024, 152 trades, PF 0.68; 2023 (from Jan 15), 146 trades, PF 0.68. The 3 setups together: 2024, 271 trades, PF 0.82; 2023 (from Jan 15), 242 trades, PF 0.84. They did not hold (under 1.3): UNPROVEN, Strategy Tester and demo only.
+; Data: Binance BTCUSDT, broker server time. Points are 0.01 USD: 2000 points = 20 USD.
+; Times are BROKER SERVER TIME (New York + 7 h: GMT+2 in the US winter, GMT+3 in the US summer).
+; UseNewsFilter was not in the backtest.
+MagicNumber=26118206
+TradeComment=LOMA_BM3Cand3
+TradeDirection=2
+AutoScalePoints=true
+VerboseLog=true
+ShowLevels=true
+ShowStatusPanel=true
+MarkSignals=true
+ShowHumpLabels=true
+TriggerTimeframe=3
+MACD_Fast=16
+MACD_Slow=35
+MACD_Signal=9
+Stoch_K=14
+Stoch_Slowing=1
+Stoch_D=7
+HumpWarmupBars=3000
+BigHumpHistory=20
+BigHumpMultiplier=1.5
+BigHumpMinBars=8
+RequireStochLevel=true
+StochLow=25.0
+StochHigh=75.0
+TrendBreakRatio=99.0
+MaxSignalsPerBigHump=3
+TrendMaxBars=120
+PullbackMinBars=1
+PullbackMaxRatio=0.6
+SkipBigPullback=true
+SL_Buffer_Points=1000
+TP_Mode=1
+TP_Anticipation=0.2
+TP_RR=2.0
+MinRewardRisk=1.0
+MinSL_Points=3500
+MaxSL_Points=0
+ScaleWithPrice=false
+ReferencePrice=0.0
+UseHTFFilter=false
+HTF_Timeframe=16388
+HTF_EMA_Period=100
+UseStochTurnFilter=false
+StochTurnBars=5
+StochTurnHigh=80.0
+StochTurnLow=20.0
+RiskPercent=0.5
+MaxLotSize=0.0
+SkipIfBelowMinLot=true
+CommissionPerLot=0.0
+MaxSpread_Points=3000
+MaxSlippage_Points=1000
+MaxEntryDelaySeconds=0
+TrailStartR=0.0
+TrailDistanceR=0.5
+TrailStep_Points=200
+TrailMode=6
+TrailParam=5
+UseTradingHours=true
+TradingHoursStart=07:00
+TradingHoursEnd=12:00
+CloseBeforeWeekend=false
+WeekendCloseTime=23:00
+UseNewsFilter=true
+NewsCurrency=USD
+NewsWindowMinutes=30
+MaxHoldMinutes=60
+CloseAtEndOfDay=true
+EndOfDayTime=21:00

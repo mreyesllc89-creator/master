@@ -1,0 +1,1936 @@
+{
+ "rule": "research/results/tick/best_trailing_rule.md",
+ "min_trades": 100,
+ "thin_trades": 30,
+ "hold_pf": 1.3,
+ "timeframes": [
+  {
+   "symbol": "XAUUSD",
+   "tf": "M1",
+   "systems_with_setups": 0,
+   "eligible": 0,
+   "thin": false,
+   "candidates": [],
+   "chosen": null
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M2",
+   "systems_with_setups": 14,
+   "eligible": 10,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "step",
+     "setups": 2,
+     "trades": 105,
+     "pf": 1.0632603122524198,
+     "net_r": 4.140992495136564
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 2,
+     "trades": 168,
+     "pf": 0.8305731107313669,
+     "net_r": -15.390754644857857
+    },
+    {
+     "trailing": "candles",
+     "setups": 4,
+     "trades": 365,
+     "pf": 0.8073788318192817,
+     "net_r": -37.87369621036059
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 1,
+     "trades": 91,
+     "pf": 0.7743993356205261,
+     "net_r": -11.960365830706467
+    },
+    {
+     "trailing": "hump",
+     "setups": 3,
+     "trades": 152,
+     "pf": 0.7689112117445966,
+     "net_r": -21.881459339923467
+    },
+    {
+     "trailing": "sma",
+     "setups": 3,
+     "trades": 186,
+     "pf": 0.7219890110025897,
+     "net_r": -26.346180001960498
+    },
+    {
+     "trailing": "atr",
+     "setups": 3,
+     "trades": 165,
+     "pf": 0.6862375755395085,
+     "net_r": -20.082196104806663
+    },
+    {
+     "trailing": "percent",
+     "setups": 2,
+     "trades": 151,
+     "pf": 0.6326735143844261,
+     "net_r": -24.404345002888807
+    },
+    {
+     "trailing": "pivots",
+     "setups": 3,
+     "trades": 330,
+     "pf": 0.5956242648568876,
+     "net_r": -71.74578155362678
+    },
+    {
+     "trailing": "psar",
+     "setups": 2,
+     "trades": 181,
+     "pf": 0.5873592606342476,
+     "net_r": -27.784851042092683
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 2,
+     "trades": 106,
+     "pf": 0.5858326903080782,
+     "net_r": -23.385024142319264
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 1,
+     "trades": 91,
+     "pf": 0.5196526805929703,
+     "net_r": -30.912152076456813
+    },
+    {
+     "trailing": "ema",
+     "setups": 1,
+     "trades": 80,
+     "pf": 0.3895974834627924,
+     "net_r": -18.068375673729868
+    },
+    {
+     "trailing": "R",
+     "setups": 1,
+     "trades": 63,
+     "pf": 0.33457726290530504,
+     "net_r": -30.231146524011788
+    }
+   ],
+   "chosen": {
+    "trailing": "step",
+    "trail_mode": 4,
+    "setups": 2,
+    "keys": [
+     "M2:step:1",
+     "M2:step:2"
+    ],
+    "unseen": {
+     "n": 105,
+     "pf": 1.0632603122524198,
+     "net_r": 4.140992495136564
+    },
+    "unseen_stress": {
+     "n": 105,
+     "pf": 0.9768721167628668,
+     "net_r": -1.5366260782596637
+    },
+    "unseen_one_minute": {
+     "n": 105,
+     "pf": 1.0197213609057496,
+     "net_r": 1.2740799311971975
+    },
+    "stored_one_minute": {
+     "n": 105,
+     "pf": 1.1152359581225346,
+     "stress_pf": 0.9898930591164203
+    },
+    "calibration": {
+     "n": 200,
+     "pf": 1.5006991488232464,
+     "net_r": 48.22712088848918
+    },
+    "earlier": {
+     "earlier": {
+      "n": 70,
+      "pf": 0.7589595391096555,
+      "net_r": -10.348468336244684
+     }
+    },
+    "earlier_stress": {
+     "earlier": {
+      "n": 70,
+      "pf": 0.7776652668851156,
+      "net_r": -9.50726756363481
+     }
+    },
+    "unseen_dukascopy": {
+     "n": 81,
+     "pf": 1.1242765337896,
+     "net_r": 6.136755949273522
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "bollinger",
+     "setups": 2,
+     "trades": 168,
+     "pf": 0.8305731107313669,
+     "net_r": -15.390754644857857
+    },
+    "eligible_at_1_3": 0
+   }
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M3",
+   "systems_with_setups": 14,
+   "eligible": 13,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "ema",
+     "setups": 3,
+     "trades": 125,
+     "pf": 0.9779649434041507,
+     "net_r": -1.2449892898704964
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 3,
+     "trades": 135,
+     "pf": 0.9701971227220761,
+     "net_r": -2.700442289410602
+    },
+    {
+     "trailing": "step",
+     "setups": 3,
+     "trades": 223,
+     "pf": 0.9666132734747528,
+     "net_r": -3.7207110406011976
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 4,
+     "trades": 190,
+     "pf": 0.8676548181859828,
+     "net_r": -12.751937306710424
+    },
+    {
+     "trailing": "R",
+     "setups": 5,
+     "trades": 271,
+     "pf": 0.8626109002334913,
+     "net_r": -19.45372695330508
+    },
+    {
+     "trailing": "psar",
+     "setups": 2,
+     "trades": 194,
+     "pf": 0.8166711492171004,
+     "net_r": -12.23737283144966
+    },
+    {
+     "trailing": "pivots",
+     "setups": 4,
+     "trades": 197,
+     "pf": 0.8033683895587144,
+     "net_r": -18.670909516587557
+    },
+    {
+     "trailing": "hump",
+     "setups": 3,
+     "trades": 149,
+     "pf": 0.7423312311379996,
+     "net_r": -23.185167313960495
+    },
+    {
+     "trailing": "candles",
+     "setups": 3,
+     "trades": 298,
+     "pf": 0.687668512412583,
+     "net_r": -35.64009492606359
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 1,
+     "trades": 76,
+     "pf": 0.6839822983355393,
+     "net_r": -11.009747178920273
+    },
+    {
+     "trailing": "percent",
+     "setups": 3,
+     "trades": 187,
+     "pf": 0.6517629506704634,
+     "net_r": -33.22377860632601
+    },
+    {
+     "trailing": "sma",
+     "setups": 4,
+     "trades": 204,
+     "pf": 0.599552487821923,
+     "net_r": -41.01702453981876
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 1,
+     "trades": 140,
+     "pf": 0.530982866092742,
+     "net_r": -16.204079478292137
+    },
+    {
+     "trailing": "atr",
+     "setups": 3,
+     "trades": 153,
+     "pf": 0.5242382309595397,
+     "net_r": -39.9049403926528
+    }
+   ],
+   "chosen": {
+    "trailing": "ema",
+    "trail_mode": 7,
+    "setups": 3,
+    "keys": [
+     "M3:ema:1",
+     "M3:ema:2",
+     "M3:ema:3"
+    ],
+    "unseen": {
+     "n": 125,
+     "pf": 0.9779649434041507,
+     "net_r": -1.2449892898704964
+    },
+    "unseen_stress": {
+     "n": 127,
+     "pf": 0.7801392037248849,
+     "net_r": -13.799286990909662
+    },
+    "unseen_one_minute": {
+     "n": 125,
+     "pf": 0.9868460327096081,
+     "net_r": -0.7407824664170708
+    },
+    "stored_one_minute": {
+     "n": 125,
+     "pf": 0.9675051615868471,
+     "stress_pf": 0.8646131575377686
+    },
+    "calibration": {
+     "n": 245,
+     "pf": 1.2573289910244272,
+     "net_r": 24.54696456039522
+    },
+    "earlier": {
+     "earlier": {
+      "n": 86,
+      "pf": 0.6245230489138242,
+      "net_r": -17.67578453987126
+     }
+    },
+    "earlier_stress": {
+     "earlier": {
+      "n": 88,
+      "pf": 0.5676629596831138,
+      "net_r": -21.52800846222025
+     }
+    },
+    "unseen_dukascopy": {
+     "n": 82,
+     "pf": 0.8908150781228406,
+     "net_r": -4.143656293668946
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "htfcandle",
+     "setups": 3,
+     "trades": 135,
+     "pf": 0.9701971227220761,
+     "net_r": -2.700442289410602
+    },
+    "eligible_at_1_3": 0
+   }
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M5",
+   "systems_with_setups": 14,
+   "eligible": 11,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "hump",
+     "setups": 4,
+     "trades": 141,
+     "pf": 1.2729463829826637,
+     "net_r": 20.715355016264052
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 4,
+     "trades": 157,
+     "pf": 1.1923635801314485,
+     "net_r": 13.42689076358249
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 2,
+     "trades": 73,
+     "pf": 1.1264120275903093,
+     "net_r": 3.8732270933608532
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 1,
+     "trades": 58,
+     "pf": 1.0791341601987383,
+     "net_r": 1.8442162969311737
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 2,
+     "trades": 102,
+     "pf": 1.0681423242377006,
+     "net_r": 3.403577903500702
+    },
+    {
+     "trailing": "R",
+     "setups": 3,
+     "trades": 156,
+     "pf": 0.9947206535540215,
+     "net_r": -0.47634725750502604
+    },
+    {
+     "trailing": "psar",
+     "setups": 3,
+     "trades": 154,
+     "pf": 0.9547410219543336,
+     "net_r": -3.3070293126942927
+    },
+    {
+     "trailing": "percent",
+     "setups": 3,
+     "trades": 179,
+     "pf": 0.9061629152426659,
+     "net_r": -4.726733858006137
+    },
+    {
+     "trailing": "pivots",
+     "setups": 6,
+     "trades": 358,
+     "pf": 0.8714198902943459,
+     "net_r": -25.359075780456973
+    },
+    {
+     "trailing": "sma",
+     "setups": 2,
+     "trades": 99,
+     "pf": 0.8258051926579266,
+     "net_r": -7.350096500957925
+    },
+    {
+     "trailing": "ema",
+     "setups": 3,
+     "trades": 130,
+     "pf": 0.8088322989827649,
+     "net_r": -11.492547380609944
+    },
+    {
+     "trailing": "step",
+     "setups": 4,
+     "trades": 196,
+     "pf": 0.7588555008053234,
+     "net_r": -24.470059147295
+    },
+    {
+     "trailing": "atr",
+     "setups": 3,
+     "trades": 175,
+     "pf": 0.757021183746009,
+     "net_r": -18.556777011376273
+    },
+    {
+     "trailing": "candles",
+     "setups": 6,
+     "trades": 360,
+     "pf": 0.7039072457637018,
+     "net_r": -53.41675375435082
+    }
+   ],
+   "chosen": {
+    "trailing": "hump",
+    "trail_mode": 13,
+    "setups": 4,
+    "keys": [
+     "M5:hump:1",
+     "M5:hump:2",
+     "M5:hump:3",
+     "M5:hump:4"
+    ],
+    "unseen": {
+     "n": 141,
+     "pf": 1.2729463829826637,
+     "net_r": 20.715355016264052
+    },
+    "unseen_stress": {
+     "n": 140,
+     "pf": 1.0994450563354237,
+     "net_r": 7.82127420854591
+    },
+    "unseen_one_minute": {
+     "n": 141,
+     "pf": 1.3087507462733305,
+     "net_r": 23.032986817831365
+    },
+    "stored_one_minute": {
+     "n": 141,
+     "pf": 1.4080363149916009,
+     "stress_pf": 1.1159248280583924
+    },
+    "calibration": {
+     "n": 333,
+     "pf": 1.564578535495085,
+     "net_r": 90.1011280359397
+    },
+    "earlier": {
+     "earlier": {
+      "n": 116,
+      "pf": 0.6879418785563921,
+      "net_r": -23.69232621656642
+     }
+    },
+    "earlier_stress": {
+     "earlier": {
+      "n": 116,
+      "pf": 0.6243046153596726,
+      "net_r": -29.57054424095356
+     }
+    },
+    "unseen_dukascopy": {
+     "n": 94,
+     "pf": 1.3693883013331887,
+     "net_r": 17.933189085448664
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "chandelier",
+     "setups": 4,
+     "trades": 157,
+     "pf": 1.1923635801314485,
+     "net_r": 13.42689076358249
+    },
+    "eligible_at_1_3": 0
+   }
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M10",
+   "systems_with_setups": 14,
+   "eligible": 14,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "atr",
+     "setups": 4,
+     "trades": 203,
+     "pf": 1.5721927079017357,
+     "net_r": 27.891741283038268
+    },
+    {
+     "trailing": "percent",
+     "setups": 4,
+     "trades": 182,
+     "pf": 1.2456589102059108,
+     "net_r": 11.759549333429156
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 5,
+     "trades": 180,
+     "pf": 1.1547790270358615,
+     "net_r": 13.71883314439773
+    },
+    {
+     "trailing": "pivots",
+     "setups": 3,
+     "trades": 150,
+     "pf": 1.0779768702285932,
+     "net_r": 3.397171208648306
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 3,
+     "trades": 162,
+     "pf": 1.0507090274683233,
+     "net_r": 3.010341209407734
+    },
+    {
+     "trailing": "psar",
+     "setups": 5,
+     "trades": 191,
+     "pf": 0.9815402352208243,
+     "net_r": -1.1601555666351455
+    },
+    {
+     "trailing": "sma",
+     "setups": 6,
+     "trades": 234,
+     "pf": 0.9582304473198547,
+     "net_r": -3.524793819446387
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 5,
+     "trades": 221,
+     "pf": 0.9531789692217987,
+     "net_r": -4.011555090818023
+    },
+    {
+     "trailing": "R",
+     "setups": 4,
+     "trades": 143,
+     "pf": 0.8816541636331384,
+     "net_r": -7.106672492315156
+    },
+    {
+     "trailing": "candles",
+     "setups": 3,
+     "trades": 193,
+     "pf": 0.8776489524535669,
+     "net_r": -9.580881598514202
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 5,
+     "trades": 179,
+     "pf": 0.868148754709916,
+     "net_r": -7.480373098528962
+    },
+    {
+     "trailing": "hump",
+     "setups": 4,
+     "trades": 218,
+     "pf": 0.7156246802648045,
+     "net_r": -31.64400885152023
+    },
+    {
+     "trailing": "ema",
+     "setups": 4,
+     "trades": 119,
+     "pf": 0.7123504383399806,
+     "net_r": -10.886335444910532
+    },
+    {
+     "trailing": "step",
+     "setups": 3,
+     "trades": 157,
+     "pf": 0.6683833565625936,
+     "net_r": -25.991164223324745
+    }
+   ],
+   "chosen": {
+    "trailing": "atr",
+    "trail_mode": 1,
+    "setups": 4,
+    "keys": [
+     "M10:atr:1",
+     "M10:atr:2",
+     "M10:atr:3",
+     "M10:atr:4"
+    ],
+    "unseen": {
+     "n": 203,
+     "pf": 1.5721927079017357,
+     "net_r": 27.891741283038268
+    },
+    "unseen_stress": {
+     "n": 206,
+     "pf": 1.3756229285799593,
+     "net_r": 20.33534713958155
+    },
+    "unseen_one_minute": {
+     "n": 203,
+     "pf": 1.5598365637901463,
+     "net_r": 27.7554361315987
+    },
+    "stored_one_minute": {
+     "n": 206,
+     "pf": 1.565212670893138,
+     "stress_pf": 1.4545609502858654
+    },
+    "calibration": {
+     "n": 458,
+     "pf": 1.4655185612621862,
+     "net_r": 55.25030479981868
+    },
+    "earlier": {
+     "earlier": {
+      "n": 154,
+      "pf": 0.5817015056506492,
+      "net_r": -22.63356581726368
+     }
+    },
+    "earlier_stress": {
+     "earlier": {
+      "n": 154,
+      "pf": 0.5530837961403031,
+      "net_r": -26.694388826461584
+     }
+    },
+    "unseen_dukascopy": {
+     "n": 106,
+     "pf": 1.2055399771854025,
+     "net_r": 6.098045373608455
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "percent",
+     "setups": 4,
+     "trades": 182,
+     "pf": 1.2456589102059108,
+     "net_r": 11.759549333429156
+    },
+    "eligible_at_1_3": 1
+   }
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M15",
+   "systems_with_setups": 14,
+   "eligible": 5,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "percent",
+     "setups": 1,
+     "trades": 25,
+     "pf": 1.4135363721724181,
+     "net_r": 3.9410780622562616
+    },
+    {
+     "trailing": "psar",
+     "setups": 3,
+     "trades": 96,
+     "pf": 0.9584852718707986,
+     "net_r": -1.5307375176373994
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 3,
+     "trades": 86,
+     "pf": 0.7988889577561836,
+     "net_r": -8.527066465678498
+    },
+    {
+     "trailing": "pivots",
+     "setups": 2,
+     "trades": 66,
+     "pf": 0.7430508408619524,
+     "net_r": -5.651812952021457
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 5,
+     "trades": 246,
+     "pf": 0.7391641740725248,
+     "net_r": -32.03861530236713
+    },
+    {
+     "trailing": "sma",
+     "setups": 1,
+     "trades": 65,
+     "pf": 0.7241392537399924,
+     "net_r": -4.729605925781436
+    },
+    {
+     "trailing": "hump",
+     "setups": 3,
+     "trades": 101,
+     "pf": 0.690829330602576,
+     "net_r": -13.550390860337567
+    },
+    {
+     "trailing": "ema",
+     "setups": 5,
+     "trades": 138,
+     "pf": 0.6861435403403927,
+     "net_r": -11.52452989843242
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 3,
+     "trades": 91,
+     "pf": 0.6688300237776282,
+     "net_r": -10.14992558499035
+    },
+    {
+     "trailing": "step",
+     "setups": 4,
+     "trades": 192,
+     "pf": 0.6233014738782041,
+     "net_r": -36.869682081019604
+    },
+    {
+     "trailing": "R",
+     "setups": 3,
+     "trades": 106,
+     "pf": 0.6003978842572012,
+     "net_r": -18.797418012640257
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 2,
+     "trades": 53,
+     "pf": 0.5771312351934721,
+     "net_r": -11.857433642428063
+    },
+    {
+     "trailing": "atr",
+     "setups": 1,
+     "trades": 44,
+     "pf": 0.554654647058496,
+     "net_r": -10.101796962192976
+    },
+    {
+     "trailing": "candles",
+     "setups": 2,
+     "trades": 50,
+     "pf": 0.38704146482359575,
+     "net_r": -18.06083502514292
+    }
+   ],
+   "chosen": {
+    "trailing": "htfcandle",
+    "trail_mode": 11,
+    "setups": 5,
+    "keys": [
+     "M15:htfcandle:1",
+     "M15:htfcandle:2",
+     "M15:htfcandle:3",
+     "M15:htfcandle:4",
+     "M15:htfcandle:5"
+    ],
+    "unseen": {
+     "n": 246,
+     "pf": 0.7391641740725248,
+     "net_r": -32.03861530236713
+    },
+    "unseen_stress": {
+     "n": 248,
+     "pf": 0.6658970472772521,
+     "net_r": -43.33489721499971
+    },
+    "unseen_one_minute": {
+     "n": 246,
+     "pf": 0.7602399255842694,
+     "net_r": -28.694618222391718
+    },
+    "stored_one_minute": {
+     "n": 252,
+     "pf": 0.7605511839360628,
+     "stress_pf": 0.6891611449936293
+    },
+    "calibration": {
+     "n": 675,
+     "pf": 1.3907020618359898,
+     "net_r": 102.26887247946638
+    },
+    "earlier": {
+     "earlier": {
+      "n": 280,
+      "pf": 0.9873694670162583,
+      "net_r": -1.5934116030707806
+     }
+    },
+    "earlier_stress": {
+     "earlier": {
+      "n": 280,
+      "pf": 0.8440130972398375,
+      "net_r": -20.685818082342813
+     }
+    },
+    "unseen_dukascopy": {
+     "n": 133,
+     "pf": 0.6869950170243286,
+     "net_r": -20.222163938213523
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "hump",
+     "setups": 3,
+     "trades": 101,
+     "pf": 0.690829330602576,
+     "net_r": -13.550390860337567
+    },
+    "eligible_at_1_3": 0
+   }
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "M30",
+   "systems_with_setups": 5,
+   "eligible": 4,
+   "thin": true,
+   "candidates": [
+    {
+     "trailing": "pivots",
+     "setups": 2,
+     "trades": 68,
+     "pf": 1.0582214929530243,
+     "net_r": 1.8040244255048767
+    },
+    {
+     "trailing": "psar",
+     "setups": 1,
+     "trades": 27,
+     "pf": 0.9651850158394192,
+     "net_r": -0.3498480611592536
+    },
+    {
+     "trailing": "candles",
+     "setups": 1,
+     "trades": 56,
+     "pf": 0.6910393814191568,
+     "net_r": -9.72619729975955
+    },
+    {
+     "trailing": "hump",
+     "setups": 1,
+     "trades": 30,
+     "pf": 0.6170665530732977,
+     "net_r": -4.187441340557095
+    },
+    {
+     "trailing": "ema",
+     "setups": 1,
+     "trades": 39,
+     "pf": 0.5907009433099188,
+     "net_r": -5.280509083831007
+    }
+   ],
+   "chosen": {
+    "trailing": "pivots",
+    "trail_mode": 12,
+    "setups": 2,
+    "keys": [
+     "M30:pivots:1",
+     "M30:pivots:2"
+    ],
+    "unseen": {
+     "n": 68,
+     "pf": 1.0582214929530243,
+     "net_r": 1.8040244255048767
+    },
+    "unseen_stress": {
+     "n": 69,
+     "pf": 1.0486485433970048,
+     "net_r": 1.5679715202191384
+    },
+    "unseen_one_minute": {
+     "n": 68,
+     "pf": 1.1235180101646305,
+     "net_r": 3.641435578590961
+    },
+    "stored_one_minute": {
+     "n": 69,
+     "pf": 1.1535146135495933,
+     "stress_pf": 1.1550568361521565
+    },
+    "calibration": {
+     "n": 180,
+     "pf": 1.5232977219154986,
+     "net_r": 28.969771426706956
+    },
+    "earlier": {
+     "earlier": {
+      "n": 81,
+      "pf": 0.9684460544698232,
+      "net_r": -0.9353919086556473
+     }
+    },
+    "earlier_stress": {
+     "earlier": {
+      "n": 80,
+      "pf": 0.9548924472551132,
+      "net_r": -1.3926076501422084
+     }
+    },
+    "unseen_dukascopy": {
+     "n": 37,
+     "pf": 0.6673558827770442,
+     "net_r": -5.8575648027890495
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "candles",
+     "setups": 1,
+     "trades": 56,
+     "pf": 0.6910393814191568,
+     "net_r": -9.72619729975955
+    },
+    "eligible_at_1_3": 0
+   }
+  },
+  {
+   "symbol": "XAUUSD",
+   "tf": "H1",
+   "systems_with_setups": 0,
+   "eligible": 0,
+   "thin": false,
+   "candidates": [],
+   "chosen": null
+  },
+  {
+   "symbol": "BTCUSD",
+   "tf": "M1",
+   "systems_with_setups": 0,
+   "eligible": 0,
+   "thin": false,
+   "candidates": [],
+   "chosen": null
+  },
+  {
+   "symbol": "BTCUSD",
+   "tf": "M2",
+   "systems_with_setups": 8,
+   "eligible": 2,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "atr",
+     "setups": 3,
+     "trades": 121,
+     "pf": 1.9675568570492987,
+     "net_r": 19.482432288620192
+    },
+    {
+     "trailing": "percent",
+     "setups": 1,
+     "trades": 32,
+     "pf": 1.720282241563754,
+     "net_r": 9.421814760340698
+    },
+    {
+     "trailing": "step",
+     "setups": 1,
+     "trades": 22,
+     "pf": 1.6051301072836572,
+     "net_r": 6.330868160903792
+    },
+    {
+     "trailing": "psar",
+     "setups": 3,
+     "trades": 109,
+     "pf": 1.3651685935090025,
+     "net_r": 19.065124061226168
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 1,
+     "trades": 36,
+     "pf": 1.2209110254380575,
+     "net_r": 3.2724323584285755
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 1,
+     "trades": 45,
+     "pf": 0.8067371649723105,
+     "net_r": -5.226509094260746
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 1,
+     "trades": 49,
+     "pf": 0.6677980231913103,
+     "net_r": -4.8598203044743915
+    },
+    {
+     "trailing": "pivots",
+     "setups": 1,
+     "trades": 36,
+     "pf": 0.5527758472899866,
+     "net_r": -8.577446910090668
+    }
+   ],
+   "chosen": {
+    "trailing": "atr",
+    "trail_mode": 1,
+    "setups": 3,
+    "keys": [
+     "M2:atr:1",
+     "M2:atr:2",
+     "M2:atr:3"
+    ],
+    "unseen": {
+     "n": 121,
+     "pf": 1.9675568570492987,
+     "net_r": 19.482432288620192
+    },
+    "unseen_stress": {
+     "n": 120,
+     "pf": 1.5290281516464548,
+     "net_r": 12.62560145648639
+    },
+    "unseen_one_minute": {
+     "n": 121,
+     "pf": 2.1449739216905606,
+     "net_r": 22.02294004673304
+    },
+    "stored_one_minute": {
+     "n": 121,
+     "pf": 2.144973927207131,
+     "stress_pf": 1.643808635737417
+    },
+    "calibration": {
+     "n": 289,
+     "pf": 1.7157263648364363,
+     "net_r": 43.34293545133487
+    },
+    "earlier": {
+     "2024": {
+      "n": 214,
+      "pf": 1.0517497239484024,
+      "net_r": 3.137197397205105
+     },
+     "2023": {
+      "n": 187,
+      "pf": 0.5553976137857078,
+      "net_r": -24.672068338098363
+     }
+    },
+    "earlier_stress": {
+     "2024": {
+      "n": 217,
+      "pf": 1.0256609778916783,
+      "net_r": 1.5398936144696391
+     },
+     "2023": {
+      "n": 186,
+      "pf": 0.3876762519849961,
+      "net_r": -38.50871126049543
+     }
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "psar",
+     "setups": 3,
+     "trades": 109,
+     "pf": 1.3651685935090025,
+     "net_r": 19.065124061226168
+    },
+    "eligible_at_1_3": 2
+   }
+  },
+  {
+   "symbol": "BTCUSD",
+   "tf": "M3",
+   "systems_with_setups": 10,
+   "eligible": 1,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "percent",
+     "setups": 1,
+     "trades": 23,
+     "pf": 2.5933256334095116,
+     "net_r": 6.863673348049879
+    },
+    {
+     "trailing": "pivots",
+     "setups": 3,
+     "trades": 90,
+     "pf": 2.245022895781445,
+     "net_r": 28.796897948111347
+    },
+    {
+     "trailing": "sma",
+     "setups": 3,
+     "trades": 83,
+     "pf": 2.1090885090422273,
+     "net_r": 21.689974769985188
+    },
+    {
+     "trailing": "psar",
+     "setups": 2,
+     "trades": 67,
+     "pf": 1.629841379763323,
+     "net_r": 12.328918348166676
+    },
+    {
+     "trailing": "candles",
+     "setups": 3,
+     "trades": 140,
+     "pf": 1.4091133087630032,
+     "net_r": 16.21037301605409
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 2,
+     "trades": 43,
+     "pf": 1.3573781790369848,
+     "net_r": 5.855256194428453
+    },
+    {
+     "trailing": "R",
+     "setups": 1,
+     "trades": 37,
+     "pf": 1.3136303430866505,
+     "net_r": 4.189712595917691
+    },
+    {
+     "trailing": "atr",
+     "setups": 1,
+     "trades": 64,
+     "pf": 1.3024888493015288,
+     "net_r": 3.939363946686082
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 2,
+     "trades": 56,
+     "pf": 1.1614770102089629,
+     "net_r": 4.618909587677936
+    },
+    {
+     "trailing": "hump",
+     "setups": 2,
+     "trades": 65,
+     "pf": 0.9117171849709643,
+     "net_r": -3.2455233082034045
+    }
+   ],
+   "chosen": {
+    "trailing": "candles",
+    "trail_mode": 6,
+    "setups": 3,
+    "keys": [
+     "M3:candles:1",
+     "M3:candles:2",
+     "M3:candles:3"
+    ],
+    "unseen": {
+     "n": 140,
+     "pf": 1.4091133087630032,
+     "net_r": 16.21037301605409
+    },
+    "unseen_stress": {
+     "n": 142,
+     "pf": 1.082641101588724,
+     "net_r": 3.658598213342447
+    },
+    "unseen_one_minute": {
+     "n": 140,
+     "pf": 1.4434717807455533,
+     "net_r": 16.6608476370182
+    },
+    "stored_one_minute": {
+     "n": 140,
+     "pf": 1.4434717776886825,
+     "stress_pf": 1.1150037506163046
+    },
+    "calibration": {
+     "n": 385,
+     "pf": 1.687973293583793,
+     "net_r": 63.88630798006964
+    },
+    "earlier": {
+     "2024": {
+      "n": 271,
+      "pf": 0.817939239703409,
+      "net_r": -14.999493529351753
+     },
+     "2023": {
+      "n": 242,
+      "pf": 0.8386336632525819,
+      "net_r": -13.176859628945412
+     }
+    },
+    "earlier_stress": {
+     "2024": {
+      "n": 270,
+      "pf": 0.7123952831238809,
+      "net_r": -25.86334716224371
+     },
+     "2023": {
+      "n": 248,
+      "pf": 0.5932471124333828,
+      "net_r": -39.19584668212093
+     }
+    },
+    "held": false,
+    "runner_up": null,
+    "eligible_at_1_3": 1
+   }
+  },
+  {
+   "symbol": "BTCUSD",
+   "tf": "M5",
+   "systems_with_setups": 13,
+   "eligible": 7,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "chandelier",
+     "setups": 1,
+     "trades": 25,
+     "pf": 1.9270820795536905,
+     "net_r": 4.305772839856363
+    },
+    {
+     "trailing": "ema",
+     "setups": 1,
+     "trades": 31,
+     "pf": 1.9192442291485443,
+     "net_r": 8.63089281095864
+    },
+    {
+     "trailing": "R",
+     "setups": 2,
+     "trades": 52,
+     "pf": 1.8601813033483032,
+     "net_r": 20.37195550358409
+    },
+    {
+     "trailing": "candles",
+     "setups": 3,
+     "trades": 156,
+     "pf": 1.8131979621836585,
+     "net_r": 32.41457154733233
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 4,
+     "trades": 166,
+     "pf": 1.6906588040103245,
+     "net_r": 38.756651813251565
+    },
+    {
+     "trailing": "percent",
+     "setups": 2,
+     "trades": 70,
+     "pf": 1.5395168305873177,
+     "net_r": 7.919484439626743
+    },
+    {
+     "trailing": "sma",
+     "setups": 6,
+     "trades": 205,
+     "pf": 1.437417023290772,
+     "net_r": 30.420129563988326
+    },
+    {
+     "trailing": "atr",
+     "setups": 1,
+     "trades": 30,
+     "pf": 1.4061770083044667,
+     "net_r": 2.968465640344896
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 3,
+     "trades": 112,
+     "pf": 1.3253503752212712,
+     "net_r": 14.796517876497106
+    },
+    {
+     "trailing": "hump",
+     "setups": 4,
+     "trades": 124,
+     "pf": 1.3006770377774342,
+     "net_r": 16.561532207493016
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 4,
+     "trades": 214,
+     "pf": 1.2814072972092572,
+     "net_r": 21.780407624200585
+    },
+    {
+     "trailing": "psar",
+     "setups": 3,
+     "trades": 97,
+     "pf": 1.1388867526236373,
+     "net_r": 5.345566989445967
+    },
+    {
+     "trailing": "step",
+     "setups": 3,
+     "trades": 101,
+     "pf": 1.1039845560636536,
+     "net_r": 4.053182206517189
+    }
+   ],
+   "chosen": {
+    "trailing": "candles",
+    "trail_mode": 6,
+    "setups": 3,
+    "keys": [
+     "M5:candles:1",
+     "M5:candles:2",
+     "M5:candles:3"
+    ],
+    "unseen": {
+     "n": 156,
+     "pf": 1.8131979621836585,
+     "net_r": 32.41457154733233
+    },
+    "unseen_stress": {
+     "n": 156,
+     "pf": 1.6137568150761843,
+     "net_r": 24.453238894823343
+    },
+    "unseen_one_minute": {
+     "n": 156,
+     "pf": 1.8933420958955058,
+     "net_r": 33.987721798620655
+    },
+    "stored_one_minute": {
+     "n": 156,
+     "pf": 1.8933420963129126,
+     "stress_pf": 1.7117126125062103
+    },
+    "calibration": {
+     "n": 382,
+     "pf": 1.546201322325805,
+     "net_r": 58.1693201483436
+    },
+    "earlier": {
+     "2024": {
+      "n": 306,
+      "pf": 0.9680209846929567,
+      "net_r": -3.3679224214636445
+     },
+     "2023": {
+      "n": 320,
+      "pf": 0.8999785406298471,
+      "net_r": -12.436473912965278
+     }
+    },
+    "earlier_stress": {
+     "2024": {
+      "n": 307,
+      "pf": 0.8358481092735586,
+      "net_r": -17.629393661194417
+     },
+     "2023": {
+      "n": 319,
+      "pf": 0.745930801298542,
+      "net_r": -34.72335640650228
+     }
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "htfcandle",
+     "setups": 4,
+     "trades": 166,
+     "pf": 1.6906588040103245,
+     "net_r": 38.756651813251565
+    },
+    "eligible_at_1_3": 5
+   }
+  },
+  {
+   "symbol": "BTCUSD",
+   "tf": "M10",
+   "systems_with_setups": 12,
+   "eligible": 8,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "ema",
+     "setups": 2,
+     "trades": 102,
+     "pf": 1.9035441533054507,
+     "net_r": 22.88472778832587
+    },
+    {
+     "trailing": "pivots",
+     "setups": 4,
+     "trades": 129,
+     "pf": 1.4917893075786808,
+     "net_r": 17.99301174360844
+    },
+    {
+     "trailing": "sma",
+     "setups": 1,
+     "trades": 48,
+     "pf": 1.487620217075757,
+     "net_r": 4.50443399375088
+    },
+    {
+     "trailing": "hump",
+     "setups": 2,
+     "trades": 66,
+     "pf": 1.4194183092166224,
+     "net_r": 8.704355245154856
+    },
+    {
+     "trailing": "step",
+     "setups": 3,
+     "trades": 161,
+     "pf": 1.3193962329714015,
+     "net_r": 20.671193408343036
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 4,
+     "trades": 162,
+     "pf": 1.2483456041747134,
+     "net_r": 14.920164183471499
+    },
+    {
+     "trailing": "R",
+     "setups": 4,
+     "trades": 192,
+     "pf": 1.0773325689649125,
+     "net_r": 7.2558048307934095
+    },
+    {
+     "trailing": "percent",
+     "setups": 2,
+     "trades": 89,
+     "pf": 0.9618619308859064,
+     "net_r": -0.5307207931573853
+    },
+    {
+     "trailing": "psar",
+     "setups": 3,
+     "trades": 122,
+     "pf": 0.9556428004572208,
+     "net_r": -1.7566468097734014
+    },
+    {
+     "trailing": "candles",
+     "setups": 4,
+     "trades": 181,
+     "pf": 0.8680695435825925,
+     "net_r": -8.7494646087972
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 2,
+     "trades": 68,
+     "pf": 0.8303881617596076,
+     "net_r": -3.3529619955660066
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 5,
+     "trades": 195,
+     "pf": 0.7248398931221205,
+     "net_r": -18.315685778440045
+    }
+   ],
+   "chosen": {
+    "trailing": "ema",
+    "trail_mode": 7,
+    "setups": 2,
+    "keys": [
+     "M10:ema:1",
+     "M10:ema:2"
+    ],
+    "unseen": {
+     "n": 102,
+     "pf": 1.9035441533054507,
+     "net_r": 22.88472778832587
+    },
+    "unseen_stress": {
+     "n": 102,
+     "pf": 2.0347803178268826,
+     "net_r": 23.17393023375534
+    },
+    "unseen_one_minute": {
+     "n": 102,
+     "pf": 1.953490807321632,
+     "net_r": 23.552822070256205
+    },
+    "stored_one_minute": {
+     "n": 102,
+     "pf": 1.953490808054745,
+     "stress_pf": 2.0868046089180625
+    },
+    "calibration": {
+     "n": 236,
+     "pf": 1.6062119369386556,
+     "net_r": 45.50777380387344
+    },
+    "earlier": {
+     "2024": {
+      "n": 156,
+      "pf": 1.0165865792425048,
+      "net_r": 0.9387735003288729
+     },
+     "2023": {
+      "n": 201,
+      "pf": 0.9626028137969594,
+      "net_r": -2.6325859174525847
+     }
+    },
+    "earlier_stress": {
+     "2024": {
+      "n": 156,
+      "pf": 0.8339898051046793,
+      "net_r": -9.98095842216222
+     },
+     "2023": {
+      "n": 199,
+      "pf": 0.7945591724679606,
+      "net_r": -15.26706624606431
+     }
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "pivots",
+     "setups": 4,
+     "trades": 129,
+     "pf": 1.4917893075786808,
+     "net_r": 17.99301174360844
+    },
+    "eligible_at_1_3": 3
+   }
+  },
+  {
+   "symbol": "BTCUSD",
+   "tf": "M15",
+   "systems_with_setups": 12,
+   "eligible": 5,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "ema",
+     "setups": 1,
+     "trades": 34,
+     "pf": 1.3380312567774135,
+     "net_r": 2.3594229375967015
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 5,
+     "trades": 169,
+     "pf": 0.9624436242346249,
+     "net_r": -2.4030975443923204
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 3,
+     "trades": 124,
+     "pf": 0.8667046798172273,
+     "net_r": -6.142769270512724
+    },
+    {
+     "trailing": "candles",
+     "setups": 2,
+     "trades": 78,
+     "pf": 0.8487330723631357,
+     "net_r": -4.084383029102309
+    },
+    {
+     "trailing": "R",
+     "setups": 4,
+     "trades": 133,
+     "pf": 0.8355545658696668,
+     "net_r": -9.206641831360248
+    },
+    {
+     "trailing": "sma",
+     "setups": 2,
+     "trades": 47,
+     "pf": 0.8257154377551696,
+     "net_r": -1.9578556347856535
+    },
+    {
+     "trailing": "psar",
+     "setups": 2,
+     "trades": 84,
+     "pf": 0.7721363593882057,
+     "net_r": -8.518404058025792
+    },
+    {
+     "trailing": "hump",
+     "setups": 5,
+     "trades": 225,
+     "pf": 0.7505164127286231,
+     "net_r": -20.00963953525397
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 2,
+     "trades": 81,
+     "pf": 0.6929151423851512,
+     "net_r": -8.503507848375122
+    },
+    {
+     "trailing": "pivots",
+     "setups": 5,
+     "trades": 238,
+     "pf": 0.597278335246677,
+     "net_r": -48.83896234936613
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 2,
+     "trades": 64,
+     "pf": 0.5024645240255722,
+     "net_r": -10.636413012875973
+    },
+    {
+     "trailing": "percent",
+     "setups": 1,
+     "trades": 37,
+     "pf": 0.36060762648032635,
+     "net_r": -6.313549300874859
+    }
+   ],
+   "chosen": {
+    "trailing": "bollinger",
+    "trail_mode": 10,
+    "setups": 5,
+    "keys": [
+     "M15:bollinger:1",
+     "M15:bollinger:2",
+     "M15:bollinger:3",
+     "M15:bollinger:4",
+     "M15:bollinger:5"
+    ],
+    "unseen": {
+     "n": 169,
+     "pf": 0.9624436242346249,
+     "net_r": -2.4030975443923204
+    },
+    "unseen_stress": {
+     "n": 167,
+     "pf": 0.9125324195788695,
+     "net_r": -5.708465739470245
+    },
+    "unseen_one_minute": {
+     "n": 169,
+     "pf": 0.977107399548294,
+     "net_r": -1.4325523812901846
+    },
+    "stored_one_minute": {
+     "n": 169,
+     "pf": 0.9771073977652553,
+     "stress_pf": 0.9343449229946944
+    },
+    "calibration": {
+     "n": 474,
+     "pf": 1.6350839262298367,
+     "net_r": 78.53328980080144
+    },
+    "earlier": {
+     "2024": {
+      "n": 360,
+      "pf": 1.0551421213196834,
+      "net_r": 6.178478726695182
+     },
+     "2023": {
+      "n": 359,
+      "pf": 0.8409588061027952,
+      "net_r": -19.19538273997066
+     }
+    },
+    "earlier_stress": {
+     "2024": {
+      "n": 360,
+      "pf": 0.9883430868570323,
+      "net_r": -1.3237859386571138
+     },
+     "2023": {
+      "n": 361,
+      "pf": 0.7729520340312588,
+      "net_r": -28.8700380732363
+     }
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "htfcandle",
+     "setups": 3,
+     "trades": 124,
+     "pf": 0.8667046798172273,
+     "net_r": -6.142769270512724
+    },
+    "eligible_at_1_3": 0
+   }
+  },
+  {
+   "symbol": "BTCUSD",
+   "tf": "M30",
+   "systems_with_setups": 13,
+   "eligible": 2,
+   "thin": false,
+   "candidates": [
+    {
+     "trailing": "atr",
+     "setups": 3,
+     "trades": 100,
+     "pf": 1.0621015719595546,
+     "net_r": 2.2829986347302986
+    },
+    {
+     "trailing": "step",
+     "setups": 1,
+     "trades": 29,
+     "pf": 0.9750925078226912,
+     "net_r": -0.22344917761754846
+    },
+    {
+     "trailing": "candles",
+     "setups": 1,
+     "trades": 28,
+     "pf": 0.8193716880793221,
+     "net_r": -1.1535285185817592
+    },
+    {
+     "trailing": "pivots",
+     "setups": 3,
+     "trades": 99,
+     "pf": 0.7904074162162923,
+     "net_r": -6.689733019313726
+    },
+    {
+     "trailing": "psar",
+     "setups": 1,
+     "trades": 46,
+     "pf": 0.7493373035157784,
+     "net_r": -4.432444130558934
+    },
+    {
+     "trailing": "percent",
+     "setups": 4,
+     "trades": 128,
+     "pf": 0.6597332044043456,
+     "net_r": -8.081121308235891
+    },
+    {
+     "trailing": "htfcandle",
+     "setups": 2,
+     "trades": 78,
+     "pf": 0.6260262467854063,
+     "net_r": -9.74908079519038
+    },
+    {
+     "trailing": "ema",
+     "setups": 1,
+     "trades": 29,
+     "pf": 0.5988569352867759,
+     "net_r": -3.1092372166471955
+    },
+    {
+     "trailing": "R",
+     "setups": 2,
+     "trades": 61,
+     "pf": 0.5879677624254965,
+     "net_r": -6.134027054793917
+    },
+    {
+     "trailing": "bollinger",
+     "setups": 1,
+     "trades": 29,
+     "pf": 0.5683673457492917,
+     "net_r": -2.9532505847980564
+    },
+    {
+     "trailing": "sma",
+     "setups": 3,
+     "trades": 71,
+     "pf": 0.5254801382217488,
+     "net_r": -8.699386195811762
+    },
+    {
+     "trailing": "profitlock",
+     "setups": 1,
+     "trades": 33,
+     "pf": 0.37037568108277447,
+     "net_r": -6.432544446832118
+    },
+    {
+     "trailing": "chandelier",
+     "setups": 1,
+     "trades": 30,
+     "pf": 0.30124881857222613,
+     "net_r": -8.508403943546753
+    }
+   ],
+   "chosen": {
+    "trailing": "atr",
+    "trail_mode": 1,
+    "setups": 3,
+    "keys": [
+     "M30:atr:1",
+     "M30:atr:2",
+     "M30:atr:3"
+    ],
+    "unseen": {
+     "n": 100,
+     "pf": 1.0621015719595546,
+     "net_r": 2.2829986347302986
+    },
+    "unseen_stress": {
+     "n": 100,
+     "pf": 1.0359301454244285,
+     "net_r": 1.3302770863769258
+    },
+    "unseen_one_minute": {
+     "n": 100,
+     "pf": 1.0881840351125027,
+     "net_r": 3.1103731672096933
+    },
+    "stored_one_minute": {
+     "n": 100,
+     "pf": 1.0881840320476353,
+     "stress_pf": 1.0758934672595157
+    },
+    "calibration": {
+     "n": 251,
+     "pf": 1.513419811312229,
+     "net_r": 40.6824882470774
+    },
+    "earlier": {
+     "2024": {
+      "n": 219,
+      "pf": 1.074794533076036,
+      "net_r": 5.454385666379842
+     },
+     "2023": {
+      "n": 209,
+      "pf": 0.6284259114096264,
+      "net_r": -34.54914553650704
+     }
+    },
+    "earlier_stress": {
+     "2024": {
+      "n": 219,
+      "pf": 1.0099666924960728,
+      "net_r": 0.7632084150313512
+     },
+     "2023": {
+      "n": 209,
+      "pf": 0.5812070934749578,
+      "net_r": -40.305536453147845
+     }
+    },
+    "held": false,
+    "runner_up": {
+     "trailing": "percent",
+     "setups": 4,
+     "trades": 128,
+     "pf": 0.6597332044043456,
+     "net_r": -8.081121308235891
+    },
+    "eligible_at_1_3": 0
+   }
+  },
+  {
+   "symbol": "BTCUSD",
+   "tf": "H1",
+   "systems_with_setups": 0,
+   "eligible": 0,
+   "thin": false,
+   "candidates": [],
+   "chosen": null
+  }
+ ]
+}

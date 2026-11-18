@@ -249,16 +249,19 @@ def presets(best, data):
                                  f"(TrailMode {ch['trail_mode']}), setup {k} of {k_total}: {side.lower()}, session {sess} server time, trend filter {trend}, "
                                  f"target {target}. " + ("DO NOT LOAD ON GOLD." if btc else "DO NOT LOAD ON BTC.")),
                         MP.plain(f"Trailing: {describe(p)}. Needs EA v1.35 or later (TrailMode {ch['trail_mode']}, TrailParam {int(p.get('trail_p', 0))})."),
-                        MP.plain(f"Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest (score {q['is_score']:.2f}): "
+                        MP.plain(f"Picked on Jan 2025 - May 15 2026 only, by the one-minute backtest at the study's costs "
+                                 f"({'10 USD spread' if btc else 'FTMO spread, no commission'}; score {q['is_score']:.2f}): "
                                  f"{q['stored']['is_n']} trades, PF {q['stored']['is_pf']:.2f}. Tick replay of the same months: {cal['n']} trades, PF {f2(cal['pf'])}."),
                         MP.plain(f"TICK REPLAY (every tick, the EA's rules; {costs}). Unseen May 16 - Nov 13 2026: this setup {u['n']} trades, "
                                  f"PF {f2(u['pf'])}, net {u['net_r']:+.1f}R (stressed PF {f2(us['pf'])}); the {k_total} setups of {p['tf']} + {name} together "
                                  f"{grp_u['n']} trades, PF {f2(grp_u['pf'])}, net {grp_u['net_r']:+.1f}R (stressed {f2(grp_s['pf'])})."),
                         MP.plain(f"{name} was chosen as the best of the EA's trailing systems on {p['tf']} by that 2026 result"
-                                 + (" (fewer than 100 trades: thin)" if b["thin"] else "") + ": the 2026 figure is the score it was chosen by, not a test."),
+                                 + (" (fewer than 100 trades: thin)" if b["thin"] else "") + ": the 2026 figure is the score it was chosen by, not a test."
+                                 + (f" Even so the set lost money in those months (PF {f2(grp_u['pf'])}): it is here only because the zip has the best "
+                                    f"system of every timeframe." if grp_u["pf"] < 1.0 else "")),
                         MP.plain(f"EARLIER DATA, not used for any choice (tick replay, same costs): this setup: {e_txt}. The {k_total} setups together: {grp_e}. "
-                                 + ("They held (PF 1.3 or more in every earlier period), " if held else "They did not hold (under 1.3), ")
-                                 + "but nothing here is proven: Strategy Tester and demo only."),
+                                 + ("They held (PF 1.3 or more in every earlier period), but nothing here is proven: Strategy Tester and demo only."
+                                    if held else "They did not hold (under 1.3): UNPROVEN, Strategy Tester and demo only.")),
                         *([MP.plain(f"Its target ({p['tp_rr']:g}R) equaled its minimum reward in the backtest; the preset sets MinRewardRisk "
                                     f"{rr:g} so the EA takes every such signal (the tick figures above are with this setting).")] if is_tie(p) else []),
                         ("Data: Binance BTCUSDT, broker server time. Points are 0.01 USD: 2000 points = 20 USD." if btc else
@@ -311,13 +314,15 @@ def guide(best, data, sets):
                 continue
             ru = ch["runner_up"]
             out.append(f"| {b['tf']} | {SYSTEM[ch['trailing']]} ({ch['trail_mode']}){' – thin' if b['thin'] else ''} | {ch['setups']} | "
-                       f"**{f2(ch['unseen']['pf'])} ({ch['unseen']['n']})** | {f2(ch['unseen_stress']['pf'])} | {f2(ch['unseen_one_minute']['pf'])} | "
+                       f"**{f2(ch['unseen']['pf'])} ({ch['unseen']['n']})**{' lost' if ch['unseen']['pf'] < 1.0 else ''} | "
+                       f"{f2(ch['unseen_stress']['pf'])} | {f2(ch['unseen_one_minute']['pf'])} | "
                        + " | ".join(f"{f2(ch['earlier'][p]['pf'])} ({ch['earlier'][p]['n']})" for p in ep)
                        + f" | {'yes' if ch['held'] else 'no'} | {(SYSTEM[ru['trailing']] + ' ' + f2(ru['pf'])) if ru else '–'} |")
         return out
 
     chosen = [b for b in best if b["chosen"]]
     held = [b for b in chosen if b["chosen"]["held"]]
+    lost = [b for b in chosen if b["chosen"]["unseen"]["pf"] < 1.0]
     n_g = sum(1 for b in chosen if b["symbol"] == "XAUUSD"); n_b = len(chosen) - n_g
     held_txt = (f"{len(held)} of the {len(chosen)} chosen systems held there (profit factor 1.3 or more in every earlier period): "
                 + ", ".join(f"{b['symbol']} {b['tf']} {SYSTEM[b['chosen']['trailing']]}" for b in held)
@@ -340,7 +345,12 @@ def guide(best, data, sets):
           "> **Nothing in this zip is proven. Strategy Tester and demo only.**",
           "> - Each timeframe's trailing system was chosen by its result in the unseen months of 2026 (16 May – 13 November). "
           "That makes the 2026 figure the score it was chosen by, not a test, and the best of up to 14 systems is flattered by the choice.",
-          f"> - The check is the earlier data, which played no part in any choice (gold: 15 July – 31 December 2024; BTC: 2023 and 2024): {held_txt}.", ""]
+          f"> - The check is the earlier data, which played no part in any choice (gold: 15 July – 31 December 2024; BTC: 2023 and 2024): {held_txt}."]
+    if lost:
+        L += [f"> - On {len(lost)} timeframes even the best system lost money in the 2026 months it was chosen on: "
+              + ", ".join(f"{'gold' if b['symbol'] == 'XAUUSD' else 'BTC'} {b['tf']} ({f2(b['chosen']['unseen']['pf'])})" for b in lost)
+              + ". They are here only because the zip has one set per timeframe."]
+    L += [""]
     L += ["## How it was measured", "",
           "- **The setups** are the re-calibration's picks (November 2026): for every timeframe and trailing system, up to 10 setups chosen on "
           "1 January 2025 – 15 May 2026 only, one per direction, session and trend filter, each with an in-sample score of 1.3 or more. "
@@ -349,7 +359,9 @@ def guide(best, data, sets):
           "or the bid (sells) after the spread check; stop and target checked on every tick, a stop filled at the tick price (worse on a gap); "
           "the trailing systems updated as the EA does (TrailMode 0 and 4 on every tick in steps of `TrailStep_Points`, the others once per closed "
           "one-minute bar); the time exits, the Friday close (gold) and one position per preset. It was checked against the EA's own code run on "
-          "the same ticks in a simulated terminal, and against an independent re-trace of the trades.",
+          "the same ticks in a simulated terminal, on samples of setups covering every TrailMode: 470 of 470 gold trades and 804 of 804 BTC trades "
+          "identical in entry, stop, target, stop moves, exit and result. An independent re-trace of all 20,087 gold trades of July – December 2024 "
+          "found the same trades.",
           "- **Gold prices:** Dukascopy ticks. **VT costs:** Dukascopy's mid price with VT Markets' 0.15 spread, scaled by Dukascopy's own spread "
           "so its spikes stay, and $0.60 commission per ounce. **Stressed:** one minute late, $0.10 slippage, $0.67 commission.",
           "- **BTC prices:** Binance BTCUSDT one-second prices (the same source as the study's one-minute bars), with a $10 spread and no "
@@ -363,10 +375,31 @@ def guide(best, data, sets):
           "- Every preset's header gives its own figures; `BEST_TRAILING_PRESETS.csv` lists them all, `BEST_TRAILING_BY_TIMEFRAME.csv` the "
           "choice of every timeframe with its runner-up, and `TICK_REPLAY_ALL_CELLS.csv` every trailing system on every timeframe, period and cost model, "
           "tick and one-minute.", ""]
-    L += ["## Ticks against one minute", "", "All the setups of the EA's 14 systems together, VT costs:", "",
+    dpf = [pt - py for _, _, _, pt, _, _, py, _ in tick_vs]
+    L += ["## Ticks against one minute", "",
+          f"All the setups of the EA's 14 systems together, VT costs. The tick replay takes almost the same trades as the one-minute engine on the "
+          f"same prices and costs, and its profit factor is {min(-x for x in dpf):.2f} to {max(-x for x in dpf):.2f} lower: the one-minute "
+          "figures of the study were close, slightly optimistic.", "",
           "| Symbol | Period | Tick replay: trades, PF, net | One-minute engine: trades, PF, net |", "|---|---|---|---|"]
     for sym, per, nt, pt, st, ny, py, sy in tick_vs:
-        L.append(f"| {sym} | {PERIOD_TEXT[per]} | {nt}, {f2(pt)}, {st:+.0f}R | {ny}, {f2(py)}, {sy:+.0f}R |")
+        lab = PERIOD_TEXT[per] + (" (the setups were picked on it)" if per == "calibration" else "")
+        L.append(f"| {sym} | {lab} | {nt}, {f2(pt)}, {st:+.0f}R | {ny}, {f2(py)}, {sy:+.0f}R |")
+    L += ["", "## The 15 earlier trailing results, tick by tick", "",
+          "The combinations of timeframe and trailing system that had reached a profit factor of 1.3 on the 2026 months in the one-minute "
+          "backtest (the `Loma_T15` presets of the gold and BTC zips), re-measured here. The one-minute figures were at the study's costs "
+          "(gold: FTMO spread, no commission; BTC: $10 spread); the tick figures are at VT costs.", "",
+          "| Symbol | Timeframe | Trailing | 2026 one-minute (study): PF (trades) | 2026 tick, VT costs: PF (trades) | Stressed | Earlier data, tick: PF (trades) |",
+          "|---|---|---|---|---|---|---|"]
+    for sym in SYMS:
+        cells, tr = data[sym]
+        t15 = json.load(open(os.path.join(ROOT, "research", "results", "recal", f"{sym.lower()}_successful_trailing.json")))["combinations"]
+        for c15 in t15:
+            c = next(c for c in cells if c["tf"] == c15["timeframe"] and c["kind"] == c15["trailing"])
+            keys = [q["key"] for q in c["picks"]]
+            u, us = stats(tr, keys, "vt", "unseen"), stats(tr, keys, "vt_stress", "unseen")
+            e = "; ".join(f"{PERIOD_TEXT[p]}: {f2(stats(tr, keys, 'vt', p)['pf'])} ({stats(tr, keys, 'vt', p)['n']})" for p in SYMS[sym]["earlier"])
+            L.append(f"| {sym} | {c15['timeframe']} | {SYSTEM[c15['trailing']]} | {c15['unseen_pf']:.2f} ({c15['unseen_trades']}) | "
+                     f"{f2(u['pf'])} ({u['n']}) | {f2(us['pf'])} | {e} |")
     L += ["", "## How to run the presets", "",
           "- **One timeframe's set is one result:** its setups were tested together. Run them together on one **hedging** account (on a netting "
           "account the presets on one symbol share one position).",
