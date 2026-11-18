@@ -1,0 +1,42 @@
+XPW Shape Map v0.9.2 Strategy -> "trail after N same-direction candles"
+Two edits. Everything else in the script stays as it is.
+
+=== EDIT 1: in "S2. EXITS", add this line right after the trDisAtr input ===
+
+trailAfterN = input.int(0, "Trail only after N same-direction candles (0 = off)", minval = 0, group = grpX, tooltip = "0 = the trailing stop is live from the entry (old behaviour). N > 0: the trade runs on SL / TP only until N chart candles IN A ROW have closed in the trade's direction after the entry candle (green for a long, red for a short). From the next candle on, the trailing stop is switched on and follows price from there. A candle against the trade restarts the count; once switched on, the trail stays on for the rest of the trade.")
+
+=== EDIT 2: near the end, replace these two lines ===
+
+float xTa = trailOn and tdTk > 0 ? taTk : na
+float xTd = trailOn and tdTk > 0 ? tdTk : na
+
+=== with this block ===
+
+// Trail after N same-direction candles: count the chart candles that close in
+// the trade's direction, in a row, after the entry candle. Counted on closed
+// candles only, so history and live agree.
+var int  runCnt  = 0
+var bool trailGo = false
+var int  runFor  = na
+if strategy.position_size == 0
+    runCnt  := 0
+    trailGo := false
+    runFor  := na
+else
+    int entBar = strategy.opentrades.entry_bar_index(strategy.opentrades - 1)
+    if na(runFor) or runFor != entBar
+        runFor  := entBar
+        runCnt  := 0
+        trailGo := false
+    if barstate.isconfirmed and bar_index > entBar
+        bool sameDir = strategy.position_size > 0 ? close > open : close < open
+        runCnt := sameDir ? runCnt + 1 : 0
+        if runCnt >= trailAfterN
+            trailGo := true
+bool trailArmed = trailOn and tdTk > 0 and (trailAfterN == 0 or trailGo)
+float xTa = trailArmed ? taTk : na
+float xTd = trailArmed ? tdTk : na
+
+=== Calibrated settings (XAUUSD 15m, CONT entries, ATR unit) ===
+Stop loss 1 ATR (unchanged) | Take profit 5 R | Trailing stop ON
+Trail activation 0.02 ATR | Trail distance 0.1 ATR | Trail only after N candles = 3
