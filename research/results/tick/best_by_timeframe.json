@@ -181,7 +181,12 @@
      "net_r": -15.390754644857857
     },
     "eligible_at_1_3": 0,
-    "higher_on_few_trades": null
+    "higher_on_fewer_trades": [],
+    "exits_2026": {
+     "n": 105,
+     "trail": 1,
+     "time": 8
+    }
    }
   },
   {
@@ -352,7 +357,12 @@
      "net_r": -2.700442289410602
     },
     "eligible_at_1_3": 0,
-    "higher_on_few_trades": null
+    "higher_on_fewer_trades": [],
+    "exits_2026": {
+     "n": 125,
+     "trail": 48,
+     "time": 2
+    }
    }
   },
   {
@@ -524,7 +534,12 @@
      "net_r": 13.42689076358249
     },
     "eligible_at_1_3": 0,
-    "higher_on_few_trades": null
+    "higher_on_fewer_trades": [],
+    "exits_2026": {
+     "n": 141,
+     "trail": 20,
+     "time": 34
+    }
    }
   },
   {
@@ -696,7 +711,12 @@
      "net_r": 11.759549333429156
     },
     "eligible_at_1_3": 1,
-    "higher_on_few_trades": null
+    "higher_on_fewer_trades": [],
+    "exits_2026": {
+     "n": 203,
+     "trail": 116,
+     "time": 21
+    }
    }
   },
   {
@@ -869,12 +889,40 @@
      "net_r": -13.550390860337567
     },
     "eligible_at_1_3": 0,
-    "higher_on_few_trades": {
-     "trailing": "percent",
-     "setups": 1,
-     "trades": 25,
-     "pf": 1.4135363721724181,
-     "net_r": 3.9410780622562616
+    "higher_on_fewer_trades": [
+     {
+      "trailing": "percent",
+      "setups": 1,
+      "trades": 25,
+      "pf": 1.4135363721724181,
+      "net_r": 3.9410780622562616
+     },
+     {
+      "trailing": "psar",
+      "setups": 3,
+      "trades": 96,
+      "pf": 0.9584852718707986,
+      "net_r": -1.5307375176373994
+     },
+     {
+      "trailing": "profitlock",
+      "setups": 3,
+      "trades": 86,
+      "pf": 0.7988889577561836,
+      "net_r": -8.527066465678498
+     },
+     {
+      "trailing": "pivots",
+      "setups": 2,
+      "trades": 66,
+      "pf": 0.7430508408619524,
+      "net_r": -5.651812952021457
+     }
+    ],
+    "exits_2026": {
+     "n": 246,
+     "trail": 54,
+     "time": 69
     }
    }
   },
@@ -982,7 +1030,12 @@
      "net_r": -9.72619729975955
     },
     "eligible_at_1_3": 0,
-    "higher_on_few_trades": null
+    "higher_on_fewer_trades": [],
+    "exits_2026": {
+     "n": 68,
+     "trail": 10,
+     "time": 27
+    }
    }
   },
   {
@@ -1134,7 +1187,12 @@
      "net_r": 19.065124061226168
     },
     "eligible_at_1_3": 2,
-    "higher_on_few_trades": null
+    "higher_on_fewer_trades": [],
+    "exits_2026": {
+     "n": 121,
+     "trail": 94,
+     "time": 0
+    }
    }
   },
   {
@@ -1276,12 +1334,40 @@
     "held": false,
     "runner_up": null,
     "eligible_at_1_3": 1,
-    "higher_on_few_trades": {
-     "trailing": "percent",
-     "setups": 1,
-     "trades": 23,
-     "pf": 2.5933256334095116,
-     "net_r": 6.863673348049879
+    "higher_on_fewer_trades": [
+     {
+      "trailing": "percent",
+      "setups": 1,
+      "trades": 23,
+      "pf": 2.5933256334095116,
+      "net_r": 6.863673348049879
+     },
+     {
+      "trailing": "pivots",
+      "setups": 3,
+      "trades": 90,
+      "pf": 2.245022895781445,
+      "net_r": 28.796897948111347
+     },
+     {
+      "trailing": "sma",
+      "setups": 3,
+      "trades": 83,
+      "pf": 2.1090885090422273,
+      "net_r": 21.689974769985188
+     },
+     {
+      "trailing": "psar",
+      "setups": 2,
+      "trades": 67,
+      "pf": 1.629841379763323,
+      "net_r": 12.328918348166676
+     }
+    ],
+    "exits_2026": {
+     "n": 140,
+     "trail": 85,
+     "time": 12
     }
    }
   },
@@ -1451,12 +1537,33 @@
      "net_r": 38.756651813251565
     },
     "eligible_at_1_3": 5,
-    "higher_on_few_trades": {
-     "trailing": "chandelier",
-     "setups": 1,
-     "trades": 25,
-     "pf": 1.9270820795536905,
-     "net_r": 4.305772839856363
+    "higher_on_fewer_trades": [
+     {
+      "trailing": "chandelier",
+      "setups": 1,
+      "trades": 25,
+      "pf": 1.9270820795536905,
+      "net_r": 4.305772839856363
+     },
+     {
+      "trailing": "ema",
+      "setups": 1,
+      "trades": 31,
+      "pf": 1.9192442291485443,
+      "net_r": 8.63089281095864
+     },
+     {
+      "trailing": "R",
+      "setups": 2,
+      "trades": 52,
+      "pf": 1.8601813033483032,
+      "net_r": 20.37195550358409
+     }
+    ],
+    "exits_2026": {
+     "n": 156,
+     "trail": 103,
+     "time": 4
     }
    }
   },
@@ -1618,7 +1725,12 @@
      "net_r": 17.99301174360844
     },
     "eligible_at_1_3": 3,
-    "higher_on_few_trades": null
+    "higher_on_fewer_trades": [],
+    "exits_2026": {
+     "n": 102,
+     "trail": 53,
+     "time": 14
+    }
    }
   },
   {
@@ -1782,12 +1894,19 @@
      "net_r": -6.142769270512724
     },
     "eligible_at_1_3": 0,
-    "higher_on_few_trades": {
-     "trailing": "ema",
-     "setups": 1,
-     "trades": 34,
-     "pf": 1.3380312567774135,
-     "net_r": 2.3594229375967015
+    "higher_on_fewer_trades": [
+     {
+      "trailing": "ema",
+      "setups": 1,
+      "trades": 34,
+      "pf": 1.3380312567774135,
+      "net_r": 2.3594229375967015
+     }
+    ],
+    "exits_2026": {
+     "n": 169,
+     "trail": 9,
+     "time": 99
     }
    }
   },
@@ -1957,7 +2076,12 @@
      "net_r": -8.081121308235891
     },
     "eligible_at_1_3": 0,
-    "higher_on_few_trades": null
+    "higher_on_fewer_trades": [],
+    "exits_2026": {
+     "n": 100,
+     "trail": 18,
+     "time": 39
+    }
    }
   },
   {
