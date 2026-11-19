@@ -101,7 +101,9 @@ With "Enable filter" off, each one trades exactly like your original file. Every
 - **HRD reversal sizing.** HRD reverses with an entry while the time exit closes on the same candle. Whether TradingView sizes that entry when it is placed or when it fills can't be checked here.
   - With the filter on, the other reading moves results by at most 0.9 points.
   - With the filter off it moves them by up to about 4 points (for example BTC 15m +13.6% to +15.1%, BTC 1h +2.7% to -0.2%). So the filter-off column and the off-vs-on comparison are the less certain ones.
-- **Live vs backtest.** HRD runs on every tick live, so live divergence and breakout entries can differ from this backtest (see the file's header). ApexForge's 15m levels differ live on charts below 15m.
+- **Live vs backtest.**
+  - Your original HRD runs on every tick live, so its live entries can differ from this backtest. The fused HRD file now runs once per candle close (calc_on_every_tick = false), so live matches the backtest.
+  - ApexForge's 15m levels differ live on charts below 15m.
 - **A trade open at the end.** It is closed at the last candle here; TradingView leaves it as open P/L. That moves each figure by at most about 0.14 points.
 - **Data.** The gold data is from 2017-2018; percentages carry over to today's prices, dollar distances do not. Two years of BTC is a short window.
 
@@ -140,7 +142,7 @@ Unless stated otherwise, everything below uses **1-minute fills with our costs**
 4. **The one pick, HRD BTC 2h with the filter off, was refuted.** Activation 2%, offset 0.15%, TP 4%, time exit 100: +30.0% over 2 years with our costs, PF 1.27, drawdown 6.5%, reversed labels -28.6%, stressed costs +23.7%. It reproduces exactly, but:
    - **It is really a take profit near 2%.** A plain 1.85-1.9% target makes +26% to +28%. Activation 2.25% halves the result.
    - **It looks selected, not real.** If every signal's direction is randomised, the rule still finds a pass in at least one of 16 cells about 70% of the time. The 20 best trades are 93% of the gain. It is led by shorts in a window where BTC fell 28%, and it makes +2% in ranging markets.
-   - **Live it would trade differently.** HRD recalculates on every tick, and an emulation of that on 1-minute data gives +9.6% with a losing first half, or -2.3% with stressed costs. A ~$20 difference in prices (another exchange) already drops it to about +25%.
+   - **Live it would have traded differently.** HRD as you wrote it recalculates on every tick, and an emulation of that on 1-minute data gives +9.6% with a losing first half, or -2.3% with stressed costs. The fused file now runs once per candle close, which fixes this. A ~$20 difference in prices (another exchange) already drops it to about +25%.
 
 ### By timeframe
 
@@ -254,4 +256,9 @@ An auditor re-implemented the rule and matched all 56 verdicts and every pick. T
 
 ### A practical note on HRD
 
-HRD runs with calc_on_every_tick, so live it behaves differently from every backtest above. Divergence entries fire a candle early, on pivots that can still vanish. After an intrabar exit, a still-true signal re-enters, and the hybrid exit closes the new trade at once. Setting calc_on_every_tick to false in the strategy() line would make live trading match the backtest.
+Your HRD file runs with calc_on_every_tick = true, so live it behaves differently from every backtest above:
+- divergence entries fire a candle early, on pivots that can still vanish;
+- after an intrabar exit, a still-true signal re-enters;
+- the hybrid exit then closes that new trade at once.
+
+**Changed:** the fused file [`HRD_Full_Divergence_Strategy_v1_03_FGF.pine`](../HRD_Full_Divergence_Strategy_v1_03_FGF.pine) now sets calc_on_every_tick = false. It runs once per candle close, live and in the backtest alike, and orders fill at the next candle's open. Every backtest figure on this page stays the same, because history always runs once per candle. Your original file is unchanged.

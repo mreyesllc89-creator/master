@@ -12,18 +12,27 @@
 //  on the price chart, so FGF_FORCE_OVERLAY stays false). Also added: an
 //  optional trailing take profit, off by default (TRAILING TAKE PROFIT).
 //
+//  CHANGED FROM YOUR FILE: calc_on_every_tick = false
+//    Your file has calc_on_every_tick = true: live it runs on every tick,
+//    while a backtest only sees candle closes. Live, that made divergence
+//    entries fire a candle early on pivots that could still vanish, re-entered
+//    a still-true signal right after an intrabar exit, and let the hybrid exit
+//    close those re-entries at once, so live trading looked very different
+//    from the backtest. This build runs once per candle, at its close, live
+//    and in the backtest alike; orders fill at the next candle's open. The
+//    backtest is unchanged (history always runs once per candle). To go back,
+//    set calc_on_every_tick = true in the strategy() line.
+//
 //  WHAT THE FILTER GATES
 //    The side that would actually trade, after "Reverse Trading" and "Trade
 //    Direction": a LONG entry only while the filter allows buys (BUY ZONE), a
 //    SHORT entry only while it allows sells (SELL ZONE). In NO TRADE, before
 //    the first FlashGold signal and after a Minutes / Candles permission
-//    ends, neither. The script runs on every tick live
-//    (calc_on_every_tick). With "Check price on" = Tick (default) the gate
-//    is checked against the price of the same tick as the signal live, and
-//    at the candle close in the backtest. With Candle open it is fixed at
-//    each candle's open (live and backtest). With Candle close a forming
-//    candle is judged at its open with the last closed candle's close, and
-//    a closed candle at its close.
+//    ends, neither. The script runs once per candle, at its close (see
+//    CHANGED FROM YOUR FILE). With "Check price on" = Tick (default) or
+//    Candle close the gate is judged at the signal candle's close, like the
+//    signal; with Candle open, at that candle's open. Live and backtest
+//    agree; the order fills at the next candle's open.
 //
 //  WHAT IT NEVER GATES
 //    Exits: the SL / TP bracket, "Close after X Candles" and the hybrid
@@ -34,14 +43,10 @@
 //    short, opens a long), and a SHORT signal while long does the opposite.
 //    If the filter blocks that signal, "Blocked opposite signal still closes
 //    the trade" (on by default, group "Direction filter - trading") still
-//    closes the open trade, like the reversal would, but opens nothing at
-//    that moment. Live in Tick mode the signal is checked again on every
-//    tick: if price reaches its zone later in the same candle while the
-//    signal still holds, the entry is taken then (the time and hybrid exits
-//    treat that like a reversal). Off: the blocked signal does nothing; the
-//    trade runs on to its own exits unless the filter allows the signal
-//    later (live, on a later tick of the same candle) or allows a later
-//    opposite signal, which then reverses it.
+//    closes the open trade at the next open, like the reversal would, but
+//    opens nothing. Off: the blocked signal does nothing; the trade runs on
+//    to its own exits unless a later opposite signal the filter allows
+//    reverses it.
 //
 //  CHART AND DATA WINDOW
 //    A blocked entry gets a small gray "x" (L below the candle, S above).
@@ -49,10 +54,10 @@
 //    Window: the filter outputs (FGF ...); per side, the candles on which
 //    this script's own rules called for an entry before the filter (FGD
 //    raw), the candles on which none of those calls could enter because
-//    the filter blocked them (FGD blocked), and running counts. Live, a
-//    call on any tick of the candle counts. Once the filter has blocked or
-//    closed a trade this script's position differs from your file's, so
-//    FGD raw equals your file's entries only with the filter off.
+//    the filter blocked them (FGD blocked), and running counts. Once the
+//    filter has blocked or closed a trade this script's position differs
+//    from your file's, so FGD raw equals your file's entries only with the
+//    filter off.
 //
 //  TRAILING TAKE PROFIT (optional, group "Trailing take profit", off by default)
 //    On: each trade also gets a trailing stop. Once price has moved "Trail
@@ -65,32 +70,27 @@
 //
 //  FILTER OFF
 //    With "Enable filter" off (and the trailing take profit off, the
-//    default) every signal trades: the same orders as your file.
+//    default) every signal trades: the same orders as your file in the
+//    backtest. Live, this build acts once per candle close where yours acts
+//    on every tick (CHANGED FROM YOUR FILE).
 //
 //  NOTES ON THE ORIGINAL (unchanged here)
 //    - "Enable Alerts" has no effect: the script defines no alerts.
-//    - Live, with calc_on_every_tick, every signal is judged on each tick:
-//      breakouts, divergences, the time exit (sent on the first tick of the
-//      X-th candle) and the hybrid exit. The backtest judges them only at
-//      candle closes, so live trades can differ from it. A divergence pivot
-//      is confirmed pivotStrength candles late, but the last of those
-//      candles is the live one: a pivot found on an early tick can be gone
-//      by the close after its order was sent, so a live divergence entry
-//      can come a candle earlier than in the backtest, or not be in it at
-//      all. Only the horizons (closed D / W / M candles, [1] with
-//      lookahead_on) never repaint.
+//    - With this build's once-per-candle execution the divergences use
+//      closed candles only (a pivot is confirmed pivotStrength candles
+//      late), the horizons use closed D / W / M candles ([1] with
+//      lookahead_on), and nothing repaints. In your file, with
+//      calc_on_every_tick on, a pivot found on an early tick of the live
+//      candle could vanish by its close after the order was sent.
 //    - "Close after X Candles" starts counting only when the position was
 //      flat at the previous candle's close. A trade opened by a reversal
-//      (or, live, on the same candle the previous trade closed) keeps the
-//      previous trade's count, so it can be closed early. In the backtest,
-//      if the reversal signal comes on the candle on which the time exit
-//      fires, the count is cleared and the new trade gets no time exit at
-//      all. Live, the cleared count comes back on the next tick (it is a
-//      var), so the time exit closes the new trade at once.
+//      keeps the previous trade's count, so it can be closed early. If the
+//      reversal signal comes on the candle on which the time exit fires, the
+//      count is cleared and the new trade gets no time exit at all.
 //    - The strategy() declaration sets no commission or slippage, so
 //      TradingView reports the results without costs.
 // ============================================================================
-strategy("HRD Full Divergence Strategy v1.03", overlay=true, calc_on_every_tick=true, max_lines_count=500, max_labels_count=500, max_bars_back=500)
+strategy("HRD Full Divergence Strategy v1.03", overlay=true, calc_on_every_tick=false, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
 // ============================ INDICATOR INPUTS ============================
 grpColors    = "Horizon Colors"
@@ -146,7 +146,7 @@ minActivationPts   = input.int(40,     title="Min Activation Points (Ticks)", gr
 // =====================================================================
 // --- DIRECTION FILTER (FGF build) ---
 // =====================================================================
-hrdBlkClose = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a LONG signal the filter blocks still closes an open short (and a blocked SHORT an open long), as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs on to its own exits unless the filter allows the signal later (live, a later tick of the same candle) or allows a later opposite signal, which reverses it. Exits are never gated by the filter.")
+hrdBlkClose = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a LONG signal the filter blocks still closes an open short (and a blocked SHORT an open long), as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs on to its own exits unless a later opposite signal the filter allows reverses it. Exits are never gated by the filter.")
 hrdTrailOn  = input.bool(false, "Use trailing take profit", group="Trailing take profit", tooltip="Off (default): exits as in your file. On: once price has moved Trail activation in the trade's favour from the entry price, a stop follows Trail offset behind the best price. Both in % of the signal candle's close. SL / TP, time exit and hybrid exit stay as set.")
 hrdTrailAct = input.float(1.0, "Trail activation (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Move in the trade's favour, in % of the price, before the trail arms. 0 = armed from the entry.")
 hrdTrailOff = input.float(0.5, "Trail offset (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Distance the trailing stop keeps behind the best price, in % of the price (at least one tick).")
@@ -981,8 +981,9 @@ if useHybridExit and inTrade
 // =====================================================================
 // --- DIRECTION FILTER: BLOCKED ENTRIES AND DIAGNOSTICS (FGF build) ---
 // =====================================================================
-// Live (calc_on_every_tick) only a candle's last tick is kept, so latch each side once per
-// candle with varip: a call on any tick counts; "blocked" = called but never entered this candle.
+// Each side is latched once per candle with varip ("blocked" = called but never entered this
+// candle). With calc_on_every_tick off this equals the candle's own values; it also keeps the
+// counts right if calc_on_every_tick is turned back on.
 varip int hrdRawLBar = -1
 varip int hrdRawSBar = -1
 varip int hrdGoLBar  = -1
