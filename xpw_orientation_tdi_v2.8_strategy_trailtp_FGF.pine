@@ -2,6 +2,31 @@
 // ============================================================================
 //  XPW ORIENTATION TDI  -  v2.8 STRATEGY (ANY TIMEFRAME, EVERY LABEL TRADES)
 // ----------------------------------------------------------------------------
+//  UPDATE 1 (2026-11-23)
+//    New option "Inverted direction: opposite side at the same entries" (group
+//    "Inverted direction (Update 1)", off by default). On: every entry is
+//    decided as before (labels, "Reverse every label", AGREE, the direction
+//    filter, "Max open entries"), then placed on the OTHER side at the same
+//    tick and price: a LONG the filter allows (BUY ZONE) goes in as a SHORT,
+//    a SHORT it allows (SELL ZONE) as a LONG, a blocked entry stays blocked.
+//    Signal tick: the opposite market order. Limit at label price: the buy
+//    limit becomes a SELL STOP, the sell limit a BUY STOP, at the same price,
+//    expiring and cancelled like the limit it replaces. Trailing TP and stop
+//    loss keep their distances on the trade actually open. "exit only"
+//    labels and "Blocked entry still closes the other side" close the
+//    mirrored side. "Trade direction" alone is read on the orders really
+//    placed: Long only = only real buys, so inverted it is the SHORT entries
+//    that trade (as buys) and a LONG entry is the opposite ENTER that closes
+//    the long ("Opposite ENTER closes" keeps its real side; see STRATEGY).
+//    Order comments, and so the order-fill alerts, show the real side and
+//    "(inv)", the READ HERE row "ORDERS INVERTED"; labels and "FGD" rows keep
+//    the ladder's / the filter's side. This is NOT "Reverse every label"
+//    (which flips BEFORE the filter): see INVERTED vs REVERSE below.
+//    Off = exactly the previous version. The title now ends with "[Update 1]".
+//    The option is the last input of the script (bottom of the Inputs tab),
+//    so no earlier setting changes its place. After replacing the code on a
+//    chart, open Settings once and check that "Inverted direction" is off.
+//
 //  This is the v2.4 indicator turned into a strategy. Calibration, ladder
 //  logic, rung map, agreement gate and labels are the indicator's, line for
 //  line. The only change to the indicator's own logic: an event is detected
@@ -26,6 +51,9 @@
 //        enter           trade the direction the label points to
 //        enter opposite  trade against the label
 //        exit only       close the side the label is against, open nothing
+//      (With "Inverted direction" on, Update 1, every side in this list and
+//      in the tooltips of these rows is the mirrored one: "enter" on a LONG
+//      label sells, "exit only" on it closes longs.)
 //      The direction each label points to:
 //        Long 1st / 2nd leg       LONG        Short 1st / 2nd leg   SHORT
 //        Divergence LONG zone     LONG        Divergence SHORT zone SHORT
@@ -42,7 +70,9 @@
 //    REVERSE (group "Strategy")
 //      "Reverse every label" trades the opposite direction of whatever the
 //      label says: every "enter" becomes "enter opposite" and vice versa.
-//      AGREE entries flip too. "exit only" rows are not changed.
+//      AGREE entries flip too. "exit only" rows are not changed. (Update 1:
+//      "Inverted direction" is another switch, applied AFTER the direction
+//      filter; INVERTED vs REVERSE under DIRECTION FILTER compares the two.)
 //    TIMEFRAME ON EVERY LABEL AND ORDER
 //      Every label starts with the rung it came from ("5 Min *: DIV SHORT
 //      ZONE", "1 Min <<: 1st LEG ENTER LONGS"). Every order comment names
@@ -54,6 +84,12 @@
 //
 //  STRATEGY (group "Strategy")
 //    Trade direction   Both / Long only (buy only) / Short only (sell only).
+//                      Always the orders actually placed, also with "Inverted
+//                      direction" on: Long only = only real buys. Inverted,
+//                      the buys come from the SHORT entries, so those trade
+//                      and the LONG entries are the opposite ENTER below: the
+//                      entries taken are those of the other one-side mode
+//                      without the option, placed on the opposite side.
 //    Opposite signal   Both: reverses. Long only / Short only: the opposite
 //                      ENTER closes the position (toggle) but never opens one.
 //                      If the direction filter blocks the new side, see
@@ -62,6 +98,9 @@
 //                      on any chart timeframe. A label on the side already
 //                      held stacks a new entry (up to "Max open entries"),
 //                      each with its own trailing TP / stop.
+//                      "Inverted direction" on: the side held is the opposite
+//                      of the label's, so a LONG label stacks on an open
+//                      short and a SHORT label is its opposite signal.
 //    Trailing TP       Arms once price moves "activation" in your favour,
 //                      then trails "offset" behind the best price.
 //                      Units: ticks, price, or percent of entry.
@@ -77,6 +116,8 @@
 //                          placed when the label prints and kept for
 //                          "Limit valid (bars)". It fills only if price comes
 //                          back to that level, never before the label exists.
+//                          "Inverted direction" on: a sell stop at that buy
+//                          limit's price, a buy stop at that sell limit's.
 //    Signal tick           (default) live: the script runs on every tick
 //                          and the market order goes in on the tick the
 //                          label appears, without waiting for the candle to
@@ -146,17 +187,22 @@
 //  are the entry gate and what follows from it (goLong / goShort, oppL /
 //  oppS, the close comments, the limit price, the pending-limit price list
 //  and cancel),
-//  plus max_bars_back=500 in strategy(); with the filter off they give
-//  v2.8's results. "Enable filter" is ON by default, so turn it off to trade
-//  exactly as v2.8. The filter block between BEGIN and END FLASHGOLD
+//  plus max_bars_back=500 in strategy(), and from Update 1 the "Inverted
+//  direction" option (which changes nothing while it is off); with the
+//  filter off and "Inverted direction" off they give v2.8's results. "Enable
+//  filter" is ON by default, so turn it off (and leave "Inverted direction"
+//  off) to trade exactly as v2.8.
+//  The filter block between BEGIN and END FLASHGOLD
 //  DIRECTION FILTER is byte-identical to FlashGold_Direction_Filter_v1_2.pine
 //  except FGF_FORCE_OVERLAY = true (this strategy runs in its own pane, so
 //  the filter draws on the price chart).
 //    WHAT IT GATES   placing an entry. A LONG entry is placed only while the
 //                    filter allows buys (BUY ZONE), a SHORT entry only while
-//                    it allows sells (SELL ZONE). It checks the side actually
-//                    traded, after "Reverse every label" and "enter opposite",
-//                    and it gates AGREE entries the same way. In NO TRADE (or
+//                    it allows sells (SELL ZONE). It checks the side after
+//                    "Reverse every label" and "enter opposite": the side
+//                    actually traded, unless "Inverted direction" is on (the
+//                    allowed entry is then placed on the other side, UPDATE
+//                    1). It gates AGREE entries the same way. In NO TRADE (or
 //                    before the filter's first signal) no entry is placed.
 //    LIMIT ENTRIES   "Limit at label price" with the filter on: a limit is
 //                    placed only while the current price is itself in its
@@ -164,7 +210,16 @@
 //                    tick above the BUY ZONE edge, whichever is higher, a sell
 //                    limit at the candle high or one tick below the SELL ZONE
 //                    edge, whichever is lower (the label still shows the
-//                    candle low / high). A pending limit is cancelled at the
+//                    candle low / high). With "Inverted direction" on the
+//                    same prices carry a sell stop (for the buy limit) and a
+//                    buy stop (for the sell limit): read "limit" as that stop
+//                    here and under BLOCKED ENTRY, and "its side" as the side
+//                    the filter judged (buys and the BUY ZONE for the sell
+//                    stop, sells and the SELL ZONE for the buy stop). The
+//                    stop fills where the limit would; only the Properties
+//                    differ: a stop takes "Slippage" and not "Verify price
+//                    for limit orders" (both 0 by default).
+//                    A pending limit is cancelled at the
 //                    first script run on which the filter no longer allows
 //                    its side or a newer signal's band covers its price: live
 //                    on that tick, on history at that chart bar's close. So it
@@ -203,12 +258,45 @@
 //                    shows the price of the tick that entered; one blocked
 //                    for the whole candle shows the close.
 //    FILTER OFF      "Enable filter" off allows buys and sells at all times:
-//                    the strategy trades exactly as v2.8.
+//                    the strategy trades exactly as v2.8 (with "Inverted
+//                    direction" on: v2.8's entries on the opposite side; in
+//                    Long only / Short only, those of v2.8's other one-side
+//                    mode on the opposite side).
 //    DIAGNOSTICS     Data Window rows "FGD raw long / short" and "FGD blocked
 //                    long / short" (and running counts) count the candles on
 //                    which an entry signal fired / the filter blocked it for
 //                    the whole candle: one per candle and side, however many
-//                    labels it had, before "Max open entries".
+//                    labels it had, before "Max open entries". The sides are
+//                    the filter's, before "Inverted direction": with the
+//                    option on a "FGD raw long" is placed as a sell.
+//    INVERTED vs     (Update 1) "Reverse every label" flips a label BEFORE the
+//    REVERSE         filter: a LONG label becomes a SHORT entry that needs
+//                    the SELL ZONE and, in limit mode, is a sell limit at the
+//                    candle high; "exit only" rows are not flipped. "Inverted
+//                    direction" flips the order AFTER the filter: the LONG
+//                    label still needs the BUY ZONE and is sold there, in
+//                    limit mode by a sell stop at the buy limit's price (the
+//                    candle low); "exit only" rows close the mirrored side
+//                    (a row that closed shorts closes longs).
+//                    Filter off, Signal tick and no row on "exit only" (the
+//                    row defaults): the two place the same trades; only the
+//                    comments and the FGD sides differ. They differ with the
+//                    filter on (opposite zones), in limit mode (other end of
+//                    the candle, stop instead of limit) and on "exit only"
+//                    rows.
+//                    Both on: a label trades the side it names, but in the
+//                    OPPOSITE zone (a LONG label buys in the SELL ZONE), in
+//                    limit mode by a stop at the other end of the candle (a
+//                    buy stop at the candle high), and an "exit only" row
+//                    closes the side it points to. Filter off, Signal tick,
+//                    no "exit only" row: both on trades as both off.
+//                    The trail and the stop sit on the other side of a
+//                    mirrored trade, so it exits at other times than the
+//                    normal run's trade. What depends on the open position
+//                    ("Max open entries", the closes, stacking or reversing)
+//                    follows the trades really open, so the two runs mirror
+//                    each other entry for entry only as far as that allows.
+//                    Not backtested with the option on.
 //  Not yet backtested in this form. The October 2026 test of the filter on
 //  the S2 / S3 variant of v2.8 (xpw_orientation_tdi_v2.8_strategy_FGF.pine,
 //  header CALIBRATION, a Python replica in R units) found that on XAUUSD 60m
@@ -220,7 +308,7 @@
 //  variant has ATR exits and fixed sizing, so its numbers do not carry over.
 // ============================================================================
 
-strategy("XPW Orientation TDI v2.8 Strategy", shorttitle="XPW-OTDI8 S", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
+strategy("XPW Orientation TDI v2.8 Strategy [Update 1]", shorttitle="XPW-OTDI8 S U1", overlay=false, max_labels_count=500, max_lines_count=500, max_bars_back=500, pyramiding=100, initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10, process_orders_on_close=true, calc_on_every_tick=true)
 
 // ---------------------------------------------------------------- INPUTS ----
 rsiLen   = input.int(13,       "RSI length",            group="TDI core")
@@ -287,7 +375,7 @@ shAgS = input.bool(true, "Agree SHORT", inline="AGS", group="Agreement")
 cAgS  = input.color(#d500f9, "",        inline="AGS", group="Agreement", tooltip="Untick to hide these labels. Display only: the strategy still trades them.")
 
 // STRATEGY
-tradeDir   = input.string("Both", "Trade direction", options=["Both","Long only (buy only)","Short only (sell only)"], group="Strategy", tooltip="Long only: only LONG entries open trades. Short only: only SHORT entries open trades. Applied after 'Reverse every label'.")
+tradeDir   = input.string("Both", "Trade direction", options=["Both","Long only (buy only)","Short only (sell only)"], group="Strategy", tooltip="Long only: only LONG entries open trades. Short only: only SHORT entries open trades. Applied after 'Reverse every label' and after 'Inverted direction': it always means the orders actually placed (Long only = only real buys; with 'Inverted direction' on those are the SHORT entries).")
 reverseAll = input.bool(false, "Reverse every label (trade the opposite direction)", group="Strategy", tooltip="ON: every label trades against what it says. 'enter' rows become 'enter opposite' and vice versa, AGREE LONG enters short, AGREE SHORT enters long. 'exit only' rows are unchanged.")
 oppCloses  = input.bool(true, "Opposite ENTER closes (one-side mode)", group="Strategy", tooltip="Long only / Short only: an entry signal on the other side closes the open trade without opening a new one. In 'Both' an opposite entry reverses, unless the direction filter blocks it (see 'Blocked entry still closes the other side').")
 tradeAgree = input.bool(true, "Also enter on AGREE labels", group="Strategy", tooltip="Needs 'Require rung agreement' on. Enters on the bar 'AGREE LONG xN' / 'AGREE SHORT xN' fires.")
@@ -297,10 +385,19 @@ trailAct   = input.float(2.0, "Trail activation", minval=0.0, step=0.1, group="S
 trailOff   = input.float(1.0, "Trail offset", minval=0.0, step=0.1, group="Strategy", tooltip="Distance the stop trails behind the best price once armed.")
 slOn       = input.bool(false, "Use stop loss", group="Strategy")
 slDist     = input.float(3.0, "Stop loss distance", minval=0.0, step=0.1, group="Strategy", tooltip="Same units as the trail.")
-entryFill  = input.string("Signal tick", "Entry fill", options=["Signal tick","Limit at label price"], group="Strategy", tooltip="Limit at label price: buy limit at the label's price (candle low), sell limit at the candle high; with the direction filter on, a buy limit no lower than one tick above the BUY ZONE edge and a sell limit no higher than one tick below the SELL ZONE edge. Filled only if price returns to it. Signal tick: live, a market fill on the tick the label appears; in the backtest, at the close of the label's candle.")
+entryFill  = input.string("Signal tick", "Entry fill", options=["Signal tick","Limit at label price"], group="Strategy", tooltip="Limit at label price: buy limit at the label's price (candle low), sell limit at the candle high; with the direction filter on, a buy limit no lower than one tick above the BUY ZONE edge and a sell limit no higher than one tick below the SELL ZONE edge. Filled only if price returns to it. Signal tick: live, a market fill on the tick the label appears; in the backtest, at the close of the label's candle. With 'Inverted direction' on the buy limit is placed as a sell stop and the sell limit as a buy stop, at the same price.")
 limitBars  = input.int(5, "Limit valid (bars)", minval=1, maxval=500, group="Strategy", tooltip="An unfilled limit entry is cancelled after this many bars, or sooner when an exit or an opposite signal arrives.")
 useLimit   = entryFill == "Limit at label price"
 maxOpen    = input.int(20, "Max open entries", minval=1, maxval=100, group="Strategy", tooltip="Every entry label opens its own entry, stacking on an open trade of the same side, up to this many at once. Each entry has its own trailing TP / stop.")
+
+// INVERTED DIRECTION (Update 1). Applied AFTER the direction filter: the entry
+// the script would place is sent on the other side, on the same tick / candle
+// and at the same price. Everything that DECIDES (signals, the filter gate,
+// the blocked-entry close, the pending list, "Max open entries") keeps working
+// in the normal frame and reads the position through xpwPosN, the mirror of
+// the real position; only the orders and their comments are mirrored. The one
+// exception is "Trade direction", which restricts the orders really placed.
+// Off = the previous version, expression for expression.
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane
@@ -898,6 +995,9 @@ plot(fgsShow ? fgsL1 : na, "FGF score (next candle)", display=display.data_windo
 // DIRECTION FILTER - TRADING (the one input this fusion adds outside the block)
 fgfBlkClose = input.bool(true, "Blocked entry still closes the other side", group="Direction filter - trading", tooltip="ON: a label whose entry the direction filter blocks still closes the opposite position (and cancels that side's pending limit entries), as its reversal would have, but opens nothing on that tick (live, it can still enter later in the same candle: with Check price on = Tick on any tick where price is in the zone, with Candle close at the candle's close if it closes in the zone; with Candle open it cannot). OFF: a blocked label does nothing. Has no effect with the filter off.")
 
+// UPDATE 1: declared after every other input on purpose, so that no existing setting changes its place.
+xpwInv = input.bool(false, "Inverted direction: opposite side at the same entries", group="Inverted direction (Update 1)", tooltip="OFF (default): exactly the previous version. ON: every entry is decided as before (labels, 'enter opposite', 'Reverse every label', AGREE, the direction filter, Max open entries) and then placed on the OTHER side, on the same tick / candle and at the same price: a LONG the filter allows (BUY ZONE) is sent as a SHORT, a SHORT it allows (SELL ZONE) as a LONG; an entry the filter blocks stays blocked. Signal tick: the opposite market order. Limit at label price: the buy limit becomes a sell stop and the sell limit a buy stop at the same price (both fill when price reaches it); 'Limit valid (bars)' and the filter's cancels apply to it as to the limit. Trailing TP and stop loss keep their distances, on the trade actually open. 'exit only' labels and 'Blocked entry still closes the other side' close the mirrored side (where they closed longs they now close shorts); the tooltips of the label rows ('go LONG', 'close shorts') then name the mirrored side too. 'Trade direction' means the orders actually placed: Long only = only real buys, so the SHORT entries trade (as buys) and a LONG entry signal is the opposite ENTER that closes the long. NOT the same as 'Reverse every label', which flips the label BEFORE the filter (a reversed LONG label needs the SELL ZONE); this option flips the order AFTER it. Order comments name the real side and carry '(inv)'; the labels still say what the ladder says. This is the last input of the script, so no earlier setting changes its place; after updating a script already on a chart, check once that this box is off.")
+
 // PER-RUNG WINDOWS. 4 parent bars expressed in this rung's bars, floor 12.
 hM   = scaleWin ? 20 : flatWin
 hW   = scaleWin ? 17 : flatWin
@@ -1383,8 +1483,14 @@ if nLong > 0 and nShort > 0
     nLong  := 0
     nShort := 0
 
-bool allowLong  = tradeDir != "Short only (sell only)"
-bool allowShort = tradeDir != "Long only (buy only)"
+// UPDATE 1 (Inverted direction): "Trade direction" restricts the orders that
+// are really placed. Inverted, a LONG entry here is sent as a SELL and a
+// SHORT entry as a BUY, so "Long only (buy only)" holds back the LONG entries
+// and "Short only (sell only)" the SHORT ones. oppL / oppS below read the
+// same two flags, so the entry signal that is held back still closes the
+// side really traded ("Opposite ENTER closes"). Off: v2.8's two lines.
+bool allowLong  = xpwInv ? tradeDir != "Long only (buy only)"   : tradeDir != "Short only (sell only)"
+bool allowShort = xpwInv ? tradeDir != "Short only (sell only)" : tradeDir != "Long only (buy only)"
 
 // Live, the script runs on every tick and a label stays true for the rest of
 // its bar, so each bar's labels enter once: on the first tick they appear.
@@ -1419,8 +1525,15 @@ if (goLong or goShort) and tickBar != bar_index
 // "Blocked entry still closes the other side" is on.
 bool oppL   = nShort > 0 and ((oppCloses and not allowShort) or (fgfBlkClose and fgfBlkS))
 bool oppS   = nLong  > 0 and ((oppCloses and not allowLong)  or (fgfBlkClose and fgfBlkL))
-bool closeL = strategy.position_size > 0 and not goLong  and (useLimit ? (exitL or oppL or goShort) : not goShort and (exitL or oppL))
-bool closeS = strategy.position_size < 0 and not goShort and (useLimit ? (exitS or oppS or goLong)  : not goLong  and (exitS or oppS))
+// UPDATE 1 (Inverted direction): every decision from here on works in the
+// normal frame, as if the script held the MIRROR of its real position
+// (inverted, a LONG entry is a real short). xpwPosN is that position; off it
+// is strategy.position_size itself. closeL / closeS so mean "close the side
+// a LONG / SHORT entry opened"; strategy.close_all closes whatever is really
+// open.
+float xpwPosN = xpwInv ? -strategy.position_size : strategy.position_size
+bool closeL = xpwPosN > 0 and not goLong  and (useLimit ? (exitL or oppL or goShort) : not goShort and (exitL or oppL))
+bool closeS = xpwPosN < 0 and not goShort and (useLimit ? (exitS or oppS or goLong)  : not goLong  and (exitS or oppS))
 string firstLong  = ""
 string firstShort = ""
 if array.size(longSrc) > 0
@@ -1428,9 +1541,9 @@ if array.size(longSrc) > 0
 if array.size(shortSrc) > 0
     firstShort := array.get(shortSrc, 0)
 if closeL
-    strategy.close_all(comment=exitL ? "exit | " + exitLSrc : fgfBlkS ? "filter blocked SHORT, close | " + firstShort : "opp ENTER | " + firstShort)
+    strategy.close_all(comment=exitL ? "exit | " + exitLSrc : fgfBlkS ? (xpwInv ? "filter blocked LONG (inv), close | " : "filter blocked SHORT, close | ") + firstShort : "opp ENTER | " + firstShort)
 if closeS
-    strategy.close_all(comment=exitS ? "exit | " + exitSSrc : fgfBlkL ? "filter blocked LONG, close | " + firstLong : "opp ENTER | " + firstLong)
+    strategy.close_all(comment=exitS ? "exit | " + exitSSrc : fgfBlkL ? (xpwInv ? "filter blocked SHORT (inv), close | " : "filter blocked LONG, close | ") + firstLong : "opp ENTER | " + firstLong)
 
 // Distances in ticks from the entry. The percent unit uses this tick's price
 // (or the limit price), which is the price the entry is placed at.
@@ -1466,8 +1579,15 @@ placeEntry(string id, bool isLong, float lim, string src) =>
     float trPts = trailOn ? math.max(toTicks(trailAct, ref), 0.0) : na
     float trOff = trailOn ? math.max(toTicks(trailOff, ref), 1.0) : na
     float slPts = slOn    ? math.max(toTicks(slDist,   ref), 1.0) : na
-    string cmt = (isLong ? "ENTER LONG" : "ENTER SHORT") + (na(lim) ? "" : " @ label") + " | " + src
-    strategy.entry(id, isLong ? strategy.long : strategy.short, limit=lim, comment=cmt)
+    // UPDATE 1 (Inverted direction): the order goes in on the other side at
+    // the same price. A market order stays a market order; a limit at lim
+    // becomes a STOP at lim (a sell stop fills where the buy limit would, a
+    // buy stop where the sell limit would). The comment names the side really
+    // traded. The exit below keeps its tick distances: they apply to the
+    // trade actually open. Off: v2.8's order (stop = na is the default).
+    bool   realLong = xpwInv ? not isLong : isLong
+    string cmt = (realLong ? "ENTER LONG" : "ENTER SHORT") + (xpwInv ? " (inv)" : "") + (na(lim) ? "" : xpwInv ? " stop @ label" : " @ label") + " | " + src
+    strategy.entry(id, realLong ? strategy.long : strategy.short, limit=xpwInv ? na : lim, stop=xpwInv ? lim : na, comment=cmt)
     if trailOn or slOn
         strategy.exit("X " + id, from_entry=id, trail_points=trPts, trail_offset=trOff, loss=slPts, comment_trailing="trail TP | " + src, comment_loss="SL | " + src)
 
@@ -1475,14 +1595,18 @@ placeEntry(string id, bool isLong, float lim, string src) =>
 // the BUY ZONE edge, a sell limit no higher than one tick below the SELL ZONE
 // edge, so it cannot fill inside the NO TRADE band in force when it is placed.
 // Filter off: the candle low / high, as in v2.8.
+// UPDATE 1 (Inverted direction): the same two prices; placeEntry sends a sell
+// stop at fgfLimL and a buy stop at fgfLimS. pendDir / pendPx stay in the
+// normal frame (1 = the order of a LONG entry), so the cancel tests above
+// are unchanged. The id letter is the side really traded.
 float fgfLimL = fgfOn ? math.max(low,  fgfUpLv + syminfo.mintick) : low
 float fgfLimS = fgfOn ? math.min(high, fgfDnLv - syminfo.mintick) : high
 int room = maxOpen - strategy.opentrades - array.size(pendId)
 if goLong
     doneL := bar_index
     for k = 0 to nLong - 1
-        if room > 0 or strategy.position_size < 0
-            string id = "L" + str.tostring(bar_index) + "-" + str.tostring(k + 1)
+        if room > 0 or xpwPosN < 0
+            string id = (xpwInv ? "S" : "L") + str.tostring(bar_index) + "-" + str.tostring(k + 1)
             placeEntry(id, true, useLimit ? fgfLimL : na, array.get(longSrc, k))
             room -= 1
             if useLimit
@@ -1493,8 +1617,8 @@ if goLong
 if goShort
     doneS := bar_index
     for k = 0 to nShort - 1
-        if room > 0 or strategy.position_size > 0
-            string id = "S" + str.tostring(bar_index) + "-" + str.tostring(k + 1)
+        if room > 0 or xpwPosN > 0
+            string id = (xpwInv ? "L" : "S") + str.tostring(bar_index) + "-" + str.tostring(k + 1)
             placeEntry(id, false, useLimit ? fgfLimS : na, array.get(shortSrc, k))
             room -= 1
             if useLimit
@@ -1615,7 +1739,7 @@ if showTable and barstate.islast
             table.cell(t, 5, i + 1, vS, text_color=color.white, bgcolor=vbg, text_size=sz)
 
     string summary = readAt == -1 ? "nothing at or below " + array.get(tfName, chartIdx) + " - stay out" : array.get(tfName, readAt) + " - " + verdictOf(readAt)
-    summary := summary + "  |  signals: " + (everyRung ? "every rung" : pickIdx != -1 ? sigRung + " (S)" : array.get(tfName, chartIdx) + " (*)") + (lblRead and readAt != -1 ? " + READ HERE (<<)" : "") + (reverseAll ? "  |  REVERSED" : "")
+    summary := summary + "  |  signals: " + (everyRung ? "every rung" : pickIdx != -1 ? sigRung + " (S)" : array.get(tfName, chartIdx) + " (*)") + (lblRead and readAt != -1 ? " + READ HERE (<<)" : "") + (reverseAll ? "  |  REVERSED" : "") + (xpwInv ? "  |  ORDERS INVERTED (Update 1): opposite side" : "")
     if agreeOn
         summary := summary + "  |  agree: LONG " + str.tostring(longN) + ", SHORT " + str.tostring(shortN) + " (need " + str.tostring(needN) + " of " + str.tostring(scopeSize) + " in scope, " + agreeMode + ")"
         if agreeN > scopeSize
