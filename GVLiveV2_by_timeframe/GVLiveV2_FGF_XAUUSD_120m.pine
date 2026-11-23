@@ -4,6 +4,34 @@
 // STATUS: FALLBACK GENERAL SET. NOT calibrated for this timeframe (see below)
 // READ FIRST: the FRAGILITY lines below say where this result comes from.
 // ----------------------------------------------------------------------------
+//  UPDATE 1 (2026-11-23)
+//    New option "Inverted direction: opposite side at the same entries" (group
+//    "Inverted direction (Update 1)", off by default). On: every entry this
+//    script would take is placed on the OPPOSITE side, same candle, same
+//    price. Arms, signals, gates and the direction filter decide as before: a
+//    PRE-L arm / long signal the filter allows (BUY ZONE) is SOLD, a PRE-S
+//    arm / short signal it allows (SELL ZONE) is BOUGHT, a blocked entry
+//    stays blocked. Market Next Candle and the EMA-cross signal stay market
+//    orders; in Stop Next Candle the buy stop above the candle becomes a SELL
+//    LIMIT at the same price, the sell stop below it a BUY LIMIT. Stop,
+//    target and trail keep their distances from the fill of the trade really
+//    open (a sell has its stop above, its target below); sizing, time stops,
+//    daily lock and the losing-trade count use that trade. Order ids, the
+//    training label, TD Entry Direction and the JSON alerts (side, stop,
+//    limit, planned price, plus "inverted":true) show what is really traded.
+//    So do the Pre Long / Short Stop circles: lime is the price of the
+//    pre-candle BUY order, red that of the SELL order (inverted: red above
+//    the candle, lime below; as before, drawn even when the filter blocks
+//    the order). The PRE-L / PRE-S flags and the signal triangles keep
+//    showing the signal. No Long / Short only setting and no other reverse
+//    option here; the filter's Allow buys / Allow sells keep acting on the
+//    signal's side (filter on, Allow buys off = no PRE-L / long-signal
+//    entries, which inverted are the SELLS). Not backtested: every result
+//    below is with the option off. Details: INVERTED DIRECTION (UPDATE 1) in
+//    the code.
+//    Off = exactly the previous version. The title now ends with "[Update 1]".
+//    Default off = the tested behaviour recorded below.
+//
 // Same code as GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine (the master
 // file). Only this record, the strategy title and the input defaults listed
 // below differ. Record date 2026-10-25, rule v3.1.
@@ -136,7 +164,7 @@
 //    in R results (see S3 SIZING where given), Polymarket settlement.
 //    Re-check with Bar Magnifier and on new data before trading live.
 // ============================================================================
-strategy("GVLiveV2 FGF | XAUUSD 120m (fallback, not calibrated for this TF)", shorttitle="GV2 XAU 120m", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
+strategy("GVLiveV2 FGF | XAUUSD 120m (fallback, not calibrated for this TF) [Update 1]", shorttitle="GV2 XAU 120m U1", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
 //==============================================================================
 // Volatility Filter (DEVMA)
@@ -836,6 +864,9 @@ if fgfShowTbl and fgfOn and barstate.islast
         table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
+// UPDATE 1: declared after every other input on purpose, so that no existing setting changes its place.
+gvInv = input.bool(false, "Inverted direction: opposite side at the same entries", group="Inverted direction (Update 1)", tooltip="Off: exactly the previous version. On: every entry this script would take is placed on the OPPOSITE side, same candle, same price. Arms, signals, gates and the direction filter decide as before: a PRE-L arm or long signal the filter allows (BUY ZONE) is SOLD, a PRE-S arm or short signal it allows (SELL ZONE) is BOUGHT, an entry it blocks stays blocked. Market Next Candle and the EMA-cross signal stay market orders. Stop Next Candle: the buy stop above the candle becomes a SELL LIMIT at the same price, the sell stop below it a BUY LIMIT (same cancel rule). Stop loss, take profit and trailing keep their distances, measured from the fill of the trade really open (a sell has its stop above, its target below). Sizing, time stops, the daily lock and the losing-trades count use the real trade. Order ids, the training label, TD Entry Direction and the JSON alerts show the side and prices really traded (alerts add inverted = true and, on entries, order_type limit / market). The Pre Long / Short Stop circles follow the order too: lime is the price of the pre-candle buy order, red that of the sell order (with this on: red above the candle, lime below; the plots keep their names and, as before, also show when the filter blocks the order). The PRE-L / PRE-S flags and the signal triangles keep showing the signal. The filter's Allow buys / Allow sells act on the signal's side: with the filter and this option on, Allow buys off removes the sells, Allow sells off removes the buys. Not backtested: the results in the header are with this off.")
+
 //==============================================================================
 // Calculations
 //==============================================================================
@@ -991,6 +1022,62 @@ pointValue = switch brokerPreset
     "Crypto 1 USD per qty" => 1.0
     => manualPointValue
 
+//==============================================================================
+// INVERTED DIRECTION (UPDATE 1)
+//==============================================================================
+// gvInv off: every expression below reduces to the previous version's (each use is
+// "gvInv ? <inverted> : <previous>", or one of the six names below, whose off value is the
+// previous literal).
+// gvInv on: nothing that DECIDES changes. The arms, the EMA-cross signals, can_enter, the
+// one-order-per-bar and one-signal-per-window rules and the filter gate (fgfBuyOk for a
+// normal BUY, fgfSellOk for a normal SELL) are computed exactly as before. Only what an
+// entry branch PLACES is mirrored:
+//   normal BUY branch  (PRE-L arm, long signal)  -> entry "Short" (a sell), exit "Exit Short"
+//   normal SELL branch (PRE-S arm, short signal) -> entry "Long"  (a buy),  exit "Exit Long"
+//   Market Next Candle and the signal entries stay market orders (same fill: next open / tick).
+//   Stop Next Candle: a LIMIT order at the price the stop order had. The buy stop above the
+//     candle (preLongStopPrice) becomes a sell limit there, the sell stop below it
+//     (preShortStopPrice) a buy limit there: both fill when price reaches that price, or at the
+//     open when it gaps through it. The cancel-after-N-bars rule is unchanged. (Strategy
+//     Properties: slippage is added to stop and market fills, never to limit fills, and "Verify
+//     price for limit orders" delays limit fills; this script's own settings are 0 for both, so
+//     the fills are the same.)
+//   strategy.exit: the same loss / profit / trail ticks, attached to the entry really placed, so
+//     the engine measures them from that trade's fill, on that trade's side.
+//   Alert JSON: side, stop (stop loss) and limit (take profit) of the order really placed, i.e.
+//     the same distances on the other side of the planned entry price. With the option on every
+//     message also carries "inverted":true, and an entry message "order_type":"limit" (a Stop
+//     Next Candle entry) or "market". The "reason" names are unchanged: "pre_candle_stop" still
+//     names the Stop Next Candle mode, "entry_kind" 2.
+//   Training capture: TD Entry Direction, the training label and "entry_side_value" give the
+//     side really traded; the scores, arms and blockers describe the signal, as before.
+// The entry ids therefore always name the side really traded ("Long" = a buy, "Short" = a
+// sell), with the option on or off. That is why the strategy.cancel and strategy.close calls
+// below and every read of strategy.position_size are unchanged: each read is either a flat /
+// not-flat test (the same for a position and its mirror) or picks the id and the alert side
+// of the position really open. Sizing (same stop distance), the bar / time stops, the daily
+// lock and the losing-trade count measure the real trade.
+// The Pre Long Stop / Pre Short Stop circles (Stop Next Candle mode) sit at the price of the
+// pending order, so they follow the order: with the option on the two plots swap their series.
+// The lime plot then marks the buy limit below a PRE-S candle, the red plot the sell limit
+// above a PRE-L candle, so lime is the pending buy and red the pending sell with the option on
+// or off. Titles and colours stay constants (the script uses all 64 plot counts, and a colour
+// that is not a constant can cost one more). As before, the circles are drawn from the arm and
+// can_enter alone, so also on a candle where the filter blocks the order.
+// Not mirrored on purpose: the PRE-L / PRE-S flags, the Long / Short Signal triangles and the
+// debug table's scores describe the signal; the table's Pre Mode cell adds "INVERTED". The
+// script has no Long-only / Short-only input and no other reverse option.
+// The filter's own "Allow buys" / "Allow sells" are part of the filter's decision, so they act
+// on the normal direction: "Allow buys" off removes the PRE-L / long-signal entries, which
+// with the option on are the sells. With the filter off both gates are true and every entry
+// is simply taken the other way round.
+string gvBuyId    = gvInv ? "Short" : "Long"
+string gvBuyExit  = gvInv ? "Exit Short" : "Exit Long"
+string gvBuySide  = gvInv ? "short" : "long"
+string gvSellId   = gvInv ? "Long" : "Short"
+string gvSellExit = gvInv ? "Exit Long" : "Exit Short"
+string gvSellSide = gvInv ? "long" : "short"
+
 f_json_num(float _value) =>
     na(_value) ? "null" : str.tostring(_value)
 
@@ -1001,7 +1088,7 @@ f_json_bool(bool _value) =>
     _value ? "true" : "false"
 
 f_training_json(string _action, string _side, string _reason) =>
-    plannedOrderPrice = _action == "entry" ? (_reason == "pre_candle_stop" ? (_side == "long" ? high + atr_value * preStopAtrBuffer : low - atr_value * preStopAtrBuffer) : close) : na
+    plannedOrderPrice = _action == "entry" ? (_reason == "pre_candle_stop" ? (_side == gvBuySide ? high + atr_value * preStopAtrBuffer : low - atr_value * preStopAtrBuffer) : close) : na
     entryKind = _reason == "pre_candle_open" ? 1 : _reason == "pre_candle_stop" ? 2 : _reason == "signal" ? 3 : 0
     collectTrainingData and includeTrainingDataInAlerts and _action == "entry" ? ",\"training\":{" +
      "\"trade_number\":" + str.tostring(strategy.closedtrades + 1) + "," +
@@ -1067,7 +1154,7 @@ f_training_json(string _action, string _side, string _reason) =>
 
 f_training_label(float _direction, string _reason, float _plannedPrice) =>
     sideText = _direction > 0 ? "LONG" : "SHORT"
-    sideText + " " + _reason + "\n" +
+    sideText + (gvInv ? (_reason == "pre_candle_stop" ? " INVERTED (limit) " : " INVERTED ") : " ") + _reason + "\n" +
      "plan " + str.tostring(_plannedPrice, "#.##") + " | signal C " + str.tostring(close, "#.##") + "\n" +
      "body% " + str.tostring(signalBodyPct, "#.##") + " | closeLoc " + str.tostring(closeLocation, "#.##") + "\n" +
      "RSI " + str.tostring(rsiVal, "#.##") + " | ATR " + str.tostring(atr_value, "#.##") + "\n" +
@@ -1086,6 +1173,7 @@ f_alert_message(string _action, string _side, string _reason, float _qty, float 
      "\"action\":\"" + _action + "\"," +
      "\"side\":\"" + _side + "\"," +
      "\"reason\":\"" + _reason + "\"," +
+     (gvInv ? "\"inverted\":true," + (_action == "entry" ? "\"order_type\":\"" + (_reason == "pre_candle_stop" ? "limit" : "market") + "\"," : "") : "") +
      "\"stake_usd\":" + f_json_num(paperStakeUsd) + "," +
      "\"qty\":" + f_json_num(_qty) + "," +
      "\"price\":" + f_json_num(close) + "," +
@@ -1182,49 +1270,49 @@ string trainingEntryReason = ""
 
 if preCanOrder and preLongEntryArm and can_enter and fgfBuyOk
     expected_entry = preCandleEntryMode == "Stop Next Candle" ? preLongStopPrice : close
-    stop_loss = expected_entry - stop_distance
-    take_profit = expected_entry + profit_distance
+    stop_loss = gvInv ? expected_entry + stop_distance : expected_entry - stop_distance
+    take_profit = gvInv ? expected_entry - profit_distance : expected_entry + profit_distance
     if preCandleEntryMode == "Stop Next Candle"
-        strategy.entry("Long", strategy.long, qty=entry_qty, stop=preLongStopPrice, alert_message=f_alert_message("entry", "long", "pre_candle_stop", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+        strategy.entry(gvBuyId, gvInv ? strategy.short : strategy.long, qty=entry_qty, limit=gvInv ? preLongStopPrice : na, stop=gvInv ? na : preLongStopPrice, alert_message=f_alert_message("entry", gvBuySide, "pre_candle_stop", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
         lastPreStopOrderBar := bar_index
     else
-        strategy.entry("Long", strategy.long, qty=entry_qty, alert_message=f_alert_message("entry", "long", "pre_candle_open", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+        strategy.entry(gvBuyId, gvInv ? strategy.short : strategy.long, qty=entry_qty, alert_message=f_alert_message("entry", gvBuySide, "pre_candle_open", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
         lastPreStopOrderBar := na
     lastSignalPolyWindowStartMs := polyWindowStartMs
     preOrderThisBar := true
     trainingEntrySignal := collectTrainingData
-    trainingEntryDirection := 1.0
+    trainingEntryDirection := gvInv ? -1.0 : 1.0
     trainingEntryKind := preCandleEntryMode == "Stop Next Candle" ? 2.0 : 1.0
     trainingPlannedOrderPrice := expected_entry
     trainingEntryNumber := strategy.closedtrades + 1
     trainingEntryReason := preCandleEntryMode == "Stop Next Candle" ? "pre_candle_stop" : "pre_candle_open"
     if useTrail
-        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "long", "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit(gvBuyExit, gvBuyId, loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", gvBuySide, "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
     else
-        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "long", "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit(gvBuyExit, gvBuyId, loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", gvBuySide, "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
 
 if preCanOrder and preShortEntryArm and can_enter and not preOrderThisBar and fgfSellOk
     expected_entry = preCandleEntryMode == "Stop Next Candle" ? preShortStopPrice : close
-    stop_loss = expected_entry + stop_distance
-    take_profit = expected_entry - profit_distance
+    stop_loss = gvInv ? expected_entry - stop_distance : expected_entry + stop_distance
+    take_profit = gvInv ? expected_entry + profit_distance : expected_entry - profit_distance
     if preCandleEntryMode == "Stop Next Candle"
-        strategy.entry("Short", strategy.short, qty=entry_qty, stop=preShortStopPrice, alert_message=f_alert_message("entry", "short", "pre_candle_stop", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+        strategy.entry(gvSellId, gvInv ? strategy.long : strategy.short, qty=entry_qty, limit=gvInv ? preShortStopPrice : na, stop=gvInv ? na : preShortStopPrice, alert_message=f_alert_message("entry", gvSellSide, "pre_candle_stop", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
         lastPreStopOrderBar := bar_index
     else
-        strategy.entry("Short", strategy.short, qty=entry_qty, alert_message=f_alert_message("entry", "short", "pre_candle_open", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+        strategy.entry(gvSellId, gvInv ? strategy.long : strategy.short, qty=entry_qty, alert_message=f_alert_message("entry", gvSellSide, "pre_candle_open", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
         lastPreStopOrderBar := na
     lastSignalPolyWindowStartMs := polyWindowStartMs
     preOrderThisBar := true
     trainingEntrySignal := collectTrainingData
-    trainingEntryDirection := -1.0
+    trainingEntryDirection := gvInv ? 1.0 : -1.0
     trainingEntryKind := preCandleEntryMode == "Stop Next Candle" ? 2.0 : 1.0
     trainingPlannedOrderPrice := expected_entry
     trainingEntryNumber := strategy.closedtrades + 1
     trainingEntryReason := preCandleEntryMode == "Stop Next Candle" ? "pre_candle_stop" : "pre_candle_open"
     if useTrail
-        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "short", "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit(gvSellExit, gvSellId, loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", gvSellSide, "pre_candle_atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
     else
-        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "short", "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit(gvSellExit, gvSellId, loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", gvSellSide, "pre_candle_atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
 
 if preCandleEntryMode == "Stop Next Candle" and strategy.position_size == 0 and not na(lastPreStopOrderBar) and bar_index - lastPreStopOrderBar > preCancelAfterBars
     strategy.cancel("Long")
@@ -1232,36 +1320,36 @@ if preCandleEntryMode == "Stop Next Candle" and strategy.position_size == 0 and 
     lastPreStopOrderBar := na
 
 if longCondition and can_enter and not preOrderThisBar and fgfBuyOk
-    stop_loss = close - stop_distance
-    take_profit = close + profit_distance
-    strategy.entry("Long", strategy.long, qty=entry_qty, alert_message=f_alert_message("entry", "long", "signal", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+    stop_loss = gvInv ? close + stop_distance : close - stop_distance
+    take_profit = gvInv ? close - profit_distance : close + profit_distance
+    strategy.entry(gvBuyId, gvInv ? strategy.short : strategy.long, qty=entry_qty, alert_message=f_alert_message("entry", gvBuySide, "signal", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
     lastSignalPolyWindowStartMs := polyWindowStartMs
     trainingEntrySignal := collectTrainingData
-    trainingEntryDirection := 1.0
+    trainingEntryDirection := gvInv ? -1.0 : 1.0
     trainingEntryKind := 3.0
     trainingPlannedOrderPrice := close
     trainingEntryNumber := strategy.closedtrades + 1
     trainingEntryReason := "signal"
     if useTrail
-        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "long", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit(gvBuyExit, gvBuyId, loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", gvBuySide, "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
     else
-        strategy.exit("Exit Long", "Long", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "long", "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit(gvBuyExit, gvBuyId, loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", gvBuySide, "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
 
 if shortCondition and can_enter and not preOrderThisBar and fgfSellOk
-    stop_loss = close + stop_distance
-    take_profit = close - profit_distance
-    strategy.entry("Short", strategy.short, qty=entry_qty, alert_message=f_alert_message("entry", "short", "signal", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
+    stop_loss = gvInv ? close - stop_distance : close + stop_distance
+    take_profit = gvInv ? close + profit_distance : close - profit_distance
+    strategy.entry(gvSellId, gvInv ? strategy.long : strategy.short, qty=entry_qty, alert_message=f_alert_message("entry", gvSellSide, "signal", entry_qty, stop_loss, take_profit), disable_alert=not sendEntryAlertsToWebhook)
     lastSignalPolyWindowStartMs := polyWindowStartMs
     trainingEntrySignal := collectTrainingData
-    trainingEntryDirection := -1.0
+    trainingEntryDirection := gvInv ? 1.0 : -1.0
     trainingEntryKind := 3.0
     trainingPlannedOrderPrice := close
     trainingEntryNumber := strategy.closedtrades + 1
     trainingEntryReason := "signal"
     if useTrail
-        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", "short", "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit(gvSellExit, gvSellId, loss=exitLoss, profit=exitProfit, trail_points=trActTicks, trail_offset=trDstTicks, alert_message=f_alert_message("exit", gvSellSide, "atr_stop_target_or_trail", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
     else
-        strategy.exit("Exit Short", "Short", loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", "short", "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
+        strategy.exit(gvSellExit, gvSellId, loss=exitLoss, profit=exitProfit, alert_message=f_alert_message("exit", gvSellSide, "atr_stop_or_target", entry_qty, stop_loss, take_profit), disable_alert=not sendExitAlertsToWebhook)
 
 // Track bars in trade. The CSV showed that trades held beyond one bar were net negative.
 var int entryBarIndex = na
@@ -1309,8 +1397,10 @@ plotshape(longCondition and can_enter, title="Long Signal", style=shape.triangle
 plotshape(shortCondition and can_enter, title="Short Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
 plotshape(preLongArm and can_enter, title="Pre-Candle Long Arm", style=shape.flag, location=location.belowbar, color=color.lime, text="PRE-L", textcolor=color.black, size=size.small)
 plotshape(preShortArm and can_enter, title="Pre-Candle Short Arm", style=shape.flag, location=location.abovebar, color=color.red, text="PRE-S", textcolor=color.white, size=size.small)
-plot(preCandleEntryMode == "Stop Next Candle" and preLongArm and can_enter ? preLongStopPrice : na, "Pre Long Stop", color=color.new(color.lime, 35), style=plot.style_circles, linewidth=2)
-plot(preCandleEntryMode == "Stop Next Candle" and preShortArm and can_enter ? preShortStopPrice : na, "Pre Short Stop", color=color.new(color.red, 35), style=plot.style_circles, linewidth=2)
+// Update 1: with gvInv on the two plots swap their series, so that lime still marks the price of the
+// pending BUY and red the price of the pending SELL (see INVERTED DIRECTION (UPDATE 1) above).
+plot(preCandleEntryMode == "Stop Next Candle" and (gvInv ? preShortArm : preLongArm) and can_enter ? (gvInv ? preShortStopPrice : preLongStopPrice) : na, "Pre Long Stop", color=color.new(color.lime, 35), style=plot.style_circles, linewidth=2)
+plot(preCandleEntryMode == "Stop Next Candle" and (gvInv ? preLongArm : preShortArm) and can_enter ? (gvInv ? preLongStopPrice : preShortStopPrice) : na, "Pre Short Stop", color=color.new(color.red, 35), style=plot.style_circles, linewidth=2)
 
 var label[] trainingLabels = array.new_label()
 if collectTrainingData and showTrainingLabels and trainingEntrySignal
@@ -1346,7 +1436,7 @@ if showPreDebug and barstate.islast
     table.cell(preDash, 0, 7, "Can Enter", text_color=color.white)
     table.cell(preDash, 1, 7, can_enter ? "YES" : "NO", bgcolor=can_enter ? color.new(color.green, 60) : color.new(color.red, 60), text_color=color.white)
     table.cell(preDash, 0, 8, "Pre Mode", text_color=color.white)
-    table.cell(preDash, 1, 8, usePreCandleArm ? preCandleEntryMode : "OFF", text_color=usePreCandleArm ? color.aqua : color.white)
+    table.cell(preDash, 1, 8, (usePreCandleArm ? preCandleEntryMode : "OFF") + (gvInv ? " | INVERTED" : ""), text_color=usePreCandleArm ? color.aqua : color.white)
 
 plot(useMaxBarsExit and strategy.position_size != 0 ? barsInTrade : na, "Bars In Trade", color=color.gray, display=display.data_window)
 plot(secondsFromPolyWindowStart, "Seconds From 5M Window Start", color=color.gray, display=display.data_window)
