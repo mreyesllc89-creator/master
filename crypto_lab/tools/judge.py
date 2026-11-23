@@ -75,6 +75,8 @@ def main():
         if metrics is not None:
             jobs += [(n, f, g, metrics) for n, (f, g) in st.LIBRARY_WITH_METRICS.items()]
         for name, fn, grid, extra in jobs:
+            if tf in st.SKIP_TF.get(name, ()):
+                continue
             c = gauntlet(name, fn, grid, df, funding, sym, extra, out, tf)
             if c:
                 rows.append(dict(strategy=name, symbol=sym, tf=tf, **{k: c["oos"].get(k) for k in ("trades", "ret_pct", "pf", "maxdd_pct", "losing_streak", "avg_r")},

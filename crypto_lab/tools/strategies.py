@@ -151,15 +151,23 @@ def weekend_fade(df, atr_mult=1.5, stop_mult=2.0):
 
 
 def funding_time_premium(df, funding, thresh=0.0002, bars_before=2, atr_mult=1.0):
-    """Short the last `bars_before` bars before each 8-hour funding timestamp when the last funding print was above
-    `thresh` (long when below -thresh); flat at the print. Mechanism: the perp premium decays into the funding
-    exchange; longs paying funding pay. Dies when funding stays elevated because of a sustained trend (premium
-    persists)."""
-    f = funding.reindex(df.index).ffill().shift()
-    bars_per_hour = int(round(3600 / (df.index[1] - df.index[0]).total_seconds()))
-    into = pd.Series(df.index, index=df.index)
-    mins_to_print = ((8 - (df.index.hour % 8)) * 60 - df.index.minute) % 480
-    window = (mins_to_print > 0) & (mins_to_print <= bars_before * 60 / bars_per_hour)
+    """Short during the last `bars_before` bars before each 8-hour funding timestamp (00:00, 08:00, 16:00 UTC) when the
+    last funding print was above `thresh` (long when below -thresh); flat at the print. Mechanism: the perp premium
+    decays into the funding exchange; longs paying funding pay. Dies when funding stays elevated because of a
+    sustained trend (premium persists).
+
+    Timing (bars are indexed by open time, the backtester fills a signal at the NEXT bar's open): the target is set on
+    the bars whose following bar opens inside the window, so with 1h bars and bars_before=1 the signal sits on the
+    06:00 bar, the position is opened at the 07:00 open and closed at the 08:00 open. It is never held through the
+    print, so it neither pays nor receives funding. Bars of 1 hour or shorter only: on 4h bars the shortest window is
+    half the funding interval, which is a different trade (see SKIP_TF)."""
+    bar_min = int(round((df.index[1] - df.index[0]).total_seconds() / 60))
+    if bar_min > 60:
+        raise ValueError("funding_time_premium needs bars of 1 hour or shorter")
+    f = funding.reindex(df.index).ffill().shift()  # the last settled funding, known at the bar
+    open_to_print = ((8 - (df.index.hour % 8)) * 60 - df.index.minute) % 480  # 0 on the bar that opens at the print
+    next_open_to_print = (open_to_print - bar_min) % 480  # the bar the fill happens on
+    window = (next_open_to_print > 0) & (next_open_to_print <= bars_before * bar_min)
     target = pd.Series(0, index=df.index)
     target[window & (f > thresh)] = -1; target[window & (f < -thresh)] = 1
     return _out(df, target, atr(df) * atr_mult)
@@ -198,3 +206,5 @@ LIBRARY_WITH_METRICS = {
     "crowded_unwind": (crowded_unwind, [dict(ratio=r, oi_drop=d, hold=h) for r in (2.0, 2.5) for d in (0.02, 0.04) for h in (12, 24, 48)]),
     "taker_exhaustion": (taker_exhaustion, [dict(q=q, hold=h) for q in (0.9, 0.95) for h in (6, 12, 24)]),
 }
+# Strategies the Judge does not run on a timeframe, with the reason in the strategy's docstring.
+SKIP_TF = {"funding_time_premium": ("4h",)}
