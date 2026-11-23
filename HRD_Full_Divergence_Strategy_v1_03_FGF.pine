@@ -4,13 +4,32 @@
 // ============================================================================
 //  FGF BUILD: + FLASHGOLD DIRECTION FILTER v1.2
 // ----------------------------------------------------------------------------
+//  UPDATE 1 (2026-11-23)
+//    New option "Inverted direction: opposite side at the same entries" (group
+//    "Inverted direction (Update 1)", off by default). On: every entry this
+//    script would take is placed on the OPPOSITE side, on the same candle, at
+//    the same price, sized by the same rule. Signals, "Reverse Trading" and
+//    the direction filter decide as before: a LONG signal the filter allows
+//    (BUY ZONE) is placed as a SELL, a SHORT signal it allows (SELL ZONE) as
+//    a BUY, a blocked signal stays blocked. SL / TP keep their distances on
+//    the new side (a sell has its stop above the signal close, its target
+//    below); the trailing take profit keeps its distances. The time exit
+//    and the hybrid exit measure the trade really open. "Trade Direction"
+//    means the orders really placed (Buy Only = only real buys). "Reverse
+//    Trading" flips the signal BEFORE the filter, this option the order
+//    AFTER it. Entry, SL / TP and blocked-signal close comments name the
+//    side really traded and end in "(inv)"; the gray "x" marks and "FGD ..."
+//    values keep describing the signal and the filter (INVERTED DIRECTION).
+//    Off = exactly the previous version. The title now ends with "[Update 1]".
+//
 //  Same strategy as HRD_Full_Divergence_Strategy_v1_03.pine (your file): the
 //  horizons, breakouts, oscillator, divergences, risk engine, SL / TP, time
 //  exit and hybrid decay-slip exit are unchanged. Added: the FlashGold
 //  Direction Filter v1.2, between BEGIN and END FLASHGOLD DIRECTION FILTER,
 //  byte-identical to FlashGold_Direction_Filter_v1_2.pine (this script draws
 //  on the price chart, so FGF_FORCE_OVERLAY stays false). Also added: an
-//  optional trailing take profit, off by default (TRAILING TAKE PROFIT).
+//  optional trailing take profit, off by default (TRAILING TAKE PROFIT), and
+//  the "Inverted direction" option, off by default (UPDATE 1 above).
 //
 //  CHANGED FROM YOUR FILE: calc_on_every_tick = false
 //    Your file has calc_on_every_tick = true: live it runs on every tick,
@@ -33,6 +52,11 @@
 //    Candle close the gate is judged at the signal candle's close, like the
 //    signal; with Candle open, at that candle's open. Live and backtest
 //    agree; the order fills at the next candle's open.
+//    With "Inverted direction" on (UPDATE 1) this is the side BEFORE the
+//    inversion: the entry that would be a LONG still needs the BUY ZONE and
+//    is placed as a SELL, the one that would be a SHORT needs the SELL ZONE
+//    and is placed as a BUY. "Trade Direction" then applies to the order
+//    really placed.
 //
 //  WHAT IT NEVER GATES
 //    Exits: the SL / TP bracket, "Close after X Candles" and the hybrid
@@ -47,6 +71,10 @@
 //    opens nothing. Off: the blocked signal does nothing; the trade runs on
 //    to its own exits unless a later opposite signal the filter allows
 //    reverses it.
+//    With "Inverted direction" on the same happens on the mirrored side: a
+//    LONG signal is a sell order, so it reverses an open LONG, and when the
+//    filter blocks it that long is closed; a SHORT signal does the same to
+//    an open short.
 //
 //  CHART AND DATA WINDOW
 //    A blocked entry gets a small gray "x" (L below the candle, S above).
@@ -57,7 +85,10 @@
 //    the filter blocked them (FGD blocked), and running counts. Once the
 //    filter has blocked or closed a trade this script's position differs
 //    from your file's, so FGD raw equals your file's entries only with the
-//    filter off.
+//    filter (and "Inverted direction") off. With "Inverted direction" on,
+//    L / S and every FGD value still name the signal's side before the
+//    inversion: an "x L" is a LONG signal the filter blocked (its order
+//    would have been a SELL).
 //
 //  TRAILING TAKE PROFIT (optional, group "Trailing take profit", off by default)
 //    On: each trade also gets a trailing stop. Once price has moved "Trail
@@ -66,13 +97,65 @@
 //    trade's favour. Both distances are in % of the signal candle's close
 //    (the same price the SL / TP use). The SL / TP, time exit and hybrid
 //    exit stay as set; "Take Profit (%) = 0" removes the target. Off
-//    (default): exits exactly as in your file.
+//    (default): exits exactly as in your file ("Inverted direction" on:
+//    the same exits on the mirrored side, see INVERTED DIRECTION).
+//
+//  INVERTED DIRECTION (UPDATE 1; group "Inverted direction (Update 1)", off)
+//    On: the script decides everything as with the option off, as if it held
+//    the mirror of its real position, and sends each entry on the other side.
+//    - Entry: a LONG signal the filter allows (BUY ZONE) is sent as a SELL,
+//      a SHORT signal it allows (SELL ZONE) as a BUY. Market orders on the
+//      same candle, filled at the next candle's open, sized as before (the
+//      risk engine uses the same stop distance and the account's equity).
+//    - SL / TP: mirrored about the signal candle's close, same distances. A
+//      sell has its stop "Stop Loss (%)" above that close and its target
+//      "Take Profit (%)" below; a buy the other way round. The trailing take
+//      profit keeps its activation and offset and trails the side really
+//      open.
+//    - "Close after X Candles" and the hybrid decay-slip exit measure the
+//      trade really open: its age and its own profit. The time exit reads
+//      no side: as long as the run with the option on mirrors the run with
+//      it off, it closes both trades on the same candle. The SL / TP
+//      (unless SL % = TP %), the trailing take profit and the hybrid exit
+//      can end the two trades at different places: with SL 2 % and TP 4 %
+//      a 2 % rise stops the inverted sell while the normal buy runs on
+//      towards its target; the trail and the hybrid exit follow the
+//      opposite profit. After that each run answers the next signals from
+//      its own position: the inverted trade list is not simply the normal
+//      list with the sides swapped.
+//    - Reversal and blocked signal: a LONG signal is now a sell order, so it
+//      reverses an open LONG; if the filter blocks it, "Blocked opposite
+//      signal still closes the trade" closes that long. A SHORT signal does
+//      the same to an open short.
+//    - "Trade Direction" means the orders really placed: Buy Only = only
+//      real buys (they now come from SHORT signals), Sell Only = only real
+//      sells (from LONG signals).
+//    - "Reverse Trading" (unchanged) flips the signal BEFORE the filter: a
+//      reversed LONG signal is a SELL that needs the SELL ZONE. Inverted
+//      flips the order AFTER the filter: the LONG signal needs the BUY ZONE
+//      and is sold there. Both on: each signal trades its own side again,
+//      but only where the filter allows the opposite one (a bullish signal
+//      is a BUY, and it needs the SELL ZONE).
+//      With the filter off, Reverse alone and Inverted alone place the same
+//      orders (only the comments differ) and both on = both off, with one
+//      exception: a candle that has a LONG and a SHORT signal while flat
+//      ("Trade Direction" = Both). Both entries are sent and the second one
+//      stays: a SELL without Inverted (Reverse on or off), a BUY with it.
+//    - Shown: the comments of entries, SL / TP exits and blocked-signal
+//      closes name the side really traded and end in "(inv)":
+//      "Entry Short (inv)", "SL/TP Short (inv)", "filter blocked LONG
+//      signal, close long (inv)". The time exit and hybrid exit comments
+//      name no side and are unchanged. Divergence labels, breakout arrows,
+//      the gray "x" marks and the Data Window "FGD ..." values keep
+//      describing the signal and the filter, before the inversion. The
+//      script has no alerts of its own; TradingView's order alerts report
+//      the order really placed.
 //
 //  FILTER OFF
-//    With "Enable filter" off (and the trailing take profit off, the
-//    default) every signal trades: the same orders as your file in the
-//    backtest. Live, this build acts once per candle close where yours acts
-//    on every tick (CHANGED FROM YOUR FILE).
+//    With "Enable filter" off (and the trailing take profit and "Inverted
+//    direction" off, the defaults) every signal trades: the same orders as
+//    your file in the backtest. Live, this build acts once per candle close
+//    where yours acts on every tick (CHANGED FROM YOUR FILE).
 //
 //  NOTES ON THE ORIGINAL (unchanged here)
 //    - "Enable Alerts" has no effect: the script defines no alerts.
@@ -90,7 +173,7 @@
 //    - The strategy() declaration sets no commission or slippage, so
 //      TradingView reports the results without costs.
 // ============================================================================
-strategy("HRD Full Divergence Strategy v1.03", overlay=true, calc_on_every_tick=false, max_lines_count=500, max_labels_count=500, max_bars_back=500)
+strategy("HRD Full Divergence Strategy v1.03 [Update 1]", overlay=true, calc_on_every_tick=false, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
 // ============================ INDICATOR INPUTS ============================
 grpColors    = "Horizon Colors"
@@ -125,8 +208,8 @@ showBreaks   = input.bool(true,  "Show Breakout Arrows",  group=grpBrk)
 // --- STRATEGY RULES & RISK INPUTS ---
 // =====================================================================
 string groupRisk = "Strategy Rules & Risk"
-InpReverseTrading = input.bool(false, title = "Reverse Trading", group = groupRisk, tooltip = "When enabled, all long signals become short and vice versa")
-InpTradeDirection = input.string("Both", title = "Trade Direction", options = ["Both", "Buy Only", "Sell Only"], group = groupRisk)
+InpReverseTrading = input.bool(false, title = "Reverse Trading", group = groupRisk, tooltip = "When enabled, all long signals become short and vice versa. This flips the signal BEFORE the direction filter (a reversed LONG signal is a SELL that needs the SELL ZONE); 'Inverted direction' (Update 1) flips the order AFTER the filter.")
+InpTradeDirection = input.string("Both", title = "Trade Direction", options = ["Both", "Buy Only", "Sell Only"], group = groupRisk, tooltip = "Always the orders really placed. With 'Inverted direction' on (Update 1): Buy Only = only real buys (they come from SHORT signals), Sell Only = only real sells (from LONG signals).")
 InpRiskPct        = input.float(1.0, title = "Risk % per Trade (If SL > 0)", minval = 0.0, step = 0.1, group = groupRisk)
 InpFixedQty       = input.float(0.01, title = "Fixed Quantity (If SL = 0)", minval = 0.0, step = 0.01, group = groupRisk)
 InpSlPct          = input.float(2.0, title = "Stop Loss (%) [0 = No SL]", minval = 0.0, step = 0.1, group = groupRisk)
@@ -146,10 +229,16 @@ minActivationPts   = input.int(40,     title="Min Activation Points (Ticks)", gr
 // =====================================================================
 // --- DIRECTION FILTER (FGF build) ---
 // =====================================================================
-hrdBlkClose = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a LONG signal the filter blocks still closes an open short (and a blocked SHORT an open long), as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs on to its own exits unless a later opposite signal the filter allows reverses it. Exits are never gated by the filter.")
+hrdBlkClose = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a LONG signal the filter blocks still closes an open short (and a blocked SHORT an open long), as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs on to its own exits unless a later opposite signal the filter allows reverses it. Exits are never gated by the filter. With 'Inverted direction' on (Update 1) the sides are mirrored: a blocked LONG signal (its order would be a sell) closes an open long, a blocked SHORT signal an open short.")
 hrdTrailOn  = input.bool(false, "Use trailing take profit", group="Trailing take profit", tooltip="Off (default): exits as in your file. On: once price has moved Trail activation in the trade's favour from the entry price, a stop follows Trail offset behind the best price. Both in % of the signal candle's close. SL / TP, time exit and hybrid exit stay as set.")
 hrdTrailAct = input.float(1.0, "Trail activation (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Move in the trade's favour, in % of the price, before the trail arms. 0 = armed from the entry.")
 hrdTrailOff = input.float(0.5, "Trail offset (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Distance the trailing stop keeps behind the best price, in % of the price (at least one tick).")
+
+// UPDATE 1. Inverted direction: the same entries, placed on the opposite side. The flip is
+// applied to the ORDER, after every decision (signals, Reverse Trading, the direction
+// filter); "Trade Direction" applies to the order really placed. See RISK ENGINE EXECUTION
+// LOGIC. Off = no change.
+hrdInv = input.bool(false, "Inverted direction: opposite side at the same entries", group="Inverted direction (Update 1)", tooltip="Off: exactly the previous version. On: every entry this script would take is placed on the OPPOSITE side, on the same candle, at the same price, sized by the same rule. Signals, 'Reverse Trading' and the direction filter decide as before: a LONG signal the filter allows (BUY ZONE) is placed as a SELL, a SHORT signal it allows (SELL ZONE) as a BUY, a blocked signal stays blocked. SL / TP keep their distances on the new side (a sell has its stop above the signal close, its target below); the trailing take profit keeps its distances. The time exit and the hybrid exit measure the trade really open. A LONG signal now reverses an open long, or closes it when the filter blocks it ('Blocked opposite signal still closes the trade'). 'Trade Direction' means the orders really placed (Buy Only = only real buys). Not the same as 'Reverse Trading', which flips the signal BEFORE the filter (a reversed LONG signal needs the SELL ZONE).")
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane
@@ -902,48 +991,84 @@ if strategy.position_size != 0 and not na(entryBarIndex) and (bar_index - entryB
 
 // Direction filter gate (FGF build): the side that would trade must be allowed.
 // strategy.position_size is the position before this bar's orders, as in the original.
-bool hrdWantLong  = longSignal  and longDirectionAllowed  and strategy.position_size <= 0
-bool hrdWantShort = shortSignal and shortDirectionAllowed and strategy.position_size >= 0
+//
+// UPDATE 1, "Inverted direction" (hrdInv). From here to the end of the two EXECUTION
+// blocks the script keeps deciding in the NORMAL frame: hrdWantLong / hrdWantShort are the
+// entries it takes with the option off, gated by fgfBuyOk / fgfSellOk as before. With the
+// option on each of them is placed on the opposite side, so the script holds the MIRROR
+// of the normal position:
+//   hrdPos       the position as the normal frame sees it (the real size, sign flipped).
+//                Every decision that reads the position SIDE reads hrdPos.
+//   hrdDirOkL /  "Trade Direction" applies to the orders really placed (Buy Only = only
+//   hrdDirOkS    real buys). A normal LONG is placed as a SELL, so it needs the sell side
+//                allowed; a normal SHORT is placed as a BUY and needs the buy side.
+//   hrdIdL /     id of the order a normal LONG / SHORT entry places. Ids name the side
+//   hrdIdS       really placed: "Long" is always a buy, "Short" always a sell.
+// The time exit above and the hybrid exit below measure the trade really open and read
+// strategy.position_size / strategy.position_avg_price directly.
+// Option off: hrdPos = strategy.position_size, hrdDirOkL = longDirectionAllowed,
+// hrdDirOkS = shortDirectionAllowed, hrdIdL = "Long", hrdIdS = "Short": the previous lines.
+float  hrdPos    = hrdInv ? -strategy.position_size : strategy.position_size
+bool   hrdDirOkL = hrdInv ? shortDirectionAllowed : longDirectionAllowed
+bool   hrdDirOkS = hrdInv ? longDirectionAllowed : shortDirectionAllowed
+string hrdIdL    = hrdInv ? "Short" : "Long"
+string hrdIdS    = hrdInv ? "Long" : "Short"
+bool hrdWantLong  = longSignal  and hrdDirOkL and hrdPos <= 0
+bool hrdWantShort = shortSignal and hrdDirOkS and hrdPos >= 0
 bool hrdBlkLong   = hrdWantLong  and not fgfBuyOk
 bool hrdBlkShort  = hrdWantShort and not fgfSellOk
 
 // A blocked signal against the open trade still ends it (the original would reverse it).
-if hrdBlkClose and hrdBlkLong and strategy.position_size < 0
-    strategy.close("Short", comment = "filter blocked LONG, close")
-if hrdBlkClose and hrdBlkShort and strategy.position_size > 0
-    strategy.close("Long", comment = "filter blocked SHORT, close")
+// (UPDATE 1: "against" is read in the normal frame, hrdPos. The trade closed is the one
+// really open: the one a normal SHORT / LONG entry opened, id hrdIdS / hrdIdL. Inverted,
+// a blocked LONG signal therefore closes an open long, and the comment says so.)
+if hrdBlkClose and hrdBlkLong and hrdPos < 0
+    strategy.close(hrdIdS, comment = hrdInv ? "filter blocked LONG signal, close long (inv)" : "filter blocked LONG, close")
+if hrdBlkClose and hrdBlkShort and hrdPos > 0
+    strategy.close(hrdIdL, comment = hrdInv ? "filter blocked SHORT signal, close short (inv)" : "filter blocked SHORT, close")
 
 // 4. LONG EXECUTION
+// (UPDATE 1: LONG is the normal-frame side, gated by fgfBuyOk as before. Inverted
+// direction sends it as a SELL, id "Short": the stop above and the target below the
+// signal close at the same distances (2 x close - the long stop / the long target),
+// same quantity (same stop distance), same trail distances in ticks. Option off: each
+// conditional below is the previous expression.)
 if hrdWantLong and fgfBuyOk
     float estimatedEntryPrice = close
     float stopLossDistanceLong = InpSlPct > 0.0 ? estimatedEntryPrice * (InpSlPct / 100.0) : 0.0
-    float stopLossPriceLong    = InpSlPct > 0.0 ? estimatedEntryPrice * (1.0 - InpSlPct / 100.0) : na
-    float takeProfitPriceLong  = InpTpPct > 0.0 ? estimatedEntryPrice * (1.0 + InpTpPct / 100.0) : na
+    float stopLossPriceLong    = InpSlPct > 0.0 ? estimatedEntryPrice * (hrdInv ? 1.0 + InpSlPct / 100.0 : 1.0 - InpSlPct / 100.0) : na
+    float takeProfitPriceLong  = InpTpPct > 0.0 ? estimatedEntryPrice * (hrdInv ? 1.0 - InpTpPct / 100.0 : 1.0 + InpTpPct / 100.0) : na
 
     float longQuantity = calculatePositionSize(stopLossDistanceLong)
 
-    strategy.entry(id = "Long", direction = strategy.long, qty = longQuantity, comment = "Entry Long")
+    strategy.entry(id = hrdIdL, direction = hrdInv ? strategy.short : strategy.long, qty = longQuantity, comment = hrdInv ? "Entry Short (inv)" : "Entry Long")
     float hrdTrPts = hrdTrailOn ? math.max(estimatedEntryPrice * hrdTrailAct / 100.0 / syminfo.mintick, 0.0) : na
     float hrdTrOfs = hrdTrailOn ? math.max(estimatedEntryPrice * hrdTrailOff / 100.0 / syminfo.mintick, 1.0) : na
-    strategy.exit(id = "Long Exit", from_entry = "Long", stop = stopLossPriceLong, limit = takeProfitPriceLong, trail_points = hrdTrPts, trail_offset = hrdTrOfs, comment = "SL/TP Long")
+    strategy.exit(id = hrdInv ? "Short Exit" : "Long Exit", from_entry = hrdIdL, stop = stopLossPriceLong, limit = takeProfitPriceLong, trail_points = hrdTrPts, trail_offset = hrdTrOfs, comment = hrdInv ? "SL/TP Short (inv)" : "SL/TP Long")
 
 // 5. SHORT EXECUTION
+// (UPDATE 1: SHORT is the normal-frame side, gated by fgfSellOk as before. Inverted
+// direction sends it as a BUY, id "Long": the stop below and the target above the signal
+// close at the same distances. The two blocks keep their order, so on a candle with both
+// signals the entries are sent in the same sequence as before, each on its other side.)
 if hrdWantShort and fgfSellOk
     float estimatedEntryPrice = close
     float stopLossDistanceShort = InpSlPct > 0.0 ? estimatedEntryPrice * (InpSlPct / 100.0) : 0.0
-    float stopLossPriceShort    = InpSlPct > 0.0 ? estimatedEntryPrice * (1.0 + InpSlPct / 100.0) : na
-    float takeProfitPriceShort  = InpTpPct > 0.0 ? estimatedEntryPrice * (1.0 - InpTpPct / 100.0) : na
+    float stopLossPriceShort    = InpSlPct > 0.0 ? estimatedEntryPrice * (hrdInv ? 1.0 - InpSlPct / 100.0 : 1.0 + InpSlPct / 100.0) : na
+    float takeProfitPriceShort  = InpTpPct > 0.0 ? estimatedEntryPrice * (hrdInv ? 1.0 + InpTpPct / 100.0 : 1.0 - InpTpPct / 100.0) : na
 
     float shortQuantity = calculatePositionSize(stopLossDistanceShort)
 
-    strategy.entry(id = "Short", direction = strategy.short, qty = shortQuantity, comment = "Entry Short")
+    strategy.entry(id = hrdIdS, direction = hrdInv ? strategy.long : strategy.short, qty = shortQuantity, comment = hrdInv ? "Entry Long (inv)" : "Entry Short")
     float hrdTrPts = hrdTrailOn ? math.max(estimatedEntryPrice * hrdTrailAct / 100.0 / syminfo.mintick, 0.0) : na
     float hrdTrOfs = hrdTrailOn ? math.max(estimatedEntryPrice * hrdTrailOff / 100.0 / syminfo.mintick, 1.0) : na
-    strategy.exit(id = "Short Exit", from_entry = "Short", stop = stopLossPriceShort, limit = takeProfitPriceShort, trail_points = hrdTrPts, trail_offset = hrdTrOfs, comment = "SL/TP Short")
+    strategy.exit(id = hrdInv ? "Long Exit" : "Short Exit", from_entry = hrdIdS, stop = stopLossPriceShort, limit = takeProfitPriceShort, trail_points = hrdTrPts, trail_offset = hrdTrOfs, comment = hrdInv ? "SL/TP Long (inv)" : "SL/TP Short")
 
 // =====================================================================
 // --- HYBRID DECAY-SLIP EXIT ENGINE ---
 // =====================================================================
+// (UPDATE 1: unchanged. It measures the trade really open - its side, its average price,
+// its own profit - and close_all closes it, whichever side it is on.)
 inTrade = strategy.position_size != 0
 isLong  = strategy.position_size > 0
 isShort = strategy.position_size < 0
@@ -984,6 +1109,8 @@ if useHybridExit and inTrade
 // Each side is latched once per candle with varip ("blocked" = called but never entered this
 // candle). With calc_on_every_tick off this equals the candle's own values; it also keeps the
 // counts right if calc_on_every_tick is turned back on.
+// (UPDATE 1: normal frame, unchanged. With Inverted direction on a "raw long" is the LONG
+// signal whose order is a sell; it is blocked by fgfBuyOk as before and "x L" marks it.)
 varip int hrdRawLBar = -1
 varip int hrdRawSBar = -1
 varip int hrdGoLBar  = -1
