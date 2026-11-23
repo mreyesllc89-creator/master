@@ -28,6 +28,7 @@ This file is the contract every scheduled role follows. Read it fully before doi
 - `tools/perpbt.py` - perp backtester (fees, funding, slippage, stops, walk-forward, regime table).
 - `tools/strategies.py` - strategy library; each function returns target/stop columns, no look-ahead.
 - `tools/judge.py` - runs the gauntlet over `research/ideas_<date>.md` strategy specs, writes `cards/`.
+- `tools/calibration.py` - calibration check: train win rate vs out-of-sample win rate, shrinkage of the edge, and a luck test (monthly bootstrap + Holm correction over every combination). Writes `cards/calibration_<date>.md`. A rule that is not `alive` there has no proven edge, whatever its leaderboard score.
 - `research/` - Hunter output: `ideas_<date>.md` (>= 20 ideas, each with source URL + timestamp + mechanism).
 - `cards/` - Judge output: one strategy card per idea, `leaderboard_<date>.md`, `champion.yaml`.
 - `bot/` - the 24/7 bot (Engineer): `bot.py`, `config.yaml`, `tests/`, `deploy.md`.

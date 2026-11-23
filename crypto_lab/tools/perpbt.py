@@ -103,7 +103,9 @@ def summarize(trades, equity, capital=10000.0):
 
 def walk_forward(df, funding, sym, strategy, grid, train_months=6, test_months=3, **kw):
     """Rolling: pick the grid point with the best train avg_r*sqrt(n) (min 30 trades), apply to the next test block.
-    Returns the concatenated out-of-sample trades and the per-window choices. Strategy = callable(df, **params)."""
+    Returns the concatenated out-of-sample trades and the per-window choices. Each choice also carries what the
+    winning grid point did on its own train block (train_n, train_win, train_avg_r) so tools/calibration.py can
+    compare the promise with the result. Strategy = callable(df, **params)."""
     start = df.index[0]; end = df.index[-1]
     t0 = start
     oos, picks = [], []
@@ -120,13 +122,14 @@ def walk_forward(df, funding, sym, strategy, grid, train_months=6, test_months=3
                 continue
             score = np.nanmean(t.r) * np.sqrt(len(t))
             if best is None or score > best[0]:
-                best = (score, params)
+                best = (score, params, len(t), float((t.pnl > 0).mean()), float(np.nanmean(t.r)))
         if best is not None:
             te_df = df[t0:t2]  # warm-up included, trades filtered to the test block
             sig = strategy(te_df, **best[1])
             t, e = run(te_df, sig, funding, sym, **kw)
             t = t[t.entry_time >= t1]
-            oos.append(t); picks.append(dict(train_start=t0, test_start=t1, test_end=min(t2, end), params=best[1], n=len(t)))
+            oos.append(t); picks.append(dict(train_start=t0, test_start=t1, test_end=min(t2, end), params=best[1], n=len(t),
+                                        train_n=best[2], train_win=best[3], train_avg_r=best[4], grid_size=len(grid)))
         t0 = t0 + pd.DateOffset(months=test_months)
     return (pd.concat(oos) if oos else pd.DataFrame()), picks
 

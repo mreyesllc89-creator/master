@@ -156,10 +156,9 @@ def funding_time_premium(df, funding, thresh=0.0002, bars_before=2, atr_mult=1.0
     exchange; longs paying funding pay. Dies when funding stays elevated because of a sustained trend (premium
     persists)."""
     f = funding.reindex(df.index).ffill().shift()
-    bars_per_hour = int(round(3600 / (df.index[1] - df.index[0]).total_seconds()))
-    into = pd.Series(df.index, index=df.index)
+    bar_minutes = (df.index[1] - df.index[0]).total_seconds() / 60  # works for bars longer than 1 h too
     mins_to_print = ((8 - (df.index.hour % 8)) * 60 - df.index.minute) % 480
-    window = (mins_to_print > 0) & (mins_to_print <= bars_before * 60 / bars_per_hour)
+    window = (mins_to_print > 0) & (mins_to_print <= bars_before * bar_minutes)
     target = pd.Series(0, index=df.index)
     target[window & (f > thresh)] = -1; target[window & (f < -thresh)] = 1
     return _out(df, target, atr(df) * atr_mult)
