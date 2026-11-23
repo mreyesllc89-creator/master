@@ -3,19 +3,92 @@
 //
 // FlashGold v5 STRATEGY (BTCUSD build)
 // ---------------------------------------------------------------------------
+// UPDATE 1 (2026-11-23)
+//  - New option "Inverted direction: opposite side at the same entries" (group
+//    "Inverted direction (Update 1)", off by default). On: each entry is placed
+//    on the OPPOSITE side at the same price: a BUY signal's buy stop becomes a
+//    SELL LIMIT there, a SELL signal's sell stop a BUY LIMIT (both kinds fill
+//    when price reaches it: same candle; exceptions under "Fills" below).
+//  - Signals, zones and the direction filter decide as before: a BUY signal the
+//    filter allows (BUY ZONE) is placed as a sell, a SELL signal it allows
+//    (SELL ZONE) as a buy; a blocked signal stays blocked.
+//  - Exits keep their distances on the side really open (a sell: stop above
+//    its fill, target below; partial, runner, breakeven, trailing, time stop
+//    follow the real trade). Opposite-signal close / reversal read the
+//    position mirrored. "Direction" = the orders really placed (Long = only
+//    real buys). No other reverse option here. Order comments name the real
+//    order ("FG sell limit (inv)"); BUY / SELL marks, entry lines and "FGD"
+//    values keep describing the signal and filter. See INVERTED DIRECTION.
+//  - Off = exactly the previous version. The title now ends with "[Update 1]".
+//
 // What is kept from the indicator, unchanged: the bid/ask model from the spread
 // input, the TDI direction (RSI -> SMA fast / slow, fast rising = BUY), the
 // parent + six child zones alignment filter, the burst gate, the prior-drift
 // filter, the entry hold (virtual stop) and the one-entry-per-bar rule. The
 // entry price is the indicator's: ask + entry distance for a buy, bid - entry
-// distance for a sell, placed as a STOP order.
+// distance for a sell, placed as a STOP order (with "Inverted direction" on:
+// as a LIMIT order of the opposite side at that same price, see UPDATE 1).
 //
 // What the indicator does not have and the strategy adds (all inputs, group
-// "S1..S3"): a lifetime for the unfilled entry stop, a stop loss and target in
+// "S1..S3"): a lifetime for the unfilled entry order, a stop loss and target in
 // ATR or points, an optional trailing stop, a time stop, exit or reversal on
 // the opposite signal, a direction filter, fixed or risk-based sizing, a cost
 // header, ATR units for the burst / entry distance / hold thresholds, and
 // last-closed-bar reads for child zones on higher timeframes (non-repainting).
+// Since UPDATE 1 also the "Inverted direction" option (a group of its own).
+//
+// INVERTED DIRECTION (UPDATE 1; group "Inverted direction (Update 1)", off).
+// On: the script decides everything as with the option off, as if it held the
+// mirror of its real position, and sends each entry on the other side.
+//  - Entry: a BUY signal the filter allows (BUY ZONE) places a SELL LIMIT at
+//    the buy stop's price (ask + entry distance, above the market); a SELL
+//    signal it allows (SELL ZONE) places a BUY LIMIT at the sell stop's price
+//    (bid - entry distance, below the market). A buy stop and a sell limit at
+//    one price both fill when price reaches it (at the open after a gap through
+//    it): the same candle, the same price, apart from the two Properties under
+//    "Fills" below. Same OCA group (one fills, the other is cancelled), same
+//    "Cancel unfilled entry after N bars", same quantity rule (Risk %: the same
+//    stop distance, the account's real equity). A signal the filter blocks
+//    places nothing, inverted or not: the filter keeps judging the signal's own
+//    side, so where it lets no signal through (the 60m finding under DIRECTION
+//    FILTER below) nothing changes.
+//  - Exits: every distance is kept, on the side really open. A sell has its
+//    stop loss above its fill price and its take profit below; the partial
+//    take profit, the runner's breakeven (the fill price) and trail, the
+//    Fixed-style trailing stop and the time stop work on the real trade. So
+//    the inverted trade does not end where the normal one ends (the normal
+//    buy is stopped where the inverted sell is in profit), and from there
+//    each run answers the next signals from its own position: the inverted
+//    trade list is not the normal list with the sides swapped.
+//  - Opposite signal: the position is read mirrored. A BUY signal is ignored
+//    while the SHORT it opened is open; a SELL signal then closes that short
+//    ("Close at market on the opposite signal") or places the buy limit that
+//    reverses it ("Opposite signal may reverse an open position"). That
+//    option is about an open trade and is unchanged; the script has no option
+//    that reverses the signal itself.
+//  - "Direction" (S1) means the orders really placed: Long = only buy orders
+//    (inverted they come from the SELL signals), Short = only sell orders.
+//    The filter's "Allow buys / Allow sells" stay on the signal's side: Allow
+//    buys off blocks the BUY signals, i.e. the inverted SELL orders.
+//  - Chart: the BUY / SELL triangles, the entry price lines, labels and tags,
+//    the filter's zones and status box and the "FGD ..." values keep
+//    describing the FlashGold signal and the filter: "buys allowed" in the
+//    status box then means BUY signals are allowed (and placed as sells),
+//    "FGD raw long" is a BUY signal that reached the filter. The order
+//    markers and the trade list show the order really placed: "FG sell limit
+//    (inv)" / "FG buy limit (inv)". The order id "Long" is always a buy and
+//    "Short" always a sell (what an alert on order fills reads; the script
+//    has no alert() calls). The table title reads "FlashGold v5 S
+//    (inverted)"; its Position row is the real position.
+//  - Fills: two Properties treat a stop and a limit order differently. Slippage
+//    (5 ticks here) is added to stop and market orders only, so the normal stop
+//    entry pays it and the inverted limit entry does not. "Verify price for
+//    limit orders" (0 by default; this script does not set it) applies to limit
+//    orders only: above 0 the inverted limit entry fills only after price has
+//    gone that many ticks THROUGH its price, so it can fill on a later candle
+//    than the stop entry would, or not at all. Live, a limit order can stay
+//    unfilled when price only touches it. Every calibration figure below was
+//    measured with the option off; nothing was measured with it on.
 //
 // CALIBRATION (BTCUSD build): MEXC:BTCUSDT 60m, 776 bars (2026-09-06 to 2026-10-08),
 // 10 contracts (= 10 BTC). Only the S2 exits were swept; every other input is the
@@ -225,7 +298,7 @@
 //  - "Points" everywhere = syminfo.mintick units, as in the indicator.
 //    BTCUSDT: mintick 0.01, so 100 pts = $1 per BTC.
 //@version=5
-strategy("FlashGold v5 Strategy (BTCUSD)", "FlashGold v5 S (BTCUSD)", overlay = true, max_labels_count = 500, max_lines_count = 500,
+strategy("FlashGold v5 Strategy (BTCUSD) [Update 1]", "FlashGold v5 S (BTCUSD) U1", overlay = true, max_labels_count = 500, max_lines_count = 500,
      pyramiding = 0, initial_capital = 100000, currency = currency.NONE,
      default_qty_type = strategy.fixed, default_qty_value = 10,
      commission_type = strategy.commission.percent, commission_value = 0.02,  // % of notional per side (typical crypto futures taker fee)
@@ -294,10 +367,10 @@ labelTimeZone   = input.string("America/New_York", "Label time zone", group = gV
 
 // ============================== INPUTS (strategy additions) ==============================
 gS1 = "S1. Entry order"
-Direction       = input.string("Both", "Direction", options = ["Both", "Long", "Short"], group = gS1)
-entryValidBars  = input.int(3, "Cancel unfilled entry after N bars (0 = keep until filled)", minval = 0, group = gS1, tooltip = "The indicator only prints the entry price. The strategy places a stop order there and cancels it if price has not reached it after this many bars.")
-allowReverse    = input.bool(true, "Opposite signal may reverse an open position", group = gS1, tooltip = "On: a SELL signal while long places the sell stop; when it fills the long is closed and a short opened. Off: opposite signals are ignored while in a position.")
-exitOnOpposite  = input.bool(false, "Close at market on the opposite signal", group = gS1, tooltip = "On: the open position is closed at the close of the bar that prints the opposite signal, before any reversal order.")
+Direction       = input.string("Both", "Direction", options = ["Both", "Long", "Short"], group = gS1, tooltip = "Long: only buy orders. Short: only sell orders. With 'Inverted direction' on this still means the orders really placed: Long then takes only the SELL signals (their orders are buys).")
+entryValidBars  = input.int(3, "Cancel unfilled entry after N bars (0 = keep until filled)", minval = 0, group = gS1, tooltip = "The indicator only prints the entry price. The strategy places a stop order there and cancels it if price has not reached it after this many bars. With 'Inverted direction' on the order there is a limit order of the opposite side, cancelled the same way.")
+allowReverse    = input.bool(true, "Opposite signal may reverse an open position", group = gS1, tooltip = "On: a SELL signal while long places the sell stop; when it fills the long is closed and a short opened. Off: opposite signals are ignored while in a position. With 'Inverted direction' on the sides are mirrored: a SELL signal while SHORT places the buy limit; when it fills the short is closed and a long opened.")
+exitOnOpposite  = input.bool(false, "Close at market on the opposite signal", group = gS1, tooltip = "On: the open position is closed at the close of the bar that prints the opposite signal, before any reversal order. With 'Inverted direction' on, opposite means opposite to the signal that opened the trade: a SELL signal closes the short a BUY signal opened.")
 
 gS2 = "S2. Exits"
 ExitMode        = input.string("Pips", "SL / TP / trail unit", options = ["Pips", "ATR", "Points"], group = gS2, tooltip = "Pips: fixed distances in pips (calibrated, see the Pips inputs). ATR: distances scale with volatility (more robust when volatility changes a lot). Points: mintick units.")
@@ -913,6 +986,9 @@ if fgfShowTbl and fgfOn and barstate.islast
         table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
+// UPDATE 1: declared after every other input on purpose, so that no existing setting changes its place.
+fgvInv = input.bool(false, "Inverted direction: opposite side at the same entries", group = "Inverted direction (Update 1)", tooltip = "Off: exactly the previous version. On: every entry is placed on the OPPOSITE side at the same price: a BUY signal's buy stop (ask + entry distance) becomes a SELL LIMIT at that price, a SELL signal's sell stop (bid - entry distance) a BUY LIMIT. Both kinds fill when price reaches that price, so the fill is on the same candle; only two Properties tell them apart in the backtest: slippage is added to the stop entry and not to the limit entry, and 'Verify price for limit orders' (0 by default) applies to the limit entry only (above 0 it fills only after price has gone that many ticks through its price: later, or not at all). Same OCA group, same 'Cancel unfilled entry after N bars', same quantity. Signals, zones and the direction filter decide as before: a BUY signal the filter allows (BUY ZONE) is placed as a sell, a SELL signal it allows (SELL ZONE) as a buy, a blocked signal stays blocked. Exits keep their distances on the side really open (a sell: stop loss above its fill, take profit below; partial, runner, breakeven, trailing and time stop follow the real trade). Close / reversal on the opposite signal read the position mirrored: a SELL signal closes or reverses the short a BUY signal opened. 'Direction' means the orders really placed (Long = only real buys). Live, a limit order can stay unfilled when price only touches it.")
+
 // Exported values (Data Window + linkable as a source from other scripts).
 plot(fgfOn and fgfOpen ? 1 : 0, "FGF active", display=display.data_window)
 plot(fgfBuyOk ? 1 : 0, "FGF buy allowed", display=display.data_window)
@@ -1120,48 +1196,85 @@ calcQty(float slTicks) =>
     q
 
 // ============================== STRATEGY: ORDERS ==============================
-allowL = Direction != "Short"
-allowS = Direction != "Long"
+// UPDATE 1, "Inverted direction" (fgvInv). The entry / close DECISIONS below are taken in the normal frame, as with the
+// option off, as if the strategy held the mirror of its real position; only the order sent is mirrored (other side, LIMIT
+// instead of STOP, same price). The order ids keep naming the side really traded: "Long" is always a buy, "Short" always a
+// sell, and the L / S locks, placedBarL / S, the stale-order cancel, the breakeven flag and every strategy.exit below
+// belong to that id, so they are unchanged and always work on the trade really open (tick distances; breakeven = the
+// real fill price). Inverted, a BUY signal therefore fills the S locks and places "Short", a SELL signal the L locks and "Long".
+//   inLong / inShort   the position really open (exits, breakeven flag, stale-order cancel, table)
+//   fgvNL / fgvNS      the same read in the normal frame: the trade a BUY / a SELL signal opened is open
+//                      (inverted: fgvNL = a real short, fgvNS = a real long)
+//   allowL / allowS    may a BUY / a SELL signal place its order. "Direction" restricts the orders really placed
+//                      (Long = only real buys), so inverted a BUY signal (a sell order) needs Direction != "Long"
+// Option off: allowL / allowS as before, fgvNL = inLong, fgvNS = inShort, and each "if fgvInv ... else" runs its else
+// branch, which is the previous code.
+allowL = fgvInv ? Direction != "Long" : Direction != "Short"
+allowS = fgvInv ? Direction != "Short" : Direction != "Long"
 inLong  = strategy.position_size > 0
 inShort = strategy.position_size < 0
 flat    = strategy.position_size == 0
+fgvNL   = fgvInv ? inShort : inLong
+fgvNS   = fgvInv ? inLong : inShort
 
 var int placedBarL = na
 var int placedBarS = na
 
-// opposite-signal handling on an open position
-if exitOnOpposite and sellSignal and inLong
-    strategy.close("Long", comment = "opp signal")
-if exitOnOpposite and buySignal and inShort
-    strategy.close("Short", comment = "opp signal")
+// opposite-signal handling on an open position (inverted: the trade a BUY signal opened is the "Short", so a SELL signal closes it)
+if exitOnOpposite and sellSignal and fgvNL
+    strategy.close(fgvInv ? "Short" : "Long", comment = "opp signal")
+if exitOnOpposite and buySignal and fgvNS
+    strategy.close(fgvInv ? "Long" : "Short", comment = "opp signal")
 
-// long entry: stop order at the indicator's entry price
-if buySignal and allowL and not inLong and (flat or allowReverse or exitOnOpposite) and fgfBuyOk
+// BUY signal: a buy stop at the indicator's entry price ("Long"). Inverted: a SELL LIMIT at that same price ("Short");
+// both fill when price reaches it (the Properties that tell a stop from a limit fill: header, INVERTED DIRECTION, "Fills").
+// The gate is the BUY signal's (fgfBuyOk) either way.
+if buySignal and allowL and not fgvNL and (flat or allowReverse or exitOnOpposite) and fgfBuyOk
     qL = calcQty(slTicksNow)
     if qL > 0 and not na(buyEntryPrice)
-        lockSlL := slTicksNow
-        lockTpL := tpTicksNow
-        lockActL := trailActNow
-        lockDstL := trailDstNow
-        lockRunL := runDstNow
-        strategy.entry("Long", strategy.long, qty = qL, stop = buyEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG buy stop")
-        placedBarL := bar_index
+        if fgvInv
+            lockSlS := slTicksNow
+            lockTpS := tpTicksNow
+            lockActS := trailActNow
+            lockDstS := trailDstNow
+            lockRunS := runDstNow
+            strategy.entry("Short", strategy.short, qty = qL, limit = buyEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG sell limit (inv)")
+            placedBarS := bar_index
+        else
+            lockSlL := slTicksNow
+            lockTpL := tpTicksNow
+            lockActL := trailActNow
+            lockDstL := trailDstNow
+            lockRunL := runDstNow
+            strategy.entry("Long", strategy.long, qty = qL, stop = buyEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG buy stop")
+            placedBarL := bar_index
 
-// short entry
-if sellSignal and allowS and not inShort and (flat or allowReverse or exitOnOpposite) and fgfSellOk
+// SELL signal: a sell stop at the indicator's entry price ("Short"). Inverted: a BUY LIMIT at that same price ("Long").
+// The gate is the SELL signal's (fgfSellOk) either way.
+if sellSignal and allowS and not fgvNS and (flat or allowReverse or exitOnOpposite) and fgfSellOk
     qS = calcQty(slTicksNow)
     if qS > 0 and not na(sellEntryPrice)
-        lockSlS := slTicksNow
-        lockTpS := tpTicksNow
-        lockActS := trailActNow
-        lockDstS := trailDstNow
-        lockRunS := runDstNow
-        strategy.entry("Short", strategy.short, qty = qS, stop = sellEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG sell stop")
-        placedBarS := bar_index
+        if fgvInv
+            lockSlL := slTicksNow
+            lockTpL := tpTicksNow
+            lockActL := trailActNow
+            lockDstL := trailDstNow
+            lockRunL := runDstNow
+            strategy.entry("Long", strategy.long, qty = qS, limit = sellEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG buy limit (inv)")
+            placedBarL := bar_index
+        else
+            lockSlS := slTicksNow
+            lockTpS := tpTicksNow
+            lockActS := trailActNow
+            lockDstS := trailDstNow
+            lockRunS := runDstNow
+            strategy.entry("Short", strategy.short, qty = qS, stop = sellEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG sell stop")
+            placedBarS := bar_index
 
-// FGF diagnostics (Data Window only, no logic): the entry funnel.
-bool fgdRawLong      = buySignal and allowL and not inLong and (flat or allowReverse or exitOnOpposite)
-bool fgdRawShort     = sellSignal and allowS and not inShort and (flat or allowReverse or exitOnOpposite)
+// FGF diagnostics (Data Window only, no logic): the entry funnel. Normal frame also when inverted: "long" = a BUY
+// signal that reached the filter (its order is then a sell), "short" = a SELL signal.
+bool fgdRawLong      = buySignal and allowL and not fgvNL and (flat or allowReverse or exitOnOpposite)
+bool fgdRawShort     = sellSignal and allowS and not fgvNS and (flat or allowReverse or exitOnOpposite)
 bool fgdBlockedLong  = fgdRawLong  and not fgfBuyOk
 bool fgdBlockedShort = fgdRawShort and not fgfSellOk
 plot(fgdRawLong      ? 1 : 0, "FGD raw long",      display = display.data_window)
@@ -1173,7 +1286,7 @@ plot(ta.cum(fgdRawShort     ? 1 : 0), "FGD raw short count",     display = displ
 plot(ta.cum(fgdBlockedLong  ? 1 : 0), "FGD blocked long count",  display = display.data_window)
 plot(ta.cum(fgdBlockedShort ? 1 : 0), "FGD blocked short count", display = display.data_window)
 
-// cancel a stale unfilled entry
+// cancel a stale unfilled entry (by order id: "Long" is the pending buy, "Short" the pending sell, stop or limit)
 if entryValidBars > 0
     if not na(placedBarL) and not inLong and bar_index - placedBarL >= entryValidBars
         strategy.cancel("Long")
@@ -1260,7 +1373,7 @@ if showSideTags and sellSignal
 var table tb = table.new(position.bottom_right, 2, 12, border_width = 1)
 
 if showZoneTable and barstate.islast
-    table.cell(tb, 0, 0, "FlashGold v5 S", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 0, fgvInv ? "FlashGold v5 S (inverted)" : "FlashGold v5 S", text_color = color.white, text_size = size.small)
     table.cell(tb, 1, 0, "TDI FILTER", text_color = color.white, text_size = size.small)
     table.cell(tb, 0, 1, "Parent", text_color = color.gray, text_size = size.tiny)
     table.cell(tb, 1, 1, dirText(parentSide), text_color = dirColor(parentSide), text_size = size.tiny)
