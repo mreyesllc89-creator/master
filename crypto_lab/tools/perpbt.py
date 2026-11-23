@@ -23,7 +23,11 @@ def load(data_dir, sym, tf):
 
 def load_funding(data_dir, sym):
     f = pd.read_parquet(f"{data_dir}/{sym}_funding.parquet").set_index("time")
-    return f["last_funding_rate"].astype(float)
+    f = f["last_funding_rate"].astype(float)
+    # the archive stamps about a third of the prints a few ms after the hour (e.g. 00:00:00.002); snap them to the
+    # minute so they match the bar index, otherwise those prints are silently dropped from costs and signals
+    f.index = f.index.floor("min")
+    return f
 
 
 def run(df, sig, funding, sym, capital=10000.0, risk_pct=0.5, fee_pct=0.05, slip_ticks=1,
