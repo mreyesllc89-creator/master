@@ -48,10 +48,11 @@ you paste a file, send it over.
 | HRD Full Divergence v1.03 | [HRD_Full_Divergence_Strategy_v1_03_FGF.pine](HRD_Full_Divergence_Strategy_v1_03_FGF.pine) |
 | ApexForge Flow Resonance | [ApexForge_Flow_Resonance_Strategy_FGF.pine](ApexForge_Flow_Resonance_Strategy_FGF.pine) |
 | XPW Orientation TDI v2.8, trailing TP | [xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine](xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine) |
+| XPW Orientation TDI v2.8, S2 / S3 exits | [xpw_orientation_tdi_v2.8_strategy_FGF.pine](xpw_orientation_tdi_v2.8_strategy_FGF.pine) |
 | FlashGold v5 Strategy (BTCUSD) | [FlashGold_v5_Strategy_BTCUSD_FGF.pine](FlashGold_v5_Strategy_BTCUSD_FGF.pine) |
 | GVLiveV2 Pre-Candle | [GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine](GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine) and the 9 per-timeframe files in [GVLiveV2_by_timeframe/](GVLiveV2_by_timeframe/) |
 | DannyPhantomFX V10.21.1 LiveSafe | [DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine](DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine) and the 7 per-timeframe files in [DannyPhantomFX_by_timeframe/](DannyPhantomFX_by_timeframe/) |
 | AMVI Full MTF (already had "Trade direction: Inverted") | [AMVI_Full_MTF_Strategy_FGF.pine](AMVI_Full_MTF_Strategy_FGF.pine) and [AMVI_by_timeframe/AMVI_FGF_XAUUSD_15m.pine](AMVI_by_timeframe/AMVI_FGF_XAUUSD_15m.pine) |
 | FlashGold Direction Strategy (already had "Trade direction: Inverted") | [FlashGold_Direction_Strategy.pine](FlashGold_Direction_Strategy.pine) |
 
-More files are added to this table as their review finishes.
+That is every strategy in this repository that carries the direction filter. The originals you pasted (the files without `_FGF` in the name) are untouched.
