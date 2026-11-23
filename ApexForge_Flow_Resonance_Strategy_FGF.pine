@@ -5,16 +5,44 @@
 // ============================================================================
 //  APEXFORGE FLOW RESONANCE STRATEGY  +  FLASHGOLD DIRECTION FILTER (FGF build)
 // ----------------------------------------------------------------------------
+//  UPDATE 1 (2026-11-23)
+//    New option "Inverted direction: opposite side at the same entries" (group
+//    "Inverted direction (Update 1)", off by default). On: every signal is
+//    judged as before (resonance, filter zone, blocked-signal rules), then
+//    traded on the OTHER side, same candle, same price (market, next open):
+//    a BUY the filter allows (bullish resonance in the BUY ZONE) is placed as
+//    a SELL and opens "Apex Short"; a SELL it allows (bearish resonance in
+//    the SELL ZONE) opens "Apex Long"; a blocked signal stays blocked. Stop
+//    and target are the normal trade's mirrored around the signal candle's
+//    close (stop = 2 x close - normal stop, target = 2 x close - normal
+//    target; same distances): the short from a BUY signal has its stop above
+//    and its target below. The trailing take profit keeps its distances, on
+//    the trade really open. A later signal of the same kind still re-sets
+//    that trade's stop and target; a blocked opposite signal still closes
+//    it. BUY / SELL labels, gray marks, close comments and alert() texts name
+//    the order really placed; highlights and "FGD" rows keep the signal's
+//    side. No other reverse option and no Long / Short only setting here.
+//    The filter's "Allow buys / Allow sells" keep meaning the SIGNAL's side:
+//    Allow buys off blocks the BUY signals, i.e. the SELL orders placed when
+//    inverted (only BUY entries are left); Allow sells off the reverse.
+//    The option is the last input of the script (bottom of the Inputs tab),
+//    so no earlier setting changes its place. After pasting this version
+//    over the previous one, open the settings once and check that it is off.
+//    Off = exactly the previous version. The title now ends with "[Update 1]".
+//
 //  Same strategy as ApexForge_Flow_Resonance_Strategy.pine (your file): the
 //  forge levels, order blocks, flow / volume detection, resonance signals
-//  and the stop / target rules are unchanged. Entries, the BUY / SELL
-//  labels, the highlights and the alerts now follow the filter (below); with
-//  the filter off the entries, labels and highlights are as in your file,
-//  and the new alert() calls fire on every signal. Added: the FlashGold
-//  Direction Filter v1.2, between BEGIN and END FLASHGOLD DIRECTION FILTER,
-//  byte-identical to FlashGold_Direction_Filter_v1_2.pine (this script draws
-//  on the price chart, so FGF_FORCE_OVERLAY stays false). Also added: an
-//  optional trailing take profit, off by default (TRAILING TAKE PROFIT).
+//  and the stop / target rules are unchanged (with "Inverted direction" on,
+//  UPDATE 1, the stop and target prices are mirrored). Entries, the BUY /
+//  SELL labels, the highlights and the alerts now follow the filter (below);
+//  with the filter off (and "Inverted direction" off) the entries, labels
+//  and highlights are as in your file, and the new alert() calls fire on
+//  every signal. Added: the FlashGold Direction Filter v1.2, between BEGIN
+//  and END FLASHGOLD DIRECTION FILTER, byte-identical to
+//  FlashGold_Direction_Filter_v1_2.pine (this script draws on the price
+//  chart, so FGF_FORCE_OVERLAY stays false). Also added: an optional
+//  trailing take profit, off by default (TRAILING TAKE PROFIT), and the
+//  "Inverted direction" option, off by default (UPDATE 1 above).
 //
 //  WHAT THE FILTER GATES
 //    A BUY (bullish resonance) opens "Apex Long" only while the filter allows
@@ -26,6 +54,9 @@
 //    (calc_on_every_tick is off); with Candle open, at that candle's open
 //    (its open price and the FlashGold signal in force then). Either way the
 //    order fills at the next open.
+//    "Inverted direction" on (UPDATE 1): the same signals in the same zones,
+//    the other order: the BUY signal in the BUY ZONE opens "Apex Short", the
+//    SELL signal in the SELL ZONE opens "Apex Long".
 //
 //  WHAT IT NEVER GATES
 //    Exits. The stop and target of an open trade are the original's (the
@@ -34,6 +65,10 @@
 //    moves the long's stop and target to the new demand zone; that still
 //    happens when the filter blocks the BUY (no new entry is opened either
 //    way). Same for SELL while short.
+//    "Inverted direction" on: the stop and target are the original's
+//    mirrored around the signal close (UPDATE 1), and the trade a signal
+//    re-sets is the one that kind of signal opens: a BUY signal while short
+//    moves the short's stop and target, a SELL signal while long the long's.
 //
 //  BLOCKED SIGNAL AGAINST THE OPEN TRADE
 //    In the original an opposite signal reverses the trade: it closes it and
@@ -43,6 +78,9 @@
 //    the next open, like the reversal would, but opens nothing. Off: the
 //    blocked signal does nothing; the trade runs to its stop or target,
 //    unless a later opposite signal the filter allows reverses it.
+//    "Inverted direction" on: the opposite signal of a trade is the one that
+//    would open the other side: a blocked SELL signal (a BUY order when
+//    inverted) closes the open short, a blocked BUY signal the open long.
 //
 //  CHART
 //    BUY / SELL labels and the resonance highlights mark the signals that
@@ -50,6 +88,13 @@
 //    filter draws its shading, level, zone names and status box. Data Window:
 //    the filter outputs (FGF ...) and the counts of raw and blocked signals
 //    (FGD ...).
+//    "Inverted direction" on: the BUY / SELL labels and the gray marks name
+//    the order really placed (a bullish resonance shows SELL, or "x SELL",
+//    above its candle). The highlights keep the resonance's colour (green
+//    bullish, red bearish) and the FGD counts the signal's side. The
+//    filter's shading, zone names and status box do not change: "buys
+//    allowed" there means the BUY signals may trade, and those are placed as
+//    SELL orders.
 //
 //  ALERTS
 //    A strategy cannot create alerts from alertcondition() (TradingView only
@@ -60,6 +105,9 @@
 //    (saying when the blocked signal closes the open trade). To use them,
 //    create one alert on this strategy with "alert() function calls only"
 //    (or "Order fills and alert() function calls").
+//    "Inverted direction" on: the alert() texts say "direction inverted" and
+//    name the order really placed or blocked; the two alertcondition lines
+//    whose fixed text says BUY / SELL are held off (they do nothing anyway).
 //
 //  TRAILING TAKE PROFIT (optional, group "Trailing take profit", off by default)
 //    On: each trade also gets a trailing stop. Once price has moved "Trail
@@ -71,13 +119,16 @@
 //    (it is used only with the trailing on). A later same-side signal still
 //    re-sets the stop (and the target, if kept) as in your file, and keeps
 //    the trailing distances. Off (default): exits exactly as in your file,
-//    whatever "Keep the target" is set to.
+//    whatever "Keep the target" is set to. With "Inverted direction" on the
+//    exits are your file's mirrored, and the trailing keeps its two
+//    distances on the trade really open (a short trails down).
 //
 //  FILTER OFF
-//    With "Enable filter" off (and the trailing take profit off, the
-//    default) every signal trades: the same orders as your file. Only the
-//    duplicate version-5 annotation line is removed (a script has one
-//    version line; the filter needs v6).
+//    With "Enable filter" off (and the trailing take profit and "Inverted
+//    direction" off, the defaults) every signal trades: the same orders as
+//    your file. Only the duplicate version-5 annotation line is removed (a
+//    script has one version line; the filter needs v6). With the filter off
+//    and "Inverted direction" on every signal trades the opposite side.
 //
 //  NOTES ON THE ORIGINAL (unchanged here)
 //    - HTF high / low come from request.security without lookahead: in the
@@ -95,7 +146,7 @@
 //    - Its alertcondition() alerts cannot be created on a strategy (see
 //      ALERTS).
 // ============================================================================
-strategy("ApexForge Flow Resonance Strategy [Grok Team]", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0.04, max_bars_back=500, max_lines_count=500, max_labels_count=500)
+strategy("ApexForge Flow Resonance Strategy [Grok Team] [Update 1]", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0.04, max_bars_back=500, max_lines_count=500, max_labels_count=500)
 
 // ── USER INPUTS ─────────────────────────────────────
 htfTimeframe   = input.timeframe("15", "Higher Timeframe for Structure (Forge Levels)")
@@ -105,11 +156,15 @@ volMultiplier  = input.float(1.7, "Volume Spike Multiplier for IFT Pressure")
 rrRatio        = input.float(3.0, "Reward:Risk Ratio", minval=1.5)
 showZones      = input.bool(true, "Show Demand/Supply Zones")
 showRangeNote  = input.bool(true, "Show Range-Bar Recommendation")
-apxBlkClose    = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a BUY the filter blocks still closes an open short (and a blocked SELL an open long) at the next open, as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs to its stop or target unless a later opposite signal the filter allows reverses it. Exits are never gated by the filter.")
-apxTrailOn     = input.bool(false, "Use trailing take profit", group="Trailing take profit", tooltip="Off (default): exits as in your file. On: once price has moved Trail activation in the trade's favour from the entry price, a stop follows Trail offset behind the best price. Both in % of the signal candle's close, fixed when the trade opens. The zone stop always stays.")
+apxBlkClose    = input.bool(true, "Blocked opposite signal still closes the trade", group="Direction filter - trading", tooltip="On: a BUY the filter blocks still closes an open short (and a blocked SELL an open long) at the next open, as the original reversal would, without opening the other side. Off: the blocked signal does nothing; the trade runs to its stop or target unless a later opposite signal the filter allows reverses it. Exits are never gated by the filter. With 'Inverted direction' on, BUY and SELL here are the orders really placed (as on the labels and the gray marks).")
+apxTrailOn     = input.bool(false, "Use trailing take profit", group="Trailing take profit", tooltip="Off (default): exits as in your file. On: once price has moved Trail activation in the trade's favour from the entry price, a stop follows Trail offset behind the best price. Both in % of the signal candle's close, fixed when the trade opens. The zone stop always stays. With 'Inverted direction' on, the stop and target are your file's mirrored around the signal candle's close (the stop that stays is the mirrored zone stop) and the trail follows the trade really open.")
 apxTrailAct    = input.float(1.0, "Trail activation (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Move in the trade's favour, in % of the price, before the trail arms. 0 = armed from the entry.")
 apxTrailOff    = input.float(0.5, "Trail offset (%)", minval=0.0, step=0.05, group="Trailing take profit", tooltip="Distance the trailing stop keeps behind the best price, in % of the price (at least one tick).")
-apxUseTarget   = input.bool(true, "Keep the target (Reward:Risk)", group="Trailing take profit", tooltip="Used only with the trailing take profit on; with the trailing off the target is always kept, as in your file. Off (trailing on): no target; the trade ends on its zone stop, the trailing stop, a reversal or a blocked-opposite close.")
+apxUseTarget   = input.bool(true, "Keep the target (Reward:Risk)", group="Trailing take profit", tooltip="Used only with the trailing take profit on; with the trailing off the target is always kept, as in your file. Off (trailing on): no target; the trade ends on its zone stop, the trailing stop, a reversal or a blocked-opposite close. With 'Inverted direction' on, the target and the zone stop are the mirrored ones.")
+
+// INVERTED DIRECTION (Update 1). Applied AFTER the direction filter: the order a signal
+// would place is sent on the other side, on the same candle and at the same price, with
+// its stop and target mirrored around the signal close. Off = the previous version.
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane
@@ -693,6 +748,9 @@ if fgfShowTbl and fgfOn and barstate.islast
         table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
+// UPDATE 1: declared after every other input on purpose, so that no existing setting changes its place.
+apxInv         = input.bool(false, "Inverted direction: opposite side at the same entries", group="Inverted direction (Update 1)", tooltip="OFF (default): exactly the previous version. ON: every signal is judged as before (the resonance, the direction filter, the blocked-signal rules) and then traded on the OTHER side, on the same candle and at the same price (market order, next open): a BUY the filter allows (bullish resonance in the BUY ZONE) is placed as a SELL and opens 'Apex Short'; a SELL it allows (bearish resonance in the SELL ZONE) is placed as a BUY and opens 'Apex Long'; a signal the filter blocks stays blocked. Stop and target are the normal trade's, mirrored around the signal candle's close with the same distances: stop = 2 x close - normal stop, target = 2 x close - normal target (the short from a BUY signal has its stop above and its target below). The trailing take profit keeps its two distances, on the trade really open. A later signal of the same kind still re-sets that trade's stop and target, also when blocked; a blocked opposite signal still closes it ('Blocked opposite signal still closes the trade'). BUY / SELL labels, the gray blocked marks, the close comments and the alert() texts name the order really placed; the highlights and the FGD rows keep the signal's side. The filter's 'Allow buys' / 'Allow sells' and its status box keep meaning the signal's side: with this option on, 'Allow buys' off removes the SELL orders (the BUY signals) and 'Allow sells' off removes the BUY orders, and 'buys allowed' in the status box means the BUY signals may trade, as SELL orders.")
+
 // Filter outputs (Data Window)
 plot(fgfOn and fgfOpen ? 1 : 0, "FGF active", display=display.data_window)
 plot(fgfBuyOk ? 1 : 0, "FGF buy allowed", display=display.data_window)
@@ -744,49 +802,84 @@ bool apxGoShort  = bearResonance and fgfSellOk
 bool apxBlkLong  = bullResonance and not fgfBuyOk
 bool apxBlkShort = bearResonance and not fgfSellOk
 
+// ── INVERTED DIRECTION (Update 1) ──────────────────
+// Applied AFTER the gate. Everything that DECIDES stays in the normal frame: the gate
+// above, the blocked-signal close, the stop / target re-send on a same-side signal and
+// the trailing bookkeeping read the position through apxPosN, the MIRROR of the real
+// position (inverted, the trade a BUY signal opened is a short, and apxPosN > 0 means
+// "holding the trade of a BUY signal"). Only what is SENT is mirrored: the order side
+// with its ids (so "Apex Long" / "Exit Long" always name a real long), the stop and
+// target (mirrored around the signal close) and the texts that announce an order.
+// Off: apxPosN is strategy.position_size and the four ids are the original's.
+float  apxPosN   = apxInv ? -strategy.position_size : strategy.position_size
+string apxIdBuy  = apxInv ? "Apex Short" : "Apex Long"     // the trade a BUY signal opens
+string apxIdSell = apxInv ? "Apex Long"  : "Apex Short"    // the trade a SELL signal opens
+string apxExBuy  = apxInv ? "Exit Short" : "Exit Long"     // the exit order of that trade
+string apxExSell = apxInv ? "Exit Long"  : "Exit Short"
+
 // A blocked opposite signal still ends the open trade (the original would reverse it).
-if apxBlkClose and apxBlkShort and strategy.position_size > 0
-    strategy.close("Apex Long", comment="filter blocked SELL, close")
-if apxBlkClose and apxBlkLong and strategy.position_size < 0
-    strategy.close("Apex Short", comment="filter blocked BUY, close")
+// Inverted: the comment names the order that was blocked (a SELL signal = a BUY order).
+if apxBlkClose and apxBlkShort and apxPosN > 0
+    strategy.close(apxIdBuy, comment=apxInv ? "filter blocked BUY, close" : "filter blocked SELL, close")
+if apxBlkClose and apxBlkLong and apxPosN < 0
+    strategy.close(apxIdSell, comment=apxInv ? "filter blocked SELL, close" : "filter blocked BUY, close")
 
 // ── STRATEGY EXECUTION ─────────────────────────────
 // Trailing take profit (off by default): ticks fixed when a trade opens, kept when a later
 // same-side signal re-sets the stop / target. na = no trailing (the original's exits).
 // "Keep the target" acts only with the trailing on: trailing off = the original's target.
+// Update 1: L / S name the SIGNAL that opened the trade (BUY / SELL). Inverted, the L
+// pair belongs to the short a BUY signal opened; the ticks are the same on either side
+// and strategy.exit trails on the side of the trade really open.
 var float apxTrPtsL = na
 var float apxTrOfsL = na
 var float apxTrPtsS = na
 var float apxTrOfsS = na
 if apxGoLong
-    strategy.entry("Apex Long", strategy.long)
-    if strategy.position_size <= 0
+    strategy.entry(apxIdBuy, apxInv ? strategy.short : strategy.long)
+    if apxPosN <= 0
         apxTrPtsL := apxTrailOn ? math.max(close * apxTrailAct / 100.0 / syminfo.mintick, 0.0) : na
         apxTrOfsL := apxTrailOn ? math.max(close * apxTrailOff / 100.0 / syminfo.mintick, 1.0) : na
 // the stop / target update of an open long on a new BUY is exit management: not gated
-if apxGoLong or (bullResonance and strategy.position_size > 0)
+if apxGoLong or (bullResonance and apxPosN > 0)
     stopPrice = box.get_bottom(demandBox) * 0.995
     targetPrice = close + (close - stopPrice) * rrRatio
-    strategy.exit("Exit Long", "Apex Long", stop=stopPrice, limit=apxTrailOn and not apxUseTarget ? na : targetPrice, trail_points=apxTrPtsL, trail_offset=apxTrOfsL)
+    // Update 1: inverted, the short gets this bracket mirrored around the signal close
+    // (stop above, target below, each at its own distance). Off: the two prices as they are.
+    float apxStopBuy = apxInv ? 2.0 * close - stopPrice   : stopPrice
+    float apxTgtBuy  = apxInv ? 2.0 * close - targetPrice : targetPrice
+    strategy.exit(apxExBuy, apxIdBuy, stop=apxStopBuy, limit=apxTrailOn and not apxUseTarget ? na : apxTgtBuy, trail_points=apxTrPtsL, trail_offset=apxTrOfsL)
 
 if apxGoShort
-    strategy.entry("Apex Short", strategy.short)
-    if strategy.position_size >= 0
+    strategy.entry(apxIdSell, apxInv ? strategy.long : strategy.short)
+    if apxPosN >= 0
         apxTrPtsS := apxTrailOn ? math.max(close * apxTrailAct / 100.0 / syminfo.mintick, 0.0) : na
         apxTrOfsS := apxTrailOn ? math.max(close * apxTrailOff / 100.0 / syminfo.mintick, 1.0) : na
-if apxGoShort or (bearResonance and strategy.position_size < 0)
+if apxGoShort or (bearResonance and apxPosN < 0)
     stopPrice = box.get_top(supplyBox) * 1.005
     targetPrice = close - (stopPrice - close) * rrRatio
-    strategy.exit("Exit Short", "Apex Short", stop=stopPrice, limit=apxTrailOn and not apxUseTarget ? na : targetPrice, trail_points=apxTrPtsS, trail_offset=apxTrOfsS)
+    // Update 1: inverted, the long gets this bracket mirrored around the signal close
+    // (stop below, target above). Off: the two prices as they are.
+    float apxStopSell = apxInv ? 2.0 * close - stopPrice   : stopPrice
+    float apxTgtSell  = apxInv ? 2.0 * close - targetPrice : targetPrice
+    strategy.exit(apxExSell, apxIdSell, stop=apxStopSell, limit=apxTrailOn and not apxUseTarget ? na : apxTgtSell, trail_points=apxTrPtsS, trail_offset=apxTrOfsS)
 
 // ── VISUALS (exactly like your screenshots) ───────
 plot(htfHigh, "HTF High", color=color.new(color.red, 70), style=plot.style_linebr)
 plot(htfLow,  "HTF Low",  color=color.new(color.green, 70), style=plot.style_linebr)
 
-plotshape(apxGoLong,  title="BUY",  location=location.belowbar, color=color.new(#00ff88, 0), style=shape.labelup,   text="BUY",  textcolor=color.black, size=size.large)
-plotshape(apxGoShort, title="SELL", location=location.abovebar, color=color.new(#ff0033, 0), style=shape.labeldown, text="SELL", textcolor=color.white, size=size.large)
-plotshape(apxBlkLong,  title="BUY blocked by the filter",  location=location.belowbar, color=color.new(color.gray, 0), style=shape.xcross, text="BUY",  textcolor=color.gray, size=size.tiny)
-plotshape(apxBlkShort, title="SELL blocked by the filter", location=location.abovebar, color=color.new(color.gray, 0), style=shape.xcross, text="SELL", textcolor=color.gray, size=size.tiny)
+// Update 1: the labels and the gray marks announce an order, so they follow the order
+// really placed (inverted: a BUY signal shows SELL, or "x SELL", above its candle).
+// Off: the original four series. The highlights below describe the SIGNAL (bull / bear
+// resonance) and stay as they are.
+bool apxMarkBuy     = apxInv ? apxGoShort  : apxGoLong
+bool apxMarkSell    = apxInv ? apxGoLong   : apxGoShort
+bool apxMarkBuyBlk  = apxInv ? apxBlkShort : apxBlkLong
+bool apxMarkSellBlk = apxInv ? apxBlkLong  : apxBlkShort
+plotshape(apxMarkBuy,  title="BUY",  location=location.belowbar, color=color.new(#00ff88, 0), style=shape.labelup,   text="BUY",  textcolor=color.black, size=size.large)
+plotshape(apxMarkSell, title="SELL", location=location.abovebar, color=color.new(#ff0033, 0), style=shape.labeldown, text="SELL", textcolor=color.white, size=size.large)
+plotshape(apxMarkBuyBlk,  title="BUY blocked by the filter",  location=location.belowbar, color=color.new(color.gray, 0), style=shape.xcross, text="BUY",  textcolor=color.gray, size=size.tiny)
+plotshape(apxMarkSellBlk, title="SELL blocked by the filter", location=location.abovebar, color=color.new(color.gray, 0), style=shape.xcross, text="SELL", textcolor=color.gray, size=size.tiny)
 
 bgcolor(apxGoLong  ? color.new(#00ff88, 92) : na, title="Bull Resonance Highlight")
 bgcolor(apxGoShort ? color.new(#ff0033, 92) : na, title="Bear Resonance Highlight")
@@ -796,20 +889,25 @@ if showRangeNote and barstate.islast
     label.new(bar_index, high, "→ Use RANGE bars for cleaner execution\nNo guessing. Just structure & flow.", style=label.style_label_left, color=color.blue, textcolor=color.white, size=size.normal)
 
 // ── ALERTS ─────────────────────────────────────────
-alertcondition(apxGoLong,  title="ApexForge LONG",  message="🚀 ApexForge Bullish Resonance → BUY (Strong demand bounce)")
-alertcondition(apxGoShort, title="ApexForge SHORT", message="🔻 ApexForge Bearish Resonance → SELL (Bloodbath continuation)")
+// Update 1: the first two say BUY / SELL in a fixed text, so they are held off while the
+// direction is inverted (a strategy cannot use alertcondition() anyway); the two
+// "blocked" ones describe the signal and the filter zone and stay.
+alertcondition(apxGoLong and not apxInv,  title="ApexForge LONG",  message="🚀 ApexForge Bullish Resonance → BUY (Strong demand bounce)")
+alertcondition(apxGoShort and not apxInv, title="ApexForge SHORT", message="🔻 ApexForge Bearish Resonance → SELL (Bloodbath continuation)")
 alertcondition(apxBlkLong,  title="ApexForge LONG blocked",  message="ApexForge Bullish Resonance blocked by the direction filter (not in the BUY ZONE)")
 alertcondition(apxBlkShort, title="ApexForge SHORT blocked", message="ApexForge Bearish Resonance blocked by the direction filter (not in the SELL ZONE)")
 
 // alert() calls: the alerts a strategy can actually create ("alert() function calls only")
+// Update 1: inverted, the text names the order really placed (or blocked) and the trade
+// really closed; "closing" is decided on the mirrored position, like the close itself.
 if apxGoLong
-    alert("🚀 ApexForge Bullish Resonance → BUY (Strong demand bounce)", alert.freq_once_per_bar_close)
+    alert(apxInv ? "🔻 ApexForge Bullish Resonance, direction inverted → SELL (opposite side of the BUY)" : "🚀 ApexForge Bullish Resonance → BUY (Strong demand bounce)", alert.freq_once_per_bar_close)
 if apxGoShort
-    alert("🔻 ApexForge Bearish Resonance → SELL (Bloodbath continuation)", alert.freq_once_per_bar_close)
+    alert(apxInv ? "🚀 ApexForge Bearish Resonance, direction inverted → BUY (opposite side of the SELL)" : "🔻 ApexForge Bearish Resonance → SELL (Bloodbath continuation)", alert.freq_once_per_bar_close)
 if apxBlkLong
-    alert(apxBlkClose and strategy.position_size < 0 ? "ApexForge BUY blocked by the direction filter: closing the short" : "ApexForge BUY blocked by the direction filter (not in the BUY ZONE)", alert.freq_once_per_bar_close)
+    alert(apxBlkClose and apxPosN < 0 ? (apxInv ? "ApexForge SELL (Bullish Resonance, direction inverted) blocked by the direction filter: closing the long" : "ApexForge BUY blocked by the direction filter: closing the short") : (apxInv ? "ApexForge SELL (Bullish Resonance, direction inverted) blocked by the direction filter (not in the BUY ZONE)" : "ApexForge BUY blocked by the direction filter (not in the BUY ZONE)"), alert.freq_once_per_bar_close)
 if apxBlkShort
-    alert(apxBlkClose and strategy.position_size > 0 ? "ApexForge SELL blocked by the direction filter: closing the long" : "ApexForge SELL blocked by the direction filter (not in the SELL ZONE)", alert.freq_once_per_bar_close)
+    alert(apxBlkClose and apxPosN > 0 ? (apxInv ? "ApexForge BUY (Bearish Resonance, direction inverted) blocked by the direction filter: closing the short" : "ApexForge SELL blocked by the direction filter: closing the long") : (apxInv ? "ApexForge BUY (Bearish Resonance, direction inverted) blocked by the direction filter (not in the SELL ZONE)" : "ApexForge SELL blocked by the direction filter (not in the SELL ZONE)"), alert.freq_once_per_bar_close)
 
 // ── DIRECTION FILTER DIAGNOSTICS (Data Window) ─────
 plot(bullResonance ? 1 : 0, "FGD raw long",      display = display.data_window)

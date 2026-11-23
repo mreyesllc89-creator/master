@@ -25,6 +25,11 @@ With it on:
   "Signal direction" in DannyPhantomFX). They flip the signal before the filter; this option
   flips the order after it. Each file's header says how the two differ.
 
+**After pasting an update into TradingView:** open the strategy's Settings once and check that
+"Inverted direction" is off (it is the last setting, at the bottom of the Inputs tab) and that
+your other settings are still as you left them. The new option is declared after every other
+setting on purpose, so no existing setting changes its place.
+
 There is no TradingView compiler in this workspace: every file was reviewed against the Pine v6
 rules by two independent reviewers, but none was compiled. If TradingView reports an error when
 you paste a file, send it over.
@@ -34,5 +39,6 @@ you paste a file, send it over.
 | Strategy | File |
 |---|---|
 | HRD Full Divergence v1.03 | [HRD_Full_Divergence_Strategy_v1_03_FGF.pine](HRD_Full_Divergence_Strategy_v1_03_FGF.pine) |
+| ApexForge Flow Resonance | [ApexForge_Flow_Resonance_Strategy_FGF.pine](ApexForge_Flow_Resonance_Strategy_FGF.pine) |
 
 More files are added to this table as their review finishes.

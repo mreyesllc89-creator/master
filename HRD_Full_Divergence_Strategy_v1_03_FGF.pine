@@ -238,7 +238,6 @@ hrdTrailOff = input.float(0.5, "Trail offset (%)", minval=0.0, step=0.05, group=
 // applied to the ORDER, after every decision (signals, Reverse Trading, the direction
 // filter); "Trade Direction" applies to the order really placed. See RISK ENGINE EXECUTION
 // LOGIC. Off = no change.
-hrdInv = input.bool(false, "Inverted direction: opposite side at the same entries", group="Inverted direction (Update 1)", tooltip="Off: exactly the previous version. On: every entry this script would take is placed on the OPPOSITE side, on the same candle, at the same price, sized by the same rule. Signals, 'Reverse Trading' and the direction filter decide as before: a LONG signal the filter allows (BUY ZONE) is placed as a SELL, a SHORT signal it allows (SELL ZONE) as a BUY, a blocked signal stays blocked. SL / TP keep their distances on the new side (a sell has its stop above the signal close, its target below); the trailing take profit keeps its distances. The time exit and the hybrid exit measure the trade really open. A LONG signal now reverses an open long, or closes it when the filter blocks it ('Blocked opposite signal still closes the trade'). 'Trade Direction' means the orders really placed (Buy Only = only real buys). Not the same as 'Reverse Trading', which flips the signal BEFORE the filter (a reversed LONG signal needs the SELL ZONE).")
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
 // Set true when this block lives in a script that runs in its own pane
@@ -821,6 +820,9 @@ if fgfShowTbl and fgfOn and barstate.islast
         table.cell(fgfTable, 0, 13, "BTC 2025-26 (1/10), parent = TF, zones x1/2/4", text_color=color.gray)
         table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
+
+// UPDATE 1: declared after every other input on purpose, so that no existing setting changes its place.
+hrdInv = input.bool(false, "Inverted direction: opposite side at the same entries", group="Inverted direction (Update 1)", tooltip="Off: exactly the previous version. On: every entry this script would take is placed on the OPPOSITE side, on the same candle, at the same price, sized by the same rule. Signals, 'Reverse Trading' and the direction filter decide as before: a LONG signal the filter allows (BUY ZONE) is placed as a SELL, a SHORT signal it allows (SELL ZONE) as a BUY, a blocked signal stays blocked. SL / TP keep their distances on the new side (a sell has its stop above the signal close, its target below); the trailing take profit keeps its distances. The time exit and the hybrid exit measure the trade really open. A LONG signal now reverses an open long, or closes it when the filter blocks it ('Blocked opposite signal still closes the trade'). 'Trade Direction' means the orders really placed (Buy Only = only real buys). Not the same as 'Reverse Trading', which flips the signal BEFORE the filter (a reversed LONG signal needs the SELL ZONE).")
 
 // Filter outputs (Data Window)
 plot(fgfOn and fgfOpen ? 1 : 0, "FGF active", display=display.data_window)
