@@ -50,6 +50,7 @@ you paste a file, send it over.
 | XPW Orientation TDI v2.8, trailing TP | [xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine](xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine) |
 | FlashGold v5 Strategy (BTCUSD) | [FlashGold_v5_Strategy_BTCUSD_FGF.pine](FlashGold_v5_Strategy_BTCUSD_FGF.pine) |
 | GVLiveV2 Pre-Candle | [GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine](GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine) and the 9 per-timeframe files in [GVLiveV2_by_timeframe/](GVLiveV2_by_timeframe/) |
+| DannyPhantomFX V10.21.1 LiveSafe | [DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine](DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine) and the 7 per-timeframe files in [DannyPhantomFX_by_timeframe/](DannyPhantomFX_by_timeframe/) |
 | AMVI Full MTF (already had "Trade direction: Inverted") | [AMVI_Full_MTF_Strategy_FGF.pine](AMVI_Full_MTF_Strategy_FGF.pine) and [AMVI_by_timeframe/AMVI_FGF_XAUUSD_15m.pine](AMVI_by_timeframe/AMVI_FGF_XAUUSD_15m.pine) |
 | FlashGold Direction Strategy (already had "Trade direction: Inverted") | [FlashGold_Direction_Strategy.pine](FlashGold_Direction_Strategy.pine) |
 

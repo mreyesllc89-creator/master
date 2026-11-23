@@ -5,6 +5,35 @@
 // STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (rule v3.1 hold-out passed)
 // READ FIRST: the FRAGILITY lines below say where this result comes from.
 // ----------------------------------------------------------------------------
+//  UPDATE 1 (2026-11-23)
+//    New option "Inverted direction: opposite side at the same entries" (group
+//    "Inverted direction (Update 1)", off by default). On: every entry this
+//    script would take is placed on the OPPOSITE side, same candle, same
+//    price (market order at the close), same sizing rule. Signals, "Signal
+//    direction", the directional time windows and the direction filter
+//    decide as before: a BUY the filter allows (BUY ZONE) is placed as a
+//    SELL, a SELL it allows (SELL ZONE) as a BUY, a blocked entry stays
+//    blocked, an opposite signal still reverses. Stop, target, trailing and
+//    breakeven keep their distances from the fill of the trade really open
+//    (a sell: stop above, target below); dead-trade exit, time stop and
+//    loss-cluster count use that trade. No Long only / Short only input
+//    here; the filter's "Allow buys" / "Allow sells" and status box keep
+//    meaning the signal's side: Allow buys off removes the SELL orders this
+//    option places (only BUY orders are left), Allow sells off the reverse.
+//    Entry id, BUY / SELL triangles, Last Action and the MT4 alert (BUY /
+//    SELL, same SL / TP points) show the order really placed; the "FGD ..."
+//    values and Raw Active circles keep the signal's side.
+//    "Signal direction" (kept: the V10 design) flips the zone signals BEFORE
+//    the time windows and the filter, this option flips the order AFTER
+//    them: with "Inverted (V10 design)" and this option a supply-zone signal
+//    becomes a BUY, is judged as a buy and is placed as a SELL. With the
+//    filter off and no directional time window in force (XAUUSD / XAGUSD /
+//    NAS100 5m presets only) this option on = the other "Signal direction"
+//    with this option off; with the filter or such a window on it is not.
+//    Details: INVERTED DIRECTION (UPDATE 1) in the code.
+//    Off = exactly the previous version. The title now ends with "[Update 1]".
+//    Default off = the tested behaviour recorded below.
+//
 // Same code as DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine (the master file).
 // Only this record, the strategy title and the input defaults listed below
 // differ. Record date 2026-10-25, rule v3.1.
@@ -166,6 +195,34 @@
 //====================================================//
 // Danny Phantom FX V10.21.1 LiveSafe
 //====================================================//
+//  UPDATE 1 (2026-11-23)
+//    New option "Inverted direction: opposite side at the same entries" (group
+//    "Inverted direction (Update 1)", off by default). On: every entry this
+//    script would take is placed on the OPPOSITE side, same candle, same
+//    price (market order at the close), same sizing rule. Signals, "Signal
+//    direction", the directional time windows and the direction filter
+//    decide as before: a BUY the filter allows (BUY ZONE) is placed as a
+//    SELL, a SELL it allows (SELL ZONE) as a BUY, a blocked entry stays
+//    blocked, an opposite signal still reverses. Stop, target, trailing and
+//    breakeven keep their distances from the fill of the trade really open
+//    (a sell: stop above, target below); dead-trade exit, time stop and
+//    loss-cluster count use that trade. No Long only / Short only input
+//    here; the filter's "Allow buys" / "Allow sells" and status box keep
+//    meaning the signal's side: Allow buys off removes the SELL orders this
+//    option places (only BUY orders are left), Allow sells off the reverse.
+//    Entry id, BUY / SELL triangles, Last Action and the MT4 alert (BUY /
+//    SELL, same SL / TP points) show the order really placed; the "FGD ..."
+//    values and Raw Active circles keep the signal's side.
+//    "Signal direction" (kept: the V10 design) flips the zone signals BEFORE
+//    the time windows and the filter, this option flips the order AFTER
+//    them: with "Inverted (V10 design)" and this option a supply-zone signal
+//    becomes a BUY, is judged as a buy and is placed as a SELL. With the
+//    filter off and no directional time window in force (XAUUSD / XAGUSD /
+//    NAS100 5m presets only) this option on = the other "Signal direction"
+//    with this option off; with the filter or such a window on it is not.
+//    Details: INVERTED DIRECTION (UPDATE 1) in the code.
+//    Off = exactly the previous version. The title now ends with "[Update 1]".
+//
 // Markets: XAUUSD 5m, XAGUSD 5m, NAS100 5m
 //
 // This version preserves the V10.21 trading model:
@@ -207,7 +264,7 @@
 //   acceptance. Validate end-to-end at minimum lot before increasing risk.
 //====================================================//
 
-strategy("Danny Phantom FX V10.21.1 LiveSafe FGF | XAUUSD 30m (calibrated)", shorttitle="DPFX XAU 30m", overlay=true, pyramiding=0, initial_capital=2000, default_qty_type=strategy.fixed, default_qty_value=1, calc_on_every_tick=false, calc_on_order_fills=true, process_orders_on_close=true, commission_type=strategy.commission.percent, commission_value=0.001, slippage=75, margin_long=0.2, margin_short=0.2, max_lines_count=500, max_labels_count=500, max_bars_back=500)
+strategy("Danny Phantom FX V10.21.1 LiveSafe FGF | XAUUSD 30m (calibrated) [Update 1]", shorttitle="DPFX XAU 30m U1", overlay=true, pyramiding=0, initial_capital=2000, default_qty_type=strategy.fixed, default_qty_value=1, calc_on_every_tick=false, calc_on_order_fills=true, process_orders_on_close=true, commission_type=strategy.commission.percent, commission_value=0.001, slippage=75, margin_long=0.2, margin_short=0.2, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
 //====================================================//
 // PRESET MODE
@@ -963,6 +1020,9 @@ if fgfShowTbl and fgfOn and barstate.islast
         table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
+// UPDATE 1: declared after every other input on purpose, so that no existing setting changes its place.
+dpInv = input.bool(false, "Inverted direction: opposite side at the same entries", group="Inverted direction (Update 1)", tooltip="Off: exactly the previous version. On: every entry this script would take is placed on the OPPOSITE side, on the same candle and at the same price (a market order at the candle close), sized by the same rule. Nothing that decides changes: 'Signal direction', the EMA, session, blackout, cooldown, loss-cluster and cost rules, the directional time windows and the direction filter work on the normal direction. A normal BUY the filter allows (BUY ZONE) is placed as a SELL, a normal SELL it allows (SELL ZONE) as a BUY, an entry it blocks stays blocked, and an opposite signal still reverses the open trade in one order. Stop loss, take profit, trailing and breakeven keep their distances from the fill of the trade really open (a sell has its stop above, its target below); the dead-trade exit, the time stop and the loss-cluster count use that trade, so trades end at other candles than before. The entry id, the BUY / SELL triangles, Last Action and the MT4 alert text (BUY / SELL, same SL / TP points and lots) show the order really placed; the Raw Active circles and the FGD values keep the signal's side. The filter's 'Allow buys' / 'Allow sells' and its status box keep meaning the normal direction: with this option on, 'Allow buys' off removes the SELL orders (the normal BUYs) and 'Allow sells' off the BUY orders, and 'buys allowed' in the status box means the normal BUYs may trade, as SELL orders. 'Signal direction' is a different thing: it flips the zone signals BEFORE the time windows and the filter (its BUY needs the BUY ZONE and is bought); this option flips the order AFTER them (the BUY that needs the BUY ZONE is sold). With the filter off and no directional time window in force (XAUUSD / XAGUSD / NAS100 5m presets only) this option on trades exactly like this option off with the other 'Signal direction'. Not backtested: every result quoted for this script is with this option off.")
+
 // Exported values (Data Window + linkable as a source from other scripts).
 plot(fgfOn and fgfOpen ? 1 : 0, "FGF active", display=display.data_window)
 plot(fgfBuyOk ? 1 : 0, "FGF buy allowed", display=display.data_window)
@@ -1378,10 +1438,60 @@ bool longEntrySubmittedThisBar = (not na(lastLongSubmissionBar) and lastLongSubm
 bool shortEntrySubmittedThisBar = (not na(lastShortSubmissionBar) and lastShortSubmissionBar == bar_index) or (not na(lastShortSubmissionTime) and lastShortSubmissionTime == time)
 
 //====================================================//
+// INVERTED DIRECTION (UPDATE 1)
+//====================================================//
+// dpInv off: dpPosN is strategy.position_size, dpPlaceLong / dpPlaceShort are the two entry
+// conditions of the previous version (same operands in the same order; the SELL one is still
+// tried only when the BUY one is false) and dpLongFromDemand is tradeOriginalDirection, so the
+// script places exactly the previous orders.
+// dpInv on: nothing that DECIDES changes. The zone signals, 'Signal direction', the EMA /
+// session / blackout / cooldown / loss-cluster / cost rules, the directional time windows, the
+// one-decision-per-bar lock and the filter gate (fgfBuyOk for a normal BUY, fgfSellOk for a
+// normal SELL) are computed as before, as if the strategy held the MIRROR of its real position
+// (dpPosN): a normal BUY is taken when that mirror is flat or short, i.e. when the real
+// position is flat or long. Only the side of the order is swapped:
+//   normal BUY decision  (dpBuyGo)  -> the "Inverted Short" block below: a SELL at this close
+//   normal SELL decision (dpSellGo) -> the "Inverted Long" block below:  a BUY at this close
+// Each block is the previous version's own code for that real side, so all it does belongs to
+// the order really placed: the quantity (same stop distance), the pending ATR / SL / TP
+// distances, the entry id, the MT4 alert text (BUY / SELL with the same SL / TP points and
+// lots), the Submitted Buy / Sell triangle and Last Action (a SELL that closes a long is an
+// ATOMIC REVERSE TO SELL). The one thing in a block that belongs to the SIGNAL is the
+// one-entry-per-zone reset: it must clear the zone that produced the signal, so it tests
+// dpLongFromDemand (the real longs come from the demand zone) instead of
+// tradeOriginalDirection.
+// Everything after the entry follows the trade really open and is unchanged: the confirmed
+// fill state, stop / target / trailing / breakeven (the same distances from the real fill: a
+// sell has its stop above and its target below), the dead-trade exit (the real trade's open
+// profit and run-up), the time stop, the blackout close, the cooldown, the loss-cluster count
+// and the closes by id ("Inverted Long" is always a real long, "Inverted Short" a real short;
+// "Inverted" in those ids is the V10 name, not this option). Because stop and target change
+// sides, trades end at other candles than with the option off, so later entries can differ:
+// the option mirrors every entry decision, not the old trade list.
+// Kept on the normal direction on purpose: the directional time windows (a long window blocks
+// the normal BUYs, which are now SELLs, so the same candles stay blocked), the filter's own
+// 'Allow buys' / 'Allow sells' (Allow buys off removes the normal BUYs, i.e. the SELL orders;
+// only BUY orders are left) and status box ("buys allowed" = the normal BUYs may trade, as
+// SELLs), the Raw Active circles and the FGD values ("FGD raw long" / "FGD blocked long" count
+// normal BUY signals, placed as SELLs when this option is on).
+// 'Signal direction' flips the zone signals BEFORE the time windows and the filter; this
+// option flips the order AFTER them. With the filter off and no directional time window in
+// force the two are the same thing (dpInv on with one 'Signal direction' places the orders of
+// dpInv off with the other one). With the filter on they are not: here the BUY that needs the
+// BUY ZONE is sold. Inside a directional time window they are not either: here a long window
+// stops SELLs.
+float dpPosN = dpInv ? -strategy.position_size : strategy.position_size
+bool dpBuyGo = canSubmitEntryThisBar and invertedBuySignal and dpPosN <= 0 and fgfBuyOk
+bool dpSellGo = not dpBuyGo and canSubmitEntryThisBar and invertedSellSignal and dpPosN >= 0 and fgfSellOk
+bool dpPlaceLong = dpInv ? dpSellGo : dpBuyGo
+bool dpPlaceShort = dpInv ? dpBuyGo : dpSellGo
+bool dpLongFromDemand = dpInv ? (not tradeOriginalDirection) : tradeOriginalDirection
+
+//====================================================//
 // ENTRY / ATOMIC REVERSAL EXECUTION
 //====================================================//
 
-if canSubmitEntryThisBar and invertedBuySignal and strategy.position_size <= 0 and fgfBuyOk
+if dpPlaceLong
     float qtyLong = f_qty(slDistNow)
     pendingLongAtr := atrValue
     pendingShortAtr := na
@@ -1394,7 +1504,7 @@ if canSubmitEntryThisBar and invertedBuySignal and strategy.position_size <= 0 a
     lastEntryDecisionTime := time
     lastLiveSafeAction := strategy.position_size < 0 ? "ATOMIC REVERSE TO BUY" : "BUY"
     if onePerZoneActive
-        if tradeOriginalDirection
+        if dpLongFromDemand
             demandTop := na
             demandBottom := na
             demandKeyTop := na
@@ -1406,7 +1516,7 @@ if canSubmitEntryThisBar and invertedBuySignal and strategy.position_size <= 0 a
             supplyKeyTop := na
             supplyKeyBottom := na
             supplyBar := na
-else if canSubmitEntryThisBar and invertedSellSignal and strategy.position_size >= 0 and fgfSellOk
+else if dpPlaceShort
     float qtyShort = f_qty(slDistNow)
     pendingShortAtr := atrValue
     pendingLongAtr := na
@@ -1419,7 +1529,7 @@ else if canSubmitEntryThisBar and invertedSellSignal and strategy.position_size 
     lastEntryDecisionTime := time
     lastLiveSafeAction := strategy.position_size > 0 ? "ATOMIC REVERSE TO SELL" : "SELL"
     if onePerZoneActive
-        if tradeOriginalDirection
+        if dpLongFromDemand
             supplyTop := na
             supplyBottom := na
             supplyKeyTop := na
@@ -1433,8 +1543,8 @@ else if canSubmitEntryThisBar and invertedSellSignal and strategy.position_size 
             demandBar := na
 
 // FGF diagnostics (Data Window only, no logic): the entry funnel.
-bool fgdRawLong      = canSubmitEntryThisBar and invertedBuySignal and strategy.position_size <= 0
-bool fgdRawShort     = canSubmitEntryThisBar and invertedSellSignal and strategy.position_size >= 0
+bool fgdRawLong      = canSubmitEntryThisBar and invertedBuySignal and dpPosN <= 0
+bool fgdRawShort     = canSubmitEntryThisBar and invertedSellSignal and dpPosN >= 0
 bool fgdBlockedLong  = fgdRawLong  and not fgfBuyOk
 bool fgdBlockedShort = fgdRawShort and not fgfSellOk
 plot(fgdRawLong      ? 1 : 0, "FGD raw long",      display = display.data_window)
@@ -1609,7 +1719,7 @@ if barstate.islast
     table.cell(infoTable, 0, 1, "Preset", text_color=color.white, bgcolor=headerBg)
     table.cell(infoTable, 1, 1, presetXAUUSD ? "XAUUSD 5m" : presetXAGUSD ? "XAGUSD 5m" : presetNAS100 ? "NAS100 5m" : "Manual/Other", text_color=color.white, bgcolor=cellBg)
     table.cell(infoTable, 0, 2, "Direction", text_color=color.white, bgcolor=headerBg)
-    table.cell(infoTable, 1, 2, tradeOriginalDirection ? "ORIGINAL" : "INVERTED", text_color=color.white, bgcolor=cellBg)
+    table.cell(infoTable, 1, 2, (tradeOriginalDirection ? "ORIGINAL" : "INVERTED") + (dpInv ? " SIGNAL | INVERTED DIRECTION ON" : ""), text_color=color.white, bgcolor=dpInv ? warnBg : cellBg)
     table.cell(infoTable, 0, 3, "SL / TP", text_color=color.white, bgcolor=headerBg)
     table.cell(infoTable, 1, 3, ExitMode == "ATR" ? str.tostring(slAtrMultS2, "#.##") + " ATR / " + str.tostring(tpRS2, "#.##") + "R" + (useTrailS2 ? " +trail" : "") : str.tostring(slPointsIn, "#") + " / " + str.tostring(tpPointsIn, "#") + " pts" + (useTrailS2 ? " +trail" : ""), text_color=color.white, bgcolor=cellBg)
     table.cell(infoTable, 0, 4, "MT4 Lot", text_color=color.white, bgcolor=headerBg)
