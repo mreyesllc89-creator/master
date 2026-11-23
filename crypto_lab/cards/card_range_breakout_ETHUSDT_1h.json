@@ -5,27 +5,27 @@
  "mechanism": "Breakout from the tightest N-bar range of the last `tight_window` days. Mechanism: compression",
  "oos": {
   "trades": 11,
-  "net": 138.09,
-  "ret_pct": 1.38,
-  "pf": 1.39,
+  "net": 141.0,
+  "ret_pct": 1.41,
+  "pf": 1.4,
   "win": 36.4,
-  "avg_r": 0.285,
-  "maxdd_pct": 1.87,
+  "avg_r": 0.291,
+  "maxdd_pct": 1.86,
   "losing_streak": 3,
   "trades_per_month": 7.5,
-  "sharpe": 1.01
+  "sharpe": 1.03
  },
  "stressed": {
   "trades": 11,
-  "net": 85.06,
-  "ret_pct": 0.85,
-  "pf": 1.22,
+  "net": 87.94,
+  "ret_pct": 0.88,
+  "pf": 1.23,
   "win": 36.4,
-  "avg_r": 0.184,
-  "maxdd_pct": 2.12,
+  "avg_r": 0.19,
+  "maxdd_pct": 2.11,
   "losing_streak": 3,
   "trades_per_month": 7.5,
-  "sharpe": 0.64
+  "sharpe": 0.66
  },
  "score": {
   "total": 0,
@@ -44,13 +44,13 @@
  ],
  "worst_month": {
   "month": "2026-06",
-  "pnl": 53.97
+  "pnl": 53.22
  },
  "regimes": [
   {
    "exit_time": "2026Q2",
    "trades": "11",
-   "net_r": "3.1",
+   "net_r": "3.2",
    "win": "36.0"
   }
  ]

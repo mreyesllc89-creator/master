@@ -5,27 +5,27 @@
  "mechanism": "Top-trader long/short account ratio above `ratio` while OI falls > oi_drop over `lookback` bars and price is",
  "oos": {
   "trades": 293,
-  "net": -895.22,
-  "ret_pct": -8.95,
+  "net": -875.44,
+  "ret_pct": -8.75,
   "pf": 0.91,
   "win": 32.4,
-  "avg_r": -0.056,
-  "maxdd_pct": 21.02,
+  "avg_r": -0.054,
+  "maxdd_pct": 20.95,
   "losing_streak": 7,
   "trades_per_month": 9.6,
-  "sharpe": -0.31
+  "sharpe": -0.3
  },
  "stressed": {
   "trades": 293,
-  "net": -1855.27,
-  "ret_pct": -18.55,
-  "pf": 0.82,
-  "win": 32.1,
-  "avg_r": -0.124,
-  "maxdd_pct": 24.76,
+  "net": -1836.82,
+  "ret_pct": -18.37,
+  "pf": 0.83,
+  "win": 32.4,
+  "avg_r": -0.123,
+  "maxdd_pct": 24.68,
   "losing_streak": 7,
   "trades_per_month": 9.6,
-  "sharpe": -0.66
+  "sharpe": -0.65
  },
  "score": {
   "profit": 1,
@@ -138,19 +138,19 @@
  ],
  "worst_month": {
   "month": "2024-07",
-  "pnl": -625.42
+  "pnl": -624.93
  },
  "regimes": [
   {
    "exit_time": "2024Q2",
    "trades": "35",
-   "net_r": "-3.3",
+   "net_r": "-3.2",
    "win": "34.0"
   },
   {
    "exit_time": "2024Q3",
    "trades": "65",
-   "net_r": "-5.7",
+   "net_r": "-5.6",
    "win": "28.0"
   },
   {
@@ -162,13 +162,13 @@
   {
    "exit_time": "2025Q1",
    "trades": "22",
-   "net_r": "32.8",
+   "net_r": "32.9",
    "win": "36.0"
   },
   {
    "exit_time": "2025Q2",
    "trades": "54",
-   "net_r": "-17.2",
+   "net_r": "-17.0",
    "win": "31.0"
   },
   {
@@ -186,7 +186,7 @@
   {
    "exit_time": "2026Q1",
    "trades": "27",
-   "net_r": "-7.6",
+   "net_r": "-7.7",
    "win": "33.0"
   },
   {

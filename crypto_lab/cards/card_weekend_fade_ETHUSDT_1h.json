@@ -5,24 +5,24 @@
  "mechanism": "Fade a bar move > atr_mult ATR between Saturday 00:00 and Sunday 12:00 UTC; hold until Monday 00:00 UTC.",
  "oos": {
   "trades": 310,
-  "net": -2191.89,
-  "ret_pct": -21.92,
+  "net": -2190.41,
+  "ret_pct": -21.9,
   "pf": 0.75,
   "win": 40.0,
   "avg_r": -0.141,
-  "maxdd_pct": 24.38,
+  "maxdd_pct": 24.29,
   "losing_streak": 10,
   "trades_per_month": 10.1,
   "sharpe": -1.31
  },
  "stressed": {
   "trades": 310,
-  "net": -3118.77,
-  "ret_pct": -31.19,
+  "net": -3117.68,
+  "ret_pct": -31.18,
   "pf": 0.65,
-  "win": 38.7,
+  "win": 39.0,
   "avg_r": -0.207,
-  "maxdd_pct": 32.87,
+  "maxdd_pct": 32.83,
   "losing_streak": 10,
   "trades_per_month": 10.1,
   "sharpe": -1.92
@@ -127,7 +127,7 @@
  ],
  "worst_month": {
   "month": "2026-02",
-  "pnl": -401.31
+  "pnl": -402.25
  },
  "regimes": [
   {
@@ -145,7 +145,7 @@
   {
    "exit_time": "2024Q4",
    "trades": "26",
-   "net_r": "-6.5",
+   "net_r": "-6.4",
    "win": "42.0"
   },
   {
@@ -187,7 +187,7 @@
   {
    "exit_time": "2026Q3",
    "trades": "28",
-   "net_r": "0.8",
+   "net_r": "0.7",
    "win": "39.0"
   },
   {

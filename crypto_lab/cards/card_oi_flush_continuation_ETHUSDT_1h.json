@@ -5,24 +5,24 @@
  "mechanism": "After open interest drops > oi_drop in `lookback` bars with price down (long liquidations), go",
  "oos": {
   "trades": 430,
-  "net": 2570.81,
-  "ret_pct": 25.71,
+  "net": 2567.73,
+  "ret_pct": 25.68,
   "pf": 1.18,
-  "win": 33.3,
+  "win": 33.0,
   "avg_r": 0.101,
-  "maxdd_pct": 11.54,
+  "maxdd_pct": 11.56,
   "losing_streak": 13,
   "trades_per_month": 14.0,
   "sharpe": 0.61
  },
  "stressed": {
   "trades": 430,
-  "net": 1067.97,
-  "ret_pct": 10.68,
+  "net": 1065.04,
+  "ret_pct": 10.65,
   "pf": 1.07,
   "win": 31.9,
   "avg_r": 0.039,
-  "maxdd_pct": 16.65,
+  "maxdd_pct": 16.64,
   "losing_streak": 13,
   "trades_per_month": 14.0,
   "sharpe": 0.26
@@ -127,25 +127,25 @@
  ],
  "worst_month": {
   "month": "2024-06",
-  "pnl": -711.01
+  "pnl": -712.37
  },
  "regimes": [
   {
    "exit_time": "2024Q2",
    "trades": "35",
-   "net_r": "-9.1",
+   "net_r": "-9.2",
    "win": "23.0"
   },
   {
    "exit_time": "2024Q3",
    "trades": "52",
-   "net_r": "6.9",
+   "net_r": "6.8",
    "win": "27.0"
   },
   {
    "exit_time": "2024Q4",
    "trades": "44",
-   "net_r": "7.9",
+   "net_r": "7.8",
    "win": "41.0"
   },
   {
@@ -175,8 +175,8 @@
   {
    "exit_time": "2026Q1",
    "trades": "70",
-   "net_r": "-12.3",
-   "win": "30.0"
+   "net_r": "-12.4",
+   "win": "29.0"
   },
   {
    "exit_time": "2026Q2",

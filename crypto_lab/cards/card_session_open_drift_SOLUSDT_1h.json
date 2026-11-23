@@ -5,27 +5,27 @@
  "mechanism": "Trade the US cash open (13:30 UTC) in the direction of the pre-open drift. Mechanism: ETF creation",
  "oos": {
   "trades": 1358,
-  "net": -2620.29,
-  "ret_pct": -26.2,
+  "net": -2650.2,
+  "ret_pct": -26.5,
   "pf": 0.92,
-  "win": 42.6,
-  "avg_r": -0.036,
-  "maxdd_pct": 42.84,
+  "win": 42.5,
+  "avg_r": -0.037,
+  "maxdd_pct": 43.06,
   "losing_streak": 11,
   "trades_per_month": 44.1,
-  "sharpe": -0.73
+  "sharpe": -0.74
  },
  "stressed": {
   "trades": 1358,
-  "net": -6369.68,
-  "ret_pct": -63.7,
+  "net": -6393.69,
+  "ret_pct": -63.94,
   "pf": 0.8,
   "win": 40.2,
   "avg_r": -0.104,
-  "maxdd_pct": 70.77,
-  "losing_streak": 12,
+  "maxdd_pct": 70.95,
+  "losing_streak": 14,
   "trades_per_month": 44.1,
-  "sharpe": -1.99
+  "sharpe": -2.0
  },
  "score": {
   "profit": 1,
@@ -127,7 +127,7 @@
  ],
  "worst_month": {
   "month": "2026-04",
-  "pnl": -853.37
+  "pnl": -854.22
  },
  "regimes": [
   {
@@ -157,7 +157,7 @@
   {
    "exit_time": "2025Q2",
    "trades": "109",
-   "net_r": "-7.3",
+   "net_r": "-7.4",
    "win": "42.0"
   },
   {
@@ -169,26 +169,26 @@
   {
    "exit_time": "2025Q4",
    "trades": "146",
-   "net_r": "-12.1",
+   "net_r": "-12.2",
    "win": "40.0"
   },
   {
    "exit_time": "2026Q1",
    "trades": "154",
-   "net_r": "8.5",
+   "net_r": "8.3",
    "win": "43.0"
   },
   {
    "exit_time": "2026Q2",
    "trades": "166",
-   "net_r": "-25.9",
+   "net_r": "-26.1",
    "win": "34.0"
   },
   {
    "exit_time": "2026Q3",
    "trades": "122",
-   "net_r": "-0.4",
-   "win": "49.0"
+   "net_r": "-0.6",
+   "win": "48.0"
   },
   {
    "exit_time": "2026Q4",

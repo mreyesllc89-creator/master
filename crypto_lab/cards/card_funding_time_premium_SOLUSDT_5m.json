@@ -2,38 +2,38 @@
  "strategy": "funding_time_premium",
  "symbol": "SOLUSDT",
  "tf": "5m",
- "mechanism": "Short the last `bars_before` bars before each 8-hour funding timestamp when the last funding print was above",
+ "mechanism": "Short during the last `bars_before` bars before each 8-hour funding timestamp (00:00, 08:00, 16:00 UTC) when the",
  "oos": {
-  "trades": 124,
-  "net": -1812.06,
-  "ret_pct": -18.12,
-  "pf": 0.37,
-  "win": 33.1,
-  "avg_r": -0.328,
-  "maxdd_pct": 19.26,
-  "losing_streak": 12,
-  "trades_per_month": 6.1,
-  "sharpe": -3.57
+  "trades": 126,
+  "net": -1986.3,
+  "ret_pct": -19.86,
+  "pf": 0.13,
+  "win": 22.2,
+  "avg_r": -0.36,
+  "maxdd_pct": 19.92,
+  "losing_streak": 23,
+  "trades_per_month": 7.0,
+  "sharpe": -6.6
  },
  "stressed": {
-  "trades": 124,
-  "net": -3262.5,
-  "ret_pct": -32.63,
-  "pf": 0.14,
-  "win": 17.7,
-  "avg_r": -0.66,
-  "maxdd_pct": 33.05,
-  "losing_streak": 24,
-  "trades_per_month": 6.1,
-  "sharpe": -7.11
+  "trades": 126,
+  "net": -3533.2,
+  "ret_pct": -35.33,
+  "pf": 0.02,
+  "win": 4.8,
+  "avg_r": -0.727,
+  "maxdd_pct": 35.31,
+  "losing_streak": 43,
+  "trades_per_month": 7.0,
+  "sharpe": -11.89
  },
  "score": {
   "profit": 1,
   "drawdown": 2,
   "trades": 3,
-  "streak": 3,
+  "streak": 1,
   "regimes": 1,
-  "total": 10
+  "total": 8
  },
  "windows": [
   {
@@ -72,17 +72,17 @@
    "test_start": "2025-08-01",
    "params": {
     "thresh": 0.0001,
-    "bars_before": 2
+    "bars_before": 1
    },
-   "n": 16
+   "n": 17
   },
   {
    "test_start": "2026-02-01",
    "params": {
     "thresh": 0.0001,
-    "bars_before": 2
+    "bars_before": 1
    },
-   "n": 77
+   "n": 72
   },
   {
    "test_start": "2026-05-01",
@@ -90,68 +90,70 @@
     "thresh": 0.0001,
     "bars_before": 2
    },
-   "n": 19
+   "n": 27
   },
   {
    "test_start": "2026-08-01",
    "params": {
+    "thresh": 0.0002,
+    "bars_before": 2
+   },
+   "n": 0
+  },
+  {
+   "test_start": "2026-11-01",
+   "params": {
     "thresh": 0.0001,
     "bars_before": 2
    },
-   "n": 2
+   "n": 0
   }
  ],
  "worst_month": {
-  "month": "2026-02",
-  "pnl": -706.05
+  "month": "2026-03",
+  "pnl": -647.35
  },
  "regimes": [
   {
    "exit_time": "2025Q1",
-   "trades": "8",
-   "net_r": "2.3",
-   "win": "62.0"
+   "trades": "7",
+   "net_r": "0.2",
+   "win": "57.0"
   },
   {
    "exit_time": "2025Q2",
-   "trades": "2",
-   "net_r": "-0.6",
-   "win": "50.0"
-  },
-  {
-   "exit_time": "2025Q3",
-   "trades": "4",
-   "net_r": "1.0",
-   "win": "75.0"
-  },
-  {
-   "exit_time": "2025Q4",
-   "trades": "12",
-   "net_r": "-4.6",
-   "win": "25.0"
-  },
-  {
-   "exit_time": "2026Q1",
-   "trades": "73",
-   "net_r": "-27.9",
-   "win": "30.0"
-  },
-  {
-   "exit_time": "2026Q2",
-   "trades": "21",
-   "net_r": "-6.6",
+   "trades": "3",
+   "net_r": "-1.0",
    "win": "33.0"
   },
   {
-   "exit_time": "2026Q3",
-   "trades": "3",
-   "net_r": "-3.2",
-   "win": "0.0"
+   "exit_time": "2025Q3",
+   "trades": "6",
+   "net_r": "-0.8",
+   "win": "33.0"
   },
   {
-   "exit_time": "2026Q4",
-   "trades": "1",
-   "net_r": "-1.1",
+   "exit_time": "2025Q4",
+   "trades": "11",
+   "net_r": "-4.0",
+   "win": "9.0"
+  },
+  {
+   "exit_time": "2026Q1",
+   "trades": "65",
+   "net_r": "-24.2",
+   "win": "18.0"
+  },
+  {
+   "exit_time": "2026Q2",
+   "trades": "32",
+   "net_r": "-14.7",
+   "win": "25.0"
+  },
+  {
+   "exit_time": "2026Q3",
+   "trades": "2",
+   "net_r": "-0.8",
    "win": "0.0"
   }
  ]

@@ -1,5 +1,22 @@
 # Judge — 2026-11-13 (first pass, run manually; corrected rerun)
 
+> **Correction 2026-11-23 (rows marked †).** Two faults were found after this report and fixed in `tools/`:
+>
+> 1. `funding_time_premium` did not trade its own rule. The signal sat one bar late, so the position was opened *at* the
+>    funding print and held for the bar after it (collecting or paying funding) instead of being held for the last bars
+>    before the print and flat at it. Fixed: 1h entries are now at 07:00 / 15:00 / 23:00 UTC (06:00 / 14:00 / 22:00 for
+>    `bars_before=2`), exits at the 08:00 / 16:00 / 00:00 open, and no trade is held through a print. The † rows are the
+>    re-run. **`funding_time_premium SOLUSDT 1h` is no longer a closest miss: −3.6 % on 126 OOS trades (PF 0.76), −8.8 %
+>    under stressed costs**; the +1.3 % above came from the unintended post-print trade. The rule is not run on 4h bars
+>    (a 4-hour hold is half the funding interval, not a run-in to the print).
+> 2. About a third of the funding prints in the archive are stamped a few milliseconds after the hour (e.g. 00:00:00.002)
+>    and were silently dropped when matched to bars, so those payments were missing from costs and from funding signals.
+>    Fixed in `perpbt.load_funding`. All 1h cards and `leaderboard_1h.csv` were regenerated; outside the two funding
+>    strategies every 1h return moved by less than 0.5 percentage points and no conclusion changes
+>    (oi_flush_continuation ETHUSDT 1h: +25.7 %, stressed +10.68 % → +10.65 %, score 17). The unmarked rows below are the
+>    original 2026-11-13 numbers; `leaderboard_1h.csv` holds the current ones. 5m cards other than the † rows were not
+>    re-run (5m was dropped on 2026-11-13).
+
 Gauntlet: every library strategy × BTC/ETH/SOL × 1h and 5m; taker fee 0.05 %/side, funding, 1 tick slippage, 0.5 % risk, 5x cap;
 rolling walk-forward (6 m train / 3 m test, 11 test windows May-2024 → Nov-2026); only out-of-sample trades are shown.
 Stressed = double fees + 3 ticks. Scores 1-5 on profit / drawdown / trades / losing streak / regimes (0 = fewer than 50 OOS trades).
@@ -13,7 +30,7 @@ its end, so on 5-minute bars every OI-based strategy saw ~55 minutes into the fu
 | Strategy | Symbol | TF | OOS trades | Return | PF | Max DD | Losing streak | Avg R | Stressed return | Score |
 |---|---|---|---|---|---|---|---|---|---|---|
 | oi_flush_continuation | ETHUSDT | 1h | 430 | +25.7 % | 1.18 | 11.5 % | 13 | +0.101 | +10.7 % | 17 |
-| funding_time_premium | SOLUSDT | 1h | 127 | +1.3 % | 1.07 | 2.4 % | 5 | +0.022 | -4.0 % | 16 |
+| funding_time_premium † | SOLUSDT | 1h | 126 | -3.6 % | 0.76 | 6.5 % | 6 | -0.060 | -8.8 % | 16 |
 | asia_open_fade | ETHUSDT | 1h | 181 | -1.2 % | 0.97 | 7.9 % | 6 | -0.012 | -7.8 % | 14 |
 | asia_open_fade | BTCUSDT | 1h | 193 | -7.4 % | 0.85 | 9.9 % | 6 | -0.073 | -18.5 % | 14 |
 | donchian_trend | ETHUSDT | 1h | 273 | +3.1 % | 1.03 | 9.3 % | 13 | +0.040 | -2.4 % | 13 |
@@ -36,7 +53,7 @@ its end, so on 5-minute bars every OI-based strategy saw ~55 minutes into the fu
 | session_open_drift | BTCUSDT | 1h | 1347 | -64.8 % | 0.79 | 75.7 % | 11 | -0.103 | -114.3 % | 11 |
 | taker_exhaustion | SOLUSDT | 1h | 2235 | -70.9 % | 0.85 | 71.6 % | 11 | -0.069 | -125.1 % | 11 |
 | donchian_trend | SOLUSDT | 1h | 253 | -14.6 % | 0.84 | 24.8 % | 20 | -0.092 | -19.0 % | 10 |
-| funding_time_premium | SOLUSDT | 5m | 124 | -18.1 % | 0.37 | 19.3 % | 12 | -0.328 | -32.6 % | 10 |
+| funding_time_premium † | SOLUSDT | 5m | 126 | -19.9 % | 0.13 | 19.9 % | 23 | -0.360 | -35.3 % | 8 |
 | oi_flush_reversal | BTCUSDT | 1h | 434 | -28.6 % | 0.80 | 34.7 % | 16 | -0.140 | -47.7 % | 10 |
 | asia_open_fade | ETHUSDT | 5m | 274 | -32.9 % | 0.62 | 36.9 % | 12 | -0.251 | -72.4 % | 10 |
 | weekend_fade | SOLUSDT | 1h | 353 | -35.1 % | 0.66 | 37.5 % | 12 | -0.200 | -43.6 % | 10 |
@@ -72,12 +89,12 @@ its end, so on 5-minute bars every OI-based strategy saw ~55 minutes into the fu
 | asia_open_fade | BTCUSDT | 5m | 279 | -59.8 % | 0.38 | 61.1 % | 20 | -0.534 | -107.2 % | 8 |
 | range_breakout | SOLUSDT | 1h | 26 | +8.9 % | 1.81 | 7.0 % | 10 | +0.737 | +7.4 % | 0 |
 | range_breakout | ETHUSDT | 1h | 11 | +1.4 % | 1.39 | 1.9 % | 3 | +0.285 | +0.8 % | 0 |
-| funding_time_premium | ETHUSDT | 1h | 17 | +0.8 % | 1.27 | 2.1 % | 5 | +0.098 | -0.5 % | 0 |
+| funding_time_premium † | ETHUSDT | 1h | 1 | +0.0 % | 99.00 | 0.0 % | 0 | +0.091 | +0.0 % | 0 |
 | funding_reset | SOLUSDT | 1h | 3 | +0.4 % | 1.43 | 0.5 % | 2 | +0.305 | +0.3 % | 0 |
-| funding_time_premium | BTCUSDT | 1h | 1 | +0.2 % | 99.00 | 0.0 % | 0 | +0.406 | +0.1 % | 0 |
+| funding_time_premium † | BTCUSDT | 1h | 0 | no result: no training window reached 30 trades | | | | | | 0 |
 | funding_reset | ETHUSDT | 5m | 4 | +0.0 % | 1.02 | 0.9 % | 3 | +0.189 | -0.3 % | 0 |
-| funding_time_premium | BTCUSDT | 5m | 1 | -0.2 % | 0.00 | 0.0 % | 1 | -0.568 | -0.5 % | 0 |
-| funding_time_premium | ETHUSDT | 5m | 15 | -4.6 % | 0.10 | 4.9 % | 6 | -0.676 | -7.9 % | 0 |
+| funding_time_premium † | BTCUSDT | 5m | 0 | no result: no training window reached 30 trades | | | | | | 0 |
+| funding_time_premium † | ETHUSDT | 5m | 1 | +0.1 % | 99.00 | 0.0 % | 0 | +0.183 | +0.0 % | 0 |
 | range_breakout | BTCUSDT | 1h | 32 | -4.9 % | 0.62 | 7.4 % | 10 | -0.327 | -7.0 % | 0 |
 
 ## Verdict: NO CHAMPION TONIGHT
@@ -90,8 +107,8 @@ Only one of 67 combinations is positive out-of-sample after costs with enough tr
 - Losing streak 13 and a 33 % win rate with 1.5 ATR stops: fine for the mechanism, but the 2026 drawdown would already have triggered a review.
 - Future leakage: inputs are OI (hour-end stamped, shifted one bar) and price; no leak remains after the fix. This one passes.
 
-Closest miss / watch list (not challengers — nothing else is positive): `funding_time_premium SOLUSDT 1h` (+1.3 %, 127 trades, negative under stress),
-`donchian_trend ETHUSDT 1h` (+3.1 %, negative under stress). Everything on 5 m loses after costs — 5-minute bars are not viable for these
+Closest miss / watch list (not challengers — nothing else is positive): `donchian_trend ETHUSDT 1h` (+3.1 %, negative under stress).
+~~`funding_time_premium SOLUSDT 1h` (+1.3 %, 127 trades)~~ — withdrawn 2026-11-23, see the correction at the top: the corrected rule loses (−3.6 %). Everything on 5 m loses after costs — 5-minute bars are not viable for these
 mechanisms at retail fees; the lab should spend its 5 m budget on cost-light ideas (fewer trades, wider stops) or drop 5 m.
 
 ## Strategy card — oi_flush_continuation ETHUSDT 1h (nominated for WATCH only)

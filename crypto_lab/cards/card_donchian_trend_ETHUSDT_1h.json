@@ -5,27 +5,27 @@
  "mechanism": "Classic Donchian channel trend following; always in the market direction of the last breakout.",
  "oos": {
   "trades": 273,
-  "net": 310.83,
-  "ret_pct": 3.11,
+  "net": 282.88,
+  "ret_pct": 2.83,
   "pf": 1.03,
   "win": 27.5,
-  "avg_r": 0.04,
-  "maxdd_pct": 9.35,
+  "avg_r": 0.038,
+  "maxdd_pct": 9.4,
   "losing_streak": 13,
   "trades_per_month": 8.9,
-  "sharpe": 0.1
+  "sharpe": 0.09
  },
  "stressed": {
   "trades": 273,
-  "net": -235.77,
-  "ret_pct": -2.36,
+  "net": -262.97,
+  "ret_pct": -2.63,
   "pf": 0.97,
   "win": 27.5,
-  "avg_r": 0.002,
-  "maxdd_pct": 10.67,
+  "avg_r": -0.0,
+  "maxdd_pct": 10.73,
   "losing_streak": 13,
   "trades_per_month": 8.9,
-  "sharpe": -0.08
+  "sharpe": -0.09
  },
  "score": {
   "profit": 2,
@@ -127,7 +127,7 @@
  ],
  "worst_month": {
   "month": "2026-04",
-  "pnl": -537.08
+  "pnl": -537.53
  },
  "regimes": [
   {
@@ -145,7 +145,7 @@
   {
    "exit_time": "2024Q4",
    "trades": "26",
-   "net_r": "9.5",
+   "net_r": "9.4",
    "win": "35.0"
   },
   {
@@ -157,25 +157,25 @@
   {
    "exit_time": "2025Q2",
    "trades": "39",
-   "net_r": "-2.6",
+   "net_r": "-2.7",
    "win": "26.0"
   },
   {
    "exit_time": "2025Q3",
    "trades": "15",
-   "net_r": "25.3",
+   "net_r": "25.2",
    "win": "53.0"
   },
   {
    "exit_time": "2025Q4",
    "trades": "21",
-   "net_r": "-3.7",
+   "net_r": "-3.8",
    "win": "24.0"
   },
   {
    "exit_time": "2026Q1",
    "trades": "21",
-   "net_r": "-0.2",
+   "net_r": "-0.3",
    "win": "33.0"
   },
   {
@@ -187,13 +187,13 @@
   {
    "exit_time": "2026Q3",
    "trades": "26",
-   "net_r": "11.5",
+   "net_r": "11.3",
    "win": "31.0"
   },
   {
    "exit_time": "2026Q4",
    "trades": "14",
-   "net_r": "-8.4",
+   "net_r": "-8.3",
    "win": "14.0"
   }
  ]

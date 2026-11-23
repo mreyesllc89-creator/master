@@ -5,27 +5,27 @@
  "mechanism": "Fade a bar move > atr_mult ATR between Saturday 00:00 and Sunday 12:00 UTC; hold until Monday 00:00 UTC.",
  "oos": {
   "trades": 289,
-  "net": -1467.18,
-  "ret_pct": -14.67,
-  "pf": 0.8,
-  "win": 42.2,
-  "avg_r": -0.098,
-  "maxdd_pct": 18.3,
+  "net": -1452.73,
+  "ret_pct": -14.53,
+  "pf": 0.81,
+  "win": 42.6,
+  "avg_r": -0.097,
+  "maxdd_pct": 18.18,
   "losing_streak": 9,
   "trades_per_month": 9.5,
-  "sharpe": -0.91
+  "sharpe": -0.9
  },
  "stressed": {
   "trades": 289,
-  "net": -2664.72,
-  "ret_pct": -26.65,
+  "net": -2651.43,
+  "ret_pct": -26.51,
   "pf": 0.67,
   "win": 39.8,
-  "avg_r": -0.188,
-  "maxdd_pct": 29.22,
+  "avg_r": -0.187,
+  "maxdd_pct": 29.08,
   "losing_streak": 9,
   "trades_per_month": 9.5,
-  "sharpe": -1.71
+  "sharpe": -1.7
  },
  "score": {
   "profit": 1,
@@ -127,13 +127,13 @@
  ],
  "worst_month": {
   "month": "2024-07",
-  "pnl": -316.94
+  "pnl": -316.65
  },
  "regimes": [
   {
    "exit_time": "2024Q2",
    "trades": "12",
-   "net_r": "-4.6",
+   "net_r": "-4.5",
    "win": "25.0"
   },
   {
@@ -145,7 +145,7 @@
   {
    "exit_time": "2024Q4",
    "trades": "41",
-   "net_r": "-8.6",
+   "net_r": "-8.5",
    "win": "41.0"
   },
   {
@@ -164,24 +164,24 @@
    "exit_time": "2025Q3",
    "trades": "16",
    "net_r": "5.0",
-   "win": "56.0"
+   "win": "62.0"
   },
   {
    "exit_time": "2025Q4",
    "trades": "29",
-   "net_r": "-2.2",
+   "net_r": "-2.1",
    "win": "34.0"
   },
   {
    "exit_time": "2026Q1",
    "trades": "32",
-   "net_r": "-3.6",
+   "net_r": "-3.5",
    "win": "38.0"
   },
   {
    "exit_time": "2026Q2",
    "trades": "33",
-   "net_r": "-7.6",
+   "net_r": "-7.5",
    "win": "33.0"
   },
   {

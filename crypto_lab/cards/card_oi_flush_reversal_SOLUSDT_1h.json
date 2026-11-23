@@ -5,19 +5,19 @@
  "mechanism": "After an OI flush with price down, go long once a close recovers above the flush window's midpoint.",
  "oos": {
   "trades": 372,
-  "net": -2193.73,
-  "ret_pct": -21.94,
+  "net": -2193.07,
+  "ret_pct": -21.93,
   "pf": 0.8,
   "win": 34.7,
   "avg_r": -0.118,
-  "maxdd_pct": 26.04,
+  "maxdd_pct": 25.99,
   "losing_streak": 10,
   "trades_per_month": 12.1,
   "sharpe": -1.03
  },
  "stressed": {
   "trades": 372,
-  "net": -3147.46,
+  "net": -3146.69,
   "ret_pct": -31.47,
   "pf": 0.73,
   "win": 33.6,
@@ -127,13 +127,13 @@
  ],
  "worst_month": {
   "month": "2026-02",
-  "pnl": -734.57
+  "pnl": -729.54
  },
  "regimes": [
   {
    "exit_time": "2024Q2",
    "trades": "14",
-   "net_r": "3.7",
+   "net_r": "3.6",
    "win": "43.0"
   },
   {
@@ -145,7 +145,7 @@
   {
    "exit_time": "2024Q4",
    "trades": "50",
-   "net_r": "10.1",
+   "net_r": "10.0",
    "win": "44.0"
   },
   {
@@ -175,7 +175,7 @@
   {
    "exit_time": "2026Q1",
    "trades": "60",
-   "net_r": "-22.9",
+   "net_r": "-22.8",
    "win": "23.0"
   },
   {

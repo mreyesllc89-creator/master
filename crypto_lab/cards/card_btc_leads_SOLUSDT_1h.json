@@ -5,35 +5,35 @@
  "mechanism": "Alt follows a BTC move that it has not yet matched. Mechanism: index/ETF-driven BTC flow arrives",
  "oos": {
   "trades": 435,
-  "net": -1941.55,
-  "ret_pct": -19.42,
+  "net": -1952.37,
+  "ret_pct": -19.52,
   "pf": 0.84,
-  "win": 38.4,
-  "avg_r": -0.082,
-  "maxdd_pct": 24.96,
-  "losing_streak": 10,
+  "win": 38.6,
+  "avg_r": -0.083,
+  "maxdd_pct": 25.02,
+  "losing_streak": 9,
   "trades_per_month": 15.4,
-  "sharpe": -0.95
+  "sharpe": -0.96
  },
  "stressed": {
   "trades": 435,
-  "net": -3092.4,
-  "ret_pct": -30.92,
+  "net": -3102.5,
+  "ret_pct": -31.03,
   "pf": 0.75,
   "win": 37.2,
-  "avg_r": -0.139,
-  "maxdd_pct": 35.79,
+  "avg_r": -0.14,
+  "maxdd_pct": 35.87,
   "losing_streak": 10,
   "trades_per_month": 15.4,
   "sharpe": -1.58
  },
  "score": {
   "profit": 1,
-  "drawdown": 2,
+  "drawdown": 1,
   "trades": 5,
   "streak": 3,
   "regimes": 1,
-  "total": 12
+  "total": 11
  },
  "windows": [
   {
@@ -138,7 +138,7 @@
  ],
  "worst_month": {
   "month": "2026-07",
-  "pnl": -763.13
+  "pnl": -764.07
  },
  "regimes": [
   {
@@ -175,7 +175,7 @@
    "exit_time": "2025Q3",
    "trades": "38",
    "net_r": "-2.4",
-   "win": "34.0"
+   "win": "37.0"
   },
   {
    "exit_time": "2025Q4",
@@ -186,7 +186,7 @@
   {
    "exit_time": "2026Q1",
    "trades": "68",
-   "net_r": "-0.2",
+   "net_r": "-0.3",
    "win": "37.0"
   },
   {
@@ -198,7 +198,7 @@
   {
    "exit_time": "2026Q3",
    "trades": "32",
-   "net_r": "-6.5",
+   "net_r": "-6.6",
    "win": "38.0"
   }
  ]

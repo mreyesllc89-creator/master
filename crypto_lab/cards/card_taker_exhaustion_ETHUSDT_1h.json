@@ -5,24 +5,24 @@
  "mechanism": "Taker buy/sell volume ratio in its top q-quantile of `window` bars while price fails to make a new",
  "oos": {
   "trades": 2212,
-  "net": -9913.11,
-  "ret_pct": -99.13,
+  "net": -9921.22,
+  "ret_pct": -99.21,
   "pf": 0.77,
-  "win": 39.4,
+  "win": 39.5,
   "avg_r": -0.104,
-  "maxdd_pct": 106.58,
+  "maxdd_pct": 106.66,
   "losing_streak": 32,
   "trades_per_month": 71.9,
   "sharpe": -2.66
  },
  "stressed": {
   "trades": 2214,
-  "net": -14809.24,
-  "ret_pct": -148.09,
+  "net": -14812.82,
+  "ret_pct": -148.13,
   "pf": 0.63,
   "win": 34.9,
   "avg_r": -0.195,
-  "maxdd_pct": 153.52,
+  "maxdd_pct": 153.56,
   "losing_streak": 32,
   "trades_per_month": 72.0,
   "sharpe": -4.89
@@ -127,13 +127,13 @@
  ],
  "worst_month": {
   "month": "2026-09",
-  "pnl": -1272.7
+  "pnl": -1274.32
  },
  "regimes": [
   {
    "exit_time": "2024Q2",
    "trades": "149",
-   "net_r": "-45.7",
+   "net_r": "-45.8",
    "win": "33.0"
   },
   {
@@ -157,7 +157,7 @@
   {
    "exit_time": "2025Q2",
    "trades": "193",
-   "net_r": "-24.2",
+   "net_r": "-24.3",
    "win": "40.0"
   },
   {
@@ -175,25 +175,25 @@
   {
    "exit_time": "2026Q1",
    "trades": "274",
-   "net_r": "-4.0",
+   "net_r": "-4.1",
    "win": "39.0"
   },
   {
    "exit_time": "2026Q2",
    "trades": "208",
    "net_r": "-60.7",
-   "win": "30.0"
+   "win": "31.0"
   },
   {
    "exit_time": "2026Q3",
    "trades": "268",
-   "net_r": "-39.3",
+   "net_r": "-39.4",
    "win": "37.0"
   },
   {
    "exit_time": "2026Q4",
    "trades": "123",
-   "net_r": "9.8",
+   "net_r": "9.7",
    "win": "40.0"
   }
  ]

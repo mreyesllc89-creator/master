@@ -5,24 +5,24 @@
  "mechanism": "Fade the first bar after 00:00 UTC when it moves more than atr_mult ATR. Mechanism: thin Asian liquidity",
  "oos": {
   "trades": 193,
-  "net": -742.54,
-  "ret_pct": -7.43,
+  "net": -740.67,
+  "ret_pct": -7.41,
   "pf": 0.85,
   "win": 42.0,
   "avg_r": -0.073,
-  "maxdd_pct": 9.89,
+  "maxdd_pct": 9.86,
   "losing_streak": 6,
   "trades_per_month": 6.5,
   "sharpe": -0.57
  },
  "stressed": {
   "trades": 193,
-  "net": -1848.41,
-  "ret_pct": -18.48,
+  "net": -1846.65,
+  "ret_pct": -18.47,
   "pf": 0.66,
   "win": 37.3,
   "avg_r": -0.192,
-  "maxdd_pct": 20.32,
+  "maxdd_pct": 20.29,
   "losing_streak": 8,
   "trades_per_month": 6.5,
   "sharpe": -1.45
@@ -127,7 +127,7 @@
  ],
  "worst_month": {
   "month": "2026-09",
-  "pnl": -377.82
+  "pnl": -377.61
  },
  "regimes": [
   {

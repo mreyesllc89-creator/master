@@ -5,8 +5,8 @@
  "mechanism": "Top-trader long/short account ratio above `ratio` while OI falls > oi_drop over `lookback` bars and price is",
  "oos": {
   "trades": 101,
-  "net": -1014.44,
-  "ret_pct": -10.14,
+  "net": -1013.18,
+  "ret_pct": -10.13,
   "pf": 0.72,
   "win": 28.7,
   "avg_r": -0.203,
@@ -17,8 +17,8 @@
  },
  "stressed": {
   "trades": 101,
-  "net": -1391.83,
-  "ret_pct": -13.92,
+  "net": -1390.97,
+  "ret_pct": -13.91,
   "pf": 0.63,
   "win": 25.7,
   "avg_r": -0.288,
@@ -102,7 +102,7 @@
  ],
  "worst_month": {
   "month": "2026-02",
-  "pnl": -375.61
+  "pnl": -376.24
  },
  "regimes": [
   {
@@ -144,13 +144,13 @@
   {
    "exit_time": "2026Q3",
    "trades": "4",
-   "net_r": "-3.4",
+   "net_r": "-3.3",
    "win": "0.0"
   },
   {
    "exit_time": "2026Q4",
    "trades": "7",
-   "net_r": "3.1",
+   "net_r": "3.2",
    "win": "57.0"
   }
  ]
