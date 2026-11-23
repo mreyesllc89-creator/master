@@ -25,6 +25,13 @@ With it on:
   "Signal direction" in DannyPhantomFX). They flip the signal before the filter; this option
   flips the order after it. Each file's header says how the two differ.
 
+**Three scripts already had this option and get no new setting.** AMVI Full MTF (direction
+filter version), its XAUUSD 15m file and the FlashGold Direction Strategy trade the opposite
+side through their existing setting "Trade direction: Follow the filter / Inverted". Update 1
+changes no order in them: the title carries the number, the header explains the option, and a
+few header sentences that were wrong with Inverted are corrected. Leave "Trade direction" as you
+had it. The AMVI XAUUSD 15m file is calibrated with Inverted, so Inverted is its tested setting.
+
 **After pasting an update into TradingView:** open the strategy's Settings once and check that
 "Inverted direction" is off (it is the last setting, at the bottom of the Inputs tab) and that
 your other settings are still as you left them. The new option is declared after every other
@@ -43,5 +50,7 @@ you paste a file, send it over.
 | XPW Orientation TDI v2.8, trailing TP | [xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine](xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine) |
 | FlashGold v5 Strategy (BTCUSD) | [FlashGold_v5_Strategy_BTCUSD_FGF.pine](FlashGold_v5_Strategy_BTCUSD_FGF.pine) |
 | GVLiveV2 Pre-Candle | [GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine](GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine) and the 9 per-timeframe files in [GVLiveV2_by_timeframe/](GVLiveV2_by_timeframe/) |
+| AMVI Full MTF (already had "Trade direction: Inverted") | [AMVI_Full_MTF_Strategy_FGF.pine](AMVI_Full_MTF_Strategy_FGF.pine) and [AMVI_by_timeframe/AMVI_FGF_XAUUSD_15m.pine](AMVI_by_timeframe/AMVI_FGF_XAUUSD_15m.pine) |
+| FlashGold Direction Strategy (already had "Trade direction: Inverted") | [FlashGold_Direction_Strategy.pine](FlashGold_Direction_Strategy.pine) |
 
 More files are added to this table as their review finishes.

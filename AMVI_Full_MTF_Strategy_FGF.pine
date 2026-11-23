@@ -1,10 +1,40 @@
 //@version=6
-strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy", shorttitle="AMVI Full+ Strat", overlay=false, precision=2,
+strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy [Update 1]", shorttitle="AMVI Full+ Strat U1", overlay=false, precision=2,
      initial_capital=10000, default_qty_type=strategy.percent_of_equity, default_qty_value=10,
      commission_type=strategy.commission.percent, commission_value=0.04, slippage=1, pyramiding=0)
 
 // =====================================================================================
 // AMVI Full MTF -> Strategy
+// -------------------------------------------------------------------------------------
+// UPDATE 1 (2026-11-23)
+//   This script ALREADY HAD the option to trade the opposite side, so no new input was
+//   added (there is no "Inverted direction" checkbox here): it is "Trade direction"
+//   (group "Trade direction"), Follow the filter / Inverted. Its name, choices,
+//   default (Follow the filter) and code are unchanged. It was checked against the
+//   Update 1 rules (the ones the new "Inverted direction" option of the other
+//   strategies follows) and nothing had to be fixed. With Inverted:
+//    - Every volatility trigger is judged as before (same candle, same filter zone)
+//      and then traded on the OTHER side at the same price (market order at the next
+//      open; slippage, 1 tick by default, goes against either side): a trigger in the
+//      BUY ZONE opens "Short", in the SELL ZONE "Long", in NO TRADE nothing. A trigger
+//      in the other zone still reverses the position.
+//    - Stop, target and trailing stop keep their ATR distances (a short has its stop
+//      above, its target below). As with Follow the filter, stop and target are
+//      measured from the signal candle's close during the candle of the fill, then
+//      from the entry price of the trade really open; the trailing stop arms at its
+//      distance from that entry price. Volatility collapse and time stop close
+//      whichever trade is open.
+//    - Entry comments ("AMVI L ..." / "AMVI S ...") and the Long / Short Signal
+//      triangles show the order really placed; the SL / TP lines follow the trade
+//      really open. The filter's zones and marks and the Data Window rows "FGD ..."
+//      keep describing the filter. No alerts here.
+//    - There is no Long only / Short only input; the filter's Allow buys / Allow sells
+//      choose the ZONE, so with Inverted "Allow buys" alone trades shorts only.
+//   Changed by this update: the title now ends with "[Update 1]" (short title "AMVI
+//   Full+ Strat U1"); in the header below, the long-only / short-only sentence is
+//   completed and the EXITS line corrected (a trigger in the opposite zone always
+//   reverses; that was never optional in this build). Apart from the title no code
+//   line changed: orders, inputs and defaults = exactly the previous version.
 // -------------------------------------------------------------------------------------
 // AMVI measures volatility, not direction. The strategy therefore works as a
 // "volatility expansion" system:
@@ -14,7 +44,7 @@ strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy", shor
 //                  BUY ZONE goes long, in the SELL ZONE short, in NO TRADE nothing.
 //   3. EXITS     : ATR stop / ATR target / optional ATR trailing stop, optional
 //                  "volatility collapse" exit (average AMVI crosses below Low Vol),
-//                  optional time stop, optional reversal on opposite signal.
+//                  optional time stop. A trigger in the opposite zone reverses.
 // -------------------------------------------------------------------------------------
 // FGF build (2026-11-07): the FlashGold Direction Filter v1.2 is fused below, between
 // BEGIN and END FLASHGOLD DIRECTION FILTER, byte-identical to
@@ -26,7 +56,9 @@ strategy("Adaptive Market Volatility Indicator (AMVI) - Full MTF Strategy", shor
 // volatility trigger in the BUY ZONE goes long, in the SELL ZONE short, in NO TRADE
 // (or before the first signal) nothing; a trigger in the opposite zone reverses the
 // position. "Trade direction: Inverted" trades the same triggers the other way
-// round. Use the filter's Allow buys / Allow sells for long-only / short-only.
+// round. Use the filter's Allow buys / Allow sells for long-only / short-only
+// (they choose the zone: with Inverted, Allow buys alone trades shorts only and
+// Allow sells alone longs only).
 // The confluence count (Min TFs Above High Vol) moved to Thresholds: it belongs to
 // the volatility trigger, not to direction. The backtest date range has its own
 // group. The filter must stay enabled: with it off both sides are allowed on every

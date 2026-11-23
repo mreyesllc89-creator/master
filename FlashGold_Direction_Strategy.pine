@@ -2,6 +2,40 @@
 // ============================================================================
 //  FLASHGOLD DIRECTION STRATEGY  (built from FlashGold Direction Filter v1.2)
 // ----------------------------------------------------------------------------
+//  UPDATE 1 (2026-11-23)
+//    This script ALREADY HAD the option to trade the opposite side, so no new
+//    input was added (there is no "Inverted direction" checkbox here): it is
+//    "Trade direction" (group "Strategy: entries"), Follow the filter /
+//    Inverted. Its name, choices, default (Follow the filter) and code are
+//    unchanged. It was checked against the Update 1 rules (the ones the new
+//    "Inverted direction" option of the other strategies follows) and nothing
+//    had to be fixed. With Inverted:
+//     - Every entry trigger is judged as before (same candle, same zone or
+//       signal) and then traded on the OTHER side at the same price (market
+//       order at the next open; any slippage set in Properties goes against
+//       either side): a buy trigger opens "DS Short", a sell trigger opens
+//       "DS Long".
+//     - "Close when the entry zone ends" keeps a trade while the permission
+//       that triggered it is in force (a short opened by a buy trigger lives
+//       while that buy permission lasts). The opposite trigger closes or
+//       reverses it as before.
+//     - Stop, target and trailing stop keep their distances in ticks from
+//       the fill price of the trade really open (a short has its stop above,
+//       its target below). The quantity formula is unchanged (same stop
+//       distance); the time stop counts the bars of that trade.
+//     - "Sides" means the orders really placed: Long only + Inverted = only
+//       real buys, so only the sell triggers trade. The filter's own Allow
+//       buys / Allow sells keep choosing the zone.
+//     - Order comments ("Long" / "Short") show the order really placed. The
+//       filter's zones, marks and status box keep describing the filter.
+//       This script has no alerts.
+//    Changed by this update: the title, which now ends with "[Update 1]"
+//    (short title "FG-DS U1"), this header, and one sentence that Inverted
+//    makes false, in the "Signal confirmed" line below and in the "Entry
+//    trigger" tooltip: "it never trades against the signal" now adds "with
+//    Trade direction = Inverted it always does". No other code line changed:
+//    orders, inputs and defaults = exactly the previous version.
+//
 //  The direction filter, unchanged, trading its own direction. The block
 //  between BEGIN and END FLASHGOLD DIRECTION FILTER is byte-identical to
 //  FlashGold_Direction_Filter_v1_2.pine (a Python rebuild of it matched
@@ -14,7 +48,8 @@
 //      Zone start        buy on the first bar of a BUY ZONE (buys become
 //                        allowed), sell on the first bar of a SELL ZONE.
 //      Signal confirmed  buy once a BUY signal's own zone is reached (sell for
-//                        a SELL signal): it never trades against the signal.
+//                        a SELL signal): it never trades against the signal
+//                        (with Trade direction = Inverted it always does).
 //      New signal        trade each new signal's direction on the bar it
 //                        becomes known, wherever price is.
 //    Trade direction     Follow the filter, or Inverted (every entry the other
@@ -60,7 +95,7 @@
 //  hold-outs but lost under stressed costs (-235R at 0.035% per side).
 //  Treat the defaults as a starting point for your own tests.
 // ============================================================================
-strategy("FlashGold Direction Strategy", "FG-DS", overlay=true, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, calc_on_every_tick=false, calc_on_order_fills=false, process_orders_on_close=false, commission_type=strategy.commission.percent, commission_value=0, slippage=0, margin_long=1, margin_short=1, max_lines_count=500, max_labels_count=500, max_bars_back=500)
+strategy("FlashGold Direction Strategy [Update 1]", "FG-DS U1", overlay=true, initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1, pyramiding=0, calc_on_every_tick=false, calc_on_order_fills=false, process_orders_on_close=false, commission_type=strategy.commission.percent, commission_value=0, slippage=0, margin_long=1, margin_short=1, max_lines_count=500, max_labels_count=500, max_bars_back=500)
 
 
 // ===================== BEGIN FLASHGOLD DIRECTION FILTER ======================
@@ -660,7 +695,7 @@ plot(fgsShow ? fgsL1 : na, "FGF score (next candle)", display=display.data_windo
 //  STRATEGY: trade the filter's own direction
 // ============================================================================
 GRP_DSE = "Strategy: entries"
-dsTrigger   = input.string("Zone start", "Entry trigger", options=["Zone start", "Signal confirmed", "New signal"], group=GRP_DSE, tooltip="Zone start: buy on the first bar of a BUY ZONE, sell on the first bar of a SELL ZONE. Signal confirmed: buy once a BUY signal's own zone is reached (sell for a SELL signal), so it never trades against the signal. New signal: trade each new signal's direction on the bar it becomes known, wherever price is. Orders are placed at the bar close and fill at the next open.")
+dsTrigger   = input.string("Zone start", "Entry trigger", options=["Zone start", "Signal confirmed", "New signal"], group=GRP_DSE, tooltip="Zone start: buy on the first bar of a BUY ZONE, sell on the first bar of a SELL ZONE. Signal confirmed: buy once a BUY signal's own zone is reached (sell for a SELL signal), so it never trades against the signal (with Trade direction = Inverted it always does). New signal: trade each new signal's direction on the bar it becomes known, wherever price is. Orders are placed at the bar close and fill at the next open.")
 dsDirection = input.string("Follow the filter", "Trade direction", options=["Follow the filter", "Inverted"], group=GRP_DSE, tooltip="Inverted: every entry is taken the other way round (a buy trigger opens a short, a sell trigger opens a long).")
 dsSides     = input.string("Both", "Sides", options=["Both", "Long only", "Short only"], group=GRP_DSE)
 dsZoneExit  = input.bool(true, "Close when the entry zone ends", group=GRP_DSE, tooltip="Zone start and Signal confirmed only: close the trade at the next open once the permission that opened it is no longer in force (NO TRADE, the other zone, or a Minutes / Candles permission that ended).")
