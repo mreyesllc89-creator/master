@@ -260,7 +260,7 @@ The file now has the option "Inverted direction: opposite side at the same entri
 
 - **Inverted does not make the default trailing TP profitable.** With 1-minute fills and costs, both directions lose on every timeframe of both pairs. The two exceptions are within noise: BTC 4h inverted with the filter off (+0.14% over 2 years, first half -0.07%) and gold 2h normal with the filter off (+0.16%).
 - **BTC: the TradingView figures are the same artifact in both directions.** Normal and inverted both show +25% to +290% without Bar Magnifier, because the $2 / $1 trail is far smaller than one candle (see "Results" above). With 1-minute fills the win rate falls from 88-99% to 30-43% and both directions lose.
-- **BTC 30m to 4h: inverted loses less** (1h with the filter on: -5.45% normal, -2.10% inverted), but it still loses in both halves.
+- **BTC 30m to 4h: inverted loses less** (1h with the filter on: -5.45% normal, -2.10% inverted), but apart from the 4h case above it still loses in both halves.
 - **Gold: no pattern.** Inverted is better on 1h and 4h, worse on 15m, 30m and 2h.
 - **Trade counts** can differ by a few between normal and inverted. The entries are decided the same way, but the trailing exits fall on different candles, so the number of open entries is not always the same.
 
