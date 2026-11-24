@@ -1,0 +1,79 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © ghostsmartfire
+
+//@version=6
+//@version=5
+strategy("ApexForge Flow Resonance Strategy [Grok Team]", overlay=true, default_qty_type=strategy.percent_of_equity, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0.04)
+
+// ── USER INPUTS ─────────────────────────────────────
+htfTimeframe   = input.timeframe("15", "Higher Timeframe for Structure (Forge Levels)")
+zoneLookback   = input.int(20, "Swing Lookback for Order Blocks", minval=5)
+minBodyStr     = input.float(0.65, "Min Candle Body Strength for Flow (0-1)", minval=0.1, maxval=1.0)
+volMultiplier  = input.float(1.7, "Volume Spike Multiplier for IFT Pressure")
+rrRatio        = input.float(3.0, "Reward:Risk Ratio", minval=1.5)
+showZones      = input.bool(true, "Show Demand/Supply Zones")
+showRangeNote  = input.bool(true, "Show Range-Bar Recommendation")
+
+// ── HIGHER-TIMEFRAME STRUCTURE (Forge Levels) ─────
+htfHigh = request.security(syminfo.tickerid, htfTimeframe, high)
+htfLow  = request.security(syminfo.tickerid, htfTimeframe, low)
+
+// ── SWING-BASED ORDER BLOCKS (Demand = Green, Supply = Red) ──
+swingHigh = ta.pivothigh(high, zoneLookback, zoneLookback)
+swingLow  = ta.pivotlow(low,  zoneLookback, zoneLookback)
+
+var box demandBox = na
+var box supplyBox = na
+
+if not na(swingLow)
+    if not na(demandBox)
+        box.delete(demandBox)
+    demandBox := box.new(bar_index - zoneLookback, swingLow * 1.008, bar_index + 100, swingLow * 0.992,
+                         border_color=color.new(#00ff88, 40), bgcolor=color.new(#00ff88, 85), text="DEMAND", text_color=color.white, text_size=size.small)
+
+if not na(swingHigh)
+    if not na(supplyBox)
+        box.delete(supplyBox)
+    supplyBox := box.new(bar_index - zoneLookback, swingHigh * 1.008, bar_index + 100, swingHigh * 0.992,
+                         border_color=color.new(#ff0033, 40), bgcolor=color.new(#ff0033, 85), text="SUPPLY", text_color=color.white, text_size=size.small)
+
+// ── FLOW PRESSURE DETECTION (IFT Proxy) ─────────────
+bodyStrength = math.abs(close - open) / (high - low)
+bullFlow     = bodyStrength >= minBodyStr and close > open and (close - low) / (high - low) > 0.65   // strong lower-wick absorption
+bearFlow     = bodyStrength >= minBodyStr and close < open and (high - close) / (high - low) > 0.65  // strong upper-wick rejection
+volSpike     = volume > ta.sma(volume, 20) * volMultiplier
+
+// ── RESONANCE CONFIRMATION (Clean Bounce or Bloodbath) ──
+bullResonance = bullFlow and volSpike and not na(demandBox) and low <= box.get_top(demandBox) and close > box.get_bottom(demandBox) and close > htfLow
+bearResonance = bearFlow and volSpike and not na(supplyBox) and high >= box.get_bottom(supplyBox) and close < box.get_top(supplyBox) and close < htfHigh
+
+// ── STRATEGY EXECUTION ─────────────────────────────
+if bullResonance
+    strategy.entry("Apex Long", strategy.long)
+    stopPrice = box.get_bottom(demandBox) * 0.995
+    targetPrice = close + (close - stopPrice) * rrRatio
+    strategy.exit("Exit Long", "Apex Long", stop=stopPrice, limit=targetPrice)
+
+if bearResonance
+    strategy.entry("Apex Short", strategy.short)
+    stopPrice = box.get_top(supplyBox) * 1.005
+    targetPrice = close - (stopPrice - close) * rrRatio
+    strategy.exit("Exit Short", "Apex Short", stop=stopPrice, limit=targetPrice)
+
+// ── VISUALS (exactly like your screenshots) ───────
+plot(htfHigh, "HTF High", color=color.new(color.red, 70), style=plot.style_linebr)
+plot(htfLow,  "HTF Low",  color=color.new(color.green, 70), style=plot.style_linebr)
+
+plotshape(bullResonance, title="BUY",  location=location.belowbar, color=color.new(#00ff88, 0), style=shape.labelup,   text="BUY",  textcolor=color.black, size=size.large)
+plotshape(bearResonance, title="SELL", location=location.abovebar, color=color.new(#ff0033, 0), style=shape.labeldown, text="SELL", textcolor=color.white, size=size.large)
+
+bgcolor(bullResonance ? color.new(#00ff88, 92) : na, title="Bull Resonance Highlight")
+bgcolor(bearResonance ? color.new(#ff0033, 92) : na, title="Bear Resonance Highlight")
+
+// Range-bar reminder (just like your original post)
+if showRangeNote and barstate.islast
+    label.new(bar_index, high, "→ Use RANGE bars for cleaner execution\nNo guessing. Just structure & flow.", style=label.style_label_left, color=color.blue, textcolor=color.white, size=size.normal)
+
+// ── ALERTS ─────────────────────────────────────────
+alertcondition(bullResonance, title="ApexForge LONG",  message="🚀 ApexForge Bullish Resonance → BUY (Strong demand bounce)")
+alertcondition(bearResonance, title="ApexForge SHORT", message="🔻 ApexForge Bearish Resonance → SELL (Bloodbath continuation)")

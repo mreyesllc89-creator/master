@@ -3,19 +3,92 @@
 //
 // FlashGold v5 STRATEGY (BTCUSD build)
 // ---------------------------------------------------------------------------
+// UPDATE 1 (2026-11-23)
+//  - New option "Inverted direction: opposite side at the same entries" (group
+//    "Inverted direction (Update 1)", off by default). On: each entry is placed
+//    on the OPPOSITE side at the same price: a BUY signal's buy stop becomes a
+//    SELL LIMIT there, a SELL signal's sell stop a BUY LIMIT (both kinds fill
+//    when price reaches it: same candle; exceptions under "Fills" below).
+//  - Signals, zones and the direction filter decide as before: a BUY signal the
+//    filter allows (BUY ZONE) is placed as a sell, a SELL signal it allows
+//    (SELL ZONE) as a buy; a blocked signal stays blocked.
+//  - Exits keep their distances on the side really open (a sell: stop above
+//    its fill, target below; partial, runner, breakeven, trailing, time stop
+//    follow the real trade). Opposite-signal close / reversal read the
+//    position mirrored. "Direction" = the orders really placed (Long = only
+//    real buys). No other reverse option here. Order comments name the real
+//    order ("FG sell limit (inv)"); BUY / SELL marks, entry lines and "FGD"
+//    values keep describing the signal and filter. See INVERTED DIRECTION.
+//  - Off = exactly the previous version. The title now ends with "[Update 1]".
+//
 // What is kept from the indicator, unchanged: the bid/ask model from the spread
 // input, the TDI direction (RSI -> SMA fast / slow, fast rising = BUY), the
 // parent + six child zones alignment filter, the burst gate, the prior-drift
 // filter, the entry hold (virtual stop) and the one-entry-per-bar rule. The
 // entry price is the indicator's: ask + entry distance for a buy, bid - entry
-// distance for a sell, placed as a STOP order.
+// distance for a sell, placed as a STOP order (with "Inverted direction" on:
+// as a LIMIT order of the opposite side at that same price, see UPDATE 1).
 //
 // What the indicator does not have and the strategy adds (all inputs, group
-// "S1..S3"): a lifetime for the unfilled entry stop, a stop loss and target in
+// "S1..S3"): a lifetime for the unfilled entry order, a stop loss and target in
 // ATR or points, an optional trailing stop, a time stop, exit or reversal on
 // the opposite signal, a direction filter, fixed or risk-based sizing, a cost
 // header, ATR units for the burst / entry distance / hold thresholds, and
 // last-closed-bar reads for child zones on higher timeframes (non-repainting).
+// Since UPDATE 1 also the "Inverted direction" option (a group of its own).
+//
+// INVERTED DIRECTION (UPDATE 1; group "Inverted direction (Update 1)", off).
+// On: the script decides everything as with the option off, as if it held the
+// mirror of its real position, and sends each entry on the other side.
+//  - Entry: a BUY signal the filter allows (BUY ZONE) places a SELL LIMIT at
+//    the buy stop's price (ask + entry distance, above the market); a SELL
+//    signal it allows (SELL ZONE) places a BUY LIMIT at the sell stop's price
+//    (bid - entry distance, below the market). A buy stop and a sell limit at
+//    one price both fill when price reaches it (at the open after a gap through
+//    it): the same candle, the same price, apart from the two Properties under
+//    "Fills" below. Same OCA group (one fills, the other is cancelled), same
+//    "Cancel unfilled entry after N bars", same quantity rule (Risk %: the same
+//    stop distance, the account's real equity). A signal the filter blocks
+//    places nothing, inverted or not: the filter keeps judging the signal's own
+//    side, so where it lets no signal through (the 60m finding under DIRECTION
+//    FILTER below) nothing changes.
+//  - Exits: every distance is kept, on the side really open. A sell has its
+//    stop loss above its fill price and its take profit below; the partial
+//    take profit, the runner's breakeven (the fill price) and trail, the
+//    Fixed-style trailing stop and the time stop work on the real trade. So
+//    the inverted trade does not end where the normal one ends (the normal
+//    buy is stopped where the inverted sell is in profit), and from there
+//    each run answers the next signals from its own position: the inverted
+//    trade list is not the normal list with the sides swapped.
+//  - Opposite signal: the position is read mirrored. A BUY signal is ignored
+//    while the SHORT it opened is open; a SELL signal then closes that short
+//    ("Close at market on the opposite signal") or places the buy limit that
+//    reverses it ("Opposite signal may reverse an open position"). That
+//    option is about an open trade and is unchanged; the script has no option
+//    that reverses the signal itself.
+//  - "Direction" (S1) means the orders really placed: Long = only buy orders
+//    (inverted they come from the SELL signals), Short = only sell orders.
+//    The filter's "Allow buys / Allow sells" stay on the signal's side: Allow
+//    buys off blocks the BUY signals, i.e. the inverted SELL orders.
+//  - Chart: the BUY / SELL triangles, the entry price lines, labels and tags,
+//    the filter's zones and status box and the "FGD ..." values keep
+//    describing the FlashGold signal and the filter: "buys allowed" in the
+//    status box then means BUY signals are allowed (and placed as sells),
+//    "FGD raw long" is a BUY signal that reached the filter. The order
+//    markers and the trade list show the order really placed: "FG sell limit
+//    (inv)" / "FG buy limit (inv)". The order id "Long" is always a buy and
+//    "Short" always a sell (what an alert on order fills reads; the script
+//    has no alert() calls). The table title reads "FlashGold v5 S
+//    (inverted)"; its Position row is the real position.
+//  - Fills: two Properties treat a stop and a limit order differently. Slippage
+//    (5 ticks here) is added to stop and market orders only, so the normal stop
+//    entry pays it and the inverted limit entry does not. "Verify price for
+//    limit orders" (0 by default; this script does not set it) applies to limit
+//    orders only: above 0 the inverted limit entry fills only after price has
+//    gone that many ticks THROUGH its price, so it can fill on a later candle
+//    than the stop entry would, or not at all. Live, a limit order can stay
+//    unfilled when price only touches it. Every calibration figure below was
+//    measured with the option off; nothing was measured with it on.
 //
 // CALIBRATION (BTCUSD build): MEXC:BTCUSDT 60m, 776 bars (2026-09-06 to 2026-10-08),
 // 10 contracts (= 10 BTC). Only the S2 exits were swept; every other input is the
@@ -51,6 +124,170 @@
 //  - One month of data: re-check on new data, and with Bar Magnifier, before
 //    trading. A 0.1 ATR stop lives inside the chart bar.
 //
+// CALIBRATION (2026-10-25, XAUUSD + BTCUSD; NO default changed): OANDA:XAUUSD
+// 60m (4,750 bars, 2025-12-23 to 2026-10-13), 120m (2,420 bars, same span) and
+// 240m (2,205 bars, 2025-05-12 to 2026-10-13; TradingView exports with the
+// "FGF buy / sell allowed" columns), plus Bitfinex BTCUSD 2018-2019 (public
+// dataset, 1m bars built into 5m / 60m / 120m / 240m; no filter columns, so the
+// filter is always "allowed" there). Python replica of this script (signal,
+// zones, hold, S1-S3, the filter read from the exported columns); 381,024 input
+// combinations per dataset, a 42,336 wider-stop grid on 1m / 5m. Results in R
+// (1 R = the stop distance; no sizing). Costs: $0.30 spread per XAU round trip,
+// $0.20 spread + 0.02% per side on BTC. Two fill models: "stop-first" = after
+// every fill the rest of the bar runs adverse extreme -> favourable extreme ->
+// close (stricter than the worst case above: a stop much smaller than the bar
+// loses almost every trade); "TV path" = TradingView's open -> high -> low ->
+// close (open -> low -> high -> close when the open is nearer the low).
+//  - CURRENT DEFAULTS (Pips SL 30 / TP 5R / runner 600, 30% partial, entry
+//    distance 0.25 ATR, reverse on, filter on), stop-first fills, R = 30 pips:
+//      XAU60    +0.0R, 0 trades (see Direction filter below); filter off +50.3R, 288 trades, PF 1.31, halves +9.4 / +40.9, DD 17R
+//      XAU120  -11.7R,  57 trades, PF 0.76, halves -3.4 / -8.3, DD 25R (filter off -13.9R, 180 trades, PF 0.89, halves -29.5 / +15.5)
+//      XAU240  -35.7R,  67 trades, PF 0.39, halves -12.8 / -22.8, DD 37R; May-Dec 2025 slice -10.9R, 26 trades (filter off -3.3R, 165 trades, PF 0.97, halves +28.8 / -32.1)
+//      BTC60  -1,090.7R, 1,870 trades, PF 0.42, halves -692.9 / -397.8, DD 1,108R
+//      BTC120   -702.1R, 1,028 trades, PF 0.35, halves -476.6 / -225.5, DD 725R
+//      BTC240   -379.0R,   536 trades, PF 0.34, halves -254.8 / -124.1, DD 397R
+//      BTC5   -1,190.0R, 13,017 trades, PF 0.85, halves -1,077.9 / -112.2, DD 1,350R
+//      BTC1   +2,761.7R, 41,591 trades, PF 1.18, win 38%, halves +1,212.5 / +1,549.2, DD 172R (a $30 stop is 8 ATR of a 2018-19 1m bar: a wide-stop scalper, not the sub-bar stop above)
+//    Under the TV path the BTC 60 / 120 / 240 numbers flip to +301.1R (PF 1.24),
+//    +418.5R (PF 1.65), +481.6R (PF 2.75) and BTC5 to +492.1R; XAU barely moves
+//    (XAU240 -35.7 -> -17.6R). The defaults' edge on BTC exists only under the
+//    optimistic intrabar path, because the $30 stop lives inside a $50-100 bar
+//    (the warning above); stop-first they lose on 5 of the 6 hourly-and-up sets.
+//  - BEST FOUND (NOT applied, see below): among the 305 of 381,024 combinations
+//    positive in all 12 half-samples (3 XAU + 3 BTC timeframes x 2 halves), the
+//    one with the best worst half. A single family: entry at the ask (entry
+//    distance 0), burst 0.3 ATR, Minimum child zones aligned 1 (parent direction
+//    only; zones 2-3 are then irrelevant), reverse off, filter off, entry valid
+//    3 bars, ATR exits SL 1.0 x ATR(14), TP 1.5R, 0% partial (all runner:
+//    breakeven after 1.5R, trail 2.5 ATR), time stop 12 bars. Stop-first fills,
+//    R = 1 ATR (TV path in brackets):
+//      XAU60   +82.0R,   622 trades, PF 1.22, win 30%, halves +34.2 / +47.8, DD 20R (+85.9R)
+//      XAU120  +64.5R,   311 trades, PF 1.36, win 32%, halves +32.2 / +32.2, DD 17R (+67.0R)
+//      XAU240  +43.5R,   278 trades, PF 1.28, win 32%, halves +19.7 / +23.8, DD 14R (+41.7R); unseen May-Dec 2025 slice +4.8R, 121 trades (+2.3R)
+//      BTC60  +342.7R, 2,229 trades, PF 1.26, win 31%, halves +130.8 / +212.0, DD 31R (+410.8R)
+//      BTC120 +202.7R, 1,095 trades, PF 1.31, win 30%, halves +24.5 / +178.2, DD 38R (+207.3R)
+//      BTC240  +77.0R,   555 trades, PF 1.23, win 29%, halves +28.2 / +48.8, DD 24R (+78.2R)
+//    Six-dataset total +812.4R, all 12 halves positive, worst half +19.7R, min
+//    PF 1.22; the fill model moves it by < 20% everywhere (a 1 ATR stop is
+//    bar-sized). One-step changes (worst half): Minimum zones 2 -> +1.4R (+8.1R
+//    with a 4th zone at 8x the chart: XAU +100R / BTC +479R), reverse on ->
+//    -16.4R, 30% partial -> -3.2R, entry distance 0.25 ATR -> -31.6R, time stop
+//    off -> -1.1R, TP 2R -> +5.6R, the Pips 30 / 5 / 600 exit -> -264R, any SL
+//    <= 0.25 ATR -> below -170R. Cross-market: the 300 best XAU settings
+//    average +76.6R on BTC (47% positive) against -2,721R (7%) for random ones;
+//    the 300 best BTC settings average +34.2R on XAU (68% positive). Out of
+//    sample (the XAU240 bars May-Dec 2025 that the 60m / 120m files do not
+//    cover): the 100 best on 60m + 120m average +13.2R (81% positive), 100
+//    random settings -37.8R (33%); BEST itself +4.8R on 121 trades.
+//  - WHY THE DEFAULTS WERE NOT CHANGED: two independent reviews of the
+//    recommendation found it not trustworthy enough to ship.
+//    Overfitting: BEST is a grid corner (8 of 9 numeric inputs sit on a grid
+//    edge) and a spike, not a plateau (every one-step neighbour falls, see
+//    above; outside the grid SL 1.5 ATR -> XAU +27.8R / BTC +117R, SL 2.0 ->
+//    -2.6 / -152R, time stop 6 -> +67 / +428R); the top 2% of trades carry
+//    62-151% of each dataset's gain (without them 4 of 6 datasets are
+//    negative); block-bootstrap 95% intervals include zero on XAU240 and
+//    BTC240 (t-stats 1.4-2.9); the "12 halves" are 4 distinct periods x 3
+//    resolutions, and cutting the data into thirds or quarters gives negative
+//    pieces (-23.4R / -13.8R); the exit ranking that produced BEST depends on
+//    the stop-first convention (small stops are punished by it, so the
+//    defaults rank far higher under the TV path); the unseen slice (+4.8R on
+//    121 trades) is only the 54th percentile of all SL 1 ATR settings.
+//    Lookahead / fills / costs: NO lookahead (cutting the data at 33 / 62 / 90%
+//    or replacing the future with a random walk left every earlier trade
+//    identical, 360 of 360 checks; an independent re-implementation reproduces
+//    every BEST trade on all 6 datasets), every fill inside the bar's range,
+//    but the edge is thin against costs: break-even fee per side 0.03% on XAU60
+//    (0.06-0.07% on XAU120 / 240, 0.075-0.14% on BTC); at 0.02% per side XAU60
+//    drops to +27R and at 0.03% to -1R, and 8-13% of BEST's trades enter and
+//    are stopped on the same bar (all losers, about -1R each).
+//    Bar Magnifier (BTC only: the 60m / 120m / 240m / 5m sets are built from
+//    the same Bitfinex 1m file; XAU has no sub-bar data): BEST's chart-bar
+//    decisions (signal, stop entry, 3-bar validity, breakeven flag, 12-bar
+//    time stop, all at the chart close as calc_on_every_tick = false) replayed
+//    with 1-minute execution, TradingView's rule inside each minute. Checks:
+//    fed the chart bars as "minutes" the executor reproduces the replica trade
+//    for trade (stop-first and TV path), and 0 of 240,528 chart bars differ
+//    from their minute aggregate. Result: the stop-first model is NOT a lower
+//    bound for BEST. BTC60 +320.3R vs +342.7R (-6.5%, PF 1.245 vs 1.258),
+//    BTC120 +171.7R vs +202.7R (-15%, worst half +6.0R vs +24.5R), BTC240
+//    +49.6R vs +77.0R (-36%, DD 39R vs 24R); BTC5 +8,125R vs +4,664.6R (there
+//    a 1 ATR stop spans ~3 minute ranges, so the chart-bar model was the
+//    pessimistic one). The gap is the 2.5 ATR runner trail: the chart-bar
+//    model books it at the trail level, the minute replay at the first minute
+//    that crosses it (BTC60 trail exits net -96R against the replica, stops
+//    +61R). Minute-path bracket, adverse-first / favourable-first: +316.6 /
+//    +153.3R, +171.7 / +101.4R, +49.4 / +31.8R (favourable-first is the
+//    trail's adverse order). The 20 biggest winners are 74% / 118% / 297% of
+//    each total and 17 / 12 / 3 of them contain a minute wider than the trail
+//    distance. Without the trail (breakeven + time stop only) all models agree
+//    within 3%: BTC60 +349.5R chart-bar / +358.6R 1m, BTC120 +255.8 / +264.2R,
+//    BTC240 +88.8 / +88.8R, worst halves +67.0R / +56.2R; on XAU the same
+//    change gives +83.6 / +79.8 / +48.9R, where the trail exits carry +109 /
+//    +47 / +55R of +82 / +64 / +44R and the top 15-17% of trades carry +206 /
+//    +97 / +70R against -124 / -33 / -27R for the rest. So the calibrated
+//    numbers overstate BEST by 7-36% on hourly BTC and lean on the trail's
+//    fill; the unchecked XAU numbers lean on it even more.
+//  - DIRECTION FILTER (only XAU has real filter columns; on BTC it is inert):
+//    at BEST, filter off vs on: 60m +82.0R vs -14.0R (445 trades, PF 0.95,
+//    halves -28.7 / +14.7, DD 44R), 120m +64.5R vs +13.7R (207 trades, PF 1.12,
+//    halves -2.5 / +16.2), 240m +43.5R vs +9.6R (177 trades, PF 1.09, halves
+//    +7.8 / +1.8; unseen slice -3.8R). At the defaults: 60m 0 trades vs +50.3R
+//    off, 120m -11.7R vs -13.9R, 240m -35.7R vs -3.3R. Mechanism: the exported
+//    filter is this script's own 60m signal with Level = Entry price, so on a
+//    60m chart the level sits above the close on every buy signal bar (below on
+//    sells) and the signal's own direction is never allowed on its bar (0 of
+//    521 buys / 0 of 487 sells pass); on 120m / 240m the stale 60m level lets
+//    ~17-20% of signals through, at random with respect to the outcome. No
+//    filter-on setting is positive in all 12 halves; filter on cuts XAU60
+//    trades from a median 535 to 92 per setting. Finding: off is the better
+//    choice for this strategy (the filter is the same signal and, on the same
+//    timeframe, contradicts it); the default stays on with the rest. Holds only
+//    for the exported filter settings (60m, Level = Entry price, Until next
+//    signal); other filter timeframes / levels were not available.
+//  - CYCLE GATE (2026-10-25): tested and NOT added. On BEST, 297 gate settings
+//    (3 period bands x resonance / phase / 2x-timeframe sync) per estimator:
+//    band-pass best total -90.9R, best worst-half gain -36.6R; autocorrelation
+//    periodogram -66.5R / -38.5R; 12 random gates on the same grid: median
+//    -126.6R, max +34.4R total. Every real gate removes 10-19% of the trades
+//    and loses on net; none beats the random-gate envelope.
+//  - 5-MINUTE and 1-MINUTE CHARTS (BTC 2018-19, $0.20 spread + 0.02% per side,
+//    stop-first; not part of the selection): BTC5 (median ATR $12.4, a round
+//    trip = 0.25 ATR): BEST +4,664.6R (26,993 trades, PF 1.23, halves +2,255.6
+//    / +2,409.0, DD 670R; +9,564.5R TV path); the best 5m setting (zones 1 / 2
+//    / 4 / 8x, Minimum zones 2, burst 0.5, reverse on, same exits as BEST)
+//    +4,713R (23,795 trades, PF 1.28, DD 316R); the 200 best on the first half
+//    are positive on the second 99% of the time; defaults -1,190R (PF 0.85).
+//    BTC1 (median ATR $3.7, a round trip = 0.86 ATR = 0.86 R at SL 1 ATR):
+//    only 4.5% of settings are positive in both halves and the ranking inverts
+//    to wide stops: SL 3 ATR / TP 5R / runner 4 ATR +6,364R (62,385 trades, PF
+//    1.20, DD 1,860R), the Pips 30 / 5 / 600 exit +5,367R (PF 1.30, DD 88R);
+//    BEST -28,321.8R (109,183 trades, PF 0.81) stop-first but +85,953R under
+//    the TV path: on 1m the fill model decides the sign. Joint 5m + 1m: 1,020
+//    settings positive in all 4 halves, led by SL 2 ATR / TP 1.5R / runner 4
+//    (BTC5 +2,776R, BTC1 +7,495R, DD 6,090R). Fee sensitivity (0.02 / 0.035 /
+//    0.05% per side): BTC5 best +4,713 / -854 / -6,421R (PF 1.28 / 0.96 /
+//    0.74), defaults -1,190 / -2,256 / -3,322R; BTC1 best +6,364 / -8,150 /
+//    -22,663R, defaults +2,762 / -647 / -4,055R. Everything on 1m and 5m is
+//    negative at 0.035% per side and above. Do not use below 60m unless the
+//    all-in cost is <= 0.02% per side; on 5m BEST's exit structure holds, on 1m
+//    it does not (needs SL >= 2-3 ATR, PF ~1.2, multi-thousand-R drawdowns).
+//    Best-on-5m settings transfer badly to 1m (22% positive), best-on-1m
+//    settings well to 5m (97%).
+//  - Replica simplifications: no sizing (R per trade; partials as exact
+//    fractions; a partial + runner is one trade, TradingView lists two); the
+//    kit cost model instead of the 0.02% commission + 5-tick slippage; R = the
+//    locked stop distance; higher-TF zones rebuilt from chart bars with
+//    session alignment (XAU 17:00 New York); "One entry per bar" is inert
+//    exactly as in the Pine; tick behaviour beyond bar data not replicated.
+//    Sample: XAU 2025-26 only, BTC 2018-19 only (a different regime and price
+//    level: today a 30-pip BTC stop is 0.03% of price, so fixed pips do not
+//    port); nothing in between. Re-check with Bar Magnifier on XAUUSD (the BTC
+//    check above used the 1m bars) and on new data before trading. To try
+//    BEST, set by hand: ATR unit, SL 1.0 ATR, TP 1.5R,
+//    partial 0%, runner trail 2.5 ATR, time stop 12, entry distance 0 ATR,
+//    burst 0.3 ATR, Minimum child zones aligned 1, reverse off, filter off.
+//
 // Data notes:
 //  - Child zones on seconds timeframes need seconds bars on your plan; where
 //    TradingView has no seconds history the zone returns na. "Ignore zones
@@ -61,7 +298,7 @@
 //  - "Points" everywhere = syminfo.mintick units, as in the indicator.
 //    BTCUSDT: mintick 0.01, so 100 pts = $1 per BTC.
 //@version=5
-strategy("FlashGold v5 Strategy (BTCUSD)", "FlashGold v5 S (BTCUSD)", overlay = true, max_labels_count = 500, max_lines_count = 500,
+strategy("FlashGold v5 Strategy (BTCUSD) [Update 1]", "FlashGold v5 S (BTCUSD) U1", overlay = true, max_labels_count = 500, max_lines_count = 500,
      pyramiding = 0, initial_capital = 100000, currency = currency.NONE,
      default_qty_type = strategy.fixed, default_qty_value = 10,
      commission_type = strategy.commission.percent, commission_value = 0.02,  // % of notional per side (typical crypto futures taker fee)
@@ -130,10 +367,10 @@ labelTimeZone   = input.string("America/New_York", "Label time zone", group = gV
 
 // ============================== INPUTS (strategy additions) ==============================
 gS1 = "S1. Entry order"
-Direction       = input.string("Both", "Direction", options = ["Both", "Long", "Short"], group = gS1)
-entryValidBars  = input.int(3, "Cancel unfilled entry after N bars (0 = keep until filled)", minval = 0, group = gS1, tooltip = "The indicator only prints the entry price. The strategy places a stop order there and cancels it if price has not reached it after this many bars.")
-allowReverse    = input.bool(true, "Opposite signal may reverse an open position", group = gS1, tooltip = "On: a SELL signal while long places the sell stop; when it fills the long is closed and a short opened. Off: opposite signals are ignored while in a position.")
-exitOnOpposite  = input.bool(false, "Close at market on the opposite signal", group = gS1, tooltip = "On: the open position is closed at the close of the bar that prints the opposite signal, before any reversal order.")
+Direction       = input.string("Both", "Direction", options = ["Both", "Long", "Short"], group = gS1, tooltip = "Long: only buy orders. Short: only sell orders. With 'Inverted direction' on this still means the orders really placed: Long then takes only the SELL signals (their orders are buys).")
+entryValidBars  = input.int(3, "Cancel unfilled entry after N bars (0 = keep until filled)", minval = 0, group = gS1, tooltip = "The indicator only prints the entry price. The strategy places a stop order there and cancels it if price has not reached it after this many bars. With 'Inverted direction' on the order there is a limit order of the opposite side, cancelled the same way.")
+allowReverse    = input.bool(true, "Opposite signal may reverse an open position", group = gS1, tooltip = "On: a SELL signal while long places the sell stop; when it fills the long is closed and a short opened. Off: opposite signals are ignored while in a position. With 'Inverted direction' on the sides are mirrored: a SELL signal while SHORT places the buy limit; when it fills the short is closed and a long opened.")
+exitOnOpposite  = input.bool(false, "Close at market on the opposite signal", group = gS1, tooltip = "On: the open position is closed at the close of the bar that prints the opposite signal, before any reversal order. With 'Inverted direction' on, opposite means opposite to the signal that opened the trade: a SELL signal closes the short a BUY signal opened.")
 
 gS2 = "S2. Exits"
 ExitMode        = input.string("Pips", "SL / TP / trail unit", options = ["Pips", "ATR", "Points"], group = gS2, tooltip = "Pips: fixed distances in pips (calibrated, see the Pips inputs). ATR: distances scale with volatility (more robust when volatility changes a lot). Points: mintick units.")
@@ -749,6 +986,9 @@ if fgfShowTbl and fgfOn and barstate.islast
         table.cell(fgfTable, 1, 13, fgsRefTxt(fgfTfSec), text_color=color.gray)
 // ====================== END FLASHGOLD DIRECTION FILTER =======================
 
+// UPDATE 1: declared after every other input on purpose, so that no existing setting changes its place.
+fgvInv = input.bool(false, "Inverted direction: opposite side at the same entries", group = "Inverted direction (Update 1)", tooltip = "Off: exactly the previous version. On: every entry is placed on the OPPOSITE side at the same price: a BUY signal's buy stop (ask + entry distance) becomes a SELL LIMIT at that price, a SELL signal's sell stop (bid - entry distance) a BUY LIMIT. Both kinds fill when price reaches that price, so the fill is on the same candle; only two Properties tell them apart in the backtest: slippage is added to the stop entry and not to the limit entry, and 'Verify price for limit orders' (0 by default) applies to the limit entry only (above 0 it fills only after price has gone that many ticks through its price: later, or not at all). Same OCA group, same 'Cancel unfilled entry after N bars', same quantity. Signals, zones and the direction filter decide as before: a BUY signal the filter allows (BUY ZONE) is placed as a sell, a SELL signal it allows (SELL ZONE) as a buy, a blocked signal stays blocked. Exits keep their distances on the side really open (a sell: stop loss above its fill, take profit below; partial, runner, breakeven, trailing and time stop follow the real trade). Close / reversal on the opposite signal read the position mirrored: a SELL signal closes or reverses the short a BUY signal opened. 'Direction' means the orders really placed (Long = only real buys). Live, a limit order can stay unfilled when price only touches it.")
+
 // Exported values (Data Window + linkable as a source from other scripts).
 plot(fgfOn and fgfOpen ? 1 : 0, "FGF active", display=display.data_window)
 plot(fgfBuyOk ? 1 : 0, "FGF buy allowed", display=display.data_window)
@@ -956,48 +1196,85 @@ calcQty(float slTicks) =>
     q
 
 // ============================== STRATEGY: ORDERS ==============================
-allowL = Direction != "Short"
-allowS = Direction != "Long"
+// UPDATE 1, "Inverted direction" (fgvInv). The entry / close DECISIONS below are taken in the normal frame, as with the
+// option off, as if the strategy held the mirror of its real position; only the order sent is mirrored (other side, LIMIT
+// instead of STOP, same price). The order ids keep naming the side really traded: "Long" is always a buy, "Short" always a
+// sell, and the L / S locks, placedBarL / S, the stale-order cancel, the breakeven flag and every strategy.exit below
+// belong to that id, so they are unchanged and always work on the trade really open (tick distances; breakeven = the
+// real fill price). Inverted, a BUY signal therefore fills the S locks and places "Short", a SELL signal the L locks and "Long".
+//   inLong / inShort   the position really open (exits, breakeven flag, stale-order cancel, table)
+//   fgvNL / fgvNS      the same read in the normal frame: the trade a BUY / a SELL signal opened is open
+//                      (inverted: fgvNL = a real short, fgvNS = a real long)
+//   allowL / allowS    may a BUY / a SELL signal place its order. "Direction" restricts the orders really placed
+//                      (Long = only real buys), so inverted a BUY signal (a sell order) needs Direction != "Long"
+// Option off: allowL / allowS as before, fgvNL = inLong, fgvNS = inShort, and each "if fgvInv ... else" runs its else
+// branch, which is the previous code.
+allowL = fgvInv ? Direction != "Long" : Direction != "Short"
+allowS = fgvInv ? Direction != "Short" : Direction != "Long"
 inLong  = strategy.position_size > 0
 inShort = strategy.position_size < 0
 flat    = strategy.position_size == 0
+fgvNL   = fgvInv ? inShort : inLong
+fgvNS   = fgvInv ? inLong : inShort
 
 var int placedBarL = na
 var int placedBarS = na
 
-// opposite-signal handling on an open position
-if exitOnOpposite and sellSignal and inLong
-    strategy.close("Long", comment = "opp signal")
-if exitOnOpposite and buySignal and inShort
-    strategy.close("Short", comment = "opp signal")
+// opposite-signal handling on an open position (inverted: the trade a BUY signal opened is the "Short", so a SELL signal closes it)
+if exitOnOpposite and sellSignal and fgvNL
+    strategy.close(fgvInv ? "Short" : "Long", comment = "opp signal")
+if exitOnOpposite and buySignal and fgvNS
+    strategy.close(fgvInv ? "Long" : "Short", comment = "opp signal")
 
-// long entry: stop order at the indicator's entry price
-if buySignal and allowL and not inLong and (flat or allowReverse or exitOnOpposite) and fgfBuyOk
+// BUY signal: a buy stop at the indicator's entry price ("Long"). Inverted: a SELL LIMIT at that same price ("Short");
+// both fill when price reaches it (the Properties that tell a stop from a limit fill: header, INVERTED DIRECTION, "Fills").
+// The gate is the BUY signal's (fgfBuyOk) either way.
+if buySignal and allowL and not fgvNL and (flat or allowReverse or exitOnOpposite) and fgfBuyOk
     qL = calcQty(slTicksNow)
     if qL > 0 and not na(buyEntryPrice)
-        lockSlL := slTicksNow
-        lockTpL := tpTicksNow
-        lockActL := trailActNow
-        lockDstL := trailDstNow
-        lockRunL := runDstNow
-        strategy.entry("Long", strategy.long, qty = qL, stop = buyEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG buy stop")
-        placedBarL := bar_index
+        if fgvInv
+            lockSlS := slTicksNow
+            lockTpS := tpTicksNow
+            lockActS := trailActNow
+            lockDstS := trailDstNow
+            lockRunS := runDstNow
+            strategy.entry("Short", strategy.short, qty = qL, limit = buyEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG sell limit (inv)")
+            placedBarS := bar_index
+        else
+            lockSlL := slTicksNow
+            lockTpL := tpTicksNow
+            lockActL := trailActNow
+            lockDstL := trailDstNow
+            lockRunL := runDstNow
+            strategy.entry("Long", strategy.long, qty = qL, stop = buyEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG buy stop")
+            placedBarL := bar_index
 
-// short entry
-if sellSignal and allowS and not inShort and (flat or allowReverse or exitOnOpposite) and fgfSellOk
+// SELL signal: a sell stop at the indicator's entry price ("Short"). Inverted: a BUY LIMIT at that same price ("Long").
+// The gate is the SELL signal's (fgfSellOk) either way.
+if sellSignal and allowS and not fgvNS and (flat or allowReverse or exitOnOpposite) and fgfSellOk
     qS = calcQty(slTicksNow)
     if qS > 0 and not na(sellEntryPrice)
-        lockSlS := slTicksNow
-        lockTpS := tpTicksNow
-        lockActS := trailActNow
-        lockDstS := trailDstNow
-        lockRunS := runDstNow
-        strategy.entry("Short", strategy.short, qty = qS, stop = sellEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG sell stop")
-        placedBarS := bar_index
+        if fgvInv
+            lockSlL := slTicksNow
+            lockTpL := tpTicksNow
+            lockActL := trailActNow
+            lockDstL := trailDstNow
+            lockRunL := runDstNow
+            strategy.entry("Long", strategy.long, qty = qS, limit = sellEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG buy limit (inv)")
+            placedBarL := bar_index
+        else
+            lockSlS := slTicksNow
+            lockTpS := tpTicksNow
+            lockActS := trailActNow
+            lockDstS := trailDstNow
+            lockRunS := runDstNow
+            strategy.entry("Short", strategy.short, qty = qS, stop = sellEntryPrice, oca_name = "FG", oca_type = strategy.oca.cancel, comment = "FG sell stop")
+            placedBarS := bar_index
 
-// FGF diagnostics (Data Window only, no logic): the entry funnel.
-bool fgdRawLong      = buySignal and allowL and not inLong and (flat or allowReverse or exitOnOpposite)
-bool fgdRawShort     = sellSignal and allowS and not inShort and (flat or allowReverse or exitOnOpposite)
+// FGF diagnostics (Data Window only, no logic): the entry funnel. Normal frame also when inverted: "long" = a BUY
+// signal that reached the filter (its order is then a sell), "short" = a SELL signal.
+bool fgdRawLong      = buySignal and allowL and not fgvNL and (flat or allowReverse or exitOnOpposite)
+bool fgdRawShort     = sellSignal and allowS and not fgvNS and (flat or allowReverse or exitOnOpposite)
 bool fgdBlockedLong  = fgdRawLong  and not fgfBuyOk
 bool fgdBlockedShort = fgdRawShort and not fgfSellOk
 plot(fgdRawLong      ? 1 : 0, "FGD raw long",      display = display.data_window)
@@ -1009,7 +1286,7 @@ plot(ta.cum(fgdRawShort     ? 1 : 0), "FGD raw short count",     display = displ
 plot(ta.cum(fgdBlockedLong  ? 1 : 0), "FGD blocked long count",  display = display.data_window)
 plot(ta.cum(fgdBlockedShort ? 1 : 0), "FGD blocked short count", display = display.data_window)
 
-// cancel a stale unfilled entry
+// cancel a stale unfilled entry (by order id: "Long" is the pending buy, "Short" the pending sell, stop or limit)
 if entryValidBars > 0
     if not na(placedBarL) and not inLong and bar_index - placedBarL >= entryValidBars
         strategy.cancel("Long")
@@ -1096,7 +1373,7 @@ if showSideTags and sellSignal
 var table tb = table.new(position.bottom_right, 2, 12, border_width = 1)
 
 if showZoneTable and barstate.islast
-    table.cell(tb, 0, 0, "FlashGold v5 S", text_color = color.white, text_size = size.small)
+    table.cell(tb, 0, 0, fgvInv ? "FlashGold v5 S (inverted)" : "FlashGold v5 S", text_color = color.white, text_size = size.small)
     table.cell(tb, 1, 0, "TDI FILTER", text_color = color.white, text_size = size.small)
     table.cell(tb, 0, 1, "Parent", text_color = color.gray, text_size = size.tiny)
     table.cell(tb, 1, 1, dirText(parentSide), text_color = dirColor(parentSide), text_size = size.tiny)
