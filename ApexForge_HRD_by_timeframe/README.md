@@ -262,3 +262,113 @@ Your HRD file runs with calc_on_every_tick = true, so live it behaves differentl
 - the hybrid exit then closes that new trade at once.
 
 **Changed:** the fused file [`HRD_Full_Divergence_Strategy_v1_03_FGF.pine`](../HRD_Full_Divergence_Strategy_v1_03_FGF.pine) now sets calc_on_every_tick = false. It runs once per candle close, live and in the backtest alike, and orders fill at the next candle's open. Every backtest figure on this page stays the same, because history always runs once per candle. Your original file is unchanged.
+
+## Inverted direction (Update 1): results by timeframe
+
+Both files now have the option "Inverted direction: opposite side at the same entries" ([UPDATES.md](../UPDATES.md)). These are the results with it on, at the default inputs, next to the normal direction.
+
+- **How it was tested.** The option was added to both backtest replicas and checked trade by trade against separately written references (more than 2,000 runs each, both fill models, filter off and on). With the option off, the replicas reproduce every earlier result exactly.
+- **"As TradingView shows"** is the standard backtest with the script's own costs (ApexForge 0.04% per side, HRD none). **"1-minute fills with our costs"** is the realistic figure: exits checked on the 1-minute candles, and gold $0.30 per ounce per round trip, BTC 0.02% per side + $0.20.
+- **Filter off.** Inverted is the same as the "labels reversed" control in the tables above (for ApexForge with the stop and target mirrored). The new information is the filter-on rows.
+- **Halves** are the trades entered in each half of the window, each half from a fresh start.
+
+### ApexForge, normal vs inverted
+
+ApexForge puts 1% of equity in each trade, so the figures are small.
+
+#### BTCUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 34,602 / 34,542 | -24.00% / -24.34% | -12.79% / **-13.20%** | -6.53% / -7.14% | 0.61 |
+| 1m | on | 17,221 / 17,197 | -12.97% / -12.74% | -6.80% / **-6.56%** | -3.33% / -3.34% | 0.64 |
+| 5m | off | 4,955 / 4,855 | -3.71% / -3.48% | -1.79% / **-1.59%** | -0.52% / -1.08% | 0.86 |
+| 5m | on | 3,076 / 3,020 | -2.96% / -1.61% | -1.77% / **-0.43%** | -0.16% / -0.26% | 0.94 |
+| 15m | off | 1,180 / 1,116 | -0.47% / -0.64% | -0.00% / **-0.20%** | -0.15% / -0.06% | 0.96 |
+| 15m | on | 861 / 823 | -0.56% / -0.43% | -0.22% / **-0.10%** | +0.01% / -0.11% | 0.98 |
+| 30m | off | 359 / 347 | +0.59% / -0.84% | +0.73% / **-0.71%** | +0.13% / -0.84% | 0.77 |
+| 30m | on | 274 / 261 | +0.05% / -0.47% | +0.16% / **-0.37%** | +0.25% / -0.62% | 0.83 |
+| 1h | off | 131 / 122 | -0.22% / -0.21% | -0.16% / **-0.16%** | +0.15% / -0.31% | 0.89 |
+| 1h | on | 76 / 75 | -0.27% / -0.15% | -0.24% / **-0.12%** | +0.07% / -0.19% | 0.86 |
+| 2h | off | 52 / 49 | -0.33% / -0.20% | -0.31% / **-0.18%** | -0.04% / -0.15% | 0.77 |
+| 2h | on | 26 / 26 | -0.30% / -0.02% | -0.29% / **-0.01%** | +0.19% / -0.20% | 0.97 |
+| 4h | off | 31 / 31 | +0.00% / -0.10% | +0.02% / **-0.08%** | -0.04% / -0.04% | 0.88 |
+| 4h | on | 10 / 10 | -0.12% / +0.12% | -0.11% / **+0.12%** | +0.18% / -0.05% | 1.94 |
+
+#### XAUUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 3,651 / 3,651 | -3.20% / -2.56% | -1.18% / **-0.53%** | -0.31% / -0.21% | 0.78 |
+| 1m | on | 2,164 / 2,164 | -1.99% / -1.44% | -0.79% / **-0.22%** | -0.12% / -0.10% | 0.85 |
+| 5m | off | 875 / 873 | -0.76% / -0.61% | -0.27% / **-0.12%** | -0.06% / -0.07% | 0.90 |
+| 5m | on | 606 / 604 | -0.41% / -0.56% | -0.07% / **-0.22%** | -0.11% / -0.11% | 0.75 |
+| 15m | off | 290 / 281 | -0.33% / -0.13% | -0.17% / **+0.03%** | +0.08% / -0.05% | 1.04 |
+| 15m | on | 229 / 223 | -0.30% / -0.07% | -0.17% / **+0.05%** | +0.06% / -0.01% | 1.11 |
+| 30m | off | 194 / 188 | -0.27% / -0.06% | -0.16% / **+0.05%** | +0.08% / -0.03% | 1.09 |
+| 30m | on | 138 / 137 | -0.16% / -0.07% | -0.08% / **+0.01%** | +0.01% / +0.00% | 1.02 |
+| 1h | off | 74 / 70 | -0.04% / -0.17% | +0.00% / **-0.13%** | -0.04% / -0.09% | 0.68 |
+| 1h | on | 40 / 39 | -0.10% / -0.06% | -0.08% / **-0.04%** | +0.00% / -0.05% | 0.79 |
+| 2h | off | 37 / 34 | -0.15% / +0.05% | -0.13% / **+0.07%** | +0.02% / +0.04% | 1.31 |
+| 2h | on | 17 / 17 | -0.03% / +0.03% | -0.03% / **+0.04%** | +0.01% / +0.03% | 1.37 |
+| 4h | off | 10 / 10 | -0.11% / -0.06% | -0.10% / **-0.06%** | -0.05% / -0.01% | 0.37 |
+| 4h | on | 2 / 2 | -0.04% / -0.04% | -0.04% / **-0.04%** | -0.04% / +0.00% | 0.00 |
+
+**What it shows**
+
+- **Inverting does not turn ApexForge into a winner.** On 1m and 5m both directions lose: costs take more than the signals make either way.
+- **BTC.** The one timeframe that made money normally, 30m, loses when inverted (-0.71% against +0.73%). The only inverted gain is 4h with the filter on: +0.12% from 10 trades.
+- **Gold.** Inverted is slightly positive on 15m, 30m and 2h (+0.01% to +0.07% over 18 months). That is too small to mean anything, and only 30m filter-on and 2h are positive in both halves.
+
+### HRD, normal vs inverted
+
+HRD puts about 50% of equity in each trade. With the default exits almost no trade ends on a price level inside a candle, so both fill models give the same trades; the two columns differ only by costs.
+
+#### BTCUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 25,630 / 25,650 | -11.6% / +7.0% | -99.5% / **-99.4%** | -90.5% / -93.6% | 0.51 |
+| 1m | on | 10,186 / 10,186 | -11.6% / +11.0% | -88.6% / **-85.7%** | -59.8% / -64.5% | 0.50 |
+| 5m | off | 5,648 / 5,652 | -5.9% / +0.3% | -69.8% / **-67.8%** | -42.4% / -44.2% | 0.69 |
+| 5m | on | 2,282 / 2,282 | -5.0% / +3.1% | -40.0% / **-34.9%** | -13.7% / -24.5% | 0.72 |
+| 15m | off | 2,105 / 2,110 | +13.6% / -13.1% | -25.6% / **-43.1%** | -23.2% / -25.9% | 0.76 |
+| 15m | on | 909 / 909 | -2.6% / +3.0% | -18.9% / **-14.2%** | -7.9% / -6.8% | 0.85 |
+| 30m | off | 1,185 / 1,193 | -5.9% / +0.6% | -25.8% / **-20.9%** | -17.3% / -4.3% | 0.86 |
+| 30m | on | 576 / 575 | -6.8% / +0.7% | -17.0% / **-10.3%** | -4.8% / -5.8% | 0.87 |
+| 1h | off | 621 / 624 | +2.7% / -4.8% | -9.3% / **-16.1%** | -13.7% / -2.8% | 0.86 |
+| 1h | on | 248 / 248 | +4.7% / -3.5% | -0.4% / **-8.2%** | -9.1% / +1.0% | 0.82 |
+| 2h | off | 333 / 335 | +13.3% / -19.5% | +6.0% / **-24.8%** | -15.0% / -11.4% | 0.74 |
+| 2h | on | 97 / 97 | -6.7% / +6.0% | -8.5% / **+3.9%** | +0.6% / +3.4% | 1.17 |
+| 4h | off | 190 / 194 | -8.7% / +9.7% | -12.1% / **+5.5%** | +17.2% / -10.0% | 1.07 |
+| 4h | on | 48 / 47 | -6.1% / +7.8% | -7.0% / **+6.8%** | +4.3% / +2.4% | 1.65 |
+
+#### XAUUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 17,905 / 17,979 | -1.0% / -1.3% | -87.9% / **-88.0%** | -66.0% / -64.8% | 0.21 |
+| 1m | on | 7,237 / 7,237 | -3.6% / +3.6% | -58.8% / **-55.7%** | -34.4% / -32.5% | 0.22 |
+| 5m | off | 4,091 / 4,118 | -2.3% / +2.5% | -39.6% / **-36.8%** | -22.9% / -18.1% | 0.47 |
+| 5m | on | 1,731 / 1,731 | -2.4% / +2.4% | -20.4% / **-16.4%** | -10.7% / -6.4% | 0.50 |
+| 15m | off | 1,484 / 1,494 | -6.4% / +6.3% | -21.4% / **-10.8%** | -6.3% / -4.8% | 0.74 |
+| 15m | on | 646 / 646 | -2.2% / +2.3% | -9.4% / **-5.2%** | -3.4% / -1.8% | 0.75 |
+| 30m | off | 770 / 771 | +2.8% / -1.7% | -6.1% / **-10.2%** | -5.5% / -5.0% | 0.70 |
+| 30m | on | 357 / 357 | +0.6% / -0.6% | -3.5% / **-4.7%** | -3.9% / -0.9% | 0.73 |
+| 1h | off | 394 / 395 | +3.0% / -2.8% | -1.7% / **-7.2%** | -3.6% / -3.8% | 0.72 |
+| 1h | on | 165 / 165 | +0.7% / -0.6% | -1.3% / **-2.6%** | -1.5% / -1.1% | 0.76 |
+| 2h | off | 249 / 250 | -4.9% / +4.3% | -7.6% / **+1.2%** | -0.3% / +1.5% | 1.07 |
+| 2h | on | 74 / 74 | -2.1% / +2.1% | -2.9% / **+1.2%** | -1.0% / +2.2% | 1.21 |
+| 4h | off | 141 / 141 | -3.2% / +4.4% | -4.7% / **+2.7%** | +1.5% / +1.2% | 1.16 |
+| 4h | on | 38 / 38 | -0.0% / -0.6% | -0.5% / **-1.1%** | -0.6% / -0.5% | 0.83 |
+
+**What it shows**
+
+- **1m to 1h: both directions lose once costs are counted.** TradingView shows inverted gains on 1m and 5m (up to +11%), but HRD sets no costs; with costs the same runs lose 35% to 99%.
+- **Inverted is roughly the mirror of normal before costs.** Where normal made money in TradingView (BTC 15m and 2h with the filter off), inverted loses about as much. So inverting moves the result, it does not add an edge.
+- **2h and 4h are where inverted comes out ahead.**
+  - BTC 4h, filter on: +6.8% with costs, positive in both halves, but from only 47 trades.
+  - BTC 2h, filter on: +3.9%, both halves positive, 97 trades.
+  - BTC 4h, filter off: +5.5%, but +17.2% in one half and -10.0% in the other.
+  - Gold 2h: +1.2% with the filter off or on. Gold 4h, filter off: +2.7%, both halves positive.
+- **These are default settings and small samples.** None of them has been through a hold-out test. The calibration (every setting, normal and inverted, chosen on one half and checked on the other) is the test of whether any of this holds.
