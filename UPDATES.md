@@ -5,7 +5,36 @@ Each numbered update is marked in the script itself, so versions can't be mixed 
 - the script's title ends with the update number, for example `[Update 1]`;
 - the header at the top of the file starts with a block `UPDATE 1 (date)` saying what changed.
 
-A script without a number in its title is older than Update 1.
+A script without a number in its title is older than Update 1. An update renumbers only the
+scripts it changes, so the title shows the last update that changed that script: a script still
+titled `[Update 1]` was not touched by Update 2.
+
+## Update 2 (2026-11-24): GVLiveV2 entry alert is valid JSON
+
+Only the GVLiveV2 direction filter files change:
+[GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine](GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine)
+and the 9 per-timeframe files in [GVLiveV2_by_timeframe/](GVLiveV2_by_timeframe/). Their titles
+now end with `[Update 2]`. Every other strategy stays at Update 1.
+
+- **What was wrong.** With "Collect Entry Training Data" and "Include Training Data In Entry
+  Alerts" both on (the default), the text of an entry alert ended in one closing brace too many
+  (`}}}}` where the JSON needs `}}}`). A strict JSON reader rejects that text (Python's
+  `json.loads`: "Extra data").
+- **What changes.** That one brace is removed, nothing else. Exit and close alerts, and entry
+  alerts without the training data, are the same text as before. Orders, fills, the backtest,
+  plots and settings are unchanged, with "Inverted direction" off or on.
+- **Your alert receiver.** Nothing to do if it reads the alert as plain JSON. If it removed the
+  extra brace itself, it must stop doing so for these files.
+- **After pasting.** A TradingView alert keeps running the version of the script it was created
+  with. Create the alert again on the updated script, otherwise it keeps sending the old text.
+- **Not changed.** `GVLiveV2_Polymarket_PreCandle_Strategy.pine`, the original you pasted, has
+  the same extra brace and is left as it is.
+- **How it was checked.** There is no TradingView compiler in this workspace. The alert text was
+  rebuilt in Python from each script's own string expressions, for every alert the script sends
+  (6 entries, 8 exits, 8 closes), with the training data on and off and "Inverted direction" on
+  and off: every text now parses as JSON, and only the entry alert with the training data
+  differs from Update 1, by that one brace. If TradingView reports an error when you paste a
+  file, send it over.
 
 ## Update 1 (2026-11-23): Inverted direction
 
@@ -50,7 +79,7 @@ you paste a file, send it over.
 | XPW Orientation TDI v2.8, trailing TP | [xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine](xpw_orientation_tdi_v2.8_strategy_trailtp_FGF.pine) |
 | XPW Orientation TDI v2.8, S2 / S3 exits | [xpw_orientation_tdi_v2.8_strategy_FGF.pine](xpw_orientation_tdi_v2.8_strategy_FGF.pine) |
 | FlashGold v5 Strategy (BTCUSD) | [FlashGold_v5_Strategy_BTCUSD_FGF.pine](FlashGold_v5_Strategy_BTCUSD_FGF.pine) |
-| GVLiveV2 Pre-Candle | [GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine](GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine) and the 9 per-timeframe files in [GVLiveV2_by_timeframe/](GVLiveV2_by_timeframe/) |
+| GVLiveV2 Pre-Candle (now at Update 2) | [GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine](GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine) and the 9 per-timeframe files in [GVLiveV2_by_timeframe/](GVLiveV2_by_timeframe/) |
 | DannyPhantomFX V10.21.1 LiveSafe | [DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine](DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine) and the 7 per-timeframe files in [DannyPhantomFX_by_timeframe/](DannyPhantomFX_by_timeframe/) |
 | AMVI Full MTF (already had "Trade direction: Inverted") | [AMVI_Full_MTF_Strategy_FGF.pine](AMVI_Full_MTF_Strategy_FGF.pine) and [AMVI_by_timeframe/AMVI_FGF_XAUUSD_15m.pine](AMVI_by_timeframe/AMVI_FGF_XAUUSD_15m.pine) |
 | FlashGold Direction Strategy (already had "Trade direction: Inverted") | [FlashGold_Direction_Strategy.pine](FlashGold_Direction_Strategy.pine) |

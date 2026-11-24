@@ -4,6 +4,19 @@
 // STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (rule v3.1 hold-out passed)
 // READ FIRST: the FRAGILITY lines below say where this result comes from.
 // ----------------------------------------------------------------------------
+//  UPDATE 2 (2026-11-24)
+//    Alert text only: one closing brace removed from the ENTRY alert that
+//    carries the training object ("Collect Entry Training Data" and "Include
+//    Training Data In Entry Alerts" both on, the default). That alert ended
+//    in }}}} where the JSON needs }}}, so it was not valid JSON and a strict
+//    reader (Python's json.loads: "Extra data") rejected it. f_training_json
+//    now closes only "context" and "training"; f_alert_message closes the
+//    message, as it always did. Exit and close alerts, and entry alerts
+//    without the training object, are the same text as before. Orders,
+//    fills, the backtest, plots and settings are unchanged, with Inverted
+//    direction off or on. If your alert receiver removed the extra brace
+//    itself, it must stop doing so. The title now ends with "[Update 2]".
+//
 //  UPDATE 1 (2026-11-23)
 //    New option "Inverted direction: opposite side at the same entries" (group
 //    "Inverted direction (Update 1)", off by default). On: every entry this
@@ -29,7 +42,8 @@
 //    entries, which inverted are the SELLS). Not backtested: every result
 //    below is with the option off. Details: INVERTED DIRECTION (UPDATE 1) in
 //    the code.
-//    Off = exactly the previous version. The title now ends with "[Update 1]".
+//    Off = exactly the previous version. That version's title ended with
+//    "[Update 1]".
 //    Default off = the tested behaviour recorded below.
 //
 // Same code as GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine (the master
@@ -122,7 +136,7 @@
 //    in R results (see S3 SIZING where given), Polymarket settlement.
 //    Re-check with Bar Magnifier and on new data before trading live.
 // ============================================================================
-strategy("GVLiveV2 FGF | BTCUSD 240m (calibrated) [Update 1]", shorttitle="GV2 BTC 240m U1", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
+strategy("GVLiveV2 FGF | BTCUSD 240m (calibrated) [Update 2]", shorttitle="GV2 BTC 240m U2", overlay=true, initial_capital=100000, default_qty_type=strategy.fixed, default_qty_value=1, commission_type=strategy.commission.percent, commission_value=0, slippage=0, calc_on_every_tick=true, calc_on_order_fills=true, process_orders_on_close=false, pyramiding=0, max_labels_count=500, max_lines_count=500, max_bars_back=500)
 
 //==============================================================================
 // Volatility Filter (DEVMA)
@@ -1108,7 +1122,7 @@ f_training_json(string _action, string _side, string _reason) =>
      "\"pre_long_arm\":" + f_json_bool(preLongArm) + "," +
      "\"pre_short_arm\":" + f_json_bool(preShortArm) + "," +
      "\"entry_allowed\":true" +
-     "}}}" : ""
+     "}}" : ""
 
 f_training_label(float _direction, string _reason, float _plannedPrice) =>
     sideText = _direction > 0 ? "LONG" : "SHORT"

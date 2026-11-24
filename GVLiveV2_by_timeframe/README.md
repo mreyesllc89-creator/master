@@ -1,6 +1,8 @@
 # GVLiveV2 FGF: one file per pair and timeframe
 
-**Update 1 (2026-11-23).** Every file here now has the option "Inverted direction: opposite side at the same entries" (the last setting, off by default) and a title ending in `[Update 1]`. Off is exactly the previous version, so every result below still holds; nothing here was tested with the option on. See [UPDATES.md](../UPDATES.md).
+**Update 2 (2026-11-24).** Alert text only: the entry alert that carries the training data ended in one closing brace too many and was not valid JSON; that brace is removed. Exit and close alerts, orders and the backtest are unchanged, so every result below still holds. Every file here now has a title ending in `[Update 2]`. See [UPDATES.md](../UPDATES.md).
+
+**Update 1 (2026-11-23).** Every file here got the option "Inverted direction: opposite side at the same entries" (the last setting, off by default) and a title ending in `[Update 1]`. Off is exactly the previous version, so every result below still holds; nothing here was tested with the option on. See [UPDATES.md](../UPDATES.md).
 
 Same code as `GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine`; only the input defaults differ. Each file's header starts with a FRAGILITY block (what the result depends on), then the full record: data, costs, the rule, the hold-out in both directions, stressed costs, monthly spread and the sets it was compared with.
 
