@@ -208,3 +208,60 @@ Two independent sceptics re-ran each pick with a separate 1-minute reference and
 - The windows are short: 2 years of BTC in a strong market, 18 months of gold in 2017-2018.
 - On BTC 2h and 4h the best results come from wide or no trailing with fewer open entries: trail off capped at 10 open entries made +20.6% on BTC 2h. That variant was not put through the hold-out rule. It inherits the same fragility (dates, shorts, a few days).
 - 1-minute fills still assume a path inside each 1-minute candle, so offsets near the noise floor remain slightly optimistic.
+
+## Inverted direction (Update 1): results by timeframe
+
+The file now has the option "Inverted direction: opposite side at the same entries" ([UPDATES.md](../UPDATES.md)). These are the results with it on, at the default inputs ($2.0 activation, $1.0 offset, no stop loss), next to the normal direction.
+
+- **How it was tested.** The option was added to the backtest replica and checked trade by trade against a separately written reference, on every pair and timeframe, with the filter off and on and both fill models. With the option off, the replica reproduces every earlier result exactly.
+- **"As TradingView shows"** is the standard backtest with the script's own costs (none). **"1-minute fills with our costs"** is the realistic figure: exits checked on the 1-minute candles, and gold $0.30 per ounce per round trip, BTC 0.02% per side + $0.20.
+- **Filter off.** Inverted gives the same trades as "Reverse every label" (the "Labels reversed" control above). The new information is the filter-on rows.
+- **Halves** are the trades entered in each half of the window, each half from a fresh start.
+
+### BTCUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 63,358 / 63,358 | +248.97% / +236.32% | -72.73% / **-73.72%** | -52.12% / -45.10% | 0.43 |
+| 1m | on | 22,169 / 22,169 | +49.92% / +51.36% | -38.56% / **-37.96%** | -22.70% / -19.74% | 0.42 |
+| 5m | off | 23,789 / 23,789 | +288.04% / +264.29% | -33.46% / **-35.39%** | -21.45% / -17.74% | 0.50 |
+| 5m | on | 8,831 / 8,831 | +59.52% / +65.32% | -17.26% / **-13.95%** | -7.76% / -6.71% | 0.50 |
+| 15m | off | 11,644 / 11,644 | +261.72% / +258.35% | -14.62% / **-15.63%** | -10.22% / -6.02% | 0.58 |
+| 15m | on | 4,728 / 4,728 | +65.98% / +69.43% | -7.78% / **-6.29%** | -4.19% / -2.19% | 0.58 |
+| 30m | off | 6,945 / 6,945 | +196.86% / +204.84% | -10.36% / **-9.99%** | -6.86% / -3.36% | 0.58 |
+| 30m | on | 2,943 / 2,943 | +58.67% / +59.02% | -5.57% / **-3.94%** | -2.34% / -1.64% | 0.61 |
+| 1h | off | 3,886 / 3,886 | +143.66% / +164.30% | -6.62% / **-4.47%** | -2.35% / -2.17% | 0.64 |
+| 1h | on | 1,807 / 1,807 | +50.61% / +57.79% | -5.45% / **-2.10%** | -1.27% / -0.84% | 0.65 |
+| 2h | off | 1,826 / 1,826 | +87.01% / +91.64% | -3.95% / **-2.70%** | -1.95% / -0.77% | 0.58 |
+| 2h | on | 849 / 849 | +33.48% / +36.05% | -3.02% / **-0.58%** | -0.34% / -0.24% | 0.74 |
+| 4h | off | 1,094 / 1,094 | +69.11% / +80.03% | -2.51% / **+0.14%** | -0.07% / +0.21% | 1.07 |
+| 4h | on | 486 / 486 | +25.73% / +29.49% | -1.16% / **-0.22%** | -0.16% / -0.06% | 0.81 |
+
+### XAUUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 29,828 / 29,828 | +2.62% / +2.22% | -49.07% / **-49.27%** | -29.98% / -27.55% | 0.48 |
+| 1m | on | 10,795 / 10,795 | +0.41% / +0.92% | -22.09% / **-21.69%** | -12.12% / -10.89% | 0.47 |
+| 5m | off | 11,022 / 11,022 | +0.86% / +5.15% | -23.39% / **-19.82%** | -10.84% / -10.07% | 0.68 |
+| 5m | on | 4,268 / 4,268 | +1.02% / +0.64% | -9.19% / **-9.44%** | -4.02% / -5.64% | 0.63 |
+| 15m | off | 5,395 / 5,399 | +2.04% / +1.46% | -12.93% / **-13.01%** | -7.50% / -5.95% | 0.70 |
+| 15m | on | 2,213 / 2,213 | +2.40% / -1.75% | -4.39% / **-7.58%** | -4.17% / -3.56% | 0.62 |
+| 30m | off | 3,117 / 3,117 | +4.27% / +2.48% | -6.91% / **-8.45%** | -3.06% / -5.56% | 0.73 |
+| 30m | on | 1,312 / 1,312 | +1.73% / -0.27% | -2.93% / **-4.72%** | -1.33% / -3.43% | 0.68 |
+| 1h | off | 1,772 / 1,782 | -0.15% / +7.25% | -8.77% / **-2.38%** | +0.91% / -3.27% | 0.88 |
+| 1h | on | 811 / 811 | -1.50% / +1.83% | -5.52% / **-2.55%** | -0.01% / -2.54% | 0.76 |
+| 2h | off | 855 / 855 | +7.09% / +5.22% | +0.16% / **-1.95%** | -0.14% / -1.81% | 0.83 |
+| 2h | on | 398 / 398 | +2.55% / +1.60% | -0.29% / **-1.46%** | -0.54% / -0.92% | 0.75 |
+| 4h | off | 544 / 544 | +3.97% / +4.39% | -1.89% / **-1.57%** | -0.67% / -0.90% | 0.79 |
+| 4h | on | 247 / 247 | +1.55% / +1.86% | -1.06% / **-0.49%** | -0.13% / -0.36% | 0.85 |
+
+### What it shows
+
+- **Inverted does not make the default trailing TP profitable.** With 1-minute fills and costs, both directions lose on every timeframe of both pairs. The two exceptions are within noise: BTC 4h inverted with the filter off (+0.14% over 2 years, first half -0.07%) and gold 2h normal with the filter off (+0.16%).
+- **BTC: the TradingView figures are the same artifact in both directions.** Normal and inverted both show +25% to +290% without Bar Magnifier, because the $2 / $1 trail is far smaller than one candle (see "Results" above). With 1-minute fills the win rate falls from 88-99% to 30-43% and both directions lose.
+- **BTC 30m to 4h: inverted loses less** (1h with the filter on: -5.45% normal, -2.10% inverted), but it still loses in both halves.
+- **Gold: no pattern.** Inverted is better on 1h and 4h, worse on 15m, 30m and 2h.
+- **Trade counts** can differ by a few between normal and inverted. The entries are decided the same way, but the trailing exits fall on different candles, so the number of open entries is not always the same.
+
+Nothing here was compiled or run in TradingView. These are the script defaults; the calibration with direction as an input is a separate run.
