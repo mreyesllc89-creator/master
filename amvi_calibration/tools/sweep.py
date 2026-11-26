@@ -126,7 +126,7 @@ _ARMS = {}
 
 
 def arms_cached(ft, p):
-    k = space.filter_key(p)
+    k = (id(ft),) + space.filter_key(p)     # per dataset: the arms of one period are not another's
     a = _ARMS.get(k)
     if a is None:
         if len(_ARMS) >= 3:

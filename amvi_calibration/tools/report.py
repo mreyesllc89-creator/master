@@ -101,9 +101,9 @@ def pct(r):
     return r * RISK_PCT
 
 
-def wrap(text, width=84, indent="   "):
+def wrap(text, width=84, indent="   ", first=" -"):
     """Wrap a header paragraph: first line starts with ' - ', the others with the indent."""
-    words, lines, cur = text.split(), [], " -"
+    words, lines, cur = text.split(), [], first
     for w in words:
         if len(cur) + 1 + len(w) > width:
             lines.append(cur)
@@ -117,9 +117,9 @@ def wrap(text, width=84, indent="   "):
 def header_lines(tf, v, why, ev, hold, plat, unt, changes, p):
     b, pre = ev["base"], ev.get("pre", {})
     name = make_pine.TF_NAME[tf]
-    L = [f"AMVI Full MTF Strategy (direction filter, closed-candle engine): {SYMBOL} {name}",
-         f"STATUS: {v} - {why}.",
-         "-" * 85,
+    L = [f"AMVI Full MTF Strategy (direction filter, closed-candle engine): {SYMBOL} {name}"]
+    L += wrap(f"{v} - {why}.", indent="        ", first="STATUS:")
+    L += ["-" * 85,
          "Same code as AMVI_FGF_Inverted_XAUUSD_15m.pine; only the title, the commission and the",
          "input defaults listed at the end of this record differ. Record date 2026-11-26.",
          "Numbers come from a Python copy of this script (amvi_calibration/tools), not from",
@@ -134,9 +134,10 @@ def header_lines(tf, v, why, ev, hold, plat, unt, changes, p):
               f"{b['months_pos']} of {b['months']} months positive, {b.get('avg_bars', 0):.0f} bars per trade on average.")
     L += wrap(f"Costs: Bitget taker 0.06% {ev['bitget']['total']:+.1f}R; no costs {ev['no_cost']['total']:+.1f}R; stressed (0.10% + 3 ticks) "
               f"{ev['stress']['total']:+.1f}R; break-even commission {ev['breakeven_fee_pct']:.3f}% per side.")
+    same_costs = ev["bitget"]["total"] + ev["bitget"]["fund_r"]
     L += wrap(f"TradingView's Strategy Tester walks stops on the chart's candles (no Bar Magnifier) and charges no funding: "
-              f"on the same bars it would show about {ev['tv_view']['total']:+.1f}R ({ev['tv_view']['n']} trades) for this file. "
-              f"The difference to the figure above is the tester's optimism, not extra profit.")
+              f"on the same bars it would show about {ev['tv_view']['total']:+.1f}R ({ev['tv_view']['n']} trades) for this file. The same "
+              f"costs on second-by-second prices give {same_costs:+.1f}R; any difference is the tester's price path, not profit.")
     if p.get("trail"):
         L += wrap(f"Trailing stop: if TradingView starts it again at every candle close (not checked), the search window "
                   f"gives {ev['trail_restart']['total']:+.1f}R instead of {b['total']:+.1f}R.")
@@ -283,6 +284,24 @@ def run(res_dir):
     md = tables(rows) + "\n\n## Settings per timeframe\n\n" + "\n".join(sections)
     open(os.path.join(out_root, "REPORT_tables.md"), "w", encoding="utf-8").write(md)
     json.dump([dict(tf=r["tf"], verdict=r["verdict"], why=r["why"]) for r in rows], open(os.path.join(res_dir, "verdicts.json"), "w"))
+    # one small file with the headline numbers of every timeframe (charts.py reads it)
+    summ = []
+    for r in rows:
+        h = r["hold"]
+        d = {}
+        if r.get("inputs"):
+            for inp in r["inputs"]["inputs"]:
+                if inp["name"] == "Trade direction":
+                    d = {str(v["value"]): v["share_both"] for v in inp["values"]}
+        summ.append(dict(tf=r["tf"], name=r["name"], verdict=r["verdict"], atr_pct=r["atr_pct"], fee_r=r["fee_r"],
+                         rows=h["rows"], share_positive=h["share_positive_total"], share_both=h["share_positive_both_halves"],
+                         with_filter_both=d.get("with the filter"), inverted_both=d.get("inverted (against the filter)"),
+                         shipped_total=r["shipped"]["base"].get("total"), shipped_n=r["shipped"]["base"].get("n"),
+                         shipped_pre_total=r["shipped"].get("pre", {}).get("total"),
+                         pick_total=r["ev"]["base"]["total"] if "ev" in r else None, pick_n=r["ev"]["base"]["n"] if "ev" in r else None,
+                         pick_pre_total=r["ev"].get("pre", {}).get("total") if "ev" in r else None,
+                         pick_pre_n=r["ev"].get("pre", {}).get("n") if "ev" in r else None))
+    json.dump(summ, open(os.path.join(res_dir, "summary.json"), "w"), default=float)
 
 
 def tables(rows):
@@ -409,7 +428,8 @@ def section(tf, name, v, why, ev, hold, plat, unt, p, changes, ttl, fn):
          f"- Costs: Bitget 0.06% {ev['bitget']['total']:+.1f}R; no costs {ev['no_cost']['total']:+.1f}R; "
          f"stressed {ev['stress']['total']:+.1f}R; break-even commission {ev['breakeven_fee_pct']:.3f}% per side. Fees took {b['fee_r']:.1f}R and funding {b['fund_r']:+.1f}R.",
          f"- Price path: second by second {b['total']:+.1f}R; on 1-minute bars {ev['walk_1m']['total']:+.1f}R; on the chart's candles {ev['walk_chart']['total']:+.1f}R. "
-         f"TradingView's tester (chart candles, the file's 0.06%, no funding) would show about {ev['tv_view']['total']:+.1f}R with {ev['tv_view']['n']} trades.",
+         f"TradingView's tester (chart candles, the file's 0.06%, no funding) would show about {ev['tv_view']['total']:+.1f}R with {ev['tv_view']['n']} trades; "
+         f"the same costs second by second give {ev['bitget']['total'] + ev['bitget']['fund_r']:+.1f}R.",
          f"- Untouched {ev.get('pre_from', '2021-01-01')[:7]} to 2023-10: {F.line('', pre)[2:] if pre.get('n') else 'no trades'}"
          + (f"; stressed {ev['pre_stress']['total']:+.1f}R; weeks resampled positive {pre.get('weeks_pos', 0) * 100:.0f}%." if pre.get("n") else "."),
          f"- The selection method on this timeframe, search window -> untouched period: {fmt_u(unt)}.",

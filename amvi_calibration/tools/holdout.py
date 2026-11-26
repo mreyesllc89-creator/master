@@ -165,12 +165,13 @@ def analyse(d, settings, min_trades_half=30, seed=12345):
     return res
 
 
-def fmt_transfer(name, t):
+def fmt_transfer(name, t, by_r=False):
     if not t:
         return f"  {name}: not enough rows"
     b = "" if t.get("boot_pos") is None else f"; months resampled: positive in {t['boot_pos'] * 100:.0f}% of draws"
-    return (f"  {name}: best-40 mean on the scored part {t['top_mean']:+.1f}R ({t['top_pos'] * 100:.0f}% positive; they had "
-            f"{t['top_train_mean']:+.1f}R where chosen); random 40: mean {t['null_mean']:+.1f}R, p95 {t['null_p95']:+.1f}R{b}")
+    had = f"they had {t['top_train_mean']:+.1f}R where chosen" if by_r else f"their steadiness t was {t['top_train_mean']:.1f} where chosen"
+    return (f"  {name}: best-40 mean on the scored part {t['top_mean']:+.1f}R ({t['top_pos'] * 100:.0f}% positive; {had}); "
+            f"random 40: mean {t['null_mean']:+.1f}R, p95 {t['null_p95']:+.1f}R{b}")
 
 
 if __name__ == "__main__":
@@ -183,9 +184,10 @@ if __name__ == "__main__":
           f"(median {r['median_total']:+.1f}R); positive in both halves {r['share_positive_both_halves'] * 100:.1f}%")
     for tag, name in (("", "ranked by steadiness"), ("_byR", "ranked by net R")):
         print(f" {name}:")
-        print(fmt_transfer("first half -> second half", r["h1_to_h2" + tag]), "PASS" if r["pass_h1_to_h2" + tag] else "fail")
-        print(fmt_transfer("second half -> first half", r["h2_to_h1" + tag]), "PASS" if r["pass_h2_to_h1" + tag] else "fail")
-        print(fmt_transfer("walk-forward (2/3 -> last 1/3)", r["walk_forward" + tag]), "PASS" if r["pass_walk_forward" + tag] else "fail")
+        by_r = tag == "_byR"
+        print(fmt_transfer("first half -> second half", r["h1_to_h2" + tag], by_r), "PASS" if r["pass_h1_to_h2" + tag] else "fail")
+        print(fmt_transfer("second half -> first half", r["h2_to_h1" + tag], by_r), "PASS" if r["pass_h2_to_h1" + tag] else "fail")
+        print(fmt_transfer("walk-forward (2/3 -> last 1/3)", r["walk_forward" + tag], by_r), "PASS" if r["pass_walk_forward" + tag] else "fail")
     print(f"  candidates positive in both halves at base and stressed fee: {r['n_candidates']}")
     for c in r["candidates"][:8]:
         s = c["setting"]

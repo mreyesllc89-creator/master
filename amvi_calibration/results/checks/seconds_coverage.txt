@@ -1,0 +1,8 @@
+One-second bars built from Binance aggTrades, attached to the 1-minute bars (bars.attach_seconds)
+2021-01-01 to 2022-01-01: 525,541 minutes with a trade (59 empty minutes dropped), 525,487 with their seconds (99.990%), 4 refused, 44,999 open at the previous close (8.6%), 31,404,792 seconds
+2022-01-01 to 2023-01-01: 525,536 minutes with a trade (64 empty minutes dropped), 525,518 with their seconds (99.997%), 13 refused, 47,143 open at the previous close (9.0%), 31,199,547 seconds
+2023-01-01 to 2023-11-01: 437,741 minutes with a trade (19 empty minutes dropped), 437,741 with their seconds (100.000%), 0 refused, 27,740 open at the previous close (6.3%), 25,693,013 seconds
+2023-11-01 to 2025-01-01: 614,692 minutes with a trade (188 empty minutes dropped), 614,689 with their seconds (100.000%), 3 refused, 38,994 open at the previous close (6.3%), 36,072,805 seconds
+2025-01-01 to 2026-01-01: 525,563 minutes with a trade (37 empty minutes dropped), 525,556 with their seconds (99.999%), 6 refused, 25,363 open at the previous close (4.8%), 30,686,884 seconds
+2026-01-01 to 2026-11-01: 437,760 minutes with a trade (0 empty minutes dropped), 437,732 with their seconds (99.994%), 1 refused, 16,341 open at the previous close (3.7%), 24,895,638 seconds
+total: 3,066,833 minutes (367 empty minutes dropped), 3,066,723 with their seconds (99.996%), 27 refused, 200,580 open at the previous close (6.5%), 179,952,679 seconds

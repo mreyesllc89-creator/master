@@ -1,6 +1,8 @@
 """One-second bars of a Binance USDT-M perpetual, built from the public aggTrades archive.
 
 usage: python fetch_1s.py <out_dir> <start YYYY-MM> <end YYYY-MM> [symbol] [procs]
+       python fetch_1s.py <out_dir> fill [symbol]     fill whole-day holes of the monthly files
+                                                      from the daily files (run after the first)
 
 Writes one file per month, <out_dir>/sec/<SYM>_1s_<YYYY-MM>.npz:
     sec      int32  epoch seconds (only seconds in which at least one trade happened)
@@ -161,7 +163,49 @@ def do_month(args):
     return f"{ym}: {sec.size:,} seconds with trades ({src}) in {time.time() - t0:.0f}s"
 
 
+def fill_days(out, sym="BTCUSDT", min_missing=30):
+    """Days on which the monthly trade files have a hole (minutes that have a 1-minute bar but
+    no seconds) are fetched again from the daily files and merged into the month's file."""
+    import bars
+    sec_dir = os.path.join(out, "sec")
+    tmp_dir = os.path.join(out, "tmp_1s")
+    os.makedirs(tmp_dir, exist_ok=True)
+    files = sorted(f for f in os.listdir(sec_dir) if f.startswith(f"{sym}_1s_") and f.endswith(".npz"))
+    for f in files:
+        ym = f[len(sym) + 4:-4]
+        a = f"{ym}-01"
+        b = (pd.Period(ym, freq="M") + 1).strftime("%Y-%m-01")
+        m1 = bars.load_1m(sym, start=a, end=b)
+        s = bars.load_1s(sym, start=a, end=b)
+        if s is None or len(m1) == 0:
+            continue
+        s = bars.attach_seconds(m1, s)
+        miss = pd.Series(1, index=pd.to_datetime(m1.t[s.s1 == s.s0], unit="ms")).groupby(lambda x: x.strftime("%Y-%m-%d")).sum()
+        days = [d for d, n in miss.items() if n >= min_missing]
+        if not days:
+            continue
+        z = np.load(os.path.join(sec_dir, f))
+        parts = [(z["sec"], z["o"], z["h"], z["l"], z["c"])]
+        got = []
+        for d in days:
+            path = fetch_zip(f"{BASE}/daily/aggTrades/{sym}/{sym}-aggTrades-{d}.zip", tmp_dir)
+            if path is None:
+                continue
+            parts.append(zip_to_seconds(path))
+            os.remove(path)
+            got.append(d)
+        if got:
+            sec, o, h, l, c = merge(parts)
+            dest = os.path.join(sec_dir, f)
+            np.savez(dest + ".tmp.npz", sec=sec, o=o, h=h, l=l, c=c)
+            os.replace(dest + ".tmp.npz", dest)
+        print(f"{ym}: days with holes {days}; filled from daily files: {got}", flush=True)
+
+
 if __name__ == "__main__":
+    if sys.argv[2] == "fill":
+        fill_days(sys.argv[1], sys.argv[3] if len(sys.argv) > 3 else "BTCUSDT")
+        sys.exit(0)
     out, start, end = sys.argv[1], sys.argv[2], sys.argv[3]
     sym = sys.argv[4] if len(sys.argv) > 4 else "BTCUSDT"
     procs = int(sys.argv[5]) if len(sys.argv) > 5 else 3

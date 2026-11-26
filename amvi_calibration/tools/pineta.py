@@ -43,20 +43,22 @@ def sma(x, n):
 
 @njit(cache=True)
 def sma_exact(x, n):
-    """ta.sma recomputed from scratch per bar (no running-sum drift); used where a
-    comparison of two consecutive values decides a direction (the TDI fast line)."""
+    """ta.sma recomputed from scratch per bar (no running-sum drift), in the order of the
+    Pine reference listing (sum := sum + x[i] / n, newest bar first); used where a comparison
+    of two consecutive values decides a direction (the TDI fast line), so that even on dead
+    flat candles the rounding is the listing's."""
     out = np.full(x.size, NAN)
     for i in range(n - 1, x.size):
         s = 0.0
         ok = True
-        for k in range(i - n + 1, i + 1):
+        for k in range(i, i - n, -1):
             v = x[k]
             if np.isnan(v):
                 ok = False
                 break
-            s += v
+            s += v / n
         if ok:
-            out[i] = s / n
+            out[i] = s
     return out
 
 

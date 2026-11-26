@@ -90,5 +90,56 @@ def draw(res_dir):
     print(out)
 
 
+def draw_direction(res_dir):
+    """Two panels: share of the search's settings positive in both halves by trade direction,
+    and the commission of one round trip in R, per chart timeframe."""
+    summ = json.load(open(os.path.join(res_dir, "summary.json")))
+    summ = [r for r in summ if r.get("with_filter_both") is not None]
+    if not summ:
+        return
+    names = [r["name"] for r in summ]
+    x = np.arange(len(names))
+    plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 10, "axes.edgecolor": GRID, "axes.linewidth": 1,
+                         "xtick.color": TEXT2, "ytick.color": TEXT2, "axes.labelcolor": TEXT2, "text.color": TEXT})
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(13.5, 4.6), dpi=160, facecolor=SURFACE, gridspec_kw={"width_ratios": [1.45, 1]})
+    for ax in (a1, a2):
+        ax.set_facecolor(SURFACE)
+        ax.grid(True, axis="y", color=GRID, linewidth=1)
+        ax.set_axisbelow(True)
+        for sp in ("top", "right", "left"):
+            ax.spines[sp].set_visible(False)
+        ax.tick_params(length=0)
+        ax.set_xticks(x)
+        ax.set_xticklabels(names)
+    w = 0.36
+    wf = np.array([r["with_filter_both"] * 100 for r in summ])
+    iv = np.array([r["inverted_both"] * 100 for r in summ])
+    a1.bar(x - w / 2 - 0.01, wf, w, color=BLUE, label="with the filter")
+    a1.bar(x + w / 2 + 0.01, iv, w, color=ORANGE, label="inverted (the shipped direction)")
+    for xi, v in zip(x - w / 2 - 0.01, wf):
+        a1.annotate(f"{v:.0f}%" if v >= 9.5 else f"{v:.1f}%", (xi, v), xytext=(0, 3), textcoords="offset points", ha="center", fontsize=9, color=TEXT)
+    for xi, v in zip(x + w / 2 + 0.01, iv):
+        a1.annotate(f"{v:.0f}%" if v >= 9.5 else f"{v:.1f}%", (xi, v), xytext=(0, 3), textcoords="offset points", ha="center", fontsize=9, color=TEXT)
+    a1.set_ylim(0, max(wf.max(), iv.max()) * 1.22)
+    a1.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:.0f}%"))
+    a1.set_title("Settings positive after costs in both halves of the search window, by trade direction", loc="left", fontsize=11, color=TEXT, pad=26)
+    a1.legend(loc="upper left", bbox_to_anchor=(0.0, 1.12), ncol=2, frameon=False, fontsize=10, labelcolor=TEXT2, handlelength=1.2, borderaxespad=0)
+    a1.set_xlabel("chart timeframe")
+    fee = np.array([r["fee_r"] for r in summ])
+    a2.bar(x, fee, 0.5, color=BLUE)
+    for xi, v in zip(x, fee):
+        a2.annotate(f"{v:.2f}R", (xi, v), xytext=(0, 3), textcoords="offset points", ha="center", fontsize=9, color=TEXT)
+    a2.set_ylim(0, fee.max() * 1.18)
+    a2.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:.1f}R"))
+    a2.set_title("Commission of one round trip (0.05% per side) with a 1 x ATR stop", loc="left", fontsize=11, color=TEXT, pad=26)
+    a2.set_xlabel("chart timeframe")
+    fig.tight_layout(rect=(0.01, 0.0, 0.99, 0.98), w_pad=3)
+    out = os.path.join(res_dir, "direction_and_costs.png")
+    fig.savefig(out, facecolor=SURFACE)
+    print(out)
+
+
 if __name__ == "__main__":
-    draw(sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results"))
+    rd = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "results")
+    draw(rd)
+    draw_direction(rd)

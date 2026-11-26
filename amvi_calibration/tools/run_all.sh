@@ -17,6 +17,7 @@ import sys; sys.path.insert(0, '../../crypto_lab/tools')
 import fetch_binance as fb
 fb.funding('BTCUSDT', '2020-01', '2026-11', '$DATA')"
 python3 fetch_1s.py "$DATA" 2021-01 2026-10 BTCUSDT 3
+python3 fetch_1s.py "$DATA" fill BTCUSDT      # eight days of 2022 are missing from the monthly files
 
 # 2. checks: hand-computed order scenarios; the engine against the two independent reference
 #    versions; the second-by-second shortcut against walking every second

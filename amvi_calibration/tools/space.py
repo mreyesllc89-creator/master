@@ -166,8 +166,10 @@ def filter_key(p):
 
 
 def neighbours(p, chart_tf):
-    """Every setting one grid step away from p in one numeric input (for the plateau test),
-    plus the other weight presets."""
+    """Every setting one grid step away from p in one numeric input (for the plateau test):
+    the AMVI periods and level, band, exits, wait, the filter's numeric inputs that are in use
+    (minimum aligned zones, Candles, drift bars, entry distance), the number of timeframes
+    that must be hot, plus the other weight presets and the other TDI lengths."""
     p = normalize(p)
     out = []
     for name in ("fast", "slow", "sd", "cr", "norm", "high", "band", "sl", "tp", "max_bars", "wait", "exit_atr"):
@@ -205,6 +207,34 @@ def neighbours(p, chart_tf):
                 q = dict(p)
                 q["low"] = vals[j]
                 out.append(("low", q))
+    # the filter's own numeric inputs, where they are in use
+    steps = [("min_aligned", True)]
+    if p["perm_candles"] > 0:
+        steps.append(("perm_candles", True))
+    if p["use_drift"]:
+        steps.append(("drift_bars", True))
+    if p["lv_mode"] == "entry":
+        steps.append(("entry_dist_atr", True))
+    for name, _ in steps:
+        vals = GRID[name]
+        if p[name] not in vals:
+            continue
+        i = vals.index(p[name])
+        for j in (i - 1, i + 1):
+            if 0 <= j < len(vals):
+                q = dict(p)
+                q[name] = vals[j]
+                out.append((name, q))
+    for c in (p["conf"] - 1, p["conf"] + 1):
+        if 1 <= c <= len(p["tfs"]):
+            q = dict(p)
+            q["conf"] = c
+            out.append(("conf", q))
+    pair = (p["rsi_len"], p["fast_len"])
+    for other in (GRID["tdi"][1:] if pair == GRID["tdi"][0] else GRID["tdi"][:1]):
+        q = dict(p)
+        q["rsi_len"], q["fast_len"] = other
+        out.append(("tdi", q))
     names = list(WEIGHTS)
     for wname in names:
         if wname != p.get("weights"):
