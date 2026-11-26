@@ -39,6 +39,7 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | `charts.py` | equity curves of the picks; trade direction and cost per timeframe |
 | `assemble_report.py` | `REPORT.md` = the hand-written `REPORT_src.md` with the generated tables put in |
 | `make_pine.py` | writes a calibrated file: input defaults only, never the logic |
+| `check_outputs.py` | the trade lists and the calibrated files checked against the records and the shipped script |
 | `test_orders.py` | hand-computed order scenarios |
 | `difftest.py`, `ref/` | the engine against two reference versions written independently from the Pine source |
 | `test_fine.py` | the second-by-second order walk against walking every single second |

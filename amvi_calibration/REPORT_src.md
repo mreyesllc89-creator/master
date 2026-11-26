@@ -92,31 +92,41 @@ set to your lab's limits (0.5% risk, 5x leverage cap). Display inputs were left 
 2. **Hold-out tests inside the window.** Take the 40 steadiest settings of the first half and
    score them on the second half, which they have never seen; the same the other way round;
    and the best of the first two years on the third. A test passes when those 40 are positive
-   on average, beat 95% of random groups of 40, and stay positive when the months are
-   resampled. If the best of one half are not good on the other, "the best setting" is the
+   on average, beat 95% of random groups of 40, and stay positive in 95% of resamples of the
+   months. If the best of one half are not good on the other, "the best setting" is the
    luckiest of thousands, not a find.
-3. **Candidates and plateau.** Settings positive in both halves at base and stressed costs
+3. **Candidates and the pick.** Settings positive in both halves at base and stressed costs
    are candidates. For the 20 steadiest, every numeric input is moved one step, one at a time.
    The pick is the candidate with the largest share of neighbours still positive in both
-   halves (ties: the steadier neighbourhood). A lone peak among losing neighbours is curve
-   fitting.
+   halves (ties: the steadier neighbourhood). This screens out settings that hang on one
+   input's exact value. It does not screen out luck: neighbours take mostly the same trades,
+   and a lucky candidate passes it about nine times in ten.
 4. **The untouched period.** 2021-01-01 to 2023-10-31 (the 2021 top, the May 2021 crash, the
    2022 bear market, FTX) was not used to find or choose anything. Each pick is run on it
-   once. Separately, all candidates of a timeframe are compared there with 400 random
+   once. Separately, the candidates of a timeframe are compared there with 400 random
    settings, and with random settings of their own trade direction: does choosing on the
    search window help on data it never saw, and does it help beyond choosing the direction?
-5. **Luck-only benchmark.** The same counts are repeated in 1,000 shuffled worlds in which no
-   setting has an edge (`tools/luck.py`). They show how many "winners" chance alone produces,
-   and how often chance would earn each verdict.
-6. **Verdict**, by rules fixed before the final run (`tools/report.py`):
+5. **Luck-only benchmark.** The same counts are repeated in 1,000 shuffled worlds per
+   timeframe in which no setting has an edge (`tools/luck.py`). They show how many "winners"
+   chance alone produces, what a pick looks like when nothing is there, and how often chance
+   would earn each verdict.
+6. **Verdict** (`tools/report.py`). "Holds up on the untouched period" = positive there at base
+   and at stressed costs with at least 50 trades, and not fragile.
 
-   | Verdict | Means |
-   |---|---|
-   | RECOMMENDED | all four hold-out tests pass, plateau, positive on the untouched period at base and stressed costs with 50+ trades, and neither period's result leans on a few weeks |
-   | USABLE | plateau, positive on the untouched period at base and stressed costs with 50+ trades, and at least one of the four hold-out tests passes |
-   | PAPER-TRADE | plateau and positive on the untouched period, but the hold-out tests fail or the sample is thin: it may be luck |
-   | NOT RECOMMENDED | positive in both halves of the search window, but negative on the untouched period, or neighbours lose |
-   | DO NOT TRADE | no setting is positive in both halves at base and stressed costs |
+   | Verdict | Means | Luck alone earns it or better |
+   |---|---|---|
+   | RECOMMENDED | holds up on the untouched period, that result stays positive in 95% of resamples of its weeks, and all four hold-out tests pass | LUCK_REC |
+   | USABLE | holds up, positive in 95% of resamples, and at least one hold-out test passes | LUCK_USABLE |
+   | PAPER-TRADE | holds up and is positive in 90% of resamples, but the hold-out tests fail: watch it, do not fund it | LUCK_PAPER |
+   | NOT RECOMMENDED | the search shows more than luck would, but the pick does not hold up on the untouched period | |
+   | DO NOT TRADE | the search found no more winners than luck would, and the best candidate does not hold up | |
+
+   A calibrated file is written only for PAPER-TRADE and better: a file is an invitation to
+   trade. The rules were tightened after an independent statistics review and before the
+   final run. The first version gave PAPER-TRADE to a setting with no edge about one time in
+   three; the review measured that in shuffled worlds, and the last column is the same
+   measurement for the final rules. RECOMMENDED is strict on purpose: a moderate real edge
+   would rarely reach it in three years of data.
 
 ## 4. Results
 

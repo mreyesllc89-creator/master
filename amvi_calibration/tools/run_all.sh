@@ -56,6 +56,7 @@ done
 
 # 6. final evaluation, verdicts, calibrated files, trade lists, tables, charts, report
 python3 report.py "$RES" > "$RES/report_run.log"
+python3 check_outputs.py .. > "$RES/checks/check_outputs.txt"     # trade lists and files against the records
 python3 charts.py "$RES"
 python3 convergence.py "$RES" > "$RES/convergence.txt"
 python3 assemble_report.py ..
