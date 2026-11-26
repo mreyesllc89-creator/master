@@ -392,11 +392,11 @@ Every setting was scored on 1-minute fills with costs (gold $0.30 per ounce per 
 
 ### The rule (rule C)
 
-A setting is only worth a file if it passes all of these. The rule was fixed before the runs.
+A setting is only worth a file if it passes all of these.
 
 1. **Candidates.** Positive in both halves, with at least 30 trades entered in each.
 2. **Plateau.** Among the 40 best candidates by worst half, the pick is the best by 0.5 x its worst half + 0.5 x the average worst half of its neighbours in the grid (one input one step away). It needs at least 5 different neighbours with a positive average. Flipping the direction is not a neighbour.
-3. **Hold-out, both ways.** The 40 best settings by the first half must, on the second half, beat 95% of random draws of 40 settings, be at least 60% positive and average above zero. The same from the second half to the first.
+3. **Hold-out, both ways.** Among the settings with 30+ trades in each half (at least 80 are needed), the 40 best by the first half must, on the second half, beat 95% of random draws of 40 of them, be at least 60% positive and average above zero. The same from the second half to the first.
 4. **Direction control.** The pick must beat the same setting with the direction flipped, in both halves.
 5. **Stressed costs.** The pick must stay positive in both halves (gold $0.50 + 1 tick per side; BTC 0.035% per side + $0.20 + 1 tick per side).
 6. **Sceptics.** A pick that passes 1-5 is then attacked by independent reviewers before any file is made.
@@ -495,7 +495,7 @@ Both figures are small because ApexForge puts 1% of equity in each trade.
 - **The hold-out's 40 settings are one bet.** They are 6-7 signal sets of one family that share two thirds of their entries.
 - **The signal candle is not the source.** Entering 20 candles (100 minutes) late makes about the same (+0.76%). With the filter off the setting loses (-0.49%).
 - **Thin against real fees.** It makes +0.16% at a fee of 0.05% per side and is negative at 0.075%. Half the trades are shorts.
-- **In its favour.** It sits on a smooth plateau, survives stressed costs and start or end dates moved by up to three months, and a setting chosen on the first half alone made +0.25% on the second. That is not enough to tell it apart from the best of a no-edge search.
+- **In its favour.** It is the strongest candidate of the whole search. It sits on a smooth plateau, survives stressed costs and start or end dates moved by up to three months, passes every stricter version of the hold-out the auditor tried, and settings chosen on one half alone made +0.14% and +0.32% on the other. That is still not enough to tell it apart from the best of a no-edge search, and the points above are why it is not a setting to trade.
 
 **BTCUSD 4h, normal, filter off**
 
@@ -512,7 +512,21 @@ Both figures are small because ApexForge puts 1% of equity in each trade.
 
 **About the rule.** The reviews show the rule alone is too easy to pass. On grids with no edge it still passes between 2% and 19% of the time, depending on the timeframe: settings that trade less pay less in costs in both halves, so they beat random settings in the hold-out without any edge. About 1.4 of the 14 ApexForge cells are expected to pass by chance; 2 did. So a pass is only a reason to review a setting, never a reason to trade it.
 
-An independent re-implementation of the rule on all 28 cells was still running when this was written. This section will be updated if it changes a verdict.
+### Audit of the rule
+
+An auditor wrote the rule again from its description, without the original code, and ran it on all 28 cells.
+
+- **Same answer everywhere.** Counts, hold-out numbers, the 19 picks and all 28 verdicts match with no difference.
+- **HRD: no cell passes under any version tried** (other sizes of the top group from 10 to 160, versions that count near-identical settings once, settings chosen on one half only). The closest is BTC 1h, where the winning direction flips between the halves.
+- **ApexForge BTC 4h does not survive the stricter versions.** Only 136 settings have enough trades, from 3 signal sets. Its pass restates "normal beat inverted here" and nothing more.
+- **Closest cells that did not pass:** ApexForge gold 5m inverted (18 of 40 positive in the reverse hold-out, 24 needed), HRD BTC 1h, ApexForge BTC 30m. None was reviewed further.
+
+Weaknesses of the rule the audit found, which apply to every result on this page:
+
+- **"Beats 95% of random draws" is weaker than it sounds.** The 40 best settings are usually a few families of near-identical settings (median 4), so they move together. The conditions that really bind are "60% positive" and "average above zero".
+- **Choosing a setting has no general skill out of sample.** Of 48 settings chosen on one half only, 18 were positive on the other half.
+- **Thin timeframes depend on a detail.** The hold-out uses only settings with 30+ trades in each half. Using every setting instead, BTC 4h fails and ApexForge gold 2h passes, on settings with fewer than 30 trades per half.
+- **When the details were fixed.** The rule's text was fixed before the runs. Three details of how it is applied were settled when the analysis was written, after the first two 4h grids existed and before the other 26 ran: flipping the direction is not a neighbour, settings with identical results do not count as neighbours, and the hold-out population above. They change which setting is picked in a few cells, and for the population the two thin verdicts just named.
 
 ### What it shows
 
