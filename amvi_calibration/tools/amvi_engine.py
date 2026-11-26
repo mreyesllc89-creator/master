@@ -6,8 +6,9 @@ Script executions = "On bar close" (the closed-candle engine):
   2. direction  the FlashGold filter's zone of this chart bar (BUY ZONE / SELL ZONE / none),
                 optionally inverted;
   3. orders     decided at the bar close, market fill at the next bar's open; ATR stop,
-                target and trailing stop filled inside later bars, on the 1-minute bars
-                (each walked open -> nearer extreme -> other extreme -> close);
+                target and trailing stop filled inside later bars: on the 1-minute bars, and
+                on the one-second bars of every minute in which an order could fill (each
+                bar walked open -> nearer extreme -> other extreme -> close);
   4. costs      commission as a fraction of each fill's value, slippage in ticks on market
                 and stop fills.
 
@@ -328,14 +329,78 @@ def _round_half_up(x):
 
 
 @njit(cache=True)
+def _walk(bo, bh, bl, bc, pos, stop, limit, use_trail, act_px, off_dist, trail_on, best, slip):
+    """One bar of an open position, walked open -> nearer extreme -> other extreme -> close.
+    Returns (exit reason or 0, exit price, trailing active, best price since activation)."""
+    # the open tick: an order whose price is already passed fills at the open
+    s_eff = stop
+    is_trail = False
+    if trail_on:
+        ts = best - pos * off_dist
+        if np.isnan(s_eff) or pos * (ts - s_eff) > 0:
+            s_eff = ts
+            is_trail = True
+    if not np.isnan(s_eff) and pos * (bo - s_eff) <= EPS:
+        return (X_TRAIL if is_trail else X_STOP), bo - pos * slip, trail_on, best
+    if not np.isnan(limit) and pos * (bo - limit) >= -EPS:
+        return X_TP, bo, trail_on, best
+    if use_trail and pos * (bo - act_px) >= -EPS:
+        if not trail_on:
+            trail_on = True
+            best = bo
+        elif pos * (bo - best) > 0:
+            best = bo
+    high_first = (bh - bo) < (bo - bl) - EPS
+    p0 = bo
+    for seg in range(3):
+        if seg == 0:
+            p1 = bh if high_first else bl
+        elif seg == 1:
+            p1 = bl if high_first else bh
+        else:
+            p1 = bc
+        if p1 == p0:
+            continue
+        if pos * (p1 - p0) > 0:
+            # towards profit: the target, then the trailing stop's activation / ratchet
+            if not np.isnan(limit) and pos * (p1 - limit) >= -EPS:
+                return X_TP, limit, trail_on, best
+            if use_trail and pos * (p1 - act_px) >= -EPS:
+                if not trail_on:
+                    trail_on = True
+                    best = p1
+                elif pos * (p1 - best) > 0:
+                    best = p1
+        else:
+            s_eff = stop
+            is_trail = False
+            if trail_on:
+                ts = best - pos * off_dist
+                if np.isnan(s_eff) or pos * (ts - s_eff) > 0:
+                    s_eff = ts
+                    is_trail = True
+            if not np.isnan(s_eff) and pos * (p1 - s_eff) <= EPS:
+                return (X_TRAIL if is_trail else X_STOP), s_eff - pos * slip, trail_on, best
+        p0 = p1
+    return 0, 0.0, trail_on, best
+
+
+@njit(cache=True)
 def simulate(ct, co, cc, ci0, ci1, catr, mt, mo, mh, ml, mc, trig, zone, volc,
              inverted, sl, tp, use_trail, trail_act, trail_off, use_vol_exit, max_bars, wait,
-             fee, slip_ticks, mintick, i_start, i_end, tf_ms):
+             fee, slip_ticks, mintick, i_start, i_end, tf_ms,
+             fine, ms0, ms1, fh, fl, st, so, sh, sl_, sc, pmult, trail_reset):
     """Bar-by-bar order simulation over chart bars [i_start, i_end).
 
-    ct, co, cc      chart bar open time / open / close;  ci0, ci1  its 1-minute rows [ci0, ci1)
-    catr            exit ATR on the chart timeframe;     mt, mo..mc  1-minute time and OHLC
+    ct, co, cc      chart bar open time / open / close;  ci0, ci1  its intrabar rows [ci0, ci1)
+    catr            exit ATR on the chart timeframe;     mt, mo..mc  intrabar time and OHLC
+                    (the 1-minute bars; the chart's own bars for a chart-bar walk)
     trig, zone, volc  per chart bar: volatility trigger, filter zone (+1 / -1 / 0), vol collapse
+    fine            follow the seconds inside every intrabar in which an order could fill:
+                    ms0, ms1 = that intrabar's seconds [ms0, ms1) (empty = none: the intrabar
+                    itself is walked), fh, fl = their highest / lowest price, st = epoch
+                    second, so..sc = prices times pmult (int32)
+    trail_reset     sensitivity variant: the trailing stop starts again at every bar close
 
     Returns per trade: entry time, exit time, direction, entry price, exit price, risk distance
     (Stop Loss x ATR at the signal), net R, exit reason, signal bar index."""
@@ -404,79 +469,44 @@ def simulate(ct, co, cc, ci0, ci1, catr, mt, mo, mh, ml, mc, trig, zone, volc,
         pend_dir = 0
         pend_close = 0
 
-        # ---- stop / target / trailing stop inside the bar, on its 1-minute bars ----
+        # ---- stop / target / trailing stop inside the bar ----
         if pos != 0:
             for j in range(ci0[i], ci1[i]):
-                bo = mo[j]
-                done = False
-                xp = 0.0
                 reason = 0
-                # the open tick: an order whose price is already passed fills at the open
-                s_eff = stop
-                is_trail = False
-                if trail_on:
-                    ts = best - pos * off_dist
-                    if np.isnan(s_eff) or pos * (ts - s_eff) > 0:
-                        s_eff = ts
-                        is_trail = True
-                if not np.isnan(s_eff) and pos * (bo - s_eff) <= EPS:
-                    xp = bo - pos * slip
-                    reason = X_TRAIL if is_trail else X_STOP
-                    done = True
-                elif not np.isnan(limit) and pos * (bo - limit) >= -EPS:
-                    xp = bo
-                    reason = X_TP
-                    done = True
-                if not done:
-                    if use_trail and pos * (bo - act_px) >= -EPS:
-                        if not trail_on:
+                xp = 0.0
+                xt = mt[j]
+                if fine and ms1[j] > ms0[j]:
+                    # can any order fill inside this minute? If not, its path does not matter.
+                    fav = fh[j] if pos > 0 else fl[j]
+                    adv = fl[j] if pos > 0 else fh[j]
+                    s_eff = stop
+                    if trail_on:
+                        ts = best - pos * off_dist
+                        if np.isnan(s_eff) or pos * (ts - s_eff) > 0:
+                            s_eff = ts
+                    stop_hit = (not np.isnan(s_eff)) and pos * (adv - s_eff) <= EPS
+                    lim_hit = (not np.isnan(limit)) and pos * (fav - limit) >= -EPS
+                    ratchet = use_trail and pos * (fav - act_px) >= -EPS and ((not trail_on) or pos * (fav - best) > 0)
+                    # a trailing stop raised inside the minute can only be hit inside it when
+                    # the minute's range is at least the trailing offset
+                    trail_intra = ratchet and pos * (fav - adv) >= off_dist - EPS
+                    if not (stop_hit or lim_hit or trail_intra):
+                        if ratchet:
                             trail_on = True
-                            best = bo
-                        elif pos * (bo - best) > 0:
-                            best = bo
-                    bh = mh[j]
-                    bl = ml[j]
-                    high_first = (bh - bo) < (bo - bl) - EPS   # open -> nearer extreme -> other extreme -> close
-                    p0 = bo
-                    for seg in range(3):
-                        if seg == 0:
-                            p1 = bh if high_first else bl
-                        elif seg == 1:
-                            p1 = bl if high_first else bh
-                        else:
-                            p1 = mc[j]
-                        if p1 == p0:
-                            continue
-                        if pos * (p1 - p0) > 0:
-                            # towards profit: the target, then the trailing stop's activation / ratchet
-                            if not np.isnan(limit) and pos * (p1 - limit) >= -EPS:
-                                xp = limit
-                                reason = X_TP
-                                done = True
-                                break
-                            if use_trail and pos * (p1 - act_px) >= -EPS:
-                                if not trail_on:
-                                    trail_on = True
-                                    best = p1
-                                elif pos * (p1 - best) > 0:
-                                    best = p1
-                        else:
-                            s_eff = stop
-                            is_trail = False
-                            if trail_on:
-                                ts = best - pos * off_dist
-                                if np.isnan(s_eff) or pos * (ts - s_eff) > 0:
-                                    s_eff = ts
-                                    is_trail = True
-                            if not np.isnan(s_eff) and pos * (p1 - s_eff) <= EPS:
-                                xp = s_eff - pos * slip
-                                reason = X_TRAIL if is_trail else X_STOP
-                                done = True
-                                break
-                        p0 = p1
-                if done:
+                            best = fav
+                        continue
+                    for k in range(ms0[j], ms1[j]):
+                        reason, xp, trail_on, best = _walk(so[k] / pmult, sh[k] / pmult, sl_[k] / pmult, sc[k] / pmult,
+                                                           pos, stop, limit, use_trail, act_px, off_dist, trail_on, best, slip)
+                        if reason != 0:
+                            xt = np.int64(st[k]) * 1000
+                            break
+                else:
+                    reason, xp, trail_on, best = _walk(mo[j], mh[j], ml[j], mc[j],
+                                                       pos, stop, limit, use_trail, act_px, off_dist, trail_on, best, slip)
+                if reason != 0:
                     e_t[nt] = entry_time
-                    x_t[nt] = mt[j]
+                    x_t[nt] = xt
                     dr[nt] = pos
                     e_px[nt] = entry_px
                     x_px[nt] = xp
@@ -516,6 +546,8 @@ def simulate(ct, co, cc, ci0, ci1, catr, mt, mo, mh, ml, mc, trig, zone, volc,
                     stop = entry_px - pos * entry_atr * sl
                 if tp > 0:
                     limit = entry_px + pos * entry_atr * tp
+            if trail_reset:
+                trail_on = False
             if use_vol_exit and volc[i]:
                 pend_close = X_VOL
             if max_bars > 0 and i - entry_bar >= max_bars:
@@ -538,12 +570,41 @@ def simulate(ct, co, cc, ci0, ci1, catr, mt, mo, mh, ml, mc, trig, zone, volc,
     return e_t[:nt], x_t[:nt], dr[:nt], e_px[:nt], x_px[:nt], risk[:nt], r_net[:nt], why[:nt], sbar[:nt]
 
 
-def run(ft, chart_tf, p, fee=0.0006, slip_ticks=1, start_ms=None, end_ms=None, signals=None):
-    """Backtest one parameter set on chart timeframe `chart_tf` (minutes).
-    fee = commission per side as a fraction of the fill's value (0.0006 = 0.06 %).
-    Entries fill from start_ms on (the signal may be the bar before). Returns trade arrays."""
+_NO_I64 = np.zeros(0, np.int64)
+_NO_I32 = np.zeros(0, np.int32)
+_NO_F64 = np.zeros(0, np.float64)
+NO_SECONDS = (False, _NO_I64, _NO_I64, _NO_F64, _NO_F64, _NO_I32, _NO_I32, _NO_I32, _NO_I32, _NO_I32, 1.0)
+
+
+def walk_args(ft, chart_tf, walk="fine"):
+    """The intrabar arguments of simulate() for a walk mode:
+      "fine"   1-minute bars, and the seconds inside every minute in which an order could fill
+               (when the market has seconds; a minute without seconds is walked as one bar);
+      "1m"     1-minute bars only;
+      "chart"  the chart's own bars (what a TradingView backtest without Bar Magnifier walks).
+    Returns (ci0, ci1, mt, mo, mh, ml, mc, fine, ms0, ms1, fh, fl, st, so, sh, sl, sc, pmult)."""
     ch = ft.mk.tf(chart_tf)
     m1 = ft.mk.m1
+    none = NO_SECONDS
+    if walk == "chart":
+        idx = np.arange(len(ch), dtype=np.int64)
+        return (idx, idx + 1, ch.t, ch.o, ch.h, ch.l, ch.c) + none
+    base = (ch.i0, ch.i1, m1.t, m1.o, m1.h, m1.l, m1.c)
+    sec = ft.mk.sec
+    if walk == "1m" or sec is None:
+        return base + none
+    if walk != "fine":
+        raise ValueError(walk)
+    return base + (True, sec.s0, sec.s1, sec.hi, sec.lo, sec.sec, sec.o, sec.h, sec.l, sec.c, sec.mult)
+
+
+def run(ft, chart_tf, p, fee=0.0006, slip_ticks=1, start_ms=None, end_ms=None, signals=None,
+        walk="fine", trail_reset=False):
+    """Backtest one parameter set on chart timeframe `chart_tf` (minutes).
+    fee = commission per side as a fraction of the fill's value (0.0006 = 0.06 %).
+    Entries fill from start_ms on (the signal may be the bar before). walk: see walk_args().
+    Returns trade arrays."""
+    ch = ft.mk.tf(chart_tf)
     if signals is None:
         trig, volc, _ = trigger_arrays(ft, chart_tf, p)
         zone = zone_array(ft, chart_tf, p)
@@ -552,11 +613,13 @@ def run(ft, chart_tf, p, fee=0.0006, slip_ticks=1, start_ms=None, end_ms=None, s
     i0 = 0 if start_ms is None else int(np.searchsorted(ch.t, start_ms, side="left"))
     i1 = len(ch) if end_ms is None else int(np.searchsorted(ch.t, end_ms, side="left"))
     i0 = max(i0 - 1, 0)
-    out = simulate(ch.t, ch.o, ch.c, ch.i0, ch.i1, ft.atr(chart_tf, p["exit_atr"]),
-                   m1.t, m1.o, m1.h, m1.l, m1.c, trig, zone, volc,
+    w = walk_args(ft, chart_tf, walk)
+    out = simulate(ch.t, ch.o, ch.c, w[0], w[1], ft.atr(chart_tf, p["exit_atr"]),
+                   w[2], w[3], w[4], w[5], w[6], trig, zone, volc,
                    bool(p["inverted"]), float(p["sl"]), float(p["tp"]), bool(p["trail"]),
                    float(p["trail_act"]), float(p["trail_off"]), bool(p["vol_exit"]),
                    int(p["max_bars"]), int(p["wait"]), float(fee), float(slip_ticks), MINTICK,
-                   i0, i1, chart_tf * MIN_MS)
+                   i0, i1, chart_tf * MIN_MS,
+                   *w[7:17], float(w[17]), bool(trail_reset))
     keys = ("entry_t", "exit_t", "dir", "entry_px", "exit_px", "risk", "r", "why", "sig_bar")
     return dict(zip(keys, out))

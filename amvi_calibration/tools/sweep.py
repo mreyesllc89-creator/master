@@ -8,7 +8,8 @@ fee level can be scored afterwards without running it again:
 
   net R of a month = gross R - fee_per_side x fee_units - funding R
 
-  gross   R with slippage (1 tick on market and stop fills) and no commission
+  gross   R with slippage (1 tick on market and stop fills) and no commission; stops,
+          targets and trailing stops are filled on the second-by-second price path
   fee_u   sum over trades of (entry price + exit price) / risk distance
   fund    funding paid (+) or received (-) by the position at Binance's 8-hourly rates, in R
 
@@ -29,7 +30,7 @@ import bars
 import space
 
 WINDOW_START = "2023-11-01"
-WINDOW_END = "2026-11-26"      # exclusive
+WINDOW_END = "2026-11-01"      # exclusive: 36 whole months, all with published funding rates
 LOAD_START = "2022-01-01"      # bars before the window are only there to warm the indicators up
 BASE_FEE = 0.0005              # taker fee per side (crypto_lab hard rule 2: 0.05 % per side + funding + 1 tick)
 G = {}                         # process globals shared with the forked workers
@@ -72,9 +73,12 @@ class Funding:
         return direction * (self.cum[b] - self.cum[a]) * entry_px / risk
 
 
-def load_context(symbol="BTCUSDT", start=LOAD_START, end=WINDOW_END):
+def load_context(symbol="BTCUSDT", start=LOAD_START, end=WINDOW_END, sec_start=WINDOW_START, seconds=True):
+    """Features over [start, end) and the funding table. The one-second bars are attached from
+    sec_start on (positions only exist from the scored window's start)."""
     m1 = bars.load_1m(symbol, start=start, end=end)
-    mk = bars.Market(m1)
+    sec = bars.load_1s(symbol, start=sec_start, end=end) if seconds else None
+    mk = bars.Market(m1, sec)
     ft = E.Features(mk)
     fpath = os.path.join(bars.DATA_DIR, f"{symbol}_funding.parquet")
     fund = Funding(fpath) if os.path.exists(fpath) else None
@@ -141,7 +145,17 @@ def entry_hash(tr):
     return int(np.bitwise_xor.reduce(x)) if x.size else 0
 
 
-def evaluate(p, ft=None, fund=None, chart_tf=None, start_ms=None, end_ms=None, full=False):
+def signals_for(p, ft=None, chart_tf=None):
+    """(trigger, vol collapse, zone) arrays of a setting: they do not depend on its exits."""
+    ft = ft or G["ft"]
+    chart_tf = chart_tf or G["chart_tf"]
+    ep = E.P(**space.engine_params(p))
+    trig, volc, _ = E.trigger_arrays(ft, chart_tf, ep)
+    zone = E.zone_array(ft, chart_tf, ep, arms_cached(ft, ep))
+    return trig, volc, zone
+
+
+def evaluate(p, ft=None, fund=None, chart_tf=None, start_ms=None, end_ms=None, full=False, signals=None, walk="fine"):
     """Backtest one setting; monthly gross R, fee units, funding R and trade counts."""
     ft = ft or G["ft"]
     fund = fund if fund is not None else G.get("fund")
@@ -149,9 +163,9 @@ def evaluate(p, ft=None, fund=None, chart_tf=None, start_ms=None, end_ms=None, f
     start_ms = start_ms or G["start_ms"]
     end_ms = end_ms or G["end_ms"]
     ep = E.P(**space.engine_params(p))
-    trig, volc, _ = E.trigger_arrays(ft, chart_tf, ep)
-    zone = E.zone_array(ft, chart_tf, ep, arms_cached(ft, ep))
-    tr = E.run(ft, chart_tf, ep, fee=0.0, slip_ticks=1, start_ms=start_ms, end_ms=end_ms, signals=(trig, volc, zone))
+    if signals is None:
+        signals = signals_for(p, ft, chart_tf)
+    tr = E.run(ft, chart_tf, ep, fee=0.0, slip_ticks=1, start_ms=start_ms, end_ms=end_ms, signals=signals, walk=walk)
     nm = n_months(start_ms, end_ms)
     gross = np.zeros(nm, np.float32)
     feeu = np.zeros(nm, np.float32)

@@ -32,7 +32,8 @@ def sim(bars_ohlc, trig, zone, atr=2.0, volc=None, **kw):
     p.update(kw)
     out = E.simulate(t, o, c, i0, i0 + 1, a, t, o, h, l, c, tr, zn, vc,
                      p["inverted"], p["sl"], p["tp"], p["use_trail"], p["trail_act"], p["trail_off"], p["use_vol_exit"],
-                     p["max_bars"], p["wait"], p["fee"], p["slip_ticks"], TICK, 0, n, 60_000)
+                     p["max_bars"], p["wait"], p["fee"], p["slip_ticks"], TICK, 0, n, 60_000,
+                     *E.NO_SECONDS, False)
     keys = ("entry_t", "exit_t", "dir", "entry_px", "exit_px", "risk", "r", "why", "sig_bar")
     return dict(zip(keys, out))
 

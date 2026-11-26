@@ -5,11 +5,16 @@ trade with the script's Risk % sizing), net of costs unless stated:
 
   base      commission 0.05 % per side + 1 tick slippage + Binance funding (the lab's rule)
   bitget    0.06 % per side (Bitget's standard taker fee) + 1 tick + funding
-  tv_file   what TradingView shows with the calibrated file's Properties (commission 0.05 %,
-            1 tick slippage; TradingView does not charge funding)
-  tv_0.04   the same with the 0.04 % commission of the original file
   no_cost   no commission, no slippage, no funding
   stress    0.10 % per side + 3 ticks slippage + funding (the lab's stress)
+  tv_view   roughly what TradingView's Strategy Tester shows for the calibrated file: stops
+            and trailing stops walked on the chart's own candles (no Bar Magnifier), the
+            file's 0.06 % commission, 1 tick slippage, no funding
+  walk_1m, walk_chart   base costs, with the orders walked on 1-minute bars / on the chart's
+            candles instead of second by second: how much the result owes to the path
+  trail_restart   base costs, if the trailing stop started again at every candle close
+
+Orders are filled on the second-by-second price path unless stated.
 
 used as a library by report.py; `python final_eval.py <chart_tf> <json setting file>` prints one.
 """
@@ -26,14 +31,15 @@ import sweep
 
 BASE_FEE = sweep.BASE_FEE
 STRESS_FEE = 0.0010
-SEARCH = ("2023-11-01", "2026-11-26")
+SEARCH = (sweep.WINDOW_START, sweep.WINDOW_END)
 PRESAMPLE = ("2021-01-01", "2023-11-01")     # never used by the search or the selection (covers May 2021 and the 2022 bear)
 PRE_LOAD = "2020-01-01"
 
 
-def trades_for(ft, fund, chart_tf, p, start, end, fee, slip, funding=True):
+def trades_for(ft, fund, chart_tf, p, start, end, fee, slip, funding=True, walk="fine", trail_reset=False):
     ep = E.P(**space.engine_params(p))
-    tr = E.run(ft, chart_tf, ep, fee=0.0, slip_ticks=slip, start_ms=sweep.ms(start), end_ms=sweep.ms(end))
+    tr = E.run(ft, chart_tf, ep, fee=0.0, slip_ticks=slip, start_ms=sweep.ms(start), end_ms=sweep.ms(end),
+               walk=walk, trail_reset=trail_reset)
     keep = tr["entry_t"] >= sweep.ms(start)
     tr = {k: v[keep] for k, v in tr.items()}
     fu = (tr["entry_px"] + tr["exit_px"]) / tr["risk"]
@@ -122,51 +128,85 @@ def by_reason(tr):
     return out
 
 
+def half_split(start, end):
+    """The boundary between the two halves used by the selection: whole calendar months, the
+    first half = the first (months // 2) months."""
+    nm = sweep.n_months(sweep.ms(start), sweep.ms(end))
+    return sweep.ms(pd.Timestamp(start) + pd.DateOffset(months=nm // 2))
+
+
 def halves(tr, start, end):
-    mid = (sweep.ms(start) + sweep.ms(end)) // 2
+    mid = half_split(start, end)
     a = tr["r"][tr["entry_t"] < mid]
     b = tr["r"][tr["entry_t"] >= mid]
     return float(a.sum()), float(b.sum()), int(a.size), int(b.size)
 
 
-def evaluate(ctx_search, ctx_pre, chart_tf, p):
+def warm_date(ft, chart_tf, p):
+    """First time at which every enabled AMVI timeframe has a value on the chart (ms)."""
+    ep = E.P(**space.engine_params(p))
+    ch = ft.mk.tf(chart_tf)
+    worst = 0
+    for tf in ep["tfs"]:
+        v = E.gather(ft.amvi(tf, ep), ft.idx("amvi", chart_tf, tf))
+        ok = np.nonzero(~np.isnan(v))[0]
+        worst = max(worst, int(ok[0]) if ok.size else len(ch) - 1)
+    return int(ch.t[worst])
+
+
+def evaluate(ctx_search, ctx_pre, chart_tf, p, light=False):
     """All numbers for one setting. ctx_* = (features, funding) for the search window and for
-    the untouched earlier window."""
+    the untouched earlier window. light: only the base and stressed numbers of both windows."""
     ft, fund = ctx_search
     out = {}
     base = trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1)
     out["base"] = stats(base, chart_tf)
     out["base"]["h1"], out["base"]["h2"], out["base"]["n_h1"], out["base"]["n_h2"] = halves(base, *SEARCH)
     out["base"]["weeks_pos"] = week_resample(base)
-    out["by_year"] = by_year(base)
-    out["by_reason"] = by_reason(base)
-    out["bitget"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0006, slip=1), chart_tf)
-    out["tv_file"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, funding=False), chart_tf)
-    out["tv_004"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0004, slip=1, funding=False), chart_tf)
-    out["no_cost"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0, slip=0, funding=False), chart_tf)
     st = trades_for(ft, fund, chart_tf, p, *SEARCH, fee=STRESS_FEE, slip=3)
     out["stress"] = stats(st, chart_tf)
     out["stress"]["h1"], out["stress"]["h2"], _, _ = halves(st, *SEARCH)
-    fu = base["fee_u"].sum()
-    out["breakeven_fee_pct"] = float((base["gross"].sum() - base["fund_r"].sum()) / fu * 100) if fu > 0 else 0.0
-    flip = dict(p)
-    flip["inverted"] = not p["inverted"]
-    out["other_direction"] = stats(trades_for(ft, fund, chart_tf, flip, *SEARCH, fee=BASE_FEE, slip=1), chart_tf)
+    if not light:
+        out["by_year"] = by_year(base)
+        out["by_reason"] = by_reason(base)
+        out["bitget"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0006, slip=1), chart_tf)
+        out["no_cost"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0, slip=0, funding=False), chart_tf)
+        out["tv_view"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0006, slip=1, funding=False, walk="chart"), chart_tf)
+        out["walk_1m"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, walk="1m"), chart_tf)
+        out["walk_chart"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, walk="chart"), chart_tf)
+        if p.get("trail"):
+            out["trail_restart"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, trail_reset=True), chart_tf)
+        fu = base["fee_u"].sum()
+        out["breakeven_fee_pct"] = float((base["gross"].sum() - base["fund_r"].sum()) / fu * 100) if fu > 0 else 0.0
+        flip = dict(p)
+        flip["inverted"] = not p["inverted"]
+        out["other_direction"] = stats(trades_for(ft, fund, chart_tf, flip, *SEARCH, fee=BASE_FEE, slip=1), chart_tf)
     if ctx_pre is not None:
         pf, pfund = ctx_pre
-        pre = trades_for(pf, pfund, chart_tf, p, *PRESAMPLE, fee=BASE_FEE, slip=1)
+        # the untouched period is scored from the first day on which every AMVI timeframe of
+        # the setting has a value (a daily AMVI with long periods needs up to 600 days)
+        warm = warm_date(pf, chart_tf, p)
+        pre_from = PRESAMPLE[0]
+        if warm > sweep.ms(PRESAMPLE[0]):
+            pre_from = (pd.Timestamp(warm, unit="ms").normalize() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+        out["pre_from"] = pre_from
+        pre = trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=BASE_FEE, slip=1)
         out["_pre_trades"] = pre
         out["pre"] = stats(pre, chart_tf)
         out["pre"]["weeks_pos"] = week_resample(pre)
         out["pre_by_year"] = by_year(pre)
-        out["pre_stress"] = stats(trades_for(pf, pfund, chart_tf, p, *PRESAMPLE, fee=STRESS_FEE, slip=3), chart_tf)
+        out["pre_stress"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=STRESS_FEE, slip=3), chart_tf)
+        if not light:
+            out["pre_tv_view"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=0.0006, slip=1, funding=False, walk="chart"), chart_tf)
+            if p.get("trail"):
+                out["pre_trail_restart"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=BASE_FEE, slip=1, trail_reset=True), chart_tf)
     out["_trades"] = base
     return out
 
 
 def contexts(need_pre=True):
-    cs = sweep.load_context(start=sweep.LOAD_START, end=SEARCH[1])
-    cp = sweep.load_context(start=PRE_LOAD, end=PRESAMPLE[1]) if need_pre else None
+    cs = sweep.load_context(start=sweep.LOAD_START, end=SEARCH[1], sec_start=SEARCH[0])
+    cp = sweep.load_context(start=PRE_LOAD, end=PRESAMPLE[1], sec_start=PRESAMPLE[0]) if need_pre else None
     return cs, cp
 
 
@@ -179,16 +219,20 @@ def line(tag, s):
 
 if __name__ == "__main__":
     ctf = int(sys.argv[1])
-    p = json.load(open(sys.argv[2]))
+    p = space.normalize(json.load(open(sys.argv[2])))
     cs, cp = contexts()
     e = evaluate(cs, cp, ctf, p)
     print(line("search window, base costs", e["base"]))
     print(f"  halves {e['base']['h1']:+.1f} / {e['base']['h2']:+.1f}R; weeks resampled positive {e['base']['weeks_pos'] * 100:.1f}%; "
           f"top 10 trades {e['base']['top10']:+.1f}R, without them {e['base']['without_top10']:+.1f}R; break-even fee {e['breakeven_fee_pct']:.3f}% per side")
     print(line("  Bitget taker 0.06% + funding", e["bitget"]))
-    print(line("  TradingView view (0.05%, no funding)", e["tv_file"]))
-    print(line("  TradingView view (0.04%, no funding)", e["tv_004"]))
     print(line("  no costs", e["no_cost"]))
     print(line("  stressed costs", e["stress"]))
+    print(line("  orders walked on 1-minute bars", e["walk_1m"]))
+    print(line("  orders walked on chart candles", e["walk_chart"]))
+    print(line("  TradingView's view (chart candles, 0.06%, no funding)", e["tv_view"]))
+    if "trail_restart" in e:
+        print(line("  trailing stop restarted at every candle close", e["trail_restart"]))
     print(line("  other trade direction", e["other_direction"]))
-    print(line("untouched 2021-09 to 2023-10, base costs", e.get("pre")))
+    print(line(f"untouched {e['pre_from']} to 2023-10, base costs", e.get("pre")))
+    print(line("  stressed costs", e.get("pre_stress")))

@@ -80,9 +80,9 @@ def draw(res_dir):
     for k in range(len(tfs), nrow * ncol):
         axes[k // ncol, k % ncol].axis("off")
     handles = [plt.Line2D([0], [0], color=ORANGE, linewidth=2, label="untouched period 2021-01 to 2023-10 (never used to choose the setting)"),
-               plt.Line2D([0], [0], color=BLUE, linewidth=2, label="search window 2023-11 to 2026-11 (the setting was chosen here)")]
+               plt.Line2D([0], [0], color=BLUE, linewidth=2, label="search window 2023-11 to 2026-10 (the setting was chosen here)")]
     fig.legend(handles=handles, loc="upper left", bbox_to_anchor=(0.045, 0.955), ncol=2, frameon=False, fontsize=10, labelcolor=TEXT2)
-    fig.suptitle("Cumulative result of each timeframe's setting, in R (1R = the amount risked per trade), after fees and funding",
+    fig.suptitle("Cumulative result of each timeframe's pick, in R (1R = the amount risked per trade), after fees and funding",
                  x=0.05, y=0.985, ha="left", fontsize=12.5, color=TEXT)
     fig.tight_layout(rect=(0.02, 0.0, 0.99, 0.925))
     out = os.path.join(res_dir, "equity_all.png")
