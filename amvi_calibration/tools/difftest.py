@@ -18,6 +18,7 @@ import space
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "ref"))
 
+DUMP = os.environ.get("DIFF_DUMP")   # folder for the inputs of mismatching cases
 WHY = {E.X_STOP: "stop", E.X_TP: "tp", E.X_TRAIL: "trail", E.X_REV: "reverse", E.X_VOL: "vol", E.X_TIME: "time", E.X_END: "end"}
 
 
@@ -33,6 +34,9 @@ def short_settings(rng, chart_tf, n):
         p = space.draw(rng, chart_tf)
         if max(p["tfs"]) >= 240:
             p["slow"], p["norm"] = 50, 100
+        # the reference versions implement "Permission lasts" = Until next signal and
+        # "Check price on" = Tick only (the two other modes are covered by the reviewers' tests)
+        p["perm_candles"], p["check_open"] = 0, False
         out.append(p)
     return out
 
@@ -105,6 +109,9 @@ def test_orders(ft, m1, chart_tfs, n, seed):
                 b = (int(r["entry_t"]), int(r["exit_t"]), int(r["dir"]))
                 px = (abs(mine["entry_px"][i] - r["entry_px"]) > 1e-6 or abs(mine["exit_px"][i] - r["exit_px"]) > 1e-6
                       or abs(mine["r"][i] - r["r"]) > 1e-6 or WHY[int(mine["why"][i])] != r["why"])
+                if WHY[int(mine["why"][i])] == "end" and r["why"] == "end" and a[0] == b[0] and a[2] == b[2] and not (
+                        abs(mine["entry_px"][i] - r["entry_px"]) > 1e-6 or abs(mine["exit_px"][i] - r["exit_px"]) > 1e-6 or abs(mine["r"][i] - r["r"]) > 1e-6):
+                    continue   # the mark of a still-open position: its time stamp is a labelling choice
                 if a != b or px:
                     msgs.append(f"trade {i}: mine {a} e={mine['entry_px'][i]:.2f} x={mine['exit_px'][i]:.2f} r={mine['r'][i]:.4f} {WHY[int(mine['why'][i])]} | "
                                 f"ref {b} e={r['entry_px']:.2f} x={r['exit_px']:.2f} r={r['r']:.4f} {r['why']}")
@@ -116,6 +123,11 @@ def test_orders(ft, m1, chart_tfs, n, seed):
                 print("MISMATCH", tag, f"({dt:.1f}s)")
                 for m in msgs:
                     print("    ", m)
+                if DUMP:
+                    import pickle
+                    os.makedirs(DUMP, exist_ok=True)
+                    pickle.dump(dict(ctf=ctf, p=ep, trig=np.asarray(trig), zone=np.asarray(zone), volc=np.asarray(volc), fee=fee, slip=slip),
+                                open(os.path.join(DUMP, f"orders_{ctf}m_{k}.pkl"), "wb"))
             else:
                 print("ok      ", tag, f"trades={n_m} ({dt:.1f}s)")
     print(f"orders: {total - bad} of {total} settings identical")

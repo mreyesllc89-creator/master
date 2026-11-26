@@ -44,6 +44,20 @@ WEIGHTS = dict(
 )
 
 
+def tf_allowed(chart_tf, t):
+    """Timeframes the calibration may switch on for a chart timeframe:
+      at or above the chart   whole multiples of it only. On a chart that straddles the other
+                              timeframe's boundaries (5m on a 2m or 3m chart, 15m on a 10m chart)
+                              the script reads a different bar live than after a reload;
+      below the chart         divisors of at least 15 minutes only. TradingView keeps about
+                              100,000 intrabars per request: 69 days of 1m, 347 days of 5m,
+                              2.9 years of 15m. A setting built on 1m or 5m intrabars could not
+                              be replayed in the Strategy Tester for more than that."""
+    if t >= chart_tf:
+        return t % chart_tf == 0
+    return chart_tf % t == 0 and t >= 15
+
+
 def parent_options(f_tf):
     """Parent timeframe: the filter timeframe itself (as calibrated before) or the next of
     1h / 4h / 1D above it."""
@@ -64,10 +78,11 @@ def draw(rng, chart_tf):
     """One random setting for a chart timeframe (dict of engine parameters plus 'weights')."""
     g = GRID
     c = lambda name: g[name][rng.integers(len(g[name]))]
-    k = rng.choice((1, 2, 3, 4), p=(0.35, 0.35, 0.25, 0.05))
-    tfs = tuple(sorted(int(x) for x in rng.choice(AMVI_TFS, size=k, replace=False)))
+    amvi_opts = [t for t in AMVI_TFS if tf_allowed(chart_tf, t)]
+    k = min(int(rng.choice((1, 2, 3, 4), p=(0.35, 0.35, 0.25, 0.05))), len(amvi_opts))
+    tfs = tuple(sorted(int(x) for x in rng.choice(amvi_opts, size=k, replace=False)))
     conf = int(rng.choice(np.arange(1, k + 1), p=_conf_p(k)))
-    f_opts = sorted(set(FILTER_TFS) | {chart_tf})
+    f_opts = sorted({t for t in FILTER_TFS if tf_allowed(chart_tf, t)} | {chart_tf})
     f_tf = int(f_opts[rng.integers(len(f_opts))])
     par = parent_options(f_tf)
     parent_tf = int(par[rng.integers(len(par))])

@@ -4,3 +4,4 @@ crypto_lab/data/raw/*_metrics_daily/
 amvi_calibration/data/
 amvi_calibration/results/sweeps/
 amvi_calibration/results/prelim/
+amvi_calibration/results/sweeps_v0/

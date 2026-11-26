@@ -44,6 +44,10 @@ DEFAULTS = dict(
     wait=0,
 )
 
+# "price has reached a level" is tested with this tolerance: levels such as entry +- n ticks
+# are exact on the tick grid but not in binary floating point
+EPS = 1e-7
+
 # exit reasons
 X_STOP, X_TP, X_TRAIL, X_REV, X_VOL, X_TIME, X_END = 1, 2, 3, 4, 5, 6, 7
 
@@ -415,16 +419,16 @@ def simulate(ct, co, cc, ci0, ci1, catr, mt, mo, mh, ml, mc, trig, zone, volc,
                     if np.isnan(s_eff) or pos * (ts - s_eff) > 0:
                         s_eff = ts
                         is_trail = True
-                if not np.isnan(s_eff) and pos * (bo - s_eff) <= 0:
+                if not np.isnan(s_eff) and pos * (bo - s_eff) <= EPS:
                     xp = bo - pos * slip
                     reason = X_TRAIL if is_trail else X_STOP
                     done = True
-                elif not np.isnan(limit) and pos * (bo - limit) >= 0:
+                elif not np.isnan(limit) and pos * (bo - limit) >= -EPS:
                     xp = bo
                     reason = X_TP
                     done = True
                 if not done:
-                    if use_trail and pos * (bo - act_px) >= 0:
+                    if use_trail and pos * (bo - act_px) >= -EPS:
                         if not trail_on:
                             trail_on = True
                             best = bo
@@ -432,7 +436,7 @@ def simulate(ct, co, cc, ci0, ci1, catr, mt, mo, mh, ml, mc, trig, zone, volc,
                             best = bo
                     bh = mh[j]
                     bl = ml[j]
-                    high_first = (bh - bo) < (bo - bl)   # open -> nearer extreme -> other extreme -> close
+                    high_first = (bh - bo) < (bo - bl) - EPS   # open -> nearer extreme -> other extreme -> close
                     p0 = bo
                     for seg in range(3):
                         if seg == 0:
@@ -445,12 +449,12 @@ def simulate(ct, co, cc, ci0, ci1, catr, mt, mo, mh, ml, mc, trig, zone, volc,
                             continue
                         if pos * (p1 - p0) > 0:
                             # towards profit: the target, then the trailing stop's activation / ratchet
-                            if not np.isnan(limit) and pos * (p1 - limit) >= 0:
+                            if not np.isnan(limit) and pos * (p1 - limit) >= -EPS:
                                 xp = limit
                                 reason = X_TP
                                 done = True
                                 break
-                            if use_trail and pos * (p1 - act_px) >= 0:
+                            if use_trail and pos * (p1 - act_px) >= -EPS:
                                 if not trail_on:
                                     trail_on = True
                                     best = p1
@@ -464,7 +468,7 @@ def simulate(ct, co, cc, ci0, ci1, catr, mt, mo, mh, ml, mc, trig, zone, volc,
                                 if np.isnan(s_eff) or pos * (ts - s_eff) > 0:
                                     s_eff = ts
                                     is_trail = True
-                            if not np.isnan(s_eff) and pos * (p1 - s_eff) <= 0:
+                            if not np.isnan(s_eff) and pos * (p1 - s_eff) <= EPS:
                                 xp = s_eff - pos * slip
                                 reason = X_TRAIL if is_trail else X_STOP
                                 done = True

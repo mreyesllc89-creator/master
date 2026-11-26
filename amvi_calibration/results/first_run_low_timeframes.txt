@@ -1,0 +1,20 @@
+First sweep run (stopped and replaced): settings that read 1-minute or 5-minute data BELOW the chart
+timeframe, against settings that do not. Net of 0.05% per side, 1 tick and funding; rows with at
+least 60 trades in the 2023-11..2026-11 window. These settings were then left out of the search:
+TradingView keeps about 100,000 intrabars per request (69 days of 1m, 347 days of 5m), so a
+calibrated file built on them could not be replayed in the Strategy Tester.
+
+chart   3m  with 1m/5m below the chart:  2528 rows | positive before costs  59% | after costs  2.7% | in both halves  1.1% | median   -475R | median trades  1534
+            without:                     3066 rows | positive before costs  54% | after costs  7.0% | in both halves  3.2% | median    -67R | median trades   341
+chart   5m  with 1m/5m below the chart:  4014 rows | positive before costs  56% | after costs  3.2% | in both halves  1.2% | median   -247R | median trades  1176
+            without:                     4465 rows | positive before costs  55% | after costs  8.3% | in both halves  3.6% | median    -53R | median trades   337
+chart  10m  with 1m/5m below the chart:  6267 rows | positive before costs  56% | after costs  6.0% | in both halves  2.8% | median   -128R | median trades   865
+            without:                     2287 rows | positive before costs  49% | after costs 12.5% | in both halves  5.5% | median    -26R | median trades   229
+chart  15m  with 1m/5m below the chart:  8454 rows | positive before costs  52% | after costs  8.1% | in both halves  3.6% | median    -83R | median trades   714
+            without:                     3000 rows | positive before costs  48% | after costs 15.4% | in both halves  7.0% | median    -21R | median trades   220
+chart  30m  with 1m/5m below the chart:  8449 rows | positive before costs  54% | after costs 10.5% | in both halves  4.5% | median    -50R | median trades   600
+            without:                     3043 rows | positive before costs  51% | after costs 21.1% | in both halves  9.7% | median    -16R | median trades   218
+chart  60m  with 1m/5m below the chart:  8118 rows | positive before costs  51% | after costs 13.5% | in both halves  5.9% | median    -28R | median trades   482
+            without:                     3183 rows | positive before costs  51% | after costs 25.0% | in both halves 11.2% | median    -12R | median trades   232
+chart 240m  with 1m/5m below the chart:  7032 rows | positive before costs  51% | after costs 28.3% | in both halves 12.0% | median     -7R | median trades   214
+            without:                     3112 rows | positive before costs  51% | after costs 35.1% | in both halves 17.3% | median     -5R | median trades   166
