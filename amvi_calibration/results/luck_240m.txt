@@ -1,0 +1,7 @@
+chart 240m, 1000 no-skill worlds
+  positive in both halves: real 15.3%; luck alone 11.9% (5%..95%: 7.0..19.3%); 20% of the worlds have at least as many
+  candidates: real 751; luck alone 551 (291..1074); 22% of the worlds have at least as many
+  with the filter minus inverted: real +23.8 points; luck alone -23.0..+25.6; a gap at least this large either way in 11% of the worlds
+  luck passes: first->second 2.2%, second->first 2.3%, walk-forward 3.0%, group test on the untouched months 1.0%, at least one of the four 6.4%
+  the steadiest candidate of a no-skill world: search window +24.3R (95th percentile +74.7R), worse-half steadiness t 1.95 (95th percentile 2.71); on the untouched months -2.7R
+  it is positive on the untouched months in 36% of the worlds; at base and stressed costs with 50+ trades in 27%; luck earns PAPER-TRADE or better in 7.3%, USABLE or better in 0.7%, RECOMMENDED in 0.0%

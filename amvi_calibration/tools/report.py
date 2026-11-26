@@ -247,12 +247,13 @@ def load_json(path):
     return json.load(open(path)) if os.path.exists(path) else None
 
 
-def fee_in_r(ft, tf):
-    """Median ATR(14) of the chart timeframe as % of price over the search window, and the
-    commission of one round trip at 0.05 % per side in R for a 1 x ATR stop."""
+def fee_in_r(ft, tf, start=None):
+    """Median ATR(14) of the chart timeframe as % of price from `start` on (default: the
+    search window), and the commission of one round trip at 0.05 % per side in R for a
+    1 x ATR stop."""
     ch = ft.mk.tf(tf)
     a = ft.atr(tf, 14)
-    m = (ch.t >= sweep.ms(F.SEARCH[0])) & ~np.isnan(a)
+    m = (ch.t >= sweep.ms(start or F.SEARCH[0])) & ~np.isnan(a)
     atr_pct = float(np.median(a[m] / ch.c[m]) * 100)
     return atr_pct, 2 * F.BASE_FEE * 100 / atr_pct
 
@@ -285,7 +286,8 @@ def run(res_dir):
         for k in ("_trades", "_pre_trades"):
             base_ev.pop(k, None)
         atr_pct, fee_r = fee_in_r(cs[0], tf)
-        row = dict(tf=tf, name=name, hold=hold, unt=unt, shipped=base_ev, atr_pct=atr_pct, fee_r=fee_r, luck=luck,
+        atr_pre, fee_pre = fee_in_r(cp[0], tf, F.PRESAMPLE[0])
+        row = dict(tf=tf, name=name, hold=hold, unt=unt, shipped=base_ev, atr_pct=atr_pct, fee_r=fee_r, atr_pre=atr_pre, fee_pre=fee_pre, luck=luck,
                    trailing=load_json(os.path.join(res_dir, f"trailing_{tf}m.json")),
                    inputs=load_json(os.path.join(res_dir, f"inputs_{tf}m.json")))
         if not picks:
@@ -412,10 +414,11 @@ def tables(rows):
     if any(r.get("unt") and "random_with_filter" in r["unt"] for r in rows):
         L += ["", "## The two trade directions on data the search never saw", "",
               "400 random settings of the search per timeframe (at least 30 trades in each half of the search window), run over the untouched",
-              "period 2021-01 to 2023-10 and split by trade direction. Net of 0.05% per side, 1 tick and funding. The last four columns are the",
-              "same split on the search window, for all settings of the search: positive in both halves after costs, and before costs.", "",
-              "| Chart | Untouched: with the filter positive | Median | Untouched: inverted positive | Median | Search window, with the filter: after costs | Before costs | Search window, inverted: after costs | Before costs |",
-              "|---|---|---|---|---|---|---|---|---|"]
+              "period 2021-01 to 2023-10 and split by trade direction; then the same split on the search window for all settings of the search.",
+              "\"Positive\" = net result above zero over the whole period after 0.05% per side, 1 tick and funding. The last two columns:",
+              "positive in both halves of the search window, after costs / before costs.", "",
+              "| Chart | Untouched: with the filter positive | Median | Untouched: inverted positive | Median | Search window: with the filter positive | Median | Inverted positive | Median | Both halves, with the filter | Both halves, inverted |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
         for r in rows:
             u = r.get("unt")
             if not u or "random_with_filter" not in u:
@@ -424,7 +427,8 @@ def tables(rows):
             d = direction(r)
             dw, di = d.get("with", {}), d.get("inv", {})
             L.append(f"| {r['name']} | {w['share_positive'] * 100:.0f}% of {w['n']} | {w['median']:+.1f}R | {iv['share_positive'] * 100:.0f}% of {iv['n']} | {iv['median']:+.1f}R | "
-                     f"{dw.get('share_both', 0) * 100:.1f}% | {dw.get('share_both_gross', 0) * 100:.1f}% | {di.get('share_both', 0) * 100:.1f}% | {di.get('share_both_gross', 0) * 100:.1f}% |")
+                     f"{dw.get('share_positive', 0) * 100:.0f}% | {dw.get('median_total', 0):+.1f}R | {di.get('share_positive', 0) * 100:.0f}% | {di.get('median_total', 0):+.1f}R | "
+                     f"{dw.get('share_both', 0) * 100:.1f}% / {dw.get('share_both_gross', 0) * 100:.1f}% | {di.get('share_both', 0) * 100:.1f}% / {di.get('share_both_gross', 0) * 100:.1f}% |")
 
     if any(r.get("luck") for r in rows):
         L += ["", "## Is there more here than luck?", "",
@@ -467,10 +471,12 @@ def tables(rows):
                  + (f"{pre['total']:+.1f}R, {pre['n']} trades, PF {pre['pf']:.2f} |" if pre.get("n") else "no trades |"))
 
     L += ["", "## What one trade costs", "",
-          "Commission of a round trip at 0.05% per side, in R, when the stop is 1 x ATR(14) of the chart (a 2 x ATR stop halves it).", "",
-          "| Chart | Median ATR(14) as % of price | Round-trip commission in R |", "|---|---|---|"]
+          "Commission of a round trip at 0.05% per side, in R, when the stop is 1 x ATR(14) of the chart (a 2 x ATR stop halves it). The market",
+          "moved more per candle in 2021-2023, so the same commission was a smaller share of the risk then.", "",
+          "| Chart | Search window: median ATR(14) as % of price | Round-trip commission in R | Untouched 2021-2023: median ATR(14) | Round-trip commission in R |",
+          "|---|---|---|---|---|"]
     for r in rows:
-        L.append(f"| {r['name']} | {r['atr_pct']:.3f}% | {r['fee_r']:.2f}R |")
+        L.append(f"| {r['name']} | {r['atr_pct']:.3f}% | {r['fee_r']:.2f}R | {r['atr_pre']:.3f}% | {r['fee_pre']:.2f}R |")
 
     if any(r.get("trailing") for r in rows):
         L += ["", "## Trailing stop", "",
