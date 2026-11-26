@@ -1,12 +1,16 @@
-"""The picks themselves against the two independent reference versions (tools/ref).
+"""The picks themselves against the independent reference versions (tools/ref).
 
 usage: python replicate_picks.py [results_dir] [start] [end]
 
 difftest.py compares random settings; this compares the settings that were actually picked,
-over one long slice (default 2025-08-01 to 2026-05-01): the signal arrays bar for bar, and the
-trades of the 1-minute walk trade for trade. A pick that uses "Level at candle open" with a
-filter above the chart, or the Candles permission, is skipped: the reference versions do not
-implement those two modes (they were checked by a separate literal copy of the filter).
+over one long slice (default 2025-08-01 to 2026-05-01):
+
+  trigger, vol collapse   bar for bar against ref_signals.py;
+  filter zone             bar for bar against ref_signals.py, and against ref_filter.py (the
+                          literal copy of the filter). A pick that uses "Level at candle open"
+                          with a filter above the chart, or the Candles permission, has only
+                          the second comparison: ref_signals.py does not implement those modes;
+  trades                  the 1-minute walk trade for trade against ref_orders.py.
 """
 import json
 import os
@@ -23,12 +27,21 @@ import space
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "ref"))
 
 
+class _Lists:
+    """The 1-minute bars as plain lists, as ref_filter.py reads them."""
+
+    def __init__(self, b):
+        self.t, self.o, self.h, self.l, self.c = b.t.tolist(), b.o.tolist(), b.h.tolist(), b.l.tolist(), b.c.tolist()
+
+
 def run(res_dir, start="2025-08-01", end="2026-05-01"):
+    import ref_filter
     import ref_orders
     import ref_signals
     m1 = bars.load_1m(start=start, end=end)
     ft = E.Features(bars.Market(m1))
     md = difftest.m1_dict(m1)
+    cache = ref_filter.Cache(_Lists(m1))
     bad = done = 0
     for tf in space.CHART_TFS:
         pp = os.path.join(res_dir, f"plateau_{tf}m.json")
@@ -39,9 +52,7 @@ def run(res_dir, start="2025-08-01", end="2026-05-01"):
             continue
         p = space.normalize(picks[0]["setting"])
         name = make_pine.TF_NAME[tf]
-        if p["perm_candles"] > 0 or (p["check_open"] and p["f_tf"] > tf):
-            print(f"{name}: skipped (uses a filter mode the reference versions do not implement)")
-            continue
+        special = p["perm_candles"] > 0 or (p["check_open"] and p["f_tf"] > tf)
         ep = E.P(**space.engine_params(p))
         trig, volc, _ = E.trigger_arrays(ft, tf, ep)
         zone = E.zone_array(ft, tf, ep)
@@ -51,10 +62,20 @@ def run(res_dir, start="2025-08-01", end="2026-05-01"):
         if ref["chart_t"].size != ch.t.size or not np.array_equal(ref["chart_t"], ch.t):
             msgs.append("chart bars differ")
         else:
-            for nm, mine, theirs in (("trigger", trig, ref["trig"]), ("vol collapse", volc, ref["volc"]), ("zone", zone, ref["zone"])):
+            pairs = [("trigger", trig, ref["trig"]), ("vol collapse", volc, ref["volc"])]
+            if not special:
+                pairs.append(("zone (second copy)", zone, ref["zone"]))
+            for nm, mine, theirs in pairs:
                 d = int((np.asarray(mine) != np.asarray(theirs)).sum())
                 if d:
                     msgs.append(f"{nm}: {d} of {ch.t.size} bars differ")
+        lit = np.asarray(ref_filter.chart_zone(cache, tf, ref_filter.inputs_from_engine(ep)), dtype=np.int8)
+        if lit.size != zone.size:
+            msgs.append("zone (literal filter copy): bar counts differ")
+        else:
+            d = int((lit != np.asarray(zone)).sum())
+            if d:
+                msgs.append(f"zone (literal filter copy): {d} of {zone.size} bars differ")
         mine = E.run(ft, tf, ep, fee=0.0005, slip_ticks=1, signals=(trig, volc, zone), walk="1m")
         rt = ref_orders.reference_trades(md, tf, np.asarray(trig), np.asarray(zone), np.asarray(volc), ep, 0.0005, 1)
         if mine["r"].size != len(rt):
@@ -68,11 +89,13 @@ def run(res_dir, start="2025-08-01", end="2026-05-01"):
                 msgs.append(f"trade {i} differs")
                 break
         done += 1
+        how = "zone against the literal filter copy only" if special else "zone against both copies"
         if msgs:
             bad += 1
-            print(f"{name}: MISMATCH - " + "; ".join(msgs))
+            print(f"{name}: MISMATCH - " + "; ".join(msgs), flush=True)
         else:
-            print(f"{name}: identical ({ch.t.size:,} chart bars, {int(np.asarray(trig).sum())} triggers, {mine['r'].size} trades, {mine['r'].sum():+.2f}R)")
+            print(f"{name}: identical ({ch.t.size:,} chart bars, {int(np.asarray(trig).sum())} triggers, {int((zone != 0).sum()):,} bars with a direction, "
+                  f"{mine['r'].size} trades, {mine['r'].sum():+.2f}R; {how})", flush=True)
     print(f"picks against the reference versions, {start} to {end}: {done - bad} of {done} identical")
     return 1 if bad else 0
 

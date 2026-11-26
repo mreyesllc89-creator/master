@@ -19,11 +19,14 @@ fb.funding('BTCUSDT', '2020-01', '2026-11', '$DATA')"
 python3 fetch_1s.py "$DATA" 2021-01 2026-10 BTCUSDT 3
 python3 fetch_1s.py "$DATA" fill BTCUSDT      # eight days of 2022 are missing from the monthly files
 
-# 2. checks: hand-computed order scenarios; the engine against the two independent reference
-#    versions; the second-by-second shortcut against walking every second
+# 2. checks: data coverage; hand-computed order scenarios; the engine against the two
+#    independent reference versions; no look-ahead; the second-by-second shortcut against
+#    walking every second
+python3 seconds_coverage.py BTCUSDT > "$RES/checks/seconds_coverage.txt"
 python3 test_orders.py > "$RES/checks/test_orders.txt"
 python3 difftest.py both 6 7 > "$RES/checks/difftest_default.txt"
 python3 difftest.py both 6 11 2023-10-01 2024-01-01 > "$RES/checks/difftest_gap_period.txt"
+python3 test_lookahead.py > "$RES/checks/test_lookahead.txt"
 python3 test_fine.py 12 3 2026-07-01 2026-10-01 > "$RES/checks/test_fine.txt"
 python3 test_fine.py 12 4 2021-05-01 2021-07-01 > "$RES/checks/test_fine_2021.txt"
 

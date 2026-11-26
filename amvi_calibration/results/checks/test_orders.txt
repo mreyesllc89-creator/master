@@ -1,0 +1,9 @@
+ok  test_long_then_stop
+ok  test_fill_bar_uses_signal_close
+ok  test_gap_through_stop_fills_at_open
+ok  test_trailing
+ok  test_target_and_gap_target
+ok  test_reversal_and_inverted
+ok  test_time_stop_wait_and_vol_exit
+ok  test_same_side_signal_is_ignored_and_fee
+all order scenarios pass

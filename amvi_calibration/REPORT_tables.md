@@ -1,21 +1,22 @@
 ## Verdicts at a glance
 
-| Chart | Verdict | On 2021-2023, which it was not chosen on | Last three years, where it was chosen | File |
-|---|---|---|---|---|
-| 4h | USABLE | +21.4R in 69 trades | +35.2R in 100 trades | `AMVI_FGF_BTCUSDT_4h.pine` |
-| 1h | NOT RECOMMENDED | +7.5R in 98 trades, positive in 86% of resamples | +22.0R in 101 trades | none |
-| 30m | DO NOT TRADE | +4.8R in 68 trades, positive in 77% of resamples | +20.2R in 74 trades | none |
-| 15m | USABLE | +19.7R in 232 trades | +21.1R in 284 trades | `AMVI_FGF_BTCUSDT_15m.pine` |
-| 10m | NOT RECOMMENDED | +8.7R in 65 trades, positive in 81% of resamples | +14.5R in 85 trades | none |
-| 5m | NOT RECOMMENDED | -1.0R in 70 trades | +16.1R in 68 trades | none |
-| 3m | USABLE | +20.6R in 72 trades | +23.4R in 79 trades | `AMVI_FGF_BTCUSDT_3m.pine` |
-| 2m | NOT RECOMMENDED | +1.3R in 108 trades (-3.4R at stressed costs) | +12.0R in 97 trades | none |
-| 1m | PAPER-TRADE | +54.8R in 93 trades, positive in 93% of resamples | +107.1R in 145 trades | `AMVI_FGF_BTCUSDT_1m.pine` |
+| Chart | Verdict | What it means for you | On 2021-2023, which it was not chosen on | Last three years, where it was chosen | File |
+|---|---|---|---|---|---|
+| [1m](#1m-paper-trade) | PAPER-TRADE | watch with alerts only; no money | +54.8R in 93 trades, positive in 93% of resamples; 77% of it in 2023 | +107.1R in 145 trades | `AMVI_FGF_BTCUSDT_1m.pine` |
+| [2m](#2m-not-recommended) | NOT RECOMMENDED | nothing to load | +1.3R in 108 trades (-3.4R at stressed costs); 96% of it in 2023 | +12.0R in 97 trades | none |
+| [3m](#3m-usable) | USABLE | test with alerts first; small size at most | +20.6R in 72 trades; 80% of it in 2023 | +23.4R in 79 trades | `AMVI_FGF_BTCUSDT_3m.pine` |
+| [5m](#5m-not-recommended) | NOT RECOMMENDED | nothing to load | -1.0R in 70 trades | +16.1R in 68 trades | none |
+| [10m](#10m-not-recommended) | NOT RECOMMENDED | nothing to load | +8.7R in 65 trades, positive in 81% of resamples; all of it in 2023 (the other years together lost) | +14.5R in 85 trades | none |
+| [15m](#15m-usable) | USABLE | test with alerts first; small size at most | +19.7R in 232 trades; 69% of it in 2021 | +21.1R in 284 trades | `AMVI_FGF_BTCUSDT_15m.pine` |
+| [30m](#30m-do-not-trade) | DO NOT TRADE | nothing to load | +4.8R in 68 trades, positive in 77% of resamples; 80% of it in 2022 | +20.2R in 74 trades | none |
+| [1h](#1h-not-recommended) | NOT RECOMMENDED | nothing to load | +7.5R in 98 trades, positive in 86% of resamples | +22.0R in 101 trades | none |
+| [4h](#4h-usable) | USABLE | test with alerts first; small size at most | +21.4R in 69 trades; 84% of it in 2023 | +35.2R in 100 trades | `AMVI_FGF_BTCUSDT_4h.pine` |
 
 ## Results by timeframe
 
-The pick of each timeframe. Net of 0.05% per side, 1 tick slippage and funding. R = amount risked per trade. The untouched period comes
-first because the pick was not chosen on it; the search-window figure is the best of thousands of settings and is flattered by that choice.
+Net of 0.05% per side, 1 tick slippage and funding. R = amount risked per trade; PF = profit factor (gross profit / gross loss);
+DD = largest drawdown. The untouched period comes first because the pick was not chosen on it; the search-window figure is the best
+of thousands of settings and is flattered by that choice.
 
 | Chart | Verdict | Untouched 2021-01 to 2023-10 (not chosen on it) | Stressed costs | Positive in resamples of its weeks | Search window 2023-11 to 2026-10 (chosen here) | Halves | File |
 |---|---|---|---|---|---|---|---|
@@ -31,26 +32,27 @@ first because the pick was not chosen on it; the search-window figure is the bes
 
 ## What the search itself says
 
-Best 40 = the 40 steadiest settings of one part of the data, scored on another part. A test passes when their mean is positive,
-above 95% of random groups of 40, and stays positive in 95% of resamples of the months. Being positive is the hard part: random
-settings mostly bleed commission, so beating them is easy.
+Best 40 = the 40 steadiest settings of one part of the search window, scored on another part. A test passes when their mean is
+positive, above 95% of random groups of 40, and stays positive in 95% of resamples of the months. The last column is the same test
+for the 25 steadiest candidates (12 on 1m), chosen on the whole search window and scored on the untouched period.
+The three "Positive" columns are shares of the settings with at least 30 trades in each half: 57,920 of the 110,000 tried.
 
-| Chart | Settings tried | Positive before costs | Positive after costs | Positive in both halves | First half -> second (best 40) | Second -> first | Walk-forward | Search window -> untouched period (candidates) |
+| Chart | Settings tried | Positive before costs | Positive after costs | Positive in both halves | First half -> second (best 40) | Second -> first | Walk-forward (two years -> the third) | Search window -> untouched period (25 steadiest candidates) |
 |---|---|---|---|---|---|---|---|---|
-| 1m | 6,000 | 58% | 2% | 0.9% | -9.9R, 25% positive, months 22% (fail) | -0.3R, 50% positive, months 46% (fail) | -3.2R, 38% positive, months 38% (fail) | +60.3R, 83% positive, months 97% (pass); random settings of the same direction -1438.1R (beaten) |
-| 2m | 8,000 | 51% | 6% | 2.8% | -3.7R, 48% positive, months 25% (fail) | +10.6R, 52% positive, months 87% (fail) | +6.2R, 62% positive, months 77% (fail) | +54.0R, 72% positive, months 96% (pass); random settings of the same direction -50.2R (beaten) |
-| 3m | 8,000 | 52% | 6% | 3.3% | -5.0R, 40% positive, months 12% (fail) | +3.3R, 60% positive, months 61% (fail) | -1.1R, 50% positive, months 35% (fail) | +18.6R, 80% positive, months 99% (pass); random settings of the same direction -72.3R (beaten) |
-| 5m | 12,000 | 54% | 7% | 3.2% | -6.2R, 32% positive, months 16% (fail) | +9.4R, 55% positive, months 80% (fail) | -4.5R, 32% positive, months 22% (fail) | +27.0R, 76% positive, months 99% (pass); random settings of the same direction -150.2R (beaten) |
-| 10m | 12,000 | 51% | 13% | 6.3% | -4.3R, 35% positive, months 3% (fail) | +1.1R, 50% positive, months 56% (fail) | +0.7R, 48% positive, months 59% (fail) | +25.3R, 80% positive, months 100% (pass); random settings of the same direction -19.8R (beaten) |
-| 15m | 16,000 | 49% | 15% | 7.1% | -5.5R, 28% positive, months 11% (fail) | -3.3R, 40% positive, months 9% (fail) | -2.8R, 32% positive, months 18% (fail) | +14.7R, 84% positive, months 100% (pass); random settings of the same direction -16.1R (beaten) |
-| 30m | 16,000 | 50% | 19% | 8.6% | -5.0R, 42% positive, months 20% (fail) | +2.2R, 57% positive, months 80% (fail) | -6.3R, 35% positive, months 20% (fail) | +12.1R, 84% positive, months 93% (fail); random settings of the same direction -8.6R (not beaten) |
-| 1h | 16,000 | 51% | 23% | 9.9% | -2.0R, 45% positive, months 37% (fail) | +0.9R, 55% positive, months 79% (fail) | -2.8R, 32% positive, months 26% (fail) | +17.1R, 92% positive, months 100% (pass); random settings of the same direction +4.7R (beaten) |
-| 4h | 16,000 | 50% | 32% | 15.3% | -3.6R, 30% positive, months 17% (fail) | -1.1R, 45% positive, months 16% (fail) | -2.6R, 35% positive, months 31% (fail) | +12.5R, 68% positive, months 97% (pass); random settings of the same direction +11.9R (not beaten) |
+| 1m | 6,000 | 58% | 2% | 0.9% | -9.9R, 25% positive, 22% of resamples (fail) | -0.3R, 50% positive, 46% of resamples (fail) | -3.2R, 38% positive, 38% of resamples (fail) | +60.3R, 83% positive, 96.9% of resamples (pass); random settings of the same direction -1438.1R (beaten) |
+| 2m | 8,000 | 51% | 6% | 2.8% | -3.7R, 48% positive, 25% of resamples (fail) | +10.6R, 52% positive, 87% of resamples (fail) | +6.2R, 62% positive, 77% of resamples (fail) | +54.0R, 72% positive, 96.1% of resamples (pass); random settings of the same direction -50.2R (beaten) |
+| 3m | 8,000 | 52% | 6% | 3.3% | -5.0R, 40% positive, 12% of resamples (fail) | +3.3R, 60% positive, 61% of resamples (fail) | -1.1R, 50% positive, 35% of resamples (fail) | +18.6R, 80% positive, 98.7% of resamples (pass); random settings of the same direction -72.3R (beaten) |
+| 5m | 12,000 | 54% | 7% | 3.2% | -6.2R, 32% positive, 16% of resamples (fail) | +9.4R, 55% positive, 80% of resamples (fail) | -4.5R, 32% positive, 22% of resamples (fail) | +27.0R, 76% positive, 99.1% of resamples (pass); random settings of the same direction -150.2R (beaten) |
+| 10m | 12,000 | 51% | 13% | 6.3% | -4.3R, 35% positive, 3% of resamples (fail) | +1.1R, 50% positive, 56% of resamples (fail) | +0.7R, 48% positive, 59% of resamples (fail) | +25.3R, 80% positive, 99.5% of resamples (pass); random settings of the same direction -19.8R (beaten) |
+| 15m | 16,000 | 49% | 15% | 7.1% | -5.5R, 28% positive, 11% of resamples (fail) | -3.3R, 40% positive, 9% of resamples (fail) | -2.8R, 32% positive, 18% of resamples (fail) | +14.7R, 84% positive, 100.0% of resamples (pass); random settings of the same direction -16.1R (beaten) |
+| 30m | 16,000 | 50% | 19% | 8.6% | -5.0R, 42% positive, 20% of resamples (fail) | +2.2R, 57% positive, 80% of resamples (fail) | -6.3R, 35% positive, 20% of resamples (fail) | +12.1R, 84% positive, 93.2% of resamples (fail); random settings of the same direction -8.6R (not beaten) |
+| 1h | 16,000 | 51% | 23% | 9.9% | -2.0R, 45% positive, 37% of resamples (fail) | +0.9R, 55% positive, 79% of resamples (fail) | -2.8R, 32% positive, 26% of resamples (fail) | +17.1R, 92% positive, 99.6% of resamples (pass); random settings of the same direction +4.7R (beaten) |
+| 4h | 16,000 | 50% | 32% | 15.3% | -3.6R, 30% positive, 17% of resamples (fail) | -1.1R, 45% positive, 16% of resamples (fail) | -2.6R, 35% positive, 31% of resamples (fail) | +12.5R, 68% positive, 96.6% of resamples (pass); random settings of the same direction +11.9R (not beaten) |
 
 ## The two trade directions on data the search never saw
 
 400 random settings of the search per timeframe (at least 30 trades in each half of the search window), run over the untouched
-period 2021-01 to 2023-10 and split by trade direction; then the same split on the search window for all settings of the search.
+period and split by trade direction; then the same split on the search window for all settings of the search.
 "Positive" = net result above zero over the whole period after 0.05% per side, 1 tick and funding. The last two columns:
 positive in both halves of the search window, after costs / before costs.
 
@@ -68,9 +70,10 @@ positive in both halves of the search window, after costs / before costs.
 
 ## Is there more here than luck?
 
-The same counts in 1,000 no-skill worlds per timeframe: the months of the real search drawn at random, each month's result of all
-settings flipped by one coin toss, so that no setting has an edge before costs while fees, trade counts and the likeness between
-settings stay real. A real count inside the luck-only range is no evidence of an edge.
+To see what luck alone produces, the search results were scrambled 1,000 times per chart: months were drawn at random and, in
+each month, the before-cost results of all settings were flipped together by one coin toss. No setting has an edge after that,
+but fees, trade counts and the similarity between settings stay as they are. These are the luck-only worlds. A real count inside
+the luck-only range is no evidence of an edge.
 
 | Chart | Positive in both halves: real | Luck alone (5% to 95% of worlds) | Worlds with at least as many | Candidates: real | Luck alone | Worlds with at least as many | With the filter minus inverted: real | Luck alone | Worlds with a gap this large |
 |---|---|---|---|---|---|---|---|---|---|
@@ -84,10 +87,11 @@ settings stay real. A real count inside the luck-only range is no evidence of an
 | 1h | 9.9% | 7.1% (4.0 to 11.9%) | 15% | 423 | 262 (128 to 526) | 14% | +14.0 points | -10.3 to +13.6 | 6% |
 | 4h | 15.3% | 11.9% (7.0 to 19.3%) | 20% | 751 | 551 (291 to 1074) | 22% | +23.8 points | -23.0 to +25.6 | 11% |
 
-What a pick is worth when nothing is there: the steadiest candidate of each no-skill world, and how often luck alone meets the
-conditions of each verdict (plateau leg taken as passed, months standing in for weeks).
+What a pick is worth when nothing is there: the steadiest candidate of each luck-only world, on the months it was chosen on and
+on further months it was not chosen on, and how often luck alone meets the conditions of each verdict (the neighbour test of
+section 3 taken as passed, months standing in for weeks).
 
-| Chart | Luck's pick on the search window (median, 95th percentile) | Luck's pick on fresh months | Positive on fresh months | At base and stressed costs with 50+ trades | Luck passes at least one hold-out test | Luck earns PAPER-TRADE or better | USABLE or better | RECOMMENDED |
+| Chart | Luck's pick where it was chosen (median, 95th percentile) | Luck's pick on months it was not chosen on | Positive there | Positive there at base and stressed costs with 50+ trades | Luck passes at least one of the four tests | Luck earns PAPER-TRADE or better | USABLE or better | RECOMMENDED |
 |---|---|---|---|---|---|---|---|---|
 | 1m | +65.4R, +365.5R | -12.1R | 33% | 20% | 2.9% | 6.5% | 1.1% | 0.0% |
 | 2m | +52.2R, +236.4R | -9.0R | 32% | 20% | 3.4% | 4.9% | 0.6% | 0.0% |
@@ -99,10 +103,11 @@ conditions of each verdict (plateau leg taken as passed, months standing in for 
 | 1h | +27.3R, +88.7R | -3.9R | 34% | 22% | 5.2% | 5.2% | 0.3% | 0.0% |
 | 4h | +24.3R, +74.7R | -2.7R | 36% | 27% | 6.4% | 7.3% | 0.7% | 0.0% |
 
-## The file as shipped (your current inputs) on BTCUSDT
+## The shipped inputs on BTCUSDT
 
-The inputs of AMVI_FGF_Inverted_XAUUSD_15m.pine unchanged (calibrated for gold on 15m), run on each BTC chart timeframe.
-On the 2m and 10m charts the 15m AMVI does not line up with the chart's candles; the numbers there are what a reloaded chart shows.
+The inputs of AMVI_FGF_Inverted_XAUUSD_15m.pine unchanged (calibrated for gold on 15m: 60m filter, trade direction Inverted), run on
+each BTC chart timeframe. On the 2m and 10m charts the 15m AMVI does not line up with the chart's candles; the numbers there are what
+a reloaded chart shows.
 
 | Chart | Search window (2023-11 to 2026-10) | Stressed costs | Untouched 2021-01 to 2023-10 |
 |---|---|---|---|
@@ -119,9 +124,9 @@ On the 2m and 10m charts the 15m AMVI does not line up with the chart's candles;
 ## What one trade costs
 
 Commission of a round trip at 0.05% per side, in R, when the stop is 1 x ATR(14) of the chart (a 2 x ATR stop halves it). The market
-moved more per candle in 2021-2023, so the same commission was a smaller share of the risk then.
+moved more per candle on the untouched period, so the same commission was a smaller share of the risk then.
 
-| Chart | Search window: median ATR(14) as % of price | Round-trip commission in R | Untouched 2021-2023: median ATR(14) | Round-trip commission in R |
+| Chart | Search window: median ATR(14) as % of price | Round-trip commission in R | Untouched period: median ATR(14) | Round-trip commission in R |
 |---|---|---|---|---|
 | 1m | 0.058% | 1.73R | 0.089% | 1.12R |
 | 2m | 0.089% | 1.12R | 0.134% | 0.75R |
@@ -138,130 +143,22 @@ moved more per candle in 2021-2023, so the same commission was a smaller share o
 The same settings (a random sample of the search: 300 per timeframe, 200 on 5m and below) with the trailing stop off and with
 each of the 42 Trail Activation x Trail Offset pairs, nothing else changed, on the second-by-second price path. "Both halves" =
 share of the settings positive after costs in both halves of the search window. The best of 42 pairs is partly the luckiest of
-42, so it was chosen on one random half of the settings and is read on the other half.
+42, so it was chosen on one random half of the settings and is read on the other half. The last three columns are for a tight
+pair (0.5 / 0.5 ATR): what a walk on the chart's candles shows, how much profit per trade that invents, and the real figure.
 
-| Chart | Trailing off: both halves | With trailing: median of the 42 pairs | Pairs above "off" | Best pair chosen on half the settings (activation / offset) | On the other half: with it vs trailing off | Shipped pair 1.5 / 1.0 | It makes a setting better / leaves it unchanged / worse | Chart-candle testing claims for 0.5 / 0.5 | Second by second it is |
-|---|---|---|---|---|---|---|---|---|---|
-| 1m | 0.0% | 0.0% | 7 of 42 | 0.5 / 0.5 | 0.0% vs 0.0% | 0.0% | 42% / 10% / 49% | 0.0% (+0.07R per trade too good) | 0.0% |
-| 2m | 6.5% | 1.0% | 0 of 42 | 1 / 2 | 0.0% vs 7.0% | 1.0% | 44% / 18% / 38% | 0.5% (+0.05R per trade too good) | 0.0% |
-| 3m | 3.0% | 1.0% | 0 of 42 | 2 / 0.5 | 1.0% vs 3.0% | 1.0% | 42% / 10% / 48% | 0.0% (+0.07R per trade too good) | 0.0% |
-| 5m | 4.5% | 1.5% | 0 of 42 | 6 / 3 | 0.0% vs 1.0% | 1.5% | 34% / 16% / 50% | 1.5% (+0.08R per trade too good) | 0.0% |
-| 10m | 7.3% | 3.5% | 0 of 42 | 6 / 1.5 | 4.7% vs 8.7% | 2.7% | 37% / 16% / 48% | 7.7% (+0.07R per trade too good) | 0.7% |
-| 15m | 11.3% | 6.8% | 0 of 42 | 6 / 1.5 | 12.0% vs 14.0% | 6.0% | 38% / 13% / 49% | 13.3% (+0.09R per trade too good) | 0.3% |
-| 30m | 10.0% | 6.8% | 1 of 42 | 3 / 3 | 5.3% vs 8.7% | 4.3% | 33% / 16% / 51% | 20.0% (+0.09R per trade too good) | 0.7% |
-| 1h | 13.0% | 9.2% | 0 of 42 | 4 / 3 | 7.3% vs 11.3% | 7.0% | 33% / 13% / 53% | 43.0% (+0.10R per trade too good) | 3.3% |
-| 4h | 14.7% | 14.2% | 17 of 42 | 0.5 / 3 | 20.7% vs 17.3% | 8.7% | 38% / 17% / 45% | 49.0% (+0.08R per trade too good) | 4.3% |
+| Chart | Trailing off: both halves | With trailing: median of the 42 pairs | Pairs above "off" | Best pair chosen on half the settings (activation / offset) | On the other half: with it vs trailing off | Shipped pair 1.5 / 1.0 | It makes a setting better / leaves it unchanged / worse | Tight pair on chart candles | Profit it invents per trade | Tight pair second by second |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1m | 0.0% | 0.0% | 7 of 42 | 0.5 / 0.5 | 0.0% vs 0.0% | 0.0% | 42% / 10% / 49% | 0.0% | +0.07R | 0.0% |
+| 2m | 6.5% | 1.0% | 0 of 42 | 1 / 2 | 0.0% vs 7.0% | 1.0% | 44% / 18% / 38% | 0.5% | +0.05R | 0.0% |
+| 3m | 3.0% | 1.0% | 0 of 42 | 2 / 0.5 | 1.0% vs 3.0% | 1.0% | 42% / 10% / 48% | 0.0% | +0.07R | 0.0% |
+| 5m | 4.5% | 1.5% | 0 of 42 | 6 / 3 | 0.0% vs 1.0% | 1.5% | 34% / 16% / 50% | 1.5% | +0.08R | 0.0% |
+| 10m | 7.3% | 3.5% | 0 of 42 | 6 / 1.5 | 4.7% vs 8.7% | 2.7% | 37% / 16% / 48% | 7.7% | +0.07R | 0.7% |
+| 15m | 11.3% | 6.8% | 0 of 42 | 6 / 1.5 | 12.0% vs 14.0% | 6.0% | 38% / 13% / 49% | 13.3% | +0.09R | 0.3% |
+| 30m | 10.0% | 6.8% | 1 of 42 | 3 / 3 | 5.3% vs 8.7% | 4.3% | 33% / 16% / 51% | 20.0% | +0.09R | 0.7% |
+| 1h | 13.0% | 9.2% | 0 of 42 | 4 / 3 | 7.3% vs 11.3% | 7.0% | 33% / 13% / 53% | 43.0% | +0.10R | 3.3% |
+| 4h | 14.7% | 14.2% | 17 of 42 | 0.5 / 3 | 20.7% vs 17.3% | 8.7% | 38% / 17% / 45% | 49.0% | +0.08R | 4.3% |
 
-Full grids per timeframe (share of settings positive in both halves; rows = Trail Activation, columns = Trail Offset, x ATR):
-
-**1m** (trailing off: 0.0%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 0.0% | 0.0% | 0.5% | 0.5% | 0.5% | 0.0% |
-| 1 | 0.0% | 0.0% | 0.0% | 0.5% | 0.5% | 0.0% |
-| 1.5 | 0.0% | 0.0% | 0.0% | 0.0% | 0.5% | 0.0% |
-| 2 | 0.0% | 0.0% | 0.0% | 0.0% | 0.5% | 0.0% |
-| 3 | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
-| 4 | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
-| 6 | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% |
-
-**2m** (trailing off: 6.5%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 0.0% | 0.0% | 0.5% | 0.5% | 1.0% | 1.0% |
-| 1 | 1.0% | 0.0% | 0.5% | 1.0% | 0.5% | 1.0% |
-| 1.5 | 1.0% | 1.0% | 0.5% | 0.5% | 1.0% | 1.0% |
-| 2 | 1.0% | 0.5% | 0.5% | 0.5% | 1.5% | 1.0% |
-| 3 | 1.0% | 1.0% | 1.0% | 1.5% | 2.0% | 1.5% |
-| 4 | 1.5% | 1.5% | 1.5% | 1.5% | 1.0% | 1.0% |
-| 6 | 2.0% | 2.0% | 2.0% | 2.0% | 2.0% | 1.5% |
-
-**3m** (trailing off: 3.0%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 0.0% | 0.0% | 0.5% | 1.0% | 2.0% | 1.0% |
-| 1 | 0.0% | 0.5% | 1.0% | 1.0% | 1.5% | 1.0% |
-| 1.5 | 0.5% | 1.0% | 1.0% | 1.0% | 1.5% | 1.0% |
-| 2 | 1.5% | 1.0% | 1.0% | 1.5% | 1.0% | 1.5% |
-| 3 | 0.5% | 0.5% | 0.5% | 1.5% | 1.0% | 1.5% |
-| 4 | 2.0% | 1.5% | 2.0% | 1.0% | 2.0% | 1.5% |
-| 6 | 1.0% | 1.0% | 1.0% | 1.0% | 1.5% | 1.5% |
-
-**5m** (trailing off: 4.5%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 0.0% | 0.5% | 0.0% | 0.5% | 2.0% | 2.0% |
-| 1 | 0.5% | 1.5% | 0.5% | 1.5% | 2.0% | 2.0% |
-| 1.5 | 1.5% | 1.5% | 1.0% | 1.5% | 2.5% | 2.0% |
-| 2 | 1.5% | 2.0% | 1.5% | 1.5% | 2.5% | 2.5% |
-| 3 | 1.5% | 1.5% | 1.5% | 1.5% | 1.5% | 2.0% |
-| 4 | 1.5% | 1.0% | 1.5% | 1.0% | 1.0% | 1.5% |
-| 6 | 2.0% | 1.5% | 1.5% | 2.0% | 2.5% | 2.0% |
-
-**10m** (trailing off: 7.3%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 0.7% | 1.0% | 2.7% | 2.3% | 3.7% | 3.0% |
-| 1 | 1.7% | 1.3% | 2.0% | 2.7% | 3.0% | 2.7% |
-| 1.5 | 2.7% | 2.7% | 2.7% | 4.0% | 4.7% | 3.7% |
-| 2 | 3.3% | 3.0% | 3.3% | 3.3% | 3.3% | 3.7% |
-| 3 | 3.0% | 2.3% | 3.7% | 4.3% | 4.7% | 3.7% |
-| 4 | 5.3% | 5.3% | 4.3% | 4.3% | 4.7% | 5.0% |
-| 6 | 5.7% | 5.7% | 6.0% | 6.3% | 5.3% | 4.0% |
-
-**15m** (trailing off: 11.3%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 0.3% | 1.7% | 2.7% | 3.3% | 7.3% | 7.3% |
-| 1 | 3.3% | 3.3% | 3.7% | 5.0% | 7.3% | 7.7% |
-| 1.5 | 5.0% | 6.0% | 6.0% | 7.3% | 7.3% | 6.3% |
-| 2 | 4.7% | 5.3% | 6.3% | 7.3% | 7.0% | 6.7% |
-| 3 | 5.7% | 6.7% | 6.3% | 6.7% | 8.0% | 6.7% |
-| 4 | 7.0% | 7.3% | 9.0% | 8.7% | 9.0% | 7.3% |
-| 6 | 9.7% | 9.7% | 10.0% | 9.7% | 9.0% | 7.7% |
-
-**30m** (trailing off: 10.0%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 0.7% | 1.0% | 3.0% | 3.0% | 5.0% | 6.7% |
-| 1 | 3.3% | 3.0% | 5.7% | 3.7% | 5.3% | 7.0% |
-| 1.5 | 4.7% | 4.3% | 5.3% | 5.0% | 5.7% | 7.7% |
-| 2 | 5.3% | 5.3% | 6.0% | 6.3% | 6.3% | 7.0% |
-| 3 | 7.0% | 7.3% | 7.7% | 8.0% | 8.0% | 7.7% |
-| 4 | 9.0% | 9.0% | 9.0% | 10.0% | 9.0% | 7.7% |
-| 6 | 8.0% | 9.3% | 10.3% | 9.3% | 9.0% | 8.0% |
-
-**1h** (trailing off: 13.0%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 3.3% | 3.7% | 4.3% | 4.3% | 9.0% | 9.3% |
-| 1 | 5.7% | 6.0% | 7.3% | 5.3% | 9.7% | 10.0% |
-| 1.5 | 6.7% | 7.0% | 9.0% | 9.3% | 10.3% | 10.3% |
-| 2 | 7.0% | 6.3% | 9.0% | 8.3% | 9.7% | 10.0% |
-| 3 | 9.0% | 8.7% | 9.3% | 9.0% | 10.3% | 10.7% |
-| 4 | 9.0% | 9.7% | 9.3% | 9.0% | 11.0% | 10.3% |
-| 6 | 10.7% | 9.7% | 9.7% | 10.0% | 11.7% | 10.7% |
-
-**4h** (trailing off: 14.7%)
-
-| Activation \ Offset | 0.5 | 1 | 1.5 | 2 | 3 | 4 |
-|---|---|---|---|---|---|---|
-| 0.5 | 4.3% | 6.0% | 9.0% | 10.7% | 18.0% | 16.0% |
-| 1 | 6.0% | 7.7% | 8.7% | 11.0% | 16.0% | 15.0% |
-| 1.5 | 9.3% | 8.7% | 12.0% | 9.7% | 16.7% | 15.3% |
-| 2 | 10.3% | 12.3% | 12.7% | 11.7% | 17.0% | 15.7% |
-| 3 | 13.7% | 14.7% | 16.3% | 15.0% | 16.3% | 15.3% |
-| 4 | 14.0% | 13.3% | 14.3% | 15.0% | 15.7% | 15.7% |
-| 6 | 13.0% | 15.7% | 14.7% | 14.7% | 15.0% | 14.0% |
-
+All 42 pairs for every timeframe: `results/TRAILING.md`.
 
 ## Direction and exits across timeframes
 
@@ -287,15 +184,17 @@ Every input, value by value, for every timeframe: `results/INPUTS.md`.
 
 ### 1m: PAPER-TRADE
 
-Positive on the untouched period at base and stressed costs, but its untouched result is positive in only 93% of resamples of the weeks. File: `presets/AMVI_FGF_BTCUSDT_1m.pine`.
+PAPER-TRADE because it made money on 2021-2023, which it was not chosen on, at base and stressed costs, but only in 93% of resamples of its weeks (95% needed). File: `presets/AMVI_FGF_BTCUSDT_1m.pine` (watch with alerts only; no money).
 
-- On data it was not chosen on (untouched 2021-01 to 2023-10): 93 trades (49L/44S), +54.8R, PF 1.75, 26% winners, max DD 15.2R, longest losing streak 12, 16 of 34 months positive; stressed costs +49.0R; positive in 93% of resamples of its weeks.
-- Where it was chosen (search window): 145 trades (73L/72S), +107.1R, PF 1.83, 18% winners, max DD 29.2R, longest losing streak 11, 13 of 36 months positive; halves +50.2 / +56.9R; average trade lasts 5220 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +65R here (95th percentile +365R) and -12R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +53.6% in three years with a worst drawdown of about 14.6% (no compounding), and the untouched period about +27.4% with a worst drawdown of 7.6%. The stop is 1.29% of price on average, so 0.5% risk asks for about 0.4x leverage.
+- On data it was not chosen on (untouched 2021-01 to 2023-10): 93 trades (49L/44S), +54.8R, PF 1.75, 26% winners, max DD 15.2R, longest losing streak 12, 16 of 34 months positive; stressed costs +49.0R; positive in 93% of resamples of its weeks. 77% of that result came in 2023. +22.1R of it is a trade still open at the end of the period, marked at the last close (without it +32.7R).
+- Where it was chosen (search window): 145 trades (73L/72S), +107.1R, PF 1.83, 18% winners, max DD 29.2R, longest losing streak 11, 13 of 36 months positive; halves +50.2 / +56.9R. The best month (2026-08) made +70.3R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +65R here (95th percentile +365R) and -12R on months it was not chosen on.
+- Holding time: 3.6 days on average and 47.7 days at most in the search window (6.4 days and 46.5 days on the untouched period): longer than your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +53.6% in three years with a worst drawdown of about 14.6% (no compounding), and the untouched period about +27.4% with a worst drawdown of 7.6%. The stop is 1.29% of price on average, so 0.5% risk asks for about 0.4x leverage.
 - Costs (search window): Bitget 0.06% +104.3R; no costs +124.5R; stressed +92.8R; break-even commission 0.424% per side. Fees took 14.3R and funding +3.0R.
-- Price path (search window): second by second +107.1R; on 1-minute bars +107.1R; on the chart's candles +107.1R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +107.3R with 145 trades; the same costs second by second give +107.3R.
-- The selection method on this timeframe, search window -> untouched period: the 12 candidates made +60.3R on average (83% positive, months resampled 97%): pass; random settings of the same trade direction made -1438.1R, so the choice adds something beyond the direction.
-- Not fragile: 88% of 25 neighbouring settings positive in both halves; sensitive to: max_bars, norm, tp.
+- Price path (search window): second by second +107.1R; on 1-minute bars +107.1R; on the chart's candles +107.1R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 145 trades, 18% profitable, profit factor about 1.8, net profit about +54% for 2023-11-01 to 2026-10-31.
+- The selection method on this timeframe, search window -> untouched period: the 12 steadiest candidates made +60.3R on average (83% of them made money; positive in 96.9% of resamples of the months): pass. Random settings of the same trade direction made -1438.1R, so the choice adds something beyond the direction.
+- Not fragile: 88% of 25 neighbouring settings positive in both halves; sensitive to: Time Stop, Normalization Period, Take Profit.
 - Concentration (search window): 10 biggest trades +207.5R, all others -100.4R; positive in 91.0% of resamples of its weeks.
 - Same inputs, other trade direction: -22.5R.
 
@@ -319,11 +218,11 @@ Positive on the untouched period at base and stressed costs, but its untouched r
 |---|---|---|---|---|
 | 2021 (untouched) | 23 | +18.4 | 35% | 11.1 |
 | 2022 (untouched) | 39 | -5.6 | 18% | 14.1 |
-| 2023 (untouched) | 31 | +42.0 | 29% | 13.3 |
-| 2023 | 10 | +7.4 | 10% | 5.6 |
+| 2023 (Jan-Oct, untouched) | 31 | +42.0 | 29% | 13.3 |
+| 2023 (Nov-Dec) | 10 | +7.4 | 10% | 5.6 |
 | 2024 | 43 | +35.0 | 28% | 10.9 |
 | 2025 | 55 | -14.7 | 15% | 22.5 |
-| 2026 | 37 | +79.4 | 14% | 12.0 |
+| 2026 (Jan-Oct) | 37 | +79.4 | 14% | 12.0 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|
@@ -332,15 +231,17 @@ Positive on the untouched period at base and stressed costs, but its untouched r
 
 ### 2m: NOT RECOMMENDED
 
-The search shows more than luck would, but the pick does not hold up: it loses on the untouched period at stressed costs. No file was written: a file is an invitation to trade, and this pick did not earn one. Its inputs are listed below for the record.
+NOT RECOMMENDED because it does not hold up on 2021-2023 (it loses there at stressed costs), although the 25 steadiest candidates passed the test there as a group. No file was written. The inputs below are listed only so that the result can be reproduced; they are not a setup to trade.
 
-- On data it was not chosen on (untouched 2021-01 to 2023-10): 108 trades (53L/55S), +1.3R, PF 1.05, 77% winners, max DD 4.2R, longest losing streak 4, 16 of 34 months positive; stressed costs -3.4R; positive in 60% of resamples of its weeks.
-- Where it was chosen (search window): 97 trades (46L/51S), +12.0R, PF 1.81, 86% winners, max DD 2.6R, longest losing streak 2, 24 of 36 months positive; halves +6.5 / +5.5R; average trade lasts 171 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +52R here (95th percentile +236R) and -9R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +6.0% in three years with a worst drawdown of about 1.3% (no compounding), and the untouched period about +0.6% with a worst drawdown of 2.1%. The stop is 2.20% of price on average, so 0.5% risk asks for about 0.2x leverage.
+- On data it was not chosen on (untouched 2021-01 to 2023-10): 108 trades (53L/55S), +1.3R, PF 1.05, 77% winners, max DD 4.2R, longest losing streak 4, 16 of 34 months positive; stressed costs -3.4R; positive in 60% of resamples of its weeks. 96% of that result came in 2023.
+- Where it was chosen (search window): 97 trades (46L/51S), +12.0R, PF 1.81, 86% winners, max DD 2.6R, longest losing streak 2, 24 of 36 months positive; halves +6.5 / +5.5R. The best month (2024-05) made +1.4R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +52R here (95th percentile +236R) and -9R on months it was not chosen on.
+- Holding time: 6 hours on average and 5.5 days at most in the search window (6 hours and 2.3 days on the untouched period): longer than your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +6.0% in three years with a worst drawdown of about 1.3% (no compounding), and the untouched period about +0.6% with a worst drawdown of 2.1%. The stop is 2.20% of price on average, so 0.5% risk asks for about 0.2x leverage.
 - Costs (search window): Bitget 0.06% +10.9R; no costs +17.1R; stressed +6.8R; break-even commission 0.166% per side. Fees took 5.2R and funding -0.0R.
-- Price path (search window): second by second +12.0R; on 1-minute bars +12.0R; on the chart's candles +12.0R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +10.9R with 97 trades; the same costs second by second give +10.9R.
-- The selection method on this timeframe, search window -> untouched period: the 25 candidates made +54.0R on average (72% positive, months resampled 96%): pass; random settings of the same trade direction made -50.2R, so the choice adds something beyond the direction.
-- Not fragile: 92% of 25 neighbouring settings positive in both halves; sensitive to: band, max_bars.
+- Price path (search window): second by second +12.0R; on 1-minute bars +12.0R; on the chart's candles +12.0R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 97 trades, 86% profitable, profit factor about 1.7, net profit about +5% for 2023-11-01 to 2026-10-31.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +54.0R on average (72% of them made money; positive in 96.1% of resamples of the months): pass. Random settings of the same trade direction made -50.2R, so the choice adds something beyond the direction.
+- Not fragile: 92% of 25 neighbouring settings positive in both halves; sensitive to: No-trade band, ATR mult, Time Stop.
 - Concentration (search window): 10 biggest trades +3.5R, all others +8.4R; positive in 99.5% of resamples of its weeks.
 - Same inputs, other trade direction: -22.4R.
 
@@ -370,11 +271,11 @@ The search shows more than luck would, but the pick does not hold up: it loses o
 |---|---|---|---|---|
 | 2021 (untouched) | 30 | -0.9 | 73% | 2.8 |
 | 2022 (untouched) | 40 | +1.0 | 78% | 3.1 |
-| 2023 (untouched) | 38 | +1.2 | 79% | 2.6 |
-| 2023 | 6 | +2.0 | 100% | 0.0 |
+| 2023 (Jan-Oct, untouched) | 38 | +1.2 | 79% | 2.6 |
+| 2023 (Nov-Dec) | 6 | +2.0 | 100% | 0.0 |
 | 2024 | 36 | +3.6 | 83% | 1.8 |
 | 2025 | 24 | +2.1 | 83% | 2.1 |
-| 2026 | 31 | +4.4 | 87% | 1.1 |
+| 2026 (Jan-Oct) | 31 | +4.4 | 87% | 1.1 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|
@@ -383,15 +284,17 @@ The search shows more than luck would, but the pick does not hold up: it loses o
 
 ### 3m: USABLE
 
-Holds up on the untouched period beyond what luck gives, and part of the hold-out tests pass. File: `presets/AMVI_FGF_BTCUSDT_3m.pine`.
+USABLE because it made money on 2021-2023, which it was not chosen on, at base and stressed costs and in 100% of resamples of its weeks; the 25 steadiest candidates did too as a group; the three hold-out tests inside the last three years fail. File: `presets/AMVI_FGF_BTCUSDT_3m.pine` (test with alerts first; small size at most).
 
-- On data it was not chosen on (untouched 2021-01 to 2023-10): 72 trades (37L/35S), +20.6R, PF 2.56, 54% winners, max DD 2.9R, longest losing streak 4, 20 of 34 months positive; stressed costs +16.9R; positive in 100% of resamples of its weeks.
-- Where it was chosen (search window): 79 trades (45L/34S), +23.4R, PF 2.13, 61% winners, max DD 2.9R, longest losing streak 4, 19 of 36 months positive; halves +11.3 / +12.0R; average trade lasts 73 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +45R here (95th percentile +181R) and -8R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +11.7% in three years with a worst drawdown of about 1.4% (no compounding), and the untouched period about +10.3% with a worst drawdown of 1.4%. The stop is 1.72% of price on average, so 0.5% risk asks for about 0.3x leverage.
+- On data it was not chosen on (untouched 2021-01 to 2023-10): 72 trades (37L/35S), +20.6R, PF 2.56, 54% winners, max DD 2.9R, longest losing streak 4, 20 of 34 months positive; stressed costs +16.9R; positive in 100% of resamples of its weeks. 80% of that result came in 2023.
+- Where it was chosen (search window): 79 trades (45L/34S), +23.4R, PF 2.13, 61% winners, max DD 2.9R, longest losing streak 4, 19 of 36 months positive; halves +11.3 / +12.0R. The best month (2024-08) made +4.4R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +45R here (95th percentile +181R) and -8R on months it was not chosen on.
+- Holding time: 4 hours on average and 5 hours at most in the search window (4 hours and 5 hours on the untouched period): inside your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +11.7% in three years with a worst drawdown of about 1.4% (no compounding), and the untouched period about +10.3% with a worst drawdown of 1.4%. The stop is 1.72% of price on average, so 0.5% risk asks for about 0.3x leverage.
 - Costs (search window): Bitget 0.06% +22.2R; no costs +29.0R; stressed +17.7R; break-even commission 0.258% per side. Fees took 5.6R and funding +0.1R.
-- Price path (search window): second by second +23.4R; on 1-minute bars +23.4R; on the chart's candles +23.4R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +22.3R with 79 trades; the same costs second by second give +22.3R.
-- The selection method on this timeframe, search window -> untouched period: the 25 candidates made +18.6R on average (80% positive, months resampled 99%): pass; random settings of the same trade direction made -72.3R, so the choice adds something beyond the direction.
-- Not fragile: 93% of 28 neighbouring settings positive in both halves; sensitive to: burst_atr, conf.
+- Price path (search window): second by second +23.4R; on 1-minute bars +23.4R; on the chart's candles +23.4R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 79 trades, 58% profitable, profit factor about 2.1, net profit about +11% for 2023-11-01 to 2026-10-31.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +18.6R on average (80% of them made money; positive in 98.7% of resamples of the months): pass. Random settings of the same trade direction made -72.3R, so the choice adds something beyond the direction.
+- Not fragile: 93% of 28 neighbouring settings positive in both halves; sensitive to: Burst threshold, ATR mult, Min TFs Above High Vol.
 - Concentration (search window): 10 biggest trades +14.4R, all others +9.0R; positive in 99.6% of resamples of its weeks.
 - Same inputs, other trade direction: -24.3R.
 
@@ -426,11 +329,11 @@ Holds up on the untouched period beyond what luck gives, and part of the hold-ou
 |---|---|---|---|---|
 | 2021 (untouched) | 24 | +4.4 | 58% | 2.5 |
 | 2022 (untouched) | 15 | -0.2 | 40% | 2.9 |
-| 2023 (untouched) | 33 | +16.4 | 58% | 1.7 |
-| 2023 | 6 | -0.8 | 50% | 1.2 |
+| 2023 (Jan-Oct, untouched) | 33 | +16.4 | 58% | 1.7 |
+| 2023 (Nov-Dec) | 6 | -0.8 | 50% | 1.2 |
 | 2024 | 22 | +11.9 | 73% | 2.2 |
 | 2025 | 31 | +6.0 | 55% | 2.9 |
-| 2026 | 20 | +6.3 | 60% | 2.9 |
+| 2026 (Jan-Oct) | 20 | +6.3 | 60% | 2.9 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|
@@ -440,15 +343,17 @@ Holds up on the untouched period beyond what luck gives, and part of the hold-ou
 
 ### 5m: NOT RECOMMENDED
 
-The search shows more than luck would, but the pick does not hold up: it loses on the untouched 2021-2023 period. No file was written: a file is an invitation to trade, and this pick did not earn one. Its inputs are listed below for the record.
+NOT RECOMMENDED because it does not hold up on 2021-2023 (it lost there), although the 25 steadiest candidates passed the test there as a group. No file was written. The inputs below are listed only so that the result can be reproduced; they are not a setup to trade.
 
 - On data it was not chosen on (untouched 2021-01 to 2023-10): 70 trades (44L/26S), -1.0R, PF 0.98, 46% winners, max DD 6.7R, longest losing streak 5, 20 of 34 months positive; stressed costs -4.8R; positive in 45% of resamples of its weeks.
-- Where it was chosen (search window): 68 trades (38L/30S), +16.1R, PF 1.51, 56% winners, max DD 5.2R, longest losing streak 3, 20 of 36 months positive; halves +7.1 / +9.1R; average trade lasts 266 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +36R here (95th percentile +152R) and -8R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +8.1% in three years with a worst drawdown of about 2.6% (no compounding), and the untouched period about -0.5% with a worst drawdown of 3.3%. The stop is 1.80% of price on average, so 0.5% risk asks for about 0.3x leverage.
+- Where it was chosen (search window): 68 trades (38L/30S), +16.1R, PF 1.51, 56% winners, max DD 5.2R, longest losing streak 3, 20 of 36 months positive; halves +7.1 / +9.1R. The best month (2024-02) made +5.0R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +36R here (95th percentile +152R) and -8R on months it was not chosen on.
+- Holding time: 22 hours on average and 8.5 days at most in the search window (23 hours and 7.9 days on the untouched period): longer than your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +8.1% in three years with a worst drawdown of about 2.6% (no compounding), and the untouched period about -0.5% with a worst drawdown of 3.3%. The stop is 1.80% of price on average, so 0.5% risk asks for about 0.3x leverage.
 - Costs (search window): Bitget 0.06% +15.2R; no costs +20.7R; stressed +11.6R; break-even commission 0.229% per side. Fees took 4.5R and funding +0.0R.
-- Price path (search window): second by second +16.1R; on 1-minute bars +16.1R; on the chart's candles +16.1R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +15.2R with 68 trades; the same costs second by second give +15.2R.
-- The selection method on this timeframe, search window -> untouched period: the 25 candidates made +27.0R on average (76% positive, months resampled 99%): pass; random settings of the same trade direction made -150.2R, so the choice adds something beyond the direction.
-- Not fragile: 96% of 28 neighbouring settings positive in both halves; sensitive to: burst_atr.
+- Price path (search window): second by second +16.1R; on 1-minute bars +16.1R; on the chart's candles +16.1R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 68 trades, 56% profitable, profit factor about 1.5, net profit about +8% for 2023-11-01 to 2026-10-31.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +27.0R on average (76% of them made money; positive in 99.1% of resamples of the months): pass. Random settings of the same trade direction made -150.2R, so the choice adds something beyond the direction.
+- Not fragile: 96% of 28 neighbouring settings positive in both halves; sensitive to: Burst threshold, ATR mult.
 - Concentration (search window): 10 biggest trades +13.0R, all others +3.2R; positive in 96.0% of resamples of its weeks.
 - Same inputs, other trade direction: -26.8R.
 
@@ -483,11 +388,11 @@ The search shows more than luck would, but the pick does not hold up: it loses o
 |---|---|---|---|---|
 | 2021 (untouched) | 19 | +0.9 | 47% | 5.5 |
 | 2022 (untouched) | 24 | -2.2 | 42% | 5.9 |
-| 2023 (untouched) | 27 | +0.4 | 48% | 5.4 |
-| 2023 | 3 | -0.9 | 33% | 2.1 |
+| 2023 (Jan-Oct, untouched) | 27 | +0.4 | 48% | 5.4 |
+| 2023 (Nov-Dec) | 3 | -0.9 | 33% | 2.1 |
 | 2024 | 23 | +8.3 | 61% | 3.1 |
 | 2025 | 23 | +1.1 | 48% | 5.2 |
-| 2026 | 19 | +7.6 | 63% | 2.2 |
+| 2026 (Jan-Oct) | 19 | +7.6 | 63% | 2.2 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|
@@ -496,15 +401,17 @@ The search shows more than luck would, but the pick does not hold up: it loses o
 
 ### 10m: NOT RECOMMENDED
 
-The search shows more than luck would, but the pick does not hold up: its untouched result is positive in only 81% of resamples of the weeks, so it rests on a few good weeks. No file was written: a file is an invitation to trade, and this pick did not earn one. Its inputs are listed below for the record.
+NOT RECOMMENDED because it does not hold up on 2021-2023 (its gain there stays positive in only 81% of resamples of its weeks, so a few good weeks carry it), although the 25 steadiest candidates passed the test there as a group. No file was written. The inputs below are listed only so that the result can be reproduced; they are not a setup to trade.
 
-- On data it was not chosen on (untouched 2021-01 to 2023-10): 65 trades (38L/27S), +8.7R, PF 1.31, 58% winners, max DD 6.4R, longest losing streak 6, 14 of 34 months positive; stressed costs +6.0R; positive in 81% of resamples of its weeks.
-- Where it was chosen (search window): 85 trades (45L/40S), +14.5R, PF 1.44, 62% winners, max DD 5.7R, longest losing streak 4, 18 of 36 months positive; halves +7.3 / +7.2R; average trade lasts 99 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +31R here (95th percentile +123R) and -5R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +7.3% in three years with a worst drawdown of about 2.9% (no compounding), and the untouched period about +4.4% with a worst drawdown of 3.2%. The stop is 2.13% of price on average, so 0.5% risk asks for about 0.2x leverage.
+- On data it was not chosen on (untouched 2021-01 to 2023-10): 65 trades (38L/27S), +8.7R, PF 1.31, 58% winners, max DD 6.4R, longest losing streak 6, 14 of 34 months positive; stressed costs +6.0R; positive in 81% of resamples of its weeks. All of that result came in 2023; the other years together lost.
+- Where it was chosen (search window): 85 trades (45L/40S), +14.5R, PF 1.44, 62% winners, max DD 5.7R, longest losing streak 4, 18 of 36 months positive; halves +7.3 / +7.2R. The best month (2025-11) made +3.8R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +31R here (95th percentile +123R) and -5R on months it was not chosen on.
+- Holding time: 17 hours on average and 6.8 days at most in the search window (22 hours and 6.8 days on the untouched period): longer than your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +7.3% in three years with a worst drawdown of about 2.9% (no compounding), and the untouched period about +4.4% with a worst drawdown of 3.2%. The stop is 2.13% of price on average, so 0.5% risk asks for about 0.2x leverage.
 - Costs (search window): Bitget 0.06% +13.6R; no costs +19.2R; stressed +10.2R; break-even commission 0.211% per side. Fees took 4.5R and funding +0.1R.
-- Price path (search window): second by second +14.5R; on 1-minute bars +14.5R; on the chart's candles +16.8R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +15.9R with 85 trades; the same costs second by second give +13.7R.
-- The selection method on this timeframe, search window -> untouched period: the 25 candidates made +25.3R on average (80% positive, months resampled 100%): pass; random settings of the same trade direction made -19.8R, so the choice adds something beyond the direction.
-- Not fragile: 94% of 31 neighbouring settings positive in both halves; sensitive to: cr, max_bars.
+- Price path (search window): second by second +14.5R; on 1-minute bars +14.5R; on the chart's candles +16.8R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 85 trades, 62% profitable, profit factor about 1.5, net profit about +8% for 2023-11-01 to 2026-10-31.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +25.3R on average (80% of them made money; positive in 99.5% of resamples of the months): pass. Random settings of the same trade direction made -19.8R, so the choice adds something beyond the direction.
+- Not fragile: 94% of 31 neighbouring settings positive in both halves; sensitive to: Candle Range Period, Time Stop.
 - Concentration (search window): 10 biggest trades +14.3R, all others +0.2R; positive in 95.3% of resamples of its weeks.
 - Same inputs, other trade direction: -28.7R.
 - Trailing stop restarted at every candle close (if TradingView does that): search window +15.4R, untouched +7.8R.
@@ -538,11 +445,11 @@ The search shows more than luck would, but the pick does not hold up: its untouc
 |---|---|---|---|---|
 | 2021 (untouched) | 17 | -1.0 | 47% | 6.4 |
 | 2022 (untouched) | 20 | -2.7 | 50% | 6.0 |
-| 2023 (untouched) | 28 | +12.4 | 71% | 2.1 |
-| 2023 | 8 | -0.2 | 50% | 2.1 |
+| 2023 (Jan-Oct, untouched) | 28 | +12.4 | 71% | 2.1 |
+| 2023 (Nov-Dec) | 8 | -0.2 | 50% | 2.1 |
 | 2024 | 23 | +5.6 | 65% | 3.1 |
 | 2025 | 27 | +8.8 | 70% | 3.2 |
-| 2026 | 27 | +0.4 | 56% | 5.7 |
+| 2026 (Jan-Oct) | 27 | +0.4 | 56% | 5.7 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|
@@ -553,14 +460,16 @@ The search shows more than luck would, but the pick does not hold up: its untouc
 
 ### 15m: USABLE
 
-Holds up on the untouched period beyond what luck gives, and part of the hold-out tests pass. File: `presets/AMVI_FGF_BTCUSDT_15m.pine`.
+USABLE because it made money on 2021-2023, which it was not chosen on, at base and stressed costs and in 99% of resamples of its weeks; the 25 steadiest candidates did too as a group; the three hold-out tests inside the last three years fail. File: `presets/AMVI_FGF_BTCUSDT_15m.pine` (test with alerts first; small size at most).
 
-- On data it was not chosen on (untouched 2021-01 to 2023-10): 232 trades (112L/120S), +19.7R, PF 1.41, 56% winners, max DD 7.0R, longest losing streak 5, 22 of 34 months positive; stressed costs +14.7R; positive in 99% of resamples of its weeks.
-- Where it was chosen (search window): 284 trades (134L/150S), +21.1R, PF 1.35, 54% winners, max DD 3.7R, longest losing streak 5, 24 of 36 months positive; halves +10.7 / +10.4R; average trade lasts 75 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +29R here (95th percentile +95R) and -5R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +10.6% in three years with a worst drawdown of about 1.8% (no compounding), and the untouched period about +9.8% with a worst drawdown of 3.5%. The stop is 4.27% of price on average, so 0.5% risk asks for about 0.1x leverage.
+- On data it was not chosen on (untouched 2021-01 to 2023-10): 232 trades (112L/120S), +19.7R, PF 1.41, 56% winners, max DD 7.0R, longest losing streak 5, 22 of 34 months positive; stressed costs +14.7R; positive in 99% of resamples of its weeks. 69% of that result came in 2021.
+- Where it was chosen (search window): 284 trades (134L/150S), +21.1R, PF 1.35, 54% winners, max DD 3.7R, longest losing streak 5, 24 of 36 months positive; halves +10.7 / +10.4R. The best month (2026-06) made +3.8R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +29R here (95th percentile +95R) and -5R on months it was not chosen on.
+- Holding time: 19 hours on average and 24 hours at most in the search window (18 hours and 24 hours on the untouched period): inside your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +10.6% in three years with a worst drawdown of about 1.8% (no compounding), and the untouched period about +9.8% with a worst drawdown of 3.5%. The stop is 4.27% of price on average, so 0.5% risk asks for about 0.1x leverage.
 - Costs (search window): Bitget 0.06% +19.6R; no costs +28.8R; stressed +13.6R; break-even commission 0.191% per side. Fees took 7.5R and funding +0.1R.
-- Price path (search window): second by second +21.1R; on 1-minute bars +21.1R; on the chart's candles +21.1R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +19.8R with 284 trades; the same costs second by second give +19.8R.
-- The selection method on this timeframe, search window -> untouched period: the 25 candidates made +14.7R on average (84% positive, months resampled 100%): pass; random settings of the same trade direction made -16.1R, so the choice adds something beyond the direction.
+- Price path (search window): second by second +21.1R; on 1-minute bars +21.1R; on the chart's candles +21.1R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 284 trades, 54% profitable, profit factor about 1.3, net profit about +10% for 2023-11-01 to 2026-10-31.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +14.7R on average (84% of them made money; positive in 100.0% of resamples of the months): pass. Random settings of the same trade direction made -16.1R, so the choice adds something beyond the direction.
 - Not fragile: 100% of 23 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +7.4R, all others +13.7R; positive in 98.9% of resamples of its weeks.
 - Same inputs, other trade direction: -32.6R.
@@ -587,11 +496,11 @@ Holds up on the untouched period beyond what luck gives, and part of the hold-ou
 |---|---|---|---|---|
 | 2021 (untouched) | 75 | +13.5 | 64% | 1.9 |
 | 2022 (untouched) | 75 | +2.5 | 53% | 3.0 |
-| 2023 (untouched) | 82 | +3.7 | 51% | 7.0 |
-| 2023 | 15 | -0.2 | 47% | 1.5 |
+| 2023 (Jan-Oct, untouched) | 82 | +3.7 | 51% | 7.0 |
+| 2023 (Nov-Dec) | 15 | -0.2 | 47% | 1.5 |
 | 2024 | 105 | +10.7 | 55% | 3.7 |
 | 2025 | 98 | +3.7 | 51% | 3.6 |
-| 2026 | 66 | +7.0 | 56% | 2.9 |
+| 2026 (Jan-Oct) | 66 | +7.0 | 56% | 2.9 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|
@@ -602,14 +511,16 @@ Holds up on the untouched period beyond what luck gives, and part of the hold-ou
 
 ### 30m: DO NOT TRADE
 
-The search found no more winners than luck would, no hold-out test passes, and the best candidate does not hold up: its untouched result is positive in only 77% of resamples of the weeks, so it rests on a few good weeks. No file was written: a file is an invitation to trade, and this pick did not earn one. Its inputs are listed below for the record.
+DO NOT TRADE because it does not hold up on 2021-2023 (its gain there stays positive in only 77% of resamples of its weeks, so a few good weeks carry it), and none of the four tests passes. No file was written. The inputs below are listed only so that the result can be reproduced; they are not a setup to trade.
 
-- On data it was not chosen on (untouched 2021-01 to 2023-10): 68 trades (35L/33S), +4.8R, PF 1.22, 65% winners, max DD 3.8R, longest losing streak 3, 18 of 34 months positive; stressed costs +3.1R; positive in 77% of resamples of its weeks.
-- Where it was chosen (search window): 74 trades (38L/36S), +20.2R, PF 2.22, 76% winners, max DD 3.3R, longest losing streak 2, 23 of 36 months positive; halves +12.3 / +8.0R; average trade lasts 92 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +28R here (95th percentile +103R) and -5R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +10.1% in three years with a worst drawdown of about 1.7% (no compounding), and the untouched period about +2.4% with a worst drawdown of 1.9%. The stop is 3.83% of price on average, so 0.5% risk asks for about 0.1x leverage.
+- On data it was not chosen on (untouched 2021-01 to 2023-10): 68 trades (35L/33S), +4.8R, PF 1.22, 65% winners, max DD 3.8R, longest losing streak 3, 18 of 34 months positive; stressed costs +3.1R; positive in 77% of resamples of its weeks. 80% of that result came in 2022.
+- Where it was chosen (search window): 74 trades (38L/36S), +20.2R, PF 2.22, 76% winners, max DD 3.3R, longest losing streak 2, 23 of 36 months positive; halves +12.3 / +8.0R. The best month (2026-08) made +3.6R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +28R here (95th percentile +103R) and -5R on months it was not chosen on.
+- Holding time: 46 hours on average and 15.8 days at most in the search window (2.2 days and 25.2 days on the untouched period): longer than your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +10.1% in three years with a worst drawdown of about 1.7% (no compounding), and the untouched period about +2.4% with a worst drawdown of 1.9%. The stop is 3.83% of price on average, so 0.5% risk asks for about 0.1x leverage.
 - Costs (search window): Bitget 0.06% +19.8R; no costs +22.4R; stressed +18.0R; break-even commission 0.510% per side. Fees took 2.2R and funding -0.1R.
-- Price path (search window): second by second +20.2R; on 1-minute bars +21.5R; on the chart's candles +21.4R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +20.9R with 72 trades; the same costs second by second give +19.7R.
-- The selection method on this timeframe, search window -> untouched period: the 25 candidates made +12.1R on average (84% positive, months resampled 93%): fail; random settings of the same trade direction made -8.6R, so the choice adds nothing measurable beyond the direction.
+- Price path (search window): second by second +20.2R; on 1-minute bars +21.5R; on the chart's candles +21.4R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 72 trades, 75% profitable, profit factor about 2.3, net profit about +10% for 2023-11-01 to 2026-10-31.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.1R on average (84% of them made money; positive in 93.2% of resamples of the months): fail. Random settings of the same trade direction made -8.6R, so the choice adds nothing measurable beyond the direction.
 - Not fragile: 100% of 25 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +12.2R, all others +8.1R; positive in 99.8% of resamples of its weeks.
 - Same inputs, other trade direction: -17.2R.
@@ -638,11 +549,11 @@ The search found no more winners than luck would, no hold-out test passes, and t
 |---|---|---|---|---|
 | 2021 (untouched) | 14 | -1.3 | 57% | 3.3 |
 | 2022 (untouched) | 30 | +3.9 | 67% | 3.4 |
-| 2023 (untouched) | 24 | +2.3 | 67% | 3.8 |
-| 2023 | 4 | -0.7 | 50% | 2.1 |
+| 2023 (Jan-Oct, untouched) | 24 | +2.3 | 67% | 3.8 |
+| 2023 (Nov-Dec) | 4 | -0.7 | 50% | 2.1 |
 | 2024 | 23 | +9.7 | 87% | 2.0 |
 | 2025 | 28 | +7.7 | 75% | 2.1 |
-| 2026 | 19 | +3.5 | 68% | 2.7 |
+| 2026 (Jan-Oct) | 19 | +3.5 | 68% | 2.7 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|
@@ -652,14 +563,16 @@ The search found no more winners than luck would, no hold-out test passes, and t
 
 ### 1h: NOT RECOMMENDED
 
-The search shows more than luck would, but the pick does not hold up: its untouched result is positive in only 86% of resamples of the weeks, so it rests on a few good weeks. No file was written: a file is an invitation to trade, and this pick did not earn one. Its inputs are listed below for the record.
+NOT RECOMMENDED because it does not hold up on 2021-2023 (its gain there stays positive in only 86% of resamples of its weeks, so a few good weeks carry it), although the 25 steadiest candidates passed the test there as a group. No file was written. The inputs below are listed only so that the result can be reproduced; they are not a setup to trade.
 
 - On data it was not chosen on (untouched 2021-01 to 2023-10): 98 trades (98L/0S), +7.5R, PF 1.29, 74% winners, max DD 6.0R, longest losing streak 3, 19 of 34 months positive; stressed costs +3.8R; positive in 86% of resamples of its weeks.
-- Where it was chosen (search window): 101 trades (101L/0S), +22.0R, PF 2.32, 84% winners, max DD 3.2R, longest losing streak 3, 25 of 36 months positive; halves +11.1 / +10.9R; average trade lasts 13 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +27R here (95th percentile +89R) and -4R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +11.0% in three years with a worst drawdown of about 1.6% (no compounding), and the untouched period about +3.7% with a worst drawdown of 3.0%. The stop is 2.63% of price on average, so 0.5% risk asks for about 0.2x leverage.
+- Where it was chosen (search window): 101 trades (101L/0S), +22.0R, PF 2.32, 84% winners, max DD 3.2R, longest losing streak 3, 25 of 36 months positive; halves +11.1 / +10.9R. The best month (2026-08) made +2.2R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +27R here (95th percentile +89R) and -4R on months it was not chosen on.
+- Holding time: 13 hours on average and 5.8 days at most in the search window (8 hours and 3.2 days on the untouched period): longer than your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +11.0% in three years with a worst drawdown of about 1.6% (no compounding), and the untouched period about +3.7% with a worst drawdown of 3.0%. The stop is 2.63% of price on average, so 0.5% risk asks for about 0.2x leverage.
 - Costs (search window): Bitget 0.06% +21.2R; no costs +26.5R; stressed +17.8R; break-even commission 0.312% per side. Fees took 4.2R and funding +0.3R.
-- Price path (search window): second by second +22.0R; on 1-minute bars +22.0R; on the chart's candles +22.0R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +21.5R with 101 trades; the same costs second by second give +21.5R.
-- The selection method on this timeframe, search window -> untouched period: the 25 candidates made +17.1R on average (92% positive, months resampled 100%): pass; random settings of the same trade direction made +4.7R, so the choice adds something beyond the direction.
+- Price path (search window): second by second +22.0R; on 1-minute bars +22.0R; on the chart's candles +22.0R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 101 trades, 84% profitable, profit factor about 2.3, net profit about +11% for 2023-11-01 to 2026-10-31.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +17.1R on average (92% of them made money; positive in 99.6% of resamples of the months): pass. Random settings of the same trade direction made +4.7R, so the choice adds something beyond the direction.
 - Not fragile: 100% of 22 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +4.7R, all others +17.3R; positive in 100.0% of resamples of its weeks.
 - Same inputs, other trade direction: -23.4R.
@@ -690,11 +603,11 @@ The search shows more than luck would, but the pick does not hold up: its untouc
 |---|---|---|---|---|
 | 2021 (untouched) | 26 | +1.6 | 73% | 2.6 |
 | 2022 (untouched) | 38 | +4.2 | 76% | 2.2 |
-| 2023 (untouched) | 34 | +1.7 | 74% | 6.0 |
-| 2023 | 5 | +0.8 | 80% | 1.0 |
+| 2023 (Jan-Oct, untouched) | 34 | +1.7 | 74% | 6.0 |
+| 2023 (Nov-Dec) | 5 | +0.8 | 80% | 1.0 |
 | 2024 | 34 | +9.6 | 88% | 1.6 |
 | 2025 | 33 | +3.0 | 76% | 3.2 |
-| 2026 | 29 | +8.7 | 90% | 1.1 |
+| 2026 (Jan-Oct) | 29 | +8.7 | 90% | 1.1 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|
@@ -703,18 +616,20 @@ The search shows more than luck would, but the pick does not hold up: its untouc
 
 ### 4h: USABLE
 
-Holds up on the untouched period beyond what luck gives, and part of the hold-out tests pass. File: `presets/AMVI_FGF_BTCUSDT_4h.pine`.
+USABLE because it made money on 2021-2023, which it was not chosen on, at base and stressed costs and in 98% of resamples of its weeks; the 25 steadiest candidates did too as a group; the three hold-out tests inside the last three years fail. File: `presets/AMVI_FGF_BTCUSDT_4h.pine` (test with alerts first; small size at most).
 
-- On data it was not chosen on (untouched 2021-01 to 2023-10): 69 trades (41L/28S), +21.4R, PF 1.71, 58% winners, max DD 8.3R, longest losing streak 6, 19 of 34 months positive; stressed costs +18.9R; positive in 98% of resamples of its weeks.
-- Where it was chosen (search window): 100 trades (46L/54S), +35.2R, PF 1.84, 60% winners, max DD 5.7R, longest losing streak 5, 24 of 36 months positive; halves +22.4 / +12.9R; average trade lasts 7 candles. In shuffled worlds where no setting has an edge, the same choice still shows about +24R here (95th percentile +75R) and -3R on fresh months.
-- With the file's sizing (0.5% of equity at risk per trade, position capped at 5x equity) the search-window result is about +17.6% in three years with a worst drawdown of about 2.8% (no compounding), and the untouched period about +10.7% with a worst drawdown of 4.1%. The stop is 2.33% of price on average, so 0.5% risk asks for about 0.2x leverage.
+- On data it was not chosen on (untouched 2021-01 to 2023-10): 69 trades (41L/28S), +21.4R, PF 1.71, 58% winners, max DD 8.3R, longest losing streak 6, 19 of 34 months positive; stressed costs +18.9R; positive in 98% of resamples of its weeks. 84% of that result came in 2023.
+- Where it was chosen (search window): 100 trades (46L/54S), +35.2R, PF 1.84, 60% winners, max DD 5.7R, longest losing streak 5, 24 of 36 months positive; halves +22.4 / +12.9R. The best month (2025-04) made +5.1R of it. In luck-only worlds, where no setting has an edge, a pick chosen the same way still shows about +24R here (95th percentile +75R) and -3R on months it was not chosen on.
+- Holding time: 28 hours on average and 8.4 days at most in the search window (35 hours and 4.9 days on the untouched period): longer than your lab's holding limit (hours to one day).
+- With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +17.6% in three years with a worst drawdown of about 2.8% (no compounding), and the untouched period about +10.7% with a worst drawdown of 4.1%. The stop is 2.33% of price on average, so 0.5% risk asks for about 0.2x leverage.
 - Costs (search window): Bitget 0.06% +34.3R; no costs +40.0R; stressed +30.5R; break-even commission 0.422% per side. Fees took 4.7R and funding +0.0R.
-- Price path (search window): second by second +35.2R; on 1-minute bars +35.2R; on the chart's candles +32.9R. TradingView's tester (chart candles, the file's 0.06%, no funding) would show about +32.0R with 100 trades; the same costs second by second give +34.3R.
-- The selection method on this timeframe, search window -> untouched period: the 25 candidates made +12.5R on average (68% positive, months resampled 97%): pass; random settings of the same trade direction made +11.9R, so the choice adds nothing measurable beyond the direction.
+- Price path (search window): second by second +35.2R; on 1-minute bars +35.2R; on the chart's candles +32.9R.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 100 trades, 59% profitable, profit factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31; TradingView can replay this file only from about 2024-01-19: from then about 94 trades, 61% profitable, net profit about +17%.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.5R on average (68% of them made money; positive in 96.6% of resamples of the months): pass. Random settings of the same trade direction made +11.9R, so the choice adds nothing measurable beyond the direction.
 - Not fragile: 100% of 30 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +13.2R, all others +22.1R; positive in 99.8% of resamples of its weeks.
 - Same inputs, other trade direction: -31.0R.
-- This setting reads 15m candles from a 4h chart. TradingView keeps about 100,000 intrabars per request, so its tester can replay it only back to about 2024-01; earlier trades of this record cannot be checked there.
+- This setting reads 15m candles from a 4h chart. TradingView keeps about 100,000 candles of a lower timeframe per request, so its tester can replay it only back to about 2024-01-19; earlier trades of this record cannot be checked there.
 
 | Input | Shipped | This file |
 |---|---|---|
@@ -745,11 +660,11 @@ Holds up on the untouched period beyond what luck gives, and part of the hold-ou
 |---|---|---|---|---|
 | 2021 (untouched) | 28 | +6.1 | 54% | 3.1 |
 | 2022 (untouched) | 16 | -2.6 | 38% | 7.0 |
-| 2023 (untouched) | 25 | +17.9 | 76% | 2.1 |
-| 2023 | 4 | +0.4 | 50% | 2.1 |
+| 2023 (Jan-Oct, untouched) | 25 | +17.9 | 76% | 2.1 |
+| 2023 (Nov-Dec) | 4 | +0.4 | 50% | 2.1 |
 | 2024 | 33 | +14.5 | 64% | 5.7 |
 | 2025 | 31 | +12.0 | 61% | 2.1 |
-| 2026 | 32 | +8.3 | 56% | 3.2 |
+| 2026 (Jan-Oct) | 32 | +8.3 | 56% | 3.2 |
 
 | Exit (search window) | Trades | Net R | Average |
 |---|---|---|---|

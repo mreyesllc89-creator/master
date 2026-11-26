@@ -12,7 +12,8 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 |---|---|
 | `REPORT.md` | findings, method, results per timeframe, caveats |
 | `presets/` | a `.pine` file for every timeframe whose pick holds up on the untouched period: the script with other input defaults |
-| `results/` | hold-out and plateau tests, final numbers and trade lists per timeframe |
+| `results/` | hold-out and plateau tests, final numbers and trade lists per timeframe; `results/checks/` holds the logs of the engine checks |
+| `REPORT_src.md`, `REPORT_tables.md` | the hand-written text and the generated tables that `tools/assemble_report.py` joins into `REPORT.md` |
 | `tools/` | the Python copy of the script and the calibration steps |
 | `data/` | 1-minute bars and funding (not in git; `tools/fetch_1m.py` rebuilds it) |
 
@@ -40,10 +41,12 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | `assemble_report.py` | `REPORT.md` = the hand-written `REPORT_src.md` with the generated tables put in |
 | `make_pine.py` | writes a calibrated file: input defaults only, never the logic |
 | `check_outputs.py` | the trade lists and the calibrated files checked against the records and the shipped script |
-| `replicate_picks.py` | the picked settings against the two independent reference versions, trade for trade |
+| `replicate_picks.py` | the picked settings against the reference versions: signals bar for bar, the filter zone against a literal copy of the filter, orders trade for trade |
 | `test_orders.py` | hand-computed order scenarios |
-| `difftest.py`, `ref/` | the engine against two reference versions written independently from the Pine source |
+| `difftest.py`, `ref/` | the engine against two reference versions written independently from the Pine source (`ref_signals.py`, `ref_orders.py`); `ref_filter.py` is a third, statement-by-statement copy of the filter |
+| `test_lookahead.py` | prices after a time T replaced by another path: nothing the engine shows for candles closed by T may change |
 | `test_fine.py` | the second-by-second order walk against walking every single second |
+| `seconds_coverage.py` | how completely the one-second bars cover the 1-minute bars |
 | `run_all.sh` | everything, in order |
 
 ## Conventions
@@ -54,15 +57,22 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
   minute in which an order could fill, the minute's one-second bars are walked (open, nearer
   extreme, other extreme, close). Minutes in which nothing can fill are skipped; the result is
   the same as walking every second (`test_fine.py`).
-- A minute without a trade is not a bar (369 such minutes in the exchange's files, exchange
-  outages), as on TradingView.
+- An empty row of the exchange's 1-minute file is not a bar. There are 367 of them from 2021-01
+  to 2026-10; in 192 (all between 2023-11 and 2025) the trade-by-trade files do show a trade,
+  so TradingView may have a candle there (`results/checks/seconds_coverage.txt`).
+- In 27 minutes the one-second prices contradict the exchange's own 1-minute bar (off-market
+  prints); the 1-minute bar is used there.
 - Costs: 0.05 % commission per side, 1 tick slippage on market and stop fills, Binance funding
   (the crypto lab's rule). Stress: 0.10 % per side and 3 ticks.
 - Results are in R: 1 R = Stop Loss x ATR at the signal = the amount risked per trade with the
   script's Risk % sizing.
 - Search window 2023-11-01 to 2026-10-31 (36 months). The period 2021-01-01 to 2023-10-31 is
   not used by the search or the selection; each timeframe's pick is run on it once at the end.
-- Seconds timeframes are not calibrated: there is no long seconds history to test them on.
+- Seconds timeframes (1s to 45s) are not calibrated: the engine builds its indicators from
+  1-minute bars; the one-second bars only fill the orders.
+- Verdicts, from best to worst: RECOMMENDED, USABLE, PAPER-TRADE, NOT RECOMMENDED, DO NOT
+  TRADE (`tools/report.py`; `REPORT.md` section 3). A file is written for PAPER-TRADE and
+  better and carries its verdict in its title.
 
 ## Rebuild
 

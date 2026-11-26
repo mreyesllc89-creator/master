@@ -1,52 +1,35 @@
 //@version=6
 // =====================================================================================
 // AMVI Full MTF Strategy (direction filter, closed-candle engine): BTCUSDT.P 4h
-// STATUS: USABLE - holds up on the untouched period beyond what luck gives, and part
-//         of the hold-out tests pass.
+// STATUS: USABLE (grade 2 of 5): test with alerts first; small size at most. For the
+//         4h chart of BTCUSDT.P only. Not yet run on TradingView: alerts only until
+//         its trade list matches (see CHECK).
 // -------------------------------------------------------------------------------------
-// Same code as AMVI_FGF_Inverted_XAUUSD_15m.pine; only the title, the commission and the
-// input defaults listed at the end of this record differ. Record date 2026-11-26.
-// Numbers come from a Python copy of this script (amvi_calibration/tools), not from
-// TradingView: check them against the Strategy Tester before relying on them.
+// RESULT: 2021-01 to 2023-10, NOT used for choosing: +21.4R (84% of it in 2023), 69
+//         trades, largest drawdown 8.3R; +18.9R at double commission.
+//         2023-11 to 2026-10, used for choosing (so flattered): +35.2R, 100 trades,
+//         largest drawdown 5.7R.
+//         1R = the amount risked per trade = 0.5% of the account with this file's
+//         sizing. After 0.05% commission per side, 1 tick slippage and funding, on
+//         Binance prices. Trades are held 28 hours on average, 8.4 days at most.
+// WHY:    USABLE because it made money on 2021-2023, which it was not chosen on, at
+//         base and stressed costs and in 98% of resamples of its weeks; the 25
+//         steadiest candidates did too as a group; the three hold-out tests inside the
+//         last three years fail.
+// TESTER: TradingView's Strategy Tester (Bar Magnifier off) should show about 100
+//         trades, 59% profitable, profit factor about 1.7, net profit about +16% for
+//         2023-11-01 to 2026-10-31; TradingView can replay this file only from about
+//         2024-01-19: from then about 94 trades, 61% profitable, net profit about
+//         +17%. It shows money, not R, and only the candles your plan loads (Deep
+//         Backtesting covers the whole period).
+// CHECK:  amvi_calibration/results/trades_BTCUSDT_4h.csv (UTC times, Binance prices):
+//         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides.
+// RECORD: amvi_calibration/REPORT.md, section 7, 4h. Record date 2026-11-26. Numbers
+//         come from a Python copy of this script, not from TradingView.
 //
-//  - Data: Binance BTCUSDT perpetual; chart 4h; stops, targets and trailing stops
-//    filled on the second-by-second trade prices. Costs: 0.05% per side + 1 tick
-//    slippage + funding. R = the amount risked per trade (Stop Loss x ATR14); with the
-//    file's Risk 0.5% sizing 1R = 0.5% of equity.
-//  - On data it was NOT chosen on (untouched 2021-01 to 2023-10): 69 trades, +21.4R,
-//    PF 1.71, max DD 8.3R, 19 of 34 months positive; stressed costs +18.9R; positive
-//    in 98% of resamples of its weeks.
-//  - Where it was chosen (search window 2023-11-01 to 2026-10-31, the best of 16,000
-//    settings, so flattered): 100 trades (46L/54S), +35.2R, PF 1.84, max DD 5.7R,
-//    halves +22.4R/+12.9R, 60% winners, longest losing streak 5, 24 of 36 months
-//    positive, 7 bars per trade on average. In shuffled worlds where no setting has an
-//    edge, the same choice still shows about +24R here (95th percentile +75R) and -3R
-//    on fresh months.
-//  - Costs on the search window: Bitget taker 0.06% +34.3R; no costs +40.0R; stressed
-//    (0.10% + 3 ticks) +30.5R; break-even commission 0.422% per side.
-//  - TradingView's Strategy Tester walks stops on the chart's candles (no Bar
-//    Magnifier) and charges no funding: on the same bars it would show about +32.0R
-//    (100 trades) for the search window. The same costs on second-by-second prices
-//    give +34.3R; any difference is the tester's price path, not profit.
-//  - Hold-outs (best 40 settings of one part, scored on the other): first half ->
-//    second -3.6R (30% positive, months resampled 17%); second -> first -1.1R (45%
-//    positive, months resampled 16%); walk-forward -2.6R (35% positive, months
-//    resampled 31%). Search window -> untouched period: the 25 candidates made +12.5R
-//    on average (68% positive, months resampled 97%): pass; random settings of the
-//    same trade direction made +11.9R, so the choice adds nothing measurable beyond
-//    the direction.
-//  - Not fragile: 100% of 30 one-step neighbours are positive in both halves (a screen
-//    against fragility, not against luck). Concentration: the 10 biggest trades of the
-//    search window give +13.2R, the rest +22.1R. The other trade direction with the
-//    same inputs: -31.0R.
-//  - This setting reads 15m candles from a 4h chart. TradingView keeps about 100,000
-//    intrabars per request, so its tester can replay it only back to about 2024-01;
-//    earlier trades of this record cannot be checked there.
-//  - Not simulated: seconds timeframes (all off), the filter's entry hold,
-//    liquidation, partial fills, your exchange's own prices (Binance trades were
-//    used).
-//
-// Inputs set in this file (shipped value in brackets):
+// Same code as AMVI_FGF_Inverted_XAUUSD_15m.pine; only the title, the commission (0.06%), the
+// sizing defaults (risk 0.5%, max 5 BTC, margin 20%, fixed quantity 0.01 BTC) and these inputs
+// differ (shipped value in brackets):
 // fastATRPeriod = 10 [7], candleRangePeriod = 10 [20],
 // normalizationPeriod = 400 [200], aatrWeight = 0.2 [0.35], vrWeight = 0.5 [0.25],
 // nsdWeight = 0.15 [0.25], highVolThreshold = 65.0 [60.0],
@@ -56,15 +39,12 @@
 // fgfBurstAtr = 0.25 [0.5], fgfUseBurst = true [false], fgfAnyCombo = false [true],
 // fgfDriftBars = 120 [60], fgfUseDrift = true [false], fgfParentTf = "D" ["60"],
 // fgfMinAligned = 2 [0], en60 = false [true], en240 = false [true].
-// Seconds timeframes (1s-45s) are off: they cannot be tested on history.
-//
-// SIZING (S3): Risk % of equity per trade; this file ships 0.5% and a 20% margin (5x
-// leverage cap), the limits of your crypto lab. Results in R do not depend on size.
+// Seconds timeframes (1s-45s) are off: they were not tested.
 //
 // CLOSED-CANDLE ENGINE: every decision is taken once per candle, at its close, and filled
 // at the next open; keep Properties -> Script executions on "On bar close" only.
 // =====================================================================================
-strategy("AMVI FGF | BTCUSDT.P 4h (calibrated, closed-candle)", shorttitle="AMVI BTC 4h", overlay=false, precision=2,
+strategy("AMVI FGF | BTCUSDT.P 4h (usable, closed-candle)", shorttitle="AMVI BTC 4h USABLE", overlay=false, precision=2,
      initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1,
      commission_type=strategy.commission.percent, commission_value=0.06, slippage=1, pyramiding=0,
      margin_long=20, margin_short=20)

@@ -1,0 +1,38 @@
+1m bars 129581
+ok   default 15m chart, filter 60 above
+      non-NaN AMVI bars per tf: {'amvi_seen_15': 8421, 'amvi_seen_60': 7764, 'amvi_seen_240': 5136} | trig 131 zone+ 636 zone- 605
+      values that changed AFTER T (power of the test): {'trig': 896, 'volc': 341, 'hot': 13033, 'amvi_seen_15': 17210, 'amvi_seen_60': 17188, 'amvi_seen_240': 17104, 'zone': 4672, 'arm_level': 17198, 'arm_dir': 7848, 'arm_atr': 17198, 'arm_candles_since': 0, 'arm_on_sig': 0, 'exit_atr': 17220}
+ok   5m chart, filter 1m BELOW, parent 60 above the filter, daily AMVI
+      non-NaN AMVI bars per tf: {'amvi_seen_1': 25916, 'amvi_seen_5': 25904, 'amvi_seen_1440': 21886} | trig 7242 zone+ 10310 zone- 10588
+      values that changed AFTER T (power of the test): {'trig': 21038, 'volc': 9303, 'hot': 35514, 'amvi_seen_1': 51654, 'amvi_seen_5': 51644, 'amvi_seen_1440': 50112, 'zone': 31278, 'arm_level': 51642, 'arm_dir': 23630, 'arm_atr': 51642, 'arm_candles_since': 38262, 'arm_on_sig': 25739, 'exit_atr': 51654}
+ok   15m chart, filter 240 above, parent 1D, zones below the filter, daily AMVI
+      non-NaN AMVI bars per tf: {'amvi_seen_5': 8636, 'amvi_seen_60': 8584, 'amvi_seen_1440': 7296} | trig 1481 zone+ 1127 zone- 1065
+      values that changed AFTER T (power of the test): {'trig': 5003, 'volc': 2517, 'hot': 11917, 'amvi_seen_5': 17220, 'amvi_seen_60': 17188, 'amvi_seen_1440': 16704, 'zone': 8711, 'arm_level': 17066, 'arm_dir': 8615, 'arm_atr': 17066, 'arm_candles_since': 8563, 'arm_on_sig': 469, 'exit_atr': 17220}
+ok   60m chart, filter 60 EQUAL, parent 240, daily AMVI
+      non-NaN AMVI bars per tf: {'amvi_seen_1': 2160, 'amvi_seen_60': 2146, 'amvi_seen_1440': 1824} | trig 468 zone+ 410 zone- 423
+      values that changed AFTER T (power of the test): {'trig': 1560, 'volc': 745, 'hot': 2997, 'amvi_seen_1': 4307, 'amvi_seen_60': 4297, 'amvi_seen_1440': 4176, 'zone': 2500, 'arm_level': 4296, 'arm_dir': 1866, 'arm_atr': 4296, 'arm_candles_since': 1361, 'arm_on_sig': 1284, 'exit_atr': 4307}
+ok   240m chart, filter 1D above, daily AMVI
+      non-NaN AMVI bars per tf: {'amvi_seen_30': 539, 'amvi_seen_240': 526, 'amvi_seen_1440': 456} | trig 164 zone+ 22 zone- 51
+      values that changed AFTER T (power of the test): {'trig': 454, 'volc': 189, 'hot': 768, 'amvi_seen_30': 1079, 'amvi_seen_240': 1069, 'amvi_seen_1440': 1044, 'zone': 603, 'arm_level': 1048, 'arm_dir': 573, 'arm_atr': 1048, 'arm_candles_since': 459, 'arm_on_sig': 77, 'exit_atr': 1079}
+ok   240m chart, filter 15 BELOW, entry-price level, candles permission
+      non-NaN AMVI bars per tf: {'amvi_seen_60': 537, 'amvi_seen_240': 526, 'amvi_seen_1440': 456} | trig 153 zone+ 90 zone- 98
+      values that changed AFTER T (power of the test): {'trig': 431, 'volc': 176, 'hot': 770, 'amvi_seen_60': 1079, 'amvi_seen_240': 1069, 'amvi_seen_1440': 1044, 'zone': 605, 'arm_level': 1069, 'arm_dir': 475, 'arm_atr': 1069, 'arm_candles_since': 959, 'arm_on_sig': 302, 'exit_atr': 1079}
+ok   2m chart, filter 5 above (not a multiple), AMVI 1/5/15
+      non-NaN AMVI bars per tf: {'amvi_seen_1': 64683, 'amvi_seen_5': 64244, 'amvi_seen_15': 63149} | trig 1737 zone+ 9096 zone- 9561
+      values that changed AFTER T (power of the test): {'trig': 9292, 'volc': 5658, 'hot': 62762, 'amvi_seen_1': 129134, 'amvi_seen_5': 129107, 'amvi_seen_15': 129071, 'zone': 54512, 'arm_level': 129117, 'arm_dir': 58884, 'arm_atr': 129117, 'arm_candles_since': 36911, 'arm_on_sig': 6431, 'exit_atr': 129134}
+ok   10m chart, filter 15 above (not a multiple), level at candle open
+      non-NaN AMVI bars per tf: {'amvi_seen_5': 12851, 'amvi_seen_15': 12631, 'amvi_seen_60': 11646} | trig 360 zone+ 2510 zone- 2501
+      values that changed AFTER T (power of the test): {'trig': 2091, 'volc': 746, 'hot': 16026, 'amvi_seen_5': 25829, 'amvi_seen_15': 25811, 'amvi_seen_60': 25782, 'zone': 13828, 'arm_level': 25811, 'arm_dir': 11895, 'arm_atr': 25811, 'arm_candles_since': 0, 'arm_on_sig': 0, 'exit_atr': 25829}
+ok   1m chart, filter 1 EQUAL
+      non-NaN AMVI bars per tf: {'amvi_seen_1': 129362, 'amvi_seen_5': 128486} | trig 1925 zone+ 64839 zone- 64709
+      values that changed AFTER T (power of the test): {'trig': 11598, 'volc': 12052, 'hot': 86380, 'amvi_seen_1': 258253, 'amvi_seen_5': 258220, 'zone': 119325, 'arm_level': 258253, 'arm_dir': 119048, 'arm_atr': 258253, 'arm_candles_since': 364, 'arm_on_sig': 364, 'exit_atr': 258263}
+ok   30m chart, filter 5 BELOW, burst only, drift
+      non-NaN AMVI bars per tf: {'amvi_seen_15': 4314, 'amvi_seen_30': 4306, 'amvi_seen_1440': 3648} | trig 819 zone+ 1885 zone- 1929
+      values that changed AFTER T (power of the test): {'trig': 2918, 'volc': 1143, 'hot': 6058, 'amvi_seen_15': 8611, 'amvi_seen_30': 8601, 'amvi_seen_1440': 8352, 'zone': 4902, 'arm_level': 8601, 'arm_dir': 4061, 'arm_atr': 8601, 'arm_candles_since': 7481, 'arm_on_sig': 2848, 'exit_atr': 8611}
+ok   15m chart, filter 60 above, level at candle open, entry level, no band
+      non-NaN AMVI bars per tf: {'amvi_seen_1': 8640, 'amvi_seen_15': 8626, 'amvi_seen_1440': 7296} | trig 1806 zone+ 4246 zone- 4118
+      values that changed AFTER T (power of the test): {'trig': 6121, 'volc': 3167, 'hot': 11999, 'amvi_seen_1': 17220, 'amvi_seen_15': 17210, 'amvi_seen_1440': 16704, 'zone': 8021, 'arm_level': 17188, 'arm_dir': 7388, 'arm_atr': 17188, 'arm_candles_since': 0, 'arm_on_sig': 0, 'exit_atr': 17220}
+ok   3m chart, filter 5 above (not a multiple), filter zones off
+      non-NaN AMVI bars per tf: {'amvi_seen_1': 43123, 'amvi_seen_5': 42830, 'amvi_seen_60': 38815} | trig 1506 zone+ 4743 zone- 4902
+      values that changed AFTER T (power of the test): {'trig': 7447, 'volc': 4737, 'hot': 50609, 'amvi_seen_1': 86090, 'amvi_seen_5': 86070, 'amvi_seen_60': 85940, 'zone': 27310, 'arm_level': 86080, 'arm_dir': 0, 'arm_atr': 86080, 'arm_candles_since': 0, 'arm_on_sig': 0, 'exit_atr': 86090}
+TOTAL look-ahead differences: 0

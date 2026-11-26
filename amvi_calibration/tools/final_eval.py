@@ -91,6 +91,11 @@ def stats(tr, chart_tf=None, period=None):
              avg_risk_pct=float(np.mean(tr["risk"] / tr["entry_px"]) * 100))
     if chart_tf:
         s["avg_bars"] = float(np.mean((tr["exit_t"] - tr["entry_t"]) / (chart_tf * 60000.0)))
+    hours = (tr["exit_t"] - tr["entry_t"]) / 3_600_000.0
+    s["hold_mean_h"] = float(hours.mean())
+    s["hold_max_h"] = float(hours.max())
+    s["best_month"] = f"{int(months.idxmax()) // 100}-{int(months.idxmax()) % 100:02d}"
+    s["best_month_total"] = float(months.max())
     # in % of equity with the files' sizing: a tight stop would need more than 5x leverage, the
     # position is then capped and less than 0.5 % is at risk on that trade
     stop_pct = tr["risk"] / tr["entry_px"] * 100
@@ -98,6 +103,9 @@ def stats(tr, chart_tf=None, period=None):
     s["pct_total"] = float((r * at_risk).sum())
     s["pct_dd"] = max_drawdown(r * at_risk)
     s["cap_share"] = float((LEV_CAP * stop_pct < RISK_PCT).mean())
+    still_open = tr["why"] == E.X_END
+    s["open_at_end"] = int(still_open.sum())
+    s["open_at_end_r"] = float(r[still_open].sum())
     srt = np.sort(r)[::-1]
     s["top10"] = float(srt[:10].sum())
     s["without_top10"] = float(srt[10:].sum())
@@ -169,9 +177,11 @@ def warm_date(ft, chart_tf, p):
     return int(ch.t[worst])
 
 
-def evaluate(ctx_search, ctx_pre, chart_tf, p, light=False):
+def evaluate(ctx_search, ctx_pre, chart_tf, p, light=False, tv_since=None):
     """All numbers for one setting. ctx_* = (features, funding) for the search window and for
-    the untouched earlier window. light: only the base and stressed numbers of both windows."""
+    the untouched earlier window. light: only the base and stressed numbers of both windows.
+    tv_since ('YYYY-MM-DD'): also the TradingView view restricted to entries from that day on
+    (for a setting TradingView can only replay that far back)."""
     ft, fund = ctx_search
     out = {}
     base = trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1)
@@ -184,18 +194,23 @@ def evaluate(ctx_search, ctx_pre, chart_tf, p, light=False):
     if not light:
         out["by_year"] = by_year(base)
         out["by_reason"] = by_reason(base)
-        out["bitget"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0006, slip=1), chart_tf)
-        out["no_cost"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0, slip=0, funding=False), chart_tf)
-        out["tv_view"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0006, slip=1, funding=False, walk="chart"), chart_tf)
-        out["walk_1m"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, walk="1m"), chart_tf)
-        out["walk_chart"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, walk="chart"), chart_tf)
+        out["bitget"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0006, slip=1), chart_tf, SEARCH)
+        out["no_cost"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0, slip=0, funding=False), chart_tf, SEARCH)
+        tv = trades_for(ft, fund, chart_tf, p, *SEARCH, fee=0.0006, slip=1, funding=False, walk="chart")
+        out["tv_view"] = stats(tv, chart_tf, SEARCH)
+        if tv_since:
+            m = tv["entry_t"] >= sweep.ms(tv_since)
+            out["tv_view_since"] = stats({k: v[m] for k, v in tv.items()}, chart_tf)
+            out["tv_view_since"]["since"] = tv_since
+        out["walk_1m"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, walk="1m"), chart_tf, SEARCH)
+        out["walk_chart"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, walk="chart"), chart_tf, SEARCH)
         if p.get("trail"):
-            out["trail_restart"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, trail_reset=True), chart_tf)
+            out["trail_restart"] = stats(trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1, trail_reset=True), chart_tf, SEARCH)
         fu = base["fee_u"].sum()
         out["breakeven_fee_pct"] = float((base["gross"].sum() - base["fund_r"].sum()) / fu * 100) if fu > 0 else 0.0
         flip = dict(p)
         flip["inverted"] = not p["inverted"]
-        out["other_direction"] = stats(trades_for(ft, fund, chart_tf, flip, *SEARCH, fee=BASE_FEE, slip=1), chart_tf)
+        out["other_direction"] = stats(trades_for(ft, fund, chart_tf, flip, *SEARCH, fee=BASE_FEE, slip=1), chart_tf, SEARCH)
     if ctx_pre is not None:
         pf, pfund = ctx_pre
         # the untouched period is scored from the first day on which every AMVI timeframe of
@@ -212,9 +227,9 @@ def evaluate(ctx_search, ctx_pre, chart_tf, p, light=False):
         out["pre_by_year"] = by_year(pre)
         out["pre_stress"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=STRESS_FEE, slip=3), chart_tf, (pre_from, PRESAMPLE[1]))
         if not light:
-            out["pre_tv_view"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=0.0006, slip=1, funding=False, walk="chart"), chart_tf)
+            out["pre_tv_view"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=0.0006, slip=1, funding=False, walk="chart"), chart_tf, (pre_from, PRESAMPLE[1]))
             if p.get("trail"):
-                out["pre_trail_restart"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=BASE_FEE, slip=1, trail_reset=True), chart_tf)
+                out["pre_trail_restart"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=BASE_FEE, slip=1, trail_reset=True), chart_tf, (pre_from, PRESAMPLE[1]))
     out["_trades"] = base
     return out
 
