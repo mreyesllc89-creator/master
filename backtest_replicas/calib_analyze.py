@@ -20,6 +20,11 @@ trades entered in each half of the window, each half compounded from a fresh sta
    60% positive and have a positive mean.
 5. Direction control: the pick beats the same setting with the direction flipped in both halves.
 6. Stressed costs: the pick stays positive in both halves (re-run through calib_<s>.py --one).
+7. Nested picks (rule C2, added after the audit of the ApexForge / HRD calibration, reported for
+   every cell and required from the XPW calibration on): steps 2-3 applied to ONE half only
+   (candidates = positive in that half with MIN_TR+ trades in it; the TOPN best by that half;
+   plateau = neighbours' mean of that half), and the setting so chosen scored on the OTHER half:
+   it must be positive there and beat its direction-flipped twin there. Both ways.
 """
 import json
 import os
@@ -138,6 +143,37 @@ def holdout(el, rng, fwd):
             'median_random': round(float(np.median(draws)), 3), 'why': '; '.join(why)}
 
 
+def nested(df, pool, C, D, jdir, a, b, ta):
+    """Steps 2-3 on half `a` only; the setting chosen is scored on half `b`."""
+    cand = pool[(pool[a] > 0) & (pool[ta] >= MIN_TR)]
+    if not len(cand):
+        return {'pass': False, 'why': 'no setting is positive in the selection half with 30+ trades in it'}
+    best, bs = None, -np.inf
+    for i, r in cand.sort_values(a, ascending=False, kind='mergesort').head(TOPN).iterrows():
+        nbd = df.loc[neighbours(C, D, jdir, i)]
+        nbd = nbd[nbd.in_floor & (nbd.sig != r['sig'])]
+        nbd = nbd[~nbd.sig.duplicated(keep='first')]
+        if len(nbd) < MIN_NB:
+            continue
+        m = float(nbd[a].mean())
+        if m <= 0:
+            continue
+        sc = 0.5 * r[a] + 0.5 * m
+        if sc > bs:
+            best, bs = i, sc
+    if best is None:
+        return {'pass': False, 'why': 'no plateau in the selection half'}
+    r = df.loc[best]
+    tw = C[best].copy()
+    tw[jdir] = 1 - tw[jdir]
+    tm = (C == tw).all(axis=1)
+    twin = df[tm].iloc[0] if tm.any() else None
+    ok = bool(r[b] > 0 and twin is not None and r[b] > twin[b])
+    why = '' if ok else (f'the setting chosen on one half makes {r[b]:+.2f}% on the other' if not r[b] > 0 else 'its direction-flipped twin does as well on the other half')
+    return {'pass': ok, 'setting': label(D, r), 'selection_half': num(r[a]), 'other_half': num(r[b]),
+            'twin_other_half': num(twin[b]) if twin is not None else None, 'why': why}
+
+
 def one(strat, pair, tf, p, path, cost):
     r = subprocess.run([sys.executable, '-I', W + f'calib_{strat}.py', '--one', pair, tf, json.dumps(p), '--path', path, '--cost', cost],
                        capture_output=True, text=True, cwd=W)
@@ -229,6 +265,8 @@ def analyze(strat, pair, tf, D, default_p=None, verify=True):
     reasons = []
     rng = np.random.default_rng(SEED)
     res['forward'], res['reverse'] = holdout(el, rng, True), holdout(el, rng, False)
+    res['nested_fwd'] = nested(df, pool, C, D, jdir, 'h1r_pct', 'h2r_pct', 'h1_trades')
+    res['nested_rev'] = nested(df, pool, C, D, jdir, 'h2r_pct', 'h1r_pct', 'h2_trades')
     if pk is not None:
         b = brief(D, pk)
         b.update({'score': round(float(pk['score']), 3), 'nb_mean': round(float(pk['nb_mean']), 3), 'n_nb': int(pk['n_nb']),
@@ -263,6 +301,12 @@ def analyze(strat, pair, tf, D, default_p=None, verify=True):
     if not res['reverse']['pass']:
         reasons.append('reverse hold-out failed: ' + res['reverse']['why'])
     res['passes'], res['reasons'] = not reasons, reasons
+    # rule C2 = rule C + the nested picks, both ways
+    r2 = list(reasons)
+    for nm, k in (('forward', 'nested_fwd'), ('reverse', 'nested_rev')):
+        if not res[k]['pass']:
+            r2.append(f'nested {nm} pick failed: ' + res[k]['why'])
+    res['passes_c2'], res['reasons_c2'] = not r2, r2
     return res
 
 
@@ -290,7 +334,8 @@ def main(argv):
             print(f"{strat} {pair} {tf:>3} | pool {r['pool']:>6} eligible {r['eligible']:>6} cand {r['candidates']:>5} "
                   f"(normal {bd['normal']['candidates']}, inverted {bd['inverted']['candidates']}) | fwd {'ok' if r['forward']['pass'] else 'no'} "
                   f"rev {'ok' if r['reverse']['pass'] else 'no'} | pick {(p['setting'] + ' net ' + str(p['net_pct'])) if p else '-'} "
-                  f"| {'PASS' if r['passes'] else 'no'}: {'; '.join(x.split(':')[0] for x in r['reasons'])}", flush=True)
+                  f"| nested {'ok' if r['nested_fwd']['pass'] else 'no'}/{'ok' if r['nested_rev']['pass'] else 'no'} "
+                  f"| C {'PASS' if r['passes'] else 'no'} C2 {'PASS' if r['passes_c2'] else 'no'}: {'; '.join(x.split(':')[0] for x in r['reasons'])}", flush=True)
             json.dump(out, open(fn, 'w'), indent=1, default=str)
 
 

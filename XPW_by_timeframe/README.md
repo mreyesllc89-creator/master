@@ -265,3 +265,66 @@ The file now has the option "Inverted direction: opposite side at the same entri
 - **Trade counts** can differ by a few between normal and inverted. The entries are decided the same way, but the trailing exits fall on different candles, so the number of open entries is not always the same.
 
 Nothing here was compiled or run in TradingView. These are the script defaults; the calibration with direction as an input is a separate run.
+
+## The other XPW file (S2 / S3 exits): normal vs inverted by timeframe
+
+Everything above is about the trailing-TP file. This section is about [`xpw_orientation_tdi_v2.8_strategy_FGF.pine`](../xpw_orientation_tdi_v2.8_strategy_FGF.pine), the version with the ATR stop, the target in R, the ATR trailing stop and its own sizing. Its signals are the same code as the trailing-TP file's (the two blocks are identical line for line), so only the orders and exits differ.
+
+- **Inputs.** The file's defaults: stop 3 ATR, target 1R, trailing 1.0 / 0.75 ATR, no time stop, 0.1 unit per entry, up to 20 open entries, 10,000 account. Normal = the file as it is; inverted = the Update 1 option on.
+- **Money.** A fixed 0.1 unit per entry on a 10,000 account. On gold that is about $130 per entry, so the percentages are small. On BTC it is about $9,000 per entry and entries stack, so the percentages are large and can go below -100% (the account would be gone; TradingView's margin is not modelled).
+- **"As TradingView shows"**: the standard backtest with the file's own costs (none). **"1-minute fills with our costs"**: exits checked on 1-minute candles, gold $0.30 per ounce per round trip, BTC 0.02% per side + $0.20.
+- **How it was tested.** A new Python replica of the orders and exits: two builds written independently agree on all 8.45 million trades of 1,536 settings, and an auditor's own separately written reference agrees on another 878,810 trades. No defect was found.
+
+### BTCUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 63,358 / 63,358 | +477.9% / +364.2% | -1800.7% / **-1914.3%** | -1148.1% / -766.2% | 0.45 |
+| 1m | on | 22,169 / 22,169 | +178.3% / +227.1% | -618.4% / **-569.6%** | -334.3% / -235.3% | 0.54 |
+| 5m | off | 23,789 / 23,789 | +384.0% / +199.7% | -559.6% / **-761.0%** | -443.9% / -317.1% | 0.70 |
+| 5m | on | 8,831 / 8,831 | +110.0% / +160.9% | -245.8% / **-199.5%** | -105.7% / -93.8% | 0.80 |
+| 15m | off | 11,644 / 11,644 | +316.5% / +158.7% | -187.8% / **-368.4%** | -272.5% / -95.9% | 0.81 |
+| 15m | on | 4,728 / 4,728 | +56.6% / +173.0% | -160.2% / **-62.8%** | -45.6% / -17.2% | 0.93 |
+| 30m | off | 6,945 / 6,945 | +254.7% / +216.7% | -87.5% / **-147.4%** | -142.1% / -5.4% | 0.91 |
+| 30m | on | 2,943 / 2,943 | +134.2% / +137.4% | -14.7% / **-40.4%** | -50.6% / +10.2% | 0.95 |
+| 1h | off | 3,886 / 3,886 | +63.3% / +242.3% | -158.4% / **-46.8%** | -37.0% / -9.9% | 0.96 |
+| 1h | on | 1,807 / 1,807 | +47.9% / +189.1% | -68.8% / **+31.1%** | -31.3% / +62.4% | 1.05 |
+| 2h | off | 1,826 / 1,826 | +48.9% / +226.1% | -99.5% / **+62.8%** | +25.4% / +37.4% | 1.07 |
+| 2h | on | 849 / 849 | +19.9% / +134.9% | -47.1% / **+57.5%** | +47.9% / +9.6% | 1.13 |
+| 4h | off | 1,094 / 1,094 | -41.7% / +161.0% | -137.3% / **+46.9%** | +1.0% / +45.9% | 1.07 |
+| 4h | on | 486 / 486 | -62.0% / +75.2% | -98.3% / **+25.3%** | +33.7% / -8.4% | 1.07 |
+
+### XAUUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 29,828 / 29,828 | +0.5% / +0.7% | -8.4% / **-8.3%** | -4.2% / -4.1% | 0.20 |
+| 1m | on | 10,795 / 10,795 | +0.1% / +0.4% | -3.1% / **-2.9%** | -1.5% / -1.4% | 0.24 |
+| 5m | off | 11,022 / 11,022 | +0.4% / +0.5% | -3.2% / **-3.0%** | -1.6% / -1.4% | 0.48 |
+| 5m | on | 4,268 / 4,268 | +0.2% / +0.3% | -1.2% / **-1.1%** | -0.5% / -0.6% | 0.58 |
+| 15m | off | 5,399 / 5,399 | +0.3% / +0.2% | -1.6% / **-1.7%** | -0.9% / -0.8% | 0.63 |
+| 15m | on | 2,213 / 2,213 | +0.1% / +0.1% | -0.7% / **-0.8%** | -0.3% / -0.4% | 0.66 |
+| 30m | off | 3,117 / 3,117 | +0.3% / +0.1% | -0.9% / **-1.0%** | -0.3% / -0.7% | 0.72 |
+| 30m | on | 1,312 / 1,312 | +0.1% / +0.1% | -0.4% / **-0.5%** | -0.1% / -0.3% | 0.76 |
+| 1h | off | 1,782 / 1,782 | +0.0% / +0.4% | -0.8% / **-0.5%** | -0.1% / -0.4% | 0.83 |
+| 1h | on | 811 / 811 | +0.1% / +0.1% | -0.3% / **-0.3%** | -0.1% / -0.2% | 0.81 |
+| 2h | off | 855 / 855 | +0.2% / +0.2% | -0.2% / **-0.3%** | -0.1% / -0.2% | 0.84 |
+| 2h | on | 398 / 398 | +0.2% / -0.1% | -0.0% / **-0.3%** | -0.1% / -0.1% | 0.74 |
+| 4h | off | 544 / 544 | +0.4% / -0.2% | +0.1% / **-0.5%** | -0.1% / -0.4% | 0.74 |
+| 4h | on | 247 / 247 | +0.2% / -0.2% | +0.1% / **-0.4%** | -0.1% / -0.2% | 0.64 |
+
+### What it shows
+
+- **BTC, normal direction: loses on every timeframe** with 1-minute fills and costs.
+- **BTC, inverted: positive in both halves on 2h (filter off +62.8%, filter on +57.5%) and on 4h with the filter off (+46.9%).** It is also positive overall on 1h and 4h with the filter on, with one losing half each.
+- **Those inverted results are thin.** Profit factor 1.07 to 1.13, about $3 to $7 per 0.1 BTC entry, and a drawdown of 31% to 85% of the account on the way. They are single default runs, not tested by any hold-out. The calibration below is what decides whether they are real.
+- **1m to 30m lose in both directions on both pairs.**
+- **Gold loses in both directions on every timeframe**, apart from +0.1% on 4h normal.
+- **TradingView's own figures flatter the trailing stop.** With the trail on, 15-17% of trades end differently once the exit is checked on 1-minute candles, and every BTC timeframe above 1m is worse. That is why "as TradingView shows" is positive almost everywhere on BTC and the realistic column is not.
+
+### Limits
+
+- **BTC figures ignore margin.** With TradingView's default 100% margin, 0.1 BTC per entry on a 10,000 account would be cut by refused orders and margin calls. Read the BTC rows as money per 0.1 BTC entry.
+- **TradingView's order matching (FIFO)** can pair exits with other entries than the replica does. Net profit is the same; TradingView's win rate would read 1 to 7 points lower.
+- **Not reproduced:** "Require rung agreement" on, the seconds rungs, and anything that only happens live.
+- Short windows and old gold data, as above. Nothing here was compiled or run in TradingView.

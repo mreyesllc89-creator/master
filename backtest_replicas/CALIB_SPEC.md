@@ -86,4 +86,20 @@ Scored on 1-minute fills with our costs, on the fair halves.
 5. Direction control: the pick must beat the same setting with the direction flipped (normal
    <-> inverted) in both halves.
 6. Stressed costs: the pick must stay positive in both halves.
-A pick that passes 1-6 is then attacked by independent sceptics before any file is published.
+7. Nested picks (rule C2, added 2026-11-26 after the audit of the ApexForge / HRD calibration;
+   required for every strategy calibrated after those two): steps 2-3 applied to one half only
+   (candidates positive in that half with 30+ trades in it, the 40 best by that half, plateau =
+   the neighbours' mean of that half); the setting so chosen must be positive on the other half
+   and beat its direction-flipped twin there. Both ways.
+A pick that passes is then attacked by independent sceptics before any file is published.
+
+Details of the implementation (`calib_analyze.py`), stated here so the text and the code agree:
+- step 4's population is the eligible pool: settings with 30+ trades in EACH half, and at least
+  80 of them are needed (both for the 40 best and for the random draws);
+- flipping the direction is never a neighbour (it is the control of step 5);
+- neighbours with the candidate's own result, and repeated results, do not count as neighbours;
+- a row a runner marks `floor_ok` False is computed but is neither in the pool nor a neighbour.
+What the audit found (see ApexForge_HRD_by_timeframe/README.md, "Audit of the rule"): with no
+edge the rule still passes 2% to 19% of the time per cell, the 40 best are usually a few
+families of near-identical settings, and thin cells depend on the population choice. A pass is
+a reason to review a setting, never a reason to trade it.
