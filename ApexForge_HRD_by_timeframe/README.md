@@ -469,7 +469,7 @@ ApexForge puts 1% of equity in each trade, so the figures are small.
 
 ### Review of the settings that passed
 
-**Both are refuted. Neither becomes a file.** Three independent reviews are in. Every number reproduces exactly (the replica, the runner, and brokers the reviewers wrote themselves). What fails is the claim that these are real edges.
+**Both are refuted. Neither becomes a file.** Each was attacked by two independent reviewers, and all four reviews reach the same verdict. Every number reproduces exactly (the replica, the runner, and brokers the reviewers wrote themselves). What fails is the claim that these are real edges.
 
 | | BTCUSD 5m | BTCUSD 4h |
 |---|---|---|
@@ -482,7 +482,7 @@ ApexForge puts 1% of equity in each trade, so the figures are small.
 | Same setting, direction flipped | -1.17% | -0.14% |
 | Stressed costs | +0.49% (+0.32% / +0.17%) | +0.22% (+0.09% / +0.13%) |
 | As TradingView would show it | +0.38% | +0.21% |
-| Verdict | **refuted** (two reviews) | **refuted** (one review) |
+| Verdict | **refuted** (two reviews) | **refuted** (two reviews) |
 
 Both figures are small because ApexForge puts 1% of equity in each trade.
 
@@ -499,7 +499,9 @@ Both figures are small because ApexForge puts 1% of equity in each trade.
 
 **BTCUSD 4h, normal, filter off**
 
-- **Not significant.** t = 1.4 (first half 0.8). Five trades carry +0.227% of the +0.244%. The equity made no new high for 419 of the 730 days.
+- **A search with no edge passes here one time in six.** Under five different no-edge versions of the grid the rule passes 16-18% of the time on this timeframe, and the settings it then picks make more (median +0.36% to +0.45%) than the real +0.24%.
+- **Not significant.** t = 1.4 (first half 0.8). Five trades carry +0.227% of the +0.244%, and without the 6 best the result is zero. The equity made no new high for 419 of the 730 days.
+- **The hold-out is the same bet 40 times.** Only 136 settings have 30+ trades per half, all from three signal sets on the same 120 entry days. Settings chosen on one half alone make -0.07% and -0.01% on the other.
 - **The signals carry no information.** After a signal, price does not move in its direction at any horizon tested. With the script's own exits (no trailing) the same signals lose at every Reward:Risk. The profit comes from the wide trailing stop.
 - **Random entries do as well.** With the same exits, 5.5-15% of random entries reach its result.
 - **Earlier years fail.** On the same exchange, the two years just before the window (never used in the calibration) make +0.03%, with halves +0.21% / -0.18%.
@@ -508,7 +510,9 @@ Both figures are small because ApexForge puts 1% of equity in each trade.
 
 **Result of the calibration: no file.** On this data no setting of ApexForge or HRD, on any timeframe from 1m to 4h and in either direction, is defensible.
 
-A second review of the 4h setting and an independent re-implementation of the rule on all 28 cells were still running when this was written. This section will be updated if either changes a verdict.
+**About the rule.** The reviews show the rule alone is too easy to pass. On grids with no edge it still passes between 2% and 19% of the time, depending on the timeframe: settings that trade less pay less in costs in both halves, so they beat random settings in the hold-out without any edge. About 1.4 of the 14 ApexForge cells are expected to pass by chance; 2 did. So a pass is only a reason to review a setting, never a reason to trade it.
+
+An independent re-implementation of the rule on all 28 cells was still running when this was written. This section will be updated if it changes a verdict.
 
 ### What it shows
 
