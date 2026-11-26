@@ -356,7 +356,7 @@ def tables(rows):
                 uc += f"; same direction only: vs {u['matched_null_mean']:+.1f}R ({'pass' if u['passed_matched'] else 'fail'})"
         elif u:
             uc = f"no candidates; random {u['random_mean']:+.1f}R, {u['random_share_positive'] * 100:.0f}% positive"
-        L.append(f"| {r['name']} | {h['rows']} | {h['gross_share_positive'] * 100:.0f}% | {h['share_positive_total'] * 100:.0f}% | {h['share_positive_both_halves'] * 100:.1f}% | "
+        L.append(f"| {r['name']} | {h['rows']:,} | {h['gross_share_positive'] * 100:.0f}% | {h['share_positive_total'] * 100:.0f}% | {h['share_positive_both_halves'] * 100:.1f}% | "
                  f"{cell(h['h1_to_h2'], h['pass_h1_to_h2'])} | {cell(h['h2_to_h1'], h['pass_h2_to_h1'])} | {cell(h['walk_forward'], h['pass_walk_forward'])} | {uc} |")
 
     if any(r.get("unt") and "random_with_filter" in r["unt"] for r in rows):

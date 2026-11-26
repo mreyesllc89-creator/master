@@ -114,6 +114,12 @@ def run(res_dir):
               f" | with a 0.5/0.5 trailing stop: chart {row['tight']['chart']:+.1f} / 1m {row['tight']['1m']:+.1f} / 15s {row['tight']['15s']:+.1f} / 5s {row['tight']['5s']:+.1f} / 1s {row['tight']['1s']:+.1f}R",
               flush=True)
     json.dump(out, open(os.path.join(res_dir, "convergence.json"), "w"))
+    md = ["| Chart | Setting | Chart candles | 1-minute bars | 15-second bars | 5-second bars | 1-second bars |", "|---|---|---|---|---|---|---|"]
+    for row in out:
+        for tag, label in (("pick", "the pick" + (" (uses the trailing stop)" if row["pick_uses_trailing"] else "")), ("tight", "the pick with a 0.5 / 0.5 trailing stop")):
+            r = row[tag]
+            md.append(f"| {row['name']} | {label} | {r['chart']:+.1f}R | {r['1m']:+.1f}R | {r['15s']:+.1f}R | {r['5s']:+.1f}R | {r['1s']:+.1f}R |")
+    open(os.path.join(res_dir, "convergence.md"), "w", encoding="utf-8").write("\n".join(md) + "\n")
 
 
 if __name__ == "__main__":
