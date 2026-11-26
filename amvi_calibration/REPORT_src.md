@@ -29,9 +29,10 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
 2. **On BTC, trade with the filter, not against it, once the filter is slow.** A signal in
    the filter's BUY ZONE is a long, in the SELL ZONE a short. Your file is set to "Inverted",
    so its entries point the other way. (Entries are the order markers that begin with "AMVI
-   L" for a long and "AMVI S" for a short, with a small triangle under or over the candle.
-   The tiny triangles in the same colours are the filter's own signals: they do not change
-   with this input and are not entries; "Signal marks" hides them.) Among settings that
+   L" for a long and "AMVI S" for a short, with a small triangle under or over the candle
+   before (the candle whose close decided the entry). The tiny triangles in the same
+   colours are the filter's own signals: they do not change with this input and are not
+   entries; "Signal marks" hides them.) Among settings that
    trade with the filter, 4% (1m) to 53% (4h) made money over the last three years; among
    inverted ones 1% to 11% (settings with at least 30 trades in each half). On 2021-2023: 10%
    to 83% against 2% to 16%. This holds on all nine BTC charts in both periods. It is clear
@@ -148,23 +149,28 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
 
 **What I would do.**
 
-1. Now: check that TradingView trades like my copy. Open the Binance perpetual
-   (BINANCE:BTCUSDT.P, the data used here) on a 15m chart, time zone UTC, load
-   `AMVI_FGF_BTCUSDT_15m.pine`, change no input, and compare the Strategy Tester's List of
-   Trades with `results/trades_BTCUSDT_15m.csv`. Entries must be on the same candles and in
-   the same direction, and on this file the exits too. If they are not, do not trade the
-   file and send me the tester's list; if the file does not load, send me the error line.
-   - Surest, with Deep Backtesting (Premium plans and above): switch on "Limit Backtest Date
-     Range" (group "Backtest range") with 2023-11-01 to 2026-10-31. The script then has
-     years of history and starts flat like the list, so every trade should match from the
-     first.
-   - On an ordinary chart the script has no history before the chart's first candle, so
-     skip the chart's first four weeks (one week is enough if TradingView loads the daily
-     filter's candles from before that candle, which I could not check). On 26 November
-     that leaves about 12 list trades on a 10,000-candle chart, 31 on 20,000 and 81 on
-     40,000, and fewer every week, because the chart moves on and the list ends on
-     2026-10-31. A 5,000-candle chart has none left. Section 9 has the details.
-2. Then run that file on your Bitget chart with alerts only until about 20 trades have
+1. Now: check that TradingView trades like my copy. On BINANCE:BTCUSDT.P (the data used
+   here), time zone UTC, load a file on its own timeframe and change no input except the
+   date range below. Compare the Strategy Tester's List of Trades with that file's list in
+   `results/`, up to 2026-10-31 (the list ends there): entries must be on the same candles
+   and in the same direction. If a file does not load, send me the error line.
+   - With Deep Backtesting (Premium plans and above), check the 15m file
+     `AMVI_FGF_BTCUSDT_15m.pine` on a 15m chart. Set the Deep Backtesting period to
+     2023-05-01 to 2026-10-31, and in the script's inputs switch on "Limit Backtest Date
+     Range" (group "Backtest range") with 2023-11-01 to 2026-10-31. The range only blocks
+     entries; the six months before it give the script its history. Every trade must then
+     match, exits included: in my simulation all 284 do, and with the period starting on
+     2023-11-01 itself the first 4 do not. If one does not match, do not trade the file and
+     send me the tester's list.
+   - Without Deep Backtesting, check the 4h file `AMVI_FGF_BTCUSDT_4h.pine` on a 4h chart
+     instead; it runs the same code with other inputs. Compare from two weeks after the
+     oldest 15m candle the tester has (about 2024-02-02 if you check on 26 November, a day
+     later every day): about 92 trades. On a 5,000-candle chart (Basic plan) compare from
+     five months after the chart's first candle: about 60 trades. List trades missing before
+     those dates are expected, and one exit of this list is expected to differ (section 9);
+     an entry on another candle or on the other side after them is a mismatch. The 15m file
+     itself can be compared only loosely on an ordinary chart (section 9).
+2. Then run the 15m file on your Bitget chart with alerts only until about 20 trades have
    come: about three months on 15m (seven to ten months for the 3m and 4h files). The file
    has no alert() call: create the alert on the strategy itself (order fills). Do not judge
    these months by profit: 20 trades cannot show it. In the backtest itself about one run
@@ -179,7 +185,8 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
    and TradingView can replay it. The 3m file comes second (it needs Deep Backtesting to
    check). Treat the 4h file as one with-the-filter setting among many: on 4h the search
    added nothing measurable to the direction, the file passes its one test narrowly (96.6%
-   of resamples where 95% is needed), and TradingView can replay it only back to 2024-01.
+   of resamples where 95% is needed), and on plans up to Premium TradingView can replay it
+   only back to about 2024-01-19 (as of 26 November; a day later every day).
 4. On your 5m and 10m charts: do not trade this strategy now. The one setting chosen for
    each did not pass (the 5m pick lost on 2021-2023, the 10m pick's gain there rests on a
    few weeks), so there is no file. If you keep your own file on such a chart to watch it:
@@ -268,9 +275,10 @@ can be replayed on TradingView:
 - a timeframe at or above the chart must be a whole multiple of it (15m on a 10m chart reads
   a different candle live than after a reload);
 - a timeframe below the chart must be at least 15m. TradingView keeps about 100,000 candles
-  of a lower timeframe per request: 69 days of 1m, 347 days of 5m. In an earlier run without
-  this rule, settings that read 1m or 5m candles from a higher chart were profitable 0.4 to
-  0.5 times as often (0.8 times on 4h; `results/first_run_low_timeframes.txt`).
+  of a lower timeframe per request on plans up to Premium (200,000 on Ultimate): 69 days of
+  1m, 347 days of 5m. In an earlier run without this rule, settings that read 1m or 5m
+  candles from a higher chart were profitable 0.4 to 0.5 times as often (0.8 times on 4h;
+  `results/first_run_low_timeframes.txt`).
 
 Seconds timeframes (1s to 45s) are off everywhere: the search did not include them.
 
@@ -603,63 +611,73 @@ the advantage of section 4.4 shows only after costs.
    and 20% margin. Keep Script executions on "On bar close" only (the tick options off) and
    Bar detalization on its default (the former "Bar Magnifier": off).
 4. Compare the Strategy Tester's List of Trades with `results/trades_BTCUSDT_<chart>.csv`,
-   trade by trade. Entry candle and side must agree. Compare trades, not totals. Where to
-   start comparing depends on how you run the file:
+   trade by trade, up to 2026-10-31 (the list ends there; later trades of the tester are not
+   in it). Entry candle and side must agree. Compare trades, not totals. Where to start
+   comparing depends on how you run the file:
 
-| File | With Deep Backtesting (Premium plans and above) and "Limit Backtest Date Range" (group "Backtest range") on, 2023-11-01 to 2026-10-31 | On an ordinary chart (5,000 to 40,000 candles, by plan) |
+| File | With Deep Backtesting (Premium plans and above): the tester's period 2023-05-01 to 2026-10-31, and the input "Limit Backtest Date Range" (group "Backtest range") on, 2023-11-01 to 2026-10-31 | On an ordinary chart: 5,000 candles on Basic, 10,000 on Essential and Plus, 20,000 on Premium, 25,000 on Expert, 40,000 on Ultimate |
 |---|---|---|
-| 15m | every trade from the first | skip the first four weeks of the chart (one week is enough if TradingView loads the daily filter's candles from before the chart's first candle) |
-| 3m | every trade from the first | not possible: 40,000 3m candles reach back only to 2026-09-03 (3 list trades) |
-| 1m | every trade from the first | not possible: 40,000 1m candles reach back only to 2026-10-29 (no list trade) |
-| 4h | from two weeks after the oldest 15m candle the tester has: about 2024-01-19 on 26 November with about 100,000 15m candles (plans up to Premium) | the same with 10,000 candles or more; with 5,000 (from 2024-08-14) skip five months (two weeks if TradingView loads the daily filter's candles from before the chart's first candle) |
+| 15m | every trade from the first | a loose check only: skip the chart's first four weeks, and see below |
+| 3m | every trade from the first | not possible: even 40,000 candles reach back only to 2026-09-03 (3 list trades) |
+| 1m | every trade from the first (two million 1m candles reach back to 2023-05-01 only until about 2027-02-17) | not possible: 40,000 candles reach back only to 2026-10-29 (no list trade) |
+| 4h | from two weeks after the oldest 15m candle the tester has (below) | with 10,000 candles or more: the same; with 5,000, from five months after the chart's first candle |
+
+The oldest 15m candle (4h file). The 4h file's AMVI reads 15m candles, of which TradingView
+keeps about 100,000 on plans up to Premium (200,000 on Ultimate, from a web search of its
+documentation; not checked). On 26 November the oldest is 2024-01-19 08:00, and it moves a
+day later every day: it is the day you check minus about 1,042 days.
 
 Why the start differs. The trade lists were made with years of history before every trade,
-and they start flat on 2023-11-01. With Deep Backtesting and the date range the tester is in
-the same position: its chart reaches back years and the script opens nothing before
-2023-11-01. An ordinary chart starts where its candles start, and two things are missing
-there. First, the AMVI needs history before it has a value: 418 candles in the 15m file,
-which normalises over 400 (4.4 days of that chart). The 4h file's AMVI reads 15m candles,
-of which TradingView keeps about 100,000 on plans up to Premium (200,000 on Ultimate, back to
-2021-03; from a web search of its documentation, not checked). Second, the filter reads
-daily candles (4h candles in the 3m file). Whether TradingView loads those from before the
-chart's first candle I could not check: its site cannot be reached from here. If it does
-not, the filter starts with only a few weeks of daily candles, which changes its zones; on
-the 4h file, whose filter compares each daily close with the close 120 days earlier, for
-about four months. I simulated both cases with my copy (`tools/tester_view.py`, log in
-`results/checks/tester_view.txt`; charts of 5,000 to 40,000 candles, checked on four dates
-from 26 November to 17 December). With the filter's candles loaded from before the chart,
-the last difference on the 15m file came at most 5.3 days after the chart's first candle,
-and the 4h file differed only through its 15m limit (on 26 November the list's trade of
-2024-01-22 16:00 is missing and the first one to compare is 2024-01-26 12:00). Without them,
-the 15m file differed for up to 24.5 days, and the 4h file on a 5,000-candle chart until
-2024-12-19, about four months. Almost every difference is a list trade missing in the
-tester; in 2 of the 56 simulated cases the tester took one trade the list does not have,
-and never a trade on the other side.
+and they start flat on 2023-11-01. "Limit Backtest Date Range" only blocks entries outside
+its dates; the history comes from the period the tester computes over. With Deep
+Backtesting from six months before the range, the script has that history. I simulated it
+with my copy, letting every request start on the first day of the period, the cautious case
+(`tools/tester_view.py`, log in `results/checks/tester_view.txt`): all trades of the 15m, 3m
+and 1m lists then match, and the 4h list does from 3.3 days after its oldest 15m candle. With
+the period starting on 2023-11-01 itself, the first 2 to 6 trades of each list do not.
 
-How many trades that leaves on the 15m file, at 00:00 UTC on 26 November. Skipping four
-weeks: 12 list trades on a 10,000-candle chart, 31 on 20,000 and 81 on 40,000; a 5,000-candle
-chart has none. Skipping one week: 3 on 5,000 candles, 16 on 10,000, 37 on 20,000 and 84 on
-40,000. The chart moves on by a day every day and the list ends on 2026-10-31, so these
-numbers fall from week to week (10,000 candles, four weeks skipped: 10 on 1 December, 6 on 15
-December). Do the check soon, or with Deep Backtesting.
+An ordinary chart starts where its candles start. The AMVI needs history before it has a
+value: 418 candles in the 15m file, which normalises over 400 (4.4 days of that chart). The
+filter reads daily candles (4h candles in the 3m file), and whether TradingView loads those
+from before the chart's first candle I could not check: its site cannot be reached from
+here. I simulated both cases, for checks every 12 hours over the five weeks from 26
+November and every plan size. If TradingView loads them, every difference on the 15m and 4h
+files came within 5.3 days of the start. If it does not, the filter's ATR and RSI start from
+other values and keep part of that difference for weeks. On the 15m file differences then
+came up to 16.5 days after the chart's first candle with 5,000 candles, 50.2 days with
+10,000, 28.2 with 20,000, 23.7 with 25,000 and 24.5 with 40,000. On the 4h file with 5,000
+candles they came up to 124 days after it, because its filter compares each daily close with
+the close 120 days earlier; with 10,000 4h candles or more the chart starts long before the
+oldest 15m candle and nothing changes. Almost every difference is a list trade missing in the tester;
+sometimes the tester takes a trade the list does not have; never one on the other side. So
+on an ordinary 15m chart a missing or extra trade, even after four weeks, is no proof of a
+mismatch; a trade on the other side is.
+
+How many trades that leaves, at 00:00 UTC on 26 November (fewer every week, because the chart
+moves on and the list ends on 2026-10-31). The 4h file: 92 list trades from two weeks after
+its oldest 15m candle; on a 5,000-candle chart 61 from five months after the chart's first
+candle. The 15m file, four weeks skipped: none on 5,000 candles, 12 on 10,000, 31 on 20,000,
+44 on 25,000 and 81 on 40,000.
 
 What the tester can show. It shows money, not R: with the file's sizing, net profit in % is
-about R x 0.5. It covers only the candles your plan loads, up to today: 20,000 candles are
-9 years of 4h, 208 days of 15m, 42 days of 3m and 14 days of 1m. For the full search window
-use Deep Backtesting (up to two million candles) with the date range above. The header of
-each file says what the tester should then show. The 4h file is the exception: with about
-100,000 15m candles it can be replayed only from about 2024-01-19 (as of 26 November). The
-untouched period can be checked the same way on the 15m and 3m files, with the date range
-2021-01-01 to 2023-10-31; two million 1m candles reach back only to early 2023, so most of
-the 1m file's untouched period cannot be replayed at all.
+about R x 0.5. On an ordinary chart it covers only the candles your plan loads, up to today:
+20,000 candles are 9 years of 4h, 208 days of 15m, 42 days of 3m and 14 days of 1m. For the
+full search window use Deep Backtesting with the period and the date range above. The
+header of each file says what the tester should then show. The 4h file is the exception: it
+can be replayed only from its oldest 15m candle. The untouched period can be checked the same
+way on the 15m and 3m files, with the period 2020-07-01 to 2023-10-31 and the date range
+2021-01-01 to 2023-10-31: in my simulation all 232 and 72 trades then match (with the period
+starting on 2021-01-01, the first 7 and 1 do not). Two million 1m candles reach back only to
+early 2023, so the 1m file's untouched period cannot be replayed.
 
-If it differs. Entries on other candles or in the other direction, from the start given in
-the table on: do not trade the file, and send me the tester's list. Exits: the list gives the exact
-second, the tester only the candle. On the 15m, 3m and 1m files every exit should still be
-in the same candle and at the same price, because my copy takes the same trades on chart
-candles as second by second. On the 4h file one exit is the opposite one: the long entered
-2024-02-28 16:00 is a target in the list (63,098.6, +1.29R) and a stop in the tester (about
-59,426, -1.04R). Both prices lie inside that one 4h candle. The tester knows only the
+If it differs. An entry on another candle or in the other direction, from the start given in
+the table on: do not trade the file, and send me the tester's list. On an ordinary 15m chart
+send me the list before deciding, unless a trade is on the other side. Exits: the list gives
+the exact second, the tester only the candle. On the 15m, 3m and 1m files every exit should
+still be in the same candle and at the same price, because my copy takes the same trades on
+chart candles as second by second. On the 4h file one exit is the opposite one: the long
+entered 2024-02-28 16:00 is a target in the list (63,098.6, +1.29R) and a stop in the tester
+(about 59,426, -1.04R). Both prices lie inside that one 4h candle. The tester knows only the
 candle's open, high, low and close and assumes the low came first; second by second the
 target came first (17:06, the low at 17:31). That one trade is the whole gap between +35.2R
 and +32.9R in the 4h block, and it is not a mismatch. A file that does not load: send me the

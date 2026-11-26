@@ -1,14 +1,15 @@
 //@version=6
 // =====================================================================================
 // AMVI Full MTF Strategy (direction filter, closed-candle engine): BTCUSDT.P 1m
-// STATUS: PAPER-TRADE (grade 3 of 5): watch with alerts only; no money. For the 1m
-//         chart of BTCUSDT.P only. Not yet run on TradingView: first check that its
-//         trade list matches (see CHECK). After that still alerts only, no money.
+// STATUS: PAPER-TRADE (grade 3 of 5, 1 = best): watch with alerts only; no money. For
+//         the 1m chart of BTCUSDT.P only. Not yet run on TradingView: first check that
+//         its trade list matches (see CHECK). After that still alerts only, no money.
 // -------------------------------------------------------------------------------------
-// RESULT: 2021-01 to 2023-10, NOT used for choosing: +54.8R (77% of it in 2023), 93
-//         trades, largest drawdown 15.2R; +49.0R at double commission. +22.1R of it is
-//         a trade still open at the end of the period, marked at the last close
-//         (without it +32.7R).
+// RESULT: 2021-01 to 2023-10, NOT used to choose the inputs: +54.8R (77% of it in
+//         2023), 93 trades, largest drawdown 15.2R; +49.0R at double commission.
+//         +22.1R of it is a trade still open at the end of the period, marked at the
+//         last close (without it +32.7R). This file exists only because that result
+//         was good, so expect less (REPORT.md, section 1, point 4).
 //         2023-11 to 2026-10, used for choosing (so flattered): +107.1R, 145 trades,
 //         largest drawdown 29.2R; 66% of it in one month (2026-08).
 //         1R = the amount risked per trade = 0.5% of the account with this file's
@@ -23,14 +24,16 @@
 //         shows money, not R, and only the candles your plan loads (Deep Backtesting
 //         covers the whole period).
 // CHECK:  amvi_calibration/results/trades_BTCUSDT_1m.csv (UTC times, Binance prices):
-//         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides.
-//         Change no input. Surest: Deep Backtesting (Premium and above) with "Limit
-//         Backtest Date Range" on, 2023-11-01 to 2026-10-31: the script then has years
-//         of history and starts flat like the list, so every entry should match from
-//         the first. An ordinary chart holds too few of this file's trades to check
-//         it: 40,000 1m candles, the most any plan loads, reach back only to
-//         2026-10-29. The exits should be on the same candles too. Details: REPORT.md,
-//         section 9.
+//         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides, up
+//         to 2026-10-31 (the list ends there). Change no input. Surest: Deep
+//         Backtesting (Premium and above) over a period from 2023-05-01 to 2026-10-31,
+//         with "Limit Backtest Date Range" on, 2023-11-01 to 2026-10-31. The range
+//         only blocks entries; the six months before it give the script its history.
+//         Two million 1m candles reach that far back only until about 2027-02-17.
+//         Every entry should then match from the first. An ordinary chart holds too
+//         few of this file's trades to check it: 40,000 1m candles, the most any plan
+//         loads, reach back only to 2026-10-29. The exits should be on the same
+//         candles too. Details: REPORT.md, section 9.
 // RECORD: amvi_calibration/REPORT.md, section 7, 1m. Record date 2026-11-26. Numbers
 //         come from a Python copy of this script, not from TradingView.
 //

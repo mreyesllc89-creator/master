@@ -1,120 +1,125 @@
 1m file (PAPER-TRADE)
    exits, search window (2023-11-01 to 2026-11-01): 145 trades second by second (+124.48R before costs), 145 on chart candles (+124.48R); trades that differ: 0
    exits, untouched period (2021-01-01 to 2023-11-01): 93 trades second by second (+64.97R before costs), 93 on chart candles (+64.97R); trades that differ: 0
-   limited history (an ordinary chart, strategy flat at its first candle; longest trade of the list 47.7 days):
-      5,000 1m candles reach back to 2026-11-22 12:40 on 2026-11-26: 0 list entries after that
-         too few to compare: not simulated
-      10,000 1m candles reach back to 2026-11-19 01:20 on 2026-11-26: 0 list entries after that
-         too few to compare: not simulated
-      20,000 1m candles reach back to 2026-11-12 02:40 on 2026-11-26: 0 list entries after that
-         too few to compare: not simulated
-      40,000 1m candles reach back to 2026-10-29 05:20 on 2026-11-26: 0 list entries after that
-         too few to compare: not simulated
-   latest difference after the comparison start: B1 0.0 days, B2 0.0 days
+   longest trade of the list: 47.7 days
+   Deep Backtesting, every request from the start of the tester's period, entries from the date range's start, checked 2026-11-26:
+      search list, period from 2023-05-01, date range 2023-11-01 to 2026-11-01: list trades 145; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list trades after it 145
+      search list, period from 2023-11-01, date range 2023-11-01 to 2026-11-01: list trades 145; missing in the tester 4 (2023-11-02 17:01, 2023-11-14 20:01, 2023-11-15 20:01, 2023-11-16 20:01); in the tester only 0 (-); other side 0; last difference 15.8 days after 2023-11-01 00:00; list trades after it 141
+      untouched list: two million 1m candles do not reach back to 2020-07-01: not possible
+   ordinary chart, strategy flat at the chart's first candle, checks every 12 hours from 2026-11-26 for 35 days:
+      5,000 1m candles (Basic) reach back to 2026-11-22 12:40 on 2026-11-26: 0 list trades after that
+      10,000 1m candles (Essential, Plus) reach back to 2026-11-19 01:20 on 2026-11-26: 0 list trades after that
+      20,000 1m candles (Premium) reach back to 2026-11-12 02:40 on 2026-11-26: 0 list trades after that
+      25,000 1m candles (Expert) reach back to 2026-11-08 15:20 on 2026-11-26: 0 list trades after that
+      40,000 1m candles (Ultimate) reach back to 2026-10-29 05:20 on 2026-11-26: 0 list trades after that
 
 3m file (USABLE)
    exits, search window (2023-11-01 to 2026-11-01): 79 trades second by second (+29.03R before costs), 79 on chart candles (+29.03R); trades that differ: 0
    exits, untouched period (2021-01-01 to 2023-11-01): 72 trades second by second (+24.54R before costs), 72 on chart candles (+24.54R); trades that differ: 0
-   limited history (an ordinary chart, strategy flat at its first candle; longest trade of the list 0.2 days):
-      5,000 3m candles reach back to 2026-11-15 14:00 on 2026-11-26: 0 list entries after that
-         too few to compare: not simulated
-      10,000 3m candles reach back to 2026-11-05 04:00 on 2026-11-26: 0 list entries after that
-         too few to compare: not simulated
-      20,000 3m candles reach back to 2026-10-15 08:00 on 2026-11-26: 0 list entries after that
-         too few to compare: not simulated
-      40,000 3m candles reach back to 2026-09-03 16:00 on 2026-11-26: 3 list entries after that
-         B1, checked 2026-11-26, first candle 2026-09-03 16:00, compared from 2026-09-03 16:00: list entries 3; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 3
-         B2, checked 2026-11-26, first candle 2026-09-03 16:00, compared from 2026-09-03 16:00: list entries 3; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 3
-         B1, checked 2026-12-03, first candle 2026-09-10 16:00, compared from 2026-09-10 16:00: list entries 3; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 3
-         B2, checked 2026-12-03, first candle 2026-09-10 16:00, compared from 2026-09-10 16:00: list entries 3; missing in the tester 1 (2026-09-18 14:03); in the tester only 0 (-); other side 0; last difference 7.9 days after the comparison start; list entries after it 2
-         B1, checked 2026-12-10, first candle 2026-09-17 16:00, compared from 2026-09-17 16:00: list entries 3; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 3
-         B2, checked 2026-12-10, first candle 2026-09-17 16:00, compared from 2026-09-17 16:00: list entries 3; missing in the tester 2 (2026-09-18 14:03, 2026-09-21 09:03); in the tester only 0 (-); other side 0; last difference 3.7 days after the comparison start; list entries after it 1
-         B1, checked 2026-12-17, first candle 2026-09-24 16:00, compared from 2026-09-24 16:00: list entries 1; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 1
-         B2, checked 2026-12-17, first candle 2026-09-24 16:00, compared from 2026-09-24 16:00: list entries 1; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 1
-   latest difference after the comparison start: B1 0.0 days, B2 7.9 days
+   longest trade of the list: 0.2 days
+   Deep Backtesting, every request from the start of the tester's period, entries from the date range's start, checked 2026-11-26:
+      search list, period from 2023-05-01, date range 2023-11-01 to 2026-11-01: list trades 79; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list trades after it 79
+      search list, period from 2023-11-01, date range 2023-11-01 to 2026-11-01: list trades 79; missing in the tester 2 (2023-11-01 21:03, 2023-11-09 02:33); in the tester only 0 (-); other side 0; last difference 8.1 days after 2023-11-01 00:00; list trades after it 77
+      untouched list, period from 2020-07-01, date range 2021-01-01 to 2023-11-01: list trades 72; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list trades after it 72
+      untouched list, period from 2021-01-01, date range 2021-01-01 to 2023-11-01: list trades 72; missing in the tester 1 (2021-01-02 14:03); in the tester only 0 (-); other side 0; last difference 1.6 days after 2021-01-01 00:00; list trades after it 71
+   ordinary chart, strategy flat at the chart's first candle, checks every 12 hours from 2026-11-26 for 35 days:
+      5,000 3m candles (Basic) reach back to 2026-11-15 14:00 on 2026-11-26: 0 list trades after that
+      10,000 3m candles (Essential, Plus) reach back to 2026-11-05 04:00 on 2026-11-26: 0 list trades after that
+      20,000 3m candles (Premium) reach back to 2026-10-15 08:00 on 2026-11-26: 0 list trades after that
+      25,000 3m candles (Expert) reach back to 2026-10-04 22:00 on 2026-11-26: 1 list trades after that
+      40,000 3m candles (Ultimate) reach back to 2026-09-03 16:00 on 2026-11-26: 3 list trades after that
+         B1: 70 checks (1 more with no list trade left); last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 0.0 days; checks with a trade only in the tester 0, with a trade on the other side 0
+         B2: 70 checks (1 more with no list trade left); last difference later than 7 / 14 / 21 / 28 / 42 days: 9 / 0 / 0 / 0 / 0; latest 8.5 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-12-22 12:00: list trades 1; missing in the tester 1 (2026-10-08 15:33); in the tester only 0 (-); other side 0; last difference 8.5 days after 2026-09-30 04:00; list trades after it 0
+            checked 2026-12-02 12:00: list trades 3; missing in the tester 1 (2026-09-18 14:03); in the tester only 0 (-); other side 0; last difference 8.4 days after 2026-09-10 04:00; list trades after it 2
+            checked 2026-12-05 12:00: list trades 3; missing in the tester 2 (2026-09-18 14:03, 2026-09-21 09:03); in the tester only 0 (-); other side 0; last difference 8.2 days after 2026-09-13 04:00; list trades after it 1
 
 15m file (USABLE)
    exits, search window (2023-11-01 to 2026-11-01): 284 trades second by second (+28.74R before costs), 284 on chart candles (+28.74R); trades that differ: 0
    exits, untouched period (2021-01-01 to 2023-11-01): 232 trades second by second (+25.06R before costs), 232 on chart candles (+25.06R); trades that differ: 0
-   limited history (an ordinary chart, strategy flat at its first candle; longest trade of the list 1.0 days):
-      5,000 15m candles reach back to 2026-10-04 22:00 on 2026-11-26: 5 list entries after that
-         B1, checked 2026-11-26, first candle 2026-10-04 22:00, compared from 2026-10-04 22:00: list entries 5; missing in the tester 2 (2026-10-07 02:30, 2026-10-08 14:00); in the tester only 0 (-); other side 0; last difference 3.7 days after the comparison start; list entries after it 3
-         B2, checked 2026-11-26, first candle 2026-10-04 22:00, compared from 2026-10-04 22:00: list entries 5; missing in the tester 4 (2026-10-07 02:30, 2026-10-08 14:00, 2026-10-12 23:30, 2026-10-13 04:00); in the tester only 0 (-); other side 0; last difference 8.2 days after the comparison start; list entries after it 1
-         B1, checked 2026-12-03, first candle 2026-10-11 22:00, compared from 2026-10-11 22:00: list entries 3; missing in the tester 2 (2026-10-12 23:30, 2026-10-13 04:00); in the tester only 0 (-); other side 0; last difference 1.2 days after the comparison start; list entries after it 1
-         B2, checked 2026-12-03, first candle 2026-10-11 22:00, compared from 2026-10-11 22:00: list entries 3; missing in the tester 2 (2026-10-12 23:30, 2026-10-13 04:00); in the tester only 0 (-); other side 0; last difference 1.2 days after the comparison start; list entries after it 1
-         B1, checked 2026-12-10, first candle 2026-10-18 22:00, compared from 2026-10-18 22:00: list entries 1; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 1
-         B2, checked 2026-12-10, first candle 2026-10-18 22:00, compared from 2026-10-18 22:00: list entries 1; missing in the tester 1 (2026-10-29 21:00); in the tester only 0 (-); other side 0; last difference 11.0 days after the comparison start; list entries after it 0
-         B1, checked 2026-12-17, first candle 2026-10-25 22:00, compared from 2026-10-25 22:00: list entries 1; missing in the tester 1 (2026-10-29 21:00); in the tester only 0 (-); other side 0; last difference 4.0 days after the comparison start; list entries after it 0
-         B2, checked 2026-12-17, first candle 2026-10-25 22:00, compared from 2026-10-25 22:00: list entries 1; missing in the tester 1 (2026-10-29 21:00); in the tester only 0 (-); other side 0; last difference 4.0 days after the comparison start; list entries after it 0
-      10,000 15m candles reach back to 2026-08-13 20:00 on 2026-11-26: 17 list entries after that
-         B1, checked 2026-11-26, first candle 2026-08-13 20:00, compared from 2026-08-13 20:00: list entries 17; missing in the tester 1 (2026-08-17 17:45); in the tester only 0 (-); other side 0; last difference 3.9 days after the comparison start; list entries after it 16
-         B2, checked 2026-11-26, first candle 2026-08-13 20:00, compared from 2026-08-13 20:00: list entries 17; missing in the tester 3 (2026-08-17 17:45, 2026-08-21 09:15, 2026-08-28 16:15); in the tester only 0 (-); other side 0; last difference 14.8 days after the comparison start; list entries after it 14
-         B1, checked 2026-12-03, first candle 2026-08-20 20:00, compared from 2026-08-20 20:00: list entries 16; missing in the tester 1 (2026-08-21 09:15); in the tester only 0 (-); other side 0; last difference 0.6 days after the comparison start; list entries after it 15
-         B2, checked 2026-12-03, first candle 2026-08-20 20:00, compared from 2026-08-20 20:00: list entries 16; missing in the tester 4 (2026-08-21 09:15, 2026-08-28 16:15, 2026-09-03 14:45, 2026-09-04 13:00); in the tester only 0 (-); other side 0; last difference 14.7 days after the comparison start; list entries after it 12
-         B1, checked 2026-12-10, first candle 2026-08-27 20:00, compared from 2026-08-27 20:00: list entries 15; missing in the tester 1 (2026-08-28 16:15); in the tester only 0 (-); other side 0; last difference 0.8 days after the comparison start; list entries after it 14
-         B2, checked 2026-12-10, first candle 2026-08-27 20:00, compared from 2026-08-27 20:00: list entries 15; missing in the tester 4 (2026-08-28 16:15, 2026-09-03 14:45, 2026-09-04 13:00, 2026-09-11 13:00); in the tester only 0 (-); other side 0; last difference 14.7 days after the comparison start; list entries after it 11
-         B1, checked 2026-12-17, first candle 2026-09-03 20:00, compared from 2026-09-03 20:00: list entries 13; missing in the tester 1 (2026-09-04 13:00); in the tester only 0 (-); other side 0; last difference 0.7 days after the comparison start; list entries after it 12
-         B2, checked 2026-12-17, first candle 2026-09-03 20:00, compared from 2026-09-03 20:00: list entries 13; missing in the tester 4 (2026-09-04 13:00, 2026-09-11 13:00, 2026-09-15 19:00, 2026-09-18 14:15); in the tester only 0 (-); other side 0; last difference 14.8 days after the comparison start; list entries after it 9
-      20,000 15m candles reach back to 2026-05-01 16:00 on 2026-11-26: 38 list entries after that
-         B1, checked 2026-11-26, first candle 2026-05-01 16:00, compared from 2026-05-01 16:00: list entries 38; missing in the tester 1 (2026-05-04 02:15); in the tester only 0 (-); other side 0; last difference 2.4 days after the comparison start; list entries after it 37
-         B2, checked 2026-11-26, first candle 2026-05-01 16:00, compared from 2026-05-01 16:00: list entries 38; missing in the tester 4 (2026-05-04 02:15, 2026-05-14 15:15, 2026-05-15 14:15, 2026-05-18 16:30); in the tester only 1 (2026-05-18 15:00); other side 0; last difference 17.0 days after the comparison start; list entries after it 34
-         B1, checked 2026-12-03, first candle 2026-05-08 16:00, compared from 2026-05-08 16:00: list entries 37; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 37
-         B2, checked 2026-12-03, first candle 2026-05-08 16:00, compared from 2026-05-08 16:00: list entries 37; missing in the tester 5 (2026-05-14 15:15, 2026-05-15 14:15, 2026-05-18 16:30, 2026-05-22 20:00, 2026-05-23 21:00); in the tester only 0 (-); other side 0; last difference 15.2 days after the comparison start; list entries after it 32
-         B1, checked 2026-12-10, first candle 2026-05-15 16:00, compared from 2026-05-15 16:00: list entries 35; missing in the tester 1 (2026-05-18 16:30); in the tester only 0 (-); other side 0; last difference 3.0 days after the comparison start; list entries after it 34
-         B2, checked 2026-12-10, first candle 2026-05-15 16:00, compared from 2026-05-15 16:00: list entries 35; missing in the tester 4 (2026-05-18 16:30, 2026-05-22 20:00, 2026-05-23 21:00, 2026-05-28 04:30); in the tester only 0 (-); other side 0; last difference 12.5 days after the comparison start; list entries after it 31
-         B1, checked 2026-12-17, first candle 2026-05-22 16:00, compared from 2026-05-22 16:00: list entries 34; missing in the tester 2 (2026-05-22 20:00, 2026-05-23 21:00); in the tester only 0 (-); other side 0; last difference 1.2 days after the comparison start; list entries after it 32
-         B2, checked 2026-12-17, first candle 2026-05-22 16:00, compared from 2026-05-22 16:00: list entries 34; missing in the tester 9 (2026-05-22 20:00, 2026-05-23 21:00, 2026-05-28 04:30, 2026-06-01 14:00, 2026-06-02 14:45, 2026-06-03 22:30, 2026-06-05 06:45, 2026-06-05 20:30, 2026-06-07 22:45); in the tester only 0 (-); other side 0; last difference 16.3 days after the comparison start; list entries after it 25
-      40,000 15m candles reach back to 2025-10-05 08:00 on 2026-11-26: 89 list entries after that
-         B1, checked 2026-11-26, first candle 2025-10-05 08:00, compared from 2025-10-05 08:00: list entries 89; missing in the tester 3 (2025-10-07 15:30, 2025-10-09 14:45, 2025-10-10 15:45); in the tester only 1 (2025-10-09 17:15); other side 0; last difference 5.3 days after the comparison start; list entries after it 86
-         B2, checked 2026-11-26, first candle 2025-10-05 08:00, compared from 2025-10-05 08:00: list entries 89; missing in the tester 7 (2025-10-07 15:30, 2025-10-09 14:45, 2025-10-10 15:45, 2025-10-10 19:45, 2025-10-10 21:15, 2025-10-17 15:00, 2025-10-29 19:00); in the tester only 0 (-); other side 0; last difference 24.5 days after the comparison start; list entries after it 81
-         B1, checked 2026-12-03, first candle 2025-10-12 08:00, compared from 2025-10-12 08:00: list entries 84; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 84
-         B2, checked 2026-12-03, first candle 2025-10-12 08:00, compared from 2025-10-12 08:00: list entries 84; missing in the tester 2 (2025-10-17 15:00, 2025-10-26 22:30); in the tester only 0 (-); other side 0; last difference 14.6 days after the comparison start; list entries after it 82
-         B1, checked 2026-12-10, first candle 2025-10-19 08:00, compared from 2025-10-19 08:00: list entries 83; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 83
-         B2, checked 2026-12-10, first candle 2025-10-19 08:00, compared from 2025-10-19 08:00: list entries 83; missing in the tester 4 (2025-10-26 22:30, 2025-10-29 19:00, 2025-11-03 15:45, 2025-11-04 16:45); in the tester only 0 (-); other side 0; last difference 16.4 days after the comparison start; list entries after it 79
-         B1, checked 2026-12-17, first candle 2025-10-26 08:00, compared from 2025-10-26 08:00: list entries 83; missing in the tester 2 (2025-10-26 22:30, 2025-10-29 19:00); in the tester only 0 (-); other side 0; last difference 3.5 days after the comparison start; list entries after it 81
-         B2, checked 2026-12-17, first candle 2025-10-26 08:00, compared from 2025-10-26 08:00: list entries 83; missing in the tester 5 (2025-10-26 22:30, 2025-10-29 19:00, 2025-11-03 15:45, 2025-11-04 16:45, 2025-11-06 17:00); in the tester only 0 (-); other side 0; last difference 11.4 days after the comparison start; list entries after it 78
-   latest difference after the comparison start: B1 5.3 days, B2 24.5 days
+   longest trade of the list: 1.0 days
+   Deep Backtesting, every request from the start of the tester's period, entries from the date range's start, checked 2026-11-26:
+      search list, period from 2023-05-01, date range 2023-11-01 to 2026-11-01: list trades 284; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list trades after it 284
+      search list, period from 2023-11-01, date range 2023-11-01 to 2026-11-01: list trades 284; missing in the tester 4 (2023-11-01 21:00, 2023-11-09 02:45, 2023-11-09 14:30, 2023-11-15 18:45); in the tester only 0 (-); other side 0; last difference 14.8 days after 2023-11-01 00:00; list trades after it 280
+      untouched list, period from 2020-07-01, date range 2021-01-01 to 2023-11-01: list trades 232; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list trades after it 232
+      untouched list, period from 2021-01-01, date range 2021-01-01 to 2023-11-01: list trades 232; missing in the tester 7 (2021-01-02 13:15, 2021-01-02 20:30, 2021-01-04 10:00, 2021-01-07 19:00, 2021-01-08 03:30, 2021-01-10 20:45, ...); in the tester only 0 (-); other side 0; last difference 10.6 days after 2021-01-01 00:00; list trades after it 225
+   ordinary chart, strategy flat at the chart's first candle, checks every 12 hours from 2026-11-26 for 35 days:
+      5,000 15m candles (Basic) reach back to 2026-10-04 22:00 on 2026-11-26: 5 list trades after that
+         B1: 50 checks (21 more with no list trade left); last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 4.2 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-11-30 00:00: list trades 3; missing in the tester 2 (2026-10-12 23:30, 2026-10-13 04:00); in the tester only 0 (-); other side 0; last difference 4.2 days after 2026-10-08 22:00; list trades after it 1
+            checked 2026-12-17 00:00: list trades 1; missing in the tester 1 (2026-10-29 21:00); in the tester only 0 (-); other side 0; last difference 4.0 days after 2026-10-25 22:00; list trades after it 0
+            checked 2026-11-30 12:00: list trades 3; missing in the tester 2 (2026-10-12 23:30, 2026-10-13 04:00); in the tester only 0 (-); other side 0; last difference 3.8 days after 2026-10-09 10:00; list trades after it 1
+         B2: 50 checks (21 more with no list trade left); last difference later than 7 / 14 / 21 / 28 / 42 days: 22 / 5 / 0 / 0 / 0; latest 16.5 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-12-04 12:00: list trades 1; missing in the tester 1 (2026-10-29 21:00); in the tester only 0 (-); other side 0; last difference 16.5 days after 2026-10-13 10:00; list trades after it 0
+            checked 2026-12-05 00:00: list trades 1; missing in the tester 1 (2026-10-29 21:00); in the tester only 0 (-); other side 0; last difference 16.0 days after 2026-10-13 22:00; list trades after it 0
+            checked 2026-12-05 12:00: list trades 1; missing in the tester 1 (2026-10-29 21:00); in the tester only 0 (-); other side 0; last difference 15.5 days after 2026-10-14 10:00; list trades after it 0
+      10,000 15m candles (Essential, Plus) reach back to 2026-08-13 20:00 on 2026-11-26: 17 list trades after that
+         B1: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 4.3 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-12-06 12:00: list trades 15; missing in the tester 1 (2026-08-28 16:15); in the tester only 0 (-); other side 0; last difference 4.3 days after 2026-08-24 08:00; list trades after it 14
+            checked 2026-12-12 12:00: list trades 14; missing in the tester 1 (2026-09-03 14:45); in the tester only 0 (-); other side 0; last difference 4.3 days after 2026-08-30 08:00; list trades after it 13
+            checked 2026-12-27 12:00: list trades 11; missing in the tester 2 (2026-09-15 19:00, 2026-09-18 14:15); in the tester only 0 (-); other side 0; last difference 4.3 days after 2026-09-14 08:00; list trades after it 9
+         B2: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 71 / 45 / 13 / 8 / 8; latest 50.2 days; checks with a trade only in the tester 6, with a trade on the other side 0
+            checked 2026-12-01 12:00: list trades 16; missing in the tester 5 (2026-08-21 09:15, 2026-08-28 16:15, 2026-09-03 14:45, 2026-09-04 13:00, 2026-10-08 14:00); in the tester only 0 (-); other side 0; last difference 50.2 days after 2026-08-19 08:00; list trades after it 3
+            checked 2026-12-02 00:00: list trades 16; missing in the tester 5 (2026-08-21 09:15, 2026-08-28 16:15, 2026-09-03 14:45, 2026-09-04 13:00, 2026-10-08 14:00); in the tester only 0 (-); other side 0; last difference 49.8 days after 2026-08-19 20:00; list trades after it 3
+            checked 2026-12-17 12:00: list trades 13; missing in the tester 4 (2026-09-04 13:00, 2026-09-11 13:00, 2026-09-15 19:00, 2026-09-18 14:15); in the tester only 1 (2026-10-20 14:30); other side 0; last difference 46.3 days after 2026-09-04 08:00; list trades after it 1
+      20,000 15m candles (Premium) reach back to 2026-05-01 16:00 on 2026-11-26: 38 list trades after that
+         B1: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 4.7 days; checks with a trade only in the tester 1, with a trade on the other side 0
+            checked 2026-12-26 12:00: list trades 31; missing in the tester 5 (2026-06-01 14:00, 2026-06-02 14:45, 2026-06-03 22:30, 2026-06-05 06:45, 2026-06-05 20:30); in the tester only 1 (2026-06-05 14:45); other side 0; last difference 4.7 days after 2026-06-01 04:00; list trades after it 26
+            checked 2026-12-29 00:00: list trades 29; missing in the tester 4 (2026-06-03 22:30, 2026-06-05 06:45, 2026-06-05 20:30, 2026-06-07 22:45); in the tester only 0 (-); other side 0; last difference 4.3 days after 2026-06-03 16:00; list trades after it 25
+            checked 2026-12-25 00:00: list trades 31; missing in the tester 3 (2026-06-01 14:00, 2026-06-02 14:45, 2026-06-03 22:30); in the tester only 0 (-); other side 0; last difference 4.3 days after 2026-05-30 16:00; list trades after it 28
+         B2: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 71 / 60 / 15 / 1 / 0; latest 28.2 days; checks with a trade only in the tester 23, with a trade on the other side 0
+            checked 2026-12-20 12:00: list trades 32; missing in the tester 8 (2026-05-28 04:30, 2026-06-01 14:00, 2026-06-02 14:45, 2026-06-03 22:30, 2026-06-05 06:45, 2026-06-05 20:30, ...); in the tester only 1 (2026-06-23 08:45); other side 0; last difference 28.2 days after 2026-05-26 04:00; list trades after it 23
+            checked 2026-12-21 00:00: list trades 32; missing in the tester 8 (2026-05-28 04:30, 2026-06-01 14:00, 2026-06-02 14:45, 2026-06-03 22:30, 2026-06-05 06:45, 2026-06-05 20:30, ...); in the tester only 1 (2026-06-23 08:45); other side 0; last difference 27.7 days after 2026-05-26 16:00; list trades after it 23
+            checked 2026-12-21 12:00: list trades 32; missing in the tester 8 (2026-05-28 04:30, 2026-06-01 14:00, 2026-06-02 14:45, 2026-06-03 22:30, 2026-06-05 06:45, 2026-06-05 20:30, ...); in the tester only 1 (2026-06-23 08:45); other side 0; last difference 27.2 days after 2026-05-27 04:00; list trades after it 23
+      25,000 15m candles (Expert) reach back to 2026-03-10 14:00 on 2026-11-26: 49 list trades after that
+         B1: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 5.2 days; checks with a trade only in the tester 2, with a trade on the other side 0
+            checked 2026-11-30 00:00: list trades 47; missing in the tester 2 (2026-03-18 15:15, 2026-03-19 17:45); in the tester only 1 (2026-03-19 14:30); other side 0; last difference 5.2 days after 2026-03-14 14:00; list trades after it 45
+            checked 2026-11-30 12:00: list trades 47; missing in the tester 2 (2026-03-18 15:15, 2026-03-19 17:45); in the tester only 1 (2026-03-19 14:30); other side 0; last difference 4.7 days after 2026-03-15 02:00; list trades after it 45
+            checked 2026-12-26 00:00: list trades 44; missing in the tester 2 (2026-04-13 15:00, 2026-04-13 22:30); in the tester only 0 (-); other side 0; last difference 4.4 days after 2026-04-09 14:00; list trades after it 42
+         B2: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 47 / 23 / 4 / 0 / 0; latest 23.7 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-12-22 12:00: list trades 44; missing in the tester 4 (2026-04-13 15:00, 2026-04-13 22:30, 2026-04-17 13:30, 2026-04-29 18:30); in the tester only 0 (-); other side 0; last difference 23.7 days after 2026-04-06 02:00; list trades after it 39
+            checked 2026-12-23 00:00: list trades 44; missing in the tester 4 (2026-04-13 15:00, 2026-04-13 22:30, 2026-04-17 13:30, 2026-04-29 18:30); in the tester only 0 (-); other side 0; last difference 23.2 days after 2026-04-06 14:00; list trades after it 39
+            checked 2026-12-23 12:00: list trades 44; missing in the tester 4 (2026-04-13 15:00, 2026-04-13 22:30, 2026-04-17 13:30, 2026-04-29 18:30); in the tester only 0 (-); other side 0; last difference 22.7 days after 2026-04-07 02:00; list trades after it 39
+      40,000 15m candles (Ultimate) reach back to 2025-10-05 08:00 on 2026-11-26: 89 list trades after that
+         B1: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 5.3 days; checks with a trade only in the tester 2, with a trade on the other side 0
+            checked 2026-11-26 00:00: list trades 89; missing in the tester 3 (2025-10-07 15:30, 2025-10-09 14:45, 2025-10-10 15:45); in the tester only 1 (2025-10-09 17:15); other side 0; last difference 5.3 days after 2025-10-05 08:00; list trades after it 86
+            checked 2026-12-22 00:00: list trades 81; missing in the tester 2 (2025-11-03 15:45, 2025-11-04 16:45); in the tester only 1 (2025-11-04 17:15); other side 0; last difference 4.4 days after 2025-10-31 08:00; list trades after it 79
+            checked 2026-12-24 00:00: list trades 81; missing in the tester 3 (2025-11-03 15:45, 2025-11-04 16:45, 2025-11-06 17:00); in the tester only 0 (-); other side 0; last difference 4.4 days after 2025-11-02 08:00; list trades after it 78
+         B2: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 71 / 42 / 7 / 0 / 0; latest 24.5 days; checks with a trade only in the tester 2, with a trade on the other side 0
+            checked 2026-11-26 00:00: list trades 89; missing in the tester 7 (2025-10-07 15:30, 2025-10-09 14:45, 2025-10-10 15:45, 2025-10-10 19:45, 2025-10-10 21:15, 2025-10-17 15:00, ...); in the tester only 0 (-); other side 0; last difference 24.5 days after 2025-10-05 08:00; list trades after it 81
+            checked 2026-11-26 12:00: list trades 89; missing in the tester 7 (2025-10-07 15:30, 2025-10-09 14:45, 2025-10-10 15:45, 2025-10-10 19:45, 2025-10-10 21:15, 2025-10-17 15:00, ...); in the tester only 0 (-); other side 0; last difference 24.0 days after 2025-10-05 20:00; list trades after it 81
+            checked 2026-11-27 00:00: list trades 89; missing in the tester 7 (2025-10-07 15:30, 2025-10-09 14:45, 2025-10-10 15:45, 2025-10-10 19:45, 2025-10-10 21:15, 2025-10-17 15:00, ...); in the tester only 0 (-); other side 0; last difference 23.5 days after 2025-10-06 08:00; list trades after it 81
 
 4h file (USABLE)
    exits, search window (2023-11-01 to 2026-11-01): 100 trades second by second (+40.00R before costs), 100 on chart candles (+37.66R); trades that differ: 1
       long entered 2024-02-28 16:00: second by second target at 63098.6 (2024-02-28 17:06:01, +1.333R before costs); on chart candles stop at 59426.0 (candle 2024-02-28 16:00, -1.000R)
    exits, untouched period (2021-01-01 to 2023-11-01): 69 trades second by second (+24.33R before costs), 69 on chart candles (+24.33R); trades that differ: 0
-   limited history (an ordinary chart, strategy flat at its first candle; longest trade of the list 8.4 days):
-      5,000 4h candles reach back to 2024-08-14 16:00 on 2026-11-26: 71 list entries after that
-         B1, checked 2026-11-26, first candle 2024-08-14 16:00, compared from 2024-08-14 16:00: list entries 71; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 71
-         B2, checked 2026-11-26, first candle 2024-08-14 16:00, compared from 2024-08-14 16:00: list entries 71; missing in the tester 7 (2024-09-23 00:00, 2024-10-14 04:00, 2024-10-14 16:00, 2024-10-15 16:00, 2024-11-01 16:00, 2024-11-06 04:00, 2024-11-10 20:00); in the tester only 0 (-); other side 0; last difference 88.2 days after the comparison start; list entries after it 64
-         B1, checked 2026-12-03, first candle 2024-08-21 16:00, compared from 2024-08-21 16:00: list entries 71; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 71
-         B2, checked 2026-12-03, first candle 2024-08-21 16:00, compared from 2024-08-21 16:00: list entries 71; missing in the tester 8 (2024-09-23 00:00, 2024-10-14 04:00, 2024-10-14 16:00, 2024-10-15 16:00, 2024-11-01 16:00, 2024-11-06 04:00, 2024-11-10 20:00, 2024-12-19 20:00); in the tester only 0 (-); other side 0; last difference 120.2 days after the comparison start; list entries after it 63
-         B1, checked 2026-12-10, first candle 2024-08-28 16:00, compared from 2024-08-28 16:00: list entries 71; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 71
-         B2, checked 2026-12-10, first candle 2024-08-28 16:00, compared from 2024-08-28 16:00: list entries 71; missing in the tester 8 (2024-09-23 00:00, 2024-10-14 04:00, 2024-10-14 16:00, 2024-10-15 16:00, 2024-11-01 16:00, 2024-11-06 04:00, 2024-11-10 20:00, 2024-12-19 20:00); in the tester only 0 (-); other side 0; last difference 113.2 days after the comparison start; list entries after it 63
-         B1, checked 2026-12-17, first candle 2024-09-04 16:00, compared from 2024-09-04 16:00: list entries 71; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 71
-         B2, checked 2026-12-17, first candle 2024-09-04 16:00, compared from 2024-09-04 16:00: list entries 71; missing in the tester 8 (2024-09-23 00:00, 2024-10-14 04:00, 2024-10-14 16:00, 2024-10-15 16:00, 2024-11-01 16:00, 2024-11-06 04:00, 2024-11-10 20:00, 2024-12-19 20:00); in the tester only 0 (-); other side 0; last difference 106.2 days after the comparison start; list entries after it 63
-      10,000 4h candles reach back to 2022-05-04 08:00 on 2026-11-26: 100 list entries after that
-         B1, checked 2026-11-26, first candle 2022-05-04 08:00, compared from 2024-01-19 08:00: list entries 94; missing in the tester 1 (2024-01-22 16:00); in the tester only 0 (-); other side 0; last difference 3.3 days after the comparison start; list entries after it 93
-         B2, checked 2026-11-26, first candle 2022-05-04 08:00, compared from 2024-01-19 08:00: list entries 94; missing in the tester 1 (2024-01-22 16:00); in the tester only 0 (-); other side 0; last difference 3.3 days after the comparison start; list entries after it 93
-         B1, checked 2026-12-03, first candle 2022-05-11 08:00, compared from 2024-01-26 08:00: list entries 93; missing in the tester 1 (2024-01-26 12:00); in the tester only 0 (-); other side 0; last difference 0.2 days after the comparison start; list entries after it 92
-         B2, checked 2026-12-03, first candle 2022-05-11 08:00, compared from 2024-01-26 08:00: list entries 93; missing in the tester 1 (2024-01-26 12:00); in the tester only 0 (-); other side 0; last difference 0.2 days after the comparison start; list entries after it 92
-         B1, checked 2026-12-10, first candle 2022-05-18 08:00, compared from 2024-02-02 08:00: list entries 92; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 92
-         B2, checked 2026-12-10, first candle 2022-05-18 08:00, compared from 2024-02-02 08:00: list entries 92; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 92
-         B1, checked 2026-12-17, first candle 2022-05-25 08:00, compared from 2024-02-09 08:00: list entries 92; missing in the tester 1 (2024-02-09 16:00); in the tester only 0 (-); other side 0; last difference 0.3 days after the comparison start; list entries after it 91
-         B2, checked 2026-12-17, first candle 2022-05-25 08:00, compared from 2024-02-09 08:00: list entries 92; missing in the tester 1 (2024-02-09 16:00); in the tester only 0 (-); other side 0; last difference 0.3 days after the comparison start; list entries after it 91
-      20,000 4h candles reach back to 2017-10-10 16:00 on 2026-11-26: 100 list entries after that
-         B1, checked 2026-11-26: chart starts before the loaded data: not simulated
-         B2, checked 2026-11-26: chart starts before the data: not simulated
-         B1, checked 2026-12-03: chart starts before the loaded data: not simulated
-         B2, checked 2026-12-03: chart starts before the data: not simulated
-         B1, checked 2026-12-10: chart starts before the loaded data: not simulated
-         B2, checked 2026-12-10: chart starts before the data: not simulated
-         B1, checked 2026-12-17: chart starts before the loaded data: not simulated
-         B2, checked 2026-12-17: chart starts before the data: not simulated
-      40,000 4h candles reach back to 2008-08-25 08:00 on 2026-11-26: 100 list entries after that
-         B1, checked 2026-11-26: chart starts before the loaded data: not simulated
-         B2, checked 2026-11-26: chart starts before the data: not simulated
-         B1, checked 2026-12-03: chart starts before the loaded data: not simulated
-         B2, checked 2026-12-03: chart starts before the data: not simulated
-         B1, checked 2026-12-10: chart starts before the loaded data: not simulated
-         B2, checked 2026-12-10: chart starts before the data: not simulated
-         B1, checked 2026-12-17: chart starts before the loaded data: not simulated
-         B2, checked 2026-12-17: chart starts before the data: not simulated
-   latest difference after the comparison start: B1 3.3 days, B2 120.2 days
+   longest trade of the list: 8.4 days
+   Deep Backtesting, every request from the start of the tester's period, entries from the date range's start, checked 2026-11-26:
+      search list, period from 2023-05-01, date range 2023-11-01 to 2026-11-01: list trades 94; missing in the tester 1 (2024-01-22 16:00); in the tester only 0 (-); other side 0; last difference 3.3 days after 2024-01-19 08:00; list trades after it 93
+      search list, period from 2023-11-01, date range 2023-11-01 to 2026-11-01: list trades 94; missing in the tester 6 (2024-01-22 16:00, 2024-01-26 12:00, 2024-02-09 16:00, 2024-02-27 04:00, 2024-02-28 16:00, 2024-03-04 16:00); in the tester only 0 (-); other side 0; last difference 45.3 days after 2024-01-19 08:00; list trades after it 88
+      untouched list: the tester keeps no 15m candles from before 2023-11-01: not possible
+   ordinary chart, strategy flat at the chart's first candle, checks every 12 hours from 2026-11-26 for 35 days:
+      5,000 4h candles (Basic) reach back to 2024-08-14 16:00 on 2026-11-26: 71 list trades after that
+         B1: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 4.3 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-12-31 00:00: list trades 71; missing in the tester 1 (2024-09-23 00:00); in the tester only 0 (-); other side 0; last difference 4.3 days after 2024-09-18 16:00; list trades after it 70
+         B2: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 71 / 71 / 71 / 71 / 71; latest 124.2 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-12-30 12:00: list trades 71; missing in the tester 11 (2024-09-23 00:00, 2024-10-14 04:00, 2024-10-14 16:00, 2024-10-15 16:00, 2024-11-01 16:00, 2024-11-06 04:00, ...); in the tester only 0 (-); other side 0; last difference 124.2 days after 2024-09-18 04:00; list trades after it 60
+            checked 2026-11-29 12:00: list trades 71; missing in the tester 8 (2024-09-23 00:00, 2024-10-14 04:00, 2024-10-14 16:00, 2024-10-15 16:00, 2024-11-01 16:00, 2024-11-06 04:00, ...); in the tester only 0 (-); other side 0; last difference 123.7 days after 2024-08-18 04:00; list trades after it 63
+            checked 2026-12-31 00:00: list trades 71; missing in the tester 11 (2024-09-23 00:00, 2024-10-14 04:00, 2024-10-14 16:00, 2024-10-15 16:00, 2024-11-01 16:00, 2024-11-06 04:00, ...); in the tester only 0 (-); other side 0; last difference 123.7 days after 2024-09-18 16:00; list trades after it 60
+      10,000 4h candles (Essential, Plus) reach back to 2022-05-04 08:00 on 2026-11-26: 100 list trades after that
+         B1: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 4.3 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-12-13 00:00: list trades 92; missing in the tester 1 (2024-02-09 16:00); in the tester only 0 (-); other side 0; last difference 4.3 days after 2024-02-05 08:00; list trades after it 91
+            checked 2026-12-30 12:00: list trades 91; missing in the tester 1 (2024-02-27 04:00); in the tester only 0 (-); other side 0; last difference 4.3 days after 2024-02-22 20:00; list trades after it 90
+            checked 2026-11-29 00:00: list trades 94; missing in the tester 2 (2024-01-22 16:00, 2024-01-26 12:00); in the tester only 0 (-); other side 0; last difference 4.2 days after 2024-01-22 08:00; list trades after it 92
+         B2: 71 checks; last difference later than 7 / 14 / 21 / 28 / 42 days: 0 / 0 / 0 / 0 / 0; latest 4.3 days; checks with a trade only in the tester 0, with a trade on the other side 0
+            checked 2026-12-13 00:00: list trades 92; missing in the tester 1 (2024-02-09 16:00); in the tester only 0 (-); other side 0; last difference 4.3 days after 2024-02-05 08:00; list trades after it 91
+            checked 2026-12-30 12:00: list trades 91; missing in the tester 1 (2024-02-27 04:00); in the tester only 0 (-); other side 0; last difference 4.3 days after 2024-02-22 20:00; list trades after it 90
+            checked 2026-11-29 00:00: list trades 94; missing in the tester 2 (2024-01-22 16:00, 2024-01-26 12:00); in the tester only 0 (-); other side 0; last difference 4.2 days after 2024-01-22 08:00; list trades after it 92
+      20,000 4h candles (Premium) reach back to 2017-10-10 16:00 on 2026-11-26: 100 list trades after that
+         further back than the list's own history: as with Deep Backtesting above
+      25,000 4h candles (Expert) reach back to 2015-06-30 08:00 on 2026-11-26: 100 list trades after that
+         further back than the list's own history: as with Deep Backtesting above
+      40,000 4h candles (Ultimate) reach back to 2008-08-25 08:00 on 2026-11-26: 100 list trades after that
+         further back than the list's own history: as with Deep Backtesting above
 

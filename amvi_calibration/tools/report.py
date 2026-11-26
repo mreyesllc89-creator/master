@@ -56,6 +56,9 @@ ACTION = {"RECOMMENDED": "test with alerts, then trade small", "USABLE": "test w
           "PAPER-TRADE": "watch with alerts only; no money", "NOT RECOMMENDED": "nothing to load", "DO NOT TRADE": "nothing to load"}
 WINDOW_TXT = "2023-11 to 2026-10"
 NUMBER_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
+LOWER_TF_CANDLES = 100_000          # lower-timeframe candles a request gets on plans up to Premium
+DEEP_CANDLES = 2_000_000            # the most Deep Backtesting computes
+DEEP_LEAD = "2023-05-01"            # Deep Backtesting period start for the check: six months of history before the list
 RECORD_DATE = "2026-11-26"
 # engine parameter -> Pine input variable (for readable names of fragile inputs)
 ENGINE_TO_PINE = dict(fast="fastATRPeriod", slow="slowATRPeriod", sd="stdDevPeriod", cr="candleRangePeriod", norm="normalizationPeriod",
@@ -78,8 +81,11 @@ def replay_note(tf, p):
     since = replay_since(tf, p)
     if not since:
         return None
-    return (f"This setting reads 15m candles from a {make_pine.TF_NAME[tf]} chart. TradingView keeps about 100,000 candles of a lower timeframe "
-            f"per request, so its tester can replay it only back to about {since}; earlier trades of this record cannot be checked there.")
+    days = LOWER_TF_CANDLES * 15 / 1440
+    return (f"This setting reads 15m candles from a {make_pine.TF_NAME[tf]} chart. TradingView keeps about {LOWER_TF_CANDLES:,} candles of a lower "
+            f"timeframe per request on plans up to Premium (Ultimate is documented with 200,000; not checked), so on those plans its tester can "
+            f"replay it only back to about {since} as of {RECORD_DATE}, a day later for every later day (the day you check minus about "
+            f"{days:,.0f} days); earlier trades of this record cannot be checked there.")
 
 
 def trail_robust(p, ev):
@@ -215,8 +221,8 @@ def tester_txt(ev):
          f"for 2023-11-01 to 2026-10-31")
     s = ev.get("tv_view_since")
     if s and s.get("n"):
-        t += (f"; TradingView can replay this file only from about {s['since']}: from then about {s['n']} trades, {s['win'] * 100:.0f}% profitable, "
-              f"net profit about {s['pct_total']:+.0f}%")
+        t += (f"; TradingView can replay this file only from about {s['since']} (as of {RECORD_DATE}; a day later every day): from then about "
+              f"{s['n']} trades, {s['win'] * 100:.0f}% profitable, net profit about {s['pct_total']:+.0f}%")
     return t
 
 
@@ -226,17 +232,19 @@ def header_lines(tf, v, why, ev, changes, p, lower_wait_weeks=None):
     grade = ORDER.index(v) + 1
     L = [f"AMVI Full MTF Strategy (direction filter, closed-candle engine): {SYMBOL} {name}"]
     after = (". After that still alerts only, no money." if v == "PAPER-TRADE"
-             else ", then alerts only for about 20 trades before any money (REPORT.md, What I would do).")
-    L += wrap(f"{v} (grade {grade} of 5): {ACTION[v]}. For the {name} chart of {SYMBOL} only. Not yet run on TradingView: "
+             else (", then alerts only for about 20 trades, to see that they match the tester (not to judge profit); money only after that, "
+                   "and not before your lab's \"go live\" (REPORT.md, What I would do)."))
+    L += wrap(f"{v} (grade {grade} of 5, 1 = best): {ACTION[v]}. For the {name} chart of {SYMBOL} only. Not yet run on TradingView: "
               f"first check that its trade list matches (see CHECK){after}")
     L += ["-" * 85]
     ys = year_share(ev)
     conc = f" ({share_words(ys)})" if ys and ys[0] >= 0.6 else ""
     if pre.get("n"):
-        L += wrap(f"{ev.get('pre_from', '2021-01-01')[:7]} to 2023-10, NOT used for choosing: {pre['total']:+.1f}R{conc}, {pre['n']} trades, "
-                  f"largest drawdown {pre['dd']:.1f}R; {ev['pre_stress']['total']:+.1f}R at double commission.{open_txt(pre)}", first="RESULT:")
+        L += wrap(f"{ev.get('pre_from', '2021-01-01')[:7]} to 2023-10, NOT used to choose the inputs: {pre['total']:+.1f}R{conc}, {pre['n']} trades, "
+                  f"largest drawdown {pre['dd']:.1f}R; {ev['pre_stress']['total']:+.1f}R at double commission.{open_txt(pre)} This file exists "
+                  f"only because that result was good, so expect less (REPORT.md, section 1, point 4).", first="RESULT:")
     else:
-        L += wrap("2021-01 to 2023-10, NOT used for choosing: no trades.", first="RESULT:")
+        L += wrap("2021-01 to 2023-10, NOT used to choose the inputs: no trades.", first="RESULT:")
     month = (f"; {b['best_month_total'] / b['total'] * 100:.0f}% of it in one month ({b['best_month']})"
              if b["total"] > 0 and b["best_month_total"] / b["total"] >= 0.5 else "")
     L += wrap(f"2023-11 to 2026-10, used for choosing (so flattered): {b['total']:+.1f}R, {b['n']} trades, largest drawdown {b['dd']:.1f}R{month}.",
@@ -255,13 +263,19 @@ def header_lines(tf, v, why, ev, changes, p, lower_wait_weeks=None):
                   f"{ev['trail_restart']['total']:+.1f}R and {ev.get('pre_trail_restart', {}).get('total', 0):+.1f}R instead of {b['total']:+.1f}R and {pre.get('total', 0):+.1f}R.",
                   first="NOTE:  ")
     since = ev.get("tv_view_since", {}).get("since")
+    period = (f"Surest: Deep Backtesting (Premium and above) over a period from {DEEP_LEAD} to 2026-10-31, with \"Limit Backtest Date "
+              f"Range\" on, 2023-11-01 to 2026-10-31. The range only blocks entries; the six months before it give the script its history.")
+    reach_days = tf * DEEP_CANDLES / 1440           # how long two million candles of this chart last
+    if reach_days < 3 * 365 + (pd.Timestamp(RECORD_DATE) - pd.Timestamp(DEEP_LEAD)).days:
+        reach_end = pd.Timestamp(DEEP_LEAD) + pd.Timedelta(days=reach_days)
+        period += (f" Two million {name} candles reach that far back only until about {reach_end.strftime('%Y-%m-%d')}.")
     if since:
-        deep = (f"Surest: Deep Backtesting (Premium and above) with \"Limit Backtest Date Range\" on, 2023-11-01 to 2026-10-31. This file reads "
-                f"lower-timeframe candles, which the tester has only from about {since} (TESTER): compare from "
-                f"{NUMBER_WORDS.get(lower_wait_weeks or 2, str(lower_wait_weeks))} weeks after that date.")
+        days = LOWER_TF_CANDLES * min(space.engine_params(p)["tfs"]) / 1440
+        deep = (f"{period} This file reads lower-timeframe candles, of which the tester keeps about {LOWER_TF_CANDLES:,} (plans up to "
+                f"Premium): on {RECORD_DATE} they start about {since}, a day later every day (the day you check minus about {days:,.0f} days). "
+                f"Compare from {NUMBER_WORDS.get(lower_wait_weeks or 2, str(lower_wait_weeks))} weeks after that start.")
     else:
-        deep = ("Surest: Deep Backtesting (Premium and above) with \"Limit Backtest Date Range\" on, 2023-11-01 to 2026-10-31: the script then "
-                "has years of history and starts flat like the list, so every entry should match from the first.")
+        deep = f"{period} Every entry should then match from the first."
     entries = ev["_trades"]["entry_t"]
     reach40 = pd.Timestamp(RECORD_DATE) - pd.Timedelta(minutes=tf * 40_000)
     n40 = int((entries >= reach40.value // 10 ** 6).sum())
@@ -282,7 +296,8 @@ def header_lines(tf, v, why, ev, changes, p, lower_wait_weeks=None):
     else:
         exits = " The exits should be on the same candles too."
     L += wrap(f"amvi_calibration/results/trades_BTCUSDT_{name}.csv (UTC times, Binance prices): on BINANCE:BTCUSDT.P the entries must be on "
-              f"the same candles and sides. Change no input. {deep}{ordinary}{exits} Details: REPORT.md, section 9.", first="CHECK: ")
+              f"the same candles and sides, up to 2026-10-31 (the list ends there). Change no input. {deep}{ordinary}{exits} "
+              f"Details: REPORT.md, section 9.", first="CHECK: ")
     L += wrap(f"amvi_calibration/REPORT.md, section 7, {name}. Record date {RECORD_DATE}. Numbers come from a Python copy of this script, "
               f"not from TradingView.", first="RECORD:")
     L += ["",

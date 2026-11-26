@@ -1,6 +1,6 @@
 """What TradingView's Strategy Tester will show differently from a calibrated file's trade list,
-without the file being wrong. Nothing here runs on TradingView: both effects are simulated
-with the Python copy.
+without the file being wrong. Nothing here runs on TradingView: every effect is simulated with
+the Python copy.
 
 usage: python tester_view.py [results_dir]
 
@@ -9,16 +9,24 @@ usage: python tester_view.py [results_dir]
    close; the trade lists follow stops and targets second by second. Every trade of a
    calibrated file whose exit differs between the two walks is listed.
 
-2. Limited history. A chart loads 5,000 to 40,000 candles depending on the plan, and a request
-   for a lower timeframe about 100,000. The script then starts without the history the trade
-   list had, and the entries around the start differ. How far back TradingView loads a
-   request for a higher timeframe (the filter; an AMVI above the chart) was not checked, so
-   two models are simulated (scenario()): B1, those requests have their full history; B2,
-   they start on the chart's first day. In both, an AMVI on the chart's own timeframe starts
-   at the chart's first candle, one below the chart not before the oldest lower-timeframe
-   candle TradingView keeps, and the strategy is flat at the chart's first candle. The
-   differences are counted from the later of the chart's first candle, the start of the
-   search window and the AMVI's first candle.
+2. Deep Backtesting. The tester computes the script over the period chosen in the Strategy
+   Tester; the script's "Limit Backtest Date Range" only blocks entries outside its dates.
+   Simulated: every request starts on the period's first day (the cautious case), entries from
+   the range's start, against the list: with the period starting six months before the range,
+   and with both starting on the same day.
+
+3. An ordinary chart. A chart loads 5,000 to 40,000 candles depending on the plan, and a
+   request for a lower timeframe about 100,000 candles (200,000 on Ultimate; not simulated).
+   The script then starts without the history the trade list had. How far back TradingView
+   loads a request for a higher timeframe (the filter; an AMVI above the chart) was not
+   checked, so two models are simulated (scenario()): B1, those requests have their full
+   history; B2, they start on the chart's first day. In both, an AMVI on the chart's own
+   timeframe starts at the chart's first candle, one below the chart not before the oldest
+   lower-timeframe candle TradingView keeps, and the strategy is flat at the chart's first
+   candle. Checks are scanned every SCAN_STEP_H hours over SCAN_DAYS days from the record
+   date, for every plan size that holds at least 3 list trades. A difference is counted from
+   the later of the chart's first candle, the start of the search window and the AMVI's first
+   candle.
 """
 import csv
 import json
@@ -37,9 +45,11 @@ import space
 import sweep
 
 REASON = {E.X_STOP: "stop", E.X_TP: "target", E.X_TRAIL: "trail", E.X_REV: "reversal", E.X_VOL: "vol exit", E.X_TIME: "time stop", E.X_END: "open"}
-CHART_CANDLES = (5000, 10000, 20000, 40000)      # what a chart holds, by plan
-LOWER_TF_CANDLES = 100_000                       # what a request for a lower timeframe holds
-LATER_DAYS = (0, 7, 14, 21)                      # a check made that many days after the record date
+CHART_CANDLES = {5000: "Basic", 10000: "Essential, Plus", 20000: "Premium", 25000: "Expert", 40000: "Ultimate"}   # what a chart holds, by plan
+LOWER_TF_CANDLES = 100_000                       # what a request for a lower timeframe holds (plans up to Premium)
+SCAN_DAYS, SCAN_STEP_H = 35, 12                  # checks made over the five weeks after the record date
+DEEP = {"search": ("2023-05-01", F.SEARCH), "untouched": ("2020-07-01", F.PRESAMPLE)}   # Deep Backtesting period start, date range
+_M1 = {}
 
 
 def when(ms_, fmt="%Y-%m-%d %H:%M"):
@@ -78,10 +88,18 @@ def floor_day(ms_):
     return ms_ // 86_400_000 * 86_400_000
 
 
+def m1_all():
+    if "m1" not in _M1:
+        _M1["m1"] = bars.load_1m("BTCUSDT", start=F.PRE_LOAD, end=F.SEARCH[1])
+    return _M1["m1"]
+
+
 def features_from(start_ms):
-    """Features over 1-minute bars from start_ms to the end of the search window (no seconds)."""
-    sub = bars.load_1m("BTCUSDT", start=pd.Timestamp(int(start_ms), unit="ms").strftime("%Y-%m-%d %H:%M"), end=F.SEARCH[1])
-    return E.Features(bars.Market(sub))
+    """Features over the 1-minute bars from start_ms to the end of the search window (no seconds)."""
+    m = m1_all()
+    k = int(np.searchsorted(m.t, int(start_ms)))
+    idx = np.arange(m.t.size - k, dtype=np.int64)
+    return E.Features(bars.Market(bars.Bars(1, m.t[k:], m.o[k:], m.h[k:], m.l[k:], m.c[k:], m.v[k:], idx, idx + 1)))
 
 
 def aligned(ch, ch_part, arr_part):
@@ -94,51 +112,49 @@ def aligned(ch, ch_part, arr_part):
     return out
 
 
-def scenario(tf, ep, ft_full, listed, s_ms, now_ms, model):
-    """The entries the tester takes on a chart whose first candle opens at s_ms, against the list.
+def simulate(tf, ep, listed, first_ms, now_ms, model, full=None, run_from=None, end_ms=None):
+    """The entries the tester takes when its data starts at first_ms, against the list.
 
-    model "B1": the filter and an AMVI above the chart have their full history (as with Deep
-                Backtesting, or if TradingView loads those requests further back than the chart);
-    model "B2": every request starts on the chart's first day (nothing before the chart).
-    An AMVI on the chart's own timeframe starts at the chart's first candle in both models, one
-    below the chart not before the oldest of the LOWER_TF_CANDLES candles TradingView keeps.
-    The strategy is flat at the chart's first candle. Returns a dict, or a string saying why
-    the case was not simulated."""
+    model "B1": the filter and an AMVI above the chart have the trade list's own history
+                (full = (features, zone) of the list's context);
+    model "B2": every request starts on the first day of the tester's data.
+    An AMVI on the chart's own timeframe starts at first_ms, one below the chart not before
+    now_ms minus LOWER_TF_CANDLES of its candles. Entries from run_from (the date range's start;
+    default first_ms), flat there, up to end_ms. Returns a dict, or a string saying why the
+    case was not simulated."""
     amvi_tf = sorted(ep["tfs"])
-    end = sweep.ms(F.SEARCH[1])
-    data0 = int(ft_full.mk.m1.t[0])
+    end_ms = end_ms or sweep.ms(F.SEARCH[1])
+    run_from = run_from or first_ms
     if any(t > tf for t in amvi_tf) and any(t <= tf for t in amvi_tf):
         return "AMVI timeframes on both sides of the chart: not simulated"
     low = min(amvi_tf)
     limit = now_ms - low * LOWER_TF_CANDLES * bars.MIN_MS if low < tf else None
-    amvi_start = None if low > tf else max(s_ms, limit or s_ms)
+    amvi_start = None if low > tf else max(first_ms, limit or first_ms)
+    if max(run_from, amvi_start or run_from) >= max(listed, default=0):
+        return "no list trade after the start: nothing to compare"
     if model == "B1":
-        # the full history is the trade list's own (loaded from sweep.LOAD_START)
-        if s_ms < data0:
-            return "chart starts before the loaded data: not simulated"
-        ft_run = ft_full
-        zone = E.zone_array(ft_full, tf, ep)
+        ft_run, zone = full
+        if first_ms < int(ft_run.mk.m1.t[0]):
+            return "starts before the list's own history: not simulated"
     else:
-        day0 = floor_day(s_ms)
+        day0 = floor_day(first_ms)
         if day0 < sweep.ms(F.PRE_LOAD):
-            return "chart starts before the data: not simulated"
+            return "starts before the data: not simulated"
         ft_run = features_from(day0)
         zone = E.zone_array(ft_run, tf, ep)
     ch = ft_run.mk.tf(tf)
-    if amvi_start is None and model == "B1":
-        trig, volc, _ = E.trigger_arrays(ft_full, tf, ep)
-    elif amvi_start is None:
+    if amvi_start is None:
         trig, volc, _ = E.trigger_arrays(ft_run, tf, ep)
     else:
         ft_a = features_from(amvi_start)
         t2, v2, _ = E.trigger_arrays(ft_a, tf, ep)
         ch_a = ft_a.mk.tf(tf)
         trig, volc = aligned(ch, ch_a, t2), aligned(ch, ch_a, v2)
-    j0 = int(np.searchsorted(ch.t, s_ms))
-    tv = E.run(ft_run, tf, ep, fee=0.0, slip_ticks=1, start_ms=int(ch.t[j0]), end_ms=end, signals=(trig, volc, zone), walk="1m")
-    cmp_from = max(s_ms, sweep.ms(F.SEARCH[0]), amvi_start or s_ms)
-    te = {int(t): int(x) for t, x in zip(tv["entry_t"], tv["dir"]) if t >= cmp_from}
-    le = {t: x for t, x in listed.items() if t >= cmp_from}
+    j0 = int(np.searchsorted(ch.t, run_from))
+    tv = E.run(ft_run, tf, ep, fee=0.0, slip_ticks=1, start_ms=int(ch.t[j0]), end_ms=end_ms, signals=(trig, volc, zone), walk="1m")
+    cmp_from = max(run_from, amvi_start or run_from)
+    te = {int(t): int(x) for t, x in zip(tv["entry_t"], tv["dir"]) if cmp_from <= t < end_ms}
+    le = {t: x for t, x in listed.items() if cmp_from <= t < end_ms}
     only_list = sorted(set(le) - set(te))
     only_tv = sorted(set(te) - set(le))
     other_side = sorted(t for t in set(le) & set(te) if le[t] != te[t])
@@ -148,38 +164,74 @@ def scenario(tf, ep, ft_full, listed, s_ms, now_ms, model):
                 last_days=(last - cmp_from) / 86_400_000 if last else None, after=sum(1 for t in le if last is None or t > last))
 
 
-def limited_history(name, tf, ep, ft_full, listed, hold_max_days):
-    """An ordinary chart holds 5,000 to 40,000 candles depending on the plan: the script then
-    starts without the history the trade list had. Both models of scenario(), for every chart
-    size whose first candle lies inside the search window, checked on the record date and up
-    to three weeks later."""
-    now0 = pd.Timestamp(report.RECORD_DATE)
-    print(f"   limited history (an ordinary chart, strategy flat at its first candle; longest trade of the list {hold_max_days:.1f} days):")
-    worst = {"B1": 0.0, "B2": 0.0}
-    for n in CHART_CANDLES:
-        s0 = now0 - pd.Timedelta(minutes=tf * n)
-        in_range = sum(1 for t in listed if t >= int(s0.value // 10 ** 6))
-        print(f"      {n:,} {name} candles reach back to {s0.strftime('%Y-%m-%d %H:%M')} on {report.RECORD_DATE}: {in_range} list entries after that")
-        if in_range < 3:
-            print("         too few to compare: not simulated")
+def line(r):
+    return (f"list trades {r['n_list']}; missing in the tester {len(r['only_list'])} ({', '.join(when(t) for t in r['only_list'][:6]) or '-'}"
+            + (", ..." if len(r["only_list"]) > 6 else "") + f"); in the tester only {len(r['only_tv'])} ({', '.join(when(t) for t in r['only_tv'][:6]) or '-'}); "
+            f"other side {len(r['other_side'])}; last difference "
+            + (f"{r['last_days']:.1f} days after {when(r['cmp_from'])}" if r["last_days"] is not None else "none") + f"; list trades after it {r['after']}")
+
+
+def deep_backtesting(name, tf, ep, listed_by_period):
+    """The Deep Backtesting check: the period starting six months before the date range, and
+    starting on the range's first day; every request from the period's start (model B2)."""
+    now_ms = sweep.ms(report.RECORD_DATE)
+    print(f"   Deep Backtesting, every request from the start of the tester's period, entries from the date range's start, checked {report.RECORD_DATE}:")
+    for period, (lead, (r0, r1)) in DEEP.items():
+        listed = listed_by_period.get(period)
+        if not listed:
             continue
-        for d in LATER_DAYS:
-            now = now0 + pd.Timedelta(days=d)
-            s_ms = int((now - pd.Timedelta(minutes=tf * n)).value // 10 ** 6)
-            for model in ("B1", "B2"):
-                r = scenario(tf, ep, ft_full, listed, s_ms, int(now.value // 10 ** 6), model)
+        lead_ms, r0_ms, r1_ms = sweep.ms(lead), sweep.ms(r0), sweep.ms(r1)
+        if lead_ms < now_ms - 2_000_000 * tf * bars.MIN_MS:
+            print(f"      {period} list: two million {name} candles do not reach back to {lead}: not possible")
+            continue
+        low = min(ep["tfs"])
+        if low < tf and now_ms - low * LOWER_TF_CANDLES * bars.MIN_MS >= r1_ms:
+            print(f"      {period} list: the tester keeps no {make_pine.TF_NAME[low]} candles from before {r1}: not possible")
+            continue
+        for first in (lead_ms, r0_ms):
+            r = simulate(tf, ep, listed, first, now_ms, "B2", run_from=r0_ms, end_ms=r1_ms)
+            what = f"period from {when(first)[:10]}, date range {r0} to {r1}"
+            print(f"      {period} list, {what}: " + (r if isinstance(r, str) else line(r)), flush=True)
+
+
+def ordinary_chart(name, tf, ep, listed, full):
+    """Ordinary charts of every plan size, checks every SCAN_STEP_H hours over SCAN_DAYS days."""
+    now0 = sweep.ms(report.RECORD_DATE)
+    steps = range(0, SCAN_DAYS * 24 // SCAN_STEP_H + 1)
+    print(f"   ordinary chart, strategy flat at the chart's first candle, checks every {SCAN_STEP_H} hours from {report.RECORD_DATE} for {SCAN_DAYS} days:")
+    summary = {}
+    for n, plan in CHART_CANDLES.items():
+        s0 = now0 - n * tf * bars.MIN_MS
+        in_range = sum(1 for t in listed if t >= s0)
+        print(f"      {n:,} {name} candles ({plan}) reach back to {when(s0)} on {report.RECORD_DATE}: {in_range} list trades after that", flush=True)
+        if in_range < 3:
+            continue
+        if s0 < int(full[0].mk.m1.t[0]):
+            print("         further back than the list's own history: as with Deep Backtesting above")
+            continue
+        for model in ("B1", "B2"):
+            res, empty, why = [], 0, ""
+            for k in steps:
+                now_ms = now0 + k * SCAN_STEP_H * 3_600_000
+                r = simulate(tf, ep, listed, now_ms - n * tf * bars.MIN_MS, now_ms, model, full=full)
                 if isinstance(r, str):
-                    print(f"         {model}, checked {now.strftime('%Y-%m-%d')}: {r}")
+                    empty, why = empty + 1, r
                     continue
-                if r["last_days"] is not None:
-                    worst[model] = max(worst[model], r["last_days"])
-                print(f"         {model}, checked {now.strftime('%Y-%m-%d')}, first candle {when(s_ms)}, compared from {when(r['cmp_from'])}: list entries {r['n_list']}; "
-                      f"missing in the tester {len(r['only_list'])} ({', '.join(when(t) for t in r['only_list']) or '-'}); in the tester only "
-                      f"{len(r['only_tv'])} ({', '.join(when(t) for t in r['only_tv']) or '-'}); other side {len(r['other_side'])}; last difference "
-                      + (f"{r['last_days']:.1f} days after the comparison start" if r["last_days"] is not None else "none")
-                      + f"; list entries after it {r['after']}", flush=True)
-    print(f"   latest difference after the comparison start: B1 {worst['B1']:.1f} days, B2 {worst['B2']:.1f} days")
-    return worst
+                res.append((now_ms, r))
+            if not res:
+                print(f"         {model}: {why}")
+                continue
+            lasts = [r["last_days"] or 0.0 for _, r in res]
+            worst = sorted(res, key=lambda x: -(x[1]["last_days"] or 0.0))[:3]
+            summary[(n, model)] = max(lasts)
+            print(f"         {model}: {len(res)} checks" + (f" ({empty} more with no list trade left)" if empty else "") + "; last difference later than 7 / 14 / 21 / 28 / 42 days: "
+                  f"{sum(x > 7 for x in lasts)} / {sum(x > 14 for x in lasts)} / {sum(x > 21 for x in lasts)} / {sum(x > 28 for x in lasts)} / "
+                  f"{sum(x > 42 for x in lasts)}; latest {max(lasts):.1f} days; checks with a trade only in the tester "
+                  f"{sum(1 for _, r in res if r['only_tv'])}, with a trade on the other side {sum(1 for _, r in res if r['other_side'])}")
+            for now_ms, r in worst:
+                if r["last_days"]:
+                    print(f"            checked {when(now_ms)}: {line(r)}")
+    return summary
 
 
 def run(res_dir):
@@ -198,9 +250,12 @@ def run(res_dir):
         exits_on_chart_candles(name, tf, ep, cs, F.SEARCH[0], F.SEARCH[1], "exits, search window")
         exits_on_chart_candles(name, tf, ep, cp, fin["eval"].get("pre_from", F.PRESAMPLE[0]), F.PRESAMPLE[1], "exits, untouched period")
         rows = list(csv.DictReader(open(os.path.join(res_dir, f"trades_BTCUSDT_{name}.csv"))))
-        listed = {sweep.ms(r["entry_utc"]): (1 if r["side"] == "long" else -1) for r in rows if r["period"] == "search"}
+        listed = {per: {sweep.ms(r["entry_utc"]): (1 if r["side"] == "long" else -1) for r in rows if r["period"] == per} for per in ("search", "untouched")}
         hold = max((sweep.ms(r["exit_utc"]) - sweep.ms(r["entry_utc"])) / 86_400_000 for r in rows)
-        limited_history(name, tf, ep, cs[0], listed, hold)
+        print(f"   longest trade of the list: {hold:.1f} days")
+        deep_backtesting(name, tf, ep, listed)
+        ft_full = cs[0]
+        ordinary_chart(name, tf, ep, listed["search"], (ft_full, E.zone_array(ft_full, tf, ep)))
         print(flush=True)
 
 

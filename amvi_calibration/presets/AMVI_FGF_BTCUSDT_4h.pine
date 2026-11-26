@@ -1,13 +1,17 @@
 //@version=6
 // =====================================================================================
 // AMVI Full MTF Strategy (direction filter, closed-candle engine): BTCUSDT.P 4h
-// STATUS: USABLE (grade 2 of 5): test with alerts first; small size at most. For the
-//         4h chart of BTCUSDT.P only. Not yet run on TradingView: first check that its
-//         trade list matches (see CHECK), then alerts only for about 20 trades before
-//         any money (REPORT.md, What I would do).
+// STATUS: USABLE (grade 2 of 5, 1 = best): test with alerts first; small size at most.
+//         For the 4h chart of BTCUSDT.P only. Not yet run on TradingView: first check
+//         that its trade list matches (see CHECK), then alerts only for about 20
+//         trades, to see that they match the tester (not to judge profit); money only
+//         after that, and not before your lab's "go live" (REPORT.md, What I would
+//         do).
 // -------------------------------------------------------------------------------------
-// RESULT: 2021-01 to 2023-10, NOT used for choosing: +21.4R (84% of it in 2023), 69
-//         trades, largest drawdown 8.3R; +18.9R at double commission.
+// RESULT: 2021-01 to 2023-10, NOT used to choose the inputs: +21.4R (84% of it in
+//         2023), 69 trades, largest drawdown 8.3R; +18.9R at double commission. This
+//         file exists only because that result was good, so expect less (REPORT.md,
+//         section 1, point 4).
 //         2023-11 to 2026-10, used for choosing (so flattered): +35.2R, 100 trades,
 //         largest drawdown 5.7R.
 //         1R = the amount risked per trade = 0.5% of the account with this file's
@@ -20,22 +24,26 @@
 // TESTER: TradingView's Strategy Tester (Bar detalization on its default, the former
 //         Bar Magnifier off) should show about 100 trades, 59% profitable, profit
 //         factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31;
-//         TradingView can replay this file only from about 2024-01-19: from then about
-//         94 trades, 61% profitable, net profit about +17%. It shows money, not R, and
-//         only the candles your plan loads (for this file Deep Backtesting reaches no
-//         further back on plans up to Premium, which keep about 100,000
-//         lower-timeframe candles; Ultimate is documented with 200,000, not checked).
+//         TradingView can replay this file only from about 2024-01-19 (as of
+//         2026-11-26; a day later every day): from then about 94 trades, 61%
+//         profitable, net profit about +17%. It shows money, not R, and only the
+//         candles your plan loads (for this file Deep Backtesting reaches no further
+//         back on plans up to Premium, which keep about 100,000 lower-timeframe
+//         candles; Ultimate is documented with 200,000, not checked).
 // CHECK:  amvi_calibration/results/trades_BTCUSDT_4h.csv (UTC times, Binance prices):
-//         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides.
-//         Change no input. Surest: Deep Backtesting (Premium and above) with "Limit
-//         Backtest Date Range" on, 2023-11-01 to 2026-10-31. This file reads
-//         lower-timeframe candles, which the tester has only from about 2024-01-19
-//         (TESTER): compare from two weeks after that date. On an ordinary chart the
-//         start differs, because the script has no history before the chart's first
-//         candle: REPORT.md, section 9, says how much to skip. Where stop and target
-//         lie inside one candle the tester can take the other exit: walked on chart
-//         candles this record would be +32.9R instead of +35.2R. Details: REPORT.md,
-//         section 9.
+//         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides, up
+//         to 2026-10-31 (the list ends there). Change no input. Surest: Deep
+//         Backtesting (Premium and above) over a period from 2023-05-01 to 2026-10-31,
+//         with "Limit Backtest Date Range" on, 2023-11-01 to 2026-10-31. The range
+//         only blocks entries; the six months before it give the script its history.
+//         This file reads lower-timeframe candles, of which the tester keeps about
+//         100,000 (plans up to Premium): on 2026-11-26 they start about 2024-01-19, a
+//         day later every day (the day you check minus about 1,042 days). Compare from
+//         two weeks after that start. On an ordinary chart the start differs, because
+//         the script has no history before the chart's first candle: REPORT.md,
+//         section 9, says how much to skip. Where stop and target lie inside one
+//         candle the tester can take the other exit: walked on chart candles this
+//         record would be +32.9R instead of +35.2R. Details: REPORT.md, section 9.
 // RECORD: amvi_calibration/REPORT.md, section 7, 4h. Record date 2026-11-26. Numbers
 //         come from a Python copy of this script, not from TradingView.
 //

@@ -48,7 +48,7 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | `test_lookahead.py` | prices after a time T replaced by another path: nothing the engine shows for candles closed by T may change |
 | `test_fine.py` | the second-by-second order walk against walking every single second |
 | `seconds_coverage.py` | how completely the one-second bars cover the 1-minute bars |
-| `tester_view.py` | what TradingView's tester will show differently from a file's trade list: exits on chart candles, and entries at the start of a chart's limited history |
+| `tester_view.py` | what TradingView's tester will show differently from a file's trade list: exits on chart candles, the Deep Backtesting check (period against date range), and entries at the start of an ordinary chart for every plan size, with and without the filter's earlier history |
 | `run_all.sh` | everything, in order |
 
 ## Conventions

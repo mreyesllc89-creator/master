@@ -628,12 +628,12 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 - With 0.5% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about +17.6% in three years with a worst drawdown of about 2.8% (no compounding), and the untouched period about +10.7% with a worst drawdown of 4.1%. The stop is 2.33% of price on average, so 0.5% risk asks for about 0.2x leverage.
 - Costs (search window): Bitget 0.06% +34.3R; no costs +40.0R; stressed +30.5R; break-even commission 0.422% per side. Fees took 4.7R and funding +0.0R.
 - Price path (search window): second by second +35.2R; on 1-minute bars +35.2R; on the chart's candles +32.9R.
-- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 100 trades, 59% profitable, profit factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31; TradingView can replay this file only from about 2024-01-19: from then about 94 trades, 61% profitable, net profit about +17%.
+- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 100 trades, 59% profitable, profit factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31; TradingView can replay this file only from about 2024-01-19 (as of 2026-11-26; a day later every day): from then about 94 trades, 61% profitable, net profit about +17%.
 - The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.5R on average (68% of them made money; positive in 96.6% of resamples of the months): pass. Random groups with the candidates' trade directions (3 of 25 inverted) made +11.9R on average; the candidates do not beat 95% of such groups, so the choice adds nothing measurable beyond the direction.
 - Not fragile: 100% of 30 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +13.2R, all others +22.1R; positive in 99.8% of resamples of its weeks.
 - Same inputs, other trade direction: -31.0R.
-- This setting reads 15m candles from a 4h chart. TradingView keeps about 100,000 candles of a lower timeframe per request, so its tester can replay it only back to about 2024-01-19; earlier trades of this record cannot be checked there.
+- This setting reads 15m candles from a 4h chart. TradingView keeps about 100,000 candles of a lower timeframe per request on plans up to Premium (Ultimate is documented with 200,000; not checked), so on those plans its tester can replay it only back to about 2024-01-19 as of 2026-11-26, a day later for every later day (the day you check minus about 1,042 days); earlier trades of this record cannot be checked there.
 
 | Input | Shipped | This file |
 |---|---|---|
