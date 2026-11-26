@@ -9,6 +9,10 @@ window with the orders filled on the second-by-second path. Net of 0.05 % per si
 funding. Also runs the 1-minute walk and the chart-candle walk of every version: how much a
 coarser price path flatters the trailing stop.
 
+"The best pair" is the largest of 42 noisy numbers, so it is chosen on one random half of the
+settings and read on the other half. A setting counts as better / unchanged / worse with a
+pair by its own net R with and without it.
+
 Writes results/trailing_<tf>m.json.
 """
 import json
@@ -68,7 +72,9 @@ def run(chart_tf, res_dir, n_settings=300, seed=5, procs=4):
     base = np.array([r["base"] for r in res])            # h1, h2, n
     base_tot = base[:, 0] + base[:, 1]
     base_both = (base[:, 0] > 0) & (base[:, 1] > 0)
-    good = base_tot > 0
+    # a fair reading of "the best pair": chosen on one random half of the settings, read on the other
+    half = np.zeros(len(res), bool)
+    half[rng.permutation(len(res))[: len(res) // 2]] = True
     grid = []
     for a in ACTS:
         for o in OFFS:
@@ -78,30 +84,41 @@ def run(chart_tf, res_dir, n_settings=300, seed=5, procs=4):
             vc = np.array([r["var_chart"][key] for r in res])
             tot = v[:, 0] + v[:, 1]
             dlt = tot - base_tot
+            both = (v[:, 0] > 0) & (v[:, 1] > 0)
             n = np.maximum(v[:, 2], 1)
             grid.append(dict(act=a, off=o,
-                             share_both=float(((v[:, 0] > 0) & (v[:, 1] > 0)).mean()),
+                             share_both=float(both.mean()), share_both_a=float(both[half].mean()), share_both_b=float(both[~half].mean()),
                              share_positive=float((tot > 0).mean()),
-                             share_improved=float((dlt > 0).mean()),
+                             share_better=float((dlt > 1e-9).mean()), share_worse=float((dlt < -1e-9).mean()),
+                             share_unchanged=float((np.abs(dlt) <= 1e-9).mean()),
                              median_change=float(np.median(dlt)), mean_change=float(dlt.mean()),
-                             median_change_good=float(np.median(dlt[good])) if good.sum() >= 10 else None,
-                             share_improved_good=float((dlt[good] > 0).mean()) if good.sum() >= 10 else None,
                              trades_ratio=float(np.median(v[:, 2] / np.maximum(base[:, 2], 1))),
                              # how much a coarser path flatters the same version, in R per trade
                              flatter_1m=float(np.mean(((v1[:, 0] + v1[:, 1]) - tot) / n)),
                              flatter_chart=float(np.mean(((vc[:, 0] + vc[:, 1]) - tot) / n)),
                              share_both_1m=float(((v1[:, 0] > 0) & (v1[:, 1] > 0)).mean()),
                              share_both_chart=float(((vc[:, 0] > 0) & (vc[:, 1] > 0)).mean())))
-    out = dict(chart_tf=chart_tf, settings=int(len(res)), good=int(good.sum()),
-               base_share_both=float(base_both.mean()), base_share_positive=float((base_tot > 0).mean()),
-               base_median_total=float(np.median(base_tot)), base_median_trades=float(np.median(base[:, 2])), grid=grid)
+    best_a = max(grid, key=lambda g: (g["share_both_a"], g["median_change"]))
+    out = dict(chart_tf=chart_tf, settings=int(len(res)),
+               base_share_both=float(base_both.mean()), base_share_both_b=float(base_both[~half].mean()),
+               base_share_positive=float((base_tot > 0).mean()),
+               base_median_total=float(np.median(base_tot)), base_median_trades=float(np.median(base[:, 2])),
+               grid_median_share_both=float(np.median([g["share_both"] for g in grid])),
+               pairs_above_base=int(sum(g["share_both"] > base_both.mean() for g in grid)), pairs=len(grid),
+               best_pair=dict(act=best_a["act"], off=best_a["off"], share_where_chosen=best_a["share_both_a"],
+                              share_other_half=best_a["share_both_b"], base_other_half=float(base_both[~half].mean())),
+               grid=grid)
     json.dump(out, open(os.path.join(res_dir, f"trailing_{chart_tf}m.json"), "w"))
-    best = sorted(grid, key=lambda g: -g["share_both"])[:5]
+    bp = out["best_pair"]
     print(f"chart {chart_tf}m: {len(res)} settings; without trailing {out['base_share_both'] * 100:.1f}% positive in both halves "
           f"({out['base_share_positive'] * 100:.1f}% positive overall, median {out['base_median_total']:+.1f}R)")
-    for g in best:
-        print(f"  activation {g['act']} ATR, offset {g['off']} ATR: {g['share_both'] * 100:.1f}% positive in both halves, improves {g['share_improved'] * 100:.0f}% of settings, "
-              f"median change {g['median_change']:+.1f}R; chart-candle walk would show {g['share_both_chart'] * 100:.1f}% ({g['flatter_chart']:+.3f}R per trade flattered)")
+    print(f"  with trailing, median of the {len(grid)} pairs: {out['grid_median_share_both'] * 100:.1f}%; {out['pairs_above_base']} of {len(grid)} pairs are above no trailing")
+    print(f"  best pair chosen on half the settings: activation {bp['act']} / offset {bp['off']} ({bp['share_where_chosen'] * 100:.1f}% there); "
+          f"on the other half {bp['share_other_half'] * 100:.1f}% against {bp['base_other_half'] * 100:.1f}% without trailing")
+    for g in sorted(grid, key=lambda g: -g["share_both"])[:4]:
+        print(f"  activation {g['act']} ATR, offset {g['off']} ATR: {g['share_both'] * 100:.1f}% positive in both halves; better for {g['share_better'] * 100:.0f}%, "
+              f"unchanged {g['share_unchanged'] * 100:.0f}%, worse {g['share_worse'] * 100:.0f}% of settings, median change {g['median_change']:+.1f}R; "
+              f"chart-candle walk would show {g['share_both_chart'] * 100:.1f}% ({g['flatter_chart']:+.3f}R per trade flattered)")
 
 
 if __name__ == "__main__":

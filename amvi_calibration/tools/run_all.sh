@@ -40,18 +40,22 @@ for tf in 240 60 30 15 10 5 3 2 1; do
     python3 plateau.py "$tf" "$RES" > "$RES/plateau_${tf}m.txt"
 done
 
-# 5. studies that choose nothing: the selection method on the untouched period, the trailing
-#    stop, the inputs one by one, what luck alone would produce
-python3 untouched_check.py "$RES" > "$RES/untouched_check.txt"
-for tf in 240 60 30 15 10 5 3 2 1; do
-    python3 trailing_study.py "$tf" "$RES" > "$RES/trailing_${tf}m.txt"
-done
+# 5. studies that choose nothing: the inputs one by one, the selection method on the untouched
+#    period, what luck alone would produce, the trailing stop
 python3 inputs_summary.py "$RES" > /dev/null
+python3 untouched_check.py "$RES" > "$RES/untouched_check.txt"
 for tf in 240 60 30 15 10 5 3 2 1; do
     python3 luck.py "$tf" "$RES" 1000 > "$RES/luck_${tf}m.txt"
 done
+for tf in 240 60 30 15 10; do
+    python3 trailing_study.py "$tf" "$RES" 300 5 > "$RES/trailing_${tf}m.txt"
+done
+for tf in 5 3 2 1; do
+    python3 trailing_study.py "$tf" "$RES" 200 5 > "$RES/trailing_${tf}m.txt"
+done
 
-# 6. final evaluation, verdicts, calibrated files, trade lists, tables, chart
+# 6. final evaluation, verdicts, calibrated files, trade lists, tables, charts, report
 python3 report.py "$RES" > "$RES/report_run.log"
 python3 charts.py "$RES"
 python3 convergence.py "$RES" > "$RES/convergence.txt"
+python3 assemble_report.py ..

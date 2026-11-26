@@ -69,7 +69,9 @@ def max_drawdown(r):
     return float((np.maximum.accumulate(np.maximum(eq, 0.0)) - eq).max())
 
 
-def stats(tr, chart_tf=None):
+def stats(tr, chart_tf=None, period=None):
+    """period = (start, end): 'months' is then every calendar month of the period (a month
+    without a trade is a month that was not positive); without it, the months with a trade."""
     r = tr["r"]
     n = int(r.size)
     if n == 0:
@@ -79,9 +81,10 @@ def stats(tr, chart_tf=None):
     t = pd.to_datetime(tr["entry_t"], unit="ms")
     ym = t.year * 100 + t.month
     months = pd.Series(r).groupby(np.asarray(ym)).sum()
+    n_months = sweep.n_months(sweep.ms(period[0]), sweep.ms(period[1])) if period else int(months.size)
     s = dict(n=n, n_long=int((tr["dir"] > 0).sum()), n_short=int((tr["dir"] < 0).sum()), total=float(r.sum()),
              avg=float(r.mean()), pf=float(wins / losses) if losses > 0 else 99.0, win=float((r > 0).mean()),
-             dd=max_drawdown(r), streak=longest_losing_streak(r), months=int(months.size),
+             dd=max_drawdown(r), streak=longest_losing_streak(r), months=int(n_months),
              months_pos=int((months > 0).sum()), best_trade=float(r.max()), worst_trade=float(r.min()),
              t_stat=float(r.mean() / r.std(ddof=1) * np.sqrt(n)) if n > 2 and r.std(ddof=1) > 0 else 0.0,
              fee_r=float(tr["fee_r"].sum()), fund_r=float(tr["fund_r"].sum()), gross=float(tr["gross"].sum()),
@@ -102,17 +105,20 @@ def stats(tr, chart_tf=None):
     return s
 
 
-def week_resample(tr, draws=5000, seed=7):
-    """Share of resamples (calendar weeks drawn with replacement) with a positive total."""
+def week_resample(tr, period, draws=5000, seed=7):
+    """Share of resamples (the period's calendar weeks drawn with replacement, weeks without a
+    trade included as zero) with a positive total."""
     r = tr["r"]
     if r.size == 0:
         return 0.0
-    wk = (tr["entry_t"] // (7 * 86_400_000)).astype(np.int64)
-    u, inv = np.unique(wk, return_inverse=True)
-    sums = np.zeros(u.size)
-    np.add.at(sums, inv, r)
+    W = 7 * 86_400_000
+    w0 = sweep.ms(period[0]) // W
+    w1 = (sweep.ms(period[1]) - 1) // W
+    sums = np.zeros(int(w1 - w0 + 1))
+    wk = np.clip((tr["entry_t"] // W).astype(np.int64) - w0, 0, sums.size - 1)
+    np.add.at(sums, wk, r)
     rng = np.random.default_rng(seed)
-    tot = sums[rng.integers(0, u.size, size=(draws, u.size))].sum(1)
+    tot = sums[rng.integers(0, sums.size, size=(draws, sums.size))].sum(1)
     return float((tot > 0).mean())
 
 
@@ -169,11 +175,11 @@ def evaluate(ctx_search, ctx_pre, chart_tf, p, light=False):
     ft, fund = ctx_search
     out = {}
     base = trades_for(ft, fund, chart_tf, p, *SEARCH, fee=BASE_FEE, slip=1)
-    out["base"] = stats(base, chart_tf)
+    out["base"] = stats(base, chart_tf, SEARCH)
     out["base"]["h1"], out["base"]["h2"], out["base"]["n_h1"], out["base"]["n_h2"] = halves(base, *SEARCH)
-    out["base"]["weeks_pos"] = week_resample(base)
+    out["base"]["weeks_pos"] = week_resample(base, SEARCH)
     st = trades_for(ft, fund, chart_tf, p, *SEARCH, fee=STRESS_FEE, slip=3)
-    out["stress"] = stats(st, chart_tf)
+    out["stress"] = stats(st, chart_tf, SEARCH)
     out["stress"]["h1"], out["stress"]["h2"], _, _ = halves(st, *SEARCH)
     if not light:
         out["by_year"] = by_year(base)
@@ -201,10 +207,10 @@ def evaluate(ctx_search, ctx_pre, chart_tf, p, light=False):
         out["pre_from"] = pre_from
         pre = trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=BASE_FEE, slip=1)
         out["_pre_trades"] = pre
-        out["pre"] = stats(pre, chart_tf)
-        out["pre"]["weeks_pos"] = week_resample(pre)
+        out["pre"] = stats(pre, chart_tf, (pre_from, PRESAMPLE[1]))
+        out["pre"]["weeks_pos"] = week_resample(pre, (pre_from, PRESAMPLE[1]))
         out["pre_by_year"] = by_year(pre)
-        out["pre_stress"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=STRESS_FEE, slip=3), chart_tf)
+        out["pre_stress"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=STRESS_FEE, slip=3), chart_tf, (pre_from, PRESAMPLE[1]))
         if not light:
             out["pre_tv_view"] = stats(trades_for(pf, pfund, chart_tf, p, pre_from, PRESAMPLE[1], fee=0.0006, slip=1, funding=False, walk="chart"), chart_tf)
             if p.get("trail"):

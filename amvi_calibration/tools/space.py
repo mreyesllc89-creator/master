@@ -207,8 +207,9 @@ def neighbours(p, chart_tf):
                 q = dict(p)
                 q["low"] = vals[j]
                 out.append(("low", q))
-    # the filter's own numeric inputs, where they are in use
-    steps = [("min_aligned", True)]
+    # the filter's own numeric inputs, where they are in use (minimum aligned zones and the
+    # TDI lengths are only read when the zone filter is on)
+    steps = [("min_aligned", True)] if p["use_zones"] else []
     if p["perm_candles"] > 0:
         steps.append(("perm_candles", True))
     if p["use_drift"]:
@@ -230,11 +231,12 @@ def neighbours(p, chart_tf):
             q = dict(p)
             q["conf"] = c
             out.append(("conf", q))
-    pair = (p["rsi_len"], p["fast_len"])
-    for other in (GRID["tdi"][1:] if pair == GRID["tdi"][0] else GRID["tdi"][:1]):
-        q = dict(p)
-        q["rsi_len"], q["fast_len"] = other
-        out.append(("tdi", q))
+    if p["use_zones"]:
+        pair = (p["rsi_len"], p["fast_len"])
+        for other in (GRID["tdi"][1:] if pair == GRID["tdi"][0] else GRID["tdi"][:1]):
+            q = dict(p)
+            q["rsi_len"], q["fast_len"] = other
+            out.append(("tdi", q))
     names = list(WEIGHTS)
     for wname in names:
         if wname != p.get("weights"):

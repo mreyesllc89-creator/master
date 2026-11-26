@@ -11,7 +11,7 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | Path | What it is |
 |---|---|
 | `REPORT.md` | findings, method, results per timeframe, caveats |
-| `presets/` | one `.pine` file per timeframe: the script with other input defaults |
+| `presets/` | a `.pine` file for every timeframe whose pick holds up on the untouched period: the script with other input defaults |
 | `results/` | hold-out and plateau tests, final numbers and trade lists per timeframe |
 | `tools/` | the Python copy of the script and the calibration steps |
 | `data/` | 1-minute bars and funding (not in git; `tools/fetch_1m.py` rebuilds it) |
@@ -28,15 +28,16 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | `space.py` | the search space: every input that changes a trade |
 | `sweep.py` | random search, one chart timeframe at a time |
 | `holdout.py` | does the best of one part of the window work on another part? |
-| `plateau.py` | are the neighbours of a candidate profitable too? Fixes the pick |
+| `plateau.py` | are the neighbours of a candidate profitable too (a screen against fragility)? Fixes the pick |
 | `untouched_check.py` | do the candidates of the search window beat random settings on 2021-2023? |
 | `trailing_study.py` | the same settings with and without a trailing stop, every activation and offset |
 | `inputs_summary.py` | the search's settings grouped by one input's value (`results/INPUTS.md`) |
 | `luck.py` | the same counts in no-skill worlds: what luck alone would produce |
 | `convergence.py` | the picks with orders walked on chart candles, 1-minute, 15s, 5s and 1s bars |
 | `final_eval.py` | all numbers for one setting, including the untouched 2021-2023 period |
-| `report.py` | verdict per timeframe, calibrated files, trade lists, tables |
-| `charts.py` | equity curves of the picks |
+| `report.py` | verdict per timeframe, calibrated files (PAPER-TRADE and better), trade lists, tables |
+| `charts.py` | equity curves of the picks; trade direction and cost per timeframe |
+| `assemble_report.py` | `REPORT.md` = the hand-written `REPORT_src.md` with the generated tables put in |
 | `make_pine.py` | writes a calibrated file: input defaults only, never the logic |
 | `test_orders.py` | hand-computed order scenarios |
 | `difftest.py`, `ref/` | the engine against two reference versions written independently from the Pine source |

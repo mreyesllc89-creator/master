@@ -5,8 +5,8 @@ usage: python untouched_check.py [results_dir] [n_random=400]
 For every chart timeframe: the candidates of the search window (positive in both halves at
 base and stressed costs, the 25 steadiest with distinct entries, from holdout_<tf>m.json) and
 a random sample of the sweep's settings (at least 30 trades in each half of the search window)
-are run over the untouched period 2021-01-01 to 2023-10-31, which no search and no selection
-ever saw. Net of 0.05 % per side, 1 tick and funding.
+are run over the untouched period 2021-01-01 to 2023-10-31, which the search and the selection
+do not use. Net of 0.05 % per side, 1 tick and funding.
 
 The test (the same three conditions as the hold-out tests inside the search window): the
 candidates' mean must be positive, above the 95th percentile of the mean of equally many
@@ -17,7 +17,10 @@ candidates (as many inverted and as many with-the-filter ones): did the search f
 beyond which direction to trade?
 
 This is a test of the selection method on a timeframe. It does not choose anything: the pick
-of a timeframe is fixed by plateau.py before this runs.
+of a timeframe is fixed by plateau.py before this runs, and no pick may ever be swapped using
+the numbers written here. "Above random settings" is the easy leg (random settings mostly
+bleed commission); being positive and staying positive when the months are resampled are the
+legs that bind.
 
 Writes results/untouched_<tf>m.json.
 """

@@ -15,10 +15,16 @@ In every world the same things are counted as on the real data:
   candidates     settings positive in both halves at base and stressed costs
   gap            share_both of the with-the-filter settings minus that of the inverted ones
   hold-out tests the three transfer tests of holdout.py: how often does luck pass them?
-  pick           the steadiest candidate: how often is it positive on the "untouched" months at
-                 base and stressed costs with at least 50 trades?
+  pick           the steadiest candidate (the stand-in for a timeframe's pick): what does it
+                 show on the search window, where it was chosen, and on the "untouched" months?
+                 How often does it meet each verdict's conditions on the untouched months
+                 (positive; positive at base and stressed costs with 50+ trades; that and
+                 positive in 90 % / 95 % of resamples of the months)?
   group test     untouched_check.py's test (candidates against random settings on the untouched
                  months): how often does luck pass it?
+
+The plateau leg of the verdicts is taken as passed (a lucky candidate passes it about nine
+times in ten), and months stand in for weeks in the resampling.
 
 Writes results/luck_<tf>m.json. A real count inside the luck-only range is no evidence of an
 edge; a real count far above it is.
@@ -87,15 +93,22 @@ def run(chart_tf, res_dir, n_worlds=300, seed=2026):
         o, both, cand, tst = counts(net, net_s, cw, inv, hashes, rng)
         # the pick (steadiest candidate) and the group test on the "untouched" months
         U, Us, nU = net[:, NS:], net_s[:, NS:], cw[:, NS:].sum(1)
-        o["pick_ok"] = False
-        o["group_pass"] = False
+        o.update(pick_pos=False, pick_ok=False, pick_ok90=False, pick_ok95=False, group_pass=False,
+                 pick_search=np.nan, pick_t=np.nan, pick_untouched=np.nan)
         if cand.any():
             worst_t = np.minimum(tst["h1"], tst["h2"])
             order = np.nonzero(cand)[0]
             order = order[np.argsort(-worst_t[order], kind="stable")]
             top = H.distinct_top(order, hashes, 25)
             p = top[0]
+            boot_p = float((U[p][rng.integers(0, NU, size=(DRAWS, NU))].sum(1) > 0).mean())
+            o["pick_pos"] = bool(U[p].sum() > 0)
             o["pick_ok"] = bool(U[p].sum() > 0 and Us[p].sum() > 0 and nU[p] >= 50)
+            o["pick_ok90"] = bool(o["pick_ok"] and boot_p >= 0.90)
+            o["pick_ok95"] = bool(o["pick_ok"] and boot_p >= 0.95)
+            o["pick_search"] = float(net[p, :NS].sum())
+            o["pick_t"] = float(worst_t[p])
+            o["pick_untouched"] = float(U[p].sum())
             pool = np.nonzero(both)[0]
             if pool.size >= 400:
                 rnd = rng.choice(pool, 400, replace=False)
@@ -111,14 +124,28 @@ def run(chart_tf, res_dir, n_worlds=300, seed=2026):
         v = np.array([w[key] for w in W], dtype=float)
         return dict(real=real[key], median=float(np.median(v)), p05=float(np.percentile(v, 5)), p95=float(np.percentile(v, 95)),
                     worlds_at_least=float((v >= real[key]).mean()))
+    def anytest(w):
+        return w["pass_h1_to_h2"] or w["pass_h2_to_h1"] or w["pass_walk_forward"] or w["group_pass"]
+
+    def q(key, pct):
+        v = np.array([w[key] for w in W], dtype=float)
+        v = v[~np.isnan(v)]
+        return float(np.percentile(v, pct)) if v.size else 0.0
     res = dict(chart_tf=chart_tf, worlds=n_worlds, real=real,
                share_both=dist("share_both"), candidates=dist("candidates"), gap=dist("gap"),
                gap_abs_at_least=float(np.mean([abs(w["gap"]) >= abs(real["gap"]) for w in W])),
+               # what the steadiest candidate of a no-skill world shows
+               pick=dict(search_median=q("pick_search", 50), search_p95=q("pick_search", 95), t_median=q("pick_t", 50), t_p95=q("pick_t", 95),
+                         untouched_median=q("pick_untouched", 50)),
                luck_pass=dict(h1_to_h2=float(np.mean([w["pass_h1_to_h2"] for w in W])), h2_to_h1=float(np.mean([w["pass_h2_to_h1"] for w in W])),
                               walk_forward=float(np.mean([w["pass_walk_forward"] for w in W])), group=float(np.mean([w["group_pass"] for w in W])),
-                              any=float(np.mean([w["pass_h1_to_h2"] or w["pass_h2_to_h1"] or w["pass_walk_forward"] or w["group_pass"] for w in W])),
+                              any=float(np.mean([anytest(w) for w in W])),
+                              pick_pos=float(np.mean([w["pick_pos"] for w in W])),
                               pick_ok=float(np.mean([w["pick_ok"] for w in W])),
-                              usable=float(np.mean([w["pick_ok"] and (w["pass_h1_to_h2"] or w["pass_h2_to_h1"] or w["pass_walk_forward"] or w["group_pass"]) for w in W]))))
+                              # the verdicts' conditions on the untouched months (plateau leg taken as passed)
+                              paper=float(np.mean([w["pick_ok90"] for w in W])),
+                              usable=float(np.mean([w["pick_ok95"] and anytest(w) for w in W])),
+                              recommended=float(np.mean([w["pick_ok95"] and w["pass_h1_to_h2"] and w["pass_h2_to_h1"] and w["pass_walk_forward"] and w["group_pass"] for w in W]))))
     json.dump(res, open(os.path.join(res_dir, f"luck_{chart_tf}m.json"), "w"))
     s, c, gp, lp = res["share_both"], res["candidates"], res["gap"], res["luck_pass"]
     print(f"chart {chart_tf}m, {n_worlds} no-skill worlds")
@@ -129,8 +156,11 @@ def run(chart_tf, res_dir, n_worlds=300, seed=2026):
           f"a gap at least this large either way in {res['gap_abs_at_least'] * 100:.0f}% of the worlds")
     print(f"  luck passes: first->second {lp['h1_to_h2'] * 100:.1f}%, second->first {lp['h2_to_h1'] * 100:.1f}%, walk-forward {lp['walk_forward'] * 100:.1f}%, "
           f"group test on the untouched months {lp['group'] * 100:.1f}%, at least one of the four {lp['any'] * 100:.1f}%")
-    print(f"  the steadiest candidate is positive on the untouched months at base and stressed costs with 50+ trades in {lp['pick_ok'] * 100:.0f}% of the worlds; "
-          f"that and at least one test: {lp['usable'] * 100:.1f}%", flush=True)
+    pk = res["pick"]
+    print(f"  the steadiest candidate of a no-skill world: search window {pk['search_median']:+.1f}R (95th percentile {pk['search_p95']:+.1f}R), "
+          f"worse-half steadiness t {pk['t_median']:.2f} (95th percentile {pk['t_p95']:.2f}); on the untouched months {pk['untouched_median']:+.1f}R")
+    print(f"  it is positive on the untouched months in {lp['pick_pos'] * 100:.0f}% of the worlds; at base and stressed costs with 50+ trades in {lp['pick_ok'] * 100:.0f}%; "
+          f"luck earns PAPER-TRADE or better in {lp['paper'] * 100:.1f}%, USABLE or better in {lp['usable'] * 100:.1f}%, RECOMMENDED in {lp['recommended'] * 100:.1f}%", flush=True)
 
 
 if __name__ == "__main__":
