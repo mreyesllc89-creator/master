@@ -469,7 +469,7 @@ ApexForge puts 1% of equity in each trade, so the figures are small.
 
 ### Review of the settings that passed
 
-**Under review, not confirmed.** Two ApexForge settings pass steps 1 to 5. Independent reviewers are attacking them now (step 6), and a second reviewer is re-implementing the rule on all 28 cells. Until that is in, treat both as unconfirmed: every earlier pick in this repository that passed its rule was later refuted at this step. No per-timeframe file has been made.
+**Both are refuted. Neither becomes a file.** Three independent reviews are in. Every number reproduces exactly (the replica, the runner, and brokers the reviewers wrote themselves). What fails is the claim that these are real edges.
 
 | | BTCUSD 5m | BTCUSD 4h |
 |---|---|---|
@@ -482,15 +482,40 @@ ApexForge puts 1% of equity in each trade, so the figures are small.
 | Same setting, direction flipped | -1.17% | -0.14% |
 | Stressed costs | +0.49% (+0.32% / +0.17%) | +0.22% (+0.09% / +0.13%) |
 | As TradingView would show it | +0.38% | +0.21% |
+| Verdict | **refuted** (two reviews) | **refuted** (one review) |
 
-Both are small because ApexForge puts 1% of equity in each trade. The 4h result rests on 82 trades, and on that timeframe only 136 settings have 30+ trades per half, so its hold-out says little.
+Both figures are small because ApexForge puts 1% of equity in each trade.
+
+**BTCUSD 5m, inverted, filter on**
+
+- **A search with no edge produces the same thing.** The reviewer flipped each day's trade direction at random on the whole grid, kept the costs, and applied the rule. It still passed 2.3% of the time, and the setting it then picked made a median +0.98%, more than the real +0.82%. Across the ApexForge cells about 1.4 passes are expected with no edge anywhere; 2 were observed.
+- **Not significant on its own.** t = 1.5 (second half 0.8). There is a 5-6% chance the true result is zero or less, and about 25% that one of the halves is.
+- **A handful of trades.** Without the 10 best of 1,109 trades it loses (-0.09%). The 12 trades that reached their target are 79% of the profit. The equity made no new high for 304 days.
+- **One timeframe only.** The same setting loses on BTC 1m (-1.05%), 15m (-0.10%) and 30m (-0.20%), and on gold 5m. On BTC 1m, 15m and 30m the normal direction is the better one, so the winning side flips between neighbouring timeframes.
+- **The hold-out's 40 settings are one bet.** They are 6-7 signal sets of one family that share two thirds of their entries.
+- **The signal candle is not the source.** Entering 20 candles (100 minutes) late makes about the same (+0.76%). With the filter off the setting loses (-0.49%).
+- **Thin against real fees.** It makes +0.16% at a fee of 0.05% per side and is negative at 0.075%. Half the trades are shorts.
+- **In its favour.** It sits on a smooth plateau, survives stressed costs and start or end dates moved by up to three months, and a setting chosen on the first half alone made +0.25% on the second. That is not enough to tell it apart from the best of a no-edge search.
+
+**BTCUSD 4h, normal, filter off**
+
+- **Not significant.** t = 1.4 (first half 0.8). Five trades carry +0.227% of the +0.244%. The equity made no new high for 419 of the 730 days.
+- **The signals carry no information.** After a signal, price does not move in its direction at any horizon tested. With the script's own exits (no trailing) the same signals lose at every Reward:Risk. The profit comes from the wide trailing stop.
+- **Random entries do as well.** With the same exits, 5.5-15% of random entries reach its result.
+- **Earlier years fail.** On the same exchange, the two years just before the window (never used in the calibration) make +0.03%, with halves +0.21% / -0.18%.
+- **One cell only.** The same setting loses on BTC 2h (-0.21%) and on gold 4h (-0.18%).
+- **What does hold** is execution: costs (break-even at 6.5 times our costs in the weaker half), entry slippage and the fill model do not break it.
+
+**Result of the calibration: no file.** On this data no setting of ApexForge or HRD, on any timeframe from 1m to 4h and in either direction, is defensible.
+
+A second review of the 4h setting and an independent re-implementation of the rule on all 28 cells were still running when this was written. This section will be updated if either changes a verdict.
 
 ### What it shows
 
 - **HRD: no setting passes on any timeframe of either pair, in either direction.** The best settings look large in-sample (BTC 15m inverted +110.6%, BTC 1h normal +140.3%), but settings chosen on one half lose on the other. On BTC 15m the 40 best of the first half made -14.2% in the second.
 - **HRD, closest to passing: BTC 1h.** The reverse hold-out passes (+19.2%, 95% positive), the forward one fails (only 40% positive).
 - **The direction is not an edge by itself.** For HRD, inverted has more candidates on BTC 1h and 2h and gold 1h and 4h; normal has more on BTC 15m, 30m and 4h and gold 30m and 2h. There is no consistent side.
-- **ApexForge on BTC 5m is the one place where the direction separates cleanly.** None of the 3,384 different normal results is positive in both halves; 264 inverted ones are. That is what the reviewers are testing.
+- **ApexForge on BTC 5m is the one place where the direction separates cleanly in-sample.** None of the 3,384 different normal results is positive in both halves; 264 inverted ones are. The review above shows why that is still not an edge: it does not hold on the neighbouring timeframes, and in the second half the inverted side is ahead in only 49% of the pairs.
 - **ApexForge on gold: inverted has more candidates from 5m to 4h, but none passes both hold-outs.** 5m and 30m pass forward and fail in reverse.
 - **1m: nothing.** On both strategies and both pairs, no setting (or one, on gold HRD) is positive in both halves on the 1-minute chart, in either direction.
 
