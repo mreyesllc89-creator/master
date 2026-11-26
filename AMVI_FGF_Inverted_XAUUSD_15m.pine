@@ -81,8 +81,51 @@
 //    equal to "Margin %". Order size is not used (S3 sizes every entry).
 //  - R results above do not depend on size. The % figures above were measured
 //    at the former size, 10% of equity per trade.
+//
+// CLOSED-CANDLE ENGINE (added 2026-11-26; not part of the calibration above)
+//  - Why: run on ticks (Properties -> Script executions -> "On realtime bar tick",
+//    "On history bar tick", "On order fill"), the script decided again on every
+//    price inside a candle: several entries, exits and reversals in one candle
+//    live, and other trades again after a reload, where TradingView replays a
+//    finished candle as a few prices while a lower-timeframe request already
+//    returns that candle's last intrabar (with a 1m filter on a 5m chart the
+//    level of a candle was its own final price: hindsight). The live chart and
+//    the reloaded chart could not agree.
+//  - Now every decision (entry, reversal, volatility exit, time stop) is taken
+//    once per candle, on its closing tick (barstate.isconfirmed), and filled at
+//    the next candle's open: at most one entry per candle, the same live and
+//    after a reload, whatever Script executions is set to. Keep only "On bar
+//    close" ticked there: it is all the script uses. If TradingView reports more
+//    than one closing execution for finished candles, closing ticks cannot be told
+//    from the others: the script then opens no trade and says so on the chart.
+//  - AMVI timeframes below the chart's (seconds, 1m on a 5m chart) are read at the
+//    candle close, where their last confirmed bar is the candle's last intrabar.
+//    (Before: the newest value live, a single intrabar of the candle on history,
+//    so the triggers of these timeframes moved after a reload.) TradingView keeps
+//    little seconds history: after a reload those timeframes are empty on older
+//    candles and their triggers are gone there.
+//  - Filter timeframe not above the chart's ("Chart", or 1m on a 5m chart): every
+//    candle closes together with a filter candle whose own signal moves the level
+//    to that very close, so a closed candle always read NO TRADE and only ticks
+//    could trade. There a candle is judged against the level that stood when it
+//    opened ("Check price on" = "Level at candle open", applied automatically).
+//    A filter timeframe above the chart's (the calibrated 60m on 15m) is unchanged.
+//  - The filter's parent timeframe, when above the filter timeframe (60m parent,
+//    1m filter), is read from its last closed bar, like a higher child zone.
+//    (Before: live it followed the bar still forming, so signals changed side
+//    inside the hour and came out different after a reload.) A parent equal to
+//    the filter timeframe (the calibrated 60m / 60m) is unchanged.
+//  - "Candles to wait after an entry" (default 0 = off) spaces entries further.
+//  - Still different after a reload: stops, targets and trailing stops fill inside
+//    candles, live on real ticks, on history on TradingView's replay of the candle
+//    (Properties -> Bar detalization), so an exit can land on another candle or
+//    price, and the trades that follow it can differ.
+//  - With the calibrated settings and "On bar close" this changes no trade: the
+//    backtest already decided once per closed candle, no enabled timeframe is
+//    below the 15m chart and the 60m filter is above it. From this date the code
+//    differs from AMVI_Full_MTF_Strategy_FGF.pine by this engine.
 // =====================================================================================
-strategy("AMVI FGF Inverted | XAUUSD 15m (calibrated, risk-sized)", shorttitle="AMVI XAU15 INV", overlay=false, precision=2,
+strategy("AMVI FGF Inverted | XAUUSD 15m (calibrated, risk-sized, closed-candle)", shorttitle="AMVI XAU15 INV CC", overlay=false, precision=2,
      initial_capital=10000, default_qty_type=strategy.fixed, default_qty_value=1,
      commission_type=strategy.commission.percent, commission_value=0.04, slippage=1, pyramiding=0,
      margin_long=1, margin_short=1)
@@ -102,12 +145,16 @@ strategy("AMVI FGF Inverted | XAUUSD 15m (calibrated, risk-sized)", shorttitle="
 //   4. SIZING    : "S3. Sizing": the quantity that loses Risk % of equity at the
 //                  stop, or a fixed quantity; capped at Max quantity and at the
 //                  available margin, rounded down to the quantity step.
+//   5. TIMING    : every decision is taken once per candle, when it closes, and is
+//                  filled at the next candle's open (closed-candle engine, header).
 // -------------------------------------------------------------------------------------
 // FGF build (2026-11-07): the FlashGold Direction Filter v1.2 is fused below, between
 // BEGIN and END FLASHGOLD DIRECTION FILTER, byte-identical to
 // FlashGold_Direction_Filter_v1_2.pine except FGF_FORCE_OVERLAY = true (this script
 // runs in its own pane, so the filter's shading, level lines, marks and status box
-// are drawn on the price chart). The filter IS the direction: the "Strategy -
+// are drawn on the price chart) and, since 2026-11-26, the "Level at candle open"
+// check and the parent read from its last closed bar (the lines marked "AMVI
+// fuse"; see CLOSED-CANDLE ENGINE). The filter IS the direction: the "Strategy -
 // Entries" inputs of the original (Trade Direction, Direction Filter EMA / Candle /
 // Donchian, EMA and Donchian lengths, Reverse on Opposite Signal) are removed. A
 // volatility trigger in the BUY ZONE goes long, in the SELL ZONE short, in NO TRADE
@@ -128,7 +175,7 @@ stdDevPeriod        = input.int(20, "StdDev Period", minval=1, group="Calculatio
 candleRangePeriod   = input.int(20, "Candle Range Period", minval=1, group="Calculation", tooltip="Calibrated for XAUUSD 15m (see the header).")
 normalizationPeriod = input.int(200, "Normalization Period", minval=1, group="Calculation")
 noRepaint           = input.bool(true, "Non-Repainting MTF Values (use last confirmed bar)", group="Calculation",
-     tooltip="Recommended for strategies. Uses the previous confirmed bar of each requested timeframe so backtest and live behave the same.")
+     tooltip="Recommended for strategies. Uses the previous confirmed bar of each requested timeframe so backtest and live behave the same. A timeframe below the chart's is always read at the candle close (its last confirmed bar there is the candle's last intrabar).")
 
 aatrWeight = input.float(0.35, "AATR Weight", minval=0.0, maxval=1.0, group="Weights")
 vrWeight   = input.float(0.25, "VR Weight", minval=0.0, maxval=1.0, group="Weights")
@@ -161,6 +208,9 @@ endTime       = input.time(timestamp("2099-12-31T00:00:00"), "End", group="Backt
 
 // --- Trade direction (same entries, optionally the other way round) ---
 amviTradeDir = input.string("Inverted", "Trade direction", options=["Follow the filter", "Inverted"], group="Trade direction", tooltip="Calibrated for XAUUSD 15m (see the header).")
+
+// --- Closed-candle engine (every decision is taken once per candle, when it closes) ---
+amviWait = input.int(0, "Candles to wait after an entry (0 = off)", minval=0, group="Closed-candle engine", tooltip="Every decision is taken once per candle, when it closes, and filled at the next candle's open: the same live and after a reload, whatever Properties -> Script executions is set to (keep only 'On bar close' ticked there). So there is at most one entry per candle. This also skips the triggers of that many candles after an entry; 0 = the very next candle may enter or reverse again.")
 
 // --- Strategy: Exits ---
 gEx = "Strategy - Exits"
@@ -211,7 +261,8 @@ fgfLvMode    = input.string("Signal close", "Level", options=["Entry price", "Si
 fgfLast      = input.string("Until next signal", "Permission lasts", options=["Until next signal", "Minutes", "Candles"], group=GRP_FGF, tooltip="Until next signal: the level stays in force until the next signal replaces it. Minutes / Candles: it also ends after that many minutes, or that many filter-timeframe candles counted from the signal candle (1 = the signal candle only); then nothing is allowed until the next signal.")
 fgfMinutes   = input.int(60, "Minutes", minval=1, group=GRP_FGF)
 fgfBars      = input.int(1, "Candles", minval=1, group=GRP_FGF)
-fgfCheck     = input.string("Tick", "Check price on", options=["Tick", "Candle open", "Candle close"], group=GRP_FGF, tooltip="When price is compared to the level. Tick: the live price, on every tick (closed candles keep their close). Candle open: each candle's open, decided on its first tick and fixed for the whole candle. Candle close: each candle's close, decided when it closes; while a candle is forming it is judged at its open with the last closed candle's close.")
+// AMVI fuse: the input is fgfCheckIn and has one more choice; fgfCheck, the check in force, is set below fgfTfSec
+fgfCheckIn   = input.string("Tick", "Check price on", options=["Tick", "Candle open", "Candle close", "Level at candle open"], group=GRP_FGF, tooltip="When price is compared to the level. Tick: the live price, on every tick (closed candles keep their close). Candle open: each candle's open, decided on its first tick and fixed for the whole candle. Candle close: each candle's close, decided when it closes; while a candle is forming it is judged at its open with the last closed candle's close. Level at candle open: the live price (closed candles keep their close) against the level that stood when the candle opened; a signal inside the candle counts from the next candle. It replaces Tick and Candle close whenever the filter timeframe is not above the chart's: there every candle closes together with a filter candle, whose own signal moves the level to that very close, so a closed candle would always read NO TRADE.")
 fgfBandAtr   = input.float(0.5, "No-trade band, ATR mult", minval=0.0, step=0.05, group=GRP_FGF, tooltip="Calibrated for XAUUSD 15m (see the header).")
 fgfAgainst   = input.bool(true, "Allow trading against the signal", group=GRP_FGF, tooltip="On: below a BUY signal's level the SELL ZONE allows sells (and above a SELL signal's level the BUY ZONE allows buys). Off: those zones are NO TRADE; only the signal's own direction is allowed, and only once price confirms it.")
 fgfAllowBuy  = input.bool(true, "Allow buys", inline="side", group=GRP_FGF)
@@ -248,13 +299,13 @@ fgfUseDrift     = input.bool(false, "Use prior drift filter", group=GRP_FGB)
 
 GRP_FGZ = "FlashGold signal: TDI trade zone"
 fgfUseZones   = input.bool(true, "Use TDI trade-zone filter", group=GRP_FGZ)
-fgfParentTf   = input.timeframe("60", "Parent obedience timeframe", group=GRP_FGZ, tooltip="Calibrated with the parent = the timeframe the signal runs on. Keep it equal to Filter timeframe: a parent above it reads its forming bar live, so it repaints.")
+fgfParentTf   = input.timeframe("60", "Parent obedience timeframe", group=GRP_FGZ, tooltip="Calibrated with the parent = the timeframe the signal runs on. A parent above the filter timeframe is read from its last closed bar, like a higher child zone ('Higher-TF zones use the last CLOSED bar'); with that switch off it reads its forming bar live, so it repaints.")
 fgfRsiLen     = input.int(14, "TDI RSI length", minval=2, group=GRP_FGZ)
 fgfFastLen    = input.int(2, "TDI white fast length", minval=1, group=GRP_FGZ)
 fgfMinAligned = input.int(0, "Minimum child zones aligned", minval=0, maxval=6, group=GRP_FGZ, tooltip="Calibrated for XAUUSD 15m (see the header).")
 fgfFlatParent = input.bool(false, "Allow trade if parent is flat", group=GRP_FGZ)
 fgfIgnoreNa   = input.bool(true, "Ignore zones without data", group=GRP_FGZ, tooltip="A child zone whose timeframe has no data on this candle is dropped from the active count instead of counting as MIX.")
-fgfHtfClosed  = input.bool(true, "Higher-TF zones use the last CLOSED bar", group=GRP_FGZ, tooltip="A child zone on a timeframe HIGHER than the filter timeframe is read from its last closed bar, so history and live agree. Off: such a zone reads its forming bar live, so it repaints.")
+fgfHtfClosed  = input.bool(true, "Higher-TF zones use the last CLOSED bar", group=GRP_FGZ, tooltip="A child zone (and the parent) on a timeframe HIGHER than the filter timeframe is read from its last closed bar, so history and live agree. Off: it reads its forming bar live, so it repaints.")
 fgfUseZ1 = input.bool(true, "Use child zone 1", group=GRP_FGZ)
 fgfZTf1  = input.timeframe("60", "Zone 1 timeframe", group=GRP_FGZ)
 fgfUseZ2 = input.bool(true, "Use child zone 2", group=GRP_FGZ)
@@ -271,6 +322,12 @@ fgfZTf6  = input.timeframe("2", "Zone 6 timeframe", group=GRP_FGZ)
 // The timeframe the signal runs on ("Chart" = the chart's own).
 string fgfTfEff = fgfTf == "" ? timeframe.period : fgfTf
 int    fgfTfSec = timeframe.in_seconds(fgfTfEff)
+// AMVI fuse: the check in force. A filter timeframe that is not above the chart's
+// closes a filter candle with every chart candle, and that candle's own signal
+// sets the level at the very close being judged: Tick and Candle close would read
+// NO TRADE on every closed candle. There the candle is judged against the level
+// that stood when it opened.
+string fgfCheck = fgfCheckIn != "Candle open" and fgfTfSec <= timeframe.in_seconds(timeframe.period) ? "Level at candle open" : fgfCheckIn
 
 // ===== FLASHGOLD SIGNAL =======================================================
 // The strategy's signal logic, unchanged. It runs on the filter timeframe
@@ -310,7 +367,9 @@ fgfSignal(int ctxSec) =>
     float midPrice   = (bidPx + askPx) * 0.5
 
     // TDI trade zone
-    int parentDir = request.security(syminfo.tickerid, fgfParentTf, fgfTdiDir(), barmerge.gaps_off, barmerge.lookahead_off)
+    // AMVI fuse: the parent is read like a child zone, so a parent above the timeframe the
+    // signal runs on comes from its last closed bar (fgfHtfClosed) and no longer repaints
+    int parentDir = fgfZoneDir(fgfParentTf, ctxSec)
     int z1Dir = fgfZoneDir(fgfZTf1, ctxSec)
     int z2Dir = fgfZoneDir(fgfZTf2, ctxSec)
     int z3Dir = fgfZoneDir(fgfZTf3, ctxSec)
@@ -504,9 +563,13 @@ string fgfTfTag = fgfTfText(fgfTfEff)
 //   Candle open   every bar at its open time (fixed from its first tick).
 //   Candle close  a closed bar at its close time; the live bar at its open
 //                 time, with the last closed candle's close (see fgfValue).
+//   Level at candle open  (AMVI fuse) every bar at its open time, as Candle
+//                 open, but the price compared is the live price (a closed
+//                 bar: its close).
 // Closed bars never repaint in any mode.
 bool fgfLiveBar = not barstate.isconfirmed
-bool fgfAtOpen  = fgfCheck == "Candle open" or (fgfCheck == "Candle close" and fgfLiveBar)
+// AMVI fuse: "Level at candle open" also takes the open-time clock
+bool fgfAtOpen  = fgfCheck == "Candle open" or fgfCheck == "Level at candle open" or (fgfCheck == "Candle close" and fgfLiveBar)
 // The close-time clock (Tick, and closed bars in Candle close). A live bar's
 // real clock never reaches the bar's close, nor the close of the filter
 // candle still forming (fp on a live bar), so a filter candle is never read
@@ -796,9 +859,16 @@ calc_amvi() =>
 
 // Disabled timeframes request the chart timeframe instead (cheap, never errors on
 // unsupported seconds timeframes) and return na so they never plot or count.
+// A timeframe below the chart's is read at the candle close, where its last confirmed
+// bar is the candle's last intrabar: the same value live and after a reload, and the
+// decisions are only taken there. (Before, it went through the lookahead request,
+// which on history returns one intrabar of the candle and live the newest value, so
+// the triggers of these timeframes moved after a reload.)
 get_mtf(simple string tf, simple bool on) =>
-    float v = request.security(syminfo.tickerid, on ? tf : timeframe.period, calc_amvi()[noRepaint ? 1 : 0],
-         gaps=barmerge.gaps_off, lookahead=noRepaint ? barmerge.lookahead_on : barmerge.lookahead_off)
+    bool below = on and timeframe.in_seconds(tf) < timeframe.in_seconds(timeframe.period)
+    bool lag   = noRepaint and not below
+    float v = request.security(syminfo.tickerid, on ? tf : timeframe.period, calc_amvi()[lag ? 1 : 0],
+         gaps=barmerge.gaps_off, lookahead=lag ? barmerge.lookahead_on : barmerge.lookahead_off)
     on ? v : na
 
 // --- Fetch MTF Data ---
@@ -839,12 +909,31 @@ bool trigger  = anyCross and hotCount >= minConfluence
 // long, in the SELL ZONE short; in NO TRADE (or before the first signal) nothing. A
 // trigger in the opposite zone reverses the position (strategy.entry reverses).
 // "Trade direction: Inverted" takes the same triggers the other way round.
+//
+// Closed-candle engine: a decision is taken only on a candle's closing tick, so it is
+// the same live and after a reload, and there is at most one per candle. Executions
+// inside a candle (Properties -> Script executions: realtime ticks, history ticks,
+// order fills) only keep the exit orders in place. amviCcDups counts the finished
+// candles that reported more than one closing execution: with those, closing ticks
+// cannot be told from the others, so no trade is opened and the chart says why.
+varip int amviCcBar  = -1
+varip int amviCcDups = 0
+if barstate.isconfirmed and barstate.ishistory
+    if bar_index == amviCcBar
+        amviCcDups += 1
+    amviCcBar := bar_index
+bool amviCcBad  = amviCcDups >= 3
+bool amviDecide = barstate.isconfirmed and not amviCcBad
+// "Candles to wait after an entry": the candle of the last entry signal
+var int amviLastEntryBar = na
+bool amviWaitOk = amviWait == 0 or na(amviLastEntryBar) or bar_index - amviLastEntryBar > amviWait
+
 bool inRange   = not useDateRange or (time >= startTime and time <= endTime)
 bool amviDirUp = fgfOn and fgfBuyOk and not fgfSellOk
 bool amviDirDn = fgfOn and fgfSellOk and not fgfBuyOk
 bool amviInv   = amviTradeDir == "Inverted"
-bool longSig   = trigger and (amviInv ? amviDirDn : amviDirUp) and inRange
-bool shortSig  = trigger and (amviInv ? amviDirUp : amviDirDn) and inRange
+bool longSig   = amviDecide and amviWaitOk and trigger and (amviInv ? amviDirDn : amviDirUp) and inRange
+bool shortSig  = amviDecide and amviWaitOk and trigger and (amviInv ? amviDirUp : amviDirDn) and inRange
 bool goLong    = longSig and strategy.position_size <= 0
 bool goShort   = shortSig and strategy.position_size >= 0
 
@@ -886,9 +975,11 @@ bool  enterShort = goShort and s3Qty > 0
 
 if enterLong
     entryAtr := atrX
+    amviLastEntryBar := bar_index
     strategy.entry("Long", strategy.long, qty=s3Qty, comment="AMVI L " + str.tostring(hotCount) + "TF")
 if enterShort
     entryAtr := atrX
+    amviLastEntryBar := bar_index
     strategy.entry("Short", strategy.short, qty=s3Qty, comment="AMVI S " + str.tostring(hotCount) + "TF")
 if goLong and not enterLong and strategy.position_size < 0
     strategy.close("Short", comment="Reverse (qty 0)")
@@ -923,12 +1014,18 @@ if hasBracket and (strategy.position_size < 0 or enterShort)
 
 // Volatility collapse exit (crossunder computed every bar for consistent history)
 bool volCollapse = ta.crossunder(avgAmvi, lowVolThreshold)
-if useVolExit and strategy.position_size != 0 and volCollapse
+if amviDecide and useVolExit and strategy.position_size != 0 and volCollapse
     strategy.close_all(comment="Vol Collapse")
 
 // Time stop
-if maxBars > 0 and strategy.opentrades > 0 and bar_index - strategy.opentrades.entry_bar_index(0) >= maxBars
+if amviDecide and maxBars > 0 and strategy.opentrades > 0 and bar_index - strategy.opentrades.entry_bar_index(0) >= maxBars
     strategy.close_all(comment="Time Stop")
+
+// The warning of the closed-candle engine (see amviCcDups above).
+var label amviCcWarn = na
+if barstate.islast and amviCcBad
+    label.delete(amviCcWarn)
+    amviCcWarn := label.new(bar_index, high, "AMVI opens no trades: this chart runs it inside finished candles.\nProperties > Script executions: keep only 'On bar close' ticked.", style=label.style_label_down, color=color.red, textcolor=color.white, size=size.normal, force_overlay=true)
 
 // =====================================================================================
 // PLOTS
