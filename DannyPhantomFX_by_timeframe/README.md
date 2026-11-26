@@ -74,3 +74,72 @@ The filter was rebuilt in Python and checked against TradingView: at the Pine de
 - v3 (commits 19384f7 and 4ed9157): first release, 9 files (XAUUSD 30m/45m/120m/240m, BTCUSD 15m/30m/60m/120m/240m).
 - v3.1 (this version), after the adversarial review: the permutation test also counts the top 40 as distinct entry-overlap clusters and plateaus ignore clones, which withdrew XAUUSD 120m and 240m (their top 40 were one or two clusters) and revised the BTCUSD picks (7 files); headers open with the fragility facts (the result without the 10 biggest trades, fee break-even, TradingView's 75-tick slippage report, weekend holds, exits); Points-mode distances were added to every file (calibrated where the Points exit rule passed, converted elsewhere) and the Risk % size was set by the reordered-drawdown rule. The Points timeframes without a file were also swept in Points mode; none passed.
 - Direction filter test (this version): the filter was rebuilt in Python, validated against TradingView and swept on all 14 timeframes; it stays off everywhere (see the section above).
+
+## Inverted direction (Update 1): results by timeframe on new data
+
+This section is separate from everything above. The files and tables above were calibrated in October on TradingView exports (OANDA / VANTAGE gold, Bitfinex BTC 2018-2019) that are no longer available here. Below, the **master file** [`DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine`](../DannyPhantomFX_V10_21_1_LiveSafe_FGF.pine) is run at its own defaults on the data used for the other strategies, with the new option off ("normal") and on ("inverted").
+
+- **Data.** BTCUSD: Bitstamp, 2024-11-17 to 2026-11-17. XAUUSD: Dukascopy, 2017-01-02 to 2018-06-19.
+- **Normal** is the file as it ships, which already has "Signal direction" at "Inverted (V10 design)". **Inverted** adds the Update 1 option on top. With the filter off, inverted gives the same trades as "Signal direction: Original".
+- **Sizing** is the file's own: risk 1% of equity per trade on a 2,000 account. A result of -100% means the account could no longer size a trade.
+- **"As TradingView shows"** uses the file's own Properties: 75 ticks of slippage per fill and 0.001% commission, on a 0.01-tick symbol. **"1-minute fills with our costs"** is the realistic figure: stop and target checked on 1-minute candles, gold $0.30 per ounce per round trip, BTC 0.02% per side + $0.20.
+- **How it was tested.** A new Python replica: two builds written independently agree on all 1.8 million trades of 1,016 test cases, and an audit against the Pine found one defect, on a switch that is not at its default, with no effect on any number here.
+
+### BTCUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 1,435 / 1,578 | +195,422% / +167,030% | -100.0% / **-100.0%** | -99.9% / -40.5% | 0.68 |
+| 1m | on | 1,208 / 1,233 | +227.1% / +1,245% | -100.0% / **-100.0%** | -99.9% / -33.1% | 0.59 |
+| 5m | off | 3,509 / 2,990 | +631.2% / +369.6% | -99.8% / **-99.8%** | -99.4% / -62.4% | 0.82 |
+| 5m | on | 2,495 / 2,598 | +25.4% / +489.5% | -99.2% / **-97.8%** | -87.1% / -82.9% | 0.84 |
+| 15m | off | 3,379 / 2,616 | -62.3% / +547.8% | -98.5% / **-61.8%** | -38.8% / -37.5% | 0.95 |
+| 15m | on | 1,389 / 1,334 | -72.8% / +81.1% | -93.1% / **-55.6%** | -23.8% / -41.7% | 0.92 |
+| 30m | off | 1,959 / 1,505 | +0.8% / -1.4% | -75.1% / **-64.2%** | -30.9% / -48.2% | 0.90 |
+| 30m | on | 1,030 / 904 | -3.7% / -5.0% | -54.3% / **-48.8%** | -33.8% / -22.6% | 0.88 |
+| 1h | off | 1,198 / 927 | -10.4% / +41.8% | -50.5% / **-10.8%** | -29.0% / +25.7% | 0.97 |
+| 1h | on | 779 / 631 | -42.4% / +47.7% | -60.6% / **+5.3%** | -3.8% / +9.4% | 1.02 |
+| 2h | off | 633 / 481 | +23.8% / -10.0% | -1.0% / **-28.1%** | +5.3% / -31.8% | 0.89 |
+| 2h | on | 425 / 345 | +51.5% / +11.9% | +30.2% / **-0.9%** | +17.3% / -15.5% | 1.00 |
+| 4h | off | 328 / 248 | +12.6% / +3.8% | +3.8% / **-1.6%** | -7.7% / +6.6% | 0.99 |
+| 4h | on | 216 / 176 | +15.2% / +14.8% | +9.3% / **+9.8%** | -2.2% / +12.3% | 1.09 |
+
+### XAUUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 1,517 / 1,605 | -100.0% / -100.0% | -100.0% / **-100.0%** | -100.0% / +0.0% | 0.46 |
+| 1m | on | 1,299 / 1,347 | -100.0% / -100.0% | -100.0% / **-100.0%** | -100.0% / +0.0% | 0.44 |
+| 5m | off | 0 / 0 | no trades | no trades | | |
+| 5m | on | 0 / 0 | no trades | no trades | | |
+| 15m | off | 2,492 / 1,900 | -100.0% / -100.0% | -99.6% / **-97.9%** | -90.2% / -78.9% | 0.71 |
+| 15m | on | 1,013 / 987 | -100.0% / -100.0% | -87.9% / **-85.0%** | -69.8% / -50.5% | 0.75 |
+| 30m | off | 1,208 / 872 | -100.0% / -99.9% | -88.8% / **-63.4%** | -29.4% / -48.2% | 0.87 |
+| 30m | on | 633 / 551 | -99.5% / -99.3% | -40.8% / **-67.2%** | -49.2% / -35.5% | 0.75 |
+| 1h | off | 615 / 453 | -95.2% / -88.6% | -24.8% / **-31.3%** | -5.9% / -27.1% | 0.91 |
+| 1h | on | 416 / 317 | -84.5% / -77.5% | -17.2% / **-6.5%** | +15.0% / -18.7% | 0.97 |
+| 2h | off | 357 / 273 | -81.0% / -56.8% | -36.7% / **-13.7%** | +24.8% / -30.8% | 0.94 |
+| 2h | on | 235 / 191 | -74.7% / -39.5% | -45.2% / **+13.2%** | +44.1% / -21.5% | 1.07 |
+| 4h | off | 178 / 132 | -55.2% / -25.5% | -30.9% / **+0.7%** | +15.2% / -12.6% | 1.01 |
+| 4h | on | 125 / 99 | -34.9% / -17.6% | -14.6% / **-4.0%** | +9.0% / -11.9% | 0.95 |
+
+Gold 5m takes no trade at the defaults: on that chart the file switches to its XAUUSD 5m preset, whose cost filter never passes on a 0.01-tick symbol.
+
+### What it shows
+
+- **Inverted is not positive in both halves on any timeframe.** Its positive totals (BTC 1h and 4h and gold 2h with the filter on, gold 4h with the filter off) each have one losing half.
+- **Two default cells are positive in both halves, both normal, both BTC with the filter on:** 2h (+30.2%, halves +10.0% / +18.4%, 425 trades) and 4h (+9.3%, halves +7.8% / +1.4%, 216 trades). These are single default runs, not tested by any hold-out.
+- **1m to 30m lose in both directions on both pairs.** With 1% risk per trade the costs wipe the account on the fastest charts.
+- **Inverted loses less than normal on most BTC charts up to 1h and on gold from 2h**, but it is not a consistent winner: on BTC 2h normal is far ahead.
+- **BTC 1m and 5m "as TradingView shows" are not results.** Both directions show large profits there, which no signal can explain. With this script's exits, random entries on a random side also profit on those charts when costs are near zero, and the file's 75 ticks are only $0.75 on a 0.01-tick BTC symbol.
+- **Gold "as TradingView shows" is negative everywhere** because $0.75 of slippage per fill is a large part of the stop distance on gold.
+
+### Limits
+
+- **Two TradingView behaviours could not be checked here, and they move the numbers.**
+  - The file runs again after every fill. The replica assumes TradingView then restores the script's variables to the previous candle, as its documentation describes. Under that reading "One entry per zone" and the cooldown have no effect. The other reading changes BTC 1h with the filter on from 779 trades / -42.4% to 648 / -39.2% in the TradingView view.
+  - About 15% of trades are re-entries on the candle where the stop or target closed the previous trade. The replica fills them at that candle's close. If TradingView fills them earlier in the candle, the normal direction gains a lot in its view (BTC 1h, filter off: -10.4% becomes about +160%) and the inverted one does not.
+- **The TradingView view depends on the symbol's tick.** 75 ticks is $0.75 on a 0.01 tick, $75 on a whole-dollar BTC symbol and $0.075 on a 0.001-tick gold symbol. Set Properties > Slippage to match your broker.
+- **Short windows and old gold data**, as for the other strategies. Gold volume is tick count.
+- These are the defaults only. The calibration of this file on the new data, with the direction as an input, is a separate run.
+- Nothing here was compiled or run in TradingView.
