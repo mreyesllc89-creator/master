@@ -38,6 +38,13 @@ W = os.path.dirname(os.path.abspath(__file__)) + '/'
 TFS = ['1', '5', '15', '30', '60', '120', '240']
 MIN_TR, TOPN, MIN_NB, NRAND, SEED = 30, 40, 5, 5000, 20261124
 DIR_NAMES = ('inv', 'apxinv', 'hrdinv', 'xpwinv', 'direction', 'inverted')
+# Strategy-specific extras.
+# REAL_DIR: a second input that also flips the traded side (before the gate). Neighbours must trade
+#   the same real side as the candidate; the direction control (step 5) still flips `inv` only.
+# CONTROLS: extra re-runs of a pick through --one (1-minute fills, our costs); each must stay
+#   positive in both halves.
+REAL_DIR = {'danny': ('signalDirection', 'Original (un-inverted)')}
+CONTROLS = {'danny': [('file sizing', ['--script-sizing']), ('one run per candle reading', ['--var-rollback', 'false'])]}
 KEEP = ('trades', 'net_pct', 'pf', 'win_pct', 'max_dd_pct', 'h1r_pct', 'h2r_pct', 'h1_trades', 'h2_trades',
         'avg_bars_held', 'exposure', 'long', 'short', 'long_trades', 'short_trades')
 
@@ -111,6 +118,9 @@ def brief(D, row):
     return out
 
 
+RD = None   # real traded side per row (set in analyze); None = the direction dimension alone
+
+
 def neighbours(C, D, jdir, i):
     c = C[i]
     both = (C >= 0) & (c >= 0)
@@ -119,7 +129,8 @@ def neighbours(C, D, jdir, i):
     for j, d in enumerate(D):
         if d.get('kind') == 'ordinal':
             bad |= diff[:, j] & (np.abs(C[:, j] - c[j]) != 1)
-    ok = (diff.sum(axis=1) == 1) & ~bad & ~diff[:, jdir]
+    same_side = ~diff[:, jdir] if RD is None else (RD == RD[i])
+    ok = (diff.sum(axis=1) == 1) & ~bad & same_side
     return np.flatnonzero(ok)
 
 
@@ -174,8 +185,8 @@ def nested(df, pool, C, D, jdir, a, b, ta):
             'twin_other_half': num(twin[b]) if twin is not None else None, 'why': why}
 
 
-def one(strat, pair, tf, p, path, cost):
-    r = subprocess.run([sys.executable, '-I', W + f'calib_{strat}.py', '--one', pair, tf, json.dumps(p), '--path', path, '--cost', cost],
+def one(strat, pair, tf, p, path, cost, extra=()):
+    r = subprocess.run([sys.executable, '-I', W + f'calib_{strat}.py', '--one', pair, tf, json.dumps(p), '--path', path, '--cost', cost, *extra],
                        capture_output=True, text=True, cwd=W)
     if r.returncode != 0:
         raise RuntimeError(r.stderr[-2000:])
@@ -188,6 +199,12 @@ def analyze(strat, pair, tf, D, default_p=None, verify=True):
     jdir = next(j for j, d in enumerate(D) if d['name'].lower() in DIR_NAMES)
     dname = 'p_' + D[jdir]['name']
     C = codes_of(df, D)
+    global RD
+    RD = None
+    if strat in REAL_DIR:
+        nm2, flipval = REAL_DIR[strat]
+        other = np.array([(not isna(x)) and x == flipval for x in df['p_' + nm2].to_numpy(dtype=object)])
+        RD = (C[:, jdir] == 1) ^ other
     df['worst'] = np.minimum(df.h1r_pct, df.h2r_pct)
     sig = (df.trades.astype(str) + '|' + df.net_pct.round(6).astype(str) + '|' + df.h1r_pct.round(6).astype(str) + '|' + df.h2r_pct.round(6).astype(str))
     df['sig'] = sig
@@ -294,6 +311,12 @@ def analyze(strat, pair, tf, D, default_p=None, verify=True):
                 reasons.append(f"stressed costs: halves {st['h1r_pct']:+.2f}% / {st['h2r_pct']:+.2f}%")
             if not res['pick_recheck_ok']:
                 reasons.append('the pick does not reproduce through --one')
+            res['pick_controls'] = {}
+            for cname, flags in CONTROLS.get(strat, []):
+                cx = one(strat, pair, tf, p, 'mag', 'ours', flags)
+                res['pick_controls'][cname] = {k: num(cx[k]) for k in ('net_pct', 'h1r_pct', 'h2r_pct', 'trades', 'pf')}
+                if not (cx['h1r_pct'] > 0 and cx['h2r_pct'] > 0):
+                    reasons.append(f"with the {cname}: halves {cx['h1r_pct']:+.2f}% / {cx['h2r_pct']:+.2f}%")
     else:
         reasons.append('no pick: ' + why)
     if not res['forward']['pass']:

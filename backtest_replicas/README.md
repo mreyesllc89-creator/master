@@ -12,6 +12,7 @@ TradingView cannot be run from here, so every result in the `*_by_timeframe` fol
 | `hrd.py` | HRD Full Divergence v1.03 + filter |
 | `xpw23.py` | XPW Orientation TDI v2.8 with the S2 / S3 exits (signals from `xpw.py`) |
 | `danny.py` | Danny Phantom FX V10.21.1 LiveSafe + filter |
+| `gvl.py` | GVLiveV2 Polymarket Pre-Candle + filter |
 | `run_*.py`, `run_inv_*.py` | Results by timeframe, normal and inverted direction |
 | `sweep*.py` | The trailing sweeps |
 | `calib_*.py` | The calibration grids and the selection rule (`calib_analyze.py`) |

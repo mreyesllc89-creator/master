@@ -26,20 +26,31 @@ def best(b):
     return f"{f(b['net_pct'])} ({f(b['h1r_pct'])} / {f(b['h2r_pct'])}, {int(b['trades'])} trades)"
 
 
+def nest(r):
+    out = []
+    for k in ('nested_fwd', 'nested_rev'):
+        x = r.get(k) or {}
+        out.append(f(x['other_half']) if 'other_half' in x else 'none')
+    return ' / '.join(out)
+
+
+NESTED = any('nested_fwd' in r for r in R.values())
 for pair in ('BTC', 'XAU'):
     print(f'\n#### {PN[pair]}\n')
-    print('| TF | Different results | Positive in both halves: normal / inverted | Typical result: normal / inverted | Best normal (halves, trades) | Best inverted (halves, trades) | Forward hold-out | Reverse hold-out | Verdict |')
-    print('|---|---|---|---|---|---|---|---|---|')
+    print('| TF | Different results | Positive in both halves: normal / inverted | Typical result: normal / inverted | Best normal (halves, trades) | Best inverted (halves, trades) | Forward hold-out | Reverse hold-out |' + (' Chosen on one half, result on the other: first to second / second to first |' if NESTED else '') + ' Verdict |')
+    print('|---|---|---|---|---|---|---|---|' + ('---|' if NESTED else '') + '---|')
     for tf in TFS:
         r = R.get(f'{pair}|{tf}')
         if not r:
             continue
         n, i = r['by_direction']['normal'], r['by_direction']['inverted']
-        if r['passes']:
+        ok = r.get('passes_c2', r['passes']) if NESTED else r['passes']
+        rs = r.get('reasons_c2', r['reasons']) if NESTED else r['reasons']
+        if ok:
             v = '**rule passed**: ' + r['pick']['setting']
         elif r['pick']:
-            v = 'no setting: ' + '; '.join(x.split(':')[0] for x in r['reasons'])
+            v = 'no setting: ' + '; '.join(dict.fromkeys(x.split(':')[0] for x in rs))
         else:
             v = 'no setting: ' + r['why_no_pick'].split(' (')[0]
         print(f"| {TFL[tf]} | {r['pool']:,} | {n['candidates']:,} / {i['candidates']:,} | {f(n['median_net_eligible'])} / {f(i['median_net_eligible'])} | "
-              f"{best(n['best_worst_half'])} | {best(i['best_worst_half'])} | {hold(r['forward'])} | {hold(r['reverse'])} | {v} |")
+              f"{best(n['best_worst_half'])} | {best(i['best_worst_half'])} | {hold(r['forward'])} | {hold(r['reverse'])} | " + (f"{nest(r)} | " if NESTED else '') + f"{v} |")

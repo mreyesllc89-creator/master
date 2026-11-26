@@ -47,3 +47,66 @@ Costs: gold $0.30 spread per round trip; BTC 0.02% fee per side + $0.20 spread p
 - v1 (commit 18f2f62): 14 files, one per pair and timeframe, per-timeframe picks with a single first-half hold-out.
 - v3 (commit 19384f7), after the first adversarial review: the replica booked trail exits beyond the target when the trail activation lay at or beyond it (the Pine fills the target first); the engine was fixed and those settings dropped (they had inflated the v1 XAUUSD 10m/15m/30m and BTCUSD 30m files by 34-73%). Random baselines became fair permutation tests, the hold-out had to pass both ways and the pick had to survive stressed costs. XAUUSD 10m/15m and BTCUSD 1m/15m were withdrawn; XAUUSD 30m/45m/120m and BTCUSD 120m became fallback files (10 files).
 - v3.1 (this version), after the second review: the permutation test also counts the top 40 as distinct entry-overlap clusters, plateaus ignore clones, fallback sets must sit on a plateau (XAUUSD 45m withdrawn, 9 files), headers open with the fragility facts, the OANDA/VANTAGE overlap dates in the gold 60m/120m/240m files were corrected, and the live one-bar-early time stop and TradingView's zero-cost report are stated.
+
+## Inverted direction (Update 1): results by timeframe on new data
+
+This section is separate from everything above. The files and tables above were calibrated in October on TradingView exports (OANDA / VANTAGE gold, Bitfinex BTC 2018-2019) that are no longer available here. Below, the **master file** [`GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine`](../GVLiveV2_Polymarket_PreCandle_Strategy_FGF.pine) is run at its own defaults on the data used for the other strategies, with the new option off ("normal") and on ("inverted").
+
+- **Data.** BTCUSD: Bitstamp, 2024-11-17 to 2026-11-17. XAUUSD: Dukascopy, 2017-01-02 to 2018-06-19.
+- **Defaults.** EMA 8 / 21, trend EMA 100, pre-candle arm on with "Market Next Candle", stop 1 x ATR, target 5R, no trailing, at most 3 losing trades per New York day. In this file the direction filter is off by default; both states are shown.
+- **Sizing** is the file's own: risk 1% of equity on a 100,000 account, at most 50 units. On gold every trade hits the 50-ounce cap, so the real risk is 0.01% to 0.24% of the account and the percentages are small. On BTC the 1% risk compounds, and -100% means the account could no longer size a trade.
+- **"As TradingView shows"** has no costs at all: the file's Properties are commission 0 and slippage 0. **"1-minute fills with our costs"** is the realistic figure: stop and target checked on 1-minute candles, gold $0.30 per ounce per round trip, BTC 0.02% per side + $0.20.
+- **How it was tested.** A new Python replica: two builds written independently agree on all 2.0 million trades of 1,440 test cases, and an auditor's own reference written from the Pine alone agrees on another 1.35 million trades and on every figure below. No defect was found.
+
+### BTCUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 915 / 1,000 | +740.7% / +810.3% | -100.0% / **-100.0%** | -100.0% / -41.6% | 0.51 |
+| 1m | on | 939 / 1,023 | +665.2% / +1,010.4% | -100.0% / **-100.0%** | -100.0% / -43.2% | 0.60 |
+| 5m | off | 2,688 / 2,530 | +872.6% / +235.6% | -100.0% / **-100.0%** | -99.4% / -99.2% | 0.71 |
+| 5m | on | 2,612 / 2,621 | +676.4% / +496.5% | -100.0% / **-100.0%** | -98.5% / -98.4% | 0.69 |
+| 15m | off | 2,107 / 1,985 | +298.3% / +220.8% | -91.1% / **-90.1%** | -90.5% / +4.0% | 0.84 |
+| 15m | on | 1,654 / 1,599 | +332.4% / +150.8% | -71.4% / **-82.9%** | -82.4% / -2.7% | 0.89 |
+| 30m | off | 1,275 / 1,228 | +82.5% / +16.6% | -55.4% / **-67.7%** | -69.6% / +6.1% | 0.90 |
+| 30m | on | 896 / 883 | +328.8% / +61.7% | +66.5% / **-35.4%** | -69.9% / +114.5% | 0.93 |
+| 1h | off | 741 / 663 | -52.2% / +6.3% | -71.9% / **-32.3%** | +16.3% / -41.8% | 0.95 |
+| 1h | on | 279 / 249 | -32.4% / -3.1% | -45.0% / **-19.2%** | -7.0% / -13.2% | 0.91 |
+| 2h | off | 359 / 373 | +48.1% / +11.2% | +25.2% / **-6.6%** | +17.6% / -20.6% | 0.98 |
+| 2h | on | 129 / 121 | -5.9% / +8.1% | -11.5% / **+2.1%** | +9.1% / -6.4% | 1.02 |
+| 4h | off | 155 / 170 | +42.0% / -24.7% | +35.2% / **-28.5%** | +1.1% / -29.3% | 0.80 |
+| 4h | on | 52 / 52 | +43.3% / -10.5% | +41.0% / **-11.9%** | -5.3% / -7.0% | 0.73 |
+
+### XAUUSD
+
+| TF | Filter | Trades normal / inverted | As TradingView shows: normal / inverted | 1-minute fills with our costs: normal / inverted | Inverted, both halves (1-minute fills, our costs) | PF inverted (same) |
+|---|---|---|---|---|---|---|
+| 1m | off | 1,649 / 1,642 | +1.6% / +1.0% | -23.2% / **-23.6%** | -11.8% / -13.3% | 0.31 |
+| 1m | on | 1,579 / 1,566 | -0.2% / +0.8% | -23.9% / **-22.7%** | -10.7% / -13.5% | 0.35 |
+| 5m | off | 1,482 / 1,471 | +0.3% / +0.7% | -22.0% / **-20.9%** | -9.1% / -13.0% | 0.61 |
+| 5m | on | 1,343 / 1,364 | +0.2% / -1.1% | -19.9% / **-21.6%** | -11.0% / -11.8% | 0.61 |
+| 15m | off | 993 / 1,000 | +4.4% / +5.2% | -9.5% / **-9.9%** | -7.9% / -2.1% | 0.85 |
+| 15m | on | 756 / 773 | +1.0% / +3.3% | -9.3% / **-8.3%** | -7.2% / -1.2% | 0.84 |
+| 30m | off | 603 / 584 | +2.5% / +10.0% | -6.6% / **+1.3%** | -1.9% / +3.2% | 1.02 |
+| 30m | on | 404 / 416 | +8.0% / +5.4% | +1.9% / **-0.8%** | -5.6% / +5.1% | 0.98 |
+| 1h | off | 329 / 325 | -0.1% / -1.1% | -5.1% / **-5.9%** | -0.2% / -5.7% | 0.86 |
+| 1h | on | 122 / 126 | +8.0% / +1.1% | +6.2% / **-0.8%** | -0.7% / -0.1% | 0.95 |
+| 2h | off | 193 / 188 | +3.7% / -9.6% | +0.8% / **-12.5%** | -7.7% / -5.1% | 0.63 |
+| 2h | on | 72 / 73 | +0.7% / +2.4% | -0.4% / **+1.3%** | +1.5% / -0.2% | 1.11 |
+| 4h | off | 84 / 88 | +6.5% / -8.4% | +5.3% / **-9.8%** | -5.9% / -4.1% | 0.56 |
+| 4h | on | 35 / 32 | +1.0% / +4.2% | +0.5% / **+3.7%** | +0.8% / +2.9% | 1.55 |
+
+### What it shows
+
+- **Normal is positive in both halves on four cells:** BTC 30m with the filter on (+66.5%, halves +53.3% / +8.6%, 896 trades), BTC 4h with the filter off (+35.2%, 155 trades) and on (+41.0%, 52 trades), and gold 1h with the filter on (+6.2%, 122 trades).
+- **Inverted is positive in both halves on one cell only:** gold 4h with the filter on (+3.7%, 32 trades). On BTC from 30m up, inverted is mostly worse than normal.
+- **These are single default runs,** several of them on few trades, and none has been through a hold-out test. The calibration with the direction as an input is a separate run.
+- **1m and 5m lose in both directions.** On BTC the costs wipe the account; on gold they cost 20% to 24%.
+- **BTC 1m to 15m "as TradingView shows" are not results.** Both directions show several hundred percent there with no costs, which no signal can explain: on those charts the stop is about the size of one candle and the backtest books it exactly at its level.
+
+### Limits
+
+- **Margin.** The file sets no margin, so TradingView's default of 100% applies, and on BTC most default positions below the 4h chart are larger than the account and would be refused. These results assume Properties > Margin is set low (about 1%), as the file's own sizing input assumes. Gold is not affected.
+- **One TradingView behaviour could not be checked here, and it moves its own report.** After a stop or target, the file can enter again on the same candle. The replica fills that entry at the next candle's open, which is what happens live. TradingView's backtest may fill it inside the exit candle at an extreme price, and would then show more profit than the figures above, most of all for inverted.
+- **The daily limit shapes the fast charts.** "3 losing trades per day" counts New York calendar days and is in force on about two thirds of the 5-minute candles, so the 1m and 5m results are mostly the hours after New York midnight.
+- Short windows and old gold data, as for the other strategies. Nothing here was compiled or run in TradingView.
