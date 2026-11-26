@@ -1,0 +1,19 @@
+chart 240m: 16000 rows, 8813 with enough trades in both halves, 36 months
+  before costs 50% of rows are positive; after fees and funding 32% (median -5.0R); positive in both halves 15.3%
+ ranked by steadiness:
+  first half -> second half: best-40 mean on the scored part -3.6R (30% positive; their steadiness t was 3.0 where chosen); random 40: mean -6.6R, p95 -2.2R; months resampled: positive in 17% of draws fail
+  second half -> first half: best-40 mean on the scored part -1.1R (45% positive; their steadiness t was 2.4 where chosen); random 40: mean -3.8R, p95 +0.8R; months resampled: positive in 16% of draws fail
+  walk-forward (2/3 -> last 1/3): best-40 mean on the scored part -2.6R (35% positive; their steadiness t was 3.0 where chosen); random 40: mean -4.2R, p95 -0.9R; months resampled: positive in 31% of draws fail
+ ranked by net R:
+  first half -> second half: best-40 mean on the scored part -28.4R (22% positive; they had +79.1R where chosen); random 40: mean -6.7R, p95 -2.3R; months resampled: positive in 3% of draws fail
+  second half -> first half: best-40 mean on the scored part +9.5R (68% positive; they had +68.5R where chosen); random 40: mean -3.8R, p95 +0.9R; months resampled: positive in 59% of draws fail
+  walk-forward (2/3 -> last 1/3): best-40 mean on the scored part -19.3R (20% positive; they had +84.6R where chosen); random 40: mean -4.2R, p95 -0.9R; months resampled: positive in 7% of draws fail
+  candidates positive in both halves at base and stressed fee: 751
+    row 12179: halves +11.5 / +11.3R (t 2.4 / 2.5), total +22.8R (stress +19.1R), 91 trades, DD 3.2R | tfs [15, 240, 1440] conf 2 high 60.0 f_tf 60 band 0.25 inv True sl 1.5 tp 1.5 trail False max_bars 24 wait 0
+    row 2473: halves +14.6 / +14.9R (t 2.7 / 2.0), total +29.4R (stress +21.1R), 209 trades, DD 4.1R | tfs [15, 1440] conf 1 high 70.0 f_tf 30 band 0.5 inv False sl 2.0 tp 2.0 trail False max_bars 6 wait 2
+    row 8799: halves +9.7 / +11.7R (t 1.9 / 2.0), total +21.4R (stress +19.3R), 137 trades, DD 5.6R | tfs [30, 60, 1440] conf 2 high 60.0 f_tf 30 band 2.0 inv False sl 4.0 tp 4.0 trail True max_bars 0 wait 0
+    row 10001: halves +22.4 / +12.9R (t 2.3 / 1.9), total +35.2R (stress +30.5R), 100 trades, DD 5.7R | tfs [15] conf 1 high 65.0 f_tf 1440 band 1.5 inv False sl 1.5 tp 2.0 trail False max_bars 0 wait 0
+    row 11343: halves +23.4 / +19.8R (t 2.1 / 1.9), total +43.2R (stress +26.7R), 429 trades, DD 5.2R | tfs [30] conf 1 high 50.0 f_tf 30 band 2.0 inv False sl 2.0 tp 2.0 trail True max_bars 6 wait 2
+    row 1432: halves +12.4 / +22.7R (t 1.7 / 1.9), total +35.0R (stress +30.2R), 194 trades, DD 6.6R | tfs [60] conf 1 high 55.0 f_tf 15 band 0.25 inv False sl 3.0 tp 0.0 trail True max_bars 0 wait 0
+    row 13585: halves +7.7 / +7.9R (t 1.6 / 2.8), total +15.6R (stress +12.4R), 248 trades, DD 2.6R | tfs [15] conf 1 high 60.0 f_tf 60 band 1.5 inv False sl 6.0 tp 2.0 trail True max_bars 0 wait 0
+    row 478: halves +4.0 / +6.0R (t 1.6 / 2.1), total +10.1R (stress +6.9R), 250 trades, DD 2.1R | tfs [60] conf 1 high 50.0 f_tf 1440 band 0.5 inv False sl 6.0 tp 1.0 trail False max_bars 0 wait 0

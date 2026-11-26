@@ -1,0 +1,9 @@
+chart 30m: 20 candidates, 579 neighbour backtests (39 took exactly the candidate's trades and are not counted)
+  row 7053: own halves +12.3 / +8.0R; 100% of 25 neighbours positive in both halves, their median worse-half steadiness t 1.27 (median worse half +6.9R, worst +1.3R); fragile: none
+  row 11394: own halves +7.9 / +6.5R; 97% of 30 neighbours positive in both halves, their median worse-half steadiness t 0.69 (median worse half +3.6R, worst -0.6R); fragile: weights
+  row 1659: own halves +3.9 / +5.0R; 95% of 21 neighbours positive in both halves, their median worse-half steadiness t 0.97 (median worse half +2.9R, worst -0.4R); fragile: max_bars
+  row 6717: own halves +52.8 / +77.8R; 94% of 18 neighbours positive in both halves, their median worse-half steadiness t 1.15 (median worse half +37.1R, worst -6.9R); fragile: tp
+  row 2820: own halves +7.6 / +5.7R; 93% of 29 neighbours positive in both halves, their median worse-half steadiness t 1.55 (median worse half +4.3R, worst -1.1R); fragile: conf, norm
+  row 14196: own halves +9.2 / +3.9R; 93% of 27 neighbours positive in both halves, their median worse-half steadiness t 1.30 (median worse half +4.3R, worst -2.2R); fragile: max_bars, norm
+  row 2734: own halves +9.5 / +6.0R; 93% of 28 neighbours positive in both halves, their median worse-half steadiness t 1.09 (median worse half +5.3R, worst -5.8R); fragile: band, min_aligned
+  row 14550: own halves +7.3 / +4.8R; 93% of 27 neighbours positive in both halves, their median worse-half steadiness t 1.03 (median worse half +3.5R, worst -1.3R); fragile: conf, trail_act
