@@ -35,24 +35,27 @@ of thousands of settings and is flattered by that choice.
 Best 40 = the 40 steadiest settings of one part of the search window, scored on another part. A test passes when their mean is
 positive, above 95% of random groups of 40, and stays positive in 95% of resamples of the months. The last column is the same test
 for the 25 steadiest candidates (12 on 1m), chosen on the whole search window and scored on the untouched period.
-The three "Positive" columns are shares of the settings with at least 30 trades in each half: 57,920 of the 110,000 tried.
+The three "Positive" columns are shares of the settings with at least 30 trades in each half and a trade in at least 60% of its
+months: 57,920 of the 110,000 tried. "Beaten" in the last column: the candidates' mean is above 95% of random groups with
+their own trade directions.
 
 | Chart | Settings tried | Positive before costs | Positive after costs | Positive in both halves | First half -> second (best 40) | Second -> first | Walk-forward (two years -> the third) | Search window -> untouched period (25 steadiest candidates) |
 |---|---|---|---|---|---|---|---|---|
-| 1m | 6,000 | 58% | 2% | 0.9% | -9.9R, 25% positive, 22% of resamples (fail) | -0.3R, 50% positive, 46% of resamples (fail) | -3.2R, 38% positive, 38% of resamples (fail) | +60.3R, 83% positive, 96.9% of resamples (pass); random settings of the same direction -1438.1R (beaten) |
-| 2m | 8,000 | 51% | 6% | 2.8% | -3.7R, 48% positive, 25% of resamples (fail) | +10.6R, 52% positive, 87% of resamples (fail) | +6.2R, 62% positive, 77% of resamples (fail) | +54.0R, 72% positive, 96.1% of resamples (pass); random settings of the same direction -50.2R (beaten) |
-| 3m | 8,000 | 52% | 6% | 3.3% | -5.0R, 40% positive, 12% of resamples (fail) | +3.3R, 60% positive, 61% of resamples (fail) | -1.1R, 50% positive, 35% of resamples (fail) | +18.6R, 80% positive, 98.7% of resamples (pass); random settings of the same direction -72.3R (beaten) |
-| 5m | 12,000 | 54% | 7% | 3.2% | -6.2R, 32% positive, 16% of resamples (fail) | +9.4R, 55% positive, 80% of resamples (fail) | -4.5R, 32% positive, 22% of resamples (fail) | +27.0R, 76% positive, 99.1% of resamples (pass); random settings of the same direction -150.2R (beaten) |
-| 10m | 12,000 | 51% | 13% | 6.3% | -4.3R, 35% positive, 3% of resamples (fail) | +1.1R, 50% positive, 56% of resamples (fail) | +0.7R, 48% positive, 59% of resamples (fail) | +25.3R, 80% positive, 99.5% of resamples (pass); random settings of the same direction -19.8R (beaten) |
-| 15m | 16,000 | 49% | 15% | 7.1% | -5.5R, 28% positive, 11% of resamples (fail) | -3.3R, 40% positive, 9% of resamples (fail) | -2.8R, 32% positive, 18% of resamples (fail) | +14.7R, 84% positive, 100.0% of resamples (pass); random settings of the same direction -16.1R (beaten) |
-| 30m | 16,000 | 50% | 19% | 8.6% | -5.0R, 42% positive, 20% of resamples (fail) | +2.2R, 57% positive, 80% of resamples (fail) | -6.3R, 35% positive, 20% of resamples (fail) | +12.1R, 84% positive, 93.2% of resamples (fail); random settings of the same direction -8.6R (not beaten) |
-| 1h | 16,000 | 51% | 23% | 9.9% | -2.0R, 45% positive, 37% of resamples (fail) | +0.9R, 55% positive, 79% of resamples (fail) | -2.8R, 32% positive, 26% of resamples (fail) | +17.1R, 92% positive, 99.6% of resamples (pass); random settings of the same direction +4.7R (beaten) |
-| 4h | 16,000 | 50% | 32% | 15.3% | -3.6R, 30% positive, 17% of resamples (fail) | -1.1R, 45% positive, 16% of resamples (fail) | -2.6R, 35% positive, 31% of resamples (fail) | +12.5R, 68% positive, 96.6% of resamples (pass); random settings of the same direction +11.9R (not beaten) |
+| 1m | 6,000 | 58% | 2% | 0.9% | -9.9R, 25% positive, 22% of resamples (fail) | -0.3R, 50% positive, 46% of resamples (fail) | -3.2R, 38% positive, 38% of resamples (fail) | +60.3R, 83% positive, 96.9% of resamples (pass); random settings of the same directions -1438.1R (beaten) |
+| 2m | 8,000 | 51% | 6% | 2.8% | -3.7R, 48% positive, 25% of resamples (fail) | +10.6R, 52% positive, 87% of resamples (fail) | +6.2R, 62% positive, 77% of resamples (fail) | +54.0R, 72% positive, 96.1% of resamples (pass); random settings of the same directions -50.2R (beaten) |
+| 3m | 8,000 | 52% | 6% | 3.3% | -5.0R, 40% positive, 12% of resamples (fail) | +3.3R, 60% positive, 61% of resamples (fail) | -1.1R, 50% positive, 35% of resamples (fail) | +18.6R, 80% positive, 98.7% of resamples (pass); random settings of the same directions -72.3R (beaten) |
+| 5m | 12,000 | 54% | 7% | 3.2% | -6.2R, 32% positive, 16% of resamples (fail) | +9.4R, 55% positive, 80% of resamples (fail) | -4.5R, 32% positive, 22% of resamples (fail) | +27.0R, 76% positive, 99.1% of resamples (pass); random settings of the same directions -150.2R (beaten) |
+| 10m | 12,000 | 51% | 13% | 6.3% | -4.3R, 35% positive, 3% of resamples (fail) | +1.1R, 50% positive, 56% of resamples (fail) | +0.7R, 48% positive, 59% of resamples (fail) | +25.3R, 80% positive, 99.5% of resamples (pass); random settings of the same directions -19.8R (beaten) |
+| 15m | 16,000 | 49% | 15% | 7.1% | -5.5R, 28% positive, 11% of resamples (fail) | -3.3R, 40% positive, 9% of resamples (fail) | -2.8R, 32% positive, 18% of resamples (fail) | +14.7R, 84% positive, 100.0% of resamples (pass); random settings of the same directions -16.1R (beaten) |
+| 30m | 16,000 | 50% | 19% | 8.6% | -5.0R, 42% positive, 20% of resamples (fail) | +2.2R, 57% positive, 80% of resamples (fail) | -6.3R, 35% positive, 20% of resamples (fail) | +12.1R, 84% positive, 93.2% of resamples (fail); random settings of the same directions -8.6R (beaten) |
+| 1h | 16,000 | 51% | 23% | 9.9% | -2.0R, 45% positive, 37% of resamples (fail) | +0.9R, 55% positive, 79% of resamples (fail) | -2.8R, 32% positive, 26% of resamples (fail) | +17.1R, 92% positive, 99.6% of resamples (pass); random settings of the same directions +4.7R (beaten) |
+| 4h | 16,000 | 50% | 32% | 15.3% | -3.6R, 30% positive, 17% of resamples (fail) | -1.1R, 45% positive, 16% of resamples (fail) | -2.6R, 35% positive, 31% of resamples (fail) | +12.5R, 68% positive, 96.6% of resamples (pass); random settings of the same directions +11.9R (not beaten) |
 
 ## The two trade directions on data the search never saw
 
 400 random settings of the search per timeframe (at least 30 trades in each half of the search window), run over the untouched
-period and split by trade direction; then the same split on the search window for all settings of the search.
+period and split by trade direction; then the same split on the search window for all settings of the search with at least 30
+trades in each half (58,800 of the 110,000).
 "Positive" = net result above zero over the whole period after 0.05% per side, 1 tick and funding. The last two columns:
 positive in both halves of the search window, after costs / before costs.
 
@@ -193,8 +196,8 @@ PAPER-TRADE because it made money on 2021-2023, which it was not chosen on, at b
 - Costs (search window): Bitget 0.06% +104.3R; no costs +124.5R; stressed +92.8R; break-even commission 0.424% per side. Fees took 14.3R and funding +3.0R.
 - Price path (search window): second by second +107.1R; on 1-minute bars +107.1R; on the chart's candles +107.1R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 145 trades, 18% profitable, profit factor about 1.8, net profit about +54% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 12 steadiest candidates made +60.3R on average (83% of them made money; positive in 96.9% of resamples of the months): pass. Random settings of the same trade direction made -1438.1R, so the choice adds something beyond the direction.
-- Not fragile: 88% of 25 neighbouring settings positive in both halves; sensitive to: Time Stop, Normalization Period, Take Profit.
+- The selection method on this timeframe, search window -> untouched period: the 12 steadiest candidates made +60.3R on average (83% of them made money; positive in 96.9% of resamples of the months): pass. Random groups with the candidates' trade directions (1 of 12 inverted) made -1438.1R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
+- Not fragile: 88% of 25 neighbouring settings positive in both halves; sensitive to: Time Stop; Normalization Period; Take Profit.
 - Concentration (search window): 10 biggest trades +207.5R, all others -100.4R; positive in 91.0% of resamples of its weeks.
 - Same inputs, other trade direction: -22.5R.
 
@@ -240,8 +243,8 @@ NOT RECOMMENDED because it does not hold up on 2021-2023 (it loses there at stre
 - Costs (search window): Bitget 0.06% +10.9R; no costs +17.1R; stressed +6.8R; break-even commission 0.166% per side. Fees took 5.2R and funding -0.0R.
 - Price path (search window): second by second +12.0R; on 1-minute bars +12.0R; on the chart's candles +12.0R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 97 trades, 86% profitable, profit factor about 1.7, net profit about +5% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +54.0R on average (72% of them made money; positive in 96.1% of resamples of the months): pass. Random settings of the same trade direction made -50.2R, so the choice adds something beyond the direction.
-- Not fragile: 92% of 25 neighbouring settings positive in both halves; sensitive to: No-trade band, ATR mult, Time Stop.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +54.0R on average (72% of them made money; positive in 96.1% of resamples of the months): pass. Random groups with the candidates' trade directions (4 of 25 inverted) made -50.2R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
+- Not fragile: 92% of 25 neighbouring settings positive in both halves; sensitive to: No-trade band, ATR mult; Time Stop.
 - Concentration (search window): 10 biggest trades +3.5R, all others +8.4R; positive in 99.5% of resamples of its weeks.
 - Same inputs, other trade direction: -22.4R.
 
@@ -293,8 +296,8 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 - Costs (search window): Bitget 0.06% +22.2R; no costs +29.0R; stressed +17.7R; break-even commission 0.258% per side. Fees took 5.6R and funding +0.1R.
 - Price path (search window): second by second +23.4R; on 1-minute bars +23.4R; on the chart's candles +23.4R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 79 trades, 58% profitable, profit factor about 2.1, net profit about +11% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +18.6R on average (80% of them made money; positive in 98.7% of resamples of the months): pass. Random settings of the same trade direction made -72.3R, so the choice adds something beyond the direction.
-- Not fragile: 93% of 28 neighbouring settings positive in both halves; sensitive to: Burst threshold, ATR mult, Min TFs Above High Vol.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +18.6R on average (80% of them made money; positive in 98.7% of resamples of the months): pass. Random groups with the candidates' trade directions (2 of 25 inverted) made -72.3R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
+- Not fragile: 93% of 28 neighbouring settings positive in both halves; sensitive to: Burst threshold, ATR mult; Min TFs Above High Vol.
 - Concentration (search window): 10 biggest trades +14.4R, all others +9.0R; positive in 99.6% of resamples of its weeks.
 - Same inputs, other trade direction: -24.3R.
 
@@ -352,7 +355,7 @@ NOT RECOMMENDED because it does not hold up on 2021-2023 (it lost there), althou
 - Costs (search window): Bitget 0.06% +15.2R; no costs +20.7R; stressed +11.6R; break-even commission 0.229% per side. Fees took 4.5R and funding +0.0R.
 - Price path (search window): second by second +16.1R; on 1-minute bars +16.1R; on the chart's candles +16.1R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 68 trades, 56% profitable, profit factor about 1.5, net profit about +8% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +27.0R on average (76% of them made money; positive in 99.1% of resamples of the months): pass. Random settings of the same trade direction made -150.2R, so the choice adds something beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +27.0R on average (76% of them made money; positive in 99.1% of resamples of the months): pass. Random groups with the candidates' trade directions (4 of 25 inverted) made -150.2R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
 - Not fragile: 96% of 28 neighbouring settings positive in both halves; sensitive to: Burst threshold, ATR mult.
 - Concentration (search window): 10 biggest trades +13.0R, all others +3.2R; positive in 96.0% of resamples of its weeks.
 - Same inputs, other trade direction: -26.8R.
@@ -410,8 +413,8 @@ NOT RECOMMENDED because it does not hold up on 2021-2023 (its gain there stays p
 - Costs (search window): Bitget 0.06% +13.6R; no costs +19.2R; stressed +10.2R; break-even commission 0.211% per side. Fees took 4.5R and funding +0.1R.
 - Price path (search window): second by second +14.5R; on 1-minute bars +14.5R; on the chart's candles +16.8R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 85 trades, 62% profitable, profit factor about 1.5, net profit about +8% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +25.3R on average (80% of them made money; positive in 99.5% of resamples of the months): pass. Random settings of the same trade direction made -19.8R, so the choice adds something beyond the direction.
-- Not fragile: 94% of 31 neighbouring settings positive in both halves; sensitive to: Candle Range Period, Time Stop.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +25.3R on average (80% of them made money; positive in 99.5% of resamples of the months): pass. Random groups with the candidates' trade directions (4 of 25 inverted) made -19.8R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
+- Not fragile: 94% of 31 neighbouring settings positive in both halves; sensitive to: Candle Range Period; Time Stop.
 - Concentration (search window): 10 biggest trades +14.3R, all others +0.2R; positive in 95.3% of resamples of its weeks.
 - Same inputs, other trade direction: -28.7R.
 - Trailing stop restarted at every candle close (if TradingView does that): search window +15.4R, untouched +7.8R.
@@ -469,7 +472,7 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 - Costs (search window): Bitget 0.06% +19.6R; no costs +28.8R; stressed +13.6R; break-even commission 0.191% per side. Fees took 7.5R and funding +0.1R.
 - Price path (search window): second by second +21.1R; on 1-minute bars +21.1R; on the chart's candles +21.1R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 284 trades, 54% profitable, profit factor about 1.3, net profit about +10% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +14.7R on average (84% of them made money; positive in 100.0% of resamples of the months): pass. Random settings of the same trade direction made -16.1R, so the choice adds something beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +14.7R on average (84% of them made money; positive in 100.0% of resamples of the months): pass. Random groups with the candidates' trade directions (1 of 25 inverted) made -16.1R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
 - Not fragile: 100% of 23 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +7.4R, all others +13.7R; positive in 98.9% of resamples of its weeks.
 - Same inputs, other trade direction: -32.6R.
@@ -520,7 +523,7 @@ DO NOT TRADE because it does not hold up on 2021-2023 (its gain there stays posi
 - Costs (search window): Bitget 0.06% +19.8R; no costs +22.4R; stressed +18.0R; break-even commission 0.510% per side. Fees took 2.2R and funding -0.1R.
 - Price path (search window): second by second +20.2R; on 1-minute bars +21.5R; on the chart's candles +21.4R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 72 trades, 75% profitable, profit factor about 2.3, net profit about +10% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.1R on average (84% of them made money; positive in 93.2% of resamples of the months): fail. Random settings of the same trade direction made -8.6R, so the choice adds nothing measurable beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.1R on average (84% of them made money; positive in 93.2% of resamples of the months): fail. Random groups with the candidates' trade directions (1 of 25 inverted) made -8.6R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
 - Not fragile: 100% of 25 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +12.2R, all others +8.1R; positive in 99.8% of resamples of its weeks.
 - Same inputs, other trade direction: -17.2R.
@@ -572,7 +575,7 @@ NOT RECOMMENDED because it does not hold up on 2021-2023 (its gain there stays p
 - Costs (search window): Bitget 0.06% +21.2R; no costs +26.5R; stressed +17.8R; break-even commission 0.312% per side. Fees took 4.2R and funding +0.3R.
 - Price path (search window): second by second +22.0R; on 1-minute bars +22.0R; on the chart's candles +22.0R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 101 trades, 84% profitable, profit factor about 2.3, net profit about +11% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +17.1R on average (92% of them made money; positive in 99.6% of resamples of the months): pass. Random settings of the same trade direction made +4.7R, so the choice adds something beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +17.1R on average (92% of them made money; positive in 99.6% of resamples of the months): pass. Random groups of with-the-filter settings made +4.7R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
 - Not fragile: 100% of 22 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +4.7R, all others +17.3R; positive in 100.0% of resamples of its weeks.
 - Same inputs, other trade direction: -23.4R.
@@ -625,7 +628,7 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 - Costs (search window): Bitget 0.06% +34.3R; no costs +40.0R; stressed +30.5R; break-even commission 0.422% per side. Fees took 4.7R and funding +0.0R.
 - Price path (search window): second by second +35.2R; on 1-minute bars +35.2R; on the chart's candles +32.9R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 100 trades, 59% profitable, profit factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31; TradingView can replay this file only from about 2024-01-19: from then about 94 trades, 61% profitable, net profit about +17%.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.5R on average (68% of them made money; positive in 96.6% of resamples of the months): pass. Random settings of the same trade direction made +11.9R, so the choice adds nothing measurable beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.5R on average (68% of them made money; positive in 96.6% of resamples of the months): pass. Random groups with the candidates' trade directions (3 of 25 inverted) made +11.9R on average; the candidates do not beat 95% of such groups, so the choice adds nothing measurable beyond the direction.
 - Not fragile: 100% of 30 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +13.2R, all others +22.1R; positive in 99.8% of resamples of its weeks.
 - Same inputs, other trade direction: -31.0R.

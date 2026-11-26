@@ -2,8 +2,9 @@
 // =====================================================================================
 // AMVI Full MTF Strategy (direction filter, closed-candle engine): BTCUSDT.P 4h
 // STATUS: USABLE (grade 2 of 5): test with alerts first; small size at most. For the
-//         4h chart of BTCUSDT.P only. Not yet run on TradingView: alerts only until
-//         its trade list matches (see CHECK).
+//         4h chart of BTCUSDT.P only. Not yet run on TradingView: first check that its
+//         trade list matches (see CHECK), then alerts only for about 20 trades before
+//         any money (REPORT.md, What I would do).
 // -------------------------------------------------------------------------------------
 // RESULT: 2021-01 to 2023-10, NOT used for choosing: +21.4R (84% of it in 2023), 69
 //         trades, largest drawdown 8.3R; +18.9R at double commission.
@@ -16,20 +17,27 @@
 //         base and stressed costs and in 98% of resamples of its weeks; the 25
 //         steadiest candidates did too as a group; the three hold-out tests inside the
 //         last three years fail.
-// TESTER: TradingView's Strategy Tester (Bar Magnifier off) should show about 100
-//         trades, 59% profitable, profit factor about 1.7, net profit about +16% for
-//         2023-11-01 to 2026-10-31; TradingView can replay this file only from about
-//         2024-01-19: from then about 94 trades, 61% profitable, net profit about
-//         +17%. It shows money, not R, and only the candles your plan loads (Deep
-//         Backtesting covers the whole period).
+// TESTER: TradingView's Strategy Tester (Bar detalization on its default, the former
+//         Bar Magnifier off) should show about 100 trades, 59% profitable, profit
+//         factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31;
+//         TradingView can replay this file only from about 2024-01-19: from then about
+//         94 trades, 61% profitable, net profit about +17%. It shows money, not R, and
+//         only the candles your plan loads (for this file not before that date,
+//         whatever the plan: the 100,000 15m candles TradingView keeps are the limit).
 // CHECK:  amvi_calibration/results/trades_BTCUSDT_4h.csv (UTC times, Binance prices):
 //         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides.
+//         Change no input. Start one week after the date in TESTER (the first 15m
+//         candle TradingView still holds; it moves on by a day every day): the script
+//         needs a few hundred candles of history before its first signal, so earlier
+//         list trades are missing in the tester. An exit differs on chart candles
+//         where stop and target lie inside one candle: walked that way this record
+//         would be +32.9R instead of +35.2R. Details: REPORT.md, section 9.
 // RECORD: amvi_calibration/REPORT.md, section 7, 4h. Record date 2026-11-26. Numbers
 //         come from a Python copy of this script, not from TradingView.
 //
 // Same code as AMVI_FGF_Inverted_XAUUSD_15m.pine; only the title, the commission (0.06%), the
-// sizing defaults (risk 0.5%, max 5 BTC, margin 20%, fixed quantity 0.01 BTC) and these inputs
-// differ (shipped value in brackets):
+// sizing defaults (risk 0.5%, max 5 BTC, margin 20%, fixed quantity 0.01 BTC), the wording of
+// tooltips and of the two quantity labels, and these inputs differ (shipped value in brackets):
 // fastATRPeriod = 10 [7], candleRangePeriod = 10 [20],
 // normalizationPeriod = 400 [200], aatrWeight = 0.2 [0.35], vrWeight = 0.5 [0.25],
 // nsdWeight = 0.15 [0.25], highVolThreshold = 65.0 [60.0],

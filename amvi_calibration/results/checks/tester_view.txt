@@ -1,0 +1,41 @@
+1m file (PAPER-TRADE)
+   exits, search window (2023-11-01 to 2026-11-01): 145 trades second by second (+124.48R before costs), 145 on chart candles (+124.48R); trades that differ: 0
+   exits, untouched period (2021-01-01 to 2023-11-01): 93 trades second by second (+64.97R before costs), 93 on chart candles (+64.97R); trades that differ: 0
+   limited history: the AMVI of this file reads 1h candles from a 1m chart (higher timeframes); not simulated.
+
+3m file (USABLE)
+   exits, search window (2023-11-01 to 2026-11-01): 79 trades second by second (+29.03R before costs), 79 on chart candles (+29.03R); trades that differ: 0
+   exits, untouched period (2021-01-01 to 2023-11-01): 72 trades second by second (+24.54R before costs), 72 on chart candles (+24.54R); trades that differ: 0
+   limited history: the AMVI of this file reads 30m, 4h candles from a 3m chart (higher timeframes); not simulated.
+
+15m file (USABLE)
+   exits, search window (2023-11-01 to 2026-11-01): 284 trades second by second (+28.74R before costs), 284 on chart candles (+28.74R); trades that differ: 0
+   exits, untouched period (2021-01-01 to 2023-11-01): 232 trades second by second (+25.06R before costs), 232 on chart candles (+25.06R); trades that differ: 0
+   limited history: the full-history run gives the list's 284 search-window entries: True
+      5,000 15m candles, checked 2026-11-26: history from 2026-10-04 22:00; the AMVI has its first value 418 candles later; list entries from there 5; missing in the tester 2 (2026-10-07 02:30, 2026-10-08 14:00); in the tester only 0 (-); other side 0; last difference 3.7 days after the start; list entries after it 3
+      5,000 15m candles, checked 2026-12-03: history from 2026-10-11 22:00; the AMVI has its first value 418 candles later; list entries from there 3; missing in the tester 2 (2026-10-12 23:30, 2026-10-13 04:00); in the tester only 0 (-); other side 0; last difference 1.2 days after the start; list entries after it 1
+      5,000 15m candles, checked 2026-12-10: history from 2026-10-18 22:00; the AMVI has its first value 418 candles later; list entries from there 1; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 1
+      5,000 15m candles, checked 2026-12-17: history from 2026-10-25 22:00; the AMVI has its first value 418 candles later; list entries from there 1; missing in the tester 1 (2026-10-29 21:00); in the tester only 0 (-); other side 0; last difference 4.0 days after the start; list entries after it 0
+      10,000 15m candles, checked 2026-11-26: history from 2026-08-13 20:00; the AMVI has its first value 418 candles later; list entries from there 17; missing in the tester 1 (2026-08-17 17:45); in the tester only 0 (-); other side 0; last difference 3.9 days after the start; list entries after it 16
+      10,000 15m candles, checked 2026-12-03: history from 2026-08-20 20:00; the AMVI has its first value 418 candles later; list entries from there 16; missing in the tester 1 (2026-08-21 09:15); in the tester only 0 (-); other side 0; last difference 0.6 days after the start; list entries after it 15
+      10,000 15m candles, checked 2026-12-10: history from 2026-08-27 20:00; the AMVI has its first value 418 candles later; list entries from there 15; missing in the tester 1 (2026-08-28 16:15); in the tester only 0 (-); other side 0; last difference 0.8 days after the start; list entries after it 14
+      10,000 15m candles, checked 2026-12-17: history from 2026-09-03 20:00; the AMVI has its first value 418 candles later; list entries from there 13; missing in the tester 1 (2026-09-04 13:00); in the tester only 0 (-); other side 0; last difference 0.7 days after the start; list entries after it 12
+      20,000 15m candles, checked 2026-11-26: history from 2026-05-01 16:00; the AMVI has its first value 418 candles later; list entries from there 38; missing in the tester 1 (2026-05-04 02:15); in the tester only 0 (-); other side 0; last difference 2.4 days after the start; list entries after it 37
+      20,000 15m candles, checked 2026-12-03: history from 2026-05-08 16:00; the AMVI has its first value 418 candles later; list entries from there 37; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 37
+      20,000 15m candles, checked 2026-12-10: history from 2026-05-15 16:00; the AMVI has its first value 418 candles later; list entries from there 35; missing in the tester 1 (2026-05-18 16:30); in the tester only 0 (-); other side 0; last difference 3.0 days after the start; list entries after it 34
+      20,000 15m candles, checked 2026-12-17: history from 2026-05-22 16:00; the AMVI has its first value 418 candles later; list entries from there 34; missing in the tester 2 (2026-05-22 20:00, 2026-05-23 21:00); in the tester only 0 (-); other side 0; last difference 1.2 days after the start; list entries after it 32
+      40,000 15m candles, checked 2026-11-26: history from 2025-10-05 08:00; the AMVI has its first value 418 candles later; list entries from there 89; missing in the tester 3 (2025-10-07 15:30, 2025-10-09 14:45, 2025-10-10 15:45); in the tester only 1 (2025-10-09 17:15); other side 0; last difference 5.3 days after the start; list entries after it 86
+      40,000 15m candles, checked 2026-12-03: history from 2025-10-12 08:00; the AMVI has its first value 418 candles later; list entries from there 84; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 84
+      40,000 15m candles, checked 2026-12-10: history from 2025-10-19 08:00; the AMVI has its first value 418 candles later; list entries from there 83; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 83
+      40,000 15m candles, checked 2026-12-17: history from 2025-10-26 08:00; the AMVI has its first value 418 candles later; list entries from there 83; missing in the tester 2 (2025-10-26 22:30, 2025-10-29 19:00); in the tester only 0 (-); other side 0; last difference 3.5 days after the start; list entries after it 81
+
+4h file (USABLE)
+   exits, search window (2023-11-01 to 2026-11-01): 100 trades second by second (+40.00R before costs), 100 on chart candles (+37.66R); trades that differ: 1
+      long entered 2024-02-28 16:00: second by second target at 63098.6 (2024-02-28 17:06:01, +1.333R before costs); on chart candles stop at 59426.0 (candle 2024-02-28 16:00, -1.000R)
+   exits, untouched period (2021-01-01 to 2023-11-01): 69 trades second by second (+24.33R before costs), 69 on chart candles (+24.33R); trades that differ: 0
+   limited history: the full-history run gives the list's 100 search-window entries: True
+      100,000 15m candles, checked 2026-11-26: history from 2024-01-19 08:00; the AMVI has its first value 418 candles later; list entries from there 94; missing in the tester 1 (2024-01-22 16:00); in the tester only 0 (-); other side 0; last difference 3.3 days after the start; list entries after it 93
+      100,000 15m candles, checked 2026-12-03: history from 2024-01-26 08:00; the AMVI has its first value 418 candles later; list entries from there 93; missing in the tester 1 (2024-01-26 12:00); in the tester only 0 (-); other side 0; last difference 0.2 days after the start; list entries after it 92
+      100,000 15m candles, checked 2026-12-10: history from 2024-02-02 08:00; the AMVI has its first value 418 candles later; list entries from there 92; missing in the tester 0 (-); in the tester only 0 (-); other side 0; last difference none; list entries after it 92
+      100,000 15m candles, checked 2026-12-17: history from 2024-02-09 08:00; the AMVI has its first value 418 candles later; list entries from there 92; missing in the tester 1 (2024-02-09 16:00); in the tester only 0 (-); other side 0; last difference 0.3 days after the start; list entries after it 91
+

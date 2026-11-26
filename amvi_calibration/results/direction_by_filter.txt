@@ -1,0 +1,76 @@
+chart 1m: 3,934 of 6,000 settings with at least 30 trades in each half
+  filter  1m: with the filter  317 settings, before costs  24.6%, after costs  1.3% | inverted  323 settings, before costs  41.5%, after costs  0.3% | gap -16.9 points, luck-only worlds with a gap this large: 5.8%
+  filter  5m: with the filter  278 settings, before costs  31.3%, after costs  2.9% | inverted  258 settings, before costs  47.3%, after costs  0.8% | gap -16.0 points, luck-only worlds with a gap this large: 9.6%
+  filter 15m: with the filter  290 settings, before costs  38.6%, after costs  1.0% | inverted  254 settings, before costs  35.8%, after costs  1.6% | gap  +2.8 points, luck-only worlds with a gap this large: 72.3%
+  filter 30m: with the filter  272 settings, before costs  45.2%, after costs  2.6% | inverted  265 settings, before costs  28.7%, after costs  0.4% | gap +16.5 points, luck-only worlds with a gap this large: 4.4%
+  filter  1h: with the filter  302 settings, before costs  46.4%, after costs  5.0% | inverted  306 settings, before costs  23.2%, after costs  0.7% | gap +23.2 points, luck-only worlds with a gap this large: 0.6%
+  filter  4h: with the filter  287 settings, before costs  44.3%, after costs  5.9% | inverted  254 settings, before costs  25.6%, after costs  0.8% | gap +18.7 points, luck-only worlds with a gap this large: 2.8%
+  filter  1D: with the filter  265 settings, before costs  38.9%, after costs  7.2% | inverted  263 settings, before costs  28.5%, after costs  1.1% | gap +10.4 points, luck-only worlds with a gap this large: 36.4%
+chart 2m: 3,284 of 8,000 settings with at least 30 trades in each half
+  filter  2m: with the filter  364 settings, before costs  19.8%, after costs  4.7% | inverted  344 settings, before costs  35.2%, after costs  2.6% | gap -15.4 points, luck-only worlds with a gap this large: 5.2%
+  filter 30m: with the filter  250 settings, before costs  28.8%, after costs  5.6% | inverted  281 settings, before costs  26.7%, after costs  3.9% | gap  +2.1 points, luck-only worlds with a gap this large: 76.6%
+  filter  1h: with the filter  333 settings, before costs  32.4%, after costs  9.3% | inverted  318 settings, before costs  18.9%, after costs  2.5% | gap +13.6 points, luck-only worlds with a gap this large: 17.7%
+  filter  4h: with the filter  389 settings, before costs  35.0%, after costs  9.5% | inverted  347 settings, before costs  19.6%, after costs  4.6% | gap +15.4 points, luck-only worlds with a gap this large: 23.3%
+  filter  1D: with the filter  328 settings, before costs  36.9%, after costs 10.7% | inverted  330 settings, before costs  15.5%, after costs  3.0% | gap +21.4 points, luck-only worlds with a gap this large: 12.3%
+chart 3m: 4,078 of 8,000 settings with at least 30 trades in each half
+  filter  3m: with the filter  365 settings, before costs  26.6%, after costs  6.3% | inverted  389 settings, before costs  24.9%, after costs  2.1% | gap  +1.6 points, luck-only worlds with a gap this large: 85.8%
+  filter 15m: with the filter  254 settings, before costs  30.3%, after costs  6.7% | inverted  302 settings, before costs  29.1%, after costs  2.6% | gap  +1.2 points, luck-only worlds with a gap this large: 90.4%
+  filter 30m: with the filter  352 settings, before costs  43.8%, after costs 12.2% | inverted  347 settings, before costs  16.7%, after costs  1.4% | gap +27.0 points, luck-only worlds with a gap this large: 2.2%
+  filter  1h: with the filter  338 settings, before costs  45.6%, after costs 11.2% | inverted  376 settings, before costs  16.8%, after costs  2.7% | gap +28.8 points, luck-only worlds with a gap this large: 1.5%
+  filter  4h: with the filter  346 settings, before costs  53.5%, after costs 15.0% | inverted  344 settings, before costs  14.0%, after costs  1.7% | gap +39.5 points, luck-only worlds with a gap this large: 0.0%
+  filter  1D: with the filter  333 settings, before costs  49.8%, after costs 13.5% | inverted  332 settings, before costs  13.0%, after costs  2.1% | gap +36.9 points, luck-only worlds with a gap this large: 0.3%
+chart 5m: 7,207 of 12,000 settings with at least 30 trades in each half
+  filter  5m: with the filter  628 settings, before costs  35.2%, after costs  7.3% | inverted  658 settings, before costs  21.6%, after costs  3.5% | gap +13.6 points, luck-only worlds with a gap this large: 15.3%
+  filter 15m: with the filter  555 settings, before costs  43.4%, after costs  9.7% | inverted  583 settings, before costs  20.2%, after costs  3.1% | gap +23.2 points, luck-only worlds with a gap this large: 1.9%
+  filter 30m: with the filter  623 settings, before costs  51.0%, after costs 11.4% | inverted  665 settings, before costs  14.7%, after costs  1.7% | gap +36.3 points, luck-only worlds with a gap this large: 0.2%
+  filter  1h: with the filter  597 settings, before costs  54.6%, after costs 13.7% | inverted  646 settings, before costs  13.0%, after costs  1.1% | gap +41.6 points, luck-only worlds with a gap this large: 0.1%
+  filter  4h: with the filter  592 settings, before costs  56.1%, after costs 18.1% | inverted  600 settings, before costs  11.8%, after costs  2.0% | gap +44.2 points, luck-only worlds with a gap this large: 0.0%
+  filter  1D: with the filter  527 settings, before costs  47.6%, after costs 16.1% | inverted  533 settings, before costs  15.0%, after costs  3.8% | gap +32.6 points, luck-only worlds with a gap this large: 1.7%
+  with the filter, a 4h filter, trailing off: 358 settings, 78 positive after costs = 21.8%, median -25.1R
+  with the filter, a 4h or 1D filter, trailing off: 669 settings, 143 positive after costs = 21.4%, median -29.2R
+chart 10m: 5,114 of 12,000 settings with at least 30 trades in each half
+  filter 10m: with the filter  547 settings, before costs  34.4%, after costs 17.4% | inverted  503 settings, before costs  17.7%, after costs  6.8% | gap +16.7 points, luck-only worlds with a gap this large: 9.6%
+  filter 30m: with the filter  432 settings, before costs  34.5%, after costs 17.1% | inverted  494 settings, before costs  19.0%, after costs  7.9% | gap +15.5 points, luck-only worlds with a gap this large: 15.9%
+  filter  1h: with the filter  513 settings, before costs  39.0%, after costs 19.5% | inverted  555 settings, before costs  14.6%, after costs  6.3% | gap +24.4 points, luck-only worlds with a gap this large: 8.7%
+  filter  4h: with the filter  603 settings, before costs  48.4%, after costs 25.2% | inverted  532 settings, before costs   7.1%, after costs  1.7% | gap +41.3 points, luck-only worlds with a gap this large: 0.9%
+  filter  1D: with the filter  459 settings, before costs  47.7%, after costs 24.8% | inverted  476 settings, before costs  10.3%, after costs  5.0% | gap +37.4 points, luck-only worlds with a gap this large: 3.9%
+  with the filter, a 4h filter, trailing off: 344 settings, 92 positive after costs = 26.7%, median -10.8R
+  with the filter, a 4h or 1D filter, trailing off: 599 settings, 172 positive after costs = 28.7%, median -9.6R
+chart 15m: 8,402 of 16,000 settings with at least 30 trades in each half
+  filter 15m: with the filter  847 settings, before costs  38.6%, after costs 17.6% | inverted  840 settings, before costs  14.3%, after costs  5.4% | gap +24.3 points, luck-only worlds with a gap this large: 2.7%
+  filter 30m: with the filter  789 settings, before costs  45.6%, after costs 22.3% | inverted  882 settings, before costs  15.1%, after costs  7.3% | gap +30.5 points, luck-only worlds with a gap this large: 1.5%
+  filter  1h: with the filter  904 settings, before costs  48.7%, after costs 26.8% | inverted  953 settings, before costs  10.8%, after costs  4.8% | gap +37.9 points, luck-only worlds with a gap this large: 0.8%
+  filter  4h: with the filter  878 settings, before costs  54.6%, after costs 29.3% | inverted  868 settings, before costs   8.9%, after costs  3.2% | gap +45.7 points, luck-only worlds with a gap this large: 0.4%
+  filter  1D: with the filter  693 settings, before costs  51.4%, after costs 29.1% | inverted  748 settings, before costs  10.7%, after costs  4.1% | gap +40.7 points, luck-only worlds with a gap this large: 1.5%
+chart 30m: 8,725 of 16,000 settings with at least 30 trades in each half
+  filter 15m: with the filter  961 settings, before costs  47.9%, after costs 27.7% | inverted  924 settings, before costs  15.3%, after costs  7.6% | gap +32.6 points, luck-only worlds with a gap this large: 0.8%
+  filter 30m: with the filter  958 settings, before costs  48.4%, after costs 30.8% | inverted  998 settings, before costs  11.5%, after costs  6.3% | gap +36.9 points, luck-only worlds with a gap this large: 0.1%
+  filter  1h: with the filter  832 settings, before costs  44.5%, after costs 31.9% | inverted  898 settings, before costs  14.0%, after costs  8.8% | gap +30.4 points, luck-only worlds with a gap this large: 0.9%
+  filter  4h: with the filter  813 settings, before costs  50.8%, after costs 34.6% | inverted  922 settings, before costs   8.5%, after costs  4.9% | gap +42.3 points, luck-only worlds with a gap this large: 1.1%
+  filter  1D: with the filter  696 settings, before costs  50.1%, after costs 31.8% | inverted  723 settings, before costs   9.8%, after costs  5.1% | gap +40.3 points, luck-only worlds with a gap this large: 2.3%
+chart 1h: 9,188 of 16,000 settings with at least 30 trades in each half
+  filter 15m: with the filter 1050 settings, before costs  44.1%, after costs 29.7% | inverted 1018 settings, before costs  12.1%, after costs  8.4% | gap +32.0 points, luck-only worlds with a gap this large: 5.2%
+  filter 30m: with the filter 1028 settings, before costs  44.9%, after costs 34.3% | inverted 1066 settings, before costs  11.6%, after costs  8.9% | gap +33.3 points, luck-only worlds with a gap this large: 5.6%
+  filter  1h: with the filter  973 settings, before costs  47.7%, after costs 39.1% | inverted  976 settings, before costs  11.5%, after costs  9.3% | gap +36.2 points, luck-only worlds with a gap this large: 3.0%
+  filter  4h: with the filter  839 settings, before costs  50.9%, after costs 43.0% | inverted  858 settings, before costs   8.2%, after costs  6.9% | gap +42.7 points, luck-only worlds with a gap this large: 1.1%
+  filter  1D: with the filter  684 settings, before costs  48.5%, after costs 42.1% | inverted  696 settings, before costs   9.2%, after costs  7.9% | gap +39.3 points, luck-only worlds with a gap this large: 6.3%
+chart 4h: 8,868 of 16,000 settings with at least 30 trades in each half
+  filter 15m: with the filter  949 settings, before costs  46.9%, after costs 51.2% | inverted  997 settings, before costs   8.2%, after costs 10.3% | gap +38.7 points, luck-only worlds with a gap this large: 8.5%
+  filter 30m: with the filter 1001 settings, before costs  48.4%, after costs 55.3% | inverted 1007 settings, before costs   8.1%, after costs  9.8% | gap +40.2 points, luck-only worlds with a gap this large: 8.1%
+  filter  1h: with the filter  976 settings, before costs  49.0%, after costs 51.7% | inverted 1008 settings, before costs   7.2%, after costs  9.5% | gap +41.7 points, luck-only worlds with a gap this large: 6.9%
+  filter  4h: with the filter  944 settings, before costs  48.1%, after costs 56.1% | inverted  859 settings, before costs   8.3%, after costs 11.2% | gap +39.8 points, luck-only worlds with a gap this large: 10.8%
+  filter  1D: with the filter  547 settings, before costs  45.2%, after costs 51.2% | inverted  580 settings, before costs   9.7%, after costs 14.1% | gap +35.5 points, luck-only worlds with a gap this large: 12.8%
+
+| Chart | Filter on the chart's own timeframe | 5m filter | 15m filter | 30m filter | 1h filter | 4h filter | 1D filter |
+|---|---|---|---|---|---|---|---|
+| 1m | 25% / 41% * | 31% / 47% * | 39% / 36% | 45% / 29% | 46% / 23% | 44% / 26% | 39% / 29% |
+| 2m | 20% / 35% * | - | - | 29% / 27% | 32% / 19% | 35% / 20% | 37% / 15% |
+| 3m | 27% / 25% | - | 30% / 29% | 44% / 17% | 46% / 17% | 53% / 14% | 50% / 13% |
+| 5m | 35% / 22% | see first column | 43% / 20% | 51% / 15% | 55% / 13% | 56% / 12% | 48% / 15% |
+| 10m | 34% / 18% | - | - | 34% / 19% | 39% / 15% | 48% / 7% | 48% / 10% |
+| 15m | 39% / 14% | - | see first column | 46% / 15% | 49% / 11% | 55% / 9% | 51% / 11% |
+| 30m | 48% / 12% | - | 48% / 15% | see first column | 44% / 14% | 51% / 8% | 50% / 10% |
+| 1h | 48% / 11% | - | 44% / 12% | 45% / 12% | see first column | 51% / 8% | 49% / 9% |
+| 4h | 48% / 8% | - | 47% / 8% | 48% / 8% | 49% / 7% | see first column | 45% / 10% |
+
+\* inverted ahead.

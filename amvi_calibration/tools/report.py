@@ -224,8 +224,10 @@ def header_lines(tf, v, why, ev, changes, p):
     name = make_pine.TF_NAME[tf]
     grade = ORDER.index(v) + 1
     L = [f"AMVI Full MTF Strategy (direction filter, closed-candle engine): {SYMBOL} {name}"]
+    after = (". After that still alerts only, no money." if v == "PAPER-TRADE"
+             else ", then alerts only for about 20 trades before any money (REPORT.md, What I would do).")
     L += wrap(f"{v} (grade {grade} of 5): {ACTION[v]}. For the {name} chart of {SYMBOL} only. Not yet run on TradingView: "
-              f"alerts only until its trade list matches (see CHECK).")
+              f"first check that its trade list matches (see CHECK){after}")
     L += ["-" * 85]
     ys = year_share(ev)
     conc = f" ({share_words(ys)})" if ys and ys[0] >= 0.6 else ""
@@ -242,20 +244,31 @@ def header_lines(tf, v, why, ev, changes, p):
               f"slippage and funding, on Binance prices. Trades are held {hours_txt(b['hold_mean_h'])} on average, {hours_txt(b['hold_max_h'])} at most.",
               first="       ")
     L += wrap(f"{v} because it {why}.", first="WHY:   ")
-    L += wrap(f"TradingView's Strategy Tester (Bar Magnifier off) should show {tester_txt(ev)}. It shows money, not R, and only the candles "
-              f"your plan loads (Deep Backtesting covers the whole period).", first="TESTER:")
+    reach = ("for this file not before that date, whatever the plan: the 100,000 15m candles TradingView keeps are the limit"
+             if ev.get("tv_view_since") else "Deep Backtesting covers the whole period")
+    L += wrap(f"TradingView's Strategy Tester (Bar detalization on its default, the former Bar Magnifier off) should show {tester_txt(ev)}. "
+              f"It shows money, not R, and only the candles your plan loads ({reach}).", first="TESTER:")
     if p.get("trail"):
         L += wrap(f"this file uses the trailing stop. If TradingView starts it again at every candle close (not checked), the results are "
                   f"{ev['trail_restart']['total']:+.1f}R and {ev.get('pre_trail_restart', {}).get('total', 0):+.1f}R instead of {b['total']:+.1f}R and {pre.get('total', 0):+.1f}R.",
                   first="NOTE:  ")
+    if abs(ev["walk_chart"]["total"] - b["total"]) >= 0.05:
+        exits = (f" An exit differs on chart candles where stop and target lie inside one candle: walked that way this record would be "
+                 f"{ev['walk_chart']['total']:+.1f}R instead of {b['total']:+.1f}R.")
+    else:
+        exits = " The exits should be on the same candles too."
+    start = ("the date in TESTER (the first 15m candle TradingView still holds; it moves on by a day every day)" if ev.get("tv_view_since")
+             else "the first candle the chart loads")
     L += wrap(f"amvi_calibration/results/trades_BTCUSDT_{name}.csv (UTC times, Binance prices): on BINANCE:BTCUSDT.P the entries must be on "
-              f"the same candles and sides.", first="CHECK: ")
+              f"the same candles and sides. Change no input. Start one week after {start}: the script needs a few hundred candles of "
+              f"history before its first signal, so earlier list trades are missing in the tester.{exits} "
+              f"Details: REPORT.md, section 9.", first="CHECK: ")
     L += wrap(f"amvi_calibration/REPORT.md, section 7, {name}. Record date {RECORD_DATE}. Numbers come from a Python copy of this script, "
               f"not from TradingView.", first="RECORD:")
     L += ["",
           "Same code as AMVI_FGF_Inverted_XAUUSD_15m.pine; only the title, the commission (0.06%), the",
-          "sizing defaults (risk 0.5%, max 5 BTC, margin 20%, fixed quantity 0.01 BTC) and these inputs",
-          "differ (shipped value in brackets):"]
+          "sizing defaults (risk 0.5%, max 5 BTC, margin 20%, fixed quantity 0.01 BTC), the wording of",
+          "tooltips and of the two quantity labels, and these inputs differ (shipped value in brackets):"]
     line = ""
     for nm, old, new in changes:
         item = f"{nm} = {new} [{old}]"
@@ -278,9 +291,20 @@ def fmt_u(u):
     t = (f"the {u['n_candidates']} steadiest candidates made {u['cand_mean']:+.1f}R on average ({u['cand_share_positive'] * 100:.0f}% of them made money; "
          f"positive in {u['boot_pos'] * 100:.1f}% of resamples of the months): {'pass' if u['passed'] else 'fail'}")
     if "matched_null_mean" in u:
-        t += (f". Random settings of the same trade direction made {u['matched_null_mean']:+.1f}R, so the choice "
-              f"{'adds something' if u['passed_matched'] else 'adds nothing measurable'} beyond the direction")
+        inv = u.get("candidates_inverted", 0)
+        who = (f"Random groups with the candidates' trade directions ({inv} of {u['n_candidates']} inverted)" if inv
+               else "Random groups of with-the-filter settings")
+        t += f". {who} made {u['matched_null_mean']:+.1f}R on average; " + (
+            "the candidates beat 95% of such groups, so the choice adds something beyond the direction" if beats_matched(u)
+            else "the candidates do not beat 95% of such groups, so the choice adds nothing measurable beyond the direction")
     return t
+
+
+def beats_matched(u):
+    """The candidates' mean is above 95 % of random groups with their own trade directions.
+    (untouched_check's passed_matched also asks for 95 % of resamples, which the main test
+    already reports.)"""
+    return u["cand_mean"] > u["matched_null_p95"]
 
 
 def sizing_defaults(src):
@@ -504,7 +528,9 @@ def tables(rows):
           "Best 40 = the 40 steadiest settings of one part of the search window, scored on another part. A test passes when their mean is",
           "positive, above 95% of random groups of 40, and stays positive in 95% of resamples of the months. The last column is the same test",
           "for the 25 steadiest candidates (12 on 1m), chosen on the whole search window and scored on the untouched period.",
-          f"The three \"Positive\" columns are shares of the settings with at least 30 trades in each half: {elig:,} of the {tried:,} tried.", "",
+          f"The three \"Positive\" columns are shares of the settings with at least 30 trades in each half and a trade in at least 60% of its",
+          f"months: {elig:,} of the {tried:,} tried. \"Beaten\" in the last column: the candidates' mean is above 95% of random groups with",
+          "their own trade directions.", "",
           "| Chart | Settings tried | Positive before costs | Positive after costs | Positive in both halves | First half -> second (best 40) | Second -> first | Walk-forward (two years -> the third) | Search window -> untouched period (25 steadiest candidates) |",
           "|---|---|---|---|---|---|---|---|---|"]
     for r in rows:
@@ -518,7 +544,7 @@ def tables(rows):
         if u and "cand_mean" in u:
             uc = f"{u['cand_mean']:+.1f}R, {u['cand_share_positive'] * 100:.0f}% positive, {u['boot_pos'] * 100:.1f}% of resamples ({'pass' if u['passed'] else 'fail'})"
             if "matched_null_mean" in u:
-                uc += f"; random settings of the same direction {u['matched_null_mean']:+.1f}R ({'beaten' if u['passed_matched'] else 'not beaten'})"
+                uc += f"; random settings of the same directions {u['matched_null_mean']:+.1f}R ({'beaten' if beats_matched(u) else 'not beaten'})"
         elif u:
             uc = "no candidates"
         L.append(f"| {r['name']} | {h['rows']:,} | {h['gross_share_positive'] * 100:.0f}% | {h['share_positive_total'] * 100:.0f}% | {h['share_positive_both_halves'] * 100:.1f}% | "
@@ -527,7 +553,8 @@ def tables(rows):
     if any(r.get("unt") and "random_with_filter" in r["unt"] for r in rows):
         L += ["", "## The two trade directions on data the search never saw", "",
               "400 random settings of the search per timeframe (at least 30 trades in each half of the search window), run over the untouched",
-              "period and split by trade direction; then the same split on the search window for all settings of the search.",
+              "period and split by trade direction; then the same split on the search window for all settings of the search with at least 30",
+              f"trades in each half ({sum(sum(v['rows'] for v in direction(r).values()) for r in rows):,} of the {tried:,}).",
               "\"Positive\" = net result above zero over the whole period after 0.05% per side, 1 tick and funding. The last two columns:",
               "positive in both halves of the search window, after costs / before costs.", "",
               "| Chart | Untouched: with the filter positive | Median | Untouched: inverted positive | Median | Search window: with the filter positive | Median | Inverted positive | Median | Both halves, with the filter | Both halves, inverted |",
@@ -668,7 +695,7 @@ def section(tf, name, v, why, ev, plat, unt, p, changes, ttl, fn, luck=None):
          f"- On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show {tester_txt(ev)}.",
          f"- The selection method on this timeframe, search window -> untouched period: {fmt_u(unt)}.",
          f"- Not fragile: {plat['share_both_positive'] * 100:.0f}% of {plat['neighbours']} neighbouring settings positive in both halves"
-         + (f"; sensitive to: {', '.join(input_label(x, ttl) for x in plat['fragile_inputs'])}." if plat["fragile_inputs"] else "."),
+         + (f"; sensitive to: {'; '.join(input_label(x, ttl) for x in plat['fragile_inputs'])}." if plat["fragile_inputs"] else "."),
          f"- Concentration (search window): 10 biggest trades {b['top10']:+.1f}R, all others {b['without_top10']:+.1f}R; positive in {b['weeks_pos'] * 100:.1f}% of resamples of its weeks.",
          f"- Same inputs, other trade direction: {ev['other_direction']['total']:+.1f}R."]
     if p.get("trail"):

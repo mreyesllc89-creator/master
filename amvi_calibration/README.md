@@ -15,7 +15,7 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | `results/` | hold-out and plateau tests, final numbers and trade lists per timeframe; `results/checks/` holds the logs of the engine checks |
 | `REPORT_src.md`, `REPORT_tables.md` | the hand-written text and the generated tables that `tools/assemble_report.py` joins into `REPORT.md` |
 | `tools/` | the Python copy of the script and the calibration steps |
-| `data/` | 1-minute bars and funding (not in git; `tools/fetch_1m.py` rebuilds it) |
+| `data/` | 1-minute bars, funding and one-second bars (not in git; step 1 of `tools/run_all.sh` rebuilds it: `fetch_1m.py`, the funding call, `fetch_1s.py`) |
 
 ## Tools
 
@@ -33,6 +33,7 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | `untouched_check.py` | do the candidates of the search window beat random settings on 2021-2023? |
 | `trailing_study.py` | the same settings with and without a trailing stop, every activation and offset |
 | `inputs_summary.py` | the search's settings grouped by one input's value (`results/INPUTS.md`) |
+| `direction_by_filter.py` | the two trade directions by filter timeframe, with a luck test (`results/direction_by_filter.txt`) |
 | `luck.py` | the same counts in no-skill worlds: what luck alone would produce |
 | `convergence.py` | the picks with orders walked on chart candles, 1-minute, 15s, 5s and 1s bars |
 | `final_eval.py` | all numbers for one setting, including the untouched 2021-2023 period |
@@ -43,10 +44,11 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | `check_outputs.py` | the trade lists and the calibrated files checked against the records and the shipped script |
 | `replicate_picks.py` | the picked settings against the reference versions: signals bar for bar, the filter zone against a literal copy of the filter, orders trade for trade |
 | `test_orders.py` | hand-computed order scenarios |
-| `difftest.py`, `ref/` | the engine against two reference versions written independently from the Pine source (`ref_signals.py`, `ref_orders.py`); `ref_filter.py` is a third, statement-by-statement copy of the filter |
+| `difftest.py`, `ref/` | the engine against two reference versions written independently from the Pine source: `ref_signals.py` (signal side only) and `ref_orders.py` (order side only, given the engine's signals); `ref_filter.py` is a statement-by-statement copy of the filter |
 | `test_lookahead.py` | prices after a time T replaced by another path: nothing the engine shows for candles closed by T may change |
 | `test_fine.py` | the second-by-second order walk against walking every single second |
 | `seconds_coverage.py` | how completely the one-second bars cover the 1-minute bars |
+| `tester_view.py` | what TradingView's tester will show differently from a file's trade list: exits on chart candles, and entries at the start of a chart's limited history |
 | `run_all.sh` | everything, in order |
 
 ## Conventions

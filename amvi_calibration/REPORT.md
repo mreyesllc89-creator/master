@@ -8,9 +8,10 @@ called the search window from section 2 on), each with its stops, targets and tr
 filled on the real second-by-second prices. The best were then tested on 2021-01 to 2023-10
 (the untouched period), which no search had used (one exception for 4h: section 8, point 5).
 Nothing here ran on TradingView: the numbers come from a Python copy of the script, checked
-against two more copies written independently from the Pine source and one more independent
-copy of the filter part. A calibrated `.pine` file is in `presets/` for the four timeframes
-whose pick made money on 2021-2023; each carries its verdict in its title.
+against a second version written independently from the Pine source (in two parts: one for
+the signals, one for the orders) and against a literal copy of the filter part. A calibrated
+`.pine` file is in `presets/` for the four timeframes whose pick held up on 2021-2023 (15m,
+3m, 4h and 1m; what "held up" means: section 3); each carries its verdict in its title.
 
 Only want the answer for one chart? Read section 1, then that chart's block in section 7.
 Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingView: section 9.
@@ -22,26 +23,41 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
    all nine charts in both periods: from -98R on 4h to -597R on 1m over the last three years
    (-295R on 5m, -215R on 10m), and from -36R to -616R on 2021-2023. 1R = the amount risked on
    one trade; at 0.5% risk per trade, 200R is the whole account. Your own variant with the
-   1-second filter was not tested (point 7); it has the same inverted direction, which lost
-   in every test (point 2).
+   1-second filter was not tested: that filter is faster than anything in the search, and
+   for a filter that fast the tests support neither trade direction (points 2 and 7).
 
-2. **On BTC, trade with the filter, not against it.** A signal in the filter's BUY ZONE is a
-   long, in the SELL ZONE a short. Your file is set to "Inverted", so its entry arrows point
-   the other way: on BTC the better side was the opposite of the arrow you see now. Set
-   **Trade direction** to "Follow the filter" and the arrows point the right way; every pick
-   below does. Among settings that trade with the filter, 4% (1m) to 53% (4h) made money over
-   the last three years; among inverted ones 1% to 11%. On 2021-2023: 10% to 83% against 2%
-   to 16%. This holds on all nine BTC charts in both periods; it is clear from 5m up and small
-   on 2m and 3m. It says nothing about gold: the gold record in your file found the opposite
-   there (Follow the filter -53.6R), and gold was not re-tested.
+2. **On BTC, trade with the filter, not against it, once the filter is slow.** A signal in
+   the filter's BUY ZONE is a long, in the SELL ZONE a short. Your file is set to "Inverted",
+   so its entries point the other way. (Entries are the order markers that begin with "AMVI
+   L" for a long and "AMVI S" for a short, with a small triangle under or over the candle.
+   The tiny triangles in the same colours are the filter's own signals: they do not change
+   with this input and are not entries; "Signal marks" hides them.) Among settings that
+   trade with the filter, 4% (1m) to 53% (4h) made money over the last three years; among
+   inverted ones 1% to 11% (settings with at least 30 trades in each half). On 2021-2023: 10%
+   to 83% against 2% to 16%. This holds on all nine BTC charts in both periods. It is clear
+   from 5m up; on 2m and 3m it is clear in the last three years (3m: 11% against 2%) and
+   small on 2021-2023 (15% against 10%).
+
+   **For the arrows in your screenshot there is no right direction.** That chart has the
+   filter on 1 second, and the advantage of trading with the filter shrinks as the filter
+   gets faster. On a 5m chart the gap between the two directions (settings positive in both
+   halves before fees) is 44 points with a 4h filter, 23 with a 15m filter and 14 with a 5m
+   filter. With the fastest filters tested (1m and 5m on the 1m chart, 2m on the 2m chart)
+   the order is even reversed before fees (1m chart, 1m filter: 41% of inverted settings
+   against 25% with the filter; chance alone produces a gap that size about one time in
+   17), and after fees almost nothing made money on either side (0% to 5% of settings). A
+   1-second filter is faster again and was not tested. So change the filter first (point
+   7), then set **Trade direction** to "Follow the filter"; every pick below does. The table
+   is in section 6. None of this says anything about gold: the gold record in your file
+   found the opposite there (Follow the filter -53.6R), and gold was not re-tested.
 
 3. **No timeframe earned RECOMMENDED. Three files are USABLE (15m, 3m, 4h) and one is
    PAPER-TRADE (1m).** On 1h, 30m, 10m, 5m and 2m the pick did not hold up on 2021-2023, and
    no file was written. That includes the two charts you trade: the 5m pick lost on
    2021-2023, and the 10m pick's gain there rests on a few weeks. There is nothing to load
    for 5m or 10m. Switching your current setup to "Follow the filter" with a 4h filter and no
-   trailing stop does not make it a tested setup: of the 5m settings that did all three, 21%
-   made money in the last three years (10m: 29%), and the typical one lost 29R (10m: 10R).
+   trailing stop does not make it a tested setup: of the 5m settings that did all three, 22%
+   made money in the last three years (10m: 27%), and the typical one lost 25R (10m: 11R).
 
 | Chart | Verdict | What it means for you | On 2021-2023, which it was not chosen on | Last three years, where it was chosen | File |
 |---|---|---|---|---|---|
@@ -55,21 +71,23 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
 | [1h](#1h-not-recommended) | NOT RECOMMENDED | nothing to load | +7.5R in 98 trades, positive in 86% of resamples | +22.0R in 101 trades | none |
 | [4h](#4h-usable) | USABLE | test with alerts first; small size at most | +21.4R in 69 trades; 84% of it in 2023 | +35.2R in 100 trades | `AMVI_FGF_BTCUSDT_4h.pine` |
 
-   *What the grades mean for you.* USABLE = test with alerts first, then small size at most.
-   PAPER-TRADE = watch with alerts only, never with money. NOT RECOMMENDED and DO NOT TRADE
-   both mean: no file, do not trade this chart with this strategy. The only difference
-   between those two is whether the 25 steadiest candidates of that chart, as a group, passed
-   the test on 2021-2023: they did on 1h, 10m, 5m and 2m and just failed on 30m (93% of
-   resamples instead of 95%). It does not make 30m worse than 5m: on 2021-2023 the 30m pick
-   made +4.8R and the 5m pick lost 1.0R.
+   *What the grades mean for you.* USABLE = test with alerts first, then small size at most
+   (what the alerts must show, and what "small" is: What I would do, step 2). PAPER-TRADE =
+   watch with alerts only, never with money. NOT RECOMMENDED and DO NOT TRADE both mean: no
+   file, do not trade this chart with this strategy. The only difference between those two
+   is whether the 25 steadiest candidates of that chart, as a group, passed the test on
+   2021-2023: they did on 1h, 10m, 5m and 2m and just failed on 30m (93% of resamples
+   instead of 95%). It does not make 30m worse than 5m: on 2021-2023 the 30m pick made +4.8R
+   and the 5m pick lost 1.0R.
 
    *Words used here.* Pick: the one setting chosen for a chart. Candidates: the settings that
-   made money in both 18-month halves of the last three years, also at stressed costs.
-   Stressed costs: double commission (0.10% per side) and 3 ticks of slippage. Resamples: the
-   weeks of a result are drawn again at random thousands of times (some twice, some not at
-   all) and added up; "positive in 86% of resamples" means the total stayed above zero in 86%
-   of these draws. Below 90%, a few good weeks carry the result. Steadiest: the most even
-   result month by month, not the biggest total.
+   made money in both 18-month halves of the last three years, also at stressed costs (only
+   settings with at least 30 trades in each half count). Stressed costs: double commission
+   (0.10% per side) and 3 ticks of slippage. Resamples: the weeks of a result are drawn
+   again at random thousands of times (some twice, some not at all) and added up; "positive
+   in 86% of resamples" means the total stayed above zero in 86% of these draws. Below 90%,
+   a few good weeks carry the result. Steadiest: the most even result month by month, not
+   the biggest total.
 
 4. **Expect little, and less than the files show.** The only figures that say something are
    those on 2021-2023, which the picks were not chosen on. There the three USABLE picks made
@@ -95,7 +113,7 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
    three years passed the same test as a group on 2021-2023 on 8 of 9 charts (they made money
    on all nine). That period had bigger moves (ATR 1.4 to 1.5 times higher), so commission
    weighed less. And on 4h, where commission is small, the candidates did no better there
-   than random settings of the same direction.
+   than random settings with the same trade directions.
 
 6. **Which charts got a file is partly the luck of one pick.** On 1h, 10m, 5m and 2m the 25
    steadiest candidates did well as a group on 2021-2023 (72% to 92% of them made money), but
@@ -113,6 +131,11 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
    fastest filter tested is 1m, and on the 1m chart it is the worst (25% of with-the-filter
    settings positive in both halves before fees, against 44% with a 4h filter). With a
    no-trade band 1.6 USD wide, a 1-second filter flips on almost every tick.
+
+   This is advice for your own file. The calibrated files keep the filter they were tested
+   with: 1D with a 1D parent in the 15m, 4h and 1m files, 4h with a 4h parent in the 3m
+   file. Leave every input of a calibrated file as it is: a changed file is an untested
+   one, and its trades no longer match the list.
 
 8. **Trailing stop: leave it off.** With the same settings, switching it on made no
    difference on 4h and made results worse on every chart from 2m to 1h (on 1m nothing is
@@ -135,27 +158,45 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
 
 **What I would do.**
 
-1. Today: check that TradingView trades like my copy. Open the Binance perpetual
+1. Now: check that TradingView trades like my copy. Open the Binance perpetual
    (BINANCE:BTCUSDT.P, the data used here) on a 15m chart, time zone UTC, load
-   `AMVI_FGF_BTCUSDT_15m.pine` and compare the Strategy Tester's List of Trades with
-   `results/trades_BTCUSDT_15m.csv` for the dates both cover (the list ends 2026-10-31).
-   Entries must be on the same candles and in the same direction. If they are not, do not
-   trade the file and send me the tester's list; if the file does not load, send me the error
-   line. An exit that differs by a candle or a few USDT is the tester's price path (section 9
-   has the details).
+   `AMVI_FGF_BTCUSDT_15m.pine`, change no input, and compare the Strategy Tester's List of
+   Trades with `results/trades_BTCUSDT_15m.csv` for the dates both cover (the list ends
+   2026-10-31). Start one week after the first candle your chart loads: the script has no
+   signal for its first 420 candles or so (4.4 days), so list trades in that stretch are
+   missing in the tester and the next one can be shifted. That is not a mismatch. From
+   there on, entries must be on the same candles and in the same direction, and on this
+   file the exits should be on the same candles too. If they are not, do not trade the file
+   and send me the tester's list; if the file does not load, send me the error line. Do it
+   soon: the chart's window moves on every day and the list does not. A chart with 5,000
+   candles has 3 list trades left to compare today and none from mid-December; 10,000
+   candles have 16, 20,000 have 37 (section 9).
 2. Then run that file on your Bitget chart with alerts only for about three months (some 20
-   trades). On Bitget a few trades will differ from Binance.
+   trades). The file has no alert() call: create the alert on the strategy itself (order
+   fills). Do not judge these months by profit: 20 trades cannot show it. In the backtest
+   itself about one run of 20 trades in four lost (the average run made +1.5R, the worst
+   -4.4R). Check instead that every alert shows up afterwards in the Strategy Tester's list
+   on the same candle and side, and how far Bitget's price is from that entry; a few trades
+   will differ from Binance. Only if that holds: small size means no more than the file's
+   own sizing, 0.5% of the account at risk per trade with the position capped at 5x, which
+   is your lab's limit, and your lab's own rule comes first (testnet until you write "go
+   live").
 3. Start with the 15m file: it made money in each year of 2021-2023, its candidates did
    better there than random with-the-filter settings (84% of them made money, against 43%),
    and TradingView can replay it. The 3m file comes second (it needs Deep Backtesting to
    check). Treat the 4h file as one with-the-filter setting among many: on 4h the search
    added nothing measurable to the direction, the file passes its one test narrowly (96.6%
    of resamples where 95% is needed), and TradingView can replay it only back to 2024-01.
-4. Do not run the 1-second filter or the inverted direction on BTC, and do not put a file on
-   another chart timeframe than the one in its name. On a 10m chart also switch off the 15m
-   AMVI timeframe (it is on in your file): 15m candles do not line up with 10m candles, so
-   the live chart and the reloaded chart take different trades.
-5. Only the 15m and 3m files stay inside your lab's holding limit (hours to one day): the 4h
+4. On your 5m and 10m charts: do not trade this strategy now. The one setting chosen for
+   each did not pass (the 5m pick lost on 2021-2023, the 10m pick's gain there rests on a
+   few weeks), so there is no file. If you keep your own file on such a chart to watch it:
+   "Follow the filter", a 4h filter with a 4h or 1D parent, trailing stop off. On 10m also
+   untick "15m" in the group "Timeframes (enabled = fetched, plotted, used for signals)",
+   not the "15m" under "Overlay": 15m candles do not line up with 10m candles, so the live
+   chart and the reloaded chart take different trades. That setup stays untested (point 3).
+5. Do not run the 1-second filter on BTC, do not run the inverted direction with a slower
+   filter, and do not put a file on another chart timeframe than the one in its name.
+6. Only the 15m and 3m files stay inside your lab's holding limit (hours to one day): the 4h
    file holds 28 to 35 hours on average and up to 8 days, the 1m file 3.6 to 6.4 days on
    average.
 
@@ -179,14 +220,15 @@ does not run in this environment, so the script was rebuilt in Python
 filter (signal, zones, band, permission), and the orders (reversal, ATR stop, target, trailing
 stop, volatility exit, time stop, wait). It was checked five ways (logs in `results/checks/`):
 
-- two more copies were written independently from the Pine source (`tools/ref/`). The engine
-  agrees with them bar for bar on the signals and trade for trade on the orders, on 72 + 72
-  random settings (two three-month slices, six chart timeframes) and on the nine picks
-  themselves over 2025-08 to 2026-04;
-- a third, literal statement-by-statement copy of the filter agrees with the engine on the
-  filter zone of all nine picks, including the 4h and 5m picks, whose filter mode ("Level at
-  candle open" with a filter above the chart) the other two copies do not implement. During
-  the review it agreed on 49.8 million chart bars;
+- two reference versions were written independently from the Pine source (`tools/ref/`):
+  one of the signal side, one of the order side. The engine agrees with the first bar for
+  bar on the signals and with the second trade for trade on the orders (the order version
+  is given the engine's signals), on 72 + 72 random settings (two three-month slices, six
+  chart timeframes) and on the nine picks themselves over 2025-08 to 2026-04. So each part
+  has one independent check, not two;
+- a literal statement-by-statement copy of the filter agrees with the engine on the filter
+  zone of all nine picks, including the 4h and 5m picks, whose filter mode ("Level at
+  candle open" with a filter above the chart) the signal version does not implement;
 - 8 hand-computed order scenarios;
 - a look-ahead test: prices after a time T were replaced by another path, and nothing the
   engine shows for candles closed by T changed;
@@ -225,9 +267,10 @@ With the files' Risk 0.5% sizing, 1R = 0.5% of the account: +20R is about +10%. 
 is so tight that 0.5% risk would need more than 5x leverage, the files' 5x cap makes the
 position smaller; the per-timeframe blocks give the result in % with that cap applied.
 
-**Timeframes.** Chart: 1m, 2m, 3m, 5m, 10m, 15m, 30m, 1h, 4h. AMVI timeframes and filter
-timeframe: 1m, 5m, 15m, 30m, 1h, 4h, 1D, with two restrictions so that a result can be
-replayed on TradingView:
+**Timeframes.** Chart: 1m, 2m, 3m, 5m, 10m, 15m, 30m, 1h, 4h. AMVI timeframes: 1m, 5m, 15m,
+30m, 1h, 4h, 1D. Filter timeframe: the same list, or the chart's own timeframe (2m, 3m and
+10m filters exist only on those charts). Two restrictions apply to both, so that a result
+can be replayed on TradingView:
 
 - a timeframe at or above the chart must be a whole multiple of it (15m on a 10m chart reads
   a different candle live than after a reload);
@@ -259,13 +302,14 @@ set to your lab's limits (0.5% risk, 5x leverage cap). Display inputs were left 
    when those 40 are positive on average, beat 95% of random groups of 40, and stay positive
    in 95% of resamples of the months. If the best of one half are not good on the other,
    "the best setting" is the luckiest of thousands, not a find.
-3. **Candidates and the pick.** Settings positive in both halves at base and stressed costs
-   are candidates. For the 20 steadiest, every numeric input is moved one step, one at a time
-   (the neighbours). The pick is the candidate with the largest share of neighbours still
-   positive in both halves (ties: the steadier neighbourhood). This screens out settings that
-   hang on one input's exact value. It does not screen out luck: neighbours take mostly the
-   same trades, and a lucky candidate passes it about nine times in ten.
-4. **The untouched period.** 2021-01-01 to 2023-10-31 (BTC +58% in 2021, -65% in 2022, +110%
+3. **Candidates and the pick.** Settings with at least 30 trades in each half, and a trade
+   in at least 60% of its months, that are positive in both halves at base and stressed
+   costs are candidates. For the 20 steadiest, every numeric input is moved one step, one at
+   a time (the neighbours). The pick is the candidate with the largest share of neighbours
+   still positive in both halves (ties: the steadier neighbourhood). This screens out
+   settings that hang on one input's exact value. It does not screen out luck: neighbours
+   take mostly the same trades, and a lucky candidate passes it about nine times in ten.
+4. **The untouched period.** 2021-01-01 to 2023-10-31 (BTC +60% in 2021, -64% in 2022, +110%
    from January to October 2023) was not used to find or choose anything. Each pick is run
    on it once. Separately there is a group test: the 25 steadiest candidates of a timeframe
    (12 on 1m) are scored there with the same three conditions as a hold-out test, against
@@ -283,14 +327,16 @@ set to your lab's limits (0.5% risk, 5x leverage cap). Display inputs were left 
 
    | Verdict | Means | Luck alone earns it or better |
    |---|---|---|
-   | RECOMMENDED | holds up, positive in 95% of resamples, and all four tests pass | never in 9,000 luck-only worlds |
+   | RECOMMENDED | holds up, positive in 95% of resamples (there and in the search window), and all four tests pass | never in 9,000 luck-only worlds |
    | USABLE | holds up, positive in 95% of resamples, and at least one of the four tests passes (for 15m, 3m and 4h it is the group test; the three hold-out tests fail on every chart) | in 0.1% to 1.1% of the luck-only worlds, depending on the chart |
    | PAPER-TRADE | holds up, but is positive in fewer than 95% of resamples (1m: 93%) or passes none of the four tests: watch it, do not fund it | in 4.6% to 7.3% |
-   | NOT RECOMMENDED | the pick does not hold up, although one of the four tests passes (here always the group test) | |
-   | DO NOT TRADE | the pick does not hold up and none of the four tests passes | |
+   | NOT RECOMMENDED | the pick does not hold up, although one of the four tests passes (here always the group test) or the search found more candidates than 95% of the luck-only worlds (that rule decided no chart) | |
+   | DO NOT TRADE | the pick does not hold up and neither of those is true | |
 
-   A file is written only for PAPER-TRADE and better; the PAPER-TRADE file is for watching,
-   not for money. The rules were tightened after an independent statistics review and before
+   A pick that uses the trailing stop can be USABLE or better only if it also stays positive
+   in both periods when the trailing stop starts again at every candle close (section 8,
+   point 6); none of the four files uses the trailing stop. A file is written only for
+   PAPER-TRADE and better; the PAPER-TRADE file is for watching, not for money. The rules were tightened after an independent statistics review and before
    the final run (what that changed: section 8, point 5). RECOMMENDED is strict on purpose: a
    moderate real edge would rarely reach it in three years of data.
 
@@ -319,27 +365,30 @@ of thousands of settings and is flattered by that choice.
 Best 40 = the 40 steadiest settings of one part of the search window, scored on another part. A test passes when their mean is
 positive, above 95% of random groups of 40, and stays positive in 95% of resamples of the months. The last column is the same test
 for the 25 steadiest candidates (12 on 1m), chosen on the whole search window and scored on the untouched period.
-The three "Positive" columns are shares of the settings with at least 30 trades in each half: 57,920 of the 110,000 tried.
+The three "Positive" columns are shares of the settings with at least 30 trades in each half and a trade in at least 60% of its
+months: 57,920 of the 110,000 tried. "Beaten" in the last column: the candidates' mean is above 95% of random groups with
+their own trade directions.
 
 | Chart | Settings tried | Positive before costs | Positive after costs | Positive in both halves | First half -> second (best 40) | Second -> first | Walk-forward (two years -> the third) | Search window -> untouched period (25 steadiest candidates) |
 |---|---|---|---|---|---|---|---|---|
-| 1m | 6,000 | 58% | 2% | 0.9% | -9.9R, 25% positive, 22% of resamples (fail) | -0.3R, 50% positive, 46% of resamples (fail) | -3.2R, 38% positive, 38% of resamples (fail) | +60.3R, 83% positive, 96.9% of resamples (pass); random settings of the same direction -1438.1R (beaten) |
-| 2m | 8,000 | 51% | 6% | 2.8% | -3.7R, 48% positive, 25% of resamples (fail) | +10.6R, 52% positive, 87% of resamples (fail) | +6.2R, 62% positive, 77% of resamples (fail) | +54.0R, 72% positive, 96.1% of resamples (pass); random settings of the same direction -50.2R (beaten) |
-| 3m | 8,000 | 52% | 6% | 3.3% | -5.0R, 40% positive, 12% of resamples (fail) | +3.3R, 60% positive, 61% of resamples (fail) | -1.1R, 50% positive, 35% of resamples (fail) | +18.6R, 80% positive, 98.7% of resamples (pass); random settings of the same direction -72.3R (beaten) |
-| 5m | 12,000 | 54% | 7% | 3.2% | -6.2R, 32% positive, 16% of resamples (fail) | +9.4R, 55% positive, 80% of resamples (fail) | -4.5R, 32% positive, 22% of resamples (fail) | +27.0R, 76% positive, 99.1% of resamples (pass); random settings of the same direction -150.2R (beaten) |
-| 10m | 12,000 | 51% | 13% | 6.3% | -4.3R, 35% positive, 3% of resamples (fail) | +1.1R, 50% positive, 56% of resamples (fail) | +0.7R, 48% positive, 59% of resamples (fail) | +25.3R, 80% positive, 99.5% of resamples (pass); random settings of the same direction -19.8R (beaten) |
-| 15m | 16,000 | 49% | 15% | 7.1% | -5.5R, 28% positive, 11% of resamples (fail) | -3.3R, 40% positive, 9% of resamples (fail) | -2.8R, 32% positive, 18% of resamples (fail) | +14.7R, 84% positive, 100.0% of resamples (pass); random settings of the same direction -16.1R (beaten) |
-| 30m | 16,000 | 50% | 19% | 8.6% | -5.0R, 42% positive, 20% of resamples (fail) | +2.2R, 57% positive, 80% of resamples (fail) | -6.3R, 35% positive, 20% of resamples (fail) | +12.1R, 84% positive, 93.2% of resamples (fail); random settings of the same direction -8.6R (not beaten) |
-| 1h | 16,000 | 51% | 23% | 9.9% | -2.0R, 45% positive, 37% of resamples (fail) | +0.9R, 55% positive, 79% of resamples (fail) | -2.8R, 32% positive, 26% of resamples (fail) | +17.1R, 92% positive, 99.6% of resamples (pass); random settings of the same direction +4.7R (beaten) |
-| 4h | 16,000 | 50% | 32% | 15.3% | -3.6R, 30% positive, 17% of resamples (fail) | -1.1R, 45% positive, 16% of resamples (fail) | -2.6R, 35% positive, 31% of resamples (fail) | +12.5R, 68% positive, 96.6% of resamples (pass); random settings of the same direction +11.9R (not beaten) |
+| 1m | 6,000 | 58% | 2% | 0.9% | -9.9R, 25% positive, 22% of resamples (fail) | -0.3R, 50% positive, 46% of resamples (fail) | -3.2R, 38% positive, 38% of resamples (fail) | +60.3R, 83% positive, 96.9% of resamples (pass); random settings of the same directions -1438.1R (beaten) |
+| 2m | 8,000 | 51% | 6% | 2.8% | -3.7R, 48% positive, 25% of resamples (fail) | +10.6R, 52% positive, 87% of resamples (fail) | +6.2R, 62% positive, 77% of resamples (fail) | +54.0R, 72% positive, 96.1% of resamples (pass); random settings of the same directions -50.2R (beaten) |
+| 3m | 8,000 | 52% | 6% | 3.3% | -5.0R, 40% positive, 12% of resamples (fail) | +3.3R, 60% positive, 61% of resamples (fail) | -1.1R, 50% positive, 35% of resamples (fail) | +18.6R, 80% positive, 98.7% of resamples (pass); random settings of the same directions -72.3R (beaten) |
+| 5m | 12,000 | 54% | 7% | 3.2% | -6.2R, 32% positive, 16% of resamples (fail) | +9.4R, 55% positive, 80% of resamples (fail) | -4.5R, 32% positive, 22% of resamples (fail) | +27.0R, 76% positive, 99.1% of resamples (pass); random settings of the same directions -150.2R (beaten) |
+| 10m | 12,000 | 51% | 13% | 6.3% | -4.3R, 35% positive, 3% of resamples (fail) | +1.1R, 50% positive, 56% of resamples (fail) | +0.7R, 48% positive, 59% of resamples (fail) | +25.3R, 80% positive, 99.5% of resamples (pass); random settings of the same directions -19.8R (beaten) |
+| 15m | 16,000 | 49% | 15% | 7.1% | -5.5R, 28% positive, 11% of resamples (fail) | -3.3R, 40% positive, 9% of resamples (fail) | -2.8R, 32% positive, 18% of resamples (fail) | +14.7R, 84% positive, 100.0% of resamples (pass); random settings of the same directions -16.1R (beaten) |
+| 30m | 16,000 | 50% | 19% | 8.6% | -5.0R, 42% positive, 20% of resamples (fail) | +2.2R, 57% positive, 80% of resamples (fail) | -6.3R, 35% positive, 20% of resamples (fail) | +12.1R, 84% positive, 93.2% of resamples (fail); random settings of the same directions -8.6R (beaten) |
+| 1h | 16,000 | 51% | 23% | 9.9% | -2.0R, 45% positive, 37% of resamples (fail) | +0.9R, 55% positive, 79% of resamples (fail) | -2.8R, 32% positive, 26% of resamples (fail) | +17.1R, 92% positive, 99.6% of resamples (pass); random settings of the same directions +4.7R (beaten) |
+| 4h | 16,000 | 50% | 32% | 15.3% | -3.6R, 30% positive, 17% of resamples (fail) | -1.1R, 45% positive, 16% of resamples (fail) | -2.6R, 35% positive, 31% of resamples (fail) | +12.5R, 68% positive, 96.6% of resamples (pass); random settings of the same directions +11.9R (not beaten) |
 
 **None of the 27 hold-out tests inside the search window passes.** The 40 steadiest settings
 of one part made between -10R and +11R on the other part: around zero. On the charts up to
-1h they do far better than random settings, which lose from 10R on 1h to more than 700R on
-1m, but less bad than random is not a profit. On 4h, where random settings lose only 4R to
-7R, the best 40 are no better than a random group in any of the three tests. The
-walk-forward column is the most recent year, scored with settings chosen on the two years
-before it: between -6R and +6R on every chart.
+1h random settings lose from 10R (1h) to more than 700R (1m), and the best 40 do far better
+than that in 23 of the 24 tests (the exception is the 30m walk-forward: -6.3R, inside the
+range of random groups); but less bad than random is not a profit. On 4h, where random
+settings lose only 4R to 7R, the best 40 are no better than a random group in any of the
+three tests. The walk-forward column is the most recent year, scored with settings chosen
+on the two years before it: between -6R and +6R on every chart.
 
 **The last column passes on 8 of 9 charts.** The 25 steadiest candidates of the whole search
 window, run on the untouched period, made money as a group on all nine charts: +12R to +60R
@@ -348,13 +397,15 @@ resamples instead of 95%). The 4h result passes by as little (96.6%), and it is 
 of the four tests that 4h passes; had it missed, the 4h file would be PAPER-TRADE. On the
 low timeframes the candidates beat random settings of their own direction by a wide margin,
 but mostly because random settings there lose to commission; on 4h, where commission is
-small, the candidates do no better than random with-the-filter settings (+12.5R against
-+11.9R). The direction is the find, not the fine-tuning.
+small, the candidates do no better than random settings with the same trade directions
+(+12.5R against +11.9R; 22 of the 25 trade with the filter, 3 are inverted). The direction
+is the find, not the fine-tuning.
 
 ### 4.3 The two trade directions on data the search never saw
 
 400 random settings of the search per timeframe (at least 30 trades in each half of the search window), run over the untouched
-period and split by trade direction; then the same split on the search window for all settings of the search.
+period and split by trade direction; then the same split on the search window for all settings of the search with at least 30
+trades in each half (58,800 of the 110,000).
 "Positive" = net result above zero over the whole period after 0.05% per side, 1 tick and funding. The last two columns:
 positive in both halves of the search window, after costs / before costs.
 
@@ -376,7 +427,8 @@ less: from 4% on 1m to 53% on 4h in the search window, from 10% to 83% on the un
 period. The inverted direction, which the shipped file uses, stays between 1% and 16%
 everywhere. The gap is clear from 5m up and small on 2m and 3m on the untouched period (16%
 against 11%, 15% against 10%). From 3m up it is as wide before costs (last two columns), so
-it is not a commission effect.
+it is not a commission effect. It does depend on the filter's timeframe: with the fastest
+filters on the 1m and 2m charts the order is reversed before costs (section 6).
 
 **The untouched period was the easier one.** On every chart more with-the-filter settings
 made money there than in the search window (4h: 83% against 53%; 15m: 43% against 25%). The
@@ -499,15 +551,17 @@ The shipped pair (activation 1.5, offset 1.0) is one of the weaker ones. On ever
 and the share of settings positive in both halves falls to about 60% of the "off" figure on
 4h, about half on 1h and 15m, 43% on 30m, about a third from 10m to 3m, and 15% on 2m.
 
-**Why TradingView shows the opposite on 4h and 1h.** Without Bar Magnifier the Strategy
-Tester knows only each candle's open, high, low and close. It assumes price went straight to
-the high before coming back, so a trailing stop seems to exit near the best price of every
-candle. Walked that way, 30 of the 42 pairs look better than "off" on 4h and 14 on 1h, the
-tight ones most: with a 0.5 / 0.5 ATR pair, 49% of the 4h settings look profitable in both
-halves, and on the real second-by-second prices 4% are (1h: 43% and 3%). That is 0.05R to
-0.10R per trade of profit that never existed. From 15m down even the chart-candle walk shows
-most pairs below "off". If a trailing stop has looked excellent in your own TradingView
-tests on the higher timeframes, this is the most likely reason.
+**Why TradingView shows the opposite on 4h and 1h.** With Bar detalization on its default
+(the former "Bar Magnifier" off) the Strategy Tester knows only each candle's open, high,
+low and close. It assumes price ran in straight lines from the open to one extreme, on to
+the other and then to the close, so a trailing stop seems to exit just behind the best
+price of every candle. Walked that way, 30 of the 42 pairs look better than "off" on 4h,
+14 on 1h and 13 on 30m (there mostly the pairs with an offset of 0.5 or 1 ATR), and at most
+7 on the charts from 15m down to 2m. The tight pairs gain most: with a 0.5 / 0.5 ATR pair,
+49% of the 4h settings look profitable in both halves, and on the real second-by-second
+prices 4% are (1h: 43% and 3%). That is 0.05R to 0.10R per trade of profit that never
+existed. If a trailing stop has looked excellent in your own TradingView tests on the
+higher timeframes, this is the most likely reason.
 
 The same settings (a random sample of the search: 300 per timeframe, 200 on 5m and below) with the trailing stop off and with
 each of the 42 Trail Activation x Trail Offset pairs, nothing else changed, on the second-by-second price path. "Both halves" =
@@ -586,13 +640,15 @@ before, the difference is commission, not better trades.
 
 Every input, value by value, for every timeframe: `results/INPUTS.md`.
 
-**Before costs, only one input clearly separates good from bad: the trade direction.** From
-5m up, 41% to 48% of with-the-filter settings are positive in both halves before costs,
-against 8% to 16% of inverted ones; below 5m the gap narrows (1m: 38% against 33%). Trailing
-on or off, target or none, time stop or none: before costs each pair lands within a few
-points of the other (except on 1m, where trailing and target differ by 6 to 9 points). Stop
-size shows no steady pattern before costs: a 0.5 ATR stop is the worst on 15m and 4h but
-among the best on 1m, 3m and 5m. After costs it is the worst on every chart.
+**Before costs, the trade direction is the only input that clearly separates good from bad
+on its own.** (The filter timeframe does too once the direction is fixed, on charts up to
+15m: last two paragraphs.) From 5m up, 41% to 48% of with-the-filter settings are positive
+in both halves before costs, against 8% to 16% of inverted ones; below 5m the gap narrows
+(1m: 38% against 33%). Trailing on or off, target or none, time stop or none: before costs
+each pair lands within a few points of the other (except on 1m, where trailing and target
+differ by 6 to 9 points). Stop size shows no steady pattern before costs: a 0.5 ATR stop is
+the worst on 15m and 4h but among the best on 1m, 3m and 5m. After costs it is the worst on
+every chart.
 
 **After costs, what looks like "a better value" is mostly a cheaper one.** A stop of 4 ATR or
 more pays a fraction of the commission in R of a stop of 1 ATR or less, and looks better for
@@ -615,6 +671,37 @@ costs is 2 to 3 points, which is noise, and on 4h there is none. A 1D filter com
 most charts. These figures are for with-the-filter settings only; `results/INPUTS.md` pools
 both directions, where the effect partly cancels. Seconds filters were not tested.
 
+**The faster the filter, the less the direction is worth.** Settings positive in both halves
+before costs, with the filter / inverted, by filter timeframe (settings with at least 30
+trades in each half; `tools/direction_by_filter.py`, log in
+`results/direction_by_filter.txt`):
+
+| Chart | Filter on the chart's own timeframe | 5m filter | 15m filter | 30m filter | 1h filter | 4h filter | 1D filter |
+|---|---|---|---|---|---|---|---|
+| 1m | 25% / 41% * | 31% / 47% * | 39% / 36% | 45% / 29% | 46% / 23% | 44% / 26% | 39% / 29% |
+| 2m | 20% / 35% * | - | - | 29% / 27% | 32% / 19% | 35% / 20% | 37% / 15% |
+| 3m | 27% / 25% | - | 30% / 29% | 44% / 17% | 46% / 17% | 53% / 14% | 50% / 13% |
+| 5m | 35% / 22% | see first column | 43% / 20% | 51% / 15% | 55% / 13% | 56% / 12% | 48% / 15% |
+| 10m | 34% / 18% | - | - | 34% / 19% | 39% / 15% | 48% / 7% | 48% / 10% |
+| 15m | 39% / 14% | - | see first column | 46% / 15% | 49% / 11% | 55% / 9% | 51% / 11% |
+| 30m | 48% / 12% | - | 48% / 15% | see first column | 44% / 14% | 51% / 8% | 50% / 10% |
+| 1h | 48% / 11% | - | 44% / 12% | 45% / 12% | see first column | 51% / 8% | 49% / 9% |
+| 4h | 48% / 8% | - | 47% / 8% | 48% / 8% | 49% / 7% | see first column | 45% / 10% |
+
+\* inverted ahead.
+
+With a 4h filter the with-the-filter side is 15 to 46 points ahead on every chart; on the
+charts from 3m to 1h fewer than 2% of luck-only worlds show a gap that large (1m: 3%, 4h:
+11%, 2m: 23%). With the filter on the chart's own timeframe the gap shrinks to 14 and 17
+points on the 5m and 10m charts, is gone on 3m (2 points) and is reversed on 1m and 2m: on
+the 1m chart with a 1m or 5m filter and on the 2m chart with a 2m filter the inverted side
+is ahead by 15 to 17 points. Chance produces a gap that size in 5% to 10% of luck-only
+worlds, so the reversal may be luck; what it rules out is reading "trade with the filter"
+as a rule for fast filters. After costs it matters little there: in those three cells 1% to
+5% of with-the-filter settings and 0% to 3% of inverted ones made money over the three
+years. The 2m chart is the weakest case throughout: its gaps are inside the luck-only range
+at every filter timeframe.
+
 ## 7. Settings per timeframe
 
 ### 1m: PAPER-TRADE
@@ -628,8 +715,8 @@ PAPER-TRADE because it made money on 2021-2023, which it was not chosen on, at b
 - Costs (search window): Bitget 0.06% +104.3R; no costs +124.5R; stressed +92.8R; break-even commission 0.424% per side. Fees took 14.3R and funding +3.0R.
 - Price path (search window): second by second +107.1R; on 1-minute bars +107.1R; on the chart's candles +107.1R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 145 trades, 18% profitable, profit factor about 1.8, net profit about +54% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 12 steadiest candidates made +60.3R on average (83% of them made money; positive in 96.9% of resamples of the months): pass. Random settings of the same trade direction made -1438.1R, so the choice adds something beyond the direction.
-- Not fragile: 88% of 25 neighbouring settings positive in both halves; sensitive to: Time Stop, Normalization Period, Take Profit.
+- The selection method on this timeframe, search window -> untouched period: the 12 steadiest candidates made +60.3R on average (83% of them made money; positive in 96.9% of resamples of the months): pass. Random groups with the candidates' trade directions (1 of 12 inverted) made -1438.1R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
+- Not fragile: 88% of 25 neighbouring settings positive in both halves; sensitive to: Time Stop; Normalization Period; Take Profit.
 - Concentration (search window): 10 biggest trades +207.5R, all others -100.4R; positive in 91.0% of resamples of its weeks.
 - Same inputs, other trade direction: -22.5R.
 
@@ -675,8 +762,8 @@ NOT RECOMMENDED because it does not hold up on 2021-2023 (it loses there at stre
 - Costs (search window): Bitget 0.06% +10.9R; no costs +17.1R; stressed +6.8R; break-even commission 0.166% per side. Fees took 5.2R and funding -0.0R.
 - Price path (search window): second by second +12.0R; on 1-minute bars +12.0R; on the chart's candles +12.0R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 97 trades, 86% profitable, profit factor about 1.7, net profit about +5% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +54.0R on average (72% of them made money; positive in 96.1% of resamples of the months): pass. Random settings of the same trade direction made -50.2R, so the choice adds something beyond the direction.
-- Not fragile: 92% of 25 neighbouring settings positive in both halves; sensitive to: No-trade band, ATR mult, Time Stop.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +54.0R on average (72% of them made money; positive in 96.1% of resamples of the months): pass. Random groups with the candidates' trade directions (4 of 25 inverted) made -50.2R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
+- Not fragile: 92% of 25 neighbouring settings positive in both halves; sensitive to: No-trade band, ATR mult; Time Stop.
 - Concentration (search window): 10 biggest trades +3.5R, all others +8.4R; positive in 99.5% of resamples of its weeks.
 - Same inputs, other trade direction: -22.4R.
 
@@ -728,8 +815,8 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 - Costs (search window): Bitget 0.06% +22.2R; no costs +29.0R; stressed +17.7R; break-even commission 0.258% per side. Fees took 5.6R and funding +0.1R.
 - Price path (search window): second by second +23.4R; on 1-minute bars +23.4R; on the chart's candles +23.4R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 79 trades, 58% profitable, profit factor about 2.1, net profit about +11% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +18.6R on average (80% of them made money; positive in 98.7% of resamples of the months): pass. Random settings of the same trade direction made -72.3R, so the choice adds something beyond the direction.
-- Not fragile: 93% of 28 neighbouring settings positive in both halves; sensitive to: Burst threshold, ATR mult, Min TFs Above High Vol.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +18.6R on average (80% of them made money; positive in 98.7% of resamples of the months): pass. Random groups with the candidates' trade directions (2 of 25 inverted) made -72.3R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
+- Not fragile: 93% of 28 neighbouring settings positive in both halves; sensitive to: Burst threshold, ATR mult; Min TFs Above High Vol.
 - Concentration (search window): 10 biggest trades +14.4R, all others +9.0R; positive in 99.6% of resamples of its weeks.
 - Same inputs, other trade direction: -24.3R.
 
@@ -787,7 +874,7 @@ NOT RECOMMENDED because it does not hold up on 2021-2023 (it lost there), althou
 - Costs (search window): Bitget 0.06% +15.2R; no costs +20.7R; stressed +11.6R; break-even commission 0.229% per side. Fees took 4.5R and funding +0.0R.
 - Price path (search window): second by second +16.1R; on 1-minute bars +16.1R; on the chart's candles +16.1R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 68 trades, 56% profitable, profit factor about 1.5, net profit about +8% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +27.0R on average (76% of them made money; positive in 99.1% of resamples of the months): pass. Random settings of the same trade direction made -150.2R, so the choice adds something beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +27.0R on average (76% of them made money; positive in 99.1% of resamples of the months): pass. Random groups with the candidates' trade directions (4 of 25 inverted) made -150.2R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
 - Not fragile: 96% of 28 neighbouring settings positive in both halves; sensitive to: Burst threshold, ATR mult.
 - Concentration (search window): 10 biggest trades +13.0R, all others +3.2R; positive in 96.0% of resamples of its weeks.
 - Same inputs, other trade direction: -26.8R.
@@ -845,8 +932,8 @@ NOT RECOMMENDED because it does not hold up on 2021-2023 (its gain there stays p
 - Costs (search window): Bitget 0.06% +13.6R; no costs +19.2R; stressed +10.2R; break-even commission 0.211% per side. Fees took 4.5R and funding +0.1R.
 - Price path (search window): second by second +14.5R; on 1-minute bars +14.5R; on the chart's candles +16.8R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 85 trades, 62% profitable, profit factor about 1.5, net profit about +8% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +25.3R on average (80% of them made money; positive in 99.5% of resamples of the months): pass. Random settings of the same trade direction made -19.8R, so the choice adds something beyond the direction.
-- Not fragile: 94% of 31 neighbouring settings positive in both halves; sensitive to: Candle Range Period, Time Stop.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +25.3R on average (80% of them made money; positive in 99.5% of resamples of the months): pass. Random groups with the candidates' trade directions (4 of 25 inverted) made -19.8R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
+- Not fragile: 94% of 31 neighbouring settings positive in both halves; sensitive to: Candle Range Period; Time Stop.
 - Concentration (search window): 10 biggest trades +14.3R, all others +0.2R; positive in 95.3% of resamples of its weeks.
 - Same inputs, other trade direction: -28.7R.
 - Trailing stop restarted at every candle close (if TradingView does that): search window +15.4R, untouched +7.8R.
@@ -904,7 +991,7 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 - Costs (search window): Bitget 0.06% +19.6R; no costs +28.8R; stressed +13.6R; break-even commission 0.191% per side. Fees took 7.5R and funding +0.1R.
 - Price path (search window): second by second +21.1R; on 1-minute bars +21.1R; on the chart's candles +21.1R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 284 trades, 54% profitable, profit factor about 1.3, net profit about +10% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +14.7R on average (84% of them made money; positive in 100.0% of resamples of the months): pass. Random settings of the same trade direction made -16.1R, so the choice adds something beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +14.7R on average (84% of them made money; positive in 100.0% of resamples of the months): pass. Random groups with the candidates' trade directions (1 of 25 inverted) made -16.1R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
 - Not fragile: 100% of 23 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +7.4R, all others +13.7R; positive in 98.9% of resamples of its weeks.
 - Same inputs, other trade direction: -32.6R.
@@ -955,7 +1042,7 @@ DO NOT TRADE because it does not hold up on 2021-2023 (its gain there stays posi
 - Costs (search window): Bitget 0.06% +19.8R; no costs +22.4R; stressed +18.0R; break-even commission 0.510% per side. Fees took 2.2R and funding -0.1R.
 - Price path (search window): second by second +20.2R; on 1-minute bars +21.5R; on the chart's candles +21.4R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 72 trades, 75% profitable, profit factor about 2.3, net profit about +10% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.1R on average (84% of them made money; positive in 93.2% of resamples of the months): fail. Random settings of the same trade direction made -8.6R, so the choice adds nothing measurable beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.1R on average (84% of them made money; positive in 93.2% of resamples of the months): fail. Random groups with the candidates' trade directions (1 of 25 inverted) made -8.6R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
 - Not fragile: 100% of 25 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +12.2R, all others +8.1R; positive in 99.8% of resamples of its weeks.
 - Same inputs, other trade direction: -17.2R.
@@ -1007,7 +1094,7 @@ NOT RECOMMENDED because it does not hold up on 2021-2023 (its gain there stays p
 - Costs (search window): Bitget 0.06% +21.2R; no costs +26.5R; stressed +17.8R; break-even commission 0.312% per side. Fees took 4.2R and funding +0.3R.
 - Price path (search window): second by second +22.0R; on 1-minute bars +22.0R; on the chart's candles +22.0R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 101 trades, 84% profitable, profit factor about 2.3, net profit about +11% for 2023-11-01 to 2026-10-31.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +17.1R on average (92% of them made money; positive in 99.6% of resamples of the months): pass. Random settings of the same trade direction made +4.7R, so the choice adds something beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +17.1R on average (92% of them made money; positive in 99.6% of resamples of the months): pass. Random groups of with-the-filter settings made +4.7R on average; the candidates beat 95% of such groups, so the choice adds something beyond the direction.
 - Not fragile: 100% of 22 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +4.7R, all others +17.3R; positive in 100.0% of resamples of its weeks.
 - Same inputs, other trade direction: -23.4R.
@@ -1060,7 +1147,7 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 - Costs (search window): Bitget 0.06% +34.3R; no costs +40.0R; stressed +30.5R; break-even commission 0.422% per side. Fees took 4.7R and funding +0.0R.
 - Price path (search window): second by second +35.2R; on 1-minute bars +35.2R; on the chart's candles +32.9R.
 - On TradingView (chart candles, 0.06% commission, no funding) the Strategy Tester should show about 100 trades, 59% profitable, profit factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31; TradingView can replay this file only from about 2024-01-19: from then about 94 trades, 61% profitable, net profit about +17%.
-- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.5R on average (68% of them made money; positive in 96.6% of resamples of the months): pass. Random settings of the same trade direction made +11.9R, so the choice adds nothing measurable beyond the direction.
+- The selection method on this timeframe, search window -> untouched period: the 25 steadiest candidates made +12.5R on average (68% of them made money; positive in 96.6% of resamples of the months): pass. Random groups with the candidates' trade directions (3 of 25 inverted) made +11.9R on average; the candidates do not beat 95% of such groups, so the choice adds nothing measurable beyond the direction.
 - Not fragile: 100% of 30 neighbouring settings positive in both halves.
 - Concentration (search window): 10 biggest trades +13.2R, all others +22.1R; positive in 99.8% of resamples of its weeks.
 - Same inputs, other trade direction: -31.0R.
@@ -1108,9 +1195,11 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 
 ## 8. What these numbers do not tell you
 
-1. **Not TradingView.** Every number comes from the Python copy. It matches two independent
-   copies of the Pine source and a third copy of its filter on all nine picks, and an
-   independent audit rebuilt the four files' trades from raw data. But it has not been
+1. **Not TradingView.** Every number comes from the Python copy. On all nine picks it matches
+   a reference version of the signal side and another of the order side, both written
+   independently from the Pine source, and a literal copy of the filter: one independent
+   check per part, two for the filter zone (one on the 4h and 5m picks). An independent
+   audit also rebuilt the four files' trades from raw data. But it has not been
    compared with TradingView, and the Pine files (the closed-candle engine included) have
    not been compiled there from here. If a file does not load, send me the error line.
 2. **Binance, not Bitget.** Same market, different exchange: wicks, the exact second a stop is
@@ -1136,9 +1225,12 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
    further change to the rules would need a fresh unseen period (data after 2026-11-01).
 6. **Trailing stop at candle closes.** The script re-sends its exit order at every candle
    close. I assumed TradingView keeps an already trailing stop where it is; I found no
-   official statement either way. If it starts the trailing again, trailing settings do
-   worse. None of the four files uses the trailing stop; the 10m and 30m picks do, and their
-   blocks in section 7 show that variant.
+   official statement either way. If it starts the trailing again, the two picks that trail
+   change by 1R to 4R, for the better in three of four results (10m: +15.4R instead of
+   +14.5R in the search window, +7.8R instead of +8.7R on 2021-2023; 30m: +24.0R instead of
+   +20.2R, +6.7R instead of +4.8R). No other trailing setting was run that way, so the
+   trailing study of section 5 holds only under my assumption. None of the four files uses
+   the trailing stop.
 7. **What TradingView can replay.** A chart holds 5,000 to 40,000 candles depending on the
    plan, and a request for a lower timeframe about 100,000 candles (section 9).
 8. **Small things not modelled.** Liquidation, partial fills, the filter's entry hold (off in
@@ -1155,38 +1247,67 @@ USABLE because it made money on 2021-2023, which it was not chosen on, at base a
 | Path | What it is |
 |---|---|
 | `presets/AMVI_FGF_BTCUSDT_<chart>.pine` | the script with that chart's input defaults (15m, 3m, 4h, 1m); the verdict is in the title and at the top of the file |
-| `results/trades_BTCUSDT_<chart>.csv` | every trade of a pick, untouched period and search window (UTC, Binance prices), to compare with TradingView's List of Trades |
+| `results/trades_BTCUSDT_<chart>.csv` | every trade of a pick, untouched period and search window (UTC, Binance prices), to compare with TradingView's List of Trades. R columns are rounded to three decimals: one 3m trade (2024-01-08) reads +0.000R and counts as a winner in the 3m block |
 | `results/equity_all.png`, `results/direction_and_costs.png` | the two charts of section 1 |
 | `results/INPUTS.md`, `results/TRAILING.md` | every input value by value, and every trailing pair, for every chart |
 | `results/final_<minutes>m.json` | every number of a pick (4h = 240, 1h = 60) |
 | `results/holdout_*.txt`, `plateau_*.txt`, `untouched_check.txt`, `trailing_*.txt`, `luck_*.txt` | the printed output of each step |
-| `results/checks/` | the engine against the reference copies, the look-ahead test, the second-by-second walk, data coverage, the output check |
+| `results/checks/` | the engine against the reference versions, the look-ahead test, the second-by-second walk, data coverage, the output check, and what the tester shows differently (`tester_view.txt`) |
+| `results/direction_by_filter.txt` | the two trade directions by filter timeframe (section 6) |
 | `tools/` | the Python copy of the script and every step (`README.md` lists them) |
 
 ### How to load and check a file on TradingView
 
 1. Open BINANCE:BTCUSDT.P (the data used here) on the file's timeframe, time zone UTC.
 2. Paste the file into the Pine Editor and add it to the chart.
-3. Change nothing in Settings, Properties: the file already sets 0.06% commission, 1 tick
-   slippage and 20% margin. Keep Script executions on "On bar close" only (the tick options
-   off) and Bar Magnifier off.
+3. Change nothing in Settings: no input (the date range below is the one exception), and
+   nothing under Properties, where the file already sets 0.06% commission, 1 tick slippage
+   and 20% margin. Keep Script executions on "On bar close" only (the tick options off) and
+   Bar detalization on its default (the former "Bar Magnifier": off).
 4. Compare the Strategy Tester's List of Trades with `results/trades_BTCUSDT_<chart>.csv`,
-   trade by trade, for the dates both cover. Entry candle and side must agree. Compare
-   trades, not totals.
+   trade by trade, for the dates both cover, starting one week after the first candle the
+   chart loads. Entry candle and side must agree. Compare trades, not totals.
+
+Why not the first week. The trade lists were made with years of history before every trade.
+A chart starts where its candles start, and the script's AMVI needs history before it has a
+value: 418 candles in the 15m file, which normalises over 400. Those are the first 4.4 days
+of the chart. List trades in that stretch are missing in the tester, and in one simulated
+case the trade after them was shifted. In 16 simulated cases (5,000 to 40,000 candles,
+checked on four dates) the last difference came at most 5.3 days after the first candle
+(`tools/tester_view.py`, log in `results/checks/tester_view.txt`). The 4h file reads 15m
+candles, of which TradingView keeps about 100,000. Checked on 2026-11-26 they start on
+2024-01-19: the list's trade of 2024-01-22 16:00 is then missing and the first one to
+compare is 2024-01-26 12:00; every later day moves that start by a day. The 3m and 1m files
+read their AMVI from higher timeframes (30m and 4h; 1h). How much earlier history
+TradingView gives those I could not check, so allow at least the same week.
+
+How many trades that leaves. On 2026-11-26 a 15m chart with 5,000 candles starts on
+2026-10-04 and has 3 list trades left to compare (1 a week later, none from mid-December);
+10,000 candles have 16, 20,000 have 37 and 40,000 have 84. The list ends on 2026-10-31 and
+the chart moves on every day, so do the check soon.
 
 What the tester can show. It shows money, not R: with the file's sizing, net profit in % is
 about R x 0.5. It covers only the candles your plan loads, up to today: 20,000 candles are
 9 years of 4h, 208 days of 15m, 42 days of 3m and 14 days of 1m. For the full search window
 use Deep Backtesting (Premium plans and above, up to two million candles) and switch on the
 input "Limit Backtest Date Range" (group "Backtest range") with 2023-11-01 to 2026-10-31. The
-header of each file says what the tester should then show. The 4h file can be replayed only
-from 2024-01-19, because it reads 15m candles and TradingView keeps about 100,000 of them.
-Two million 1m candles reach back to early 2023, so most of the 1m file's untouched period
-cannot be replayed at all.
+header of each file says what the tester should then show. The 4h file is the exception: it
+can be replayed only from about 2024-01-19 (as of 2026-11-26), because of the 100,000 15m
+candles; I found no statement that Deep Backtesting lifts that limit. Two million 1m candles
+reach back to early 2023, so most of the 1m file's untouched period cannot be replayed at
+all.
 
-If it differs. Entries on other candles or in the other direction: do not trade the file,
-and send me the tester's list. An exit that differs by a candle or a few USDT is the
-tester's price path. A file that does not load: send me the error line.
+If it differs. Entries on other candles or in the other direction, after that first week:
+do not trade the file, and send me the tester's list. Exits: the list gives the exact
+second, the tester only the candle. On the 15m, 3m and 1m files every exit should still be
+in the same candle and at the same price, because my copy takes the same trades on chart
+candles as second by second. On the 4h file one exit is the opposite one: the long entered
+2024-02-28 16:00 is a target in the list (63,098.6, +1.29R) and a stop in the tester (about
+59,426, -1.04R). Both prices lie inside that one 4h candle. The tester knows only the
+candle's open, high, low and close and assumes the low came first; second by second the
+target came first (17:06, the low at 17:31). That one trade is the whole gap between +35.2R
+and +32.9R in the 4h block, and it is not a mismatch. A file that does not load: send me the
+error line.
 
 ### Rebuild
 

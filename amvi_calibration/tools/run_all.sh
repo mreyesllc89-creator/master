@@ -43,9 +43,11 @@ for tf in 240 60 30 15 10 5 3 2 1; do
     python3 plateau.py "$tf" "$RES" > "$RES/plateau_${tf}m.txt"
 done
 
-# 5. studies that choose nothing: the inputs one by one, the selection method on the untouched
-#    period, what luck alone would produce, the trailing stop
+# 5. studies that choose nothing: the inputs one by one, the trade direction by filter
+#    timeframe, the selection method on the untouched period, what luck alone would produce,
+#    the trailing stop
 python3 inputs_summary.py "$RES" > /dev/null
+python3 direction_by_filter.py "$RES" > "$RES/direction_by_filter.txt"
 python3 untouched_check.py "$RES" > "$RES/untouched_check.txt"
 for tf in 240 60 30 15 10 5 3 2 1; do
     python3 luck.py "$tf" "$RES" 1000 > "$RES/luck_${tf}m.txt"
@@ -61,6 +63,7 @@ done
 python3 report.py "$RES" > "$RES/report_run.log"
 python3 check_outputs.py .. > "$RES/checks/check_outputs.txt"     # trade lists and files against the records
 python3 replicate_picks.py "$RES" > "$RES/checks/replicate_picks.txt"   # the picks against the reference versions
+python3 tester_view.py "$RES" > "$RES/checks/tester_view.txt"           # what TradingView's tester shows differently
 python3 charts.py "$RES"
 python3 convergence.py "$RES" > "$RES/convergence.txt"
 python3 assemble_report.py ..
