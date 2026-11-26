@@ -5,10 +5,11 @@ BTCUSDT perpetual. Chart timeframes: 1m, 2m, 3m, 5m, 10m, 15m, 30m, 1h, 4h.
 
 110,000 input combinations were backtested over the last three years, each with its stops,
 targets and trailing stops filled on the real second-by-second prices; the best were then
-tested on three earlier years that no search had seen. Nothing here ran on TradingView: the
-numbers come from a Python copy of the script, checked against three independent
-re-implementations of the Pine source. One calibrated `.pine` file per timeframe is in
-`presets/`, each with its verdict in the title.
+tested on the three years before that, which no search had seen. Nothing here ran on
+TradingView: the numbers come from a Python copy of the script, checked against two
+independent re-implementations of the Pine source and a third of its filter. A calibrated
+`.pine` file is in `presets/` for the four timeframes whose pick held up on the older years,
+each with its verdict in the title.
 
 ## 1. Short version
 
@@ -52,7 +53,15 @@ re-implementations of the Pine source. One calibrated `.pine` file per timeframe
    too. The 1-second filter in your screenshot could not be tested (there is no seconds
    history), and with a no-trade band 1.6 USD wide it flips on almost every tick.
 
-TRAILING_BULLET
+8. **Trailing stop: leave it off.** I ran 200 to 300 settings per chart with the trailing
+   stop off and with each of the 42 activation / offset pairs, nothing else changed. On 4h it
+   makes no difference (14.7% of the settings positive in both halves without it, 14.2% with
+   a typical pair). On every chart below 4h it makes them worse: 8 of 336 pairs came out
+   above "off", and the shipped pair (1.5 / 1.0 ATR) roughly halves the share of profitable
+   settings. **TradingView's tester will tell you the opposite.** It walks the chart's
+   candles, which lets a tight trailing stop exit near the best price of every candle. Tested
+   that way, 49% of the 4h settings with a 0.5 / 0.5 ATR trailing stop look profitable in both
+   halves; on the real second-by-second prices 4% are.
 
 9. **Fees decide the low timeframes.** With a stop of 1 x ATR, the commission of one round
    trip is 0.08R on 4h, 0.34R on 15m, 0.65R on 5m and 1.73R on 1m. Below 15m the typical
@@ -71,10 +80,11 @@ its List of Trades with `results/trades_BTCUSDT_4h.csv`. Until that matches, tre
 number here as unverified on TradingView. Do not run the 1-second filter or the inverted
 direction on BTC.
 
-**Why this could fail.** The edge is trend following: it disappears in sideways markets, and
-the most recent year was one. The support comes from 2021-2023, an unusually trending period.
-Each file has 70 to 280 trades per three years: a few trades decide a year. The data is
-Binance, your chart is Bitget. And nothing here has run on TradingView itself.
+**Why this could fail.** The edge is trend following: it disappears in choppy markets, and in
+the most recent year settings chosen on earlier data made nothing. The support comes from
+2021-2023, a period of unusually long trends. Each file has 70 to 280 trades per three
+years: a few trades decide a year. The data is Binance, your chart is Bitget. And nothing
+here has run on TradingView itself.
 
 ![Cumulative result of each timeframe's pick](results/equity_all.png)
 
@@ -90,8 +100,9 @@ filter (signal, zones, band, permission), and the orders (reversal, ATR stop, ta
 stop, volatility exit, time stop, wait). It was checked four ways:
 
 - two more copies were written independently from the Pine source; the engine agrees with
-  them bar for bar on the signals and trade for trade on the orders (72 + 72 random settings
-  on the final code, `results/checks/difftest_*.txt`);
+  them bar for bar on the signals and trade for trade on the orders, on 72 + 72 random
+  settings (`results/checks/difftest_*.txt`) and on the picks themselves
+  (`results/checks/replicate_picks.txt`);
 - a third, literal statement-by-statement copy of the filter agreed on 49.8 million chart bars;
 - 8 hand-computed order scenarios (`tools/test_orders.py`);
 - a look-ahead test: no decision reads a candle that has not closed.
@@ -100,14 +111,14 @@ It has **not** been compared with TradingView itself, and the Pine files were no
 there. Before relying on any number, load the file and compare the Strategy Tester's List of
 Trades with `results/trades_BTCUSDT_<tf>.csv`.
 
-**Data.** Binance BTCUSDT perpetual from the exchange's public archive (checksums verified):
-1-minute candles 2020-01 to 2026-10, and every trade 2021-01 to 2026-10 reduced to
+**Data.** Binance BTCUSDT perpetual from the exchange's public archive: 1-minute candles
+2020-01 to 2026-10, and every trade 2021-01 to 2026-10 (file checksums verified) reduced to
 one-second bars (180 million of them; 99.996% of all minutes have their seconds,
 `results/checks/seconds_coverage.txt`). Funding: Binance's 8-hourly rates. 367 minutes in which
 the exchange did not trade are not candles, as on TradingView. Your chart is Bitget's
 BTCUSDT.P: the same market, a few dollars apart, with its own wicks and funding.
 
-**Order fills.** Market orders fill at the next candle's open plus 1 tick. Stops, targets and
+**Order fills.** Market orders fill at the next candle's open, 1 tick against you. Stops, targets and
 trailing stops are followed **second by second** through the real trades. A coarser path
 flatters a trailing stop: it assumes price ran straight to the candle's high and only then
 came back (section 5). TradingView's Strategy Tester walks the chart's own candles unless Bar
@@ -269,7 +280,30 @@ five-minute combinations of its first run lost to fees: the same wall.
 
 <<Trailing stop>>
 
-COMMENT_TRAILING
+**No pair of trailing settings improves the strategy.** On 4h the trailing stop is neutral:
+17 of 42 pairs are a little above "off", 25 at or below it, and the best pair chosen on half
+of the settings is only slightly ahead on the other half (20.7% against 17.3%), which is
+within noise for 150 settings. The pairs that do best there have a wide offset (3 ATR). On
+every chart below 4h the typical pair cuts the share of profitable settings: by about a third
+on 1h and 30m, by half or more below that (1h: 13.0% without, 9.2% with; 15m: 11.3% and 6.8%;
+5m: 4.5% and 1.5%). The best pair found on one half of the settings is below "off" on the
+other half on every one of those charts except 1m, where both are zero. Of the 336 pairs
+below 4h only 8 are above "off": one on 30m and seven on 1m, where next to nothing is
+positive either way (0 of 200 settings without trailing, 1 of 200 with).
+
+The shipped pair (activation 1.5, offset 1.0) is one of the weaker ones. It makes somewhat
+more settings worse than better (on 1h 53% worse, 33% better, 13% unchanged), and the share
+of settings positive in both halves falls to about 60% of the "off" figure on 4h, about half
+on 1h and 15m, and a third or less from 10m down.
+
+**Why TradingView shows the opposite.** The last two columns are the same settings with a
+tight trailing stop (0.5 / 0.5 ATR), walked the way the Strategy Tester walks them without Bar
+Magnifier (open, nearer extreme, other extreme, close of each chart candle) and on the real
+second-by-second prices. The chart-candle walk lets the stop trail up to the candle's high
+and then exit just below it, as if price had gone there in a straight line. That is worth
+0.05R to 0.10R per trade of profit that never existed: on 4h it turns 4% of settings positive
+in both halves into 49%, on 1h 3% into 43%. If a trailing stop has looked excellent in your
+own TradingView tests, this is the most likely reason.
 
 ### How fine must the price path be?
 
@@ -278,7 +312,16 @@ offset 0.5 x ATR), with the orders walked on ever finer bars. Search window, net
 
 <<include results/convergence.md>>
 
-COMMENT_CONVERGENCE
+For the picks the price path hardly matters. Only the three that can have two orders close
+together inside one candle change at all when the candle is opened up: 4h (stop and target;
++32.9R on chart candles, +35.2R from 1-minute bars down), 10m (trailing stop; +16.8R and
++14.5R) and 30m (trailing stop; +21.4R down to +20.2R).
+
+With a tight trailing stop the chart-candle figure is too good on every chart, by 2R to 14R
+over the three years. One-minute bars remove most of that error, and the 5-second and
+1-second walks agree to within 0.1R in 16 of the 18 rows (0.7R in the other two: the 30m pick
+and the tight stop on 2m). Going finer than one second should not move these results by more
+than a fraction of an R.
 
 ## 6. Inputs
 

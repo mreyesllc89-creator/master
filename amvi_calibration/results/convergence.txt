@@ -1,0 +1,9 @@
+1m: pick chart +107.1 / 1m +107.1 / 15s +107.1 / 5s +107.1 / 1s +107.1R | with a 0.5/0.5 trailing stop: chart -9.3 / 1m -9.3 / 15s -12.1 / 5s -12.8 / 1s -12.8R
+2m: pick chart +12.0 / 1m +12.0 / 15s +12.0 / 5s +12.0 / 1s +12.0R | with a 0.5/0.5 trailing stop: chart +2.2 / 1m +1.5 / 15s +1.3 / 5s +1.3 / 1s +0.6R
+3m: pick chart +23.4 / 1m +23.4 / 15s +23.4 / 5s +23.4 / 1s +23.4R | with a 0.5/0.5 trailing stop: chart +2.7 / 1m +0.5 / 15s -0.3 / 5s -0.4 / 1s -0.5R
+5m: pick chart +16.1 / 1m +16.1 / 15s +16.1 / 5s +16.1 / 1s +16.1R | with a 0.5/0.5 trailing stop: chart -0.3 / 1m -1.8 / 15s -2.5 / 5s -2.8 / 1s -2.9R
+10m: pick chart +16.8 / 1m +14.5 / 15s +14.5 / 5s +14.5 / 1s +14.5R | with a 0.5/0.5 trailing stop: chart +5.4 / 1m +3.5 / 15s +3.1 / 5s +3.0 / 1s +3.0R
+15m: pick chart +21.1 / 1m +21.1 / 15s +21.1 / 5s +21.1 / 1s +21.1R | with a 0.5/0.5 trailing stop: chart +11.4 / 1m -2.0 / 15s -2.6 / 5s -2.6 / 1s -2.6R
+30m: pick chart +21.4 / 1m +21.5 / 15s +21.4 / 5s +20.9 / 1s +20.2R | with a 0.5/0.5 trailing stop: chart +11.3 / 1m +3.7 / 15s +3.2 / 5s +3.2 / 1s +3.2R
+1h: pick chart +22.0 / 1m +22.0 / 15s +22.0 / 5s +22.0 / 1s +22.0R | with a 0.5/0.5 trailing stop: chart +16.9 / 1m +7.2 / 15s +6.9 / 5s +6.9 / 1s +6.8R
+4h: pick chart +32.9 / 1m +35.2 / 15s +35.2 / 5s +35.2 / 1s +35.2R | with a 0.5/0.5 trailing stop: chart +12.6 / 1m -0.5 / 15s -0.5 / 5s -0.5 / 1s -0.5R

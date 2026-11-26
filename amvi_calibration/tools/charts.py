@@ -14,6 +14,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.dates as mdates
+import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -72,7 +73,8 @@ def draw(res_dir):
             x0 = pd.Timestamp("2021-01-01") if period == "untouched" else SPLIT
             ax.plot([x0] + list(t), [0.0] + list(eq), color=col, linewidth=2, solid_joinstyle="round", solid_capstyle="round")
             ax.plot([t[-1]], [eq[-1]], marker="o", markersize=7, color=col, markeredgecolor=SURFACE, markeredgewidth=2)
-            ax.annotate(f"{eq[-1]:+.0f}R", (t[-1], eq[-1]), xytext=(-6, 9), textcoords="offset points", ha="right", fontsize=10, color=TEXT)
+            ax.annotate(f"{eq[-1]:+.0f}R", (t[-1], eq[-1]), xytext=(-6, 9), textcoords="offset points", ha="right", fontsize=10, color=TEXT,
+                        path_effects=[pe.withStroke(linewidth=3.5, foreground=SURFACE)])
         ax.xaxis.set_major_locator(mdates.YearLocator())
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
         ax.set_xlim(pd.Timestamp("2021-01-01"), pd.Timestamp("2026-12-15"))
@@ -117,9 +119,9 @@ def draw_direction(res_dir):
     a1.bar(x - w / 2 - 0.01, wf, w, color=BLUE, label="with the filter")
     a1.bar(x + w / 2 + 0.01, iv, w, color=ORANGE, label="inverted (the shipped direction)")
     for xi, v in zip(x - w / 2 - 0.01, wf):
-        a1.annotate(f"{v:.0f}%" if v >= 9.5 else f"{v:.1f}%", (xi, v), xytext=(0, 3), textcoords="offset points", ha="center", fontsize=9, color=TEXT)
+        a1.annotate(f"{v:.0f}%" if v >= 9.5 else f"{v:.1f}%", (xi, v), xytext=(-5, 3), textcoords="offset points", ha="center", fontsize=8.5, color=TEXT)
     for xi, v in zip(x + w / 2 + 0.01, iv):
-        a1.annotate(f"{v:.0f}%" if v >= 9.5 else f"{v:.1f}%", (xi, v), xytext=(0, 3), textcoords="offset points", ha="center", fontsize=9, color=TEXT)
+        a1.annotate(f"{v:.0f}%" if v >= 9.5 else f"{v:.1f}%", (xi, v), xytext=(6, 3), textcoords="offset points", ha="center", fontsize=8.5, color=TEXT)
     a1.set_ylim(0, max(wf.max(), iv.max()) * 1.22)
     a1.yaxis.set_major_formatter(plt.FuncFormatter(lambda v, _: f"{v:.0f}%"))
     a1.set_title("Settings positive after costs in both halves of the search window, by trade direction", loc="left", fontsize=11, color=TEXT, pad=34)

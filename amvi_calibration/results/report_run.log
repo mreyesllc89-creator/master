@@ -1,0 +1,9 @@
+1m: PAPER-TRADE - positive on the untouched period at base and stressed costs, but its untouched result is positive in only 93% of resamples of the weeks
+2m: NOT RECOMMENDED - the search shows more than luck would, but the pick does not hold up: it loses on the untouched period at stressed costs
+3m: USABLE - holds up on the untouched period beyond what luck gives, and part of the hold-out tests pass
+5m: NOT RECOMMENDED - the search shows more than luck would, but the pick does not hold up: it loses on the untouched 2021-2023 period
+10m: NOT RECOMMENDED - the search shows more than luck would, but the pick does not hold up: its untouched result is positive in only 81% of resamples of the weeks, so it rests on a few good weeks
+15m: USABLE - holds up on the untouched period beyond what luck gives, and part of the hold-out tests pass
+30m: DO NOT TRADE - the search found no more winners than luck would, no hold-out test passes, and the best candidate does not hold up: its untouched result is positive in only 77% of resamples of the weeks, so it rests on a few good weeks
+1h: NOT RECOMMENDED - the search shows more than luck would, but the pick does not hold up: its untouched result is positive in only 86% of resamples of the weeks, so it rests on a few good weeks
+4h: USABLE - holds up on the untouched period beyond what luck gives, and part of the hold-out tests pass
