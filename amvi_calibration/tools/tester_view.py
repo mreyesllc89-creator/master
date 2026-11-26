@@ -10,13 +10,15 @@ usage: python tester_view.py [results_dir]
    calibrated file whose exit differs between the two walks is listed.
 
 2. Limited history. A chart loads 5,000 to 40,000 candles depending on the plan, and a request
-   for a lower timeframe about 100,000. A file whose AMVI reads the chart's own or a lower
-   timeframe then starts without the history the trade list had: the AMVI has no value for
-   its first 400 or so candles, and the entries around the start differ. Simulated: the AMVI
-   trigger from the limited history; candles, exit ATR and the filter zone from the full
-   history (the filter's daily candles have years of history on TradingView). Files whose
-   AMVI reads higher timeframes are not simulated: how much history TradingView gives those
-   requests was not checked.
+   for a lower timeframe about 100,000. The script then starts without the history the trade
+   list had, and the entries around the start differ. How far back TradingView loads a
+   request for a higher timeframe (the filter; an AMVI above the chart) was not checked, so
+   two models are simulated (scenario()): B1, those requests have their full history; B2,
+   they start on the chart's first day. In both, an AMVI on the chart's own timeframe starts
+   at the chart's first candle, one below the chart not before the oldest lower-timeframe
+   candle TradingView keeps, and the strategy is flat at the chart's first candle. The
+   differences are counted from the later of the chart's first candle, the start of the
+   search window and the AMVI's first candle.
 """
 import csv
 import json
@@ -72,55 +74,112 @@ def exits_on_chart_candles(name, tf, ep, ctx, start, end, label):
         print(d)
 
 
-def limited_history(name, tf, ep, ctx, listed):
-    """listed: {entry time in ms: side} of the file's trade list (search window)."""
-    ft = ctx[0]
+def floor_day(ms_):
+    return ms_ // 86_400_000 * 86_400_000
+
+
+def features_from(start_ms):
+    """Features over 1-minute bars from start_ms to the end of the search window (no seconds)."""
+    sub = bars.load_1m("BTCUSDT", start=pd.Timestamp(int(start_ms), unit="ms").strftime("%Y-%m-%d %H:%M"), end=F.SEARCH[1])
+    return E.Features(bars.Market(sub))
+
+
+def aligned(ch, ch_part, arr_part):
+    """Arrays of a shorter history put into the positions of the longer one (False before)."""
+    j0 = int(np.searchsorted(ch.t, ch_part.t[0]))
+    if j0 + len(ch_part) != len(ch) or not np.array_equal(ch.t[j0:], ch_part.t):
+        raise ValueError("candles do not line up")
+    out = np.zeros(len(ch), np.bool_)
+    out[j0:] = arr_part
+    return out
+
+
+def scenario(tf, ep, ft_full, listed, s_ms, now_ms, model):
+    """The entries the tester takes on a chart whose first candle opens at s_ms, against the list.
+
+    model "B1": the filter and an AMVI above the chart have their full history (as with Deep
+                Backtesting, or if TradingView loads those requests further back than the chart);
+    model "B2": every request starts on the chart's first day (nothing before the chart).
+    An AMVI on the chart's own timeframe starts at the chart's first candle in both models, one
+    below the chart not before the oldest of the LOWER_TF_CANDLES candles TradingView keeps.
+    The strategy is flat at the chart's first candle. Returns a dict, or a string saying why
+    the case was not simulated."""
     amvi_tf = sorted(ep["tfs"])
-    if any(t > tf for t in amvi_tf):
-        print(f"   limited history: the AMVI of this file reads {', '.join(make_pine.TF_NAME[t] for t in amvi_tf)} candles from a {name} chart "
-              f"(higher timeframes); not simulated.")
-        return
-    low = min(amvi_tf)
-    ch = ft.mk.tf(tf)
-    trig, volc, _ = E.trigger_arrays(ft, tf, ep)
-    zone = E.zone_array(ft, tf, ep)
     end = sweep.ms(F.SEARCH[1])
-    full = E.run(ft, tf, ep, fee=0.0, slip_ticks=1, start_ms=sweep.ms(F.SEARCH[0]), end_ms=end, signals=(trig, volc, zone), walk="fine")
-    fe = {int(t) for t in full["entry_t"] if t >= sweep.ms(F.SEARCH[0])}
-    print(f"   limited history: the full-history run gives the list's {len(listed)} search-window entries: {fe == set(listed)}")
-    sizes = CHART_CANDLES if low == tf else (LOWER_TF_CANDLES,)
+    data0 = int(ft_full.mk.m1.t[0])
+    if any(t > tf for t in amvi_tf) and any(t <= tf for t in amvi_tf):
+        return "AMVI timeframes on both sides of the chart: not simulated"
+    low = min(amvi_tf)
+    limit = now_ms - low * LOWER_TF_CANDLES * bars.MIN_MS if low < tf else None
+    amvi_start = None if low > tf else max(s_ms, limit or s_ms)
+    if model == "B1":
+        # the full history is the trade list's own (loaded from sweep.LOAD_START)
+        if s_ms < data0:
+            return "chart starts before the loaded data: not simulated"
+        ft_run = ft_full
+        zone = E.zone_array(ft_full, tf, ep)
+    else:
+        day0 = floor_day(s_ms)
+        if day0 < sweep.ms(F.PRE_LOAD):
+            return "chart starts before the data: not simulated"
+        ft_run = features_from(day0)
+        zone = E.zone_array(ft_run, tf, ep)
+    ch = ft_run.mk.tf(tf)
+    if amvi_start is None and model == "B1":
+        trig, volc, _ = E.trigger_arrays(ft_full, tf, ep)
+    elif amvi_start is None:
+        trig, volc, _ = E.trigger_arrays(ft_run, tf, ep)
+    else:
+        ft_a = features_from(amvi_start)
+        t2, v2, _ = E.trigger_arrays(ft_a, tf, ep)
+        ch_a = ft_a.mk.tf(tf)
+        trig, volc = aligned(ch, ch_a, t2), aligned(ch, ch_a, v2)
+    j0 = int(np.searchsorted(ch.t, s_ms))
+    tv = E.run(ft_run, tf, ep, fee=0.0, slip_ticks=1, start_ms=int(ch.t[j0]), end_ms=end, signals=(trig, volc, zone), walk="1m")
+    cmp_from = max(s_ms, sweep.ms(F.SEARCH[0]), amvi_start or s_ms)
+    te = {int(t): int(x) for t, x in zip(tv["entry_t"], tv["dir"]) if t >= cmp_from}
+    le = {t: x for t, x in listed.items() if t >= cmp_from}
+    only_list = sorted(set(le) - set(te))
+    only_tv = sorted(set(te) - set(le))
+    other_side = sorted(t for t in set(le) & set(te) if le[t] != te[t])
+    bad = only_list + only_tv + other_side
+    last = max(bad) if bad else None
+    return dict(cmp_from=cmp_from, n_list=len(le), only_list=only_list, only_tv=only_tv, other_side=other_side,
+                last_days=(last - cmp_from) / 86_400_000 if last else None, after=sum(1 for t in le if last is None or t > last))
+
+
+def limited_history(name, tf, ep, ft_full, listed, hold_max_days):
+    """An ordinary chart holds 5,000 to 40,000 candles depending on the plan: the script then
+    starts without the history the trade list had. Both models of scenario(), for every chart
+    size whose first candle lies inside the search window, checked on the record date and up
+    to three weeks later."""
     now0 = pd.Timestamp(report.RECORD_DATE)
-    for n in sizes:
+    print(f"   limited history (an ordinary chart, strategy flat at its first candle; longest trade of the list {hold_max_days:.1f} days):")
+    worst = {"B1": 0.0, "B2": 0.0}
+    for n in CHART_CANDLES:
+        s0 = now0 - pd.Timedelta(minutes=tf * n)
+        in_range = sum(1 for t in listed if t >= int(s0.value // 10 ** 6))
+        print(f"      {n:,} {name} candles reach back to {s0.strftime('%Y-%m-%d %H:%M')} on {report.RECORD_DATE}: {in_range} list entries after that")
+        if in_range < 3:
+            print("         too few to compare: not simulated")
+            continue
         for d in LATER_DAYS:
             now = now0 + pd.Timedelta(days=d)
-            s = now - pd.Timedelta(minutes=low * n)
-            s_ms = int(s.value // 10 ** 6)
-            sub = bars.load_1m("BTCUSDT", start=s.strftime("%Y-%m-%d %H:%M"), end=F.SEARCH[1])
-            ft2 = E.Features(bars.Market(sub))
-            ch2 = ft2.mk.tf(tf)
-            t2, v2, _ = E.trigger_arrays(ft2, tf, ep)
-            j0 = int(np.searchsorted(ch.t, ch2.t[0]))
-            assert np.array_equal(ch.t[j0:], ch2.t)
-            tt = np.zeros(len(ch), np.bool_)
-            vv = np.zeros(len(ch), np.bool_)
-            tt[j0:], vv[j0:] = t2, v2
-            first_value = np.nonzero(~np.isnan(ft2.amvi(low, ep)))[0]
-            tv = E.run(ft, tf, ep, fee=0.0, slip_ticks=1, start_ms=int(ch.t[j0]), end_ms=end, signals=(tt, vv, zone), walk="fine")
-            te = {int(t): int(x) for t, x in zip(tv["entry_t"], tv["dir"]) if t >= ch.t[j0]}
-            le = {t: x for t, x in listed.items() if t >= s_ms}
-            only_list = sorted(set(le) - set(te))
-            only_tv = sorted(set(te) - set(le))
-            other_side = sorted(t for t in set(le) & set(te) if le[t] != te[t])
-            bad = only_list + only_tv + other_side
-            last = max(bad) if bad else None
-            comparable = sum(1 for t in le if last is None or t > last)
-            what = f"{n:,} {make_pine.TF_NAME[low]} candles"
-            print(f"      {what}, checked {(now).strftime('%Y-%m-%d')}: history from {when(s_ms)}; the AMVI has its first value "
-                  f"{int(first_value[0]) if first_value.size else -1} candles later; list entries from there {len(le)}; missing in the tester "
-                  f"{len(only_list)} ({', '.join(when(t) for t in only_list) or '-'}); in the tester only {len(only_tv)} "
-                  f"({', '.join(when(t) for t in only_tv) or '-'}); other side {len(other_side)}; last difference "
-                  + (f"{(last - s_ms) / 86_400_000:.1f} days after the start" if last else "none")
-                  + f"; list entries after it {comparable}")
+            s_ms = int((now - pd.Timedelta(minutes=tf * n)).value // 10 ** 6)
+            for model in ("B1", "B2"):
+                r = scenario(tf, ep, ft_full, listed, s_ms, int(now.value // 10 ** 6), model)
+                if isinstance(r, str):
+                    print(f"         {model}, checked {now.strftime('%Y-%m-%d')}: {r}")
+                    continue
+                if r["last_days"] is not None:
+                    worst[model] = max(worst[model], r["last_days"])
+                print(f"         {model}, checked {now.strftime('%Y-%m-%d')}, first candle {when(s_ms)}, compared from {when(r['cmp_from'])}: list entries {r['n_list']}; "
+                      f"missing in the tester {len(r['only_list'])} ({', '.join(when(t) for t in r['only_list']) or '-'}); in the tester only "
+                      f"{len(r['only_tv'])} ({', '.join(when(t) for t in r['only_tv']) or '-'}); other side {len(r['other_side'])}; last difference "
+                      + (f"{r['last_days']:.1f} days after the comparison start" if r["last_days"] is not None else "none")
+                      + f"; list entries after it {r['after']}", flush=True)
+    print(f"   latest difference after the comparison start: B1 {worst['B1']:.1f} days, B2 {worst['B2']:.1f} days")
+    return worst
 
 
 def run(res_dir):
@@ -140,7 +199,8 @@ def run(res_dir):
         exits_on_chart_candles(name, tf, ep, cp, fin["eval"].get("pre_from", F.PRESAMPLE[0]), F.PRESAMPLE[1], "exits, untouched period")
         rows = list(csv.DictReader(open(os.path.join(res_dir, f"trades_BTCUSDT_{name}.csv"))))
         listed = {sweep.ms(r["entry_utc"]): (1 if r["side"] == "long" else -1) for r in rows if r["period"] == "search"}
-        limited_history(name, tf, ep, cs, listed)
+        hold = max((sweep.ms(r["exit_utc"]) - sweep.ms(r["entry_utc"])) / 86_400_000 for r in rows)
+        limited_history(name, tf, ep, cs[0], listed, hold)
         print(flush=True)
 
 

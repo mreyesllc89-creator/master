@@ -55,6 +55,7 @@ WITH_FILE = ("RECOMMENDED", "USABLE", "PAPER-TRADE")
 ACTION = {"RECOMMENDED": "test with alerts, then trade small", "USABLE": "test with alerts first; small size at most",
           "PAPER-TRADE": "watch with alerts only; no money", "NOT RECOMMENDED": "nothing to load", "DO NOT TRADE": "nothing to load"}
 WINDOW_TXT = "2023-11 to 2026-10"
+NUMBER_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six"}
 RECORD_DATE = "2026-11-26"
 # engine parameter -> Pine input variable (for readable names of fragile inputs)
 ENGINE_TO_PINE = dict(fast="fastATRPeriod", slow="slowATRPeriod", sd="stdDevPeriod", cr="candleRangePeriod", norm="normalizationPeriod",
@@ -219,7 +220,7 @@ def tester_txt(ev):
     return t
 
 
-def header_lines(tf, v, why, ev, changes, p):
+def header_lines(tf, v, why, ev, changes, p, lower_wait_weeks=None):
     b, pre = ev["base"], ev.get("pre", {})
     name = make_pine.TF_NAME[tf]
     grade = ORDER.index(v) + 1
@@ -244,7 +245,8 @@ def header_lines(tf, v, why, ev, changes, p):
               f"slippage and funding, on Binance prices. Trades are held {hours_txt(b['hold_mean_h'])} on average, {hours_txt(b['hold_max_h'])} at most.",
               first="       ")
     L += wrap(f"{v} because it {why}.", first="WHY:   ")
-    reach = ("for this file not before that date, whatever the plan: the 100,000 15m candles TradingView keeps are the limit"
+    reach = ("for this file Deep Backtesting reaches no further back on plans up to Premium, which keep about 100,000 lower-timeframe "
+             "candles; Ultimate is documented with 200,000, not checked"
              if ev.get("tv_view_since") else "Deep Backtesting covers the whole period")
     L += wrap(f"TradingView's Strategy Tester (Bar detalization on its default, the former Bar Magnifier off) should show {tester_txt(ev)}. "
               f"It shows money, not R, and only the candles your plan loads ({reach}).", first="TESTER:")
@@ -252,17 +254,35 @@ def header_lines(tf, v, why, ev, changes, p):
         L += wrap(f"this file uses the trailing stop. If TradingView starts it again at every candle close (not checked), the results are "
                   f"{ev['trail_restart']['total']:+.1f}R and {ev.get('pre_trail_restart', {}).get('total', 0):+.1f}R instead of {b['total']:+.1f}R and {pre.get('total', 0):+.1f}R.",
                   first="NOTE:  ")
-    if abs(ev["walk_chart"]["total"] - b["total"]) >= 0.05:
-        exits = (f" An exit differs on chart candles where stop and target lie inside one candle: walked that way this record would be "
+    since = ev.get("tv_view_since", {}).get("since")
+    if since:
+        deep = (f"Surest: Deep Backtesting (Premium and above) with \"Limit Backtest Date Range\" on, 2023-11-01 to 2026-10-31. This file reads "
+                f"lower-timeframe candles, which the tester has only from about {since} (TESTER): compare from "
+                f"{NUMBER_WORDS.get(lower_wait_weeks or 2, str(lower_wait_weeks))} weeks after that date.")
+    else:
+        deep = ("Surest: Deep Backtesting (Premium and above) with \"Limit Backtest Date Range\" on, 2023-11-01 to 2026-10-31: the script then "
+                "has years of history and starts flat like the list, so every entry should match from the first.")
+    entries = ev["_trades"]["entry_t"]
+    reach40 = pd.Timestamp(RECORD_DATE) - pd.Timedelta(minutes=tf * 40_000)
+    n40 = int((entries >= reach40.value // 10 ** 6).sum())
+    if n40 < 10:
+        ordinary = (f" An ordinary chart holds too few of this file's trades to check it: 40,000 {name} candles, the most any plan loads, "
+                    f"reach back only to {reach40.strftime('%Y-%m-%d')}.")
+    else:
+        ordinary = (" On an ordinary chart the start differs, because the script has no history before the chart's first candle: "
+                    "REPORT.md, section 9, says how much to skip.")
+    gap_s = ev["walk_chart"]["total"] - b["total"]
+    gap_u = ev.get("pre_tv_view", {}).get("gross", 0.0) - pre.get("gross", 0.0)
+    if p.get("trail") and (abs(gap_s) >= 0.05 or abs(gap_u) >= 0.05):
+        exits = (f" Exits differ on chart candles because of the trailing stop (REPORT.md, section 5): walked that way this record would be "
                  f"{ev['walk_chart']['total']:+.1f}R instead of {b['total']:+.1f}R.")
+    elif abs(gap_s) >= 0.05 or abs(gap_u) >= 0.05:
+        exits = (f" Where stop and target lie inside one candle the tester can take the other exit: walked on chart candles this record "
+                 f"would be {ev['walk_chart']['total']:+.1f}R instead of {b['total']:+.1f}R.")
     else:
         exits = " The exits should be on the same candles too."
-    start = ("the date in TESTER (the first 15m candle TradingView still holds; it moves on by a day every day)" if ev.get("tv_view_since")
-             else "the first candle the chart loads")
     L += wrap(f"amvi_calibration/results/trades_BTCUSDT_{name}.csv (UTC times, Binance prices): on BINANCE:BTCUSDT.P the entries must be on "
-              f"the same candles and sides. Change no input. Start one week after {start}: the script needs a few hundred candles of "
-              f"history before its first signal, so earlier list trades are missing in the tester.{exits} "
-              f"Details: REPORT.md, section 9.", first="CHECK: ")
+              f"the same candles and sides. Change no input. {deep}{ordinary}{exits} Details: REPORT.md, section 9.", first="CHECK: ")
     L += wrap(f"amvi_calibration/REPORT.md, section 7, {name}. Record date {RECORD_DATE}. Numbers come from a Python copy of this script, "
               f"not from TradingView.", first="RECORD:")
     L += ["",
@@ -283,6 +303,22 @@ def header_lines(tf, v, why, ev, changes, p):
           "CLOSED-CANDLE ENGINE: every decision is taken once per candle, at its close, and filled",
           "at the next open; keep Properties -> Script executions on \"On bar close\" only."]
     return L
+
+
+def lower_wait_weeks(ft, tf, p, ev):
+    """For a setting whose AMVI reads a timeframe below the chart: the weeks after the first
+    lower-timeframe candle TradingView holds until the tester can take the list's trades (the
+    AMVI's warm-up plus the longest trade of the list, rounded up). None otherwise."""
+    ep = E.P(**space.engine_params(p))
+    low = min(ep["tfs"])
+    if low >= tf:
+        return None
+    a = ft.amvi(low, ep)
+    first = int(np.nonzero(~np.isnan(a))[0][0])
+    warm_days = first * low / 1440
+    hold = [t for t in (ev.get("_trades"), ev.get("_pre_trades")) if t is not None and t["entry_t"].size]
+    hold_days = max(float(((t["exit_t"] - t["entry_t"]) / 86_400_000).max()) for t in hold) if hold else 0.0
+    return int(np.ceil((warm_days + hold_days) / 7))
 
 
 def fmt_u(u):
@@ -382,7 +418,7 @@ def run(res_dir):
         fn = None
         if v in WITH_FILE:
             # the calibrated file: only for a pick that holds up on the untouched period
-            hl = header_lines(tf, v, why, ev, changes, p)
+            hl = header_lines(tf, v, why, ev, changes, p, lower_wait_weeks(cs[0], tf, p, ev))
             tag = {"RECOMMENDED": "recommended", "USABLE": "usable", "PAPER-TRADE": "paper-trade only"}[v]
             short = {"RECOMMENDED": "REC", "USABLE": "USABLE", "PAPER-TRADE": "PAPER ONLY"}[v]
             src, changes = make_pine.build(p, tf, hl, f"AMVI FGF | {SYMBOL} {name} ({tag}, closed-candle)", f"AMVI BTC {name} {short}", commission_pct=0.06, symbol=SYMBOL)
@@ -530,7 +566,8 @@ def tables(rows):
           "for the 25 steadiest candidates (12 on 1m), chosen on the whole search window and scored on the untouched period.",
           f"The three \"Positive\" columns are shares of the settings with at least 30 trades in each half and a trade in at least 60% of its",
           f"months: {elig:,} of the {tried:,} tried. \"Beaten\" in the last column: the candidates' mean is above 95% of random groups with",
-          "their own trade directions.", "",
+          "their own trade directions (results/untouched_check.txt prints this comparison with the 95% resample condition included, so its",
+          "line for 30m reads \"fail\").", "",
           "| Chart | Settings tried | Positive before costs | Positive after costs | Positive in both halves | First half -> second (best 40) | Second -> first | Walk-forward (two years -> the third) | Search window -> untouched period (25 steadiest candidates) |",
           "|---|---|---|---|---|---|---|---|---|"]
     for r in rows:

@@ -24,10 +24,13 @@
 //         covers the whole period).
 // CHECK:  amvi_calibration/results/trades_BTCUSDT_1m.csv (UTC times, Binance prices):
 //         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides.
-//         Change no input. Start one week after the first candle the chart loads: the
-//         script needs a few hundred candles of history before its first signal, so
-//         earlier list trades are missing in the tester. The exits should be on the
-//         same candles too. Details: REPORT.md, section 9.
+//         Change no input. Surest: Deep Backtesting (Premium and above) with "Limit
+//         Backtest Date Range" on, 2023-11-01 to 2026-10-31: the script then has years
+//         of history and starts flat like the list, so every entry should match from
+//         the first. An ordinary chart holds too few of this file's trades to check
+//         it: 40,000 1m candles, the most any plan loads, reach back only to
+//         2026-10-29. The exits should be on the same candles too. Details: REPORT.md,
+//         section 9.
 // RECORD: amvi_calibration/REPORT.md, section 7, 1m. Record date 2026-11-26. Numbers
 //         come from a Python copy of this script, not from TradingView.
 //

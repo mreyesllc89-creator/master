@@ -22,16 +22,20 @@
 //         factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31;
 //         TradingView can replay this file only from about 2024-01-19: from then about
 //         94 trades, 61% profitable, net profit about +17%. It shows money, not R, and
-//         only the candles your plan loads (for this file not before that date,
-//         whatever the plan: the 100,000 15m candles TradingView keeps are the limit).
+//         only the candles your plan loads (for this file Deep Backtesting reaches no
+//         further back on plans up to Premium, which keep about 100,000
+//         lower-timeframe candles; Ultimate is documented with 200,000, not checked).
 // CHECK:  amvi_calibration/results/trades_BTCUSDT_4h.csv (UTC times, Binance prices):
 //         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides.
-//         Change no input. Start one week after the date in TESTER (the first 15m
-//         candle TradingView still holds; it moves on by a day every day): the script
-//         needs a few hundred candles of history before its first signal, so earlier
-//         list trades are missing in the tester. An exit differs on chart candles
-//         where stop and target lie inside one candle: walked that way this record
-//         would be +32.9R instead of +35.2R. Details: REPORT.md, section 9.
+//         Change no input. Surest: Deep Backtesting (Premium and above) with "Limit
+//         Backtest Date Range" on, 2023-11-01 to 2026-10-31. This file reads
+//         lower-timeframe candles, which the tester has only from about 2024-01-19
+//         (TESTER): compare from two weeks after that date. On an ordinary chart the
+//         start differs, because the script has no history before the chart's first
+//         candle: REPORT.md, section 9, says how much to skip. Where stop and target
+//         lie inside one candle the tester can take the other exit: walked on chart
+//         candles this record would be +32.9R instead of +35.2R. Details: REPORT.md,
+//         section 9.
 // RECORD: amvi_calibration/REPORT.md, section 7, 4h. Record date 2026-11-26. Numbers
 //         come from a Python copy of this script, not from TradingView.
 //

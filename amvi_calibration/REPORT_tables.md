@@ -37,7 +37,8 @@ positive, above 95% of random groups of 40, and stays positive in 95% of resampl
 for the 25 steadiest candidates (12 on 1m), chosen on the whole search window and scored on the untouched period.
 The three "Positive" columns are shares of the settings with at least 30 trades in each half and a trade in at least 60% of its
 months: 57,920 of the 110,000 tried. "Beaten" in the last column: the candidates' mean is above 95% of random groups with
-their own trade directions.
+their own trade directions (results/untouched_check.txt prints this comparison with the 95% resample condition included, so its
+line for 30m reads "fail").
 
 | Chart | Settings tried | Positive before costs | Positive after costs | Positive in both halves | First half -> second (best 40) | Second -> first | Walk-forward (two years -> the third) | Search window -> untouched period (25 steadiest candidates) |
 |---|---|---|---|---|---|---|---|---|
