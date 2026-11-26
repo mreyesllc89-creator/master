@@ -372,3 +372,134 @@ HRD puts about 50% of equity in each trade. With the default exits almost no tra
   - BTC 4h, filter off: +5.5%, but +17.2% in one half and -10.0% in the other.
   - Gold 2h: +1.2% with the filter off or on. Gold 4h, filter off: +2.7%, both halves positive.
 - **These are default settings and small samples.** None of them has been through a hold-out test. The calibration (every setting, normal and inverted, chosen on one half and checked on the other) is the test of whether any of this holds.
+
+## Calibration by timeframe, with the direction as an input
+
+Every earlier section used the files' default inputs. Here the inputs themselves were searched, per pair and timeframe, with the Update 1 option "Inverted direction" as one of them. 498,960 backtests: 172,368 for ApexForge and 326,592 for HRD.
+
+### What was searched
+
+Each grid is the full product of the values below, on every timeframe from 1m to 4h of BTCUSD and XAUUSD.
+
+| | ApexForge (12,312 settings per timeframe) | HRD (23,328 settings per timeframe) |
+|---|---|---|
+| Signals | "Swing Lookback for Order Blocks" 10, 20, 30; "Min Candle Body Strength" 0.5, 0.65, 0.8; "Volume Spike Multiplier" 1.2, 1.7, 2.2 | "Pivot Strength" 3, 5, 8; "Max Divergence Lookback" 30, 60, 120; divergences: all four, regular only, hidden only |
+| Filter | off; on; on with "Blocked opposite signal still closes the trade" off | the same three |
+| Direction | normal; inverted | normal; inverted ("Reverse Trading" stays off) |
+| Exits | "Reward:Risk Ratio" 1.5, 2, 3, 5; trailing off, or activation 0.3 / 1 / 3% with offset 0.2 / 0.5 / 1.5%, target kept or dropped | stop loss 1, 2, 4%; take profit off or 4%; "Close after X Candles" 5, 20, 100; hybrid exit on or off; trailing off, or 0.5 / 0.15%, 1 / 0.5%, 2 / 1% |
+
+Every setting was scored on 1-minute fills with costs (gold $0.30 per ounce per round trip, BTC 0.02% per side + $0.20), on the two halves of the window separately. A half counts the trades entered in it, from a fresh start.
+
+### The rule (rule C)
+
+A setting is only worth a file if it passes all of these. The rule was fixed before the runs.
+
+1. **Candidates.** Positive in both halves, with at least 30 trades entered in each.
+2. **Plateau.** Among the 40 best candidates by worst half, the pick is the best by 0.5 x its worst half + 0.5 x the average worst half of its neighbours in the grid (one input one step away). It needs at least 5 different neighbours with a positive average. Flipping the direction is not a neighbour.
+3. **Hold-out, both ways.** The 40 best settings by the first half must, on the second half, beat 95% of random draws of 40 settings, be at least 60% positive and average above zero. The same from the second half to the first.
+4. **Direction control.** The pick must beat the same setting with the direction flipped, in both halves.
+5. **Stressed costs.** The pick must stay positive in both halves (gold $0.50 + 1 tick per side; BTC 0.035% per side + $0.20 + 1 tick per side).
+6. **Sceptics.** A pick that passes 1-5 is then attacked by independent reviewers before any file is made.
+
+### Results
+
+How to read the tables:
+
+- **Different results**: settings with the same trades count once.
+- **Positive in both halves**: how many of those pass step 1, for each direction.
+- **Typical result**: the median over settings with 30+ trades per half.
+- **Best normal / inverted**: the setting with the best worst half, as net result (first half / second half, trades). These are in-sample: the best of thousands always looks good.
+- **Hold-outs**: what the 40 best of one half made on the other half, against the 95th percentile of random draws.
+
+#### HRD Full Divergence v1.03
+
+Risk 1% of equity per trade, so the figures are large.
+
+##### BTCUSD
+
+| TF | Different results | Positive in both halves: normal / inverted | Typical result: normal / inverted | Best normal (halves, trades) | Best inverted (halves, trades) | Forward hold-out | Reverse hold-out | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| 1m | 14,190 | 0 / 0 | -80.70% / -75.50% | -11.52% (-3.64% / -8.18%, 1808 trades) | -7.17% (-5.36% / -1.91%, 2201 trades) | -10.72% vs -49.44%, 10% positive: FAIL | -9.61% vs -46.52%, 0% positive: FAIL | no setting: no setting is positive in both halves with 30+ trades in each |
+| 5m | 15,188 | 12 / 31 | -26.07% / -31.34% | +8.62% (+5.04% / +3.41%, 1016 trades) | +18.68% (+9.63% / +8.26%, 807 trades) | -17.44% vs -16.79%, 0% positive: FAIL | -15.56% vs -15.12%, 2% positive: FAIL | no setting: none of the 40 best candidates sits on a plateau |
+| 15m | 16,559 | 381 / 250 | -10.35% / -14.67% | +68.10% (+37.75% / +22.03%, 1584 trades) | +110.64% (+51.94% / +38.63%, 538 trades) | -14.24% vs -5.90%, 30% positive: FAIL | -8.27% vs -5.25%, 18% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 30m | 13,703 | 921 / 167 | -4.61% / -12.21% | +53.46% (+28.69% / +19.25%, 441 trades) | +59.42% (+34.43% / +18.60%, 250 trades) | -6.68% vs -1.93%, 30% positive: FAIL | -12.01% vs -3.10%, 15% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 1h | 11,604 | 812 / 1,017 | -3.14% / -4.39% | +140.25% (+42.65% / +68.43%, 753 trades) | +69.04% (+29.15% / +30.89%, 151 trades) | +9.63% vs +1.60%, 40% positive: FAIL | +19.19% vs -0.80%, 95% positive: pass | no setting: forward hold-out failed |
+| 2h | 9,696 | 416 / 830 | -2.95% / -2.51% | +48.62% (+22.93% / +20.90%, 295 trades) | +76.39% (+26.17% / +39.80%, 140 trades) | -10.38% vs +1.23%, 35% positive: FAIL | -10.23% vs -0.22%, 25% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 4h | 5,479 | 141 / 110 | -3.07% / -2.60% | +92.93% (+21.42% / +58.90%, 78 trades) | +13.26% (+6.48% / +6.36%, 96 trades) | -15.20% vs -0.04%, 0% positive: FAIL | -15.34% vs +0.71%, 8% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+
+##### XAUUSD
+
+| TF | Different results | Positive in both halves: normal / inverted | Typical result: normal / inverted | Best normal (halves, trades) | Best inverted (halves, trades) | Forward hold-out | Reverse hold-out | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| 1m | 6,504 | 0 / 1 | -46.42% / -38.84% | -3.72% (-1.70% / -2.05%, 643 trades) | +0.42% (+0.08% / +0.34%, 782 trades) | -1.53% vs -23.82%, 38% positive: FAIL | -5.13% vs -24.69%, 2% positive: FAIL | no setting: none of the 1 best candidates sits on a plateau |
+| 5m | 6,107 | 0 / 0 | -13.94% / -11.13% | -0.59% (-0.26% / -0.33%, 619 trades) | +0.14% (-0.26% / +0.40%, 411 trades) | -10.37% vs -6.54%, 0% positive: FAIL | -5.81% vs -7.00%, 0% positive: FAIL | no setting: no setting is positive in both halves with 30+ trades in each |
+| 15m | 6,129 | 32 / 24 | -5.09% / -5.69% | +4.54% (+3.15% / +1.35%, 148 trades) | +3.92% (+1.52% / +2.36%, 449 trades) | -4.85% vs -2.57%, 0% positive: FAIL | -12.43% vs -2.73%, 2% positive: FAIL | no setting: none of the 40 best candidates sits on a plateau |
+| 30m | 5,608 | 142 / 97 | -3.00% / -3.19% | +12.88% (+8.02% / +4.50%, 79 trades) | +6.31% (+1.91% / +4.32%, 282 trades) | -1.87% vs -1.17%, 20% positive: FAIL | -5.51% vs -1.66%, 15% positive: FAIL | no setting: none of the 40 best candidates sits on a plateau |
+| 1h | 6,189 | 30 / 497 | -3.45% / -0.23% | +3.31% (+1.72% / +1.57%, 311 trades) | +18.61% (+11.07% / +6.78%, 72 trades) | -0.55% vs -0.20%, 60% positive: FAIL | -3.35% vs -0.53%, 35% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 2h | 5,167 | 209 / 47 | +0.22% / -2.54% | +15.38% (+9.04% / +5.82%, 171 trades) | +7.82% (+2.57% / +5.11%, 228 trades) | -2.33% vs -0.31%, 25% positive: FAIL | -4.59% vs +0.57%, 20% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 4h | 4,975 | 11 / 167 | -2.41% / +0.26% | +1.88% (+1.35% / +0.52%, 84 trades) | +22.81% (+9.69% / +11.97%, 80 trades) | -3.12% vs +0.25%, 28% positive: FAIL | -3.96% vs +0.18%, 20% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+
+#### ApexForge Flow Resonance
+
+ApexForge puts 1% of equity in each trade, so the figures are small.
+
+##### BTCUSD
+
+| TF | Different results | Positive in both halves: normal / inverted | Typical result: normal / inverted | Best normal (halves, trades) | Best inverted (halves, trades) | Forward hold-out | Reverse hold-out | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| 1m | 6,353 | 0 / 0 | -6.477% / -6.679% | -1.006% (-0.406% / -0.603%, 3363 trades) | -0.808% (-0.465% / -0.344%, 4042 trades) | -1.130% vs -3.213%, 0% positive: FAIL | -0.982% vs -2.924%, 0% positive: FAIL | no setting: no setting is positive in both halves with 30+ trades in each |
+| 5m | 7,001 | 0 / 264 | -1.291% / -0.947% | -0.416% (-0.210% / -0.206%, 1671 trades) | +0.729% (+0.363% / +0.365%, 1596 trades) | +0.211% vs -0.523%, 98% positive: pass | +0.225% vs -0.511%, 92% positive: pass | **rule passed**: zoneLookback=30, minBodyStr=0.8, volMultiplier=1.7, fgfOn=True, blkClose=False, inv=True, rrRatio=5, trailOn=False |
+| 15m | 6,684 | 147 / 138 | -0.177% / -0.427% | +0.720% (+0.280% / +0.439%, 382 trades) | +0.357% (+0.163% / +0.194%, 339 trades) | -0.242% vs -0.081%, 8% positive: FAIL | +0.016% vs -0.132%, 55% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 30m | 6,583 | 1,460 / 68 | +0.117% / -0.171% | +1.002% (+0.479% / +0.520%, 556 trades) | +0.533% (+0.352% / +0.181%, 552 trades) | +0.007% vs +0.002%, 28% positive: FAIL | +0.210% vs +0.067%, 100% positive: pass | no setting: forward hold-out failed |
+| 1h | 5,657 | 231 / 92 | +0.004% / -0.075% | +0.822% (+0.386% / +0.434%, 338 trades) | +0.272% (+0.141% / +0.130%, 89 trades) | +0.049% vs +0.036%, 52% positive: FAIL | -0.158% vs +0.011%, 8% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 2h | 4,464 | 63 / 49 | -0.040% / -0.042% | +0.433% (+0.236% / +0.197%, 103 trades) | +0.198% (+0.108% / +0.090%, 74 trades) | -0.221% vs +0.011%, 10% positive: FAIL | -0.102% vs +0.022%, 18% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 4h | 2,391 | 44 / 1 | +0.110% / -0.152% | +0.244% (+0.099% / +0.145%, 82 trades) | +0.010% (+0.009% / +0.001%, 67 trades) | +0.048% vs +0.027%, 82% positive: pass | +0.027% vs -0.012%, 65% positive: pass | **rule passed**: zoneLookback=10, minBodyStr=0.5, volMultiplier=1.2, fgfOn=False, inv=False, rrRatio=2, trailOn=True, trailAct=1, trailOff=1.5, useTarget=True |
+
+##### XAUUSD
+
+| TF | Different results | Positive in both halves: normal / inverted | Typical result: normal / inverted | Best normal (halves, trades) | Best inverted (halves, trades) | Forward hold-out | Reverse hold-out | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| 1m | 1,107 | 0 / 0 | -0.448% / -0.209% | +0.000% (-0.002% / +0.002%, 267 trades) | +0.003% (+0.027% / -0.025%, 1005 trades) | -0.082% vs -0.249%, 0% positive: FAIL | -0.030% vs -0.253%, 0% positive: FAIL | no setting: no setting is positive in both halves with 30+ trades in each |
+| 5m | 1,932 | 15 / 208 | -0.114% / -0.068% | +0.026% (+0.010% / +0.016%, 137 trades) | +0.261% (+0.135% / +0.126%, 97 trades) | +0.092% vs -0.043%, 100% positive: pass | +0.015% vs -0.052%, 45% positive: FAIL | no setting: reverse hold-out failed |
+| 15m | 2,845 | 28 / 213 | -0.050% / -0.046% | +0.103% (+0.035% / +0.068%, 107 trades) | +0.128% (+0.063% / +0.064%, 102 trades) | -0.032% vs -0.024%, 15% positive: FAIL | -0.035% vs -0.015%, 18% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 30m | 3,895 | 47 / 206 | -0.071% / -0.028% | +0.133% (+0.044% / +0.089%, 140 trades) | +0.233% (+0.156% / +0.077%, 170 trades) | +0.012% vs -0.020%, 60% positive: pass | -0.064% vs +0.004%, 20% positive: FAIL | no setting: reverse hold-out failed |
+| 1h | 3,834 | 60 / 66 | -0.009% / -0.062% | +0.117% (+0.062% / +0.056%, 87 trades) | +0.170% (+0.101% / +0.069%, 75 trades) | -0.096% vs -0.004%, 12% positive: FAIL | -0.109% vs +0.012%, 0% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 2h | 3,197 | 6 / 37 | -0.083% / +0.061% | +0.033% (+0.021% / +0.012%, 85 trades) | +0.145% (+0.072% / +0.073%, 71 trades) | -0.043% vs -0.005%, 5% positive: FAIL | +0.005% vs +0.018%, 62% positive: FAIL | no setting: forward hold-out failed; reverse hold-out failed |
+| 4h | 1,343 | 0 / 5 | -0.183% / +0.087% | -0.070% (-0.083% / +0.013%, 94 trades) | +0.190% (+0.176% / +0.014%, 76 trades) | too few settings with 30+ trades per half: FAIL | too few settings with 30+ trades per half: FAIL | no setting: none of the 5 best candidates sits on a plateau |
+
+### Review of the settings that passed
+
+**Under review, not confirmed.** Two ApexForge settings pass steps 1 to 5. Independent reviewers are attacking them now (step 6), and a second reviewer is re-implementing the rule on all 28 cells. Until that is in, treat both as unconfirmed: every earlier pick in this repository that passed its rule was later refuted at this step. No per-timeframe file has been made.
+
+| | BTCUSD 5m | BTCUSD 4h |
+|---|---|---|
+| Direction | **inverted** | normal |
+| Filter | on, "Blocked opposite signal still closes the trade" off | off |
+| Signals | swing lookback 30, body strength 0.8, volume multiplier 1.7 | swing lookback 10, body strength 0.5, volume multiplier 1.2 |
+| Exits | Reward:Risk 5, no trailing | Reward:Risk 2, trailing 1% / 1.5%, target kept |
+| Result (1-minute fills, costs) | +0.82% of equity, 1,109 trades, PF 1.16 | +0.24% of equity, 82 trades, PF 1.55 |
+| Halves | +0.49% / +0.33% | +0.10% / +0.15% |
+| Same setting, direction flipped | -1.17% | -0.14% |
+| Stressed costs | +0.49% (+0.32% / +0.17%) | +0.22% (+0.09% / +0.13%) |
+| As TradingView would show it | +0.38% | +0.21% |
+
+Both are small because ApexForge puts 1% of equity in each trade. The 4h result rests on 82 trades, and on that timeframe only 136 settings have 30+ trades per half, so its hold-out says little.
+
+### What it shows
+
+- **HRD: no setting passes on any timeframe of either pair, in either direction.** The best settings look large in-sample (BTC 15m inverted +110.6%, BTC 1h normal +140.3%), but settings chosen on one half lose on the other. On BTC 15m the 40 best of the first half made -14.2% in the second.
+- **HRD, closest to passing: BTC 1h.** The reverse hold-out passes (+19.2%, 95% positive), the forward one fails (only 40% positive).
+- **The direction is not an edge by itself.** For HRD, inverted has more candidates on BTC 1h and 2h and gold 1h and 4h; normal has more on BTC 15m, 30m and 4h and gold 30m and 2h. There is no consistent side.
+- **ApexForge on BTC 5m is the one place where the direction separates cleanly.** None of the 3,384 different normal results is positive in both halves; 264 inverted ones are. That is what the reviewers are testing.
+- **ApexForge on gold: inverted has more candidates from 5m to 4h, but none passes both hold-outs.** 5m and 30m pass forward and fail in reverse.
+- **1m: nothing.** On both strategies and both pairs, no setting (or one, on gold HRD) is positive in both halves on the 1-minute chart, in either direction.
+
+### Data
+
+Every setting of every timeframe, with its inputs, trades, net result, profit factor, drawdown and both halves: [`calibration_apex.csv.gz`](calibration_apex.csv.gz) (172,368 rows) and [`calibration_hrd.csv.gz`](calibration_hrd.csv.gz) (326,592 rows).
+
+### Limits
+
+- The windows are short: 2 years of BTC (2024-11 to 2026-11), 18 months of gold (2017-01 to 2018-06). The gold data is old.
+- "Best" figures are in-sample: the best of thousands of settings always looks good. Only the hold-out columns say whether a choice would have carried over.
+- Nothing here was compiled or run in TradingView. The 1-minute figures roughly correspond to the Strategy Tester with Bar Magnifier on and our costs entered in Properties.
