@@ -1,3 +1,6 @@
 danny_phantom_calibration/results/sweep_*.csv
 __pycache__/
 crypto_lab/data/raw/*_metrics_daily/
+amvi_calibration/data/
+amvi_calibration/results/sweeps/
+amvi_calibration/results/prelim/
