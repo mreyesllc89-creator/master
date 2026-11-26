@@ -648,10 +648,10 @@ came up to 16.5 days after the chart's first candle with 5,000 candles, 50.2 day
 10,000, 28.2 with 20,000, 23.7 with 25,000 and 24.5 with 40,000. On the 4h file with 5,000
 candles they came up to 124 days after it, because its filter compares each daily close with
 the close 120 days earlier; with 10,000 4h candles or more the chart starts long before the
-oldest 15m candle and nothing changes. Almost every difference is a list trade missing in the tester;
-sometimes the tester takes a trade the list does not have; never one on the other side. So
-on an ordinary 15m chart a missing or extra trade, even after four weeks, is no proof of a
-mismatch; a trade on the other side is.
+oldest 15m candle and nothing changes. Almost every difference is a list trade missing in
+the tester; sometimes the tester takes a trade the list does not have; never one on the
+other side. So on an ordinary 15m chart a missing or extra trade, even after four weeks, is
+no proof of a mismatch; a trade on the other side is.
 
 How many trades that leaves, at 00:00 UTC on 26 November (fewer every week, because the chart
 moves on and the list ends on 2026-10-31). The 4h file: 92 list trades from two weeks after
