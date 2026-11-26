@@ -68,10 +68,17 @@ Fixed for EVERY row (decisions of the orchestrator, not dimensions):
                         result. Everything else of the sizing is the script's: Risk 1 % of equity,
                         margin cap 1 %, capital 2,000.
                         Limit: 0.000001 is the smallest step the Pine input accepts. An account
-                        that has lost about 99.99999 % of its capital (equity x 1 % / stop
-                        distance < 0.000001: on the 1-minute charts, where a round trip costs
-                        about one stop distance) can still not size a trade and stops trading.
+                        with equity x 1 % / stop distance < 0.000001 (equity under 0.0001 x the
+                        stop distance: a cent or so on BTC, a hundredth of a cent on gold; on the
+                        short charts, where a round trip costs about one stop distance) can still
+                        not size a trade: from there on it trades less or not at all and its
+                        results are NOT scale-free (BTC 1: 10,045 rows, XAU 1: 15,458 rows with
+                        fewer than 30 trades in the second half for this reason).
                         Such a row has zero_qty > 0 (a column); the run prints how many there are.
+                        Measured on the 14 cells (2026-11-26): all 17,496 rows of BTC 1, 17,458
+                        of XAU 1, 7,706 of XAU 5, 6,086 of BTC 5, 477 of XAU 15, 220 of BTC 15,
+                        none from 30 minutes up; every one of them ends at -99.996 % or worse and
+                        none has both halves positive, so none can be a candidate of the rule.
 Everything else stays at the script's defaults (ExitMode ATR, ATR 14, loss-cluster pause on,
 blackouts on, breakeven off, the filter's own inputs).
 DEFAULT_P (= DEFAULT) is the default setting: the script's default inputs WITH the scale-free
@@ -87,6 +94,15 @@ manualEmaLength with manualUseEmaFilter False, deadBarsIn with useDeadExit False
 signalDirection with fgfOn False (see above). DIMS = the 14 dimensions (name, values, kind
 'ordinal' / 'categorical'; extra keys: side, default, unused_when); row i of a file is
 grid(pair, tf)[i].
+Repeated rows that the grid of section 14 keeps (it is run as given, 17,496 rows): deadBarsIn 30
+with timeStopBars 25 can never act (the time stop closes every trade first), so these 1,944 rows
+per cell equal their twin with useDeadExit False on every result column. On data more rows repeat
+each other where the daily / weekend close ends the trades first (BTC 60: no trade lasts 25
+candles, the three time stops give one result, 3,884 distinct results in 17,496 rows; BTC 240:
+5,698) and where the cell's trailing pair is too wide to act (BTC 1, XAU 1: about half of the
+trailing rows equal the row without trailing). The rule counts identical results once, and the
+FIRST row in file order stands for them: a result reported as "useDeadExit True, deadBarsIn 30"
+with timeStopBars 25 is the setting with the dead exit off.
 
 Every setting is scored with path 'mag' (the exit bracket walked along the 1-minute sub-bars; on
 chart "1" each bar is its own sub-bar) and cost 'ours'. Per cell: danny.prepare runs ONCE per
@@ -107,7 +123,8 @@ h1_trades, h2_trades (the fair halves), avg_bars_held, costs, slippage_paid, net
 reentry_same_bar, reentry_leg1, inherited, zero_qty, qty_capped, margin_breach. Nothing else: no
 index, no pair / tf column (they are in the file name; the parquet's key-value metadata "calib"
 holds strategy, pair, tf, path, cost, the number of settings, the fixed controls, the trailing
-pair and its floor measurement, and the sha256 of danny.py and fgf.py that produced the rows).
+pair and its floor measurement, and the sha256 of danny.py and fgf.py that produced the rows: the
+files as they were when this process imported them, not as they are when the file is written).
 pf is +inf without a losing trade and NaN without trades; win_pct and avg_bars_held are NaN
 without trades. --one prints floor_ok and the same fields (Python's json: Infinity / NaN) plus
 "setting" = {strategy, pair, tf, path, cost, p (the canonical p_ values), in_grid, row (its row
@@ -691,6 +708,14 @@ def _sha256(path):
         return hashlib.sha256(f.read()).hexdigest()
 
 
+# The code that produces the rows of this process: danny.py and fgf.py as they were when it imported
+# them. A module edited while a long run is under way is not the code that ran, so the sha256 is taken
+# here, once, and not when a file is written. (danny imports fgf at its first filter call; it is
+# imported here so that both are read at the same moment.)
+import fgf  # noqa: E402
+_SRC_SHA = {'danny': _sha256(danny.__file__), 'fgf': _sha256(fgf.__file__)}
+
+
 def file_meta(pair, tf, n, floor=None):
     """What produced a cell's file (stored in the parquet's key-value metadata, key "calib")."""
     act, dst = trail_pair(pair, tf)
@@ -698,7 +723,7 @@ def file_meta(pair, tf, n, floor=None):
             'window': [int(v) for v in danny.WINDOWS[pair]], 'varRollback': VAR_ROLLBACK,
             'qtyStepS3': SCALE_FREE['qtyStepS3'], 'maxQtyS3': SCALE_FREE['maxQtyS3'],
             'grid_presetMode': grid_preset(pair, tf), 'trailActAtr': act, 'trailDstAtr': dst, 'floor': floor,
-            'danny_sha256': _sha256(os.path.join(W, 'danny.py')), 'fgf_sha256': _sha256(os.path.join(W, 'fgf.py'))}
+            'danny_sha256': _SRC_SHA['danny'], 'fgf_sha256': _SRC_SHA['fgf']}
 
 
 def write_parquet(t, path, meta):

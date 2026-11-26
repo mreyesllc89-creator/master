@@ -11,7 +11,8 @@ Usage: python3 -I calib_tests_danny.py [name filter ...] [--cells XAU:240,BTC:24
                           file); the trailing pair of every cell = the table, and the table's floor
                           recomputed here from the bar files; the dimensions listed once (None)
                           cannot change a result, P1 (filter off: inv True = the Original signal
-                          direction); the files hold the grid in order
+                          direction); the files hold the grid in order; the file metadata names the
+                          danny.py / fgf.py the process imported (sceptic)
   test_2_default_rows     the default row with --script-sizing equals the saved default result of
                           the module with the same path and cost: out/inv_danny_<PAIR>_<TF>.json
                           runs normal/on/mag/ours and inverted/on/mag/ours through the command line
@@ -30,7 +31,9 @@ Usage: python3 -I calib_tests_danny.py [name filter ...] [--cells XAU:240,BTC:24
                           memory the parent and its 3 workers hold together during the passes
                           (sum of PSS, sampled): well under the machine's 15 GB
   test_6_row_consistency  what every row must satisfy whatever the data (counts add up, a switch
-                          that is off leaves no trace), and every dimension changes results
+                          that is off leaves no trace), and every dimension changes results; the
+                          grid's own repeats (sceptic): the 1,944 rows with deadBarsIn 30 behind
+                          timeStopBars 25 equal their twin with the dead exit off (also in test 8)
   test_7_all_rows         EVERY row of the cells' files (not a sample) recomputed in this process:
                           danny.prepare once per signal setting, danny.simulate + danny.summary per
                           row, with this file's own mapping; all summary values equal
@@ -324,6 +327,28 @@ def _swap_raw(s):
     return out
 
 
+def _late_dead(df, keys):
+    """Rows whose dead-trade exit can never act: deadBarsIn is later than timeStopBars, and the time stop
+    closes every trade first (danny kernel B7: bars in the trade >= timeStopBars forces the close). Such a
+    row must equal, on every result column, its twin with the dead exit off (useDeadExit False, deadBarsIn
+    None): it repeats another row of the grid. Returns (rows, rows equal to the twin, rows without a twin)."""
+    j_on, j_db, j_ts = SPEC_DIMS.index('useDeadExit'), SPEC_DIMS.index('deadBarsIn'), SPEC_DIMS.index('timeStopBars')
+    assert j_db == j_on + 1
+    pos = {k: i for i, k in enumerate(keys)}
+    rc = _rescols(df)
+    v = df[rc].to_numpy(dtype=float)
+    n = n_eq = n_miss = 0
+    for i, k in enumerate(keys):
+        if k[j_on] is True and k[j_db] is not None and k[j_db] > k[j_ts]:
+            n += 1
+            j = pos.get(k[:j_on] + (False, None) + k[j_db + 1:])
+            if j is None:
+                n_miss += 1
+            elif np.array_equal(v[i], v[j], equal_nan=True):
+                n_eq += 1
+    return n, n_eq, n_miss
+
+
 def _own_p10(pair, tf):
     """The 10th percentile over the window of ATR(14) / close in %, computed here from the bar file with
     pandas (Wilder's average as an exponential mean of the true range; the window starts thousands of
@@ -608,6 +633,21 @@ def test_1_grid():
         ok &= same
     else:
         _p('  out/calib_danny_dims.json: not written yet')
+    # ---- the provenance written into a file is the code this process imported (sceptic): file_meta must not
+    # read danny.py / fgf.py again when a file is written, a module edited during a long run did not run
+    o_sha = C._sha256
+    C._sha256 = lambda path: 'read again at write time'
+    try:
+        m2 = C.file_meta('XAU', '240', N_GRID)
+    finally:
+        C._sha256 = o_sha
+    import fgf
+    prov = (m2['danny_sha256'] == C._SRC_SHA['danny'] and m2['fgf_sha256'] == C._SRC_SHA['fgf']
+            and len(m2['danny_sha256']) == 64 == len(m2['fgf_sha256'])
+            and os.path.samefile(danny.__file__, os.path.join(W, 'danny.py')) and os.path.samefile(fgf.__file__, os.path.join(W, 'fgf.py')))
+    _p('  file metadata: the sha256 of danny.py and fgf.py is the one taken when the runner imported them, not read '
+       'again when a file is written: %s' % prov)
+    ok &= prov
     cols_want = None
     for pair, tf in CELLS:
         df, src = _cell_df(pair, tf)
@@ -1248,6 +1288,9 @@ def test_6_row_consistency():
             an = False
             an_txt = 'calib_analyze.codes_of FAILED: %r' % (e,)
         n_distinct = len(np.unique(sig))
+        # the grid's own repeats: a dead exit at 30 bars behind a time stop at 25 bars never acts
+        n_late, n_late_eq, n_late_miss = _late_dead(df, K)
+        late_ok = n_late == 27 * 6 * 3 * 2 * 2 == n_late_eq and n_late_miss == 0
         cand = int(((df['h1r_pct'] > 0) & (df['h2r_pct'] > 0) & (df['h1_trades'] >= 30) & (df['h2_trades'] >= 30)).sum())
         el = int(((df['h1_trades'] >= 30) & (df['h2_trades'] >= 30)).sum())
         _p('  %s %s (%s): %d rows, %d checks: %s' % (pair, tf, src, len(df), len(chk),
@@ -1260,7 +1303,10 @@ def test_6_row_consistency():
            % (tr.min(), tr.max(), int(tr.median()), n_distinct, len(df), same_twin, zq, cap, mb, el, cand))
         _p('    every row is in a group of every analysis above (no row dropped): %s; rows without a direction twin in '
            'the file: %d; %s' % (n_rows_g == n_sel_g, no_twin, an_txt))
-        ok &= not failed and same_twin == 0 and n_rows_g == n_sel_g and an \
+        _p('    rows whose dead exit (30 bars) comes after the time stop (25 bars) and so can never act: %d (27 x 6 x 12), '
+           'equal to their twin with the dead exit off on every result column: %d: %s (the section-14 grid lists these '
+           'combinations twice; the analysis counts identical results once)' % (n_late, n_late_eq, late_ok))
+        ok &= not failed and same_twin == 0 and n_rows_g == n_sel_g and an and late_ok \
             and no_twin == (1 if (pair, tf) == ('XAU', '5') else 0)
     dead = [k for k, v in live_all.items() if v == 0]
     _p('  every dimension changes results in at least one group over the cells (presetMode has one value outside '
@@ -1385,14 +1431,18 @@ def test_8_every_cell():
                 del Pp
             h = pd.util.hash_pandas_object(df[sc], index=False).to_numpy()
             n_sig = 54 + (1 if (pair, tf) == ('XAU', '5') else 0)
-            c_ok = g_ok and not bad_rows and len(groups) == n_sig and n_rows == 216 + (1 if n_sig == 55 else 0)
+            n_late, n_late_eq, n_late_miss = _late_dead(df, keys)
+            late_ok = n_late == 1944 == n_late_eq and n_late_miss == 0
+            c_ok = g_ok and not bad_rows and len(groups) == n_sig and n_rows == 216 + (1 if n_sig == 55 else 0) and late_ok
             tr = df['trades']
             _p('  %s %-3s: %d rows, the grid in order, metadata, window, floor_ok: %s; written with the danny.py / fgf.py '
                'now on disk: %s; %d rows (4 of each of the %d signal settings) recomputed: %d values, %s; distinct '
-               'results %d; trades %d .. %d; rows with zero_qty > 0: %d (%.1fs)'
+               'results %d; trades %d .. %d; rows with zero_qty > 0: %d; dead exit behind the time stop: %d rows, %d equal '
+               'to the dead-exit-off twin%s (%.1fs)'
                % (pair, tf, len(df), g_ok, cur, n_rows, len(groups), n_vals,
                   'all equal' if not bad_rows else '%d ROWS DIFFER: %s' % (len(bad_rows), bad_rows[:8]),
-                  len(np.unique(h)), tr.min(), tr.max(), int((df['zero_qty'] > 0).sum()), time.time() - t0))
+                  len(np.unique(h)), tr.min(), tr.max(), int((df['zero_qty'] > 0).sum()), n_late, n_late_eq,
+                  '' if late_ok else ' WRONG', time.time() - t0))
             ok &= c_ok
             _free()
     if n_cells == 0:
