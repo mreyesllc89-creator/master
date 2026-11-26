@@ -1,0 +1,14 @@
+1m: identical (393,102 chart bars, 122 triggers, 42 trades, -12.94R)
+2m: identical (196,552 chart bars, 221 triggers, 22 trades, +2.76R)
+3m: identical (131,035 chart bars, 128 triggers, 19 trades, +1.90R)
+5m: skipped (uses a filter mode the reference versions do not implement)
+10m: identical (39,311 chart bars, 62 triggers, 16 trades, +4.31R)
+15m: identical (26,208 chart bars, 204 triggers, 65 trades, +4.87R)
+30m: identical (13,104 chart bars, 433 triggers, 23 trades, +1.07R)
+1h: identical (6,552 chart bars, 301 triggers, 26 trades, +1.43R)
+4h: skipped (uses a filter mode the reference versions do not implement)
+picks against the reference versions, 2025-08-01 to 2026-05-01: 7 of 7 identical
+
+real	0m4.071s
+user	0m3.569s
+sys	0m1.166s

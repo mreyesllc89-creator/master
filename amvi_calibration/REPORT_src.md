@@ -12,7 +12,69 @@ re-implementations of the Pine source. One calibrated `.pine` file per timeframe
 
 ## 1. Short version
 
-SHORT_VERSION
+1. **The file as you run it loses on BTC on every timeframe.** Its inputs were calibrated for
+   gold on 15m and it trades against the filter ("Inverted"). On BTCUSDT that lost on all
+   nine charts in both periods: from -98R on 4h to -597R on 1m over the last three years, and
+   from -36R to -616R on 2021-2023. (1R = the amount risked on one trade.)
+
+2. **Trade with the filter, not against it.** This is the one finding that holds everywhere.
+   Among settings that trade with the filter, 4% (1m) to 53% (4h) made money over the last
+   three years; among inverted ones 1% to 11%. On 2021-2023, which no search saw: 10% to 83%
+   against 2% to 16%. Set **Trade direction** to "Follow the filter"; every pick below does.
+
+3. **No timeframe earned RECOMMENDED. Three files are USABLE (4h, 15m, 3m) and one is
+   PAPER-TRADE (1m).** On 1h, 30m, 10m, 5m and 2m the best candidate did not hold up on the
+   older data, and no file was written for them.
+
+<<Verdicts at a glance>>
+
+4. **Expect little.** The three USABLE picks each made about +20R on 2021-2023 and +21R to
+   +35R on the last three years: +10% to +18% in three years at the files' 0.5% risk per
+   trade, with drawdowns of 1.4% to 4%. They trade two to eight times a month. The 1m file
+   made more (+55R and +107R) with about one winner in five trades and drawdowns of 15R to
+   29R; its older result rests on fewer good weeks, hence PAPER-TRADE.
+
+5. **Fine-tuning does not carry; the direction does.** Inside the last three years none of
+   the 27 hold-out tests passes: the best settings of one part made about nothing on the
+   other part, and in the most recent year settings chosen on the two years before it landed
+   between -6R and +6R. What does carry is the family: the candidates of the last three years
+   made money as a group on 2021-2023 on 8 of 9 charts. That period had bigger moves and
+   longer trends, so commission weighed less. Read the strategy as a trend-following filter
+   that pays in trending years and roughly breaks even in choppy ones.
+
+6. **Which charts got a file is partly the luck of one pick.** On 1h, 10m, 5m and 2m the 25
+   candidates did well as a group on the older data (72% to 92% of them positive), but the
+   one candidate the rule had chosen did not clear the bar. I did not swap picks after seeing
+   that: it would be choosing with hindsight.
+
+7. **Filter timeframe: 4h or 1D. Not the chart's own low timeframe, and not seconds.** On
+   every chart below 4h a filter several steps above the chart beats a fast one, before fees
+   too. The 1-second filter in your screenshot could not be tested (there is no seconds
+   history), and with a no-trade band 1.6 USD wide it flips on almost every tick.
+
+TRAILING_BULLET
+
+9. **Fees decide the low timeframes.** With a stop of 1 x ATR, the commission of one round
+   trip is 0.08R on 4h, 0.34R on 15m, 0.65R on 5m and 1.73R on 1m. Below 15m the typical
+   with-the-filter setting loses heavily; the low-timeframe picks survive only by trading
+   rarely with a wide stop.
+
+10. **The other inputs mostly change how often it trades, not how well.** Before fees,
+    target, time stop, band and High Vol level all land within a few points of each other,
+    and stop size matters mostly through commission. After fees the versions that trade less
+    look better. Tight targets (1 to 2 ATR) and short time stops are the two things that
+    reliably cost money.
+
+**What I would do.** Forward-test the 4h or the 15m file on TradingView with alerts only (your
+lab is testnet-only anyway), Script executions on "On bar close", for a few weeks, and compare
+its List of Trades with `results/trades_BTCUSDT_4h.csv`. Until that matches, treat every
+number here as unverified on TradingView. Do not run the 1-second filter or the inverted
+direction on BTC.
+
+**Why this could fail.** The edge is trend following: it disappears in sideways markets, and
+the most recent year was one. The support comes from 2021-2023, an unusually trending period.
+Each file has 70 to 280 trades per three years: a few trades decide a year. The data is
+Binance, your chart is Bitget. And nothing here has run on TradingView itself.
 
 ![Cumulative result of each timeframe's pick](results/equity_all.png)
 
@@ -115,9 +177,9 @@ set to your lab's limits (0.5% risk, 5x leverage cap). Display inputs were left 
 
    | Verdict | Means | Luck alone earns it or better |
    |---|---|---|
-   | RECOMMENDED | holds up on the untouched period, that result stays positive in 95% of resamples of its weeks, and all four hold-out tests pass | LUCK_REC |
-   | USABLE | holds up, positive in 95% of resamples, and at least one hold-out test passes | LUCK_USABLE |
-   | PAPER-TRADE | holds up and is positive in 90% of resamples, but the hold-out tests fail: watch it, do not fund it | LUCK_PAPER |
+   | RECOMMENDED | holds up on the untouched period, that result stays positive in 95% of resamples of its weeks, and all four hold-out tests pass | never in 9,000 shuffled worlds |
+   | USABLE | holds up, positive in 95% of resamples, and at least one hold-out test passes | 0.1% to 1.1% of timeframes |
+   | PAPER-TRADE | holds up and is positive in 90% of resamples, but the hold-out tests fail: watch it, do not fund it | 4.6% to 7.3% of timeframes |
    | NOT RECOMMENDED | the search shows more than luck would, but the pick does not hold up on the untouched period | |
    | DO NOT TRADE | the search found no more winners than luck would, and the best candidate does not hold up | |
 
@@ -138,19 +200,56 @@ set to your lab's limits (0.5% risk, 5x leverage cap). Display inputs were left 
 
 <<What the search itself says>>
 
-COMMENT_SEARCH
+**None of the 27 hold-out tests inside the last three years passes.** The 40 steadiest
+settings of one part made between -10R and +11R on the other part: around zero. They do far
+better than random settings, which lose from 4R on 4h to more than 700R on 1m, but "less bad
+than random" is not a profit. The walk-forward column is the most recent year, scored with settings chosen on the
+two years before it: between -6R and +6R on every chart.
+
+**The last column does pass, on 8 of 9 charts.** The candidates of the whole three years, run
+on the older years they never saw, made money as a group: +12R to +60R on average, 68% to
+92% of them positive. On 30m the same result misses the bar by a hair (93% of resamples
+instead of 95%). On the low timeframes they beat random settings of their own direction by a
+wide margin, but mostly because random settings there are eaten by commission; on 4h, where
+commission is small, the candidates do no better than a random with-the-filter setting
+(+12.5R against +11.9R). The direction is the find, not the fine-tuning.
 
 ### 4.3 The two trade directions on data the search never saw
 
 <<The two trade directions on data the search never saw>>
 
-COMMENT_DIRECTION
+**With the filter is the better side in both periods, on every chart.** The share of
+with-the-filter settings that made money rises with the timeframe, because commission weighs
+less: from 4% on 1m to 53% on 4h in the last three years, from 10% to 83% on 2021-2023. The
+inverted direction, which the shipped file uses, stays between 1% and 16% everywhere. Before
+costs the gap is as wide (last column), so it is not a commission effect.
+
+**2021-2023 was the kinder period.** On every chart more with-the-filter settings made money
+then than in the last three years (4h: 83% against 53%; 15m: 43% against 25%). The market
+moved more per candle, so the same commission cost less in R (section 4.6), and trends ran
+further. A result on that period is real evidence, but it flatters what the same file would
+have done since.
 
 ### 4.4 Is there more here than luck?
 
 <<Is there more here than luck?>>
 
-COMMENT_LUCK
+Inside the search window the share of settings positive in both halves sits above what luck
+typically produces (1.3 to 2.1 times the luck-only median) but mostly inside its range: on 4h
+and 1h one no-skill world in five to seven finds as many winners. Only on 3m, 2m, 5m and 15m
+is it at or beyond the 95% mark. The direction gap is clearer: on 2m, 3m, 5m, 15m and 30m
+fewer than 5% of the no-skill worlds show a gap this large, on 10m, 1h and 1m about 5% to 6%,
+on 4h 11%.
+
+The second table is the yardstick for the verdicts. When nothing is there, the pick still
+shows +24R to +65R on the search window (it was chosen for that) and loses on fresh months.
+It is positive on fresh months one time in three, which is why "positive on the untouched
+period" alone proves little. With the final rules luck earns PAPER-TRADE or better on about
+5% to 7% of timeframes, USABLE on 0.1% to 1.1%, RECOMMENDED never in 9,000 worlds. Over
+nine timeframes that is roughly a 40% chance of at least one PAPER-TRADE from luck alone, and
+roughly 4% of at least one USABLE. Three USABLE files are not a coin-toss result. But the
+coin-toss worlds have no good and bad years, and the real market does (section 4.3): the
+test says the older period really paid, not that the next one will.
 
 ### 4.5 The file as shipped (your current inputs) on BTCUSDT
 
@@ -160,7 +259,11 @@ COMMENT_LUCK
 
 <<What one trade costs>>
 
-COMMENT_COSTS
+This table explains most of the rest. On the 5m chart a round trip costs two thirds of the
+amount risked before the trade has earned anything; on 1m more than one and a half times.
+A setting survives there only by trading rarely and with a wide stop, which is what every
+low-timeframe pick does. Your own crypto lab dropped 5m bars on 2026-11-13 after all 34
+five-minute combinations of its first run lost to fees: the same wall.
 
 ## 5. Trailing stop
 
@@ -181,7 +284,26 @@ COMMENT_CONVERGENCE
 
 <<Direction and exits across timeframes>>
 
-COMMENT_INPUTS
+**Before costs, only one input clearly separates good from bad: the trade direction.** From
+5m up, 41% to 48% of with-the-filter settings are positive in both halves before costs,
+against 8% to 16% of inverted ones; below 5m the gap narrows (1m: 38% against 33%). Trailing
+on or off, target or none, time stop or none: before costs each pair lands within a few
+points of the other. Stop size matters a little before costs (a 0.5 ATR stop is the worst)
+and a lot after.
+
+**After costs, what looks like "a better value" is mostly a cheaper one.** A stop of 4 ATR or
+more pays a fraction of the commission in R of a stop of 1 ATR or less, and looks better for
+that reason alone. The same holds for a wider no-trade band, a higher High Vol level, fewer
+timeframes switched on, and not allowing trades against the signal's side: each trades less
+often. Two things cost money after fees on every chart: a tight target (1 to 2 ATR) and a
+short time stop (a dozen candles or fewer). Both close trades early and pay commission again
+on the next one.
+
+**Filter timeframe: 4h, or 1D.** Among with-the-filter settings, a filter several steps above
+the chart beats a filter on the chart's own timeframe on every chart below 4h, before
+costs too (5m chart: 56% positive in both halves before costs with a 4h filter, 35% with a 5m
+filter). On the 4h chart the filter timeframe hardly matters. Seconds filters could not be
+tested (no history); nothing here suggests a faster filter helps.
 
 ## 7. Settings per timeframe
 

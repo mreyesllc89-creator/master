@@ -1,0 +1,7 @@
+chart 60m: 300 settings; without trailing 13.0% positive in both halves (29.0% positive overall, median -12.2R)
+  with trailing, median of the 42 pairs: 9.2%; 0 of 42 pairs are above no trailing
+  best pair chosen on half the settings: activation 4.0 / offset 3.0 (14.7% there); on the other half 7.3% against 11.3% without trailing
+  activation 6.0 ATR, offset 3.0 ATR: 11.7% positive in both halves; better for 23%, unchanged 46%, worse 31% of settings, median change +0.0R; chart-candle walk would show 13.0% (+0.001R per trade flattered)
+  activation 4.0 ATR, offset 3.0 ATR: 11.0% positive in both halves; better for 27%, unchanged 34%, worse 39% of settings, median change +0.0R; chart-candle walk would show 12.0% (+0.002R per trade flattered)
+  activation 3.0 ATR, offset 4.0 ATR: 10.7% positive in both halves; better for 29%, unchanged 30%, worse 41% of settings, median change +0.0R; chart-candle walk would show 11.3% (+0.001R per trade flattered)
+  activation 6.0 ATR, offset 0.5 ATR: 10.7% positive in both halves; better for 26%, unchanged 45%, worse 29% of settings, median change +0.0R; chart-candle walk would show 16.3% (+0.019R per trade flattered)

@@ -372,8 +372,30 @@ def group(r, name, test):
             sum(v["median_fee"] * v["rows"] for v in vals) / n, n)
 
 
+def glance(rows):
+    """The compact verdict table of the report's short version, highest timeframe first."""
+    L = ["## Verdicts at a glance", "",
+         "| Chart | Verdict | On 2021-2023, which it was not chosen on | Last three years, where it was chosen | File |", "|---|---|---|---|---|"]
+    for r in sorted(rows, key=lambda x: -x["tf"]):
+        if "ev" not in r:
+            L.append(f"| {r['name']} | {r['verdict']} | no candidate | - | none |")
+            continue
+        b, pre, ev = r["ev"]["base"], r["ev"].get("pre", {}), r["ev"]
+        if not pre.get("n"):
+            pc = "no trades"
+        else:
+            pc = f"{pre['total']:+.1f}R in {pre['n']} trades"
+            if pre["total"] > 0 and ev.get("pre_stress", {}).get("total", 0) <= 0:
+                pc += f" ({ev['pre_stress']['total']:+.1f}R at stressed costs)"
+            elif pre["total"] > 0 and pre.get("weeks_pos", 0) < 0.95:
+                pc += f", positive in {pre['weeks_pos'] * 100:.0f}% of resamples"
+        L.append(f"| {r['name']} | {r['verdict']} | {pc} | {b['total']:+.1f}R in {b['n']} trades | "
+                 + (f"`{r['file']}`" if r.get("file") else "none") + " |")
+    return L
+
+
 def tables(rows):
-    L = ["## Results by timeframe", "",
+    L = glance(rows) + ["", "## Results by timeframe", "",
          "The pick of each timeframe. Net of 0.05% per side, 1 tick slippage and funding. R = amount risked per trade. The untouched period comes",
          "first because the pick was not chosen on it; the search-window figure is the best of thousands of settings and is flattered by that choice.", "",
          f"| Chart | Verdict | Untouched 2021-01 to 2023-10 (not chosen on it) | Stressed costs | Positive in resamples of its weeks | Search window {WINDOW_TXT} (chosen here) | Halves | File |",
