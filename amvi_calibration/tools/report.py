@@ -185,14 +185,18 @@ def run(res_dir):
         open(os.path.join(presets, fn), "w", encoding="utf-8").write(src)
         # the trade list
         tr = ev.pop("_trades")
+        pre_tr = ev.pop("_pre_trades", None)
         with open(os.path.join(res_dir, f"trades_BTCUSDT_{name}.csv"), "w", newline="") as f:
             w = csv.writer(f)
-            w.writerow(["entry_utc", "exit_utc", "side", "entry_price", "exit_price", "risk_distance", "gross_R", "fee_R", "funding_R", "net_R", "exit"])
+            w.writerow(["period", "entry_utc", "exit_utc", "side", "entry_price", "exit_price", "risk_distance", "gross_R", "fee_R", "funding_R", "net_R", "exit"])
             reason = {E.X_STOP: "stop", E.X_TP: "target", E.X_TRAIL: "trail", E.X_REV: "reversal", E.X_VOL: "vol exit", E.X_TIME: "time stop", E.X_END: "open"}
-            for i in range(tr["r"].size):
-                w.writerow([pd.Timestamp(int(tr["entry_t"][i]), unit="ms").strftime("%Y-%m-%d %H:%M"), pd.Timestamp(int(tr["exit_t"][i]), unit="ms").strftime("%Y-%m-%d %H:%M"),
-                            "long" if tr["dir"][i] > 0 else "short", f"{tr['entry_px'][i]:.1f}", f"{tr['exit_px'][i]:.1f}", f"{tr['risk'][i]:.1f}",
-                            f"{tr['gross'][i]:.3f}", f"{tr['fee_r'][i]:.3f}", f"{tr['fund_r'][i]:.3f}", f"{tr['r'][i]:.3f}", reason[int(tr["why"][i])]])
+            for period, t in (("untouched", pre_tr), ("search", tr)):
+                if t is None:
+                    continue
+                for i in range(t["r"].size):
+                    w.writerow([period, pd.Timestamp(int(t["entry_t"][i]), unit="ms").strftime("%Y-%m-%d %H:%M"), pd.Timestamp(int(t["exit_t"][i]), unit="ms").strftime("%Y-%m-%d %H:%M"),
+                                "long" if t["dir"][i] > 0 else "short", f"{t['entry_px'][i]:.1f}", f"{t['exit_px'][i]:.1f}", f"{t['risk'][i]:.1f}",
+                                f"{t['gross'][i]:.3f}", f"{t['fee_r'][i]:.3f}", f"{t['fund_r'][i]:.3f}", f"{t['r'][i]:.3f}", reason[int(t["why"][i])]])
         json.dump(dict(tf=tf, verdict=v, why=why, setting=p, eval=ev, plateau={k: plat[k] for k in plat if k != "setting"}),
                   open(os.path.join(res_dir, f"final_{tf}m.json"), "w"), default=float)
         rows.append(dict(tf=tf, name=name, verdict=v, why=why, hold=hold, ev=ev, plat=plat, p=p, changes=changes, file=fn))

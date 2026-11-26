@@ -253,16 +253,20 @@ MODELLING DECISIONS (every choice I had to take)
 18. Float comparisons are taken literally, as Pine takes them.  One of them
     is numerically fragile: fgfTdiDir compares the fast line with its previous
     value, and when the closes of a timeframe do not change over consecutive
-    bars (common on 1m, rare on 2m, absent from 5m up on BTC) the RSI is
-    unchanged in exact arithmetic, so "rising / falling / flat" is decided by
-    the last bit of the RMA / SMA arithmetic.  This file follows the reference
+    bars (on BTC about 0.5 % of the 1m bars, fewer on 2m and 5m, the higher
+    the timeframe the rarer) the RSI is unchanged in exact arithmetic, so
+    "rising / falling / flat" is decided by the last bit of the RMA / SMA
+    arithmetic.  This file follows the reference
     listings' operation order; another faithful implementation (and
     TradingView itself) may round differently there.  reference_details()
     therefore returns `fragile` masks: a zone is flagged when the arm in force
     may come from a filter candle whose parent / child-zone direction compared
     two values closer than TIE_EPS = 1e-9 (the doubt lasts until a candle with
     firm directions fires); trig / volc are flagged when an AMVI value (the
-    average) is within TIE_EPS of the threshold on the bar or the one before.
+    average) is within TIE_EPS of the threshold on the bar or the one before,
+    or was read from a bar whose normalize() window is degenerate (every value
+    equal: no trade for norm + sd bars; here hi <= lo gives exactly 0, an
+    implementation whose flat windows carry rounding noise gives anything).
 
 SELF-TEST
     python3 -I ref_signals.py            the checks below + the requested counts
@@ -604,15 +608,22 @@ def _take(values, idx):
 # A / B / C : AMVI, get_mtf, trigger, volCollapse
 # =============================================================================
 def _normalize(val, n):
-    """normalize(val, len) => hi <= lo ? 0.0 : (val - lo) / (hi - lo)   (na while lo / hi are na)."""
+    """normalize(val, len) => hi <= lo ? 0.0 : (val - lo) / (hi - lo)   (na while lo / hi are na).
+
+    Also returns the bars where the window is degenerate (hi - lo within TIE_EPS: every value of
+    the window equal, e.g. a market that did not trade for len bars), where the quotient is
+    decided by rounding noise in an implementation whose flat windows are not exactly equal.
+    """
     lo = _lowest(val, n)
     hi = _highest(val, n)
     with np.errstate(divide="ignore", invalid="ignore"):
-        return np.where(hi <= lo, 0.0, (val - lo) / (hi - lo))
+        out = np.where(hi <= lo, 0.0, (val - lo) / (hi - lo))
+        degenerate = (hi - lo) <= TIE_EPS * np.maximum(1.0, np.abs(hi))
+    return out, degenerate
 
 
 def _calc_amvi(bars, P):
-    """calc_amvi() on one timeframe's bars."""
+    """calc_amvi() on one timeframe's bars (and the bars where a normalize() window is degenerate)."""
     h, l, c = bars["h"], bars["l"], bars["c"]
     f_atr = _atr(h, l, c, P["fast"])
     s_atr = _atr(h, l, c, P["slow"])
@@ -621,24 +632,27 @@ def _calc_amvi(bars, P):
     n_vr = (vr - 0.5) / 1.5
     sd = _stdev(c, P["sd"])
     cr = _sma(h - l, P["cr"])
-    n_atr = _normalize(f_atr, P["norm"])
-    n_sd = _normalize(sd, P["norm"])
-    n_cr = _normalize(cr, P["norm"])
-    return (P["wA"] * n_atr + P["wV"] * n_vr + P["wS"] * n_sd + P["wC"] * n_cr) * 100.0
+    n_atr, flat_atr = _normalize(f_atr, P["norm"])
+    n_sd, flat_sd = _normalize(sd, P["norm"])
+    n_cr, flat_cr = _normalize(cr, P["norm"])
+    amvi = (P["wA"] * n_atr + P["wV"] * n_vr + P["wS"] * n_sd + P["wC"] * n_cr) * 100.0
+    return amvi, flat_atr | flat_sd | flat_cr
 
 
 def _get_mtf(cache, tf, chart_tf, chart_t, P):
-    """get_mtf(tf, true) on every chart bar."""
+    """get_mtf(tf, true) on every chart bar (and whether the value read is numerically fragile)."""
     req = cache.bars(tf)
-    amvi = _calc_amvi(req, P)
+    amvi, degenerate = _calc_amvi(req, P)
     below = tf < chart_tf                      # bool below = on and in_seconds(tf) < in_seconds(timeframe.period)
     lag = NO_REPAINT and not below             # bool lag   = noRepaint and not below
     if lag:
         # request.security(tf, calc_amvi()[1], lookahead_on): the bar before the requested bar
         # that contains the chart bar's open (tf == chart: the previous chart bar)
-        return _take(amvi, _idx_lookahead_on(req["t"], chart_t) - 1)
-    # request.security(tf, calc_amvi()[0], lookahead_off): the last intrabar of the chart bar
-    return _take(amvi, _idx_lookahead_off(req["t"], tf, chart_t, chart_tf))
+        j = _idx_lookahead_on(req["t"], chart_t) - 1
+    else:
+        # request.security(tf, calc_amvi()[0], lookahead_off): the last intrabar of the chart bar
+        j = _idx_lookahead_off(req["t"], tf, chart_t, chart_tf)
+    return _take(amvi, j), _take(degenerate.astype(np.float64), j) > 0
 
 
 def _amvi_side(cache, chart_t, chart_tf, P):
@@ -649,13 +663,15 @@ def _amvi_side(cache, chart_t, chart_tf, P):
     any_cross = np.zeros(n, dtype=bool)
     v_by_tf = {}
     near_high = np.zeros(n, dtype=bool)        # diagnostics only: a v within TIE_EPS of the threshold
+    v_fragile = np.zeros(n, dtype=bool)        # diagnostics only: a v read from a degenerate normalize()
     for tf in AMVI_TFS:                        # the order of the Pine sums
         if tf not in P["tfs"]:
             continue                           # disabled: v = na
-        v = _get_mtf(cache, tf, chart_tf, chart_t, P)
+        v, fragile = _get_mtf(cache, tf, chart_tf, chart_t, P)
         v_by_tf[tf] = v
         is_na = np.isnan(v)
         near_high |= np.abs(v - P["high"]) <= TIE_EPS
+        v_fragile |= fragile
         any_cross |= (v > P["high"]) & (_prev(v) <= P["high"])      # ta.crossover(v, highVolThreshold)
         hot_count += (~is_na) & (v > P["high"])                     # hot(v)
         en_count += ~is_na                                          # cnt(v)
@@ -671,7 +687,7 @@ def _amvi_side(cache, chart_t, chart_tf, P):
 
     return {"v": v_by_tf, "hot_count": hot_count, "en_count": en_count, "avg_amvi": avg,
             "any_cross": any_cross, "trig": trig, "volc": volc,
-            "trig_fragile": or_prev(near_high), "volc_fragile": or_prev(near_low)}
+            "trig_fragile": or_prev(near_high | v_fragile), "volc_fragile": or_prev(near_low | v_fragile)}
 
 
 # =============================================================================
@@ -1046,11 +1062,13 @@ def _check_builtins():
     # AMVI warm-up: first value at max(fast, sd, cr) - 1 + norm - 1, values within 0..100
     P = _normalise_params({"fast": 7, "slow": 100, "sd": 20, "cr": 20, "norm": 200}, 5)
     bars = {"h": h, "l": l, "c": x}
-    amvi = _calc_amvi(bars, P)
+    amvi, degenerate = _calc_amvi(bars, P)
     assert int(np.flatnonzero(~np.isnan(amvi))[0]) == 20 - 1 + 200 - 1
     assert np.nanmin(amvi) >= 0.0 and np.nanmax(amvi) <= 100.0 + 1e-9
+    # high - low is the constant 1.2 here: the candle-range window is degenerate wherever it is full
+    assert degenerate[20 - 1 + 200 - 1:].all() and not degenerate[:20 - 1 + 200 - 1].any()
     P2 = _normalise_params({"fast": 30, "slow": 400, "sd": 5, "cr": 3, "norm": 50}, 5)    # slow ATR still na: vr = 1
-    amvi2 = _calc_amvi(bars, P2)
+    amvi2 = _calc_amvi(bars, P2)[0]
     assert int(np.flatnonzero(~np.isnan(amvi2))[0]) == 30 - 1 + 50 - 1
 
 
@@ -1061,12 +1079,12 @@ def _check_other_na_reading():
     x = np.round(100.0 + np.cumsum(rng.standard_normal(900)), 1)
     bars = {"h": x + 0.5, "l": x - 0.7, "c": x}
     P = _normalise_params({"fast": 7, "slow": 100, "sd": 20, "cr": 20, "norm": 200}, 5)
-    strict = _calc_amvi(bars, P)
+    strict = _calc_amvi(bars, P)[0]
     src = x.copy()
     src[:30] = np.nan
     HIGHEST_LOWEST_IGNORE_NA = True
     try:
-        loose = _calc_amvi(bars, P)
+        loose = _calc_amvi(bars, P)[0]
         hi, lo = _highest(src, 50), _lowest(src, 50)
         m1 = _synthetic_m1(2500, 4)
         p = dict(fast=3, slow=30, sd=8, cr=6, norm=40, tfs=(1, 5, 15), f_tf=5, parent_tf=5, zones=(5, 15))
@@ -1695,37 +1713,81 @@ def _sma_pairwise(x, n):
     return out
 
 
+def _sma_running(x, n):
+    """ta.sma with another rounding: a running (cumulative) sum, as a streaming implementation keeps."""
+    x = np.asarray(x, dtype=np.float64)
+    N = x.shape[0]
+    out = np.full(N, np.nan)
+    if n <= N:
+        bad = np.isnan(x)
+        total = np.concatenate(([0.0], np.cumsum(np.where(bad, 0.0, x))))
+        n_bad = np.concatenate(([0], np.cumsum(bad)))
+        out[n - 1:] = np.where(n_bad[n:] - n_bad[:-n] > 0, np.nan, (total[n:] - total[:-n]) / n)
+    return out
+
+
 def _check_fragile_mask():
     """The same formulas rounded another way may change an output only on bars flagged `fragile`.
 
-    Returns (zone bars that changed, zone bars flagged)."""
-    global _rma, _sma
+    Returns (zone bars that changed, zone bars flagged, trig / volc bars that changed, flagged)."""
     rng = np.random.default_rng(99)
     n = 20000
-    close = np.round((500.0 + np.cumsum(rng.standard_normal(n) * 0.11)) * 10.0) / 10.0     # many unchanged closes
+    t = 1767225600000 + np.arange(n, dtype=np.int64) * MS_PER_MIN
+    keep = (_rma, _sma)
+
+    def use(rma_fn, sma_fn):                     # swap the module's ta.rma / ta.sma
+        global _rma, _sma
+        _rma, _sma = rma_fn, sma_fn
+
+    def run(m1, chart_tf, p, other_rma, other_sma):
+        ref = reference_details(m1, chart_tf, p)
+        use(other_rma, other_sma)
+        try:
+            other = reference_signals(m1, chart_tf, p)
+        finally:
+            use(*keep)
+        counts = {}
+        for key in ("trig", "volc", "zone"):
+            diff = ref[key] != other[key]
+            assert not (diff & ~ref["fragile"][key]).any(), "a difference outside the fragile mask: " + key
+            counts[key] = (int(diff.sum()), int(ref["fragile"][key].sum()))
+        return counts
+
+    # 1. many unchanged closes: the TDI direction ties
+    close = np.round((500.0 + np.cumsum(rng.standard_normal(n) * 0.11)) * 10.0) / 10.0
     open_ = np.concatenate(([500.0], close[:-1]))
     high = np.round((np.maximum(open_, close) + np.abs(rng.standard_normal(n)) * 0.05) * 10.0) / 10.0
     low = np.round((np.minimum(open_, close) - np.abs(rng.standard_normal(n)) * 0.05) * 10.0) / 10.0
-    m1 = {"t": 1767225600000 + np.arange(n, dtype=np.int64) * MS_PER_MIN, "o": open_, "h": high, "l": low, "c": close}
-    keep = (_rma, _sma)
+    m1 = {"t": t, "o": open_, "h": high, "l": low, "c": close}
     changed = flagged = 0
     for chart_tf, f_tf, parent_tf, zones in ((1, 1, 1, (1, 2, 4)), (5, 1, 1, (1, 5)), (5, 5, 5, (5, 15)),
                                              (15, 5, 1, (1, 2)), (5, 60, 60, (60, 120)), (1, 5, 15, (1, 30))):
         for extra in ({}, {"band": 0.0}, {"lv_mode": "entry", "min_aligned": 1, "use_burst": True, "against": False}):
             p = dict(extra, tfs=(1, 5, 15, 60), f_tf=f_tf, parent_tf=parent_tf, zones=zones, norm=60, slow=40)
-            ref = reference_details(m1, chart_tf, p)
-            _rma, _sma = _rma_wilder, _sma_pairwise
-            try:
-                other = reference_signals(m1, chart_tf, p)
-            finally:
-                _rma, _sma = keep
-            for key in ("trig", "volc", "zone"):
-                diff = ref[key] != other[key]
-                assert not (diff & ~ref["fragile"][key]).any(), "a difference outside the fragile mask: " + key
-            changed += int((ref["zone"] != other["zone"]).sum())
-            flagged += int(ref["fragile"]["zone"].sum())
+            counts = run(m1, chart_tf, p, _rma_wilder, _sma_pairwise)
+            changed += counts["zone"][0]
+            flagged += counts["zone"][1]
     assert changed > 0 and flagged >= changed
-    return changed, flagged
+
+    # 2. a market that stops trading for an hour or two now and then: degenerate normalize() windows
+    step = rng.standard_normal(n) * 0.6
+    for start in range(1500, n - 400, 2600):
+        step[start:start + 60 + (start % 97)] = 0.0
+    close = np.round((500.0 + np.cumsum(step)) * 10.0) / 10.0
+    open_ = np.concatenate(([500.0], close[:-1]))
+    wick = np.where(step == 0.0, 0.0, np.abs(rng.standard_normal(n)) * 0.2)
+    high = np.round((np.maximum(open_, close) + wick) * 10.0) / 10.0
+    low = np.round((np.minimum(open_, close) - wick) * 10.0) / 10.0
+    m1 = {"t": t, "o": open_, "h": high, "l": low, "c": close}
+    amvi_changed = amvi_flagged = 0
+    for chart_tf in (1, 5):
+        for high_thr in (20.0, 45.0):
+            p = dict(tfs=(1, 5, 15), f_tf=5, fast=3, slow=30, sd=8, cr=6, norm=40, high=high_thr, low=12.0)
+            counts = run(m1, chart_tf, p, _rma_wilder, _sma_running)
+            amvi_changed += counts["trig"][0] + counts["volc"][0]
+            amvi_flagged += counts["trig"][1] + counts["volc"][1]
+    assert amvi_flagged > 0
+    return changed, flagged, amvi_changed, amvi_flagged
 
 
 def _counts(out):
@@ -1793,9 +1855,11 @@ def _self_test(argv):
     _check_output(out, m1_gaps, 5)
     assert not out["trig"].any() and not out["volc"].any()
     print("cross-checks passed (chart_tf 1/15/60/240 x f_tf 1/15/60/240, with and without missing minutes)")
-    changed, flagged = _check_fragile_mask()
-    print("fragile mask: another rounding of rma / sma changed %d zone bars on a flat-ish series, "
-          "all among the %d flagged" % (changed, flagged))
+    changed, flagged, amvi_changed, amvi_flagged = _check_fragile_mask()
+    print("fragile masks: another rounding of rma / sma changed %d zone bars on a flat-ish series (all among "
+          "the %d flagged)" % (changed, flagged))
+    print("               and %d trig / volc bars on a series with trading halts (all among the %d flagged)"
+          % (amvi_changed, amvi_flagged))
     deep = "--deep" in argv
     done = _check_against_scalar(9000 if deep else 2500, (1, 5, 15, 60) if deep else (5,),
                                  (1, 5, 15, 60, 240) if deep else (1, 5, 60), deep)

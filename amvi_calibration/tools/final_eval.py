@@ -155,6 +155,7 @@ def evaluate(ctx_search, ctx_pre, chart_tf, p):
     if ctx_pre is not None:
         pf, pfund = ctx_pre
         pre = trades_for(pf, pfund, chart_tf, p, *PRESAMPLE, fee=BASE_FEE, slip=1)
+        out["_pre_trades"] = pre
         out["pre"] = stats(pre, chart_tf)
         out["pre"]["weeks_pos"] = week_resample(pre)
         out["pre_by_year"] = by_year(pre)
