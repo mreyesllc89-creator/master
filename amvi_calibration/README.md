@@ -32,6 +32,8 @@ Nothing here runs on TradingView. Every number comes from a Python copy of the s
 | `untouched_check.py` | do the candidates of the search window beat random settings on 2021-2023? |
 | `trailing_study.py` | the same settings with and without a trailing stop, every activation and offset |
 | `inputs_summary.py` | the search's settings grouped by one input's value (`results/INPUTS.md`) |
+| `luck.py` | the same counts in no-skill worlds: what luck alone would produce |
+| `convergence.py` | the picks with orders walked on chart candles, 1-minute, 15s, 5s and 1s bars |
 | `final_eval.py` | all numbers for one setting, including the untouched 2021-2023 period |
 | `report.py` | verdict per timeframe, calibrated files, trade lists, tables |
 | `charts.py` | equity curves of the picks |

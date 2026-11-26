@@ -31,6 +31,8 @@ import sweep
 
 BASE_FEE = sweep.BASE_FEE
 STRESS_FEE = 0.0010
+RISK_PCT = 0.5      # the calibrated files' sizing: 0.5 % of equity at risk per trade ...
+LEV_CAP = 5.0       # ... but never a position larger than 5x equity (Margin 20 %)
 SEARCH = (sweep.WINDOW_START, sweep.WINDOW_END)
 PRESAMPLE = ("2021-01-01", "2023-11-01")     # never used by the search or the selection (covers May 2021 and the 2022 bear)
 PRE_LOAD = "2020-01-01"
@@ -86,6 +88,13 @@ def stats(tr, chart_tf=None):
              avg_risk_pct=float(np.mean(tr["risk"] / tr["entry_px"]) * 100))
     if chart_tf:
         s["avg_bars"] = float(np.mean((tr["exit_t"] - tr["entry_t"]) / (chart_tf * 60000.0)))
+    # in % of equity with the files' sizing: a tight stop would need more than 5x leverage, the
+    # position is then capped and less than 0.5 % is at risk on that trade
+    stop_pct = tr["risk"] / tr["entry_px"] * 100
+    at_risk = np.minimum(RISK_PCT, LEV_CAP * stop_pct)
+    s["pct_total"] = float((r * at_risk).sum())
+    s["pct_dd"] = max_drawdown(r * at_risk)
+    s["cap_share"] = float((LEV_CAP * stop_pct < RISK_PCT).mean())
     srt = np.sort(r)[::-1]
     s["top10"] = float(srt[:10].sum())
     s["without_top10"] = float(srt[10:].sum())

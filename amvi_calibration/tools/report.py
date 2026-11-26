@@ -47,6 +47,17 @@ ORDER = ["RECOMMENDED", "USABLE", "PAPER-TRADE", "NOT RECOMMENDED", "DO NOT TRAD
 WINDOW_TXT = "2023-11 to 2026-10"
 
 
+def replay_note(tf, p):
+    """A setting that reads 15m candles from a higher chart can only be replayed on TradingView
+    as far back as 100,000 of those candles reach (about 1,042 days)."""
+    below = {t for t in list(p["tfs"]) + [p["f_tf"]] if t < tf}
+    if 15 not in below:
+        return None
+    since = (pd.Timestamp("2026-11-26") - pd.Timedelta(minutes=15 * 100_000)).strftime("%Y-%m")
+    return (f"This setting reads 15m candles from a {make_pine.TF_NAME[tf]} chart. TradingView keeps about 100,000 intrabars per request, "
+            f"so its tester can replay it only back to about {since}; earlier trades of this record cannot be checked there.")
+
+
 def trail_robust(p, ev):
     """A trailing pick must not depend on the trailing state surviving the candle close."""
     if not p.get("trail"):
@@ -153,6 +164,8 @@ def header_lines(tf, v, why, ev, hold, plat, unt, changes, p):
     L += wrap(f"Plateau: {plat['share_both_positive'] * 100:.0f}% of {plat['neighbours']} one-step neighbours are positive in both halves. "
               f"Concentration: the 10 biggest trades give {b['top10']:+.1f}R, the rest {b['without_top10']:+.1f}R; weeks resampled: "
               f"positive in {b['weeks_pos'] * 100:.1f}% of draws. The other trade direction with the same inputs: {ev['other_direction']['total']:+.1f}R.")
+    if replay_note(tf, p):
+        L += wrap(replay_note(tf, p))
     L += wrap("Not simulated: seconds timeframes (all off), the filter's entry hold, liquidation, partial fills, your "
               "exchange's own prices (Binance trades were used).")
     L += ["", "Inputs set in this file (shipped value in brackets):"]
@@ -184,8 +197,12 @@ def fmt_t(t):
 def fmt_u(u):
     if not u or "cand_mean" not in u:
         return "not tested"
-    return (f"the {u['n_candidates']} candidates made {u['cand_mean']:+.1f}R on average ({u['cand_share_positive'] * 100:.0f}% positive), "
-            f"random settings {u['random_mean']:+.1f}R ({u['random_share_positive'] * 100:.0f}% positive): {'pass' if u['passed'] else 'fail'}")
+    t = (f"the {u['n_candidates']} candidates made {u['cand_mean']:+.1f}R on average ({u['cand_share_positive'] * 100:.0f}% positive), "
+         f"random settings {u['random_mean']:+.1f}R ({u['random_share_positive'] * 100:.0f}% positive): {'pass' if u['passed'] else 'fail'}")
+    if "matched_null_mean" in u:
+        t += (f"; against random settings of the same trade direction ({u['matched_null_mean']:+.1f}R on average): "
+              f"{'pass' if u['passed_matched'] else 'fail'}")
+    return t
 
 
 def sizing_defaults(src):
@@ -241,6 +258,7 @@ def run(res_dir):
         atr_pct, fee_r = fee_in_r(cs[0], tf)
         row = dict(tf=tf, name=name, hold=hold, unt=unt, shipped=base_ev, atr_pct=atr_pct, fee_r=fee_r,
                    trailing=load_json(os.path.join(res_dir, f"trailing_{tf}m.json")),
+                   luck=load_json(os.path.join(res_dir, f"luck_{tf}m.json")),
                    inputs=load_json(os.path.join(res_dir, f"inputs_{tf}m.json")))
         if not picks:
             v, why = verdict(hold, None, None)
@@ -334,10 +352,50 @@ def tables(rows):
         if u and "cand_mean" in u:
             uc = (f"{u['cand_mean']:+.1f}R, {u['cand_share_positive'] * 100:.0f}% positive vs {u['random_mean']:+.1f}R, {u['random_share_positive'] * 100:.0f}% "
                   f"({'pass' if u['passed'] else 'fail'})")
+            if "matched_null_mean" in u:
+                uc += f"; same direction only: vs {u['matched_null_mean']:+.1f}R ({'pass' if u['passed_matched'] else 'fail'})"
         elif u:
             uc = f"no candidates; random {u['random_mean']:+.1f}R, {u['random_share_positive'] * 100:.0f}% positive"
         L.append(f"| {r['name']} | {h['rows']} | {h['gross_share_positive'] * 100:.0f}% | {h['share_positive_total'] * 100:.0f}% | {h['share_positive_both_halves'] * 100:.1f}% | "
                  f"{cell(h['h1_to_h2'], h['pass_h1_to_h2'])} | {cell(h['h2_to_h1'], h['pass_h2_to_h1'])} | {cell(h['walk_forward'], h['pass_walk_forward'])} | {uc} |")
+
+    if any(r.get("unt") and "random_with_filter" in r["unt"] for r in rows):
+        L += ["", "## The two trade directions on data the search never saw", "",
+              "400 random settings of the search per timeframe (at least 30 trades in each half of the search window), run over the untouched",
+              "period 2021-01 to 2023-10 and split by trade direction. Net of 0.05% per side, 1 tick and funding.", "",
+              "| Chart | With the filter: positive | Median | Inverted: positive | Median | Search window, whole 3 years: with the filter positive | Inverted positive |",
+              "|---|---|---|---|---|---|---|"]
+        for r in rows:
+            u = r.get("unt")
+            if not u or "random_with_filter" not in u:
+                continue
+            w, iv = u["random_with_filter"], u["random_inverted"]
+            sw = si = "-"
+            if r.get("inputs"):
+                for inp in r["inputs"]["inputs"]:
+                    if inp["name"] == "Trade direction":
+                        for v in inp["values"]:
+                            if str(v["value"]).startswith("with"):
+                                sw = f"{v['share_positive'] * 100:.0f}%"
+                            else:
+                                si = f"{v['share_positive'] * 100:.0f}%"
+            L.append(f"| {r['name']} | {w['share_positive'] * 100:.0f}% of {w['n']} | {w['median']:+.1f}R | {iv['share_positive'] * 100:.0f}% of {iv['n']} | {iv['median']:+.1f}R | {sw} | {si} |")
+
+    if any(r.get("luck") for r in rows):
+        L += ["", "## Is there more here than luck?", "",
+              "The same counts in no-skill worlds: the months of the real search drawn at random, each month's result of all settings flipped",
+              "by one coin toss, so that no setting has an edge before costs while fees, trade counts and the likeness between settings stay real.",
+              "A real count inside the luck-only range is no evidence of an edge.", "",
+              "| Chart | Positive in both halves: real | Luck alone (5% to 95% of worlds) | Worlds with at least as many | Candidates: real | Luck alone | With the filter minus inverted: real | Luck alone | Worlds with a gap this large | Luck passes at least one hold-out test | Luck's steadiest candidate positive on untouched months |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
+        for r in rows:
+            k = r.get("luck")
+            if not k:
+                continue
+            sb, c, g, lp = k["share_both"], k["candidates"], k["gap"], k["luck_pass"]
+            L.append(f"| {r['name']} | {sb['real'] * 100:.1f}% | {sb['median'] * 100:.1f}% ({sb['p05'] * 100:.1f} to {sb['p95'] * 100:.1f}%) | {sb['worlds_at_least'] * 100:.0f}% | "
+                     f"{c['real']} | {c['median']:.0f} ({c['p05']:.0f} to {c['p95']:.0f}) | {g['real'] * 100:+.1f} points | {g['p05'] * 100:+.1f} to {g['p95'] * 100:+.1f} | "
+                     f"{k['gap_abs_at_least'] * 100:.0f}% | {lp['any'] * 100:.1f}% | {lp['pick_ok'] * 100:.0f}% |")
 
     L += ["", "## The file as shipped (your current inputs) on BTCUSDT", "",
           "The inputs of AMVI_FGF_Inverted_XAUUSD_15m.pine unchanged (calibrated for gold on 15m), run on each BTC chart timeframe.",
@@ -423,8 +481,10 @@ def section(tf, name, v, why, ev, hold, plat, unt, p, changes, ttl, fn):
     lev = RISK_PCT / b["avg_risk_pct"] if b.get("avg_risk_pct") else 0
     L = [f"### {name}: {v}", "", f"{why.capitalize()}. File: `presets/{fn}`.", "",
          f"- Search window: {F.line('', b)[2:]}; halves {b['h1']:+.1f} / {b['h2']:+.1f}R; average trade lasts {b.get('avg_bars', 0):.0f} candles.",
-         f"- At {RISK_PCT}% risk per trade that is about {pct(b['total']):+.1f}% in three years with a worst drawdown of about {pct(b['dd']):.1f}% (no compounding); "
-         f"the stop is {b['avg_risk_pct']:.2f}% of price on average, so {RISK_PCT}% risk means about {lev:.1f}x leverage.",
+         f"- With the file's sizing ({RISK_PCT}% of equity at risk per trade, position capped at 5x equity) that is about {b['pct_total']:+.1f}% in three years "
+         f"with a worst drawdown of about {b['pct_dd']:.1f}% (no compounding). The stop is {b['avg_risk_pct']:.2f}% of price on average, so {RISK_PCT}% risk "
+         f"asks for about {lev:.1f}x leverage"
+         + (f"; the 5x cap cuts the position on {b['cap_share'] * 100:.0f}% of the trades, which then risk less than {RISK_PCT}%." if b.get("cap_share", 0) > 0.005 else "."),
          f"- Costs: Bitget 0.06% {ev['bitget']['total']:+.1f}R; no costs {ev['no_cost']['total']:+.1f}R; "
          f"stressed {ev['stress']['total']:+.1f}R; break-even commission {ev['breakeven_fee_pct']:.3f}% per side. Fees took {b['fee_r']:.1f}R and funding {b['fund_r']:+.1f}R.",
          f"- Price path: second by second {b['total']:+.1f}R; on 1-minute bars {ev['walk_1m']['total']:+.1f}R; on the chart's candles {ev['walk_chart']['total']:+.1f}R. "
@@ -440,6 +500,8 @@ def section(tf, name, v, why, ev, hold, plat, unt, p, changes, ttl, fn):
     if p.get("trail"):
         L.append(f"- Trailing stop restarted at every candle close (if TradingView does that): search window {ev['trail_restart']['total']:+.1f}R, "
                  f"untouched {ev.get('pre_trail_restart', {}).get('total', 0):+.1f}R.")
+    if replay_note(tf, p):
+        L.append(f"- {replay_note(tf, p)}")
     L += ["", "| Input | Shipped | This file |", "|---|---|---|"]
     for nm, old, new in changes:
         L.append(f"| {ttl.get(nm, nm)} (`{nm}`) | {old} | {new} |")

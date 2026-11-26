@@ -12,6 +12,10 @@ The test (the same three conditions as the hold-out tests inside the search wind
 candidates' mean must be positive, above the 95th percentile of the mean of equally many
 random settings, and their basket must stay positive in 95 % of resamples of the months.
 
+The same test is repeated against random settings of the SAME trade direction as the
+candidates (as many inverted and as many with-the-filter ones): did the search find anything
+beyond which direction to trade?
+
 This is a test of the selection method on a timeframe. It does not choose anything: the pick
 of a timeframe is fixed by plateau.py before this runs.
 
@@ -84,6 +88,19 @@ def run(res_dir, n_random=400, seed=77, procs=4):
                        cand_share_positive_stress=float(np.mean([o[3] > 0 for o in cand])),
                        null_p95=float(np.percentile(null, 95)), p=float((null >= ct.mean()).mean()), boot_pos=boot,
                        passed=bool(ct.mean() > 0 and ct.mean() > np.percentile(null, 95) and boot >= 0.95))
+            # the same against random settings of the candidates' own trade direction
+            cinv = np.array([bool(settings[o[1]]["inverted"]) for o in cand])
+            k_inv, k_wf = int(cinv.sum()), int((~cinv).sum())
+            r_inv, r_wf = rt[inv], rt[~inv]
+            if r_inv.size >= max(2 * k_inv, 1) and r_wf.size >= max(2 * k_wf, 1):
+                mnull = np.empty(N_DRAWS)
+                for j in range(N_DRAWS):
+                    a = r_inv[rng.choice(r_inv.size, k_inv, replace=False)].sum() if k_inv else 0.0
+                    b = r_wf[rng.choice(r_wf.size, k_wf, replace=False)].sum() if k_wf else 0.0
+                    mnull[j] = (a + b) / k
+                res.update(matched_null_mean=float(mnull.mean()), matched_null_p95=float(np.percentile(mnull, 95)),
+                           matched_p=float((mnull >= ct.mean()).mean()),
+                           passed_matched=bool(ct.mean() > 0 and ct.mean() > np.percentile(mnull, 95) and boot >= 0.95))
         else:
             res.update(passed=False)
         json.dump(res, open(os.path.join(res_dir, f"untouched_{tf}m.json"), "w"))
@@ -92,6 +109,9 @@ def run(res_dir, n_random=400, seed=77, procs=4):
                   f"(stressed costs {res['cand_share_positive_stress'] * 100:.0f}%), months resampled {res['boot_pos'] * 100:.0f}%; "
                   f"{res['n_random']} random settings: mean {res['random_mean']:+.1f}R, {res['random_share_positive'] * 100:.0f}% positive, "
                   f"p95 of equal-size random groups {res['null_p95']:+.1f}R -> {'PASS' if res['passed'] else 'fail'}", flush=True)
+            if "matched_null_p95" in res:
+                print(f"    against random settings of the same direction: their groups average {res['matched_null_mean']:+.1f}R, p95 {res['matched_null_p95']:+.1f}R "
+                      f"-> {'PASS' if res['passed_matched'] else 'fail'}", flush=True)
         else:
             print(f"chart {tf}m: no candidates; {res['n_random']} random settings: mean {res['random_mean']:+.1f}R, {res['random_share_positive'] * 100:.0f}% positive", flush=True)
         print(f"    random settings by direction on the untouched period: with the filter {res['random_with_filter']['share_positive'] * 100:.0f}% positive "

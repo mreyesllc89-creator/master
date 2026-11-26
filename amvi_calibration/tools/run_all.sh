@@ -41,13 +41,17 @@ for tf in 240 60 30 15 10 5 3 2 1; do
 done
 
 # 5. studies that choose nothing: the selection method on the untouched period, the trailing
-#    stop, the inputs one by one
+#    stop, the inputs one by one, what luck alone would produce
 python3 untouched_check.py "$RES" > "$RES/untouched_check.txt"
 for tf in 240 60 30 15 10 5 3 2 1; do
     python3 trailing_study.py "$tf" "$RES" > "$RES/trailing_${tf}m.txt"
 done
 python3 inputs_summary.py "$RES" > /dev/null
+for tf in 240 60 30 15 10 5 3 2 1; do
+    python3 luck.py "$tf" "$RES" 1000 > "$RES/luck_${tf}m.txt"
+done
 
 # 6. final evaluation, verdicts, calibrated files, trade lists, tables, chart
 python3 report.py "$RES" > "$RES/report_run.log"
 python3 charts.py "$RES"
+python3 convergence.py "$RES" > "$RES/convergence.txt"
