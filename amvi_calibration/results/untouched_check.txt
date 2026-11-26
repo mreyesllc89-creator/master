@@ -13,3 +13,15 @@ chart 5m: 25 candidates on the untouched period: mean +27.0R, 76% positive (stre
 chart 10m: 25 candidates on the untouched period: mean +25.3R, 80% positive (stressed costs 80%), months resampled 100%; 400 random settings: mean -22.5R, 24% positive, p95 of equal-size random groups -8.7R -> PASS
     against random settings of the same direction: their groups average -19.8R, p95 -6.2R -> PASS
     random settings by direction on the untouched period: with the filter 30% positive (median -9.6R, 212 settings); inverted 16% (median -15.8R, 188); 4 of 25 candidates are inverted
+chart 15m: 25 candidates on the untouched period: mean +14.7R, 84% positive (stressed costs 72%), months resampled 100%; 400 random settings: mean -28.2R, 27% positive, p95 of equal-size random groups -11.2R -> PASS
+    against random settings of the same direction: their groups average -16.1R, p95 -1.3R -> PASS
+    random settings by direction on the untouched period: with the filter 43% positive (median -3.4R, 208 settings); inverted 9% (median -25.1R, 192); 1 of 25 candidates are inverted
+chart 30m: 25 candidates on the untouched period: mean +12.1R, 84% positive (stressed costs 56%), months resampled 93%; 400 random settings: mean -31.4R, 32% positive, p95 of equal-size random groups -9.7R -> fail
+    against random settings of the same direction: their groups average -8.6R, p95 +8.2R -> fail
+    random settings by direction on the untouched period: with the filter 55% positive (median +1.4R, 199 settings); inverted 10% (median -28.3R, 201); 1 of 25 candidates are inverted
+chart 60m: 25 candidates on the untouched period: mean +17.1R, 92% positive (stressed costs 68%), months resampled 100%; 400 random settings: mean -21.6R, 36% positive, p95 of equal-size random groups -3.2R -> PASS
+    against random settings of the same direction: their groups average +4.7R, p95 +16.5R -> PASS
+    random settings by direction on the untouched period: with the filter 66% positive (median +5.1R, 210 settings); inverted 4% (median -26.0R, 190); 0 of 25 candidates are inverted
+chart 240m: 25 candidates on the untouched period: mean +12.5R, 68% positive (stressed costs 60%), months resampled 97%; 400 random settings: mean -2.2R, 47% positive, p95 of equal-size random groups +7.7R -> PASS
+    against random settings of the same direction: their groups average +11.9R, p95 +19.8R -> fail
+    random settings by direction on the untouched period: with the filter 83% positive (median +8.1R, 203 settings); inverted 10% (median -14.1R, 197); 3 of 25 candidates are inverted
