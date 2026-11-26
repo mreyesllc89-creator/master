@@ -25,9 +25,13 @@ each with its verdict in the title.
 
 3. **No timeframe earned RECOMMENDED. Three files are USABLE (4h, 15m, 3m) and one is
    PAPER-TRADE (1m).** On 1h, 30m, 10m, 5m and 2m the best candidate did not hold up on the
-   older data, and no file was written for them.
+   older data, and no file was written for them. That includes the two charts you trade: the
+   5m candidate lost on 2021-2023, and the 10m candidate's gain there rests on a few weeks.
 
 <<Verdicts at a glance>>
+
+   NOT RECOMMENDED and DO NOT TRADE both mean "no file". The difference is only whether the
+   search as a whole found more winners than luck would (section 3).
 
 4. **Expect little.** The three USABLE picks each made about +20R on 2021-2023 and +21R to
    +35R on the last three years: +10% to +18% in three years at the files' 0.5% risk per
@@ -39,9 +43,10 @@ each with its verdict in the title.
    the 27 hold-out tests passes: the best settings of one part made about nothing on the
    other part, and in the most recent year settings chosen on the two years before it landed
    between -6R and +6R. What does carry is the family: the candidates of the last three years
-   made money as a group on 2021-2023 on 8 of 9 charts. That period had bigger moves and
-   longer trends, so commission weighed less. Read the strategy as a trend-following filter
-   that pays in trending years and roughly breaks even in choppy ones.
+   made money as a group on 2021-2023 on 8 of 9 charts. That period had bigger moves per
+   candle, so commission weighed less. Read the strategy as a trend-following filter that
+   paid in 2021-2023 and has roughly broken even since for settings not chosen with
+   hindsight.
 
 6. **Which charts got a file is partly the luck of one pick.** On 1h, 10m, 5m and 2m the 25
    candidates did well as a group on the older data (72% to 92% of them positive), but the
@@ -82,7 +87,7 @@ direction on BTC.
 
 **Why this could fail.** The edge is trend following: it disappears in choppy markets, and in
 the most recent year settings chosen on earlier data made nothing. The support comes from
-2021-2023, a period of unusually long trends. Each file has 70 to 280 trades per three
+2021-2023, when the market moved more than it has since. Each file has 70 to 280 trades per three
 years: a few trades decide a year. The data is Binance, your chart is Bitget. And nothing
 here has run on TradingView itself.
 
@@ -232,14 +237,14 @@ commission is small, the candidates do no better than a random with-the-filter s
 **With the filter is the better side in both periods, on every chart.** The share of
 with-the-filter settings that made money rises with the timeframe, because commission weighs
 less: from 4% on 1m to 53% on 4h in the last three years, from 10% to 83% on 2021-2023. The
-inverted direction, which the shipped file uses, stays between 1% and 16% everywhere. Before
-costs the gap is as wide (last column), so it is not a commission effect.
+inverted direction, which the shipped file uses, stays between 1% and 16% everywhere. From 3m
+up the gap is as wide before costs (last two columns), so it is not a commission effect; on
+1m and 2m it narrows.
 
 **2021-2023 was the kinder period.** On every chart more with-the-filter settings made money
 then than in the last three years (4h: 83% against 53%; 15m: 43% against 25%). The market
-moved more per candle, so the same commission cost less in R (section 4.6), and trends ran
-further. A result on that period is real evidence, but it flatters what the same file would
-have done since.
+moved more per candle, so the same commission cost less in R (section 4.6). A result on that
+period is real evidence, but it flatters what the same file would have done since.
 
 ### 4.4 Is there more here than luck?
 

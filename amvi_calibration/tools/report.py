@@ -306,7 +306,7 @@ def run(res_dir):
         if v in WITH_FILE:
             # the calibrated file: only for a pick that holds up on the untouched period
             hl = header_lines(tf, v, why, ev, hold, plat, unt, changes, p, luck, hold["rows"])
-            tag = "calibrated" if v in ("RECOMMENDED", "USABLE") else "paper-trade only"
+            tag = {"RECOMMENDED": "recommended", "USABLE": "usable", "PAPER-TRADE": "paper-trade only"}[v]
             src, changes = make_pine.build(p, tf, hl, f"AMVI FGF | {SYMBOL} {name} ({tag}, closed-candle)", f"AMVI BTC {name}", commission_pct=0.06, symbol=SYMBOL)
             src = sizing_defaults(src)
             fn = f"AMVI_FGF_BTCUSDT_{name}.pine"
@@ -567,7 +567,7 @@ def section(tf, name, v, why, ev, hold, plat, unt, p, changes, ttl, fn, luck=Non
          + (f"; stressed costs {ev['pre_stress']['total']:+.1f}R; positive in {pre.get('weeks_pos', 0) * 100:.0f}% of resamples of its weeks." if pre.get("n") else "."),
          f"- Where it was chosen (search window): {F.line('', b)[2:]}; halves {b['h1']:+.1f} / {b['h2']:+.1f}R; average trade lasts {b.get('avg_bars', 0):.0f} candles. "
          + luck_line(luck),
-         f"- With the file's sizing ({RISK_PCT}% of equity at risk per trade, position capped at 5x equity) the search-window result is about {b['pct_total']:+.1f}% in three years "
+         f"- With {RISK_PCT}% of equity at risk per trade and the position capped at 5x equity (the calibrated files' sizing), the search-window result is about {b['pct_total']:+.1f}% in three years "
          f"with a worst drawdown of about {b['pct_dd']:.1f}% (no compounding)"
          + (f", and the untouched period about {pre['pct_total']:+.1f}% with a worst drawdown of {pre['pct_dd']:.1f}%" if pre.get("n") else "")
          + f". The stop is {b['avg_risk_pct']:.2f}% of price on average, so {RISK_PCT}% risk asks for about {lev:.1f}x leverage"
