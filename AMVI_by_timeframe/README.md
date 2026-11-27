@@ -91,7 +91,7 @@ This section is separate from everything above, which was calibrated earlier on 
 | As published (Inverted) | 206 | **-0.72%** | -0.62% / -0.10% | -1.89% | -1.07% |
 | Same inputs, Follow the filter | 178 | +0.33% | +0.73% / -0.40% | -0.83% | +0.02% |
 
-**It loses on this data, in both halves.** This is a different feed and an older period than the one it was calibrated on, so it is a genuine out-of-sample test, and the file did not pass it. The same inputs in the normal direction are positive overall but lose in the second half. Treat the published file's record with caution until it is checked on recent gold data.
+**It loses on this data, in both halves.** This is a different feed and an older period than the one it was calibrated on, so it is a genuine out-of-sample test, and the file did not pass it. The same inputs in the normal direction are positive overall but lose in the second half. Treat the published file's record with caution until it is checked on recent gold data. The file's header now carries a warning saying so (comment lines only; no code, input or default changed).
 
 ### What it shows
 

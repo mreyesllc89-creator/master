@@ -2,7 +2,27 @@
 // =====================================================================================
 // AMVI Full MTF Strategy (direction filter version): XAUUSD 15m
 // STATUS: CALIBRATED FOR THIS PAIR AND TIMEFRAME (rule v3.1, nested hold-outs passed)
+//         ON VANTAGE XAUUSD 2025-11 TO 2026-10 ONLY. IT FAILED AN OUT-OF-SAMPLE CHECK
+//         (2026-11-27, see the WARNING below).
 // READ FIRST: the result is concentrated in a few long trades (see below).
+// -------------------------------------------------------------------------------------
+// WARNING (2026-11-27): THIS SETTING LOST MONEY ON OTHER GOLD DATA.
+//   Run with exactly these inputs on Dukascopy XAUUSD 15m, 2017-01-02 to 2018-06-19
+//   (a different feed and period, never used to choose it), it lost in both halves:
+//    - 206 trades, -0.72% of equity with fills checked on 1-minute candles and
+//      $0.30 per ounce per round trip (halves -0.62% / -0.10%); -1.89% with this
+//      file's own commission and slippage; -1.07% with stressed costs.
+//    - The same inputs with Trade direction = Follow the filter: +0.33%, but the
+//      second half lost (-0.40%).
+//    - A full search of this strategy's inputs on that data, with the direction as an
+//      input, found no setting that holds up on any timeframe, 15m included.
+//   The record below is in-sample on one feed and about 11 months. Do not trade this
+//   setting on the strength of it; re-check it on recent gold data from your own
+//   broker first. Details: AMVI_by_timeframe/README.md, sections "The published gold
+//   15m file on the new data" and "Calibration by timeframe on the new data".
+//   Nothing was compiled or run in TradingView; the check used the Python replica of
+//   this script (backtest_replicas/amvi.py). Only these comment lines were added: no
+//   code, input or default changed.
 // -------------------------------------------------------------------------------------
 // UPDATE 1 (2026-11-23)
 //   This file ALREADY HAD the option to trade the opposite side, so no new input was
