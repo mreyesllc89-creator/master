@@ -112,7 +112,7 @@ How to read the table:
 
 - **No setting passes on any timeframe of either pair, in either direction.**
 - **The typical setting loses on every timeframe, in both directions.** On 1m and 5m most settings lose the whole account.
-- **The best settings look very large only in-sample** (BTC 5m normal +661%, BTC 30m inverted +407%, at 0.5% risk per trade compounding). Settings chosen on one half do not carry over: of the 40 best of one half, at most half are profitable on the other, and of the 25 single settings chosen on one half, 5 were profitable on the other.
+- **The best settings look very large only in-sample** (BTC 5m normal +661%, BTC 30m inverted +407%, at 0.5% risk per trade compounding). Settings chosen on one half do not carry over: of the 40 best of one half, at most 53% are profitable on the other, and of the 25 single settings chosen on one half, 5 were profitable on the other.
 - **Closest: BTC 4h and BTC 2h.** On BTC 4h the 40 best of the first half average +7.7% on the second, but only 50% of them are profitable (60% needed). On BTC 2h the settings chosen on one half were profitable on the other in both directions (+2.9% and +1.1%), but no setting has enough profitable neighbours and both hold-outs fail.
 - **Direction.** On gold, normal has far more profitable settings than inverted on every timeframe from 5m up (gold 4h: 896 against 155). On BTC it goes both ways: normal on 5m to 1h, inverted on 2h and 4h. Neither carries from one half to the other.
 
