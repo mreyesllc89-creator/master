@@ -221,8 +221,8 @@ def tester_txt(ev):
          f"for 2023-11-01 to 2026-10-31")
     s = ev.get("tv_view_since")
     if s and s.get("n"):
-        t += (f"; TradingView can replay this file only from about {s['since']} (as of {RECORD_DATE}; a day later every day): from then about "
-              f"{s['n']} trades, {s['win'] * 100:.0f}% profitable, net profit about {s['pct_total']:+.0f}%")
+        t += (f"; on plans up to Premium TradingView can replay this file only from about {s['since']} (as of {RECORD_DATE}; a day later "
+              f"every day): from then about {s['n']} trades, {s['win'] * 100:.0f}% profitable, net profit about {s['pct_total']:+.0f}%")
     return t
 
 
@@ -282,9 +282,17 @@ def header_lines(tf, v, why, ev, changes, p, lower_wait_weeks=None):
     if n40 < 10:
         ordinary = (f" An ordinary chart holds too few of this file's trades to check it: 40,000 {name} candles, the most any plan loads, "
                     f"reach back only to {reach40.strftime('%Y-%m-%d')}.")
+    elif since:
+        low = min(space.engine_params(p)["tfs"])
+        reach10 = pd.Timestamp(RECORD_DATE) - pd.Timedelta(minutes=tf * 10_000)
+        oldest = pd.Timestamp(RECORD_DATE) - pd.Timedelta(minutes=low * LOWER_TF_CANDLES)
+        ordinary = (" On an ordinary chart of 10,000 candles or more compare from the same date; on 5,000 candles (Basic) the chart starts "
+                    "later and its filter may need months of history: REPORT.md, section 9, says from when." if reach10 <= oldest else
+                    " On an ordinary chart the chart starts later than that: REPORT.md, section 9, says from when to compare.")
     else:
-        ordinary = (" On an ordinary chart the start differs, because the script has no history before the chart's first candle: "
-                    "REPORT.md, section 9, says how much to skip.")
+        ordinary = (" On an ordinary chart only a loose check is possible: REPORT.md, section 9, says how much to skip and why a missing or "
+                    "extra trade there proves nothing. Without Deep Backtesting, check first the file that REPORT.md, What I would do, "
+                    "step 1, names.")
     gap_s = ev["walk_chart"]["total"] - b["total"]
     gap_u = ev.get("pre_tv_view", {}).get("gross", 0.0) - pre.get("gross", 0.0)
     if p.get("trail") and (abs(gap_s) >= 0.05 or abs(gap_u) >= 0.05):
@@ -296,7 +304,8 @@ def header_lines(tf, v, why, ev, changes, p, lower_wait_weeks=None):
     else:
         exits = " The exits should be on the same candles too."
     L += wrap(f"amvi_calibration/results/trades_BTCUSDT_{name}.csv (UTC times, Binance prices): on BINANCE:BTCUSDT.P the entries must be on "
-              f"the same candles and sides, up to 2026-10-31 (the list ends there). Change no input. {deep}{ordinary}{exits} "
+              f"the same candles and sides, up to 2026-10-31 (the list ends there). Change no input except the date range below. "
+              f"{deep}{ordinary}{exits} "
               f"Details: REPORT.md, section 9.", first="CHECK: ")
     L += wrap(f"amvi_calibration/REPORT.md, section 7, {name}. Record date {RECORD_DATE}. Numbers come from a Python copy of this script, "
               f"not from TradingView.", first="RECORD:")

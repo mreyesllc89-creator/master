@@ -28,14 +28,14 @@
 //         covers the whole period).
 // CHECK:  amvi_calibration/results/trades_BTCUSDT_3m.csv (UTC times, Binance prices):
 //         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides, up
-//         to 2026-10-31 (the list ends there). Change no input. Surest: Deep
-//         Backtesting (Premium and above) over a period from 2023-05-01 to 2026-10-31,
-//         with "Limit Backtest Date Range" on, 2023-11-01 to 2026-10-31. The range
-//         only blocks entries; the six months before it give the script its history.
-//         Every entry should then match from the first. An ordinary chart holds too
-//         few of this file's trades to check it: 40,000 3m candles, the most any plan
-//         loads, reach back only to 2026-09-03. The exits should be on the same
-//         candles too. Details: REPORT.md, section 9.
+//         to 2026-10-31 (the list ends there). Change no input except the date range
+//         below. Surest: Deep Backtesting (Premium and above) over a period from
+//         2023-05-01 to 2026-10-31, with "Limit Backtest Date Range" on, 2023-11-01 to
+//         2026-10-31. The range only blocks entries; the six months before it give the
+//         script its history. Every entry should then match from the first. An
+//         ordinary chart holds too few of this file's trades to check it: 40,000 3m
+//         candles, the most any plan loads, reach back only to 2026-09-03. The exits
+//         should be on the same candles too. Details: REPORT.md, section 9.
 // RECORD: amvi_calibration/REPORT.md, section 7, 3m. Record date 2026-11-26. Numbers
 //         come from a Python copy of this script, not from TradingView.
 //

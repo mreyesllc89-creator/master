@@ -23,27 +23,28 @@
 //         last three years fail.
 // TESTER: TradingView's Strategy Tester (Bar detalization on its default, the former
 //         Bar Magnifier off) should show about 100 trades, 59% profitable, profit
-//         factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31;
-//         TradingView can replay this file only from about 2024-01-19 (as of
-//         2026-11-26; a day later every day): from then about 94 trades, 61%
-//         profitable, net profit about +17%. It shows money, not R, and only the
-//         candles your plan loads (for this file Deep Backtesting reaches no further
-//         back on plans up to Premium, which keep about 100,000 lower-timeframe
-//         candles; Ultimate is documented with 200,000, not checked).
+//         factor about 1.7, net profit about +16% for 2023-11-01 to 2026-10-31; on
+//         plans up to Premium TradingView can replay this file only from about
+//         2024-01-19 (as of 2026-11-26; a day later every day): from then about 94
+//         trades, 61% profitable, net profit about +17%. It shows money, not R, and
+//         only the candles your plan loads (for this file Deep Backtesting reaches no
+//         further back on plans up to Premium, which keep about 100,000
+//         lower-timeframe candles; Ultimate is documented with 200,000, not checked).
 // CHECK:  amvi_calibration/results/trades_BTCUSDT_4h.csv (UTC times, Binance prices):
 //         on BINANCE:BTCUSDT.P the entries must be on the same candles and sides, up
-//         to 2026-10-31 (the list ends there). Change no input. Surest: Deep
-//         Backtesting (Premium and above) over a period from 2023-05-01 to 2026-10-31,
-//         with "Limit Backtest Date Range" on, 2023-11-01 to 2026-10-31. The range
-//         only blocks entries; the six months before it give the script its history.
-//         This file reads lower-timeframe candles, of which the tester keeps about
-//         100,000 (plans up to Premium): on 2026-11-26 they start about 2024-01-19, a
-//         day later every day (the day you check minus about 1,042 days). Compare from
-//         two weeks after that start. On an ordinary chart the start differs, because
-//         the script has no history before the chart's first candle: REPORT.md,
-//         section 9, says how much to skip. Where stop and target lie inside one
-//         candle the tester can take the other exit: walked on chart candles this
-//         record would be +32.9R instead of +35.2R. Details: REPORT.md, section 9.
+//         to 2026-10-31 (the list ends there). Change no input except the date range
+//         below. Surest: Deep Backtesting (Premium and above) over a period from
+//         2023-05-01 to 2026-10-31, with "Limit Backtest Date Range" on, 2023-11-01 to
+//         2026-10-31. The range only blocks entries; the six months before it give the
+//         script its history. This file reads lower-timeframe candles, of which the
+//         tester keeps about 100,000 (plans up to Premium): on 2026-11-26 they start
+//         about 2024-01-19, a day later every day (the day you check minus about 1,042
+//         days). Compare from two weeks after that start. On an ordinary chart of
+//         10,000 candles or more compare from the same date; on 5,000 candles (Basic)
+//         the chart starts later and its filter may need months of history: REPORT.md,
+//         section 9, says from when. Where stop and target lie inside one candle the
+//         tester can take the other exit: walked on chart candles this record would be
+//         +32.9R instead of +35.2R. Details: REPORT.md, section 9.
 // RECORD: amvi_calibration/REPORT.md, section 7, 4h. Record date 2026-11-26. Numbers
 //         come from a Python copy of this script, not from TradingView.
 //

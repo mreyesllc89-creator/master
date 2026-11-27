@@ -19,7 +19,7 @@ usage: python tester_view.py [results_dir]
    request for a lower timeframe about 100,000 candles (200,000 on Ultimate; not simulated).
    The script then starts without the history the trade list had. How far back TradingView
    loads a request for a higher timeframe (the filter; an AMVI above the chart) was not
-   checked, so two models are simulated (scenario()): B1, those requests have their full
+   checked, so two models are simulated (simulate()): B1, those requests have their full
    history; B2, they start on the chart's first day. In both, an AMVI on the chart's own
    timeframe starts at the chart's first candle, one below the chart not before the oldest
    lower-timeframe candle TradingView keeps, and the strategy is flat at the chart's first
@@ -122,6 +122,7 @@ def simulate(tf, ep, listed, first_ms, now_ms, model, full=None, run_from=None, 
     now_ms minus LOWER_TF_CANDLES of its candles. Entries from run_from (the date range's start;
     default first_ms), flat there, up to end_ms. Returns a dict, or a string saying why the
     case was not simulated."""
+    date_range = run_from is not None
     amvi_tf = sorted(ep["tfs"])
     end_ms = end_ms or sweep.ms(F.SEARCH[1])
     run_from = run_from or first_ms
@@ -153,6 +154,8 @@ def simulate(tf, ep, listed, first_ms, now_ms, model, full=None, run_from=None, 
     j0 = int(np.searchsorted(ch.t, run_from))
     tv = E.run(ft_run, tf, ep, fee=0.0, slip_ticks=1, start_ms=int(ch.t[j0]), end_ms=end_ms, signals=(trig, volc, zone), walk="1m")
     cmp_from = max(run_from, amvi_start or run_from)
+    if not date_range:
+        cmp_from = max(cmp_from, sweep.ms(F.SEARCH[0]))    # an ordinary chart: the list starts with the search window
     te = {int(t): int(x) for t, x in zip(tv["entry_t"], tv["dir"]) if cmp_from <= t < end_ms}
     le = {t: x for t, x in listed.items() if cmp_from <= t < end_ms}
     only_list = sorted(set(le) - set(te))

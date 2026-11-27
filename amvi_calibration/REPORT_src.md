@@ -163,27 +163,40 @@ Sections 2 to 6 and 8 are the evidence. How to load and check a file on TradingV
      2023-11-01 itself the first 4 do not. If one does not match, do not trade the file and
      send me the tester's list.
    - Without Deep Backtesting, check the 4h file `AMVI_FGF_BTCUSDT_4h.pine` on a 4h chart
-     instead; it runs the same code with other inputs. Compare from two weeks after the
+     first; it runs the same code with other inputs. Compare from two weeks after the
      oldest 15m candle the tester has (about 2024-02-02 if you check on 26 November, a day
      later every day): about 92 trades. On a 5,000-candle chart (Basic plan) compare from
      five months after the chart's first candle: about 60 trades. List trades missing before
-     those dates are expected, and one exit of this list is expected to differ (section 9);
-     an entry on another candle or on the other side after them is a mismatch. The 15m file
-     itself can be compared only loosely on an ordinary chart (section 9).
+     those dates are expected, and one exit of this list is expected to differ (section 9).
+     An entry on another candle or on the other side after them is a mismatch: then do not
+     run the 15m file either, and send me the tester's list. A 4h match does not check the
+     15m file's time stop, which ends 159 of its 284 list trades; the 4h file has it off,
+     and none of its trades ends by reversal. So on Essential and Plus also load the 15m
+     file on a 15m chart and compare from four weeks after its first candle: about 12 list
+     trades if you check on 26 November, 8 of them time stops. This is a loose check (a
+     missing or extra trade there proves nothing, section 9), but where an entry matches,
+     its exit should be in the same candle; a time stop one candle off means TradingView
+     counts it differently, so send me the list. On Basic no 15m list trade is left: the
+     15m file cannot be compared with my list at all, so keep it on alerts only.
 2. Then run the 15m file on your Bitget chart with alerts only until about 20 trades have
    come: about three months on 15m (seven to ten months for the 3m and 4h files). The file
    has no alert() call: create the alert on the strategy itself (order fills). Do not judge
    these months by profit: 20 trades cannot show it. In the backtest itself about one run
    of 20 trades in four lost (the average run made +1.5R, the worst -4.4R). Check instead
-   that every alert shows up afterwards in the Strategy Tester's list on the same candle and
-   side, and how far Bitget's price is from that entry; a few trades will differ from
-   Binance. Only if that holds: small size means no more than the file's own sizing, 0.5%
-   of the account at risk per trade with the position capped at 5x, which is your lab's
-   limit, and your lab's own rule comes first (testnet until you write "go live").
+   that every alert shows up in the Strategy Tester's list on the same candle and side, and
+   how far Bitget's price is from that entry; a few trades will differ from Binance. Check
+   each alert there within a week of it, not at the end: a 15m chart holds only the last 52
+   days on Basic (104 on Essential and Plus), and a trade in a chart's first weeks can be
+   missing without anything being wrong (section 9). The alerts compare TradingView with
+   itself, not with my list; they do not replace step 1. Only if both hold: small size
+   means no more than the file's own sizing, 0.5% of the account at risk per trade with the
+   position capped at 5x, which is your lab's limit, and your lab's own rule comes first
+   (testnet until you write "go live").
 3. Start with the 15m file: it made money in each year of 2021-2023, its candidates did
    better there than random with-the-filter settings (84% of them made money, against 43%),
-   and TradingView can replay it. The 3m file comes second (it needs Deep Backtesting to
-   check). Treat the 4h file as one with-the-filter setting among many: on 4h the search
+   and with Deep Backtesting TradingView can replay all of it (without it only loosely, and
+   on Basic not at all). The 3m file comes second (it can be checked only with Deep
+   Backtesting). Treat the 4h file as one with-the-filter setting among many: on 4h the search
    added nothing measurable to the direction, the file passes its one test narrowly (96.6%
    of resamples where 95% is needed), and on plans up to Premium TradingView can replay it
    only back to about 2024-01-19 (as of 26 November; a day later every day).
@@ -634,7 +647,9 @@ Backtesting from six months before the range, the script has that history. I sim
 with my copy, letting every request start on the first day of the period, the cautious case
 (`tools/tester_view.py`, log in `results/checks/tester_view.txt`): all trades of the 15m, 3m
 and 1m lists then match, and the 4h list does from 3.3 days after its oldest 15m candle. With
-the period starting on 2023-11-01 itself, the first 2 to 6 trades of each list do not.
+the period starting on 2023-11-01 itself, the first 2 to 4 trades of the 15m, 3m and 1m
+lists do not match, and on the 4h file the first 6 after its oldest 15m candle (up to 45
+days after it).
 
 An ordinary chart starts where its candles start. The AMVI needs history before it has a
 value: 418 candles in the 15m file, which normalises over 400 (4.4 days of that chart). The
