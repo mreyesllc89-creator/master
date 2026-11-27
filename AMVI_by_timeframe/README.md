@@ -106,3 +106,78 @@ This section is separate from everything above, which was calibrated earlier on 
 - **TradingView keeps only limited lower-timeframe history** on long charts, so its own report can differ further on old data.
 - **No lot rounding:** 10% of 10,000 is about 0.78 ounce of gold, which a symbol with a 1-unit minimum would not trade.
 - Short windows and old gold data. Nothing here was compiled or run in TradingView.
+
+## Calibration by timeframe on the new data, with the direction as an input
+
+The inputs were searched per pair and timeframe on the new data (Bitstamp BTC 2024-2026, Dukascopy gold 2017-2018), with "Trade direction: Inverted" as one of them: 266,112 backtests.
+
+### What was searched
+
+24,192 settings on the 5m, 15m, 30m and 1h charts and 12,096 on 1m, 2h and 4h, the full product of:
+
+| | Values |
+|---|---|
+| Trigger | "High Vol Threshold" 50, 60, 70, 80; "Min TFs Above High Vol" 1, 2, 3; timeframes: all seven, or only those at or above the chart's (5m to 1h charts only) |
+| Direction source | your unfused file's direction ("Trend (EMA)", "Candle" or "Breakout (Donchian)"), or the FlashGold Direction Filter with filter timeframe 15, 60 or 240, no-trade band 0, 0.25 or 0.75 x ATR and level at the entry price or the signal close |
+| Direction | normal ("Follow the filter") or inverted |
+| Exits | stop 1, 1.5, 2.5 x ATR; exit: 3 x ATR target, 1.5 x ATR target, no target, or the ATR trailing stop; "Vol Collapse" exit on or off |
+
+- **Scoring.** 1-minute fills with costs (gold $0.30 per ounce per round trip, BTC 0.02% per side + $0.20), 10% of equity per trade as in the file, on the two halves of the window separately.
+- **Seconds timeframes** are off throughout (no data below 1 minute).
+
+### The rule
+
+The same rule as for ApexForge and HRD ([how it works and what its audit found](../ApexForge_HRD_by_timeframe/README.md#the-rule-rule-c)), plus the step added after that audit: the selection is repeated on one half only, and the setting it picks must be profitable on the other half and beat its direction-flipped twin there, both ways. A pick must also stay profitable in both halves under the other reading of lower-timeframe requests (see Limits above). A pass is a reason to review a setting, never a reason to trade it.
+
+### Results
+
+How to read the table:
+
+- **Different results**: settings with the same trades count once.
+- **Positive in both halves**: how many of those are profitable in both halves with 30+ trades in each, per direction.
+- **Typical result**: the median over settings with 30+ trades per half.
+- **Best normal / inverted**: the setting with the best worst half, as net result (first half / second half, trades). In-sample: the best of thousands always looks good.
+- **Hold-outs**: what the 40 best of one half made on the other half, against the 95th percentile of random draws.
+- **Chosen on one half**: what the single setting picked on one half made on the other.
+
+#### BTCUSD
+
+| TF | Different results | Positive in both halves: normal / inverted | Typical result: normal / inverted | Best normal (halves, trades) | Best inverted (halves, trades) | Forward hold-out | Reverse hold-out | Chosen on one half, result on the other: first to second / second to first | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 1m | 9,397 | 53 / 81 | -11.18% / -12.53% | +9.56% (+4.26% / +5.09%, 2686 trades) | +6.22% (+2.41% / +3.72%, 2184 trades) | -0.33% vs -5.83%, 48% positive: FAIL | -0.81% vs -6.52%, 30% positive: FAIL | -0.14% / -2.27% | no setting: none of the 40 best candidates sits on a plateau |
+| 5m | 20,068 | 297 / 374 | -4.38% / -5.00% | +8.30% (+3.92% / +4.21%, 1566 trades) | +8.17% (+4.21% / +3.80%, 1242 trades) | -1.83% vs -2.23%, 20% positive: FAIL | -1.10% vs -2.78%, 35% positive: FAIL | -1.16% / -2.08% | no setting: forward hold-out failed; reverse hold-out failed; nested forward pick failed; nested reverse pick failed |
+| 15m | 21,696 | 696 / 493 | -1.95% / -3.11% | +8.17% (+4.20% / +3.81%, 197 trades) | +11.95% (+7.23% / +4.39%, 136 trades) | +0.15% vs -1.19%, 65% positive: pass | -2.56% vs -1.41%, 12% positive: FAIL | +1.13% / -3.96% | no setting: reverse hold-out failed; nested forward pick failed; nested reverse pick failed |
+| 30m | 21,735 | 451 / 1,216 | -2.91% / -1.34% | +7.68% (+3.99% / +3.55%, 201 trades) | +9.13% (+4.64% / +4.29%, 65 trades) | -2.00% vs -0.91%, 18% positive: FAIL | -1.76% vs -0.75%, 20% positive: FAIL | -3.01% / -2.06% | no setting: forward hold-out failed; reverse hold-out failed; nested forward pick failed; nested reverse pick failed |
+| 1h | 21,246 | 489 / 1,373 | -3.00% / -1.01% | +9.09% (+3.64% / +5.26%, 622 trades) | +12.99% (+5.42% / +7.18%, 1039 trades) | -1.15% vs -0.67%, 30% positive: FAIL | -0.41% vs -0.61%, 52% positive: FAIL | -1.05% / +2.27% | no setting: with the other lower-timeframe reading; forward hold-out failed; reverse hold-out failed; nested forward pick failed |
+| 2h | 12,090 | 948 / 1,210 | -1.57% / -0.83% | +12.29% (+5.24% / +6.70%, 627 trades) | +14.16% (+7.54% / +6.16%, 749 trades) | -2.44% vs -0.10%, 2% positive: FAIL | -0.15% vs +0.06%, 48% positive: FAIL | -0.48% / -0.75% | no setting: with the other lower-timeframe reading; forward hold-out failed; reverse hold-out failed; nested forward pick failed; nested reverse pick failed |
+| 4h | 12,076 | 482 / 856 | -1.56% / -0.81% | +12.97% (+7.23% / +5.35%, 300 trades) | +11.42% (+5.65% / +5.46%, 787 trades) | -2.74% vs -0.03%, 22% positive: FAIL | -3.97% vs +0.13%, 12% positive: FAIL | -3.45% / -1.87% | no setting: with the other lower-timeframe reading; forward hold-out failed; reverse hold-out failed; nested forward pick failed; nested reverse pick failed |
+
+#### XAUUSD
+
+| TF | Different results | Positive in both halves: normal / inverted | Typical result: normal / inverted | Best normal (halves, trades) | Best inverted (halves, trades) | Forward hold-out | Reverse hold-out | Chosen on one half, result on the other: first to second / second to first | Verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| 1m | 10,138 | 50 / 5 | -3.41% / -3.09% | +1.38% (+0.93% / +0.44%, 256 trades) | +0.34% (+0.14% / +0.21%, 66 trades) | -0.56% vs -1.79%, 18% positive: FAIL | -0.60% vs -1.78%, 2% positive: FAIL | -1.36% / -0.64% | no setting: none of the 40 best candidates sits on a plateau |
+| 5m | 21,641 | 260 / 70 | -1.29% / -1.42% | +1.66% (+0.93% / +0.72%, 118 trades) | +1.33% (+0.68% / +0.65%, 86 trades) | -0.71% vs -0.76%, 5% positive: FAIL | -0.75% vs -0.79%, 5% positive: FAIL | -0.46% / -1.24% | no setting: forward hold-out failed; reverse hold-out failed; nested forward pick failed; nested reverse pick failed |
+| 15m | 22,333 | 345 / 106 | -0.64% / -1.09% | +2.18% (+1.03% / +1.14%, 101 trades) | +1.00% (+0.51% / +0.49%, 76 trades) | -0.75% vs -0.49%, 10% positive: FAIL | -0.36% vs -0.46%, 42% positive: FAIL | -0.53% / +0.72% | no setting: forward hold-out failed; reverse hold-out failed; nested forward pick failed |
+| 30m | 22,188 | 223 / 198 | -0.67% / -0.99% | +2.88% (+1.70% / +1.16%, 108 trades) | +2.25% (+1.02% / +1.22%, 88 trades) | -0.36% vs -0.43%, 25% positive: FAIL | +0.04% vs -0.40%, 48% positive: FAIL | -0.18% / +0.42% | no setting: forward hold-out failed; reverse hold-out failed; nested forward pick failed |
+| 1h | 19,156 | 313 / 255 | -0.66% / -0.88% | +2.99% (+1.41% / +1.56%, 163 trades) | +1.98% (+1.12% / +0.85%, 87 trades) | -0.62% vs -0.32%, 12% positive: FAIL | +0.02% vs -0.31%, 60% positive: pass | -0.76% / +0.55% | no setting: forward hold-out failed; nested forward pick failed |
+| 2h | 11,940 | 165 / 292 | -0.65% / -0.48% | +2.00% (+1.13% / +0.86%, 132 trades) | +3.21% (+2.00% / +1.19%, 154 trades) | -0.63% vs -0.24%, 12% positive: FAIL | -0.90% vs -0.19%, 8% positive: FAIL | -0.36% / -0.93% | no setting: forward hold-out failed; reverse hold-out failed; nested forward pick failed; nested reverse pick failed |
+| 4h | 11,882 | 276 / 242 | -0.54% / -0.53% | +2.60% (+1.22% / +1.36%, 99 trades) | +1.88% (+1.04% / +0.84%, 251 trades) | -0.83% vs -0.12%, 22% positive: FAIL | -1.13% vs -0.17%, 5% positive: FAIL | -0.90% / -1.24% | no setting: forward hold-out failed; reverse hold-out failed; nested forward pick failed; nested reverse pick failed |
+
+### What it shows
+
+- **No setting passes on any timeframe of either pair, in either direction.**
+- **The typical setting loses on every timeframe, in both directions.** Results are small because the file puts 10% of equity in each trade: the best in-sample settings make +7% to +14% over two years on BTC and +1% to +3% over 18 months on gold.
+- **Settings chosen on one half do not carry over:** of the 28 single settings chosen on one half, 5 were profitable on the other.
+- **Closest: BTC 15m and gold 1h, each passing one of the two hold-outs.** On BTC 15m the 40 best of the first half are 65% profitable on the second, but only 13% the other way round. On gold 1h it is the reverse (60% from the second half to the first, 13% from the first to the second).
+- **Direction.** On BTC from 30m to 4h, inverted has more profitable settings (BTC 1h: 1,373 against 489). On gold, normal has more from 1m to 1h, inverted on 2h. Neither carries from one half to the other.
+- **Gold 15m, where the published file sits:** 345 normal against 106 inverted profitable settings, and none passes. That agrees with the check of the published file above, which loses on this data.
+
+### Data
+
+Every setting of every timeframe, with its inputs, trades, net result, profit factor, drawdown and both halves: [`calibration_amvi_newdata.csv.gz`](calibration_amvi_newdata.csv.gz) (266,112 rows; `floor_ok` false marks trailing settings under the 1-minute noise floor, which were not counted).
+
+### Limits
+
+- The same limits as the by-timeframe section above: the reading of lower-timeframe requests, TradingView's limited intrabar history, no lot rounding, the short windows and the old gold data.
+- Nothing here was compiled or run in TradingView.

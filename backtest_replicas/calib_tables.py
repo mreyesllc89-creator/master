@@ -4,6 +4,7 @@ import json
 import sys
 
 s, dec = sys.argv[1], int(sys.argv[2])
+UNIT = sys.argv[3] if len(sys.argv) > 3 else '%'   # 'R' for strategies scored in R
 R = json.load(open(f'out/calib_rule_{s}.json'))
 TFS = ['1', '5', '15', '30', '60', '120', '240']
 TFL = {'1': '1m', '5': '5m', '15': '15m', '30': '30m', '60': '1h', '120': '2h', '240': '4h'}
@@ -11,7 +12,7 @@ PN = {'BTC': 'BTCUSD', 'XAU': 'XAUUSD'}
 
 
 def f(x):
-    return 'n/a' if x is None else f'{x:+.{dec}f}%'
+    return 'n/a' if x is None else (f'{x:+,.{dec}f}R' if UNIT == 'R' else f'{x:+.{dec}f}%')
 
 
 def hold(h):
