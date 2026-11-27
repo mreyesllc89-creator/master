@@ -44,7 +44,10 @@ DIR_NAMES = ('inv', 'apxinv', 'hrdinv', 'xpwinv', 'direction', 'inverted')
 # CONTROLS: extra re-runs of a pick through --one (1-minute fills, our costs); each must stay
 #   positive in both halves.
 REAL_DIR = {'danny': ('signalDirection', 'Original (un-inverted)')}
-CONTROLS = {'danny': [('file sizing', ['--script-sizing']), ('one run per candle reading', ['--var-rollback', 'false'])]}
+CONTROLS = {'danny': [('file sizing', ['--script-sizing']), ('one run per candle reading', ['--var-rollback', 'false'])],
+            'gvl': [('file sizing', ['--script-sizing'])],
+            'fgds': [('file sizing', ['--script-sizing'])],
+            'amvi': [('other lower-timeframe reading', ['--ltf-last'])]}
 KEEP = ('trades', 'net_pct', 'pf', 'win_pct', 'max_dd_pct', 'h1r_pct', 'h2r_pct', 'h1_trades', 'h2_trades',
         'avg_bars_held', 'exposure', 'long', 'short', 'long_trades', 'short_trades')
 
