@@ -14,6 +14,7 @@ TradingView cannot be run from here, so every result in the `*_by_timeframe` fol
 | `danny.py` | Danny Phantom FX V10.21.1 LiveSafe + filter |
 | `gvl.py` | GVLiveV2 Polymarket Pre-Candle + filter |
 | `fgds.py` | FlashGold Direction Strategy (trades the filter's own zones and signals) |
+| `amvi.py` | AMVI Full MTF Strategy + filter (and the unfused original's direction) |
 | `run_*.py`, `run_inv_*.py` | Results by timeframe, normal and inverted direction |
 | `sweep*.py` | The trailing sweeps |
 | `calib_*.py` | The calibration grids and the selection rule (`calib_analyze.py`) |
